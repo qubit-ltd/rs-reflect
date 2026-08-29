@@ -554,7 +554,7 @@ fn fingerprint(input: &str) -> u64 {
 }
 
 /// Converts generic declaration facts into the runtime generic descriptor model.
-fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
+pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let parameters = generics.params.iter().map(|parameter| {
         let name = syn::LitStr::new(&parameter.name, parameter.span);
         match parameter.kind {
@@ -684,7 +684,7 @@ fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> Toke
 }
 
 /// Converts the type forms required by trait item descriptors into runtime expressions.
-fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => quote!(#facade::expression::TypeExpression::Never),
         TypeKindIr::Path(path) => path_expression(path, ty, facade),
