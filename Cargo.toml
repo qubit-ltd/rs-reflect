@@ -25,6 +25,7 @@ include = [
 
 [workspace]
 members = [".", "derive"]
+exclude = ["fuzz"]
 resolver = "3"
 
 [features]
