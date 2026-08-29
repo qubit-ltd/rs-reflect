@@ -254,6 +254,10 @@ pub(crate) enum ReturnTypeIr {
 pub(crate) struct AssociatedTypeIr {
     /// The associated type identifier.
     pub(crate) name: Ident,
+    /// Generic parameters and where predicates declared by the associated type.
+    pub(crate) generics: GenericsIr,
+    /// Direct bounds declared after the associated type name.
+    pub(crate) bounds: Vec<GenericBoundIr>,
     /// A default or impl binding converted to type IR.
     pub(crate) value: Option<TypeIr>,
     /// The complete associated type declaration tokens.

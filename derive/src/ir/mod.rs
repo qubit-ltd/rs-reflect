@@ -22,5 +22,5 @@ pub(crate) use declaration::{
     VisibilityIr, WherePredicateIr,
 };
 pub(crate) use type_ir::{
-    PathArgumentIr, PathIr, PathSegmentIr, QualifiedSelfIr, TypeIr, TypeKindIr,
+    PathArgumentIr, PathArgumentsIr, PathIr, PathSegmentIr, QualifiedSelfIr, TypeIr, TypeKindIr,
 };

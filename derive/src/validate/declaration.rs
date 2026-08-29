@@ -30,6 +30,10 @@ impl ErrorCollector {
 /// Validates all locally provable invariants in parsed reflection IR.
 ///
 /// Returns a combined `syn::Error` whose component spans point at the offending helpers.
+#[allow(
+    dead_code,
+    reason = "the staged validation API is exercised directly by unit tests and later expansion tasks"
+)]
 pub(crate) fn validate_declaration(
     declaration: ParsedDeclaration,
 ) -> syn::Result<ValidatedDeclaration> {
@@ -345,31 +349,20 @@ fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector
 /// Validates external trait IDs and detects same-input path or ID conflicts.
 fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
     let mut bound_paths = HashSet::new();
-    for bound in declaration.supertraits.iter().chain(
-        declaration
-            .generics
-            .params
-            .iter()
-            .flat_map(|parameter| parameter.bounds.iter()),
-    ) {
-        if let crate::ir::GenericBoundIr::Trait { path, .. } = bound {
-            bound_paths.insert(path.source.as_str());
-        }
+    collect_bound_paths(&declaration.supertraits, &mut bound_paths);
+    collect_generic_bound_paths(&declaration.generics, &mut bound_paths);
+    for method in &declaration.methods {
+        collect_generic_bound_paths(&method.generics, &mut bound_paths);
     }
-    for predicate in &declaration.generics.where_predicates {
-        if let crate::ir::WherePredicateIr::Type { bounds, .. } = predicate {
-            for bound in bounds {
-                if let crate::ir::GenericBoundIr::Trait { path, .. } = bound {
-                    bound_paths.insert(path.source.as_str());
-                }
-            }
-        }
+    for associated_type in &declaration.associated_types {
+        collect_bound_paths(&associated_type.bounds, &mut bound_paths);
+        collect_generic_bound_paths(&associated_type.generics, &mut bound_paths);
     }
     let mut paths = HashSet::new();
     let mut ids = HashSet::new();
     for mapping in &declaration.external_traits {
         validate_stable_id(&mapping.id, mapping.id_span, errors);
-        if !bound_paths.contains(mapping.path.source.as_str()) {
+        if !bound_paths.contains(&mapping.path.source) {
             errors.push(syn::Error::new(
                 mapping.path.span,
                 format!(
@@ -395,6 +388,27 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
                     mapping.id
                 ),
             ));
+        }
+    }
+}
+
+/// Adds all trait paths in a direct bound list to the declaration-wide set.
+fn collect_bound_paths(bounds: &[crate::ir::GenericBoundIr], paths: &mut HashSet<String>) {
+    for bound in bounds {
+        if let crate::ir::GenericBoundIr::Trait { path, .. } = bound {
+            paths.insert(path.source.clone());
+        }
+    }
+}
+
+/// Adds trait paths from generic parameters and where predicates.
+fn collect_generic_bound_paths(generics: &GenericsIr, paths: &mut HashSet<String>) {
+    for parameter in &generics.params {
+        collect_bound_paths(&parameter.bounds, paths);
+    }
+    for predicate in &generics.where_predicates {
+        if let crate::ir::WherePredicateIr::Type { bounds, .. } = predicate {
+            collect_bound_paths(bounds, paths);
         }
     }
 }

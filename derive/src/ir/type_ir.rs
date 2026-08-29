@@ -25,7 +25,18 @@ pub(crate) struct PathIr {
 #[derive(Clone, Debug)]
 pub(crate) struct PathSegmentIr {
     pub(crate) name: String,
-    pub(crate) arguments: Vec<PathArgumentIr>,
+    pub(crate) arguments: PathArgumentsIr,
+}
+
+/// The syntactic form and values of one path segment's arguments.
+#[derive(Clone, Debug)]
+pub(crate) enum PathArgumentsIr {
+    None,
+    AngleBracketed(Vec<PathArgumentIr>),
+    Parenthesized {
+        inputs: Vec<TypeIr>,
+        output: Option<Box<TypeIr>>,
+    },
 }
 
 /// A generic argument attached to a path segment.
@@ -90,6 +101,7 @@ pub(crate) enum TypeKindIr {
         element: Box<TypeIr>,
     },
     BareFunction {
+        lifetimes: Vec<String>,
         inputs: Vec<TypeIr>,
         output: Option<Box<TypeIr>>,
         is_unsafe: bool,

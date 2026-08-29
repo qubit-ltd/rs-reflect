@@ -13,8 +13,8 @@ use crate::ir::{
     GenericKindIr, GenericParamIr, GenericsIr, HelperAttributeIr, HelperTarget, ImplDeclarationIr,
     MacroKind, MethodIr, MethodQualifiersIr, ParameterIr, ParameterPatternIr,
     ParameterPatternKindIr, ParsedDeclaration, ReceiverIr, ReceiverKindIr, ReturnTypeIr,
-    TraitDeclarationIr, TypeDeclarationIr, TypeDeclarationKindIr, VariantIr, VariantKindIr,
-    VisibilityIr, WherePredicateIr,
+    TraitDeclarationIr, TypeDeclarationIr, TypeDeclarationKindIr, ValidatedDeclaration, VariantIr,
+    VariantKindIr, VisibilityIr, WherePredicateIr,
 };
 use crate::parse::attributes::{
     ErrorCollector, parse_attributes, parse_helper_tokens, remove_reflect_attributes,
@@ -25,11 +25,57 @@ use crate::validate::validation_error;
 /// Parses a procedural macro invocation into shared declaration IR.
 ///
 /// Returns combined syntax diagnostics when the input target or helper grammar is invalid.
+#[allow(
+    dead_code,
+    reason = "the staged parse API is exercised directly by unit tests and later expansion tasks"
+)]
 pub(crate) fn parse_declaration(
     kind: MacroKind,
     args: TokenStream,
     input: TokenStream,
 ) -> syn::Result<ParsedDeclaration> {
+    let pipeline = parse_pipeline(kind, args, input)?;
+    match pipeline.error {
+        Some(error) => Err(error),
+        None => Ok(pipeline.declaration),
+    }
+}
+
+/// Parses and validates one macro invocation while aggregating recoverable diagnostics.
+pub(crate) fn parse_and_validate_declaration(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> syn::Result<ValidatedDeclaration> {
+    let pipeline = parse_pipeline(kind, args, input)?;
+    let mut combined = pipeline.error;
+    if let Some(validation) = validation_error(&pipeline.declaration.declaration) {
+        if let Some(error) = &mut combined {
+            error.combine(validation);
+        } else {
+            combined = Some(validation);
+        }
+    }
+    match combined {
+        Some(error) => Err(error),
+        None => Ok(ValidatedDeclaration {
+            declaration: pipeline.declaration.declaration,
+        }),
+    }
+}
+
+/// Holds parser diagnostics alongside IR until the validation pipeline completes.
+struct ParsedPipeline {
+    declaration: ParsedDeclaration,
+    error: Option<syn::Error>,
+}
+
+/// Runs only the syntax and IR conversion phase for one macro kind.
+fn parse_pipeline(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> syn::Result<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
         MacroKind::Trait => parse_trait(args, input),
@@ -38,7 +84,7 @@ pub(crate) fn parse_declaration(
 }
 
 /// Parses a `Reflect` derive input.
-fn parse_derive(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDeclaration> {
+fn parse_derive(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     if !args.is_empty() {
         return Err(syn::Error::new_spanned(
             args,
@@ -111,16 +157,16 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDecl
             span: input.ident.span(),
         },
     };
-    finish_pipeline(
-        ParsedDeclaration {
+    Ok(ParsedPipeline {
+        declaration: ParsedDeclaration {
             declaration: DeclarationIr::Type(declaration),
         },
-        errors,
-    )
+        error: errors.into_error(),
+    })
 }
 
 /// Parses a `#[reflect]` trait input and removes nested helpers from retained tokens.
-fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDeclaration> {
+fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     let item: Item = syn::parse2(input)?;
     let Item::Trait(mut item) = item else {
         return Err(syn::Error::new(
@@ -139,8 +185,8 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDecla
         .collect();
     let (methods, associated_types, associated_consts) = convert_trait_items(&item, &mut errors);
     strip_trait_helpers(&mut item);
-    finish_pipeline(
-        ParsedDeclaration {
+    Ok(ParsedPipeline {
+        declaration: ParsedDeclaration {
             declaration: DeclarationIr::Trait(TraitDeclarationIr {
                 name: item.ident.clone(),
                 visibility: convert_visibility(&item.vis),
@@ -155,12 +201,12 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDecla
                 span: item.ident.span(),
             }),
         },
-        errors,
-    )
+        error: errors.into_error(),
+    })
 }
 
 /// Parses a `#[reflect_impl]` impl input and removes nested helpers from retained tokens.
-fn parse_impl(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDeclaration> {
+fn parse_impl(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     let item: Item = syn::parse2(input)?;
     let Item::Impl(mut item) = item else {
         return Err(syn::Error::new(
@@ -179,8 +225,8 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDeclar
     let trait_path = item.trait_.as_ref().map(|(_, path, _)| convert_path(path));
     let target_type = convert_type(&item.self_ty);
     strip_impl_helpers(&mut item);
-    finish_pipeline(
-        ParsedDeclaration {
+    Ok(ParsedPipeline {
+        declaration: ParsedDeclaration {
             declaration: DeclarationIr::Impl(ImplDeclarationIr {
                 generics: convert_generics(&item.generics),
                 target_type,
@@ -194,27 +240,8 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> syn::Result<ParsedDeclar
                 span: item.impl_token.span(),
             }),
         },
-        errors,
-    )
-}
-
-/// Combines recoverable parser diagnostics with semantic validation diagnostics.
-fn finish_pipeline(
-    declaration: ParsedDeclaration,
-    errors: ErrorCollector,
-) -> syn::Result<ParsedDeclaration> {
-    let mut combined = errors.into_error();
-    if let Some(validation) = validation_error(&declaration.declaration) {
-        if let Some(error) = &mut combined {
-            error.combine(validation);
-        } else {
-            combined = Some(validation);
-        }
-    }
-    match combined {
-        Some(error) => Err(error),
-        None => Ok(declaration),
-    }
+        error: errors.into_error(),
+    })
 }
 
 /// Converts a field collection in source order.
@@ -362,6 +389,8 @@ fn convert_trait_items(
             )),
             TraitItem::Type(ty) => associated_types.push(AssociatedTypeIr {
                 name: ty.ident.clone(),
+                generics: convert_generics(&ty.generics),
+                bounds: ty.bounds.iter().map(convert_bound).collect(),
                 value: ty.default.as_ref().map(|(_, ty)| convert_type(ty)),
                 declaration: ty.to_token_stream(),
                 attributes: parse_attributes(&ty.attrs, HelperTarget::AssociatedItem, errors),
@@ -403,6 +432,8 @@ fn convert_impl_items(
             )),
             ImplItem::Type(ty) => associated_types.push(AssociatedTypeIr {
                 name: ty.ident.clone(),
+                generics: convert_generics(&ty.generics),
+                bounds: Vec::new(),
                 value: Some(convert_type(&ty.ty)),
                 declaration: ty.to_token_stream(),
                 attributes: parse_attributes(&ty.attrs, HelperTarget::AssociatedItem, errors),

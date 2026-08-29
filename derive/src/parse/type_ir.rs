@@ -11,6 +11,7 @@ use syn::spanned::Spanned;
 
 use crate::ir::GenericBoundIr;
 use crate::ir::PathArgumentIr;
+use crate::ir::PathArgumentsIr;
 use crate::ir::PathIr;
 use crate::ir::PathSegmentIr;
 use crate::ir::QualifiedSelfIr;
@@ -71,6 +72,17 @@ pub(super) fn convert_type(ty: &Type) -> TypeIr {
             element: Box::new(convert_type(&pointer.elem)),
         },
         Type::BareFn(function) => TypeKindIr::BareFunction {
+            lifetimes: function
+                .lifetimes
+                .iter()
+                .flat_map(|lifetimes| lifetimes.lifetimes.iter())
+                .filter_map(|parameter| match parameter {
+                    syn::GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
+                    _ => None,
+                })
+                .collect(),
             inputs: function
                 .inputs
                 .iter()
@@ -111,47 +123,44 @@ pub(super) fn convert_type(ty: &Type) -> TypeIr {
 }
 
 /// Converts all generic arguments attached to one path segment.
-fn convert_path_arguments(arguments: &PathArguments) -> Vec<PathArgumentIr> {
+fn convert_path_arguments(arguments: &PathArguments) -> PathArgumentsIr {
     match arguments {
-        PathArguments::None => Vec::new(),
-        PathArguments::AngleBracketed(arguments) => arguments
-            .args
-            .iter()
-            .map(|argument| match argument {
-                syn::GenericArgument::Lifetime(lifetime) => {
-                    PathArgumentIr::Lifetime(lifetime.to_token_stream().to_string())
-                }
-                syn::GenericArgument::Type(ty) => PathArgumentIr::Type(convert_type(ty)),
-                syn::GenericArgument::Const(value) => {
-                    PathArgumentIr::Const(value.to_token_stream())
-                }
-                syn::GenericArgument::AssocType(binding) => PathArgumentIr::AssociatedType {
-                    name: binding.ident.to_string(),
-                    ty: convert_type(&binding.ty),
-                },
-                syn::GenericArgument::AssocConst(binding) => PathArgumentIr::AssociatedConst {
-                    name: binding.ident.to_string(),
-                    value: binding.value.to_token_stream(),
-                },
-                syn::GenericArgument::Constraint(constraint) => PathArgumentIr::Constraint {
-                    name: constraint.ident.to_string(),
-                    bounds: constraint.bounds.iter().map(convert_bound).collect(),
-                },
-                _ => PathArgumentIr::Other(argument.to_token_stream()),
-            })
-            .collect(),
-        PathArguments::Parenthesized(arguments) => {
-            let mut converted: Vec<_> = arguments
-                .inputs
+        PathArguments::None => PathArgumentsIr::None,
+        PathArguments::AngleBracketed(arguments) => PathArgumentsIr::AngleBracketed(
+            arguments
+                .args
                 .iter()
-                .map(convert_type)
-                .map(PathArgumentIr::Type)
-                .collect();
-            if let ReturnType::Type(_, output) = &arguments.output {
-                converted.push(PathArgumentIr::Type(convert_type(output)));
-            }
-            converted
-        }
+                .map(|argument| match argument {
+                    syn::GenericArgument::Lifetime(lifetime) => {
+                        PathArgumentIr::Lifetime(lifetime.to_token_stream().to_string())
+                    }
+                    syn::GenericArgument::Type(ty) => PathArgumentIr::Type(convert_type(ty)),
+                    syn::GenericArgument::Const(value) => {
+                        PathArgumentIr::Const(value.to_token_stream())
+                    }
+                    syn::GenericArgument::AssocType(binding) => PathArgumentIr::AssociatedType {
+                        name: binding.ident.to_string(),
+                        ty: convert_type(&binding.ty),
+                    },
+                    syn::GenericArgument::AssocConst(binding) => PathArgumentIr::AssociatedConst {
+                        name: binding.ident.to_string(),
+                        value: binding.value.to_token_stream(),
+                    },
+                    syn::GenericArgument::Constraint(constraint) => PathArgumentIr::Constraint {
+                        name: constraint.ident.to_string(),
+                        bounds: constraint.bounds.iter().map(convert_bound).collect(),
+                    },
+                    _ => PathArgumentIr::Other(argument.to_token_stream()),
+                })
+                .collect(),
+        ),
+        PathArguments::Parenthesized(arguments) => PathArgumentsIr::Parenthesized {
+            inputs: arguments.inputs.iter().map(convert_type).collect(),
+            output: match &arguments.output {
+                ReturnType::Default => None,
+                ReturnType::Type(_, output) => Some(Box::new(convert_type(output))),
+            },
+        },
     }
 }
 

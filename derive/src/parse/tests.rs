@@ -5,9 +5,9 @@ use quote::quote;
 
 use crate::ir::{
     DeclarationIr, GenericDefaultIr, HelperName, HelperTarget, MacroKind, ParameterPatternKindIr,
-    ReceiverKindIr, TypeKindIr,
+    PathArgumentsIr, ReceiverKindIr, TypeKindIr,
 };
-use crate::parse::parse_declaration;
+use crate::parse::{parse_and_validate_declaration, parse_declaration};
 use crate::validate::validate_declaration;
 
 /// Parses and validates a declaration, failing the test with its diagnostic.
@@ -22,7 +22,7 @@ fn parse_valid(
 
 /// Renders all combined diagnostics emitted for a declaration.
 fn parse_invalid(kind: MacroKind, args: TokenStream, input: TokenStream) -> String {
-    let result = parse_declaration(kind, args, input).and_then(validate_declaration);
+    let result = parse_and_validate_declaration(kind, args, input);
     result
         .expect_err("the declaration should be rejected")
         .into_compile_error()
@@ -196,6 +196,16 @@ fn test_parse_rejects_unknown_helpers() {
         },
     );
     assert!(diagnostics.contains("unknown reflection helper `unknown_policy`"));
+
+    let qualified = parse_invalid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            #[reflect(policy::unknown)]
+            struct Invalid;
+        },
+    );
+    assert!(qualified.contains("unknown reflection helper `policy :: unknown`"));
 }
 
 #[test]
@@ -215,6 +225,11 @@ fn test_parse_rejects_bare_helpers_and_aggregates_validation_errors() {
     assert!(diagnostics.contains("unknown reflection helper `unknown_policy`"));
     assert!(diagnostics.contains("`skip` is not valid on a type"));
     assert!(diagnostics.contains("bare `#[reflect]` is not a valid helper attribute"));
+    assert_eq!(
+        diagnostics.matches("`skip` is not valid on a type").count(),
+        1,
+        "semantic validation should run exactly once"
+    );
 }
 
 #[test]
@@ -281,6 +296,32 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
     assert!(
         unused_mapping.contains("external trait mapping `NotABound` does not match a trait bound")
     );
+}
+
+#[test]
+fn test_external_mappings_cover_method_and_associated_type_bounds() {
+    let declaration = parse_valid(
+        MacroKind::Trait,
+        quote!(
+            external_trait(Send, id = "core.marker.Send"),
+            external_trait(Sync, id = "core.marker.Sync"),
+            external_trait(core::fmt::Debug, id = "core.fmt.Debug")
+        ),
+        quote! {
+            trait Service {
+                type Item<T>: Send
+                where
+                    T: Sync;
+
+                fn run<T: core::fmt::Debug>(&self, value: T);
+            }
+        },
+    );
+    let DeclarationIr::Trait(declaration) = &declaration.declaration else {
+        panic!("expected a trait declaration");
+    };
+    assert_eq!(declaration.associated_types[0].generics.params.len(), 1);
+    assert_eq!(declaration.associated_types[0].bounds.len(), 1);
 }
 
 #[test]
@@ -494,4 +535,47 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
     assert!(
         matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if matches!(ty.kind, TypeKindIr::Never))
     );
+}
+
+#[test]
+fn test_parse_preserves_parenthesized_path_and_bare_function_binders() {
+    let declaration = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            struct Functions<T> {
+                callback: for<'a> unsafe extern "C" fn(&'a T) -> &'a T,
+                callable: Box<dyn Fn(T) -> T>,
+            }
+        },
+    );
+    let DeclarationIr::Type(declaration) = &declaration.declaration else {
+        panic!("expected a type declaration");
+    };
+    let TypeKindIr::BareFunction { lifetimes, .. } = &declaration.fields[0].ty.kind else {
+        panic!("expected a bare function type");
+    };
+    assert_eq!(lifetimes, &["'a"]);
+
+    let TypeKindIr::Path(box_path) = &declaration.fields[1].ty.kind else {
+        panic!("expected Box path");
+    };
+    let PathArgumentsIr::AngleBracketed(arguments) = &box_path.segments[0].arguments else {
+        panic!("expected Box angle-bracketed arguments");
+    };
+    let crate::ir::PathArgumentIr::Type(callable) = &arguments[0] else {
+        panic!("expected Box type argument");
+    };
+    let TypeKindIr::TraitObject { bounds, .. } = &callable.kind else {
+        panic!("expected trait object");
+    };
+    let crate::ir::GenericBoundIr::Trait { path, .. } = &bounds[0] else {
+        panic!("expected Fn trait bound");
+    };
+    let PathArgumentsIr::Parenthesized { inputs, output } = &path.segments[0].arguments else {
+        panic!("expected parenthesized Fn arguments");
+    };
+    assert_eq!(inputs.len(), 1);
+    assert_eq!(inputs[0].source, "T");
+    assert_eq!(output.as_deref().map(|ty| ty.source.as_str()), Some("T"));
 }

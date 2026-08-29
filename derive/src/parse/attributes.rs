@@ -92,12 +92,15 @@ fn convert_meta(
     target: HelperTarget,
     errors: &mut ErrorCollector,
 ) -> Option<HelperAttributeIr> {
-    let source_name = meta
-        .path()
-        .get_ident()
-        .map(ToString::to_string)
-        .unwrap_or_default();
     let span = meta.span();
+    let path_text = meta.path().to_token_stream().to_string();
+    let Some(source_name) = meta.path().get_ident().map(ToString::to_string) else {
+        errors.push(syn::Error::new(
+            span,
+            format!("unknown reflection helper `{path_text}`"),
+        ));
+        return None;
+    };
     let Some(name) = HelperName::from_str(&source_name) else {
         errors.push(syn::Error::new(
             span,
