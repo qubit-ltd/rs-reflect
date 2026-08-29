@@ -1,0 +1,132 @@
+//! Invocation receiver values and receiver expectations.
+
+use std::any::TypeId;
+
+use crate::invoke::{InvocationInputMode, InvocationMode};
+use crate::value::{DynamicMut, DynamicOwned, DynamicRef};
+
+/// A receiver supplied to a reflected method invocation.
+///
+/// Owned receiver containers such as `Box<T>` and `Pin<Box<T>>` retain their
+/// exact container type in [`Self::Owned`]. `Pin<&T>` and `Pin<&mut T>` must not
+/// be lowered to the ordinary borrowed variants because doing so would discard
+/// their pin proof. Generated invocation support therefore needs a
+/// method-specific `ReceiverAdapter` capability that preserves pinned borrows;
+/// absence of that adapter leaves the method describable but not invocable.
+pub enum InvocationReceiver<'call, M: InvocationMode> {
+    /// A receiver consumed as `self` or an owned receiver container.
+    Owned(DynamicOwned<M>),
+    /// A receiver supplied through a shared borrow.
+    Ref(DynamicRef<'call, M>),
+    /// A receiver supplied through an exclusive mutable borrow.
+    Mut(DynamicMut<'call, M>),
+}
+
+impl<M: InvocationMode> InvocationReceiver<'_, M> {
+    /// Returns the receiver's ownership or borrowing mode.
+    pub const fn mode(&self) -> InvocationInputMode {
+        match self {
+            Self::Owned(_) => InvocationInputMode::Owned,
+            Self::Ref(_) => InvocationInputMode::Ref,
+            Self::Mut(_) => InvocationInputMode::Mut,
+        }
+    }
+
+    /// Returns the exact process-local Rust type identity of the receiver.
+    pub fn type_id(&self) -> TypeId {
+        match self {
+            Self::Owned(value) => M::owned_type_id(value),
+            Self::Ref(value) => M::ref_type_id(value),
+            Self::Mut(value) => M::mut_type_id(value),
+        }
+    }
+}
+
+/// The receiver shape and exact type required by a method adapter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReceiverExpectation {
+    /// The method is an associated function and accepts no receiver.
+    None,
+    /// The method consumes an exact receiver value or container.
+    Owned {
+        /// Expected process-local Rust type identity.
+        type_id: TypeId,
+        /// Expected Rust type name used for diagnostics.
+        type_name: &'static str,
+    },
+    /// The method reads an exact receiver through a shared borrow.
+    Ref {
+        /// Expected process-local Rust type identity.
+        type_id: TypeId,
+        /// Expected Rust type name used for diagnostics.
+        type_name: &'static str,
+    },
+    /// The method mutates an exact receiver through an exclusive borrow.
+    Mut {
+        /// Expected process-local Rust type identity.
+        type_id: TypeId,
+        /// Expected Rust type name used for diagnostics.
+        type_name: &'static str,
+    },
+}
+
+impl ReceiverExpectation {
+    /// Creates an expectation for an associated function without a receiver.
+    pub const fn none() -> Self {
+        Self::None
+    }
+
+    /// Creates an expectation for an owned receiver of exact type `T`.
+    pub fn owned<T: ?Sized + 'static>() -> Self {
+        Self::Owned {
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+
+    /// Creates an expectation for a shared receiver of exact type `T`.
+    pub fn borrowed<T: ?Sized + 'static>() -> Self {
+        Self::Ref {
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+
+    /// Creates an expectation for a mutable receiver of exact type `T`.
+    pub fn borrowed_mut<T: ?Sized + 'static>() -> Self {
+        Self::Mut {
+            type_id: TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+
+    /// Returns the required receiver mode, or `None` for an associated function.
+    pub const fn mode(self) -> Option<InvocationInputMode> {
+        match self {
+            Self::None => None,
+            Self::Owned { .. } => Some(InvocationInputMode::Owned),
+            Self::Ref { .. } => Some(InvocationInputMode::Ref),
+            Self::Mut { .. } => Some(InvocationInputMode::Mut),
+        }
+    }
+
+    /// Returns the expected receiver type identity when a receiver is required.
+    pub const fn type_id(self) -> Option<TypeId> {
+        match self {
+            Self::None => None,
+            Self::Owned { type_id, .. } | Self::Ref { type_id, .. } | Self::Mut { type_id, .. } => {
+                Some(type_id)
+            }
+        }
+    }
+
+    /// Returns the expected receiver type name when a receiver is required.
+    pub const fn type_name(self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Owned { type_name, .. }
+            | Self::Ref { type_name, .. }
+            | Self::Mut { type_name, .. } => Some(type_name),
+        }
+    }
+}
