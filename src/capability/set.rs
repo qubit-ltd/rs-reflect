@@ -1,6 +1,7 @@
 //! Deterministic immutable capability collections.
 
 use std::any::TypeId;
+use std::sync::OnceLock;
 
 use crate::capability::{CapabilityDescriptor, CapabilityKey};
 use crate::identity::CapabilityId;
@@ -123,4 +124,10 @@ impl Default for TypeCapabilities {
             descriptors: Box::default(),
         }
     }
+}
+
+/// Returns the shared empty set used by descriptors without registered capabilities.
+pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
+    static EMPTY: OnceLock<TypeCapabilities> = OnceLock::new();
+    EMPTY.get_or_init(TypeCapabilities::default)
 }

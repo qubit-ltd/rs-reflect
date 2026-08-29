@@ -106,15 +106,65 @@ macro_rules! __qubit_reflect_capability_descriptor {
 /// The registration records facts only: `Send` and `Sync` never change the
 /// erased mode of a dynamic value.
 ///
+/// Third-party typed operations use the bracket form, where each key expression
+/// must match its adapter expression's Rust type:
+///
+/// ```
+/// use qubit_reflect::capability::{CapabilityKey, TypeCapabilities};
+/// use qubit_reflect::identity::CapabilityId;
+/// use qubit_reflect::register_type_capabilities;
+///
+/// #[derive(Clone, Copy)]
+/// struct Adapter;
+/// struct Registered;
+///
+/// fn key() -> CapabilityKey<Adapter> {
+///     CapabilityKey::new(CapabilityId::new("example.adapter").expect("valid test ID"))
+/// }
+///
+/// register_type_capabilities!(Registered: [key() => Adapter]);
+/// let _ = TypeCapabilities::default();
+/// ```
+///
 /// ```compile_fail
 /// use std::rc::Rc;
 /// use qubit_reflect::register_type_capabilities;
 ///
 /// struct LocalOnly(Rc<()>);
 /// register_type_capabilities!(LocalOnly: Send);
+/// register_type_capabilities!(LocalOnly: Sync);
+/// register_type_capabilities!(LocalOnly: Clone);
+/// struct NoDefault;
+/// register_type_capabilities!(NoDefault: Default);
 /// ```
 #[macro_export]
 macro_rules! register_type_capabilities {
+    ($target:ty: [$($key:expr => $adapter:expr),+ $(,)?]) => {
+        const _: () = {
+            fn __qubit_reflect_target_type_id() -> ::std::any::TypeId {
+                ::std::any::TypeId::of::<$target>()
+            }
+
+            fn __qubit_reflect_descriptors(
+            ) -> ::std::vec::Vec<$crate::capability::CapabilityDescriptor> {
+                ::std::vec![
+                    $(
+                        $crate::capability::CapabilityDescriptor::with_adapter(
+                            $key,
+                            $adapter,
+                        )
+                    ),+
+                ]
+            }
+
+            $crate::capability::__inventory::submit! {
+                $crate::capability::TypeCapabilityRegistration::new(
+                    __qubit_reflect_target_type_id,
+                    __qubit_reflect_descriptors,
+                )
+            }
+        };
+    };
     ($target:ty: $($capability:ident),+ $(,)?) => {
         const _: () = {
             fn __qubit_reflect_target_type_id() -> ::std::any::TypeId {

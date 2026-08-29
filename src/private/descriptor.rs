@@ -1,5 +1,6 @@
 //! Hidden factories for immutable static descriptor data.
 
+use crate::capability::TypeCapabilities;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::MapKind;
@@ -27,11 +28,31 @@ pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: Prim
     TypeDescriptor::new_primitive::<T>(query_name, kind)
 }
 
+/// Creates a primitive root descriptor with a descriptor-owned capability resolver.
+#[doc(hidden)]
+pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: PrimitiveKind,
+    capabilities: fn() -> &'static TypeCapabilities,
+) -> TypeDescriptor {
+    TypeDescriptor::new_primitive_with_capabilities::<T>(query_name, kind, capabilities)
+}
+
 /// Creates a text root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
 pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> TypeDescriptor {
     TypeDescriptor::new_text::<T>(query_name, kind)
+}
+
+/// Creates a text root descriptor with a descriptor-owned capability resolver.
+#[doc(hidden)]
+pub const fn text_with_capabilities<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: TextKind,
+    capabilities: fn() -> &'static TypeCapabilities,
+) -> TypeDescriptor {
+    TypeDescriptor::new_text_with_capabilities::<T>(query_name, kind, capabilities)
 }
 
 /// Creates a struct root descriptor for `T` with a generated diagnostic type
@@ -178,6 +199,15 @@ pub const fn trait_object<T: ?Sized + 'static>(query_name: &'static str) -> Type
 #[doc(hidden)]
 pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeDescriptor {
     TypeDescriptor::new_opaque::<T>(query_name)
+}
+
+/// Creates an opaque root descriptor with a descriptor-owned capability resolver.
+#[doc(hidden)]
+pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
+    query_name: &'static str,
+    capabilities: fn() -> &'static TypeCapabilities,
+) -> TypeDescriptor {
+    TypeDescriptor::new_opaque_with_capabilities::<T>(query_name, capabilities)
 }
 
 /// Creates an explicit opaque member descriptor whose diagnostic name is

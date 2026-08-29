@@ -17,6 +17,7 @@ pub use registration::{
     ReflectedTypeRegistration, TypeCapabilityRegistration, registered_reflected_type,
     registered_type_capabilities,
 };
+pub(crate) use set::empty_capabilities;
 pub use set::{CapabilityConflict, CapabilityConflictKind, TypeCapabilities};
 
 #[doc(hidden)]
