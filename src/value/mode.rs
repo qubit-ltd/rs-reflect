@@ -45,6 +45,14 @@ pub trait Mode: sealed::Sealed {
 /// ```
 ///
 /// ```compile_fail
+/// use qubit_reflect::value::ReflectedRef;
+///
+/// fn assert_sync<T: Sync>(_: T) {}
+/// let value = 1_u32;
+/// assert_sync(ReflectedRef::new(&value));
+/// ```
+///
+/// ```compile_fail
 /// use qubit_reflect::value::ReflectedMut;
 ///
 /// fn assert_send<T: Send>(_: T) {}
@@ -53,10 +61,25 @@ pub trait Mode: sealed::Sealed {
 /// ```
 ///
 /// ```compile_fail
+/// use qubit_reflect::value::ReflectedMut;
+///
+/// fn assert_sync<T: Sync>(_: T) {}
+/// let mut value = 1_u32;
+/// assert_sync(ReflectedMut::new(&mut value));
+/// ```
+///
+/// ```compile_fail
 /// use qubit_reflect::value::ReflectedOwned;
 ///
 /// fn assert_send<T: Send>(_: T) {}
 /// assert_send(ReflectedOwned::new(1_u32));
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::ReflectedOwned;
+///
+/// fn assert_sync<T: Sync>(_: T) {}
+/// assert_sync(ReflectedOwned::new(1_u32));
 /// ```
 pub enum Local {}
 
@@ -73,6 +96,13 @@ pub enum Local {}
 /// ```
 ///
 /// ```compile_fail
+/// use qubit_reflect::value::SendReflectedOwned;
+/// use std::cell::Cell;
+///
+/// let _ = SendReflectedOwned::new(Cell::new(1_u32));
+/// ```
+///
+/// ```compile_fail
 /// use qubit_reflect::value::SendReflectedRef;
 /// use std::cell::Cell;
 ///
@@ -85,6 +115,14 @@ pub enum Local {}
 /// use std::rc::Rc;
 ///
 /// let mut value = Rc::new(1_u32);
+/// let _ = SendReflectedMut::new(&mut value);
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedMut;
+/// use std::cell::Cell;
+///
+/// let mut value = Cell::new(1_u32);
 /// let _ = SendReflectedMut::new(&mut value);
 /// ```
 ///
