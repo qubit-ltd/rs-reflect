@@ -1,8 +1,14 @@
 //! Declaration-level semantic IR shared by validation and expansion.
 
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::Ident;
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
 
-use crate::ir::{ExternalTraitIr, HelperAttributeIr, PathIr, SpecializationIr, TypeIr};
+use crate::ir::ExternalTraitIr;
+use crate::ir::HelperAttributeIr;
+use crate::ir::PathIr;
+use crate::ir::SpecializationIr;
+use crate::ir::TypeIr;
 
 /// Selects one of the three reflection procedural macro entry points.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -296,7 +302,8 @@ pub(crate) struct GenericsIr {
     pub(crate) where_predicates: Vec<WherePredicateIr>,
     /// The complete generic declaration tokens.
     pub(crate) declaration: TokenStream,
-    /// Generic parameter tokens suitable for an impl header, with defaults removed.
+    /// Generic parameter tokens suitable for an impl header, with defaults
+    /// removed.
     pub(crate) impl_declaration: TokenStream,
     /// Generic arguments in declaration order.
     pub(crate) arguments: TokenStream,

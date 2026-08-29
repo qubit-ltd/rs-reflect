@@ -4,9 +4,12 @@
 
 use std::fs;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
-use qubit_reflect_derive::{Reflect, reflect, reflect_impl};
+use qubit_reflect_derive::Reflect;
+use qubit_reflect_derive::reflect;
+use qubit_reflect_derive::reflect_impl;
 
 #[derive(Reflect)]
 #[reflect(rename = "Record", capabilities(Clone, Default))]
@@ -69,10 +72,7 @@ fn default_code() -> u32 {
 
 #[test]
 fn test_macro_parsers_accept_supported_declarations() {
-    let _ = Record {
-        id: 1,
-        value: "value",
-    };
+    let _ = Record { id: 1, value: "value" };
     let _ = Event::Ready;
     let _ = Opaque;
 }
@@ -83,13 +83,10 @@ fn test_macro_diagnostic_points_to_the_conflicting_rename_literal() {
         .duration_since(UNIX_EPOCH)
         .expect("the system clock should follow the Unix epoch")
         .as_nanos();
-    let fixture =
-        std::env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
+    let fixture = std::env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
     let source_dir = fixture.join("src");
     fs::create_dir_all(&source_dir).expect("the temporary fixture should be created");
-    let dependency_path = env!("CARGO_MANIFEST_DIR")
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"");
+    let dependency_path = env!("CARGO_MANIFEST_DIR").replace('\\', "\\\\").replace('"', "\\\"");
     fs::write(
         fixture.join("Cargo.toml"),
         format!(

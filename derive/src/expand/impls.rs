@@ -1,18 +1,30 @@
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
-use proc_macro2::{Ident, Span, TokenStream};
-use quote::{format_ident, quote};
+use proc_macro2::Ident;
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
+use quote::format_ident;
+use quote::quote;
 
-use crate::ir::{
-    HelperName, HelperValueIr, ImplDeclarationIr, ParameterIr, ParameterPatternKindIr, PathArgumentIr,
-    PathArgumentsIr, ReceiverKindIr, ReturnTypeIr, TypeIr, TypeKindIr, VisibilityIr,
-};
+use crate::ir::HelperName;
+use crate::ir::HelperValueIr;
+use crate::ir::ImplDeclarationIr;
+use crate::ir::ParameterIr;
+use crate::ir::ParameterPatternKindIr;
+use crate::ir::PathArgumentIr;
+use crate::ir::PathArgumentsIr;
+use crate::ir::ReceiverKindIr;
+use crate::ir::ReturnTypeIr;
+use crate::ir::TypeIr;
+use crate::ir::TypeKindIr;
+use crate::ir::VisibilityIr;
 
-/// Expands an impl unchanged and submits a lazily-built implementation fragment.
+/// Expands an impl unchanged and submits a lazily-built implementation
+/// fragment.
 ///
-/// The descriptor graph is deliberately constructed during registry initialization,
-/// not from an inventory constructor. This keeps user code out of linker startup
-/// and uses the T12 registration protocol exclusively.
+/// The descriptor graph is deliberately constructed during registry
+/// initialization, not from an inventory constructor. This keeps user code out
+/// of linker startup and uses the T12 registration protocol exclusively.
 pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     if !declaration.generics.params.is_empty() {
         // Concrete specialization registration is T20's responsibility. A
@@ -29,10 +41,13 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     let target = declaration.target_type.tokens;
     let trait_path = declaration.trait_path.as_ref().map(|path| path.tokens.clone());
     let has_trait = trait_path.is_some();
-    let external_id = declaration.attributes.iter().find_map(|attribute| match &attribute.value {
-        HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
-        _ => None,
-    });
+    let external_id = declaration
+        .attributes
+        .iter()
+        .find_map(|attribute| match &attribute.value {
+            HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
+            _ => None,
+        });
     let fingerprint = fingerprint(&retained.to_string());
     let location = declaration.span.start();
     let line = location.line as u32;
@@ -42,13 +57,17 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     let invocation_adapter_definitions = declaration
         .methods
         .iter()
-        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .filter(|method| {
+            !method
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::Skip)
+        })
         .enumerate()
         .filter_map(|(index, method)| {
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
-                None
-                    | Some(ReceiverKindIr::Value)
+                None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             );
@@ -64,7 +83,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && method.qualifiers.abi.is_none()
                 && !method.qualifiers.is_variadic
                 && !return_contains_non_static_lifetime(&method.return_type)
-                && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
+                && !method
+                    .attributes
+                    .iter()
+                    .any(|attribute| attribute.name == HelperName::NoInvoke)
                 && matches!(
                     method.return_type,
                     ReturnTypeIr::Unit
@@ -147,9 +169,11 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 .iter()
                 .map(|parameter| invocation_argument_binding(parameter, &facade))
                 .collect();
-            let call_arguments: Vec<_> = method.parameters.iter().map(|parameter| {
-                format_ident!("__qubit_reflect_argument_{}", parameter.index)
-            }).collect();
+            let call_arguments: Vec<_> = method
+                .parameters
+                .iter()
+                .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
+                .collect();
             let output = match method.return_type {
                 ReturnTypeIr::Unit => {
                     let argument_bindings = &argument_bindings;
@@ -233,13 +257,17 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     let invocation_adapter_entries = declaration
         .methods
         .iter()
-        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .filter(|method| {
+            !method
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::Skip)
+        })
         .enumerate()
         .map(|(index, method)| {
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
-                None
-                    | Some(ReceiverKindIr::Value)
+                None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             );
@@ -255,7 +283,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && method.qualifiers.abi.is_none()
                 && !method.qualifiers.is_variadic
                 && !return_contains_non_static_lifetime(&method.return_type)
-                && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
+                && !method
+                    .attributes
+                    .iter()
+                    .any(|attribute| attribute.name == HelperName::NoInvoke)
                 && matches!(
                     method.return_type,
                     ReturnTypeIr::Unit
@@ -710,9 +741,7 @@ fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
 fn invocation_argument_expectation(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
     match &parameter.ty.kind {
         TypeKindIr::Reference {
-            mutable: true,
-            element,
-            ..
+            mutable: true, element, ..
         } => {
             let element = &element.tokens;
             quote!(#facade::invoke::ArgumentExpectation::borrowed_mut::<#element>())
@@ -733,9 +762,7 @@ fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) ->
     let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {
         TypeKindIr::Reference {
-            mutable: true,
-            element,
-            ..
+            mutable: true, element, ..
         } => {
             let element = &element.tokens;
             quote! {
@@ -824,7 +851,10 @@ fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
                         PathArgumentIr::Lifetime(lifetime) => lifetime != "'static",
                         PathArgumentIr::Type(ty) => type_contains_non_static_lifetime(ty),
                         PathArgumentIr::AssociatedType { ty, .. } => type_contains_non_static_lifetime(ty),
-                        PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } | PathArgumentIr::Constraint { .. } | PathArgumentIr::Other(_) => false,
+                        PathArgumentIr::Const(_)
+                        | PathArgumentIr::AssociatedConst { .. }
+                        | PathArgumentIr::Constraint { .. }
+                        | PathArgumentIr::Other(_) => false,
                     }),
                     PathArgumentsIr::Parenthesized { inputs, output } => {
                         inputs.iter().any(type_contains_non_static_lifetime)
@@ -837,11 +867,21 @@ fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
         TypeKindIr::Slice(element) | TypeKindIr::Array { element, .. } | TypeKindIr::Pointer { element, .. } => {
             type_contains_non_static_lifetime(element)
         }
-        TypeKindIr::BareFunction { lifetimes, inputs, output, .. } => {
+        TypeKindIr::BareFunction {
+            lifetimes,
+            inputs,
+            output,
+            ..
+        } => {
             lifetimes.iter().any(|lifetime| lifetime != "'static")
                 || inputs.iter().any(type_contains_non_static_lifetime)
                 || output.as_deref().is_some_and(type_contains_non_static_lifetime)
         }
-        TypeKindIr::TraitObject { .. } | TypeKindIr::ImplTrait { .. } | TypeKindIr::Never | TypeKindIr::Infer | TypeKindIr::Macro | TypeKindIr::Other => false,
+        TypeKindIr::TraitObject { .. }
+        | TypeKindIr::ImplTrait { .. }
+        | TypeKindIr::Never
+        | TypeKindIr::Infer
+        | TypeKindIr::Macro
+        | TypeKindIr::Other => false,
     }
 }
