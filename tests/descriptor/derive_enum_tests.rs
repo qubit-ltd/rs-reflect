@@ -1,13 +1,14 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for `Reflect` enum derives.
-
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::DiscriminantOrigin;
-use qubit_reflect::descriptor::NumericDiscriminant;
-use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::descriptor::VariantKind;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedRef;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::TypeDescriptor;
+use reflect::descriptor::DiscriminantOrigin;
+use reflect::descriptor::NumericDiscriminant;
+use reflect::descriptor::TypeKind;
+use reflect::descriptor::VariantKind;
+use reflect::registry::ReflectRegistry;
+use reflect::value::ReflectedRef;
 
 #[derive(Reflect)]
 enum DerivedEvent {

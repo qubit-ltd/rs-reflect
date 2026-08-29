@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Invocation collection and all-input validation.
 
 use std::fmt;

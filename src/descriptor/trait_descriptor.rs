@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Trait definitions, concrete applications, supertraits, and associated items.
 
 use std::any::TypeId;

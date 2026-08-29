@@ -1,12 +1,13 @@
+// qubit-style: allow explicit-imports
 //! Concurrency stress coverage for reflection registry and descriptor
 //! interning.
-
 use std::sync::Arc;
 use std::sync::Barrier;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::TypeDescriptor;
+use reflect::registry::ReflectRegistry;
 
 #[derive(Reflect)]
 struct StressRecord<T> {

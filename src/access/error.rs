@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Structured errors raised before or during reflected field access.
 // qubit-style: allow type-file-name
 

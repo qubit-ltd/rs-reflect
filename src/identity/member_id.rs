@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Composite identities for reflected members.
 
 use crate::identity::FragmentIdentity;

@@ -1,26 +1,26 @@
+// qubit-style: allow explicit-imports
 //! Integration coverage for implementation registration expansion.
-
 use std::sync::OnceLock;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::descriptor::MethodQualifier;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::DynamicOwned;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::descriptor::MethodQualifier;
+use reflect::descriptor::StructKind;
+use reflect::invoke::Invocation;
+use reflect::invoke::InvocationArg;
+use reflect::invoke::InvocationOutput;
+use reflect::reflect;
+use reflect::reflect_impl;
+use reflect::registry::ReflectRegistry;
+use reflect::value::DynamicOwned;
 
 struct Sample;
 
 impl Reflect for Sample {
-    fn type_descriptor() -> &'static qubit_reflect::TypeDescriptor {
-        static DESCRIPTOR: OnceLock<qubit_reflect::TypeDescriptor> = OnceLock::new();
-        DESCRIPTOR.get_or_init(|| {
-            qubit_reflect::__private::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
-        })
+    fn type_descriptor() -> &'static reflect::TypeDescriptor {
+        static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
+        DESCRIPTOR
+            .get_or_init(|| reflect::__private::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[]))
     }
 }
 
@@ -94,11 +94,10 @@ impl Sample {
 struct Counter(u8);
 
 impl Reflect for Counter {
-    fn type_descriptor() -> &'static qubit_reflect::TypeDescriptor {
-        static DESCRIPTOR: OnceLock<qubit_reflect::TypeDescriptor> = OnceLock::new();
-        DESCRIPTOR.get_or_init(|| {
-            qubit_reflect::__private::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
-        })
+    fn type_descriptor() -> &'static reflect::TypeDescriptor {
+        static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
+        DESCRIPTOR
+            .get_or_init(|| reflect::__private::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[]))
     }
 }
 
@@ -118,20 +117,18 @@ impl Counter {
 fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_shared",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_shared",
+    ) else {
         panic!("generated shared method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("safe shared method needs adapter");
     let sample = Sample;
     let output = adapter
         .invoke_local(Invocation::borrowed(
-            qubit_reflect::value::DynamicRef::<qubit_reflect::value::Local>::new(&sample),
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
             [],
         ))
         .expect("local adapter must be present")
@@ -139,7 +136,7 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
     let InvocationOutput::Owned(value) = output else {
         panic!("shared method must return an owned value");
     };
-    let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 19);
@@ -149,12 +146,8 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
 fn test_reflect_impl_generates_callable_adapter_for_mutable_receiver() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Counter::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_mut",
-        )
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "reflected_mut")
     else {
         panic!("generated mutable method instance must be discoverable");
     };
@@ -163,7 +156,7 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_receiver() {
     let value = {
         let output = adapter
             .invoke_local(Invocation::borrowed_mut(
-                qubit_reflect::value::DynamicMut::<qubit_reflect::value::Local>::new(&mut counter),
+                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
                 [],
             ))
             .expect("local adapter must be present")
@@ -171,7 +164,7 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_receiver() {
         let InvocationOutput::Owned(value) = output else {
             panic!("mutable method must return an owned value");
         };
-        let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+        let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
             panic!("generated value must retain type");
         };
         value
@@ -184,19 +177,17 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_receiver() {
 fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Counter::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_owned",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_owned",
+    ) else {
         panic!("generated owned method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("safe owned method needs adapter");
     let output = adapter
         .invoke_local(Invocation::owned(
-            DynamicOwned::<qubit_reflect::value::Local>::new(Counter(23)),
+            DynamicOwned::<reflect::value::Local>::new(Counter(23)),
             [],
         ))
         .expect("local adapter must be present")
@@ -204,7 +195,7 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
     let InvocationOutput::Owned(value) = output else {
         panic!("owned method must return an owned value");
     };
-    let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 23);
@@ -214,20 +205,18 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
 fn test_reflect_impl_does_not_generate_adapter_for_non_rust_abi() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_c_abi",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_c_abi",
+    ) else {
         panic!("non-Rust ABI method instance must remain describable");
     };
     assert!(instance.adapter().is_none());
     assert!(
         instance
             .unavailable_reasons()
-            .contains(&qubit_reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi)
+            .contains(&reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi)
     );
 }
 
@@ -248,13 +237,11 @@ fn test_reflect_impl_registers_inherent_and_external_fragments() {
 fn test_reflect_impl_generates_callable_adapter_for_safe_associated_function() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_associated",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_associated",
+    ) else {
         panic!("generated associated method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("safe associated method needs adapter");
@@ -265,7 +252,7 @@ fn test_reflect_impl_generates_callable_adapter_for_safe_associated_function() {
     let InvocationOutput::Owned(value) = output else {
         panic!("associated method must return an owned value");
     };
-    let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 17);
@@ -275,26 +262,24 @@ fn test_reflect_impl_generates_callable_adapter_for_safe_associated_function() {
 fn test_reflect_impl_generates_callable_adapter_for_owned_argument() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_owned_argument",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_owned_argument",
+    ) else {
         panic!("generated associated method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("owned argument method needs adapter");
     let output = adapter
         .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            qubit_reflect::value::Local,
+            reflect::value::Local,
         >::new(41_u8))]))
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
         panic!("associated method must return an owned value");
     };
-    let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 42);
@@ -304,27 +289,25 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_argument() {
 fn test_reflect_impl_generates_callable_adapter_for_shared_argument() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_shared_argument",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_shared_argument",
+    ) else {
         panic!("generated associated method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("shared argument method needs adapter");
     let input = 40_u8;
     let output = adapter
         .invoke_local(Invocation::associated([InvocationArg::Ref(
-            qubit_reflect::value::DynamicRef::<qubit_reflect::value::Local>::new(&input),
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
         )]))
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
         panic!("associated method must return an owned value");
     };
-    let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 42);
@@ -334,13 +317,11 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_argument() {
 fn test_reflect_impl_generates_callable_adapter_for_mutable_argument() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
-    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
-        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
-            implementations,
-            MethodQualifier::Inherent,
-            "reflected_mutable_argument",
-        )
-    else {
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_mutable_argument",
+    ) else {
         panic!("generated associated method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("mutable argument method needs adapter");
@@ -348,14 +329,14 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_argument() {
     let value = {
         let output = adapter
             .invoke_local(Invocation::associated([InvocationArg::Mut(
-                qubit_reflect::value::DynamicMut::<qubit_reflect::value::Local>::new(&mut input),
+                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut input),
             )]))
             .expect("local adapter must be present")
             .expect("validated invocation must call method");
         let InvocationOutput::Owned(value) = output else {
             panic!("associated method must return an owned value");
         };
-        let Ok(value) = DynamicOwned::<qubit_reflect::value::Local>::downcast::<u8>(value) else {
+        let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
             panic!("generated value must retain type");
         };
         value

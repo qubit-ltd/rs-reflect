@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Mode-preserving reflected futures.
 
 use std::any::TypeId;

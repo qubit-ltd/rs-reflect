@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Structured construction validation errors.
 
 use std::any::TypeId;

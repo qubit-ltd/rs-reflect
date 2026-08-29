@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Reflected inherent and trait implementation descriptors.
 
 use std::fmt;

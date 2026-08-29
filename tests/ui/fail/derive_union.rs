@@ -1,4 +1,6 @@
-use qubit_reflect::Reflect;
+// qubit-style: allow explicit-imports
+use qubit_reflect as reflect;
+use reflect::Reflect;
 
 #[derive(Reflect)]
 union Unsupported {

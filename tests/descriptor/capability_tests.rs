@@ -1,27 +1,28 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for typed reflection capabilities.
-
 use std::any::TypeId;
 use std::rc::Rc;
 use std::sync::OnceLock;
 
-use qubit_reflect::capability::CapabilityConflictKind;
-use qubit_reflect::capability::CapabilityDescriptor;
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::capability::TypeCapabilities;
-use qubit_reflect::capability::clone_descriptor;
-use qubit_reflect::capability::clone_key;
-use qubit_reflect::capability::default_descriptor;
-use qubit_reflect::capability::default_key;
-use qubit_reflect::capability::registered_reflected_type;
-use qubit_reflect::capability::registered_type_capabilities;
-use qubit_reflect::capability::send_key;
-use qubit_reflect::capability::sync_key;
-use qubit_reflect::descriptor::Reflect;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::register_reflected_type;
-use qubit_reflect::register_type_capabilities;
-use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect as reflect;
+use reflect::capability::CapabilityConflictKind;
+use reflect::capability::CapabilityDescriptor;
+use reflect::capability::CapabilityKey;
+use reflect::capability::TypeCapabilities;
+use reflect::capability::clone_descriptor;
+use reflect::capability::clone_key;
+use reflect::capability::default_descriptor;
+use reflect::capability::default_key;
+use reflect::capability::registered_reflected_type;
+use reflect::capability::registered_type_capabilities;
+use reflect::capability::send_key;
+use reflect::capability::sync_key;
+use reflect::descriptor::Reflect;
+use reflect::descriptor::TypeDescriptor;
+use reflect::identity::CapabilityId;
+use reflect::register_reflected_type;
+use reflect::register_type_capabilities;
+use reflect::value::ReflectedOwned;
 
 #[derive(Debug, Eq, PartialEq)]
 struct TextAdapter(&'static str);
@@ -59,7 +60,7 @@ fn reflected_root_capabilities() -> &'static TypeCapabilities {
     })
 }
 
-static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor = qubit_reflect::__private::descriptor::opaque_root_with_capabilities::<
+static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root_with_capabilities::<
     ReflectedRoot,
 >("ReflectedRoot", reflected_root_capabilities);
 

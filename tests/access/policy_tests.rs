@@ -1,18 +1,19 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for reflected field access policies.
-
-use qubit_reflect::__private::descriptor;
-use qubit_reflect::access::FieldAccessError;
-use qubit_reflect::access::FieldAccessOperation;
-use qubit_reflect::access::FieldAccessPolicy;
-use qubit_reflect::descriptor::FieldDescriptor;
-use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::descriptor::TypeRef;
-use qubit_reflect::identity::Visibility;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ReflectedRef;
+use qubit_reflect as reflect;
+use reflect::__private::descriptor;
+use reflect::access::FieldAccessError;
+use reflect::access::FieldAccessOperation;
+use reflect::access::FieldAccessPolicy;
+use reflect::descriptor::FieldDescriptor;
+use reflect::descriptor::OpaqueTypeDescriptor;
+use reflect::descriptor::StructKind;
+use reflect::descriptor::TypeDescriptor;
+use reflect::descriptor::TypeRef;
+use reflect::identity::Visibility;
+use reflect::value::ReflectedMut;
+use reflect::value::ReflectedOwned;
+use reflect::value::ReflectedRef;
 
 struct PolicyRecord {
     read_only: u32,

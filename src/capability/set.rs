@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Deterministic immutable capability collections.
 
 use std::any::TypeId;

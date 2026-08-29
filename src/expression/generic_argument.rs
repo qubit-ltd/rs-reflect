@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Generic arguments and structural const expressions.
 
 use std::hash::Hash;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Typed keys for retrieving capability operation contracts.
 
 use std::any::TypeId;

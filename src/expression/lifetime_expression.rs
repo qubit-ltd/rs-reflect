@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Structural representations of Rust lifetime syntax.
 
 /// A lifetime that appears in a type, bound, or generic declaration.

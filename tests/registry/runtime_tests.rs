@@ -1,48 +1,48 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for the immutable distributed reflection registry.
-
 use std::any::TypeId;
 use std::sync::LazyLock;
 use std::sync::OnceLock;
 
-use qubit_reflect::__private::registration::CapabilityRegistration;
-use qubit_reflect::__private::registration::FragmentKind;
-use qubit_reflect::__private::registration::FragmentPayload;
-use qubit_reflect::__private::registration::RegistrationFragment;
-use qubit_reflect::__private::registration::RuntimeIdentity;
-use qubit_reflect::__private::registration::StaticFragmentIdentity;
-use qubit_reflect::__private::registration::build_registry;
-use qubit_reflect::__private::registration::initialize_registry;
-use qubit_reflect::Reflect;
-use qubit_reflect::capability::CapabilityDescriptor;
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::descriptor::ImplDefinitionDescriptor;
-use qubit_reflect::descriptor::ImplDescriptor;
-use qubit_reflect::descriptor::ImplKind;
-use qubit_reflect::descriptor::TraitCompleteness;
-use qubit_reflect::descriptor::TraitDefinitionDescriptor;
-use qubit_reflect::descriptor::TraitDescriptor;
-use qubit_reflect::descriptor::TraitId;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::expression::DiagnosticText;
-use qubit_reflect::expression::GenericDefinitionDescriptor;
-use qubit_reflect::expression::GenericParameterDescriptor;
-use qubit_reflect::expression::TypeExpression;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::identity::ExternalTraitId;
-use qubit_reflect::identity::FragmentIdentity;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect as reflect;
+use reflect::__private::registration::CapabilityRegistration;
+use reflect::__private::registration::FragmentKind;
+use reflect::__private::registration::FragmentPayload;
+use reflect::__private::registration::RegistrationFragment;
+use reflect::__private::registration::RuntimeIdentity;
+use reflect::__private::registration::StaticFragmentIdentity;
+use reflect::__private::registration::build_registry;
+use reflect::__private::registration::initialize_registry;
+use reflect::Reflect;
+use reflect::capability::CapabilityDescriptor;
+use reflect::capability::CapabilityKey;
+use reflect::descriptor::ImplDefinitionDescriptor;
+use reflect::descriptor::ImplDescriptor;
+use reflect::descriptor::ImplKind;
+use reflect::descriptor::TraitCompleteness;
+use reflect::descriptor::TraitDefinitionDescriptor;
+use reflect::descriptor::TraitDescriptor;
+use reflect::descriptor::TraitId;
+use reflect::descriptor::TypeDescriptor;
+use reflect::error::RegistryErrorKind;
+use reflect::expression::DiagnosticText;
+use reflect::expression::GenericDefinitionDescriptor;
+use reflect::expression::GenericParameterDescriptor;
+use reflect::expression::TypeExpression;
+use reflect::identity::CapabilityId;
+use reflect::identity::ExternalTraitId;
+use reflect::identity::FragmentIdentity;
+use reflect::registry::ReflectRegistry;
 
 struct EarlyType;
 struct LateType;
 struct IndependentType;
 struct CapabilityTarget;
 
-static EARLY_DESCRIPTOR: TypeDescriptor =
-    qubit_reflect::__private::descriptor::opaque_root::<EarlyType>("shared-query");
-static LATE_DESCRIPTOR: TypeDescriptor = qubit_reflect::__private::descriptor::opaque_root::<LateType>("shared-query");
+static EARLY_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<EarlyType>("shared-query");
+static LATE_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<LateType>("shared-query");
 static INDEPENDENT_DESCRIPTOR: TypeDescriptor =
-    qubit_reflect::__private::descriptor::opaque_root::<IndependentType>("independent");
+    reflect::__private::descriptor::opaque_root::<IndependentType>("independent");
 
 impl Reflect for IndependentType {
     /// Returns a descriptor whose structural query is independent of the
@@ -94,10 +94,10 @@ static EARLY_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
 static LATE_FRAGMENT: RegistrationFragment =
     RegistrationFragment::new(FragmentKind::Type, LATE_IDENTITY, late_runtime_identity, late_payload);
 
-qubit_reflect::__private::inventory::submit! {
+reflect::__private::inventory::submit! {
     LATE_FRAGMENT
 }
-qubit_reflect::__private::inventory::submit! {
+reflect::__private::inventory::submit! {
     EARLY_FRAGMENT
 }
 
@@ -527,7 +527,7 @@ fn test_registry_runtime_rejects_duplicate_target_trait_impl() {
 
 static CONFLICTING_FRAGMENTS: [&RegistrationFragment; 2] = [&CONTENT_RIGHT, &CONTENT_LEFT];
 static VALID_FRAGMENTS: [&RegistrationFragment; 1] = [&EARLY_FRAGMENT];
-static ERROR_CACHE: OnceLock<Result<ReflectRegistry, qubit_reflect::error::RegistryError>> = OnceLock::new();
+static ERROR_CACHE: OnceLock<Result<ReflectRegistry, reflect::error::RegistryError>> = OnceLock::new();
 
 /// Verifies failed initialization is cached and returned by cheap error clones.
 #[test]

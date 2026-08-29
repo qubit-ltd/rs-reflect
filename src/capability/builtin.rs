@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Built-in capability identities and safe dynamic operation adapters.
 
 use std::any::Any;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Structured invocation validation and caught-panic errors.
 
 use std::any::Any;

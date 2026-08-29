@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Recovery payloads for invocation failures before user code runs.
 
 use std::fmt;

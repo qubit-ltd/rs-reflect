@@ -1,28 +1,29 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for structural Rust type expressions.
-
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use qubit_reflect::expression::ArrayTypeExpression;
-use qubit_reflect::expression::AssociatedTypeExpression;
-use qubit_reflect::expression::ConcreteTypeExpression;
-use qubit_reflect::expression::ConstExpression;
-use qubit_reflect::expression::ConstGenericArgument;
-use qubit_reflect::expression::DiagnosticText;
-use qubit_reflect::expression::FunctionAbi;
-use qubit_reflect::expression::FunctionPointerExpression;
-use qubit_reflect::expression::FunctionSafety;
-use qubit_reflect::expression::GenericArgument;
-use qubit_reflect::expression::GenericDefinitionDescriptor;
-use qubit_reflect::expression::GenericParameterDescriptor;
-use qubit_reflect::expression::LifetimeExpression;
-use qubit_reflect::expression::OpaqueTypeExpression;
-use qubit_reflect::expression::PredicateDescriptor;
-use qubit_reflect::expression::RawPointerTypeExpression;
-use qubit_reflect::expression::ReferenceTypeExpression;
-use qubit_reflect::expression::TraitObjectExpression;
-use qubit_reflect::expression::TypeExpression;
+use qubit_reflect as reflect;
+use reflect::expression::ArrayTypeExpression;
+use reflect::expression::AssociatedTypeExpression;
+use reflect::expression::ConcreteTypeExpression;
+use reflect::expression::ConstExpression;
+use reflect::expression::ConstGenericArgument;
+use reflect::expression::DiagnosticText;
+use reflect::expression::FunctionAbi;
+use reflect::expression::FunctionPointerExpression;
+use reflect::expression::FunctionSafety;
+use reflect::expression::GenericArgument;
+use reflect::expression::GenericDefinitionDescriptor;
+use reflect::expression::GenericParameterDescriptor;
+use reflect::expression::LifetimeExpression;
+use reflect::expression::OpaqueTypeExpression;
+use reflect::expression::PredicateDescriptor;
+use reflect::expression::RawPointerTypeExpression;
+use reflect::expression::ReferenceTypeExpression;
+use reflect::expression::TraitObjectExpression;
+use reflect::expression::TypeExpression;
 
 /// Builds a concrete path expression without relying on parser implementation
 /// types.
@@ -106,7 +107,7 @@ fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
             bounds: Box::new([PredicateDescriptor::TypeBound {
                 subject: TypeExpression::SelfType,
                 bounds: Box::new([iterator]),
-                bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
+                bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
                 higher_ranked_lifetimes: Box::default(),
                 diagnostic: DiagnosticText::default(),
             }]),
@@ -152,7 +153,7 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
     let predicate = PredicateDescriptor::TypeBound {
         subject: TypeExpression::Parameter("F".into()),
         bounds: Box::new([bound]),
-        bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
+        bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
         higher_ranked_lifetimes: Box::new([LifetimeExpression::Named("a".into())]),
         diagnostic: DiagnosticText::default(),
     };
@@ -204,7 +205,7 @@ fn test_generic_definition_navigates_const_generic_and_predicates() {
         predicates: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::Parameter("T".into()),
             bounds: Box::new([concrete(&["Clone"], Vec::new())]),
-            bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
+            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),
@@ -354,7 +355,7 @@ fn test_type_expression_navigates_array_trait_object_and_never() {
         bounds: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::SelfType,
             bounds: Box::new([concrete(&["Display"], Vec::new())]),
-            bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
+            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),

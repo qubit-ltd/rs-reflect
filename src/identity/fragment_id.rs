@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Stable identities for distributed registration fragments.
 
 /// The source and content identity of one registration fragment.

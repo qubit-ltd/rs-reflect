@@ -1,6 +1,8 @@
+// qubit-style: allow explicit-imports
+use qubit_reflect as reflect;
 use std::rc::Rc;
 
-use qubit_reflect::Reflect;
+use reflect::Reflect;
 
 #[derive(Reflect)]
 #[reflect(opaque)]

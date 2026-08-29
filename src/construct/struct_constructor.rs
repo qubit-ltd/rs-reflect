@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Struct construction adapter contract and descriptor-bound dispatch.
 
 use std::any::TypeId;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Stable visibility categories for source declarations.
 
 /// A normalized source visibility category.

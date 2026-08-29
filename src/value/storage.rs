@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Internal erased storage for dynamic value wrappers.
 
 use std::any::Any;

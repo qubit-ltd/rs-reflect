@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Immutable declarations and concrete instances of reflected methods.
 
 use std::fmt;
