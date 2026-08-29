@@ -78,6 +78,10 @@ impl Sample {
         *value
     }
 
+    fn reflected_two_owned_arguments(first: u8, second: u8) -> u8 {
+        first + second
+    }
+
     fn reflected_shared(&self) -> u8 {
         19
     }
@@ -343,4 +347,43 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_argument() {
     };
     assert_eq!(value, 42);
     assert_eq!(input, 42);
+}
+
+#[test]
+fn test_reflect_impl_preserves_all_owned_arguments_after_validation_failure() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_two_owned_arguments",
+    ) else {
+        panic!("two-argument method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("safe owned-argument method needs adapter");
+    let result = adapter
+        .invoke_local(Invocation::associated([
+            InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(7_u8)),
+            InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(String::from("wrong"))),
+        ]))
+        .expect("local adapter must be present");
+    let Err(failure) = result else {
+        panic!("the second argument must fail exact type validation");
+    };
+    assert!(matches!(
+        failure.error.kind(),
+        reflect::invoke::InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
+    ));
+    let (_, arguments) = failure.recovery.into_parts();
+    let mut arguments = arguments.into_vec().into_iter();
+    let (Some(InvocationArg::Owned(first)), Some(InvocationArg::Owned(second)), None) =
+        (arguments.next(), arguments.next(), arguments.next())
+    else {
+        panic!("validation failure must preserve both owned arguments in source order");
+    };
+    let Ok(first) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(first) else {
+        panic!("first value must remain intact");
+    };
+    assert_eq!(first, 7);
+    assert!(DynamicOwned::<reflect::value::Local>::downcast::<String>(second).is_ok());
 }
