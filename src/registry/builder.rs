@@ -162,6 +162,13 @@ impl RegistryBuilder {
 
         let types_by_type_name = group_types(&self.types, TypeDescriptor::type_name);
         let types_by_query_name = group_types(&self.types, TypeDescriptor::query_name);
+        let mut trait_definitions: Vec<_> = self.traits_by_id.into_iter().collect();
+        trait_definitions.sort_by(|(left_id, _), (right_id, _)| {
+            self.trait_fragments
+                .get(left_id)
+                .cmp(&self.trait_fragments.get(right_id))
+        });
+        let traits_by_rust_path = group_traits(&trait_definitions);
         let types_by_id = self
             .types_by_id
             .into_iter()
@@ -177,15 +184,16 @@ impl RegistryBuilder {
             .into_iter()
             .map(|(key, (_, identity))| (key, identity))
             .collect();
-        let indexes = RegistryIndexes::new(
+        let indexes = RegistryIndexes {
             types_by_id,
             types_by_type_name,
             types_by_query_name,
-            self.traits_by_id,
+            traits_by_id: trait_definitions.into_iter().collect(),
+            traits_by_rust_path,
             impls_by_target,
             capability_fragments,
-            self.fragment_identities.into_boxed_slice(),
-        );
+            fragment_identities: self.fragment_identities.into_boxed_slice(),
+        };
         ReflectRegistry {
             types: self.types.into_boxed_slice(),
             indexes,
@@ -316,6 +324,23 @@ fn group_types(
     groups
         .into_iter()
         .map(|(key, descriptors)| (key, descriptors.into_boxed_slice()))
+        .collect()
+}
+
+/// Groups trait definitions by their complete diagnostic paths in fragment order.
+fn group_traits(
+    traits: &[(TraitId, &'static TraitDefinitionDescriptor)],
+) -> HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>> {
+    let mut groups: HashMap<_, Vec<_>> = HashMap::new();
+    for (_, descriptor) in traits {
+        groups
+            .entry(descriptor.rust_path())
+            .or_default()
+            .push(*descriptor);
+    }
+    groups
+        .into_iter()
+        .map(|(path, descriptors)| (path, descriptors.into_boxed_slice()))
         .collect()
 }
 

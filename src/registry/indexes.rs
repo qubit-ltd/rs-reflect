@@ -17,6 +17,8 @@ pub(super) struct RegistryIndexes {
         reason = "consumed by the T21 effective-view implementation"
     )]
     pub(super) traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
+    pub(super) traits_by_rust_path:
+        HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>>,
     #[allow(
         dead_code,
         reason = "consumed by the T21 effective-view implementation"
@@ -26,27 +28,4 @@ pub(super) struct RegistryIndexes {
     pub(super) capability_fragments: HashMap<(TypeId, CapabilityId), FragmentIdentity>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
     pub(super) fragment_identities: Box<[FragmentIdentity]>,
-}
-
-impl RegistryIndexes {
-    /// Creates the complete immutable set of validated registry indexes.
-    pub(super) fn new(
-        types_by_id: HashMap<TypeId, &'static TypeDescriptor>,
-        types_by_type_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
-        types_by_query_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
-        traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
-        impls_by_target: HashMap<TypeId, Box<[&'static ImplDescriptor]>>,
-        capability_fragments: HashMap<(TypeId, CapabilityId), FragmentIdentity>,
-        fragment_identities: Box<[FragmentIdentity]>,
-    ) -> Self {
-        Self {
-            types_by_id,
-            types_by_type_name,
-            types_by_query_name,
-            traits_by_id,
-            impls_by_target,
-            capability_fragments,
-            fragment_identities,
-        }
-    }
 }

@@ -1,8 +1,10 @@
 //! Trait definitions, concrete applications, supertraits, and associated items.
 
 use std::any::TypeId;
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 use crate::descriptor::MethodDescriptor;
 use crate::expression::{
@@ -10,6 +12,11 @@ use crate::expression::{
     PredicateDescriptor, TypeExpression,
 };
 use crate::identity::ExternalTraitId;
+use crate::identity::Visibility;
+
+type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<&'static TraitDescriptor>>>;
+type ExternalSupertraitCache =
+    HashMap<(TypeId, ExternalTraitId, Box<[GenericArgument]>), &'static TraitDescriptor>;
 
 /// The process-local identity source of a reflected or external trait.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -57,6 +64,108 @@ pub struct TraitDefinitionDescriptor {
     query_name: &'static str,
     completeness: TraitCompleteness,
     generic_definition: &'static GenericDefinitionDescriptor,
+    visibility: Visibility,
+}
+
+/// Concrete trait facts supplied by a reflected trait's hidden implementation hook.
+///
+/// The hook carries declaration identity without imposing object-safety requirements on the
+/// reflected trait. Implementation expansion enriches this payload with concrete application
+/// details before it becomes part of an implementation descriptor.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug)]
+pub struct TraitImplPayload {
+    definition: &'static TraitDefinitionDescriptor,
+    applied: &'static TraitDescriptor,
+}
+
+impl TraitImplPayload {
+    /// Creates a payload for one reflected trait declaration.
+    #[doc(hidden)]
+    pub const fn new(
+        definition: &'static TraitDefinitionDescriptor,
+        applied: &'static TraitDescriptor,
+    ) -> Self {
+        Self {
+            definition,
+            applied,
+        }
+    }
+
+    /// Returns the complete trait declaration shared by every implementation.
+    #[doc(hidden)]
+    pub const fn definition(self) -> &'static TraitDefinitionDescriptor {
+        self.definition
+    }
+
+    /// Returns the concrete applied trait descriptor for the hook receiver.
+    #[doc(hidden)]
+    pub const fn applied(self) -> &'static TraitDescriptor {
+        self.applied
+    }
+
+    /// Reuses an applied descriptor without constructing a discarded candidate on cache hits.
+    #[doc(hidden)]
+    pub fn cached_with_arguments<T: ?Sized + 'static>(
+        definition: &'static TraitDefinitionDescriptor,
+        arguments: Vec<GenericArgument>,
+        build: impl FnOnce(Vec<GenericArgument>) -> Result<TraitDescriptor, TraitDescriptorBuildError>,
+    ) -> Self {
+        static CACHE: LazyLock<Mutex<AppliedTraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+        let identity = AppliedTraitId {
+            definition: definition.trait_id().clone(),
+            arguments: arguments.clone().into_boxed_slice(),
+        };
+        let key = (TypeId::of::<T>(), identity);
+        let mut cache = CACHE.lock().expect("trait payload cache mutex must not be poisoned");
+        let cell = cache.entry(key).or_insert_with(|| Arc::new(OnceLock::new())).clone();
+        drop(cache);
+        let applied = *cell.get_or_init(|| {
+            Box::leak(Box::new(
+                build(arguments).expect("a reflected trait must build a valid applied descriptor"),
+            ))
+        });
+        Self::new(definition, applied)
+    }
+}
+
+/// Returns a cached incomplete descriptor for an explicitly mapped external supertrait.
+#[doc(hidden)]
+pub fn external_supertrait<T: ?Sized + 'static>(
+    id: &'static str,
+    rust_path: &'static str,
+    arguments: Vec<GenericArgument>,
+) -> &'static TraitDescriptor {
+    static CACHE: LazyLock<Mutex<ExternalSupertraitCache>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    let external_id = ExternalTraitId::new(id)
+        .expect("the macro validator must only emit valid external trait identifiers");
+    let key = (
+        TypeId::of::<T>(),
+        external_id.clone(),
+        arguments.clone().into_boxed_slice(),
+    );
+    let mut cache = CACHE.lock().expect("external trait cache mutex must not be poisoned");
+    cache.entry(key).or_insert_with(|| {
+        let definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
+            TraitId::External(external_id),
+            rust_path.rsplit("::").next().unwrap_or(rust_path),
+            rust_path,
+            rust_path,
+            TraitCompleteness::ExternalIncomplete,
+            Box::leak(Box::new(GenericDefinitionDescriptor {
+                parameters: Box::new([]),
+                predicates: Box::new([]),
+                diagnostic: crate::expression::DiagnosticText::default(),
+            })),
+        )));
+        Box::leak(Box::new(
+            TraitDescriptor::builder(definition)
+                .arguments(arguments)
+                .build()
+                .expect("an external supertrait descriptor must be valid"),
+        ))
+    })
 }
 
 impl TraitDefinitionDescriptor {
@@ -70,6 +179,20 @@ impl TraitDefinitionDescriptor {
         completeness: TraitCompleteness,
         generic_definition: &'static GenericDefinitionDescriptor,
     ) -> Self {
+        Self::new_with_visibility(trait_id, rust_name, rust_path, query_name, completeness, generic_definition, Visibility::Private)
+    }
+
+    /// Creates immutable trait definition facts with normalized source visibility.
+    #[doc(hidden)]
+    pub const fn new_with_visibility(
+        trait_id: TraitId,
+        rust_name: &'static str,
+        rust_path: &'static str,
+        query_name: &'static str,
+        completeness: TraitCompleteness,
+        generic_definition: &'static GenericDefinitionDescriptor,
+        visibility: Visibility,
+    ) -> Self {
         Self {
             trait_id,
             rust_name,
@@ -77,7 +200,13 @@ impl TraitDefinitionDescriptor {
             query_name,
             completeness,
             generic_definition,
+            visibility,
         }
+    }
+
+    /// Returns the trait declaration's normalized source visibility.
+    pub const fn visibility(&self) -> &Visibility {
+        &self.visibility
     }
 
     /// Returns the reflected marker or external trait identity.
@@ -603,6 +732,14 @@ impl TraitDescriptorBuilder {
     /// Verifies every runtime identity parameter has one concrete argument of
     /// the matching generic kind.
     fn validate_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
+        if self.definition.completeness() == TraitCompleteness::ExternalIncomplete {
+            for (index, argument) in self.arguments.iter().enumerate() {
+                if !generic_argument_is_concrete(argument) {
+                    return Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index });
+                }
+            }
+            return Ok(());
+        }
         let parameters: Vec<_> = self
             .definition
             .generic_definition()

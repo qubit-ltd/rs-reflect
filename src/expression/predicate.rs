@@ -4,6 +4,9 @@ use std::hash::{Hash, Hasher};
 
 use crate::expression::{DiagnosticText, LifetimeExpression, TypeExpression};
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TraitBoundModifier { None, Maybe }
+
 /// A structural predicate from a generic declaration, trait object, or opaque type bound.
 #[derive(Clone, Debug)]
 pub enum PredicateDescriptor {
@@ -13,6 +16,7 @@ pub enum PredicateDescriptor {
         subject: TypeExpression,
         /// Trait or lifetime bounds in declaration order.
         bounds: Box<[TypeExpression]>,
+        bound_modifiers: Box<[TraitBoundModifier]>,
         /// Lifetimes introduced by a higher-ranked trait bound.
         higher_ranked_lifetimes: Box<[LifetimeExpression]>,
         /// Optional source-oriented diagnostic text excluded from identity.
@@ -54,18 +58,21 @@ impl PartialEq for PredicateDescriptor {
                 Self::TypeBound {
                     subject,
                     bounds,
+                    bound_modifiers,
                     higher_ranked_lifetimes,
                     diagnostic: _,
                 },
                 Self::TypeBound {
                     subject: other_subject,
                     bounds: other_bounds,
+                    bound_modifiers: other_modifiers,
                     higher_ranked_lifetimes: other_lifetimes,
                     diagnostic: _,
                 },
             ) => {
                 subject == other_subject
                     && bounds == other_bounds
+                    && bound_modifiers == other_modifiers
                     && higher_ranked_lifetimes == other_lifetimes
             }
             (
@@ -118,11 +125,13 @@ impl Hash for PredicateDescriptor {
             Self::TypeBound {
                 subject,
                 bounds,
+                bound_modifiers,
                 higher_ranked_lifetimes,
                 diagnostic: _,
             } => {
                 subject.hash(state);
                 bounds.hash(state);
+                bound_modifiers.hash(state);
                 higher_ranked_lifetimes.hash(state);
             }
             Self::LifetimeOutlives {

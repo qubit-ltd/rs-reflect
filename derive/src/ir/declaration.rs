@@ -124,6 +124,8 @@ pub(crate) struct TraitDeclarationIr {
     pub(crate) attributes: Vec<HelperAttributeIr>,
     /// Explicit mappings for external trait bounds.
     pub(crate) external_traits: Vec<ExternalTraitIr>,
+    /// Explicitly declared reflected direct supertrait paths.
+    pub(crate) reflected_supertraits: Vec<PathIr>,
     /// Trait methods in source order.
     pub(crate) methods: Vec<MethodIr>,
     /// Associated type declarations in source order.

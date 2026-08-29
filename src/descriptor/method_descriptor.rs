@@ -279,6 +279,7 @@ pub struct MethodDescriptor {
     return_value: ReturnDescriptor,
     qualifiers: MethodQualifiers,
     generic_definition: GenericDefinitionDescriptor,
+    has_default: bool,
     declaration_owner: MethodDeclarationOwner,
 }
 
@@ -366,6 +367,9 @@ impl MethodDescriptor {
         &self.generic_definition
     }
 
+    /// Returns whether the trait declaration supplies a default body.
+    pub const fn has_default(&self) -> bool { self.has_default }
+
     /// Returns the owning trait definition for a trait method.
     ///
     /// `None` means this method is declared by an impl definition.
@@ -399,6 +403,7 @@ pub struct MethodDescriptorBuilder {
     return_value: ReturnDescriptor,
     qualifiers: MethodQualifiers,
     generic_definition: GenericDefinitionDescriptor,
+    has_default: bool,
     declaration_owner: MethodDeclarationOwner,
 }
 
@@ -424,6 +429,7 @@ impl MethodDescriptorBuilder {
                 predicates: Box::new([]),
                 diagnostic: Default::default(),
             },
+            has_default: false,
             declaration_owner,
         }
     }
@@ -464,6 +470,9 @@ impl MethodDescriptorBuilder {
         self
     }
 
+    /// Records whether the declared trait method has a default body.
+    pub fn has_default(mut self, has_default: bool) -> Self { self.has_default = has_default; self }
+
     /// Builds the immutable declaration.
     pub fn build(self) -> MethodDescriptor {
         MethodDescriptor {
@@ -476,6 +485,7 @@ impl MethodDescriptorBuilder {
             return_value: self.return_value,
             qualifiers: self.qualifiers,
             generic_definition: self.generic_definition,
+            has_default: self.has_default,
             declaration_owner: self.declaration_owner,
         }
     }

@@ -11,3 +11,11 @@ pub mod descriptor;
 pub mod registration;
 
 pub use inventory;
+#[doc(hidden)]
+pub use crate::descriptor::TraitImplPayload;
+#[doc(hidden)]
+pub use crate::descriptor::external_supertrait;
+#[doc(hidden)]
+pub use registration::{
+    FragmentKind, FragmentPayload, RegistrationFragment, RuntimeIdentity, StaticFragmentIdentity,
+};
