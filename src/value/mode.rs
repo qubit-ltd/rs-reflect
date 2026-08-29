@@ -43,6 +43,21 @@ pub trait Mode: sealed::Sealed {
 /// let value = 1_u32;
 /// assert_send(ReflectedRef::new(&value));
 /// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::ReflectedMut;
+///
+/// fn assert_send<T: Send>(_: T) {}
+/// let mut value = 1_u32;
+/// assert_send(ReflectedMut::new(&mut value));
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::ReflectedOwned;
+///
+/// fn assert_send<T: Send>(_: T) {}
+/// assert_send(ReflectedOwned::new(1_u32));
+/// ```
 pub enum Local {}
 
 /// The dynamic value mode with compile-time `Send` and `Sync` constraints.
@@ -79,6 +94,30 @@ pub enum Local {}
 /// use qubit_reflect::value::ReflectedRef;
 ///
 /// fn promote<'a>(value: ReflectedRef<'a>) -> ReflectedRef<'static> {
+///     value
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::ReflectedMut;
+///
+/// fn promote<'a>(value: ReflectedMut<'a>) -> ReflectedMut<'static> {
+///     value
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedRef;
+///
+/// fn promote<'a>(value: SendReflectedRef<'a>) -> SendReflectedRef<'static> {
+///     value
+/// }
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedMut;
+///
+/// fn promote<'a>(value: SendReflectedMut<'a>) -> SendReflectedMut<'static> {
 ///     value
 /// }
 /// ```

@@ -46,7 +46,8 @@ fn test_owned_any_interoperation_preserves_type_identity() {
 #[test]
 fn test_thread_safe_owned_can_be_downgraded_to_local() {
     let value = SendReflectedOwned::new(String::from("thread-safe"));
-    assert_send_and_sync(&value);
+    assert_send_and_sync(value);
+    let value = SendReflectedOwned::new(String::from("thread-safe"));
     let value = value.into_local();
 
     let text = match value.downcast::<String>() {
@@ -57,4 +58,4 @@ fn test_thread_safe_owned_can_be_downgraded_to_local() {
 }
 
 /// Verifies that a value retains both thread-safety auto traits.
-fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
+fn assert_send_and_sync<T: Send + Sync>(_: T) {}

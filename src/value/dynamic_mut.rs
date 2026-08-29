@@ -8,6 +8,16 @@ use crate::value::storage::{LocalMutStorage, ThreadSafeMutStorage};
 use crate::value::{Local, ThreadSafe};
 
 /// A mutable dynamic value borrow whose erased boundary is selected by `M`.
+///
+/// [`Local`] preserves the ordinary local `Any` boundary and intentionally does
+/// not implement `Send` or `Sync`. [`ThreadSafe`] only accepts `Send + Sync`
+/// mutable borrows, so its wrapper can implement both auto traits. The
+/// lifetime `'a` is the lifetime of the original exclusive borrow and prevents
+/// this wrapper from escaping that borrow.
+///
+/// Sized values enter through [`Self::new`]. Mutable `str` uses the dedicated
+/// [`Self::new_str_mut`] variant; it is accessed through [`Self::as_str`] or
+/// [`Self::as_str_mut`] and never masquerades as `Any`.
 pub struct DynamicMut<'a, M: Mode> {
     storage: M::MutStorage<'a>,
     marker: PhantomData<M::Marker>,

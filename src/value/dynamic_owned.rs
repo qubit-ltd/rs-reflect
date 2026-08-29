@@ -8,6 +8,17 @@ use crate::value::storage::{LocalOwnedStorage, ThreadSafeOwnedStorage};
 use crate::value::{Local, ThreadSafe};
 
 /// An owned dynamic value whose erased boundary is selected by `M`.
+///
+/// [`Local`] retains an ordinary local `Any` value and intentionally does not
+/// implement `Send` or `Sync`. [`ThreadSafe`] only accepts `Send + Sync`
+/// values and keeps that boundary in its erased storage, so the wrapper can
+/// implement both auto traits. Owned values require `'static` and do not carry
+/// a borrow lifetime.
+///
+/// This wrapper only accepts sized `Any`-compatible values. Borrowed `str` is
+/// represented exclusively by [`DynamicRef`](crate::value::DynamicRef) and
+/// [`DynamicMut`](crate::value::DynamicMut)'s dedicated variants, never by an
+/// owned dynamic value.
 pub struct DynamicOwned<M: Mode> {
     storage: M::OwnedStorage,
     marker: PhantomData<M::Marker>,

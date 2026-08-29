@@ -8,6 +8,16 @@ use crate::value::storage::{LocalRefStorage, ThreadSafeRefStorage};
 use crate::value::{Local, ThreadSafe};
 
 /// A shared dynamic value borrow whose erased boundary is selected by `M`.
+///
+/// [`Local`] preserves the ordinary local `Any` boundary and intentionally does
+/// not implement `Send` or `Sync`. [`ThreadSafe`] stores a `Sync` shared
+/// borrow, so its wrapper can implement both auto traits. The lifetime `'a` is
+/// the lifetime of the original borrow and prevents this wrapper from escaping
+/// that borrow.
+///
+/// Sized values enter through [`Self::new`]. `str` is unsized and therefore
+/// uses the dedicated [`Self::new_str`] variant; it is accessed through
+/// [`Self::as_str`] and never masquerades as `Any`.
 pub struct DynamicRef<'a, M: Mode> {
     storage: M::RefStorage<'a>,
     marker: PhantomData<M::Marker>,
