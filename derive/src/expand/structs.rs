@@ -237,7 +237,7 @@ fn registration(
 }
 
 /// Returns whether a type token stream mentions one source generic parameter.
-fn type_uses_identifier(tokens: &TokenStream, identifier: &str) -> bool {
+pub(crate) fn type_uses_identifier(tokens: &TokenStream, identifier: &str) -> bool {
     tokens.clone().into_iter().any(|token| match token {
         proc_macro2::TokenTree::Ident(value) => value == identifier,
         proc_macro2::TokenTree::Group(group) => type_uses_identifier(&group.stream(), identifier),
