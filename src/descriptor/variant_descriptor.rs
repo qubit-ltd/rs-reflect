@@ -1,0 +1,114 @@
+//! Immutable structural facts about reflected enum variants.
+
+use std::fmt;
+
+use crate::descriptor::FieldDescriptor;
+use crate::descriptor::TypeDescriptor;
+use crate::descriptor::TypeDescriptorResolver;
+
+/// The declared shape of an enum variant.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum VariantKind {
+    /// A fieldless variant.
+    Unit,
+    /// A positional variant.
+    Tuple,
+    /// A variant with named fields.
+    Struct,
+}
+
+/// The immutable structural description of one reflected enum variant.
+pub struct VariantDescriptor {
+    declaring_type: TypeDescriptorResolver,
+    index: usize,
+    rust_name: &'static str,
+    query_name: &'static str,
+    kind: VariantKind,
+    fields: &'static [FieldDescriptor],
+}
+
+impl VariantDescriptor {
+    /// Creates a frozen enum-variant descriptor for generated descriptor data.
+    ///
+    /// The resolver must return the enum root containing the variant. Fields
+    /// must be ordered by source index. This constructor performs no
+    /// allocation and never calls the resolver.
+    #[doc(hidden)]
+    pub const fn new(
+        declaring_type: TypeDescriptorResolver,
+        index: usize,
+        rust_name: &'static str,
+        query_name: &'static str,
+        kind: VariantKind,
+        fields: &'static [FieldDescriptor],
+    ) -> Self {
+        Self {
+            declaring_type,
+            index,
+            rust_name,
+            query_name,
+            kind,
+            fields,
+        }
+    }
+
+    /// Returns the enum root that contains this variant.
+    pub fn declaring_type(&self) -> &'static TypeDescriptor {
+        (self.declaring_type)()
+    }
+
+    /// Returns the zero-based source declaration index.
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Returns the immutable Rust variant name.
+    pub const fn rust_name(&self) -> &'static str {
+        self.rust_name
+    }
+
+    /// Returns the immutable lookup name.
+    pub const fn query_name(&self) -> &'static str {
+        self.query_name
+    }
+
+    /// Returns whether the variant is unit-, tuple-, or struct-shaped.
+    pub const fn kind(&self) -> VariantKind {
+        self.kind
+    }
+
+    /// Returns fields in source declaration order.
+    pub const fn fields(&self) -> &'static [FieldDescriptor] {
+        self.fields
+    }
+
+    /// Finds a named field by query name.
+    ///
+    /// `None` means the variant has no field with that lookup name.
+    pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
+        self.fields.iter().find(|field| field.query_name() == Some(name))
+    }
+
+    /// Returns a field by source index.
+    ///
+    /// `None` means the index is outside this variant's field range.
+    pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
+        self.fields.get(index)
+    }
+}
+
+impl fmt::Debug for VariantDescriptor {
+    /// Formats local facts without following declaring-type relationships
+    /// recursively.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("VariantDescriptor")
+            .field("declaring_type", &"<resolver>")
+            .field("index", &self.index)
+            .field("rust_name", &self.rust_name)
+            .field("query_name", &self.query_name)
+            .field("kind", &self.kind)
+            .field("field_count", &self.fields.len())
+            .finish()
+    }
+}

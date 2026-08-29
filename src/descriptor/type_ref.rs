@@ -1,0 +1,117 @@
+//! Resolved, opaque, and symbolic references between descriptors.
+
+use std::any::TypeId;
+use std::fmt;
+
+use crate::descriptor::TypeDescriptor;
+use crate::expression::TypeExpression;
+
+/// Returns the process-local Rust identity of `T`.
+pub(crate) fn type_id_of<T: ?Sized + 'static>() -> TypeId {
+    TypeId::of::<T>()
+}
+
+/// A type used by a reflected declaration or member.
+#[derive(Clone)]
+pub enum TypeRef {
+    /// A concrete reflected type with a unique root descriptor.
+    Resolved(&'static TypeDescriptor),
+    /// A concrete member type whose internal structure is intentionally hidden.
+    Opaque(&'static OpaqueTypeDescriptor),
+    /// A declaration-level type that is not concrete yet.
+    Symbolic(TypeExpression),
+}
+
+impl TypeRef {
+    /// Returns the root descriptor for a resolved reference.
+    ///
+    /// `None` means this reference is explicitly opaque or still symbolic.
+    pub const fn as_resolved(&self) -> Option<&'static TypeDescriptor> {
+        match self {
+            Self::Resolved(descriptor) => Some(descriptor),
+            Self::Opaque(_) | Self::Symbolic(_) => None,
+        }
+    }
+
+    /// Returns the member-local opaque descriptor for an opaque reference.
+    ///
+    /// `None` means this reference is resolved or still symbolic.
+    pub const fn as_opaque(&self) -> Option<&'static OpaqueTypeDescriptor> {
+        match self {
+            Self::Opaque(descriptor) => Some(descriptor),
+            Self::Resolved(_) | Self::Symbolic(_) => None,
+        }
+    }
+
+    /// Returns the structural expression for a symbolic reference.
+    ///
+    /// `None` means this reference already denotes a concrete resolved or
+    /// opaque type.
+    pub const fn as_symbolic(&self) -> Option<&TypeExpression> {
+        match self {
+            Self::Symbolic(expression) => Some(expression),
+            Self::Resolved(_) | Self::Opaque(_) => None,
+        }
+    }
+}
+
+impl fmt::Debug for TypeRef {
+    /// Formats resolved relationships by name so recursive descriptor graphs
+    /// remain bounded.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Resolved(descriptor) => formatter
+                .debug_tuple("Resolved")
+                .field(&descriptor.type_name())
+                .finish(),
+            Self::Opaque(descriptor) => formatter.debug_tuple("Opaque").field(descriptor).finish(),
+            Self::Symbolic(expression) => formatter.debug_tuple("Symbolic").field(expression).finish(),
+        }
+    }
+}
+
+/// A concrete member type whose internal structure was explicitly hidden.
+///
+/// This object is a member-local view, not a second root [`TypeDescriptor`]. It
+/// retains only exact process-local identity and diagnostic naming until safe
+/// whole-value adapters are added.
+pub struct OpaqueTypeDescriptor {
+    type_id: fn() -> TypeId,
+    type_name: &'static str,
+}
+
+impl OpaqueTypeDescriptor {
+    /// Creates an immutable opaque member descriptor for `T`.
+    ///
+    /// The supplied name is diagnostic only and does not participate in Rust
+    /// type identity.
+    #[doc(hidden)]
+    pub const fn new<T: ?Sized + 'static>(type_name: &'static str) -> Self {
+        Self {
+            type_id: type_id_of::<T>,
+            type_name,
+        }
+    }
+
+    /// Returns the exact process-local Rust type identity.
+    pub fn type_id(&self) -> TypeId {
+        (self.type_id)()
+    }
+
+    /// Returns the diagnostic Rust type name.
+    pub const fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+}
+
+impl fmt::Debug for OpaqueTypeDescriptor {
+    /// Formats the diagnostic identity without attempting root-descriptor
+    /// navigation.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OpaqueTypeDescriptor")
+            .field("type_id", &self.type_id())
+            .field("type_name", &self.type_name)
+            .finish()
+    }
+}
