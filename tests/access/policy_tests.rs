@@ -1,5 +1,6 @@
 //! Integration tests for reflected field access policies.
 
+use qubit_reflect::__private::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessOperation;
 use qubit_reflect::access::FieldAccessPolicy;
@@ -60,10 +61,11 @@ fn get_skipped<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAc
     Ok(ReflectedRef::new(&record.skipped))
 }
 
-static U32_TYPE: OpaqueTypeDescriptor = OpaqueTypeDescriptor::new::<u32>("u32");
+static U32_TYPE: OpaqueTypeDescriptor =
+    descriptor::opaque_member::<u32>();
 static U32_TYPE_REF: TypeRef = TypeRef::Opaque(&U32_TYPE);
 static POLICY_FIELDS: [FieldDescriptor; 2] = [
-    FieldDescriptor::new(
+    descriptor::field(
         policy_record_descriptor,
         0,
         Some("read_only"),
@@ -77,7 +79,7 @@ static POLICY_FIELDS: [FieldDescriptor; 2] = [
         Some(get_read_only_mut),
         Some(set_read_only),
     ),
-    FieldDescriptor::new(
+    descriptor::field(
         policy_record_descriptor,
         1,
         Some("skipped"),
@@ -87,12 +89,12 @@ static POLICY_FIELDS: [FieldDescriptor; 2] = [
     )
     .with_access(FieldAccessPolicy::Skipped, Some(get_skipped), None, None),
 ];
-static POLICY_RECORD_DESCRIPTOR: TypeDescriptor = TypeDescriptor::new_struct::<PolicyRecord>(
-    "policy_tests::PolicyRecord",
-    "PolicyRecord",
-    StructKind::Named,
-    &POLICY_FIELDS,
-);
+static POLICY_RECORD_DESCRIPTOR: TypeDescriptor =
+    descriptor::struct_type::<PolicyRecord>(
+        "policy_tests::PolicyRecord",
+        StructKind::Named,
+        &POLICY_FIELDS,
+    );
 
 /// Verifies read-only fields remain readable and described while all mutable
 /// entry points are rejected before their adapters can change the target.

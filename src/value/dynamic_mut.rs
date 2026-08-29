@@ -128,6 +128,22 @@ impl<'a> DynamicMut<'a, Local> {
             LocalMutStorage::Str(value) => Some(&mut **value),
         }
     }
+
+    /// Consumes this wrapper and returns the original mutable `str` borrow.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// An `Any`-compatible value returns the untouched wrapper so its exclusive
+    /// borrow is not lost.
+    pub fn into_str_mut(self) -> Result<&'a mut str, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            LocalMutStorage::Any(value) => Err(Self {
+                storage: LocalMutStorage::Any(value),
+                marker,
+            }),
+            LocalMutStorage::Str(value) => Ok(value),
+        }
+    }
 }
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
@@ -232,6 +248,23 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
         match &mut self.storage {
             ThreadSafeMutStorage::Any(_) => None,
             ThreadSafeMutStorage::Str(value) => Some(&mut **value),
+        }
+    }
+
+    /// Consumes this wrapper and returns the original thread-safe mutable
+    /// `str` borrow.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// An `Any`-compatible value returns the untouched wrapper and preserves
+    /// its `Send + Sync` erased boundary.
+    pub fn into_str_mut(self) -> Result<&'a mut str, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            ThreadSafeMutStorage::Any(value) => Err(Self {
+                storage: ThreadSafeMutStorage::Any(value),
+                marker,
+            }),
+            ThreadSafeMutStorage::Str(value) => Ok(value),
         }
     }
 

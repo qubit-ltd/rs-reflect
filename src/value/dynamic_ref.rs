@@ -101,6 +101,22 @@ impl<'a> DynamicRef<'a, Local> {
             LocalRefStorage::Str(value) => Some(value),
         }
     }
+
+    /// Consumes this wrapper and returns the original shared `str` borrow.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// An `Any`-compatible value returns the untouched wrapper so its borrow is
+    /// not lost.
+    pub fn into_str(self) -> Result<&'a str, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            LocalRefStorage::Any(value) => Err(Self {
+                storage: LocalRefStorage::Any(value),
+                marker,
+            }),
+            LocalRefStorage::Str(value) => Ok(value),
+        }
+    }
 }
 
 impl<'a> DynamicRef<'a, ThreadSafe> {
@@ -180,6 +196,23 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
         match &self.storage {
             ThreadSafeRefStorage::Any(_) => None,
             ThreadSafeRefStorage::Str(value) => Some(value),
+        }
+    }
+
+    /// Consumes this wrapper and returns the original thread-safe shared `str`
+    /// borrow.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// An `Any`-compatible value returns the untouched wrapper and preserves
+    /// its `Sync` erased boundary.
+    pub fn into_str(self) -> Result<&'a str, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            ThreadSafeRefStorage::Any(value) => Err(Self {
+                storage: ThreadSafeRefStorage::Any(value),
+                marker,
+            }),
+            ThreadSafeRefStorage::Str(value) => Ok(value),
         }
     }
 
