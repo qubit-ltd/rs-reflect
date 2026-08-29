@@ -108,7 +108,7 @@ static MIDDLE_TRAIT: LazyLock<&'static TraitDescriptor> = LazyLock::new(|| {
 
 fn target_type() -> &'static TypeDescriptor {
     static TARGET: TypeDescriptor =
-        TypeDescriptor::new_primitive::<u32>("u32", "u32", PrimitiveKind::U32);
+        qubit_reflect::__private::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
     &TARGET
 }
 
