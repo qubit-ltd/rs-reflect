@@ -101,11 +101,7 @@ impl FieldDescriptor {
     /// runtime identity, so fields at equal positions in different variants
     /// remain distinct.
     #[doc(hidden)]
-    pub const fn with_variant(
-        mut self,
-        variant_index: usize,
-        variant_rust_name: &'static str,
-    ) -> Self {
+    pub const fn with_variant(mut self, variant_index: usize, variant_rust_name: &'static str) -> Self {
         self.variant_index = Some(variant_index);
         self.variant_rust_name = Some(variant_rust_name);
         self
@@ -168,14 +164,12 @@ impl FieldDescriptor {
     ///
     /// Returns a target mismatch, policy, or unavailable-adapter error before
     /// invoking generated code. An enum-field adapter may additionally report
-    /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot outlive
-    /// `target`.
+    /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot
+    /// outlive `target`.
     pub fn get<'a>(&self, target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
         self.validate_shared_target(&target)?;
         self.validate_policy(FieldAccessOperation::Get)?;
-        let adapter = self
-            .get
-            .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
         adapter(target)
     }
 
@@ -184,10 +178,7 @@ impl FieldDescriptor {
     /// Returns a target mismatch, read-only/skipped policy, or unavailable-
     /// adapter error before invoking generated code. The returned exclusive
     /// borrow cannot outlive `target`.
-    pub fn get_mut<'a>(
-        &self,
-        target: ReflectedMut<'a>,
-    ) -> Result<ReflectedMut<'a>, FieldAccessError> {
+    pub fn get_mut<'a>(&self, target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, FieldAccessError> {
         self.validate_mutable_target(&target)?;
         self.validate_policy(FieldAccessOperation::GetMut)?;
         let adapter = self
@@ -203,11 +194,7 @@ impl FieldDescriptor {
     /// before generated code is invoked, so these failures do not modify the
     /// target. A symbolic definition-level field has no exact runtime identity
     /// and therefore returns [`FieldAccessError::Unavailable`].
-    pub fn set(
-        &self,
-        target: ReflectedMut<'_>,
-        value: ReflectedOwned,
-    ) -> Result<(), FieldAccessError> {
+    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldAccessError> {
         self.validate_mutable_target(&target)?;
         self.validate_policy(FieldAccessOperation::Set)?;
         let (expected, _) = self
@@ -220,9 +207,7 @@ impl FieldDescriptor {
                 mismatch: Box::new(TypeMismatch::new(expected, actual)),
             });
         }
-        let adapter = self
-            .set
-            .ok_or_else(|| self.unavailable(FieldAccessOperation::Set))?;
+        let adapter = self.set.ok_or_else(|| self.unavailable(FieldAccessOperation::Set))?;
         adapter(target, value)
     }
 
@@ -264,13 +249,12 @@ impl FieldDescriptor {
                 field: self.identity(),
                 operation,
             }),
-            (
-                FieldAccessPolicy::ReadOnly,
-                FieldAccessOperation::GetMut | FieldAccessOperation::Set,
-            ) => Err(FieldAccessError::ReadOnly {
-                field: self.identity(),
-                operation,
-            }),
+            (FieldAccessPolicy::ReadOnly, FieldAccessOperation::GetMut | FieldAccessOperation::Set) => {
+                Err(FieldAccessError::ReadOnly {
+                    field: self.identity(),
+                    operation,
+                })
+            }
             (FieldAccessPolicy::ReadWrite | FieldAccessPolicy::ReadOnly, _) => Ok(()),
         }
     }

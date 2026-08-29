@@ -2,15 +2,18 @@
 
 use std::any::TypeId;
 
-use crate::invoke::{InvocationInputMode, InvocationMode};
-use crate::value::{DynamicMut, DynamicOwned, DynamicRef};
+use crate::invoke::InvocationInputMode;
+use crate::invoke::InvocationMode;
+use crate::value::DynamicMut;
+use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
 
 /// A receiver supplied to a reflected method invocation.
 ///
 /// Owned receiver containers such as `Box<T>` and `Pin<Box<T>>` retain their
-/// exact container type in [`Self::Owned`]. `Pin<&T>` and `Pin<&mut T>` must not
-/// be lowered to the ordinary borrowed variants because doing so would discard
-/// their pin proof. Generated invocation support therefore needs a
+/// exact container type in [`Self::Owned`]. `Pin<&T>` and `Pin<&mut T>` must
+/// not be lowered to the ordinary borrowed variants because doing so would
+/// discard their pin proof. Generated invocation support therefore needs a
 /// method-specific `ReceiverAdapter` capability that preserves pinned borrows;
 /// absence of that adapter leaves the method describable but not invocable.
 pub enum InvocationReceiver<'call, M: InvocationMode> {
@@ -100,7 +103,8 @@ impl ReceiverExpectation {
         }
     }
 
-    /// Returns the required receiver mode, or `None` for an associated function.
+    /// Returns the required receiver mode, or `None` for an associated
+    /// function.
     pub const fn mode(self) -> Option<InvocationInputMode> {
         match self {
             Self::None => None,
@@ -114,9 +118,7 @@ impl ReceiverExpectation {
     pub const fn type_id(self) -> Option<TypeId> {
         match self {
             Self::None => None,
-            Self::Owned { type_id, .. } | Self::Ref { type_id, .. } | Self::Mut { type_id, .. } => {
-                Some(type_id)
-            }
+            Self::Owned { type_id, .. } | Self::Ref { type_id, .. } | Self::Mut { type_id, .. } => Some(type_id),
         }
     }
 
@@ -124,9 +126,9 @@ impl ReceiverExpectation {
     pub const fn type_name(self) -> Option<&'static str> {
         match self {
             Self::None => None,
-            Self::Owned { type_name, .. }
-            | Self::Ref { type_name, .. }
-            | Self::Mut { type_name, .. } => Some(type_name),
+            Self::Owned { type_name, .. } | Self::Ref { type_name, .. } | Self::Mut { type_name, .. } => {
+                Some(type_name)
+            }
         }
     }
 }

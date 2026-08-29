@@ -4,12 +4,18 @@ use std::sync::OnceLock;
 
 use crate::error::RegistryError;
 use crate::registry::ReflectRegistry;
-
 #[doc(hidden)]
-pub use crate::registry::fragment::{
-    CapabilityRegistration, FragmentKind, FragmentPayload, RegistrationFragment, RuntimeIdentity,
-    StaticFragmentIdentity,
-};
+pub use crate::registry::fragment::CapabilityRegistration;
+#[doc(hidden)]
+pub use crate::registry::fragment::FragmentKind;
+#[doc(hidden)]
+pub use crate::registry::fragment::FragmentPayload;
+#[doc(hidden)]
+pub use crate::registry::fragment::RegistrationFragment;
+#[doc(hidden)]
+pub use crate::registry::fragment::RuntimeIdentity;
+#[doc(hidden)]
+pub use crate::registry::fragment::StaticFragmentIdentity;
 
 /// Builds and validates an isolated registry snapshot from static fragments.
 ///
@@ -17,9 +23,7 @@ pub use crate::registry::fragment::{
 /// fixtures. Ordinary applications should call [`ReflectRegistry::initialize`].
 /// Returns [`RegistryError`] only after checking the complete fragment set.
 #[doc(hidden)]
-pub fn build_registry(
-    fragments: &[&'static RegistrationFragment],
-) -> Result<ReflectRegistry, RegistryError> {
+pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     crate::registry::build_registry(fragments)
 }
 

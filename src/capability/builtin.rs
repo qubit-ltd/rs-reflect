@@ -1,10 +1,13 @@
 //! Built-in capability identities and safe dynamic operation adapters.
 
-use std::any::{Any, TypeId};
+use std::any::Any;
+use std::any::TypeId;
 
-use crate::capability::{CapabilityDescriptor, CapabilityKey};
+use crate::capability::CapabilityDescriptor;
+use crate::capability::CapabilityKey;
 use crate::error::TypeMismatch;
-use crate::value::{DynamicOwned, Local};
+use crate::value::DynamicOwned;
+use crate::value::Local;
 
 const SEND_ID: &str = "qubit.reflect.send";
 const SYNC_ID: &str = "qubit.reflect.sync";
@@ -29,10 +32,7 @@ impl CloneAdapter {
     ///
     /// Returns [`TypeMismatch`] without changing `value` when its concrete type
     /// differs from the type captured by this adapter.
-    pub fn clone_owned(
-        &self,
-        value: &DynamicOwned<Local>,
-    ) -> Result<DynamicOwned<Local>, TypeMismatch> {
+    pub fn clone_owned(&self, value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
         (self.clone_owned)(value)
     }
 }
@@ -44,7 +44,8 @@ pub struct DefaultAdapter {
 }
 
 impl DefaultAdapter {
-    /// Creates an adapter after statically proving that `T` implements `Default`.
+    /// Creates an adapter after statically proving that `T` implements
+    /// `Default`.
     pub fn new<T: Default + 'static>() -> Self {
         Self {
             create: create_default::<T>,
@@ -98,9 +99,7 @@ pub fn default_descriptor<T: Default + 'static>() -> CapabilityDescriptor {
 }
 
 /// Clones one exact dynamic concrete type after checking its runtime identity.
-fn clone_owned<T: Clone + 'static>(
-    value: &DynamicOwned<Local>,
-) -> Result<DynamicOwned<Local>, TypeMismatch> {
+fn clone_owned<T: Clone + 'static>(value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
     let Some(value) = value.downcast_ref::<T>() else {
         let actual = value
             .as_any()

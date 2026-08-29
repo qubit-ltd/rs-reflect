@@ -2,11 +2,15 @@
 
 use std::fmt;
 
-use crate::descriptor::{
-    ImplDefinitionDescriptor, TraitDefinitionDescriptor, TypeDescriptor, TypeDescriptorResolver,
-};
-use crate::expression::{FunctionAbi, GenericDefinitionDescriptor, TypeExpression};
-use crate::identity::{MemberId, Visibility};
+use crate::descriptor::ImplDefinitionDescriptor;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::descriptor::TypeDescriptor;
+use crate::descriptor::TypeDescriptorResolver;
+use crate::expression::FunctionAbi;
+use crate::expression::GenericDefinitionDescriptor;
+use crate::expression::TypeExpression;
+use crate::identity::MemberId;
+use crate::identity::Visibility;
 
 /// How a non-receiver parameter is passed to a reflected method.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -219,7 +223,8 @@ impl Default for MethodQualifiers {
     }
 }
 
-/// A stable reason why a concrete method instance cannot be invoked dynamically.
+/// A stable reason why a concrete method instance cannot be invoked
+/// dynamically.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvocationUnavailableReason {
     /// The receiver form has no safe adapter.
@@ -279,14 +284,13 @@ impl InvocationAdapter {
         }
     }
 
-    /// Creates a descriptor for one callable thread-safe invocation entry point.
+    /// Creates a descriptor for one callable thread-safe invocation entry
+    /// point.
     ///
     /// The entry point's type preserves both the call lifetime and the runtime
     /// `Send` boundary required by [`ThreadSafe`](crate::value::ThreadSafe).
     #[doc(hidden)]
-    pub const fn thread_safe(
-        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
-    ) -> Self {
+    pub const fn thread_safe(entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
             local: None,
@@ -316,7 +320,8 @@ impl InvocationAdapter {
         self.local.map(|entry_point| entry_point(invocation))
     }
 
-    /// Invokes the thread-safe generated entry point when this descriptor has one.
+    /// Invokes the thread-safe generated entry point when this descriptor has
+    /// one.
     ///
     /// Returns `None` when this method was not explicitly generated with a
     /// thread-safe adapter.
@@ -333,7 +338,8 @@ impl InvocationAdapter {
     }
 }
 
-/// Serves as a stable opaque token for adapters whose real entry point is typed.
+/// Serves as a stable opaque token for adapters whose real entry point is
+/// typed.
 fn unavailable_entry_point() {}
 
 /// An immutable reflected method declaration.
@@ -409,9 +415,7 @@ impl MethodDescriptor {
     ///
     /// `None` means no parameter has the requested identifier.
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
-        self.parameters
-            .iter()
-            .find(|parameter| parameter.name() == Some(name))
+        self.parameters.iter().find(|parameter| parameter.name() == Some(name))
     }
 
     /// Returns a non-receiver parameter by declaration index.
@@ -437,7 +441,9 @@ impl MethodDescriptor {
     }
 
     /// Returns whether the trait declaration supplies a default body.
-    pub const fn has_default(&self) -> bool { self.has_default }
+    pub const fn has_default(&self) -> bool {
+        self.has_default
+    }
 
     /// Returns the owning trait definition for a trait method.
     ///
@@ -540,7 +546,10 @@ impl MethodDescriptorBuilder {
     }
 
     /// Records whether the declared trait method has a default body.
-    pub fn has_default(mut self, has_default: bool) -> Self { self.has_default = has_default; self }
+    pub fn has_default(mut self, has_default: bool) -> Self {
+        self.has_default = has_default;
+        self
+    }
 
     /// Builds the immutable declaration.
     pub fn build(self) -> MethodDescriptor {
@@ -609,9 +618,7 @@ impl fmt::Display for MethodInstanceBuildError {
             Self::DeclaredMethodNotOwnedByImpl => {
                 formatter.write_str("a declared inherent method must be owned by an impl")
             }
-            Self::TraitMethodNotOwnedByTrait => {
-                formatter.write_str("a trait method instance must be owned by a trait")
-            }
+            Self::TraitMethodNotOwnedByTrait => formatter.write_str("a trait method instance must be owned by a trait"),
             Self::RequiredMethodHasAdapter => {
                 formatter.write_str("a required method cannot have an invocation adapter")
             }
@@ -621,8 +628,9 @@ impl fmt::Display for MethodInstanceBuildError {
             Self::UnexpectedImplementationMethod => {
                 formatter.write_str("only an overridden method can name an impl method")
             }
-            Self::AdapterHasUnavailableReasons => formatter
-                .write_str("an available invocation adapter cannot have unavailable reasons"),
+            Self::AdapterHasUnavailableReasons => {
+                formatter.write_str("an available invocation adapter cannot have unavailable reasons")
+            }
             Self::UnavailableMethodMissingReasons => {
                 formatter.write_str("an unavailable method must provide a structured reason")
             }
@@ -710,7 +718,8 @@ impl MethodInstanceDescriptor {
         }
     }
 
-    /// Returns whether the implementation is required, defaulted, or overridden.
+    /// Returns whether the implementation is required, defaulted, or
+    /// overridden.
     pub const fn implementation_source(&self) -> MethodImplementationSource {
         self.implementation_source
     }

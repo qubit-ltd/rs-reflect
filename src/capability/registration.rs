@@ -2,7 +2,9 @@
 
 use std::any::TypeId;
 
-use crate::capability::{CapabilityConflict, CapabilityDescriptor, TypeCapabilities};
+use crate::capability::CapabilityConflict;
+use crate::capability::CapabilityDescriptor;
+use crate::capability::TypeCapabilities;
 use crate::descriptor::TypeDescriptor;
 
 /// A link-time fragment declaring capabilities for one exact concrete type.
@@ -15,10 +17,7 @@ pub struct TypeCapabilityRegistration {
 impl TypeCapabilityRegistration {
     /// Creates a macro-generated concrete capability registration fragment.
     #[doc(hidden)]
-    pub const fn new(
-        target_type_id: fn() -> TypeId,
-        descriptors: fn() -> Vec<CapabilityDescriptor>,
-    ) -> Self {
+    pub const fn new(target_type_id: fn() -> TypeId, descriptors: fn() -> Vec<CapabilityDescriptor>) -> Self {
         Self {
             target_type_id,
             descriptors,
@@ -38,10 +37,7 @@ pub struct ReflectedTypeRegistration {
 impl ReflectedTypeRegistration {
     /// Creates a macro-generated reflected concrete type registration fragment.
     #[doc(hidden)]
-    pub const fn new(
-        target_type_id: fn() -> TypeId,
-        descriptor: fn() -> &'static TypeDescriptor,
-    ) -> Self {
+    pub const fn new(target_type_id: fn() -> TypeId, descriptor: fn() -> &'static TypeDescriptor) -> Self {
         Self {
             target_type_id,
             descriptor,
@@ -54,7 +50,8 @@ inventory::collect!(ReflectedTypeRegistration);
 /// Collects all capability fragments registered for exact concrete type `T`.
 ///
 /// Returns [`CapabilityConflict`] when matching fragments claim the same ID.
-/// An unregistered type produces an empty set rather than inferred capabilities.
+/// An unregistered type produces an empty set rather than inferred
+/// capabilities.
 #[doc(hidden)]
 pub fn registered_type_capabilities<T: 'static>() -> Result<TypeCapabilities, CapabilityConflict> {
     let target = TypeId::of::<T>();
@@ -193,7 +190,8 @@ macro_rules! register_type_capabilities {
     };
 }
 
-/// Registers an existing [`Reflect`](crate::descriptor::Reflect) descriptor root.
+/// Registers an existing [`Reflect`](crate::descriptor::Reflect) descriptor
+/// root.
 ///
 /// The emitted fragment calls `TypeDescriptor::of` and therefore both verifies
 /// the trait bound and preserves the interner's existing root identity.

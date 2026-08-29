@@ -1,13 +1,20 @@
 //! Where-clause and trait-bound predicates.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
-use crate::expression::{DiagnosticText, LifetimeExpression, TypeExpression};
+use crate::expression::DiagnosticText;
+use crate::expression::LifetimeExpression;
+use crate::expression::TypeExpression;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum TraitBoundModifier { None, Maybe }
+pub enum TraitBoundModifier {
+    None,
+    Maybe,
+}
 
-/// A structural predicate from a generic declaration, trait object, or opaque type bound.
+/// A structural predicate from a generic declaration, trait object, or opaque
+/// type bound.
 #[derive(Clone, Debug)]
 pub enum PredicateDescriptor {
     /// Bounds placed on a type, for example `T: Display + Send`.

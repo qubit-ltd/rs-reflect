@@ -14,11 +14,7 @@ impl<T: Reflect, const LENGTH: usize> Reflect for [T; LENGTH] {
     /// Returns the interned descriptor for this array specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_array::<Self>(
-                std::any::type_name::<Self>(),
-                                resolved::<T>(),
-                LENGTH,
-            )
+            TypeDescriptor::new_array::<Self>(std::any::type_name::<Self>(), resolved::<T>(), LENGTH)
         })
     }
 }

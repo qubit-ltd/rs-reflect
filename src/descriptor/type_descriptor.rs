@@ -3,7 +3,8 @@
 use std::any::TypeId;
 use std::fmt;
 
-use crate::capability::{CapabilityKey, TypeCapabilities};
+use crate::capability::CapabilityKey;
+use crate::capability::TypeCapabilities;
 use crate::descriptor::ArrayTypeDescriptor;
 use crate::descriptor::EnumTypeDescriptor;
 use crate::descriptor::FieldDescriptor;
@@ -380,7 +381,8 @@ impl TypeDescriptor {
         )
     }
 
-    /// Builds common immutable root state with a descriptor-owned capability resolver.
+    /// Builds common immutable root state with a descriptor-owned capability
+    /// resolver.
     const fn new_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
         data: TypeDescriptorData,

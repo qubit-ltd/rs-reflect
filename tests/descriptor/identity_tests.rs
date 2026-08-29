@@ -1,9 +1,12 @@
 //! Integration tests for type identity and base error APIs.
 
 use qubit_reflect::error::RegistryError;
-use qubit_reflect::identity::{
-    CapabilityId, ExternalTraitId, FragmentIdentity, MemberId, Visibility, VisibilityKind,
-};
+use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::identity::ExternalTraitId;
+use qubit_reflect::identity::FragmentIdentity;
+use qubit_reflect::identity::MemberId;
+use qubit_reflect::identity::Visibility;
+use qubit_reflect::identity::VisibilityKind;
 
 /// Verifies namespaced identifiers accept valid external names.
 #[test]
@@ -24,7 +27,8 @@ fn test_namespaced_ids_reject_non_ascii_and_malformed_segments() {
     assert!(CapabilityId::new("example.clone.").is_err());
 }
 
-/// Verifies external capability IDs cannot claim the library-reserved namespace.
+/// Verifies external capability IDs cannot claim the library-reserved
+/// namespace.
 #[test]
 fn test_capability_id_rejects_reserved_namespace() {
     assert!(CapabilityId::new("qubit.reflect").is_err());
@@ -32,7 +36,8 @@ fn test_capability_id_rejects_reserved_namespace() {
     assert!(ExternalTraitId::new("qubit.reflect.external").is_err());
 }
 
-/// Verifies member identities combine their declaring identity, category, index, and fragment.
+/// Verifies member identities combine their declaring identity, category,
+/// index, and fragment.
 #[test]
 fn test_member_id_is_a_composite_identity() {
     let fragment = FragmentIdentity::new("example_crate", "example::model", 12, 5, "field", 42);
@@ -47,22 +52,10 @@ fn test_member_id_is_a_composite_identity() {
 /// Verifies source visibilities normalize to their stable categories.
 #[test]
 fn test_visibility_normalizes_source_forms() {
-    assert_eq!(
-        Visibility::from_source("pub").kind(),
-        VisibilityKind::Public
-    );
-    assert_eq!(
-        Visibility::from_source("pub(crate)").kind(),
-        VisibilityKind::Crate
-    );
-    assert_eq!(
-        Visibility::from_source("pub(super)").kind(),
-        VisibilityKind::Super
-    );
-    assert_eq!(
-        Visibility::from_source("pub(self)").kind(),
-        VisibilityKind::Private
-    );
+    assert_eq!(Visibility::from_source("pub").kind(), VisibilityKind::Public);
+    assert_eq!(Visibility::from_source("pub(crate)").kind(), VisibilityKind::Crate);
+    assert_eq!(Visibility::from_source("pub(super)").kind(), VisibilityKind::Super);
+    assert_eq!(Visibility::from_source("pub(self)").kind(), VisibilityKind::Private);
 }
 
 /// Verifies restricted visibilities retain their source path for diagnostics.
@@ -83,7 +76,8 @@ fn test_visibility_rejects_empty_restricted_path() {
     assert_eq!(visibility.restricted_path(), None);
 }
 
-/// Verifies registry errors retain their machine-readable kind after inexpensive cloning.
+/// Verifies registry errors retain their machine-readable kind after
+/// inexpensive cloning.
 #[test]
 fn test_registry_error_clone_preserves_kind() {
     let left = FragmentIdentity::new("example", "example::one", 1, 1, "impl", 1);

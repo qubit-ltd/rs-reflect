@@ -2,11 +2,16 @@
 
 use std::sync::OnceLock;
 
-use qubit_reflect::descriptor::{MethodQualifier, StructKind};
-use qubit_reflect::invoke::{Invocation, InvocationArg, InvocationOutput};
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::{Reflect, reflect, reflect_impl};
+use qubit_reflect::Reflect;
+use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::invoke::Invocation;
+use qubit_reflect::invoke::InvocationArg;
+use qubit_reflect::invoke::InvocationOutput;
+use qubit_reflect::reflect;
+use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::DynamicOwned;
 
 struct Sample;
 
@@ -14,11 +19,7 @@ impl Reflect for Sample {
     fn type_descriptor() -> &'static qubit_reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<qubit_reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            qubit_reflect::__private::descriptor::struct_type::<Sample>(
-                "Sample",
-                StructKind::Named,
-                &[],
-            )
+            qubit_reflect::__private::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
         })
     }
 }
@@ -96,11 +97,7 @@ impl Reflect for Counter {
     fn type_descriptor() -> &'static qubit_reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<qubit_reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            qubit_reflect::__private::descriptor::struct_type::<Counter>(
-                "Counter",
-                StructKind::Named,
-                &[],
-            )
+            qubit_reflect::__private::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
         })
     }
 }
@@ -227,9 +224,11 @@ fn test_reflect_impl_does_not_generate_adapter_for_non_rust_abi() {
         panic!("non-Rust ABI method instance must remain describable");
     };
     assert!(instance.adapter().is_none());
-    assert!(instance
-        .unavailable_reasons()
-        .contains(&qubit_reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi));
+    assert!(
+        instance
+            .unavailable_reasons()
+            .contains(&qubit_reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi)
+    );
 }
 
 #[test]
@@ -287,9 +286,9 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_argument() {
     };
     let adapter = instance.adapter().expect("owned argument method needs adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(
-            DynamicOwned::<qubit_reflect::value::Local>::new(41_u8),
-        )]))
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            qubit_reflect::value::Local,
+        >::new(41_u8))]))
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {

@@ -31,12 +31,14 @@ struct RegistryErrorData {
 }
 
 impl RegistryError {
-    /// Creates an error for two fragments that claim the same registration identity.
+    /// Creates an error for two fragments that claim the same registration
+    /// identity.
     pub fn duplicate_fragment(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::DuplicateFragment, left, right)
     }
 
-    /// Creates an error for fragments that disagree about one identity's content.
+    /// Creates an error for fragments that disagree about one identity's
+    /// content.
     pub fn identity_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::IdentityConflict, left, right)
     }
@@ -51,7 +53,8 @@ impl RegistryError {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
 
-    /// Creates an error when the current platform lacks distributed-registration support.
+    /// Creates an error when the current platform lacks
+    /// distributed-registration support.
     pub fn unsupported_platform() -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::UnsupportedPlatform,
@@ -65,7 +68,8 @@ impl RegistryError {
         self.0.kind
     }
 
-    /// Returns the two conflicting fragments when this error originated from a conflict.
+    /// Returns the two conflicting fragments when this error originated from a
+    /// conflict.
     pub fn conflicting_fragments(&self) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
         match (&self.0.left, &self.0.right) {
             (Some(left), Some(right)) => Some((left, right)),
@@ -73,7 +77,8 @@ impl RegistryError {
         }
     }
 
-    /// Creates a conflict error retaining both conflicting registration fragments.
+    /// Creates a conflict error retaining both conflicting registration
+    /// fragments.
     fn conflict(kind: RegistryErrorKind, left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind,

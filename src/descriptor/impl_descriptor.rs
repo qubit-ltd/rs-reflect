@@ -3,14 +3,18 @@
 use std::fmt;
 
 use super::trait_descriptor::generic_argument_is_concrete;
-use crate::descriptor::{
-    AssociatedConstDescriptor, AssociatedTypeDescriptor, MethodDescriptor,
-    MethodInstanceDescriptor, TraitDefinitionDescriptor, TraitDescriptor, TypeDescriptor,
-    TypeDescriptorResolver,
-};
-use crate::expression::{
-    GenericArgument, GenericDefinitionDescriptor, GenericParameterDescriptor, TypeExpression,
-};
+use crate::descriptor::AssociatedConstDescriptor;
+use crate::descriptor::AssociatedTypeDescriptor;
+use crate::descriptor::MethodDescriptor;
+use crate::descriptor::MethodInstanceDescriptor;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::descriptor::TraitDescriptor;
+use crate::descriptor::TypeDescriptor;
+use crate::descriptor::TypeDescriptorResolver;
+use crate::expression::GenericArgument;
+use crate::expression::GenericDefinitionDescriptor;
+use crate::expression::GenericParameterDescriptor;
+use crate::expression::TypeExpression;
 use crate::identity::FragmentIdentity;
 use crate::value::ReflectedOwned;
 
@@ -226,9 +230,7 @@ impl fmt::Display for ImplDescriptorBuildError {
     /// Formats a stable diagnostic message.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InherentImplHasTrait => {
-                formatter.write_str("an inherent impl cannot name a trait")
-            }
+            Self::InherentImplHasTrait => formatter.write_str("an inherent impl cannot name a trait"),
             Self::TraitImplMissingTrait => formatter.write_str("a trait impl must name a trait"),
             Self::GenericArgumentsDoNotMatchDefinition => {
                 formatter.write_str("concrete impl arguments do not match the definition")
@@ -318,9 +320,7 @@ impl ImplDescriptor {
 
     /// Finds a trait declaration by query name.
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
-        self.methods
-            .iter()
-            .find(|method| method.query_name() == name)
+        self.methods.iter().find(|method| method.query_name() == name)
     }
 
     /// Returns concrete effective instances, including defaulted methods.
@@ -397,10 +397,7 @@ pub struct ImplDescriptorBuilder {
 
 impl ImplDescriptorBuilder {
     /// Creates an empty concrete instance builder.
-    fn new(
-        definition: &'static ImplDefinitionDescriptor,
-        target_type: TypeDescriptorResolver,
-    ) -> Self {
+    fn new(definition: &'static ImplDefinitionDescriptor, target_type: TypeDescriptorResolver) -> Self {
         Self {
             definition,
             target_type,
@@ -480,20 +477,14 @@ impl ImplDescriptorBuilder {
             .all(|(parameter, argument)| {
                 matches!(
                     (parameter, argument),
-                    (
-                        GenericParameterDescriptor::Type { .. },
-                        GenericArgument::Type(_)
-                    ) | (
-                        GenericParameterDescriptor::Const { .. },
-                        GenericArgument::Const(_)
-                    )
+                    (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
+                        | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
                 )
             });
         if !kinds_match {
             return Err(ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition);
         }
-        if let (Some(expected), Some(actual)) =
-            (self.definition.implemented_trait(), self.implemented_trait)
+        if let (Some(expected), Some(actual)) = (self.definition.implemented_trait(), self.implemented_trait)
             && actual.definition().trait_id() != expected.trait_id()
         {
             return Err(ImplDescriptorBuildError::ImplementedTraitDefinitionMismatch);
@@ -511,12 +502,9 @@ impl ImplDescriptorBuilder {
                     .methods()
                     .iter()
                     .any(|method| std::ptr::eq(method, instance.declaration()))
-                    || instance.implementation_method().is_some_and(|method| {
-                        !self
-                            .methods
-                            .iter()
-                            .any(|candidate| std::ptr::eq(candidate, method))
-                    })
+                    || instance
+                        .implementation_method()
+                        .is_some_and(|method| !self.methods.iter().any(|candidate| std::ptr::eq(candidate, method)))
             });
             let foreign_type = self.associated_types.iter().any(|binding| {
                 !applied_trait
@@ -534,8 +522,7 @@ impl ImplDescriptorBuilder {
                 return Err(ImplDescriptorBuildError::ForeignMember);
             }
         } else if self.method_instances.iter().any(|instance| {
-            instance.implementation_source()
-                != crate::descriptor::MethodImplementationSource::Declared
+            instance.implementation_source() != crate::descriptor::MethodImplementationSource::Declared
                 || !self
                     .methods
                     .iter()

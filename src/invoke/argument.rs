@@ -3,7 +3,9 @@
 use std::any::TypeId;
 
 use crate::invoke::InvocationMode;
-use crate::value::{DynamicMut, DynamicOwned, DynamicRef};
+use crate::value::DynamicMut;
+use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
 
 /// The ownership or borrowing mode of an invocation input.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

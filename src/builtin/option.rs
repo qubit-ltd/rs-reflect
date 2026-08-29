@@ -14,10 +14,7 @@ impl<T: Reflect> Reflect for Option<T> {
     /// Returns the interned descriptor for this optional-value specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_optional::<Self>(
-                std::any::type_name::<Self>(),
-                                resolved::<T>(),
-            )
+            TypeDescriptor::new_optional::<Self>(std::any::type_name::<Self>(), resolved::<T>())
         })
     }
 }

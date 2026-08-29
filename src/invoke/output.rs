@@ -1,7 +1,10 @@
 //! Outputs returned by reflected method adapters.
 
-use crate::invoke::{InvocationMode, ReflectedFuture};
-use crate::value::{DynamicMut, DynamicOwned, DynamicRef};
+use crate::invoke::InvocationMode;
+use crate::invoke::ReflectedFuture;
+use crate::value::DynamicMut;
+use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
 
 /// The invocation input from which a returned borrow may originate.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

@@ -1,10 +1,12 @@
 //! Structural representations of Rust type expressions.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
-use crate::expression::{
-    ConstExpression, GenericArgument, LifetimeExpression, PredicateDescriptor,
-};
+use crate::expression::ConstExpression;
+use crate::expression::GenericArgument;
+use crate::expression::LifetimeExpression;
+use crate::expression::PredicateDescriptor;
 
 macro_rules! impl_identity_without_diagnostic {
     ($type:ty { $first:ident $(, $field:ident)* $(,)? }) => {
@@ -27,8 +29,9 @@ macro_rules! impl_identity_without_diagnostic {
 
 /// Source-oriented text that supplements diagnostics.
 ///
-/// This value has ordinary text equality and hashing. Descriptor implementations deliberately
-/// exclude diagnostic fields from their structural identity.
+/// This value has ordinary text equality and hashing. Descriptor
+/// implementations deliberately exclude diagnostic fields from their structural
+/// identity.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DiagnosticText(pub Option<Box<str>>);
 
@@ -44,7 +47,8 @@ impl From<String> for DiagnosticText {
     }
 }
 
-/// A closed, navigable Rust type expression independent of parser implementation types.
+/// A closed, navigable Rust type expression independent of parser
+/// implementation types.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeExpression {
     /// A concrete path such as `std::vec::Vec<T>`.

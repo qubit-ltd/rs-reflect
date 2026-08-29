@@ -3,9 +3,11 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
+use crate::value::Local;
+use crate::value::ThreadSafe;
 use crate::value::mode::Mode;
-use crate::value::storage::{LocalOwnedStorage, ThreadSafeOwnedStorage};
-use crate::value::{Local, ThreadSafe};
+use crate::value::storage::LocalOwnedStorage;
+use crate::value::storage::ThreadSafeOwnedStorage;
 
 /// An owned dynamic value whose erased boundary is selected by `M`.
 ///
@@ -51,8 +53,7 @@ impl DynamicOwned<Local> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its local `Any` boundary.
@@ -126,8 +127,7 @@ impl DynamicOwned<ThreadSafe> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its thread-safe `Any` boundary.
@@ -172,7 +172,8 @@ impl DynamicOwned<ThreadSafe> {
         }
     }
 
-    /// Downgrades this thread-safe wrapper to the local mode without changing its value.
+    /// Downgrades this thread-safe wrapper to the local mode without changing
+    /// its value.
     pub fn into_local(self) -> DynamicOwned<Local> {
         let Self { storage, .. } = self;
         let ThreadSafeOwnedStorage::Any(value) = storage;

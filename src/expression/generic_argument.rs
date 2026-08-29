@@ -1,8 +1,11 @@
 //! Generic arguments and structural const expressions.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
-use crate::expression::{LifetimeExpression, PredicateDescriptor, TypeExpression};
+use crate::expression::LifetimeExpression;
+use crate::expression::PredicateDescriptor;
+use crate::expression::TypeExpression;
 
 /// An argument applied to a generic path segment.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -59,10 +62,12 @@ impl Hash for ConstGenericArgument {
     }
 }
 
-/// A structural const expression used by a generic argument, array length, or const default.
+/// A structural const expression used by a generic argument, array length, or
+/// const default.
 ///
-/// Values are stored as typed data rather than source tokens.  A path can identify a named
-/// const item or parameter, but this descriptor does not attempt runtime const evaluation.
+/// Values are stored as typed data rather than source tokens.  A path can
+/// identify a named const item or parameter, but this descriptor does not
+/// attempt runtime const evaluation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConstExpression {
     /// A signed integer value.

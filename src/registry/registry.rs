@@ -3,9 +3,13 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
-use crate::descriptor::{ImplDescriptor, TraitDefinitionDescriptor, TraitId, TypeDescriptor};
+use crate::descriptor::ImplDescriptor;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::descriptor::TraitId;
+use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
-use crate::registry::builder::{build_inventory_registry, initialize_cached};
+use crate::registry::builder::build_inventory_registry;
+use crate::registry::builder::initialize_cached;
 use crate::registry::indexes::RegistryIndexes;
 
 /// A borrowed, deterministic set of type-descriptor name matches.
@@ -46,7 +50,8 @@ impl<'registry> IntoIterator for TypeCandidates<'registry> {
     }
 }
 
-/// An ordered borrowed view over trait declarations sharing one diagnostic path.
+/// An ordered borrowed view over trait declarations sharing one diagnostic
+/// path.
 #[derive(Clone, Copy, Debug)]
 pub struct TraitCandidates<'registry> {
     descriptors: &'registry [&'static TraitDefinitionDescriptor],
@@ -59,9 +64,7 @@ impl<'registry> TraitCandidates<'registry> {
     }
 
     /// Returns candidates in stable fragment order.
-    pub fn iter(
-        self,
-    ) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
+    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
@@ -83,9 +86,7 @@ impl<'registry> TraitCandidates<'registry> {
 
 impl<'registry> IntoIterator for TraitCandidates<'registry> {
     type Item = &'static TraitDefinitionDescriptor;
-    type IntoIter = std::iter::Copied<
-        std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>,
-    >;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -123,12 +124,7 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_type_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(
-            self.indexes
-                .types_by_type_name
-                .get(name)
-                .map_or(&[], Box::as_ref),
-        )
+        TypeCandidates::new(self.indexes.types_by_type_name.get(name).map_or(&[], Box::as_ref))
     }
 
     /// Finds every descriptor with the reflection query name `name`.
@@ -136,12 +132,7 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_query_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(
-            self.indexes
-                .types_by_query_name
-                .get(name)
-                .map_or(&[], Box::as_ref),
-        )
+        TypeCandidates::new(self.indexes.types_by_query_name.get(name).map_or(&[], Box::as_ref))
     }
 
     /// Enumerates all statically registered roots in stable fragment order.
@@ -155,15 +146,14 @@ impl ReflectRegistry {
     /// exact root. Its order is the registry's stable fragment order, so a
     /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
     pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
-        self.indexes
-            .impls_by_target
-            .get(&type_id)
-            .map_or(&[], Box::as_ref)
+        self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
     }
 
-    /// Finds a reflected or external trait declaration by its process-local identity.
+    /// Finds a reflected or external trait declaration by its process-local
+    /// identity.
     ///
-    /// `None` means no linked registration fragment declared the requested trait.
+    /// `None` means no linked registration fragment declared the requested
+    /// trait.
     pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
         self.indexes.traits_by_id.get(trait_id).copied()
     }
@@ -172,23 +162,13 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked reflected trait declaration has the exact path,
     /// or the path is ambiguous across linked fragments.
-    pub fn trait_definition_by_path(
-        &self,
-        rust_path: &str,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn trait_definition_by_path(&self, rust_path: &str) -> Option<&'static TraitDefinitionDescriptor> {
         self.find_trait_definitions_by_path(rust_path).only()
     }
 
-    /// Finds every trait declaration with a diagnostic Rust path in stable order.
-    pub fn find_trait_definitions_by_path(
-        &self,
-        rust_path: &str,
-    ) -> TraitCandidates<'_> {
-        TraitCandidates::new(
-            self.indexes
-                .traits_by_rust_path
-                .get(rust_path)
-                .map_or(&[], Box::as_ref),
-        )
+    /// Finds every trait declaration with a diagnostic Rust path in stable
+    /// order.
+    pub fn find_trait_definitions_by_path(&self, rust_path: &str) -> TraitCandidates<'_> {
+        TraitCandidates::new(self.indexes.traits_by_rust_path.get(rust_path).map_or(&[], Box::as_ref))
     }
 }

@@ -3,13 +3,21 @@
 use std::fmt;
 
 use crate::identity::MemberId;
-use crate::invoke::{
-    ArgumentExpectation, InvocationArg, InvocationError, InvocationErrorKind, InvocationFailure,
-    InvocationInputMode, InvocationMode, InvocationReceiver, ReceiverExpectation,
-};
-use crate::value::{DynamicMut, DynamicOwned, DynamicRef};
+use crate::invoke::ArgumentExpectation;
+use crate::invoke::InvocationArg;
+use crate::invoke::InvocationError;
+use crate::invoke::InvocationErrorKind;
+use crate::invoke::InvocationFailure;
+use crate::invoke::InvocationInputMode;
+use crate::invoke::InvocationMode;
+use crate::invoke::InvocationReceiver;
+use crate::invoke::ReceiverExpectation;
+use crate::value::DynamicMut;
+use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
 
-/// An explicit receiver and ordered positional arguments sharing one call lifetime.
+/// An explicit receiver and ordered positional arguments sharing one call
+/// lifetime.
 pub struct Invocation<'call, M: InvocationMode> {
     receiver: Option<InvocationReceiver<'call, M>>,
     arguments: Box<[InvocationArg<'call, M>]>,
@@ -116,15 +124,13 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         })
     }
 
-    /// Creates an invocation from parts previously returned by validation or recovery.
+    /// Creates an invocation from parts previously returned by validation or
+    /// recovery.
     pub(crate) fn from_parts(
         receiver: Option<InvocationReceiver<'call, M>>,
         arguments: Box<[InvocationArg<'call, M>]>,
     ) -> Self {
-        Self {
-            receiver,
-            arguments,
-        }
+        Self { receiver, arguments }
     }
 
     /// Validates receiver presence, mode, and exact type without consuming it.
@@ -136,11 +142,9 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
                 actual: actual_mode,
             });
         }
-        if let (Some(expected_type), Some(expected_name), Some(actual)) = (
-            expected.type_id(),
-            expected.type_name(),
-            self.receiver.as_ref(),
-        ) && expected_type != actual.type_id()
+        if let (Some(expected_type), Some(expected_name), Some(actual)) =
+            (expected.type_id(), expected.type_name(), self.receiver.as_ref())
+            && expected_type != actual.type_id()
         {
             return Err(InvocationErrorKind::ReceiverTypeMismatch {
                 expected: expected_type,
@@ -152,11 +156,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Pairs one validation error with every untouched input.
-    fn into_failure(
-        self,
-        method_identity: &MemberId,
-        kind: InvocationErrorKind,
-    ) -> InvocationFailure<'call, M> {
+    fn into_failure(self, method_identity: &MemberId, kind: InvocationErrorKind) -> InvocationFailure<'call, M> {
         InvocationFailure {
             error: InvocationError::new(method_identity.clone(), kind),
             recovery: crate::invoke::InvocationRecovery::new(self.receiver, self.arguments),
@@ -185,25 +185,18 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     }
 
     /// Consumes the validation state so an adapter may extract owned values.
-    pub fn into_parts(
-        self,
-    ) -> (
-        Option<InvocationReceiver<'call, M>>,
-        Box<[InvocationArg<'call, M>]>,
-    ) {
+    pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 }
 
 impl<M: InvocationMode> fmt::Debug for ValidatedInvocation<'_, M> {
-    /// Formats modes and argument count without requiring erased values to be `Debug`.
+    /// Formats modes and argument count without requiring erased values to be
+    /// `Debug`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ValidatedInvocation")
-            .field(
-                "receiver_mode",
-                &self.receiver.as_ref().map(InvocationReceiver::mode),
-            )
+            .field("receiver_mode", &self.receiver.as_ref().map(InvocationReceiver::mode))
             .field("argument_count", &self.arguments.len())
             .finish()
     }
@@ -211,15 +204,11 @@ impl<M: InvocationMode> fmt::Debug for ValidatedInvocation<'_, M> {
 
 /// Returns whether `actual` can safely satisfy `expected`.
 fn mode_matches(expected: InvocationInputMode, actual: InvocationInputMode) -> bool {
-    expected == actual
-        || (expected == InvocationInputMode::Ref && actual == InvocationInputMode::Mut)
+    expected == actual || (expected == InvocationInputMode::Ref && actual == InvocationInputMode::Mut)
 }
 
 /// Applies argument mode compatibility to optional receiver modes.
-fn receiver_mode_matches(
-    expected: Option<InvocationInputMode>,
-    actual: Option<InvocationInputMode>,
-) -> bool {
+fn receiver_mode_matches(expected: Option<InvocationInputMode>, actual: Option<InvocationInputMode>) -> bool {
     match (expected, actual) {
         (None, None) => true,
         (Some(expected), Some(actual)) => mode_matches(expected, actual),

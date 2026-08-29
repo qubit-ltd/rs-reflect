@@ -45,13 +45,9 @@ impl fmt::Display for ConstructionUnavailableReason {
     /// Formats a concise human-readable reason.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingDefaultProvider => {
-                formatter.write_str("missing explicit default provider")
-            }
+            Self::MissingDefaultProvider => formatter.write_str("missing explicit default provider"),
             Self::SymbolicFieldType => formatter.write_str("field type is not concrete"),
-            Self::CallerValueForbidden => {
-                formatter.write_str("field value must come from its generated provider")
-            }
+            Self::CallerValueForbidden => formatter.write_str("field value must come from its generated provider"),
             Self::UpdateForbidden => formatter.write_str("field update is unavailable"),
         }
     }
@@ -133,11 +129,7 @@ impl fmt::Display for ConstructionFieldId {
                 self.declaring_type_name, self.index
             ),
             (None, Some(field)) => write!(formatter, "{}::{field}", self.declaring_type_name),
-            (None, None) => write!(
-                formatter,
-                "{} field #{}",
-                self.declaring_type_name, self.index
-            ),
+            (None, None) => write!(formatter, "{} field #{}", self.declaring_type_name, self.index),
         }
     }
 }

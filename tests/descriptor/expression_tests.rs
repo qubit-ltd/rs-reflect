@@ -1,17 +1,31 @@
 //! Integration tests for structural Rust type expressions.
 
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
-use qubit_reflect::expression::{
-    ArrayTypeExpression, AssociatedTypeExpression, ConcreteTypeExpression, ConstExpression,
-    ConstGenericArgument, DiagnosticText, FunctionAbi, FunctionPointerExpression, FunctionSafety,
-    GenericArgument, GenericDefinitionDescriptor, GenericParameterDescriptor, LifetimeExpression,
-    OpaqueTypeExpression, PredicateDescriptor, RawPointerTypeExpression, ReferenceTypeExpression,
-    TraitObjectExpression, TypeExpression,
-};
+use qubit_reflect::expression::ArrayTypeExpression;
+use qubit_reflect::expression::AssociatedTypeExpression;
+use qubit_reflect::expression::ConcreteTypeExpression;
+use qubit_reflect::expression::ConstExpression;
+use qubit_reflect::expression::ConstGenericArgument;
+use qubit_reflect::expression::DiagnosticText;
+use qubit_reflect::expression::FunctionAbi;
+use qubit_reflect::expression::FunctionPointerExpression;
+use qubit_reflect::expression::FunctionSafety;
+use qubit_reflect::expression::GenericArgument;
+use qubit_reflect::expression::GenericDefinitionDescriptor;
+use qubit_reflect::expression::GenericParameterDescriptor;
+use qubit_reflect::expression::LifetimeExpression;
+use qubit_reflect::expression::OpaqueTypeExpression;
+use qubit_reflect::expression::PredicateDescriptor;
+use qubit_reflect::expression::RawPointerTypeExpression;
+use qubit_reflect::expression::ReferenceTypeExpression;
+use qubit_reflect::expression::TraitObjectExpression;
+use qubit_reflect::expression::TypeExpression;
 
-/// Builds a concrete path expression without relying on parser implementation types.
+/// Builds a concrete path expression without relying on parser implementation
+/// types.
 fn concrete(path: &[&str], arguments: Vec<GenericArgument>) -> TypeExpression {
     TypeExpression::Concrete(ConcreteTypeExpression {
         path: path.iter().map(|segment| (*segment).into()).collect(),
@@ -27,15 +41,14 @@ fn identity_hash<T: Hash>(value: &T) -> u64 {
     hasher.finish()
 }
 
-/// Verifies that nested references, slices, and generic parameters remain navigable.
+/// Verifies that nested references, slices, and generic parameters remain
+/// navigable.
 #[test]
 fn test_type_expression_navigates_mutable_reference_to_slice_parameter() {
     let expression = TypeExpression::Reference(ReferenceTypeExpression {
         lifetime: LifetimeExpression::Named("a".into()),
         mutable: true,
-        target: Box::new(TypeExpression::Slice(Box::new(TypeExpression::Parameter(
-            "T".into(),
-        )))),
+        target: Box::new(TypeExpression::Slice(Box::new(TypeExpression::Parameter("T".into())))),
         diagnostic: DiagnosticText::default(),
     });
 
@@ -50,7 +63,8 @@ fn test_type_expression_navigates_mutable_reference_to_slice_parameter() {
     assert_eq!(element.as_ref(), &TypeExpression::Parameter("T".into()));
 }
 
-/// Verifies that an omitted reference lifetime has one canonical representation.
+/// Verifies that an omitted reference lifetime has one canonical
+/// representation.
 #[test]
 fn test_type_expression_navigates_elided_reference_lifetime() {
     let expression = TypeExpression::Reference(ReferenceTypeExpression {
@@ -66,7 +80,8 @@ fn test_type_expression_navigates_elided_reference_lifetime() {
     assert_eq!(reference.lifetime, LifetimeExpression::Elided);
 }
 
-/// Verifies that function pointers retain ABI, safety, HRTB, and opaque return bounds.
+/// Verifies that function pointers retain ABI, safety, HRTB, and opaque return
+/// bounds.
 #[test]
 fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return() {
     let iterator = concrete(
@@ -162,7 +177,8 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
     assert_eq!(parameter.lifetime, higher_ranked_lifetimes[0]);
 }
 
-/// Verifies that generic declarations preserve type, lifetime, const, and where predicates.
+/// Verifies that generic declarations preserve type, lifetime, const, and where
+/// predicates.
 #[test]
 fn test_generic_definition_navigates_const_generic_and_predicates() {
     let definition = GenericDefinitionDescriptor {
@@ -222,18 +238,12 @@ fn test_generic_argument_navigates_typed_const_value() {
     });
 
     assert_eq!(argument, alternate_diagnostic);
-    assert_eq!(
-        identity_hash(&argument),
-        identity_hash(&alternate_diagnostic)
-    );
+    assert_eq!(identity_hash(&argument), identity_hash(&alternate_diagnostic));
 
     let GenericArgument::Const(argument) = argument else {
         panic!("expected a const generic argument");
     };
-    assert_eq!(
-        argument.declared_type.as_ref(),
-        &concrete(&["usize"], Vec::new())
-    );
+    assert_eq!(argument.declared_type.as_ref(), &concrete(&["usize"], Vec::new()));
     assert_eq!(argument.value, ConstExpression::UnsignedInteger(4));
     assert_eq!(argument.normalized_diagnostic.as_ref(), "4usize");
 
@@ -255,9 +265,7 @@ fn test_type_expression_navigates_qualified_associated_type() {
         self_type: Box::new(TypeExpression::Parameter("T".into())),
         trait_path: Some(Box::new(concrete(
             &["core", "iter", "Iterator"],
-            vec![GenericArgument::Lifetime(LifetimeExpression::Named(
-                "a".into(),
-            ))],
+            vec![GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))],
         ))),
         item: "Item".into(),
         arguments: Box::new([GenericArgument::Type(TypeExpression::Parameter("U".into()))]),
@@ -267,10 +275,7 @@ fn test_type_expression_navigates_qualified_associated_type() {
     let TypeExpression::Associated(associated) = expression else {
         panic!("expected an associated type projection");
     };
-    assert_eq!(
-        associated.self_type.as_ref(),
-        &TypeExpression::Parameter("T".into())
-    );
+    assert_eq!(associated.self_type.as_ref(), &TypeExpression::Parameter("T".into()));
     let Some(TypeExpression::Concrete(trait_path)) = associated.trait_path.as_deref() else {
         panic!("expected a concrete trait path");
     };
@@ -280,9 +285,7 @@ fn test_type_expression_navigates_qualified_associated_type() {
     );
     assert_eq!(
         trait_path.arguments.as_ref(),
-        &[GenericArgument::Lifetime(LifetimeExpression::Named(
-            "a".into()
-        ))]
+        &[GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))]
     );
     assert_eq!(associated.item.as_ref(), "Item");
     assert_eq!(
@@ -321,19 +324,13 @@ fn test_type_expression_navigates_raw_pointer() {
         panic!("expected a raw pointer expression");
     };
     assert!(pointer.mutable);
-    assert_eq!(
-        pointer.target.as_ref(),
-        &TypeExpression::Parameter("T".into())
-    );
+    assert_eq!(pointer.target.as_ref(), &TypeExpression::Parameter("T".into()));
 }
 
 /// Verifies that tuple element order and nested forms remain navigable.
 #[test]
 fn test_type_expression_navigates_tuple() {
-    let expression = TypeExpression::Tuple(Box::new([
-        TypeExpression::Parameter("T".into()),
-        TypeExpression::Never,
-    ]));
+    let expression = TypeExpression::Tuple(Box::new([TypeExpression::Parameter("T".into()), TypeExpression::Never]));
 
     let TypeExpression::Tuple(elements) = expression else {
         panic!("expected a tuple expression");
@@ -344,7 +341,8 @@ fn test_type_expression_navigates_tuple() {
     );
 }
 
-/// Verifies that array, trait-object, and never forms are represented structurally.
+/// Verifies that array, trait-object, and never forms are represented
+/// structurally.
 #[test]
 fn test_type_expression_navigates_array_trait_object_and_never() {
     let array = TypeExpression::Array(ArrayTypeExpression {
@@ -371,7 +369,8 @@ fn test_type_expression_navigates_array_trait_object_and_never() {
     assert!(matches!(object, TypeExpression::TraitObject(_)));
 }
 
-/// Verifies that diagnostics do not participate in expression identity or hashing.
+/// Verifies that diagnostics do not participate in expression identity or
+/// hashing.
 #[test]
 fn test_descriptor_diagnostic_text_does_not_affect_identity() {
     let plain = concrete(&["u8"], Vec::new());
@@ -397,10 +396,7 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
         diagnostic: "T: 'a".into(),
     };
     assert_eq!(plain_predicate, annotated_predicate);
-    assert_eq!(
-        identity_hash(&plain_predicate),
-        identity_hash(&annotated_predicate)
-    );
+    assert_eq!(identity_hash(&plain_predicate), identity_hash(&annotated_predicate));
 
     let plain_definition = GenericDefinitionDescriptor {
         parameters: Box::new([GenericParameterDescriptor::Lifetime {
@@ -421,8 +417,5 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
         diagnostic: "<'a>".into(),
     };
     assert_eq!(plain_definition, annotated_definition);
-    assert_eq!(
-        identity_hash(&plain_definition),
-        identity_hash(&annotated_definition)
-    );
+    assert_eq!(identity_hash(&plain_definition), identity_hash(&annotated_definition));
 }

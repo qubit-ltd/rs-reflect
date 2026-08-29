@@ -5,18 +5,33 @@ mod invocation_runtime {
     use std::any::TypeId;
     use std::cell::Cell;
     use std::future::Future;
-    use std::panic::{AssertUnwindSafe, catch_unwind};
+    use std::panic::AssertUnwindSafe;
+    use std::panic::catch_unwind;
     use std::pin::Pin;
     use std::rc::Rc;
-    use std::task::{Context, Poll, Waker};
+    use std::task::Context;
+    use std::task::Poll;
+    use std::task::Waker;
 
-    use qubit_reflect::identity::{FragmentIdentity, MemberId};
-    use qubit_reflect::invoke::{
-        ArgumentExpectation, BorrowOrigin, Invocation, InvocationArg, InvocationErrorKind,
-        InvocationFailure, InvocationInputMode, InvocationOutput, InvocationPanic,
-        InvocationReceiver, ReceiverExpectation, ReflectedFuture,
-    };
-    use qubit_reflect::value::{DynamicMut, DynamicOwned, DynamicRef, Local, ThreadSafe};
+    use qubit_reflect::identity::FragmentIdentity;
+    use qubit_reflect::identity::MemberId;
+    use qubit_reflect::invoke::ArgumentExpectation;
+    use qubit_reflect::invoke::BorrowOrigin;
+    use qubit_reflect::invoke::Invocation;
+    use qubit_reflect::invoke::InvocationArg;
+    use qubit_reflect::invoke::InvocationErrorKind;
+    use qubit_reflect::invoke::InvocationFailure;
+    use qubit_reflect::invoke::InvocationInputMode;
+    use qubit_reflect::invoke::InvocationOutput;
+    use qubit_reflect::invoke::InvocationPanic;
+    use qubit_reflect::invoke::InvocationReceiver;
+    use qubit_reflect::invoke::ReceiverExpectation;
+    use qubit_reflect::invoke::ReflectedFuture;
+    use qubit_reflect::value::DynamicMut;
+    use qubit_reflect::value::DynamicOwned;
+    use qubit_reflect::value::DynamicRef;
+    use qubit_reflect::value::Local;
+    use qubit_reflect::value::ThreadSafe;
 
     /// A small receiver used by the hand-written invocation adapters.
     #[derive(Debug, Eq, PartialEq)]
@@ -94,29 +109,26 @@ mod invocation_runtime {
         let suffix = argument
             .downcast_ref::<String>()
             .unwrap_or_else(|| unreachable!("validation guarantees argument type"));
-        Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(
-            format!("{}{}", counter.value, suffix),
-        )))
+        Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(format!(
+            "{}{}",
+            counter.value, suffix
+        ))))
     }
 
     /// Panics after validation to prove user panic propagation stays distinct.
     fn invoke_panicking<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let _validated =
-            invocation.validate(&method_identity(2), ReceiverExpectation::none(), &[])?;
+        let _validated = invocation.validate(&method_identity(2), ReceiverExpectation::none(), &[])?;
         panic!("user panic payload")
     }
 
-    /// Returns a shared sub-borrow after consuming the validated receiver wrapper.
+    /// Returns a shared sub-borrow after consuming the validated receiver
+    /// wrapper.
     fn invoke_label<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(3),
-            ReceiverExpectation::borrowed::<Counter>(),
-            &[],
-        )?;
+        let validated = invocation.validate(&method_identity(3), ReceiverExpectation::borrowed::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Ref(receiver)) = receiver else {
@@ -130,15 +142,13 @@ mod invocation_runtime {
         })
     }
 
-    /// Returns an exclusive sub-borrow after consuming the validated receiver wrapper.
+    /// Returns an exclusive sub-borrow after consuming the validated receiver
+    /// wrapper.
     fn invoke_value_mut<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(4),
-            ReceiverExpectation::borrowed_mut::<Counter>(),
-            &[],
-        )?;
+        let validated =
+            invocation.validate(&method_identity(4), ReceiverExpectation::borrowed_mut::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Mut(receiver)) = receiver else {
@@ -152,7 +162,8 @@ mod invocation_runtime {
         })
     }
 
-    /// Returns a dedicated `str` borrow after consuming a validated argument wrapper.
+    /// Returns a dedicated `str` borrow after consuming a validated argument
+    /// wrapper.
     fn invoke_str_identity<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
@@ -182,11 +193,7 @@ mod invocation_runtime {
         invocation: Invocation<'call, Local>,
         polls: Rc<Cell<usize>>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(6),
-            ReceiverExpectation::borrowed::<Counter>(),
-            &[],
-        )?;
+        let validated = invocation.validate(&method_identity(6), ReceiverExpectation::borrowed::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Ref(receiver)) = receiver else {
@@ -201,9 +208,7 @@ mod invocation_runtime {
                 origins: [BorrowOrigin::Receiver].into(),
             }
         };
-        Ok(InvocationOutput::Future(ReflectedFuture::<Local>::new(
-            future,
-        )))
+        Ok(InvocationOutput::Future(ReflectedFuture::<Local>::new(future)))
     }
 
     /// Polls one future exactly once without selecting an executor.
@@ -213,7 +218,8 @@ mod invocation_runtime {
         Pin::new(future).poll(&mut context)
     }
 
-    /// Verifies a mutable receiver and owned parameter execute after validation.
+    /// Verifies a mutable receiver and owned parameter execute after
+    /// validation.
     #[test]
     fn test_validate_and_execute_mutable_receiver_with_owned_argument() {
         let mut counter = Counter { value: 5 };
@@ -229,7 +235,8 @@ mod invocation_runtime {
         assert_eq!(counter.value, 12);
     }
 
-    /// Verifies mutable inputs can satisfy shared receiver and argument expectations.
+    /// Verifies mutable inputs can satisfy shared receiver and argument
+    /// expectations.
     #[test]
     fn test_shared_expectation_accepts_mutable_reborrow() {
         let mut counter = Counter { value: 4 };
@@ -239,20 +246,19 @@ mod invocation_runtime {
             [InvocationArg::Mut(DynamicMut::<Local>::new(&mut suffix))],
         );
 
-        let output =
-            invoke_read(invocation).expect("mutable inputs may be read through shared borrows");
+        let output = invoke_read(invocation).expect("mutable inputs may be read through shared borrows");
 
         let InvocationOutput::Owned(value) = output else {
             panic!("the adapter should return an owned value")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<String>(value)
-                .unwrap_or_else(|_| panic!("output should be String")),
+            DynamicOwned::<Local>::downcast::<String>(value).unwrap_or_else(|_| panic!("output should be String")),
             "4 items"
         );
     }
 
-    /// Verifies consuming validated receiver storage can return a shared sub-borrow.
+    /// Verifies consuming validated receiver storage can return a shared
+    /// sub-borrow.
     #[test]
     fn test_validated_receiver_can_produce_a_call_lifetime_borrowed_output() {
         let counter = Counter { value: 41 };
@@ -267,14 +273,14 @@ mod invocation_runtime {
         assert_eq!(origins.as_ref(), &[BorrowOrigin::Receiver]);
     }
 
-    /// Verifies consuming validated mutable storage can return an exclusive sub-borrow.
+    /// Verifies consuming validated mutable storage can return an exclusive
+    /// sub-borrow.
     #[test]
     fn test_validated_receiver_can_produce_a_mutable_borrowed_output() {
         let mut counter = Counter { value: 13 };
         let invocation = Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut counter), []);
 
-        let output =
-            invoke_value_mut(invocation).expect("mutable output should retain call lifetime");
+        let output = invoke_value_mut(invocation).expect("mutable output should retain call lifetime");
 
         let InvocationOutput::Mut { mut value, origin } = output else {
             panic!("adapter should return a mutable output")
@@ -286,16 +292,14 @@ mod invocation_runtime {
         assert_eq!(value.downcast_ref::<i32>(), Some(&21));
     }
 
-    /// Verifies dedicated `str` storage retains its call lifetime through an adapter.
+    /// Verifies dedicated `str` storage retains its call lifetime through an
+    /// adapter.
     #[test]
     fn test_validated_str_argument_can_produce_a_borrowed_str_output() {
         let text = String::from("borrowed text");
-        let invocation = Invocation::associated([InvocationArg::Ref(
-            DynamicRef::<Local>::new_str(text.as_str()),
-        )]);
+        let invocation = Invocation::associated([InvocationArg::Ref(DynamicRef::<Local>::new_str(text.as_str()))]);
 
-        let output = invoke_str_identity(invocation)
-            .expect("dedicated str input should preserve the call lifetime");
+        let output = invoke_str_identity(invocation).expect("dedicated str input should preserve the call lifetime");
 
         let InvocationOutput::Ref { value, origins } = output else {
             panic!("adapter should return a shared str output")
@@ -304,15 +308,16 @@ mod invocation_runtime {
         assert_eq!(origins.as_ref(), &[BorrowOrigin::Parameter(0)]);
     }
 
-    /// Verifies a lazy future may retain and later return a validated receiver borrow.
+    /// Verifies a lazy future may retain and later return a validated receiver
+    /// borrow.
     #[test]
     fn test_validated_receiver_can_feed_a_lazy_borrowing_future() {
         let counter = Counter { value: 29 };
         let polls = Rc::new(Cell::new(0));
         let invocation = Invocation::borrowed(DynamicRef::<Local>::new(&counter), []);
 
-        let output = invoke_label_async(invocation, Rc::clone(&polls))
-            .expect("async adapter should retain receiver borrow");
+        let output =
+            invoke_label_async(invocation, Rc::clone(&polls)).expect("async adapter should retain receiver borrow");
 
         assert_eq!(polls.get(), 0);
         let InvocationOutput::Future(mut future) = output else {
@@ -326,12 +331,12 @@ mod invocation_runtime {
         assert_eq!(polls.get(), 1);
     }
 
-    /// Verifies owned arguments cannot silently satisfy shared-borrow parameters.
+    /// Verifies owned arguments cannot silently satisfy shared-borrow
+    /// parameters.
     #[test]
     fn test_owned_input_is_not_implicitly_borrowed() {
-        let invocation = Invocation::associated([InvocationArg::Owned(
-            DynamicOwned::<Local>::new(String::from("owned")),
-        )]);
+        let invocation =
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("owned")))]);
 
         let identity = method_identity(7);
         let failure = invocation
@@ -351,20 +356,20 @@ mod invocation_runtime {
             }
         ));
         let (_, arguments) = failure.recovery.into_parts();
-        let [InvocationArg::Owned(value)] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 1],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("recovery should preserve the argument")) else {
+        let [InvocationArg::Owned(value)] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 1]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("recovery should preserve the argument"))
+        else {
             panic!("recovery should preserve owned mode")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<String>(value)
-                .unwrap_or_else(|_| panic!("owned value should be intact")),
+            DynamicOwned::<Local>::downcast::<String>(value).unwrap_or_else(|_| panic!("owned value should be intact")),
             "owned"
         );
     }
 
-    /// Verifies type validation failure recovers every owned input in original order.
+    /// Verifies type validation failure recovers every owned input in original
+    /// order.
     #[test]
     fn test_validation_failure_recovers_receiver_and_all_arguments_in_order() {
         let invocation = Invocation::owned(
@@ -412,10 +417,9 @@ mod invocation_runtime {
                 .unwrap_or_else(|_| panic!("receiver should remain intact")),
             Counter { value: 9 }
         );
-        let [first, second, third] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 3],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("all arguments should be recovered"));
+        let [first, second, third] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all arguments should be recovered"));
         let InvocationArg::Owned(first) = first else {
             panic!("first argument should remain owned")
         };
@@ -426,8 +430,7 @@ mod invocation_runtime {
             panic!("third argument should remain owned")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u8>(first)
-                .unwrap_or_else(|_| panic!("first value should be intact")),
+            DynamicOwned::<Local>::downcast::<u8>(first).unwrap_or_else(|_| panic!("first value should be intact")),
             11
         );
         assert_eq!(
@@ -436,13 +439,13 @@ mod invocation_runtime {
             "second"
         );
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u32>(third)
-                .unwrap_or_else(|_| panic!("third value should be intact")),
+            DynamicOwned::<Local>::downcast::<u32>(third).unwrap_or_else(|_| panic!("third value should be intact")),
             33
         );
     }
 
-    /// Verifies receiver-shape and arity mismatches are reported before execution.
+    /// Verifies receiver-shape and arity mismatches are reported before
+    /// execution.
     #[test]
     fn test_receiver_shape_and_argument_count_fail_before_execution() {
         let identity = method_identity(9);
@@ -469,14 +472,12 @@ mod invocation_runtime {
             .expect_err("one positional argument is required");
         assert!(matches!(
             failure.error.kind(),
-            InvocationErrorKind::ArgumentCountMismatch {
-                expected: 1,
-                actual: 0,
-            }
+            InvocationErrorKind::ArgumentCountMismatch { expected: 1, actual: 0 }
         ));
     }
 
-    /// Verifies borrowed outputs expose explicit receiver and parameter origins.
+    /// Verifies borrowed outputs expose explicit receiver and parameter
+    /// origins.
     #[test]
     fn test_borrowed_outputs_retain_explicit_origins() {
         let text = String::from("borrowed");
@@ -494,10 +495,7 @@ mod invocation_runtime {
             panic!("shared output should retain its variant")
         };
         assert_eq!(value.downcast_ref::<String>(), Some(&text));
-        assert_eq!(
-            origins.as_ref(),
-            &[BorrowOrigin::Receiver, BorrowOrigin::Parameter(1)]
-        );
+        assert_eq!(origins.as_ref(), &[BorrowOrigin::Receiver, BorrowOrigin::Parameter(1)]);
         let InvocationOutput::Mut { mut value, origin } = mutable else {
             panic!("mutable output should retain its variant")
         };
@@ -508,7 +506,8 @@ mod invocation_runtime {
         assert_eq!(value.downcast_ref::<u32>(), Some(&8));
     }
 
-    /// Verifies local futures are lazy, may be non-Send, and retain local borrows.
+    /// Verifies local futures are lazy, may be non-Send, and retain local
+    /// borrows.
     #[test]
     fn test_reflected_future_is_lazy_and_preserves_local_borrows() {
         let polls = Rc::new(Cell::new(0));
@@ -524,8 +523,7 @@ mod invocation_runtime {
         let mut reflected = ReflectedFuture::<Local>::new(future);
 
         assert_eq!(polls.get(), 0);
-        let Poll::Ready(InvocationOutput::Ref { value, origins }) = poll_once(&mut reflected)
-        else {
+        let Poll::Ready(InvocationOutput::Ref { value, origins }) = poll_once(&mut reflected) else {
             panic!("the simple future should complete on its first poll")
         };
         assert_eq!(
@@ -536,7 +534,8 @@ mod invocation_runtime {
         assert_eq!(polls.get(), 1);
     }
 
-    /// Verifies thread-safe invocation values and futures retain their Send boundary.
+    /// Verifies thread-safe invocation values and futures retain their Send
+    /// boundary.
     #[test]
     fn test_thread_safe_runtime_types_cross_send_boundary() {
         fn assert_send<T: Send>() {}
@@ -559,13 +558,13 @@ mod invocation_runtime {
             panic!("thread-safe future should complete")
         };
         assert_eq!(
-            DynamicOwned::<ThreadSafe>::downcast::<u32>(value)
-                .unwrap_or_else(|_| panic!("output should be u32")),
+            DynamicOwned::<ThreadSafe>::downcast::<u32>(value).unwrap_or_else(|_| panic!("output should be u32")),
             17
         );
     }
 
-    /// Verifies ordinary panic propagation and the separate caught-panic payload type.
+    /// Verifies ordinary panic propagation and the separate caught-panic
+    /// payload type.
     #[test]
     fn test_user_panic_propagates_unchanged_and_catching_uses_separate_type() {
         let panic = catch_unwind(AssertUnwindSafe(|| {
@@ -580,14 +579,10 @@ mod invocation_runtime {
             0,
             FragmentIdentity::new("qubit-reflect", "invoke::runtime_tests", 1, 1, "method", 7),
         );
-        let caught =
-            InvocationPanic::new(method_identity.clone(), Box::new(String::from("caught")));
+        let caught = InvocationPanic::new(method_identity.clone(), Box::new(String::from("caught")));
         assert_eq!(caught.method_identity(), &method_identity);
         assert_eq!(
-            caught
-                .payload()
-                .downcast_ref::<String>()
-                .map(String::as_str),
+            caught.payload().downcast_ref::<String>().map(String::as_str),
             Some("caught")
         );
         assert_eq!(

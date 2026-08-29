@@ -9,7 +9,9 @@ mod storage;
 pub use dynamic_mut::DynamicMut;
 pub use dynamic_owned::DynamicOwned;
 pub use dynamic_ref::DynamicRef;
-pub use mode::{Local, Mode, ThreadSafe};
+pub use mode::Local;
+pub use mode::Mode;
+pub use mode::ThreadSafe;
 
 /// A locally scoped shared dynamic value borrow.
 pub type ReflectedRef<'a> = DynamicRef<'a, Local>;

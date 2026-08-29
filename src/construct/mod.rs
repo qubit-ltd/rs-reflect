@@ -3,8 +3,9 @@
 //! Construction first validates shape, binding, policy, and exact Rust type
 //! identity without extracting any owned input. Only a
 //! [`ValidatedConstructionInput`](crate::construct::ValidatedConstructionInput)
-//! or [`ValidatedUpdateInput`](crate::construct::ValidatedUpdateInput) can cross the
-//! generated adapter boundary. Validation failures retain every caller-owned
+//! or [`ValidatedUpdateInput`](crate::construct::ValidatedUpdateInput) can
+//! cross the generated adapter boundary. Validation failures retain every
+//! caller-owned
 //! value in [`ConstructionRecovery`](crate::construct::ConstructionRecovery).
 
 mod error;
@@ -15,16 +16,26 @@ mod update;
 mod validated;
 mod variant_constructor;
 
-pub use error::{
-    ConstructionError, ConstructionFieldId, ConstructionShape, ConstructionUnavailableReason,
-};
-pub use input::{
-    ConstructionDefaultProvider, ConstructionField, ConstructionFieldPolicy,
-    NamedConstructionInput, StructUpdateInput, TupleConstructionInput, UpdateField,
-    UpdateFieldPolicy,
-};
-pub use recovery::{ConstructionRecovery, RecoveredConstructionValue};
-pub use struct_constructor::{StructConstructionAdapter, StructConstructor};
-pub use update::{StructUpdateAdapter, StructUpdater};
-pub use validated::{ValidatedConstructionInput, ValidatedOverride, ValidatedUpdateInput};
-pub use variant_constructor::{VariantConstructionAdapter, VariantConstructor};
+pub use error::ConstructionError;
+pub use error::ConstructionFieldId;
+pub use error::ConstructionShape;
+pub use error::ConstructionUnavailableReason;
+pub use input::ConstructionDefaultProvider;
+pub use input::ConstructionField;
+pub use input::ConstructionFieldPolicy;
+pub use input::NamedConstructionInput;
+pub use input::StructUpdateInput;
+pub use input::TupleConstructionInput;
+pub use input::UpdateField;
+pub use input::UpdateFieldPolicy;
+pub use recovery::ConstructionRecovery;
+pub use recovery::RecoveredConstructionValue;
+pub use struct_constructor::StructConstructionAdapter;
+pub use struct_constructor::StructConstructor;
+pub use update::StructUpdateAdapter;
+pub use update::StructUpdater;
+pub use validated::ValidatedConstructionInput;
+pub use validated::ValidatedOverride;
+pub use validated::ValidatedUpdateInput;
+pub use variant_constructor::VariantConstructionAdapter;
+pub use variant_constructor::VariantConstructor;

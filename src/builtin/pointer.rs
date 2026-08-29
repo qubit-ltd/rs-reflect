@@ -20,11 +20,7 @@ macro_rules! impl_smart_pointer {
             /// Returns the interned descriptor for this smart-pointer specialization.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
-                    TypeDescriptor::new_smart_pointer::<Self>(
-                        std::any::type_name::<Self>(),
-                                                $kind,
-                        resolved::<T>(),
-                    )
+                    TypeDescriptor::new_smart_pointer::<Self>(std::any::type_name::<Self>(), $kind, resolved::<T>())
                 })
             }
         }

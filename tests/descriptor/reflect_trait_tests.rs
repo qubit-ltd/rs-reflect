@@ -18,10 +18,7 @@ trait ReflectedService {
     }
 }
 
-#[reflect(
-    supertrait(ReflectedService),
-    external_trait(Send, id = "core.marker.Send")
-)]
+#[reflect(supertrait(ReflectedService), external_trait(Send, id = "core.marker.Send"))]
 trait Worker: ReflectedService + Send {
     fn work(&self);
 }
@@ -42,11 +39,20 @@ trait GenericService<T> {
 
 #[reflect]
 trait ConstService<const N: usize> {
-    fn limit(&self) -> usize { N }
+    fn limit(&self) -> usize {
+        N
+    }
 }
 
 #[reflect]
-trait LifetimeAndLiteralDefaultService<'b, 'a: 'b, const SIGNED: i16 = -7i16, const UNSIGNED: u8 = 42u8, const ESCAPED: char = '\n'> {
+trait LifetimeAndLiteralDefaultService<
+    'b,
+    'a: 'b,
+    const SIGNED: i16 = -7i16,
+    const UNSIGNED: u8 = 42u8,
+    const ESCAPED: char = '\n',
+>
+{
     fn borrowed(&'a self) -> &'b str;
 }
 
@@ -62,22 +68,27 @@ trait MaybeService<T: ?Sized> {}
 trait HrtbService<T>
 where
     for<'a> T: Fn(&'a str),
-{}
+{
+}
 
 #[reflect]
 trait WhereBoundService<T>
 where
     for<'a> T: Fn(&'a str) + Send,
-{}
+{
+}
 
 #[reflect]
 trait WhereLifetimeService<T>
 where
     T: Send + 'static,
-{}
+{
+}
 
 #[reflect]
-trait AssocHrtb { type Output: for<'a> Fn(&'a str); }
+trait AssocHrtb {
+    type Output: for<'a> Fn(&'a str);
+}
 
 struct ServiceMarkerProbe;
 
@@ -130,7 +141,9 @@ impl StructuralService for ServiceMarkerProbe {
         |_| 0
     }
 }
-impl AssocHrtb for ServiceMarkerProbe { type Output = for<'a> fn(&'a str); }
+impl AssocHrtb for ServiceMarkerProbe {
+    type Output = for<'a> fn(&'a str);
+}
 
 #[test]
 fn test_reflect_trait_registers_complete_marker_backed_definition() {
@@ -142,17 +155,18 @@ fn test_reflect_trait_registers_complete_marker_backed_definition() {
     assert_eq!(definition.rust_name(), "ReflectedService");
     assert!(matches!(definition.trait_id(), TraitId::Reflected(_)));
     assert_eq!(definition.generic_definition().parameters.len(), 0);
-    let candidates = registry.find_trait_definitions_by_path(
-        "integration_tests::descriptor::reflect_trait_tests::ReflectedService",
-    );
+    let candidates =
+        registry.find_trait_definitions_by_path("integration_tests::descriptor::reflect_trait_tests::ReflectedService");
     assert_eq!(candidates.len(), 1);
     assert!(std::ptr::eq(
         candidates.only().expect("a unique path must have one candidate"),
         definition
     ));
-    assert!(registry
-        .find_trait_definitions_by_path("integration_tests::missing::Trait")
-        .is_empty());
+    assert!(
+        registry
+            .find_trait_definitions_by_path("integration_tests::missing::Trait")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -164,7 +178,10 @@ fn test_reflect_trait_preserves_dyn_compatibility_and_default_semantics() {
     assert_eq!(ReflectedService::required(&ServiceMarkerProbe), 8);
     Worker::work(&ServiceMarkerProbe);
     assert_eq!(GenericService::transform(&ServiceMarkerProbe, 8), 8);
-    assert_eq!(GenericService::generic::<_, 1>(&ServiceMarkerProbe, &"generic"), &"generic");
+    assert_eq!(
+        GenericService::generic::<_, 1>(&ServiceMarkerProbe, &"generic"),
+        &"generic"
+    );
     let _ = TypeId::of::<ServiceMarkerProbe>();
 }
 
@@ -224,7 +241,9 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     else {
         panic!("generic method must retain its const parameter")
     };
-    assert!(matches!(ty.as_ref(), qubit_reflect::expression::TypeExpression::Concrete(value) if value.path[0].as_ref() == "usize"));
+    assert!(
+        matches!(ty.as_ref(), qubit_reflect::expression::TypeExpression::Concrete(value) if value.path[0].as_ref() == "usize")
+    );
     assert!(matches!(
         generic_method.parameters()[0].signature_type(),
         qubit_reflect::expression::TypeExpression::Reference(value)
@@ -232,7 +251,10 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     ));
     let service = <ServiceMarkerProbe as ReflectedService>::__qubit_reflect_trait_payload();
     assert_eq!(service.applied().methods().len(), 2);
-    assert_eq!(service.applied().methods()[0].receiver(), Some(&qubit_reflect::descriptor::ReceiverDescriptor::Shared));
+    assert_eq!(
+        service.applied().methods()[0].receiver(),
+        Some(&qubit_reflect::descriptor::ReceiverDescriptor::Shared)
+    );
     assert!(!service.applied().methods()[0].has_default());
     assert!(service.applied().methods()[1].has_default());
     assert_eq!(service.applied().associated_types()[0].rust_name(), "Output");
@@ -279,16 +301,25 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     let maybe = <ServiceMarkerProbe as MaybeService<str>>::__qubit_reflect_trait_payload();
     assert_eq!(maybe.applied().arguments().len(), 1);
     let definition = maybe.definition();
-    let qubit_reflect::expression::GenericParameterDescriptor::Type { bounds, .. } = &definition.generic_definition().parameters[0] else { panic!("expected type parameter") };
-    let qubit_reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, .. } = &bounds[0] else { panic!("expected type bound") };
-    assert_eq!(bound_modifiers.as_ref(), [qubit_reflect::expression::TraitBoundModifier::Maybe]);
+    let qubit_reflect::expression::GenericParameterDescriptor::Type { bounds, .. } =
+        &definition.generic_definition().parameters[0]
+    else {
+        panic!("expected type parameter")
+    };
+    let qubit_reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, .. } = &bounds[0] else {
+        panic!("expected type bound")
+    };
+    assert_eq!(
+        bound_modifiers.as_ref(),
+        [qubit_reflect::expression::TraitBoundModifier::Maybe]
+    );
     let registry = ReflectRegistry::initialize().expect("registry must initialize");
-    let hrtb = registry.trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::HrtbService").expect("HRTB trait must register");
+    let hrtb = registry
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::HrtbService")
+        .expect("HRTB trait must register");
     assert_eq!(hrtb.generic_definition().predicates.len(), 1);
     let where_bound = registry
-        .trait_definition_by_path(
-            "integration_tests::descriptor::reflect_trait_tests::WhereBoundService",
-        )
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereBoundService")
         .expect("where-bound trait must register");
     let predicates = where_bound.generic_definition().predicates.as_ref();
     assert_eq!(predicates.len(), 1);
@@ -311,9 +342,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     );
     assert_eq!(higher_ranked_lifetimes.len(), 1);
     let lifetime_bound = registry
-        .trait_definition_by_path(
-            "integration_tests::descriptor::reflect_trait_tests::WhereLifetimeService",
-        )
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereLifetimeService")
         .expect("lifetime-bound trait must register");
     assert!(matches!(
         lifetime_bound.generic_definition().predicates.as_ref(),
@@ -329,7 +358,10 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert_where_bound::<ServiceMarkerProbe>();
     assert_lifetime_bound::<ServiceMarkerProbe>();
     let structural = <ServiceMarkerProbe as StructuralService>::__qubit_reflect_trait_payload();
-    assert_eq!(structural.definition().visibility(), &qubit_reflect::identity::Visibility::Crate);
+    assert_eq!(
+        structural.definition().visibility(),
+        &qubit_reflect::identity::Visibility::Crate
+    );
     let structural_call = StructuralService::structural(&ServiceMarkerProbe, Vec::new());
     assert_eq!(structural_call(std::ptr::null()), 0);
     let parameter = &structural.applied().methods()[0].parameters()[0];
@@ -337,9 +369,8 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         panic!("Vec parameter must remain a structured concrete path")
     };
     assert_eq!(vector.path[0].as_ref(), "Vec");
-    let qubit_reflect::expression::GenericArgument::Type(
-        qubit_reflect::expression::TypeExpression::Array(array),
-    ) = &vector.arguments[0]
+    let qubit_reflect::expression::GenericArgument::Type(qubit_reflect::expression::TypeExpression::Array(array)) =
+        &vector.arguments[0]
     else {
         panic!("Vec element must preserve its array argument")
     };
@@ -364,7 +395,17 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     );
     let assoc = <ServiceMarkerProbe as AssocHrtb>::__qubit_reflect_trait_payload();
     assert_eq!(assoc.applied().associated_types()[0].bounds().len(), 1);
-    let qubit_reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, higher_ranked_lifetimes, .. } = &assoc.applied().associated_types()[0].bounds()[0] else { panic!("expected associated type bound") };
-    assert_eq!(bound_modifiers.as_ref(), [qubit_reflect::expression::TraitBoundModifier::None]);
+    let qubit_reflect::expression::PredicateDescriptor::TypeBound {
+        bound_modifiers,
+        higher_ranked_lifetimes,
+        ..
+    } = &assoc.applied().associated_types()[0].bounds()[0]
+    else {
+        panic!("expected associated type bound")
+    };
+    assert_eq!(
+        bound_modifiers.as_ref(),
+        [qubit_reflect::expression::TraitBoundModifier::None]
+    );
     assert_eq!(higher_ranked_lifetimes.len(), 1);
 }

@@ -1,14 +1,13 @@
 //! Integration tests for owned dynamic values.
 
-use qubit_reflect::value::{ReflectedOwned, SendReflectedOwned};
+use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::SendReflectedOwned;
 
 /// Confirms an owned downcast failure returns a usable original wrapper.
 #[test]
 fn test_downcast_owned_failure_returns_the_original_wrapper() {
     let value = ReflectedOwned::new(String::from("owned value"));
-    let value = value
-        .downcast::<u32>()
-        .expect_err("a String must not downcast to u32");
+    let value = value.downcast::<u32>().expect_err("a String must not downcast to u32");
 
     assert!(value.is::<String>());
     let text = match value.downcast::<String>() {
@@ -23,10 +22,7 @@ fn test_downcast_owned_failure_returns_the_original_wrapper() {
 fn test_owned_any_interoperation_preserves_type_identity() {
     let mut value = ReflectedOwned::new(41_u32);
 
-    assert_eq!(
-        value.as_any().and_then(|value| value.downcast_ref::<u32>()),
-        Some(&41)
-    );
+    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
     *value
         .as_any_mut()
         .and_then(|value| value.downcast_mut::<u32>())
