@@ -2,7 +2,7 @@
 
 use proc_macro2::{Span, TokenStream};
 
-use crate::ir::PathIr;
+use crate::ir::{PathIr, TypeIr};
 
 /// Identifies a supported reflection helper key.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -201,6 +201,8 @@ pub(crate) struct HelperAttributeIr {
     pub(crate) target: HelperTarget,
     /// The source span used for helper diagnostics.
     pub(crate) span: Span,
+    /// The helper value span, or the key span for a flag.
+    pub(crate) value_span: Span,
 }
 
 /// Carries the syntax-specific value of a helper occurrence.
@@ -230,9 +232,19 @@ pub(crate) struct SpecializationBindingIr {
     /// The generic parameter name supplied by the user.
     pub(crate) name: String,
     /// The concrete type or const expression tokens.
-    pub(crate) value: TokenStream,
+    pub(crate) value: SpecializationValueIr,
     /// The parameter-name span used for diagnostics.
     pub(crate) span: Span,
+    /// The concrete value span used for kind diagnostics.
+    pub(crate) value_span: Span,
+}
+
+/// A specialization RHS parsed exactly once at the parser boundary.
+#[derive(Clone, Debug)]
+pub(crate) enum SpecializationValueIr {
+    Type(TypeIr),
+    Const(TokenStream),
+    AmbiguousPath(TokenStream),
 }
 
 /// An external trait path mapped to a stable identity literal.

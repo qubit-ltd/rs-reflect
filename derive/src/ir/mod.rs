@@ -11,12 +11,16 @@ mod type_ir;
 
 pub(crate) use attribute::{
     ExternalTraitIr, HelperAttributeIr, HelperName, HelperTarget, HelperValueIr,
-    SpecializationBindingIr, SpecializationIr,
+    SpecializationBindingIr, SpecializationIr, SpecializationValueIr,
 };
 pub(crate) use declaration::{
-    AssociatedConstIr, AssociatedTypeIr, DeclarationIr, FieldIr, GenericKindIr, GenericParamIr,
-    GenericsIr, ImplDeclarationIr, MacroKind, MethodIr, ParsedDeclaration, ReturnTypeIr,
-    TraitDeclarationIr, TypeDeclarationIr, TypeDeclarationKindIr, ValidatedDeclaration, VariantIr,
-    VariantKindIr, VisibilityIr,
+    AssociatedConstIr, AssociatedTypeIr, DeclarationIr, FieldIr, GenericBoundIr, GenericDefaultIr,
+    GenericKindIr, GenericParamIr, GenericsIr, ImplDeclarationIr, MacroKind, MethodIr,
+    MethodQualifiersIr, ParameterIr, ParameterPatternIr, ParameterPatternKindIr, ParsedDeclaration,
+    ReceiverIr, ReceiverKindIr, ReturnTypeIr, TraitBoundModifierIr, TraitDeclarationIr,
+    TypeDeclarationIr, TypeDeclarationKindIr, ValidatedDeclaration, VariantIr, VariantKindIr,
+    VisibilityIr, WherePredicateIr,
 };
-pub(crate) use type_ir::{PathIr, TypeIr, TypeKindIr};
+pub(crate) use type_ir::{
+    PathArgumentIr, PathIr, PathSegmentIr, QualifiedSelfIr, TypeIr, TypeKindIr,
+};

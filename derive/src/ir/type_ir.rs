@@ -2,17 +2,59 @@
 
 use proc_macro2::{Span, TokenStream};
 
+use crate::ir::GenericBoundIr;
+
 /// A Rust path retained with both structured segments and source tokens.
 #[derive(Clone, Debug)]
 pub(crate) struct PathIr {
     /// A normalized diagnostic rendering of the path.
     pub(crate) source: String,
     /// Identifier segments in source order.
-    pub(crate) segments: Vec<String>,
+    pub(crate) segments: Vec<PathSegmentIr>,
+    /// Whether the source path starts at the crate root.
+    pub(crate) leading_colon: bool,
+    /// A qualified-self prefix such as `<T as Trait>`.
+    pub(crate) qualified_self: Option<QualifiedSelfIr>,
     /// Original path tokens with their source spans.
     pub(crate) tokens: TokenStream,
     /// The complete source span of the path.
     pub(crate) span: Span,
+}
+
+/// One path segment and all of its generic arguments.
+#[derive(Clone, Debug)]
+pub(crate) struct PathSegmentIr {
+    pub(crate) name: String,
+    pub(crate) arguments: Vec<PathArgumentIr>,
+}
+
+/// A generic argument attached to a path segment.
+#[derive(Clone, Debug)]
+pub(crate) enum PathArgumentIr {
+    Lifetime(String),
+    Type(TypeIr),
+    Const(TokenStream),
+    AssociatedType {
+        name: String,
+        ty: TypeIr,
+    },
+    AssociatedConst {
+        name: String,
+        value: TokenStream,
+    },
+    Constraint {
+        name: String,
+        bounds: Vec<GenericBoundIr>,
+    },
+    Other(TokenStream),
+}
+
+/// The semantic facts of a qualified-self path prefix.
+#[derive(Clone, Debug)]
+pub(crate) struct QualifiedSelfIr {
+    pub(crate) ty: Box<TypeIr>,
+    pub(crate) position: usize,
+    pub(crate) has_as: bool,
 }
 
 /// A Rust type converted from `syn::Type` at the parser boundary.
@@ -33,6 +75,7 @@ pub(crate) struct TypeIr {
 pub(crate) enum TypeKindIr {
     Path(PathIr),
     Reference {
+        lifetime: Option<String>,
         mutable: bool,
         element: Box<TypeIr>,
     },
@@ -46,9 +89,20 @@ pub(crate) enum TypeKindIr {
         mutable: bool,
         element: Box<TypeIr>,
     },
-    BareFunction,
-    TraitObject,
-    ImplTrait,
+    BareFunction {
+        inputs: Vec<TypeIr>,
+        output: Option<Box<TypeIr>>,
+        is_unsafe: bool,
+        abi: Option<String>,
+        is_variadic: bool,
+    },
+    TraitObject {
+        bounds: Vec<GenericBoundIr>,
+        has_dyn: bool,
+    },
+    ImplTrait {
+        bounds: Vec<GenericBoundIr>,
+    },
     Never,
     Infer,
     Macro,

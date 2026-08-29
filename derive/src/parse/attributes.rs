@@ -9,9 +9,9 @@ use syn::{Attribute, Expr, ExprLit, Lit, LitStr, Meta, Path, Token, Type};
 
 use crate::ir::{
     ExternalTraitIr, HelperAttributeIr, HelperName, HelperTarget, PathIr, SpecializationBindingIr,
-    SpecializationIr,
+    SpecializationIr, SpecializationValueIr,
 };
-use crate::parse::type_ir::convert_path;
+use crate::parse::type_ir::{convert_path, convert_type};
 
 /// Accumulates independent `syn` diagnostics without losing their spans.
 #[derive(Default)]
@@ -29,12 +29,9 @@ impl ErrorCollector {
         }
     }
 
-    /// Converts the aggregate to `Ok(value)` or the combined error.
-    pub(super) fn finish<T>(self, value: T) -> syn::Result<T> {
-        match self.error {
-            Some(error) => Err(error),
-            None => Ok(value),
-        }
+    /// Returns the accumulated error for a later validation phase.
+    pub(super) fn into_error(self) -> Option<syn::Error> {
+        self.error
     }
 }
 
@@ -50,7 +47,10 @@ pub(super) fn parse_attributes(
         .filter(|attribute| attribute.path().is_ident("reflect"))
     {
         match &attribute.meta {
-            Meta::Path(_) => {}
+            Meta::Path(_) => errors.push(syn::Error::new(
+                attribute.span(),
+                "bare `#[reflect]` is not a valid helper attribute",
+            )),
             Meta::List(list) => {
                 helpers.extend(parse_helper_tokens(list.tokens.clone(), target, errors));
             }
@@ -132,12 +132,20 @@ fn convert_meta(
         }
     };
     match value {
-        Ok(value) => Some(HelperAttributeIr {
-            name,
-            value,
-            target,
-            span,
-        }),
+        Ok(value) => {
+            let value_span = match &meta {
+                Meta::NameValue(name_value) => name_value.value.span(),
+                Meta::List(list) => list.span(),
+                Meta::Path(path) => path.span(),
+            };
+            Some(HelperAttributeIr {
+                name,
+                value,
+                target,
+                span,
+                value_span,
+            })
+        }
         Err(error) => {
             errors.push(error);
             None
@@ -266,17 +274,37 @@ impl Parse for SpecializationBindings {
             let span = name.span();
             input.parse::<Token![=]>()?;
             let type_fork = input.fork();
-            let value = if type_fork.parse::<Type>().is_ok()
+            let (value, value_span) = if type_fork.parse::<Type>().is_ok()
                 && (type_fork.is_empty() || type_fork.peek(Token![,]))
             {
-                input.parse::<Type>()?.to_token_stream()
+                let ty = input.parse::<Type>()?;
+                let span = ty.span();
+                let value = if matches!(
+                    &ty,
+                    Type::Path(path)
+                        if path.qself.is_none()
+                            && path.path.segments.iter().all(|segment| {
+                                matches!(segment.arguments, syn::PathArguments::None)
+                            })
+                ) {
+                    SpecializationValueIr::AmbiguousPath(ty.to_token_stream())
+                } else {
+                    SpecializationValueIr::Type(convert_type(&ty))
+                };
+                (value, span)
             } else {
-                input.parse::<Expr>()?.to_token_stream()
+                let expression = input.parse::<Expr>()?;
+                let span = expression.span();
+                (
+                    SpecializationValueIr::Const(expression.to_token_stream()),
+                    span,
+                )
             };
             bindings.push(SpecializationBindingIr {
                 name: name.to_string(),
                 value,
                 span,
+                value_span,
             });
             if input.is_empty() {
                 break;

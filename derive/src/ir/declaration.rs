@@ -119,7 +119,7 @@ pub(crate) struct TraitDeclarationIr {
     /// Generic parameters and where predicates.
     pub(crate) generics: GenericsIr,
     /// Direct supertrait bounds in source order.
-    pub(crate) supertraits: Vec<TokenStream>,
+    pub(crate) supertraits: Vec<GenericBoundIr>,
     /// Helpers supplied to the outer trait macro.
     pub(crate) attributes: Vec<HelperAttributeIr>,
     /// Explicit mappings for external trait bounds.
@@ -171,19 +171,75 @@ pub(crate) struct MethodIr {
     /// Method generic parameters and where predicates.
     pub(crate) generics: GenericsIr,
     /// Receiver syntax when the method has a receiver.
-    pub(crate) receiver: Option<TokenStream>,
+    pub(crate) receiver: Option<ReceiverIr>,
     /// Non-receiver parameter name, type, and pattern facts.
-    pub(crate) parameters: Vec<(Option<String>, TypeIr, TokenStream)>,
+    pub(crate) parameters: Vec<ParameterIr>,
     /// The semantic method return category.
     pub(crate) return_type: ReturnTypeIr,
     /// Const, async, unsafe, and ABI qualifier tokens.
-    pub(crate) qualifiers: TokenStream,
+    pub(crate) qualifiers: MethodQualifiersIr,
+    /// Whether a trait method supplies a default body.
+    pub(crate) has_default: bool,
     /// Method-level reflection helpers.
     pub(crate) attributes: Vec<HelperAttributeIr>,
     /// Concrete method specializations in source order.
     pub(crate) specializations: Vec<SpecializationIr>,
     /// The method-name span used for diagnostics.
     pub(crate) span: Span,
+}
+
+/// A method receiver classified without retaining a `syn::Receiver`.
+#[derive(Clone, Debug)]
+pub(crate) struct ReceiverIr {
+    pub(crate) kind: ReceiverKindIr,
+    pub(crate) ty: TypeIr,
+    pub(crate) declaration: TokenStream,
+    pub(crate) span: Span,
+}
+
+/// The core receiver forms relevant to safe adapter selection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ReceiverKindIr {
+    Value,
+    SharedReference,
+    MutableReference,
+    Typed,
+}
+
+/// One non-receiver method parameter.
+#[derive(Clone, Debug)]
+pub(crate) struct ParameterIr {
+    pub(crate) name: Option<String>,
+    pub(crate) pattern: ParameterPatternIr,
+    pub(crate) ty: TypeIr,
+    pub(crate) index: usize,
+    pub(crate) span: Span,
+}
+
+/// A method parameter pattern represented independently of `syn::Pat`.
+#[derive(Clone, Debug)]
+pub(crate) struct ParameterPatternIr {
+    pub(crate) kind: ParameterPatternKindIr,
+    pub(crate) source: String,
+    pub(crate) tokens: TokenStream,
+}
+
+/// Parameter pattern categories that affect named invocation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ParameterPatternKindIr {
+    Identifier,
+    Wildcard,
+    Destructure,
+}
+
+/// Method qualifiers that affect descriptor facts and adapter safety.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct MethodQualifiersIr {
+    pub(crate) is_const: bool,
+    pub(crate) is_async: bool,
+    pub(crate) is_unsafe: bool,
+    pub(crate) abi: Option<String>,
+    pub(crate) is_variadic: bool,
 }
 
 /// The semantic return category of a method.
@@ -231,9 +287,32 @@ pub(crate) struct GenericsIr {
     /// Generic parameters in declaration order.
     pub(crate) params: Vec<GenericParamIr>,
     /// Where predicates in declaration order.
-    pub(crate) where_predicates: Vec<TokenStream>,
+    pub(crate) where_predicates: Vec<WherePredicateIr>,
     /// The complete generic declaration tokens.
     pub(crate) declaration: TokenStream,
+    /// Generic parameter tokens suitable for an impl header, with defaults removed.
+    pub(crate) impl_declaration: TokenStream,
+    /// Generic arguments in declaration order.
+    pub(crate) arguments: TokenStream,
+    /// The complete where clause tokens.
+    pub(crate) where_clause: TokenStream,
+}
+
+/// A structured predicate from a declaration's where clause.
+#[derive(Clone, Debug)]
+pub(crate) enum WherePredicateIr {
+    Lifetime {
+        lifetime: String,
+        bounds: Vec<String>,
+        declaration: TokenStream,
+    },
+    Type {
+        bounded_type: TypeIr,
+        lifetimes: Vec<String>,
+        bounds: Vec<GenericBoundIr>,
+        declaration: TokenStream,
+    },
+    Other(TokenStream),
 }
 
 /// One lifetime, type, or const generic parameter.
@@ -243,10 +322,42 @@ pub(crate) struct GenericParamIr {
     pub(crate) name: String,
     /// The parameter's lifetime, type, or const category.
     pub(crate) kind: GenericKindIr,
+    /// Bounds attached directly to this parameter.
+    pub(crate) bounds: Vec<GenericBoundIr>,
+    /// The declared default type or const expression.
+    pub(crate) default: Option<GenericDefaultIr>,
+    /// The declared type of a const parameter.
+    pub(crate) const_type: Option<TypeIr>,
     /// The complete parameter declaration tokens.
     pub(crate) declaration: TokenStream,
     /// The parameter source span.
     pub(crate) span: Span,
+}
+
+/// A generic lifetime or trait bound.
+#[derive(Clone, Debug)]
+pub(crate) enum GenericBoundIr {
+    Lifetime(String),
+    Trait {
+        path: PathIr,
+        modifier: TraitBoundModifierIr,
+        lifetimes: Vec<String>,
+    },
+    Other(TokenStream),
+}
+
+/// The optionality modifier of a trait bound.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TraitBoundModifierIr {
+    None,
+    Maybe,
+}
+
+/// A type or const generic default.
+#[derive(Clone, Debug)]
+pub(crate) enum GenericDefaultIr {
+    Type(TypeIr),
+    Const(TokenStream),
 }
 
 /// The kind of a source generic parameter.

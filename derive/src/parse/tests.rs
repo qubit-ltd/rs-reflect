@@ -3,7 +3,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::ir::{DeclarationIr, HelperName, MacroKind, TypeKindIr};
+use crate::ir::{
+    DeclarationIr, GenericDefaultIr, HelperName, HelperTarget, MacroKind, ParameterPatternKindIr,
+    ReceiverKindIr, TypeKindIr,
+};
 use crate::parse::parse_declaration;
 use crate::validate::validate_declaration;
 
@@ -196,6 +199,25 @@ fn test_parse_rejects_unknown_helpers() {
 }
 
 #[test]
+fn test_parse_rejects_bare_helpers_and_aggregates_validation_errors() {
+    let diagnostics = parse_invalid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            #[reflect(unknown_policy)]
+            #[reflect(skip)]
+            struct Invalid {
+                #[reflect]
+                value: String,
+            }
+        },
+    );
+    assert!(diagnostics.contains("unknown reflection helper `unknown_policy`"));
+    assert!(diagnostics.contains("`skip` is not valid on a type"));
+    assert!(diagnostics.contains("bare `#[reflect]` is not a valid helper attribute"));
+}
+
+#[test]
 fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
     let union_diagnostic = parse_invalid(
         MacroKind::Derive,
@@ -219,7 +241,9 @@ fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
         },
     );
     assert!(names.contains("rename cannot be empty"));
-    assert!(names.contains("duplicate field query name `same`"));
+    assert!(names.contains(
+        "field query name `same` for Rust member `third` conflicts with Rust member `second`"
+    ));
 }
 
 #[test]
@@ -245,6 +269,17 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
     assert!(mapping_diagnostics.contains("external trait path `Send` is mapped more than once"));
     assert!(
         mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once")
+    );
+
+    let unused_mapping = parse_invalid(
+        MacroKind::Trait,
+        quote!(external_trait(NotABound, id = "example.NotABound")),
+        quote! {
+            trait Invalid: Send {}
+        },
+    );
+    assert!(
+        unused_mapping.contains("external trait mapping `NotABound` does not match a trait bound")
     );
 }
 
@@ -273,6 +308,60 @@ fn test_validate_specialization_parameter_completeness() {
     };
     assert_eq!(valid.specializations.len(), 1);
     assert_eq!(valid.specializations[0].bindings.len(), 2);
+
+    let wrong_kinds = parse_invalid(
+        MacroKind::Impl,
+        quote!(specialize(T = 1, N = Vec<u8>)),
+        quote! {
+            impl<T, const N: usize> Container<T, N> {}
+        },
+    );
+    assert!(
+        wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind")
+    );
+    assert!(
+        wrong_kinds
+            .contains("specialization value for `N` does not match its Const parameter kind")
+    );
+}
+
+#[test]
+fn test_helper_target_matrix_matches_the_shared_contract() {
+    let all_targets = [
+        HelperTarget::Type,
+        HelperTarget::Field,
+        HelperTarget::Variant,
+        HelperTarget::Method,
+        HelperTarget::Impl,
+        HelperTarget::Trait,
+        HelperTarget::AssociatedItem,
+    ];
+    let expectations = [
+        (HelperName::Rename, &[0, 1, 2, 3][..]),
+        (HelperName::Opaque, &[0, 1][..]),
+        (HelperName::Capabilities, &[0][..]),
+        (HelperName::Skip, &[1, 2, 3][..]),
+        (HelperName::ReadOnly, &[1][..]),
+        (HelperName::NoConstruct, &[1, 2][..]),
+        (HelperName::Default, &[1][..]),
+        (HelperName::NoInvoke, &[3][..]),
+        (HelperName::CatchUnwind, &[3][..]),
+        (HelperName::ThreadSafe, &[3][..]),
+        (HelperName::Specialize, &[3, 4][..]),
+        (HelperName::ExternalTraitId, &[4][..]),
+        (HelperName::ExternalTrait, &[5][..]),
+    ];
+    for (helper, valid_indexes) in expectations {
+        for (index, target) in all_targets.into_iter().enumerate() {
+            assert_eq!(
+                helper.supports(target),
+                valid_indexes.contains(&index),
+                "unexpected target matrix entry for {} on {}",
+                helper.as_str(),
+                target.as_str()
+            );
+        }
+    }
 }
 
 #[test]
@@ -324,4 +413,85 @@ fn test_parse_rejects_attribute_macros_on_wrong_item_kinds() {
         ),
     );
     assert!(impl_diagnostic.contains("`#[reflect_impl]` can only be applied to an impl block"));
+}
+
+#[test]
+fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds() {
+    let declaration = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            struct Wrapper<'a: 'static, T: Clone = String, const N: usize = 4> {
+                value: &'a dyn core::fmt::Display,
+                marker: [T; N],
+            }
+        },
+    );
+    let DeclarationIr::Type(declaration) = &declaration.declaration else {
+        panic!("expected a type declaration");
+    };
+    assert_eq!(declaration.generics.params[0].bounds.len(), 1);
+    assert!(matches!(
+        declaration.generics.params[1].default,
+        Some(GenericDefaultIr::Type(_))
+    ));
+    assert!(matches!(
+        declaration.generics.params[2].default,
+        Some(GenericDefaultIr::Const(_))
+    ));
+    assert!(
+        !declaration
+            .generics
+            .impl_declaration
+            .to_string()
+            .contains('=')
+    );
+    assert_eq!(declaration.generics.arguments.to_string(), "< 'a , T , N >");
+    assert!(declaration.generics.where_clause.is_empty());
+    let TypeKindIr::Reference {
+        lifetime, element, ..
+    } = &declaration.fields[0].ty.kind
+    else {
+        panic!("expected a reference type");
+    };
+    assert_eq!(lifetime.as_deref(), Some("'a"));
+    assert!(matches!(element.kind, TypeKindIr::TraitObject { .. }));
+
+    let reflected_impl = parse_valid(
+        MacroKind::Impl,
+        TokenStream::new(),
+        quote! {
+            impl Value {
+                async unsafe extern "C" fn execute<'a, T: Clone>(
+                    &'a mut self,
+                    _: T,
+                    (left, right): (u8, u8),
+                ) -> ! {
+                    loop {}
+                }
+            }
+        },
+    );
+    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
+        panic!("expected an impl declaration");
+    };
+    let method = &reflected_impl.methods[0];
+    assert_eq!(
+        method.receiver.as_ref().map(|value| value.kind),
+        Some(ReceiverKindIr::MutableReference)
+    );
+    assert!(method.qualifiers.is_async);
+    assert!(method.qualifiers.is_unsafe);
+    assert_eq!(method.qualifiers.abi.as_deref(), Some("C"));
+    assert_eq!(
+        method.parameters[0].pattern.kind,
+        ParameterPatternKindIr::Wildcard
+    );
+    assert_eq!(
+        method.parameters[1].pattern.kind,
+        ParameterPatternKindIr::Destructure
+    );
+    assert!(
+        matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if matches!(ty.kind, TypeKindIr::Never))
+    );
 }
