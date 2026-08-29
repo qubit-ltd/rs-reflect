@@ -31,7 +31,8 @@ pub enum Visibility {
 }
 
 impl Visibility {
-    /// Normalizes a Rust source visibility spelling while retaining restricted paths.
+    /// Normalizes a Rust source visibility spelling while retaining restricted
+    /// paths.
     ///
     /// Unknown spellings are treated as private because they do not grant a
     /// recognized outward visibility.
@@ -64,7 +65,8 @@ impl Visibility {
         }
     }
 
-    /// Returns the retained restricted path, or `None` for other visibility kinds.
+    /// Returns the retained restricted path, or `None` for other visibility
+    /// kinds.
     pub fn restricted_path(&self) -> Option<&str> {
         match self {
             Self::Restricted(path) => Some(path),

@@ -3,10 +3,12 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::value::storage::{
-    LocalMutStorage, LocalOwnedStorage, LocalRefStorage, ThreadSafeMutStorage,
-    ThreadSafeOwnedStorage, ThreadSafeRefStorage,
-};
+use crate::value::storage::LocalMutStorage;
+use crate::value::storage::LocalOwnedStorage;
+use crate::value::storage::LocalRefStorage;
+use crate::value::storage::ThreadSafeMutStorage;
+use crate::value::storage::ThreadSafeOwnedStorage;
+use crate::value::storage::ThreadSafeRefStorage;
 
 mod sealed {
     /// Restricts dynamic value modes to the crate-defined markers.

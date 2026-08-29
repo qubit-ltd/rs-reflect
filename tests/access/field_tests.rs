@@ -43,7 +43,8 @@ fn get_secret_mut<'a>(target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, Fiel
     Ok(ReflectedMut::new(&mut account.secret))
 }
 
-/// Replaces the private field after descriptor-level target and value validation.
+/// Replaces the private field after descriptor-level target and value
+/// validation.
 fn set_secret(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldAccessError> {
     let account = target
         .downcast::<Account>()
@@ -56,8 +57,7 @@ fn set_secret(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), Fie
     Ok(())
 }
 
-static SECRET_TYPE: OpaqueTypeDescriptor =
-    descriptor::opaque_member::<String>();
+static SECRET_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<String>();
 static SECRET_TYPE_REF: TypeRef = TypeRef::Opaque(&SECRET_TYPE);
 static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
     account_descriptor,
@@ -74,11 +74,7 @@ static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
     Some(set_secret),
 )];
 static ACCOUNT_DESCRIPTOR: TypeDescriptor =
-    descriptor::struct_type::<Account>(
-    "field_tests::Account",
-    StructKind::Named,
-    &ACCOUNT_FIELDS,
-);
+    descriptor::struct_type::<Account>("field_tests::Account", StructKind::Named, &ACCOUNT_FIELDS);
 
 /// Verifies shared, mutable, and owned replacement adapters can safely access a
 /// private field while preserving the target borrow lifetime.
@@ -94,10 +90,7 @@ fn test_field_descriptor_reads_and_writes_private_field() {
     let borrowed = field
         .get(ReflectedRef::new(&account))
         .expect("shared access should succeed");
-    assert_eq!(
-        borrowed.downcast_ref::<String>().map(String::as_str),
-        Some("initial")
-    );
+    assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("initial"));
 
     {
         let mut borrowed = field

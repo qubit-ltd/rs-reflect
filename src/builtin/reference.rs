@@ -12,25 +12,23 @@ fn resolved<T: Reflect + ?Sized>() -> &'static TypeRef {
 }
 
 impl<T: Reflect + ?Sized> Reflect for &'static T {
-    /// Returns the interned descriptor for this shared-reference specialization.
+    /// Returns the interned descriptor for this shared-reference
+    /// specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_reference::<Self>(
-                std::any::type_name::<Self>(),
-                                ReferenceKind::Shared,
-                resolved::<T>(),
-            )
+            TypeDescriptor::new_reference::<Self>(std::any::type_name::<Self>(), ReferenceKind::Shared, resolved::<T>())
         })
     }
 }
 
 impl<T: Reflect + ?Sized> Reflect for &'static mut T {
-    /// Returns the interned descriptor for this mutable-reference specialization.
+    /// Returns the interned descriptor for this mutable-reference
+    /// specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_reference::<Self>(
                 std::any::type_name::<Self>(),
-                                ReferenceKind::Mutable,
+                ReferenceKind::Mutable,
                 resolved::<T>(),
             )
         })

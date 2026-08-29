@@ -14,23 +14,45 @@ mod variant_descriptor;
 pub use field_descriptor::FieldDescriptor;
 pub use field_descriptor::TypeDescriptorResolver;
 pub use generic_descriptor::ConcreteGenericDescriptor;
-pub use impl_descriptor::{
-    AssociatedConstBindingDescriptor, AssociatedConstImplementationSource, AssociatedConstReader,
-    AssociatedTypeBindingDescriptor, ImplDefinitionDescriptor, ImplDescriptor,
-    ImplDescriptorBuildError, ImplKind, MethodLookup, MethodQualifier,
-};
-pub use method_descriptor::{
-    InvocationAdapter, InvocationUnavailableReason, MethodDescriptor, MethodDescriptorBuilder,
-    MethodDeclarationOwner, MethodImplementationSource, MethodInstanceBuildError,
-    MethodInstanceDescriptor, MethodQualifiers, MethodVisibility, ParameterDescriptor,
-    ParameterPassingMode, ParameterPatternDescriptor, ReceiverDescriptor, ReturnDescriptor,
-    ReturnKind,
-};
-pub use trait_descriptor::{
-    AppliedTraitId, AssociatedConstDescriptor, AssociatedTypeDescriptor, SupertraitClosure,
-    TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitDescriptorBuildError,
-    TraitDescriptorBuilder, TraitDescriptorRef, TraitId, TraitImplPayload, external_supertrait,
-};
+pub use impl_descriptor::AssociatedConstBindingDescriptor;
+pub use impl_descriptor::AssociatedConstImplementationSource;
+pub use impl_descriptor::AssociatedConstReader;
+pub use impl_descriptor::AssociatedTypeBindingDescriptor;
+pub use impl_descriptor::ImplDefinitionDescriptor;
+pub use impl_descriptor::ImplDescriptor;
+pub use impl_descriptor::ImplDescriptorBuildError;
+pub use impl_descriptor::ImplKind;
+pub use impl_descriptor::MethodLookup;
+pub use impl_descriptor::MethodQualifier;
+pub use method_descriptor::InvocationAdapter;
+pub use method_descriptor::InvocationUnavailableReason;
+pub use method_descriptor::MethodDeclarationOwner;
+pub use method_descriptor::MethodDescriptor;
+pub use method_descriptor::MethodDescriptorBuilder;
+pub use method_descriptor::MethodImplementationSource;
+pub use method_descriptor::MethodInstanceBuildError;
+pub use method_descriptor::MethodInstanceDescriptor;
+pub use method_descriptor::MethodQualifiers;
+pub use method_descriptor::MethodVisibility;
+pub use method_descriptor::ParameterDescriptor;
+pub use method_descriptor::ParameterPassingMode;
+pub use method_descriptor::ParameterPatternDescriptor;
+pub use method_descriptor::ReceiverDescriptor;
+pub use method_descriptor::ReturnDescriptor;
+pub use method_descriptor::ReturnKind;
+pub use trait_descriptor::AppliedTraitId;
+pub use trait_descriptor::AssociatedConstDescriptor;
+pub use trait_descriptor::AssociatedTypeDescriptor;
+pub use trait_descriptor::SupertraitClosure;
+pub use trait_descriptor::TraitCompleteness;
+pub use trait_descriptor::TraitDefinitionDescriptor;
+pub use trait_descriptor::TraitDescriptor;
+pub use trait_descriptor::TraitDescriptorBuildError;
+pub use trait_descriptor::TraitDescriptorBuilder;
+pub use trait_descriptor::TraitDescriptorRef;
+pub use trait_descriptor::TraitId;
+pub use trait_descriptor::TraitImplPayload;
+pub use trait_descriptor::external_supertrait;
 pub use type_descriptor::Reflect;
 pub use type_descriptor::TypeDescriptor;
 pub use type_kind::FunctionPointerKind;
@@ -63,5 +85,7 @@ pub use typed_view::StructTypeDescriptor;
 pub use typed_view::TextTypeDescriptor;
 pub use typed_view::TraitObjectTypeDescriptor;
 pub use typed_view::TupleTypeDescriptor;
-pub use variant_descriptor::{DiscriminantOrigin, NumericDiscriminant, VariantDescriptor};
+pub use variant_descriptor::DiscriminantOrigin;
+pub use variant_descriptor::NumericDiscriminant;
+pub use variant_descriptor::VariantDescriptor;
 pub use variant_descriptor::VariantKind;

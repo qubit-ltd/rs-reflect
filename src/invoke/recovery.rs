@@ -2,9 +2,11 @@
 
 use std::fmt;
 
-use crate::invoke::{
-    Invocation, InvocationArg, InvocationError, InvocationMode, InvocationReceiver,
-};
+use crate::invoke::Invocation;
+use crate::invoke::InvocationArg;
+use crate::invoke::InvocationError;
+use crate::invoke::InvocationMode;
+use crate::invoke::InvocationReceiver;
 
 /// Complete invocation input retained after pre-execution validation fails.
 pub struct InvocationRecovery<'call, M: InvocationMode> {
@@ -18,10 +20,7 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
         receiver: Option<InvocationReceiver<'call, M>>,
         arguments: Box<[InvocationArg<'call, M>]>,
     ) -> Self {
-        Self {
-            receiver,
-            arguments,
-        }
+        Self { receiver, arguments }
     }
 
     /// Returns the recovered receiver, or `None` for an associated function.
@@ -35,12 +34,7 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     }
 
     /// Consumes the recovery and returns the receiver and ordered arguments.
-    pub fn into_parts(
-        self,
-    ) -> (
-        Option<InvocationReceiver<'call, M>>,
-        Box<[InvocationArg<'call, M>]>,
-    ) {
+    pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 
@@ -52,14 +46,12 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
 }
 
 impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
-    /// Formats input modes and count without requiring erased values to be `Debug`.
+    /// Formats input modes and count without requiring erased values to be
+    /// `Debug`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("InvocationRecovery")
-            .field(
-                "receiver_mode",
-                &self.receiver.as_ref().map(InvocationReceiver::mode),
-            )
+            .field("receiver_mode", &self.receiver.as_ref().map(InvocationReceiver::mode))
             .field("argument_count", &self.arguments.len())
             .finish()
     }
@@ -74,7 +66,8 @@ pub struct InvocationFailure<'call, M: InvocationMode> {
 }
 
 impl<M: InvocationMode> fmt::Debug for InvocationFailure<'_, M> {
-    /// Formats the error and recovery metadata without formatting erased values.
+    /// Formats the error and recovery metadata without formatting erased
+    /// values.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("InvocationFailure")

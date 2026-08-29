@@ -12,13 +12,9 @@ pub struct MemberId {
 }
 
 impl MemberId {
-    /// Creates a member ID from its declaring identity, category, position, and fragment.
-    pub fn new(
-        declaring_identity: &str,
-        kind: &str,
-        index: usize,
-        fragment: FragmentIdentity,
-    ) -> Self {
+    /// Creates a member ID from its declaring identity, category, position, and
+    /// fragment.
+    pub fn new(declaring_identity: &str, kind: &str, index: usize, fragment: FragmentIdentity) -> Self {
         Self {
             declaring_identity: declaring_identity.into(),
             kind: kind.into(),

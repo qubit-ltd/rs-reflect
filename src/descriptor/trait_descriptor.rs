@@ -4,19 +4,23 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock};
+use std::sync::Arc;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use crate::descriptor::MethodDescriptor;
-use crate::expression::{
-    ConstExpression, GenericArgument, GenericDefinitionDescriptor, GenericParameterDescriptor,
-    PredicateDescriptor, TypeExpression,
-};
+use crate::expression::ConstExpression;
+use crate::expression::GenericArgument;
+use crate::expression::GenericDefinitionDescriptor;
+use crate::expression::GenericParameterDescriptor;
+use crate::expression::PredicateDescriptor;
+use crate::expression::TypeExpression;
 use crate::identity::ExternalTraitId;
 use crate::identity::Visibility;
 
 type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<&'static TraitDescriptor>>>;
-type ExternalSupertraitCache =
-    HashMap<(TypeId, ExternalTraitId, Box<[GenericArgument]>), &'static TraitDescriptor>;
+type ExternalSupertraitCache = HashMap<(TypeId, ExternalTraitId, Box<[GenericArgument]>), &'static TraitDescriptor>;
 
 /// The process-local identity source of a reflected or external trait.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -67,11 +71,13 @@ pub struct TraitDefinitionDescriptor {
     visibility: Visibility,
 }
 
-/// Concrete trait facts supplied by a reflected trait's hidden implementation hook.
+/// Concrete trait facts supplied by a reflected trait's hidden implementation
+/// hook.
 ///
-/// The hook carries declaration identity without imposing object-safety requirements on the
-/// reflected trait. Implementation expansion enriches this payload with concrete application
-/// details before it becomes part of an implementation descriptor.
+/// The hook carries declaration identity without imposing object-safety
+/// requirements on the reflected trait. Implementation expansion enriches this
+/// payload with concrete application details before it becomes part of an
+/// implementation descriptor.
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug)]
 pub struct TraitImplPayload {
@@ -82,14 +88,8 @@ pub struct TraitImplPayload {
 impl TraitImplPayload {
     /// Creates a payload for one reflected trait declaration.
     #[doc(hidden)]
-    pub const fn new(
-        definition: &'static TraitDefinitionDescriptor,
-        applied: &'static TraitDescriptor,
-    ) -> Self {
-        Self {
-            definition,
-            applied,
-        }
+    pub const fn new(definition: &'static TraitDefinitionDescriptor, applied: &'static TraitDescriptor) -> Self {
+        Self { definition, applied }
     }
 
     /// Returns the complete trait declaration shared by every implementation.
@@ -104,7 +104,8 @@ impl TraitImplPayload {
         self.applied
     }
 
-    /// Reuses an applied descriptor without constructing a discarded candidate on cache hits.
+    /// Reuses an applied descriptor without constructing a discarded candidate
+    /// on cache hits.
     #[doc(hidden)]
     pub fn cached_with_arguments<T: ?Sized + 'static>(
         definition: &'static TraitDefinitionDescriptor,
@@ -129,17 +130,17 @@ impl TraitImplPayload {
     }
 }
 
-/// Returns a cached incomplete descriptor for an explicitly mapped external supertrait.
+/// Returns a cached incomplete descriptor for an explicitly mapped external
+/// supertrait.
 #[doc(hidden)]
 pub fn external_supertrait<T: ?Sized + 'static>(
     id: &'static str,
     rust_path: &'static str,
     arguments: Vec<GenericArgument>,
 ) -> &'static TraitDescriptor {
-    static CACHE: LazyLock<Mutex<ExternalSupertraitCache>> =
-        LazyLock::new(|| Mutex::new(HashMap::new()));
-    let external_id = ExternalTraitId::new(id)
-        .expect("the macro validator must only emit valid external trait identifiers");
+    static CACHE: LazyLock<Mutex<ExternalSupertraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+    let external_id =
+        ExternalTraitId::new(id).expect("the macro validator must only emit valid external trait identifiers");
     let key = (
         TypeId::of::<T>(),
         external_id.clone(),
@@ -179,10 +180,19 @@ impl TraitDefinitionDescriptor {
         completeness: TraitCompleteness,
         generic_definition: &'static GenericDefinitionDescriptor,
     ) -> Self {
-        Self::new_with_visibility(trait_id, rust_name, rust_path, query_name, completeness, generic_definition, Visibility::Private)
+        Self::new_with_visibility(
+            trait_id,
+            rust_name,
+            rust_path,
+            query_name,
+            completeness,
+            generic_definition,
+            Visibility::Private,
+        )
     }
 
-    /// Creates immutable trait definition facts with normalized source visibility.
+    /// Creates immutable trait definition facts with normalized source
+    /// visibility.
     #[doc(hidden)]
     pub const fn new_with_visibility(
         trait_id: TraitId,
@@ -387,9 +397,7 @@ pub struct SupertraitClosure<'a> {
 impl<'a> SupertraitClosure<'a> {
     /// Returns applied supertraits in deterministic path order.
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
-        self.descriptors
-            .iter()
-            .map(|descriptor| descriptor.descriptor())
+        self.descriptors.iter().map(|descriptor| descriptor.descriptor())
     }
 
     /// Returns the number of distinct transitive supertraits.
@@ -477,9 +485,7 @@ impl TraitDescriptor {
     ///
     /// `None` means this applied trait has no method with the requested name.
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
-        self.methods
-            .iter()
-            .find(|method| method.query_name() == name)
+        self.methods.iter().find(|method| method.query_name() == name)
     }
 
     /// Returns associated type declarations in source order.
@@ -491,9 +497,7 @@ impl TraitDescriptor {
     ///
     /// `None` means no associated type has the requested name.
     pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
-        self.associated_types
-            .iter()
-            .find(|item| item.query_name() == name)
+        self.associated_types.iter().find(|item| item.query_name() == name)
     }
 
     /// Returns associated constant declarations in source order.
@@ -505,9 +509,7 @@ impl TraitDescriptor {
     ///
     /// `None` means no associated constant has the requested name.
     pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
-        self.associated_consts
-            .iter()
-            .find(|item| item.query_name() == name)
+        self.associated_consts.iter().find(|item| item.query_name() == name)
     }
 
     /// Returns whether two descriptors are the same concrete trait application.
@@ -542,7 +544,8 @@ pub enum TraitDescriptorBuildError {
     },
     /// An external incomplete trait attempted to claim unobservable facts.
     ExternalTraitHasUnprovenFacts,
-    /// The number of concrete type/const arguments does not match the definition.
+    /// The number of concrete type/const arguments does not match the
+    /// definition.
     GenericArgumentCount {
         /// Number of runtime identity arguments required by the definition.
         expected: usize,
@@ -570,25 +573,20 @@ impl fmt::Display for TraitDescriptorBuildError {
             Self::RecursiveSupertrait { rust_path } => {
                 write!(formatter, "recursive supertrait application: {rust_path}")
             }
-            Self::ExternalTraitHasUnprovenFacts => formatter.write_str(
-                "an external incomplete trait cannot claim supertraits or associated items",
-            ),
+            Self::ExternalTraitHasUnprovenFacts => {
+                formatter.write_str("an external incomplete trait cannot claim supertraits or associated items")
+            }
             Self::GenericArgumentCount { expected, actual } => write!(
                 formatter,
                 "trait application requires {expected} concrete arguments but received {actual}"
             ),
             Self::GenericArgumentKind { index } => {
-                write!(
-                    formatter,
-                    "trait argument {index} has the wrong generic kind"
-                )
+                write!(formatter, "trait argument {index} has the wrong generic kind")
             }
             Self::NonConcreteGenericArgument { index } => {
                 write!(formatter, "trait argument {index} is not concrete")
             }
-            Self::ForeignMethod => {
-                formatter.write_str("applied trait contains a foreign method declaration")
-            }
+            Self::ForeignMethod => formatter.write_str("applied trait contains a foreign method declaration"),
         }
     }
 }
@@ -626,14 +624,8 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets direct supertraits in source declaration order.
-    pub fn direct_supertraits<const N: usize>(
-        mut self,
-        direct_supertraits: [&'static TraitDescriptor; N],
-    ) -> Self {
-        self.direct_supertraits = direct_supertraits
-            .into_iter()
-            .map(TraitDescriptorRef::new)
-            .collect();
+    pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
+        self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
         self
     }
 
@@ -716,10 +708,7 @@ impl TraitDescriptorBuilder {
                 rust_path: self.definition.rust_path(),
             });
         }
-        if closure
-            .iter()
-            .any(|existing| existing.same_application(candidate))
-        {
+        if closure.iter().any(|existing| existing.same_application(candidate)) {
             return Ok(());
         }
         closure.push(TraitDescriptorRef::new(candidate));
@@ -753,18 +742,11 @@ impl TraitDescriptorBuilder {
                 actual: self.arguments.len(),
             });
         }
-        for (index, (parameter, argument)) in
-            parameters.into_iter().zip(&self.arguments).enumerate()
-        {
+        for (index, (parameter, argument)) in parameters.into_iter().zip(&self.arguments).enumerate() {
             let kind_matches = matches!(
                 (parameter, argument),
-                (
-                    GenericParameterDescriptor::Type { .. },
-                    GenericArgument::Type(_)
-                ) | (
-                    GenericParameterDescriptor::Const { .. },
-                    GenericArgument::Const(_)
-                )
+                (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
+                    | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
             );
             if !kind_matches {
                 return Err(TraitDescriptorBuildError::GenericArgumentKind { index });
@@ -781,9 +763,7 @@ impl TraitDescriptorBuilder {
 pub(super) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
     match argument {
         GenericArgument::Type(expression) => type_expression_is_concrete(expression),
-        GenericArgument::Const(argument) => {
-            !matches!(argument.value, ConstExpression::Parameter(_))
-        }
+        GenericArgument::Const(argument) => !matches!(argument.value, ConstExpression::Parameter(_)),
         GenericArgument::Lifetime(_) => true,
         GenericArgument::AssociatedType { value, .. } => type_expression_is_concrete(value),
         GenericArgument::AssociatedTypeBound { .. } => false,
@@ -793,15 +773,12 @@ pub(super) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
 /// Returns whether a substituted type expression contains no symbolic type.
 fn type_expression_is_concrete(expression: &TypeExpression) -> bool {
     match expression {
-        TypeExpression::Concrete(concrete) => {
-            concrete.arguments.iter().all(generic_argument_is_concrete)
-        }
+        TypeExpression::Concrete(concrete) => concrete.arguments.iter().all(generic_argument_is_concrete),
         TypeExpression::Reference(reference) => type_expression_is_concrete(&reference.target),
         TypeExpression::RawPointer(pointer) => type_expression_is_concrete(&pointer.target),
         TypeExpression::Slice(element) => type_expression_is_concrete(element),
         TypeExpression::Array(array) => {
-            type_expression_is_concrete(&array.element)
-                && !matches!(array.length, ConstExpression::Parameter(_))
+            type_expression_is_concrete(&array.element) && !matches!(array.length, ConstExpression::Parameter(_))
         }
         TypeExpression::Tuple(elements) => elements.iter().all(type_expression_is_concrete),
         TypeExpression::FunctionPointer(function) => {

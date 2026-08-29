@@ -3,13 +3,21 @@
 use std::any::TypeId;
 use std::fmt;
 
-use crate::construct::struct_constructor::{local_type_id, thread_safe_type_id};
-use crate::construct::{
-    ConstructionError, ConstructionField, ConstructionRecovery, ConstructionShape,
-    NamedConstructionInput, TupleConstructionInput, ValidatedConstructionInput,
-};
-use crate::descriptor::{VariantDescriptor, VariantKind};
-use crate::value::{DynamicOwned, Local, Mode, ThreadSafe};
+use crate::construct::ConstructionError;
+use crate::construct::ConstructionField;
+use crate::construct::ConstructionRecovery;
+use crate::construct::ConstructionShape;
+use crate::construct::NamedConstructionInput;
+use crate::construct::TupleConstructionInput;
+use crate::construct::ValidatedConstructionInput;
+use crate::construct::struct_constructor::local_type_id;
+use crate::construct::struct_constructor::thread_safe_type_id;
+use crate::descriptor::VariantDescriptor;
+use crate::descriptor::VariantKind;
+use crate::value::DynamicOwned;
+use crate::value::Local;
+use crate::value::Mode;
+use crate::value::ThreadSafe;
 
 /// A mode-specific adapter generated inside the declaring enum module.
 pub type VariantConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> DynamicOwned<M>;
@@ -71,8 +79,7 @@ impl<M: Mode + 'static> VariantConstructor<M> {
                 actual: ConstructionShape::Named,
             }));
         }
-        let validated =
-            crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -89,8 +96,7 @@ impl<M: Mode + 'static> VariantConstructor<M> {
                 actual: ConstructionShape::Tuple,
             }));
         }
-        let validated =
-            crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -114,7 +120,8 @@ impl<M: Mode + 'static> VariantConstructor<M> {
         Ok(self.execute(validated, value_type_id))
     }
 
-    /// Invokes generated code and enforces its exact enum-root output invariant.
+    /// Invokes generated code and enforces its exact enum-root output
+    /// invariant.
     fn execute(
         &self,
         validated: ValidatedConstructionInput<M>,
@@ -136,8 +143,7 @@ impl<M: Mode + 'static> VariantConstructor<M> {
             self.fields.len(),
             "construction policy must cover every variant field"
         );
-        for (descriptor_field, construction_field) in self.variant.fields().iter().zip(self.fields)
-        {
+        for (descriptor_field, construction_field) in self.variant.fields().iter().zip(self.fields) {
             assert!(
                 std::ptr::eq(descriptor_field, construction_field.descriptor()),
                 "construction policy fields must be the variant's own fields"
@@ -187,9 +193,7 @@ impl VariantConstructor<ThreadSafe> {
     }
 
     /// Validates and constructs a thread-safe unit enum variant.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
+    pub fn construct_unit(&self) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
         self.construct_unit_with(thread_safe_type_id)
     }
 }

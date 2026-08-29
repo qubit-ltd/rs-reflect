@@ -16,12 +16,7 @@ fn resolved<T: Reflect>() -> &'static TypeRef {
 
 /// Builds the descriptor shared by every map family specialization.
 fn descriptor<T: ?Sized + 'static, K: Reflect, V: Reflect>(kind: MapKind) -> TypeDescriptor {
-    TypeDescriptor::new_map::<T>(
-        std::any::type_name::<T>(),
-                kind,
-        resolved::<K>(),
-        resolved::<V>(),
-    )
+    TypeDescriptor::new_map::<T>(std::any::type_name::<T>(), kind, resolved::<K>(), resolved::<V>())
 }
 
 impl<K: Reflect, V: Reflect, Hasher: 'static> Reflect for HashMap<K, V, Hasher> {

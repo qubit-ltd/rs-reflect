@@ -1,16 +1,20 @@
 //! Generic parameter declarations and their where predicates.
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
+use std::hash::Hasher;
 
-use crate::expression::{
-    ConstExpression, DiagnosticText, LifetimeExpression, PredicateDescriptor, TypeExpression,
-};
+use crate::expression::ConstExpression;
+use crate::expression::DiagnosticText;
+use crate::expression::LifetimeExpression;
+use crate::expression::PredicateDescriptor;
+use crate::expression::TypeExpression;
 
-/// The generic declaration shared by all concrete instances of a reflected item.
+/// The generic declaration shared by all concrete instances of a reflected
+/// item.
 ///
-/// Parameters and predicates preserve source declaration order.  It describes a declaration;
-/// it neither synthesizes a runtime type identity for lifetime-only instantiations nor evaluates
-/// predicates at runtime.
+/// Parameters and predicates preserve source declaration order.  It describes a
+/// declaration; it neither synthesizes a runtime type identity for
+/// lifetime-only instantiations nor evaluates predicates at runtime.
 #[derive(Clone, Debug)]
 pub struct GenericDefinitionDescriptor {
     /// Lifetime, type, and const parameters in declaration order.

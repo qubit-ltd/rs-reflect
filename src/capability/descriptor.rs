@@ -1,6 +1,7 @@
 //! Type-erased descriptors for capability facts and operation adapters.
 
-use std::any::{Any, TypeId};
+use std::any::Any;
+use std::any::TypeId;
 use std::sync::Arc;
 
 use crate::capability::CapabilityKey;

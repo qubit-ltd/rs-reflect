@@ -1,8 +1,11 @@
-//! Concurrency stress coverage for reflection registry and descriptor interning.
+//! Concurrency stress coverage for reflection registry and descriptor
+//! interning.
 
-use std::sync::{Arc, Barrier};
+use std::sync::Arc;
+use std::sync::Barrier;
 
-use qubit_reflect::{Reflect, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::registry::ReflectRegistry;
 
 #[derive(Reflect)]
@@ -10,8 +13,8 @@ struct StressRecord<T> {
     values: Vec<T>,
 }
 
-/// Verifies first-time generic descriptor interning and registry lookup converge
-/// under a synchronized multi-threaded start.
+/// Verifies first-time generic descriptor interning and registry lookup
+/// converge under a synchronized multi-threaded start.
 #[test]
 fn test_stress_concurrent_generic_descriptor_and_registry_initialization() {
     const WORKERS: usize = 16;
@@ -23,10 +26,7 @@ fn test_stress_concurrent_generic_descriptor_and_registry_initialization() {
                 barrier.wait();
                 let descriptor = TypeDescriptor::of::<StressRecord<u64>>();
                 let registry = ReflectRegistry::initialize().expect("registry must initialize once");
-                (
-                    descriptor as *const TypeDescriptor as usize,
-                    registry.types().len(),
-                )
+                (descriptor as *const TypeDescriptor as usize, registry.types().len())
             })
         })
         .collect();

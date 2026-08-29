@@ -33,8 +33,18 @@ pub enum DiscriminantOrigin {
 /// The exact integer representation of an enum discriminant value.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NumericDiscriminant {
-    I8(i8), I16(i16), I32(i32), I64(i64), I128(i128), Isize(isize),
-    U8(u8), U16(u16), U32(u32), U64(u64), U128(u128), Usize(usize),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    Isize(isize),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    Usize(usize),
 }
 
 /// The immutable structural description of one reflected enum variant.
@@ -81,11 +91,7 @@ impl VariantDescriptor {
 
     /// Records source discriminant facts supplied by generated enum metadata.
     #[doc(hidden)]
-    pub const fn with_discriminant(
-        mut self,
-        origin: DiscriminantOrigin,
-        numeric: Option<NumericDiscriminant>,
-    ) -> Self {
+    pub const fn with_discriminant(mut self, origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
         self
@@ -135,9 +141,7 @@ impl VariantDescriptor {
     ///
     /// `None` means the variant has no field with that lookup name.
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields
-            .iter()
-            .find(|field| field.query_name() == Some(name))
+        self.fields.iter().find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a field by source index.
@@ -147,7 +151,8 @@ impl VariantDescriptor {
         self.fields.get(index)
     }
 
-    /// Returns whether this variant is active for an exact declaring enum value.
+    /// Returns whether this variant is active for an exact declaring enum
+    /// value.
     ///
     /// A target of another type returns [`TypeMismatch`] without invoking the
     /// generated adapter.

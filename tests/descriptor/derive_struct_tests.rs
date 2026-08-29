@@ -1,9 +1,13 @@
 //! Integration tests for `Reflect` struct derives.
 
-use qubit_reflect::descriptor::{StructKind, TypeKind};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::{ReflectedMut, ReflectedOwned, ReflectedRef};
-use qubit_reflect::{Reflect, TypeDescriptor};
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::ReflectedRef;
 
 #[derive(Reflect)]
 struct DerivedNamed {
@@ -85,7 +89,8 @@ fn test_derive_reflect_accesses_private_named_field() {
     assert_eq!(value.value, 9);
 }
 
-/// Verifies tuple, newtype, and unit shapes retain their distinct descriptor views.
+/// Verifies tuple, newtype, and unit shapes retain their distinct descriptor
+/// views.
 #[test]
 fn test_derive_reflect_preserves_non_named_struct_shapes() {
     let tuple = TypeDescriptor::of::<DerivedTuple>();
@@ -120,16 +125,27 @@ fn test_derive_reflect_generic_struct_resolves_field_type_per_specialization() {
 
     assert_ne!(u8_descriptor.type_id(), u16_descriptor.type_id());
     assert!(std::ptr::eq(
-        u8_descriptor.field_at(0).expect("generic field").field_type().as_resolved().expect("resolved field"),
+        u8_descriptor
+            .field_at(0)
+            .expect("generic field")
+            .field_type()
+            .as_resolved()
+            .expect("resolved field"),
         TypeDescriptor::of::<u8>(),
     ));
     assert!(std::ptr::eq(
-        u16_descriptor.field_at(0).expect("generic field").field_type().as_resolved().expect("resolved field"),
+        u16_descriptor
+            .field_at(0)
+            .expect("generic field")
+            .field_type()
+            .as_resolved()
+            .expect("resolved field"),
         TypeDescriptor::of::<u16>(),
     ));
 }
 
-/// Verifies an opaque field does not require its generic argument to implement `Reflect`.
+/// Verifies an opaque field does not require its generic argument to implement
+/// `Reflect`.
 #[test]
 fn test_derive_reflect_opaque_generic_field_does_not_require_reflect_bound() {
     let descriptor = TypeDescriptor::of::<DerivedOpaqueMember<std::rc::Rc<()>>>();
@@ -140,7 +156,8 @@ fn test_derive_reflect_opaque_generic_field_does_not_require_reflect_bound() {
     ));
 }
 
-/// Verifies a concrete derived root contributes a linker-discovered type fragment.
+/// Verifies a concrete derived root contributes a linker-discovered type
+/// fragment.
 #[test]
 fn test_derive_reflect_registers_concrete_struct() {
     let registry = ReflectRegistry::initialize().expect("derived type fragments must validate");

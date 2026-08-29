@@ -5,12 +5,18 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use crate::descriptor::{
-    AppliedTraitId, ImplDescriptor, ImplKind, TraitDefinitionDescriptor, TraitId, TypeDescriptor,
-};
+use crate::descriptor::AppliedTraitId;
+use crate::descriptor::ImplDescriptor;
+use crate::descriptor::ImplKind;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::descriptor::TraitId;
+use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
-use crate::identity::{CapabilityId, ExternalTraitId, FragmentIdentity};
-use crate::registry::fragment::{FragmentPayload, RegistrationFragment};
+use crate::identity::CapabilityId;
+use crate::identity::ExternalTraitId;
+use crate::identity::FragmentIdentity;
+use crate::registry::fragment::FragmentPayload;
+use crate::registry::fragment::RegistrationFragment;
 use crate::registry::indexes::RegistryIndexes;
 use crate::registry::registry::ReflectRegistry;
 
@@ -33,8 +39,7 @@ struct RegistryBuilder {
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
-    external_traits:
-        HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
+    external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
     capabilities: HashMap<(TypeId, CapabilityId), (TypeId, FragmentIdentity)>,
@@ -49,23 +54,12 @@ impl RegistryBuilder {
             FragmentPayload::Trait(descriptor) => self.push_trait(descriptor, &built.identity)?,
             FragmentPayload::Impl(descriptor) => self.push_impl(descriptor, &built.identity)?,
             FragmentPayload::Capability(registration) => {
-                let key = (
-                    registration.target_type_id(),
-                    registration.descriptor().id().clone(),
-                );
+                let key = (registration.target_type_id(), registration.descriptor().id().clone());
                 if let Some((_, first)) = self.capabilities.get(&key) {
-                    return Err(RegistryError::capability_conflict(
-                        first.clone(),
-                        built.identity,
-                    ));
+                    return Err(RegistryError::capability_conflict(first.clone(), built.identity));
                 }
-                self.capabilities.insert(
-                    key,
-                    (
-                        registration.descriptor().adapter_type(),
-                        built.identity.clone(),
-                    ),
-                );
+                self.capabilities
+                    .insert(key, (registration.descriptor().adapter_type(), built.identity.clone()));
             }
         }
         self.fragment_identities.push(built.identity);
@@ -79,10 +73,7 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         if let Some((_, first)) = self.types_by_id.get(&descriptor.type_id()) {
-            return Err(RegistryError::identity_conflict(
-                first.clone(),
-                identity.clone(),
-            ));
+            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
         }
         self.types.push(descriptor);
         self.types_by_id
@@ -98,8 +89,7 @@ impl RegistryBuilder {
     ) -> Result<(), RegistryError> {
         let definition_id = descriptor.trait_id().clone();
         if let TraitId::External(external_id) = &definition_id {
-            if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id)
-            {
+            if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id) {
                 if !compatible_external_traits(first_descriptor, descriptor) {
                     return Err(RegistryError::external_trait_id_conflict(
                         first_identity.clone(),
@@ -111,18 +101,15 @@ impl RegistryBuilder {
                     .insert(external_id.clone(), (descriptor, identity.clone()));
             }
         } else if let Some(first) = self.trait_fragments.get(&definition_id) {
-            return Err(RegistryError::identity_conflict(
-                first.clone(),
-                identity.clone(),
-            ));
+            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
         }
-        self.trait_fragments
-            .insert(definition_id.clone(), identity.clone());
+        self.trait_fragments.insert(definition_id.clone(), identity.clone());
         self.traits_by_id.entry(definition_id).or_insert(descriptor);
         Ok(())
     }
 
-    /// Adds one impl after validating its outer, definition, and target identities.
+    /// Adds one impl after validating its outer, definition, and target
+    /// identities.
     fn push_impl(
         &mut self,
         descriptor: &'static ImplDescriptor,
@@ -140,21 +127,16 @@ impl RegistryBuilder {
         if let Some(implemented_trait) = descriptor.implemented_trait() {
             let key = (target_type_id, implemented_trait.trait_id().clone());
             if let Some(first) = self.trait_impls.get(&key) {
-                return Err(RegistryError::identity_conflict(
-                    first.clone(),
-                    identity.clone(),
-                ));
+                return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
             }
             self.trait_impls.insert(key, identity.clone());
         }
-        self.impls_by_target
-            .entry(target_type_id)
-            .or_default()
-            .push(descriptor);
+        self.impls_by_target.entry(target_type_id).or_default().push(descriptor);
         Ok(())
     }
 
-    /// Freezes deterministic slices and hash indexes after successful validation.
+    /// Freezes deterministic slices and hash indexes after successful
+    /// validation.
     fn finish(mut self) -> ReflectRegistry {
         for implementations in self.impls_by_target.values_mut() {
             implementations.sort_by(compare_impls);
@@ -207,9 +189,7 @@ pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryErro
 }
 
 /// Builds a registry from an explicit static fragment slice.
-pub(crate) fn build_registry(
-    fragments: &[&'static RegistrationFragment],
-) -> Result<ReflectRegistry, RegistryError> {
+pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(fragments.iter().copied())
 }
 
@@ -291,7 +271,8 @@ fn validate_fragment_identities(fragments: &[PendingFragment]) -> Result<(), Reg
     Ok(())
 }
 
-/// Compares stable source facts while deliberately excluding content fingerprint.
+/// Compares stable source facts while deliberately excluding content
+/// fingerprint.
 fn same_source_identity(left: &FragmentIdentity, right: &FragmentIdentity) -> bool {
     left.declaring_crate() == right.declaring_crate()
         && left.module_path() == right.module_path()
@@ -301,12 +282,8 @@ fn same_source_identity(left: &FragmentIdentity, right: &FragmentIdentity) -> bo
 }
 
 /// Returns whether two aliases contribute mergeable facts for one external ID.
-fn compatible_external_traits(
-    left: &TraitDefinitionDescriptor,
-    right: &TraitDefinitionDescriptor,
-) -> bool {
-    left.completeness() == right.completeness()
-        && left.generic_definition() == right.generic_definition()
+fn compatible_external_traits(left: &TraitDefinitionDescriptor, right: &TraitDefinitionDescriptor) -> bool {
+    left.completeness() == right.completeness() && left.generic_definition() == right.generic_definition()
 }
 
 /// Groups descriptors by one static name without leaking hash iteration order.
@@ -316,10 +293,7 @@ fn group_types(
 ) -> HashMap<&'static str, Box<[&'static TypeDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for descriptor in types {
-        groups
-            .entry(name(descriptor))
-            .or_default()
-            .push(*descriptor);
+        groups.entry(name(descriptor)).or_default().push(*descriptor);
     }
     groups
         .into_iter()
@@ -327,16 +301,14 @@ fn group_types(
         .collect()
 }
 
-/// Groups trait definitions by their complete diagnostic paths in fragment order.
+/// Groups trait definitions by their complete diagnostic paths in fragment
+/// order.
 fn group_traits(
     traits: &[(TraitId, &'static TraitDefinitionDescriptor)],
 ) -> HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for (_, descriptor) in traits {
-        groups
-            .entry(descriptor.rust_path())
-            .or_default()
-            .push(*descriptor);
+        groups.entry(descriptor.rust_path()).or_default().push(*descriptor);
     }
     groups
         .into_iter()
@@ -372,16 +344,13 @@ fn compare_impl_namespaces(left: &ImplDescriptor, right: &ImplDescriptor) -> Ord
         (None, None) => Ordering::Equal,
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
-        (Some(left_trait), Some(right_trait)) => match (
-            left_trait.definition().trait_id(),
-            right_trait.definition().trait_id(),
-        ) {
-            (TraitId::Reflected(_), TraitId::Reflected(_)) => {
-                left_trait.rust_path().cmp(right_trait.rust_path())
+        (Some(left_trait), Some(right_trait)) => {
+            match (left_trait.definition().trait_id(), right_trait.definition().trait_id()) {
+                (TraitId::Reflected(_), TraitId::Reflected(_)) => left_trait.rust_path().cmp(right_trait.rust_path()),
+                (TraitId::External(left_id), TraitId::External(right_id)) => left_id.cmp(right_id),
+                (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
+                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
             }
-            (TraitId::External(left_id), TraitId::External(right_id)) => left_id.cmp(right_id),
-            (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
-            (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
-        },
+        }
     }
 }

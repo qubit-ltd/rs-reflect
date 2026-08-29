@@ -1,6 +1,7 @@
 //! Integration tests for borrowed dynamic values.
 
-use qubit_reflect::value::{ReflectedMut, ReflectedRef};
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedRef;
 
 /// Confirms a failed shared downcast leaves the original borrow usable.
 #[test]
@@ -34,10 +35,7 @@ fn test_mut_downcast_failure_keeps_the_borrow_usable() {
 fn test_borrowed_any_interoperation_preserves_type_identity() {
     let mut number = 42_u32;
     let value = ReflectedRef::new(&number);
-    assert_eq!(
-        value.as_any().and_then(|value| value.downcast_ref::<u32>()),
-        Some(&42)
-    );
+    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&42));
 
     {
         let mut value = ReflectedMut::new(&mut number);
@@ -61,9 +59,9 @@ fn test_ref_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
         Err(value) => value,
     };
 
-    let number_ref = value.downcast::<u32>().unwrap_or_else(|_| {
-        panic!("an exact consuming downcast should return the original borrow")
-    });
+    let number_ref = value
+        .downcast::<u32>()
+        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the original borrow"));
     assert_eq!(number_ref, &42);
 }
 
@@ -77,9 +75,9 @@ fn test_mut_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,
     };
-    *value.downcast::<u32>().unwrap_or_else(|_| {
-        panic!("an exact consuming downcast should return the original mutable borrow")
-    }) = 43;
+    *value
+        .downcast::<u32>()
+        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the original mutable borrow")) = 43;
 
     assert_eq!(number, 43);
 }

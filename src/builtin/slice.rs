@@ -13,11 +13,6 @@ fn resolved<T: Reflect>() -> &'static TypeRef {
 impl<T: Reflect> Reflect for [T] {
     /// Returns the interned descriptor for this slice specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
-        interner::intern::<Self>(|| {
-            TypeDescriptor::new_slice::<Self>(
-                std::any::type_name::<Self>(),
-                                resolved::<T>(),
-            )
-        })
+        interner::intern::<Self>(|| TypeDescriptor::new_slice::<Self>(std::any::type_name::<Self>(), resolved::<T>()))
     }
 }

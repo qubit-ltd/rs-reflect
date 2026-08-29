@@ -3,7 +3,8 @@
 use std::fmt;
 
 use crate::construct::ConstructionError;
-use crate::value::{DynamicOwned, Mode};
+use crate::value::DynamicOwned;
+use crate::value::Mode;
 
 /// One caller-owned value retained after construction validation fails.
 pub enum RecoveredConstructionValue<M: Mode> {
@@ -52,10 +53,7 @@ pub struct ConstructionRecovery<M: Mode> {
 
 impl<M: Mode> ConstructionRecovery<M> {
     /// Creates recovery from one structured error and ordered owned values.
-    pub(crate) fn new(
-        error: ConstructionError,
-        values: Vec<RecoveredConstructionValue<M>>,
-    ) -> Self {
+    pub(crate) fn new(error: ConstructionError, values: Vec<RecoveredConstructionValue<M>>) -> Self {
         Self {
             error: Box::new(error),
             values,
@@ -87,7 +85,8 @@ impl<M: Mode> ConstructionRecovery<M> {
 }
 
 impl<M: Mode> fmt::Debug for ConstructionRecovery<M> {
-    /// Formats the error and recovery metadata without formatting erased values.
+    /// Formats the error and recovery metadata without formatting erased
+    /// values.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ConstructionRecovery")

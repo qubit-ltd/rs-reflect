@@ -9,16 +9,14 @@ use crate::value::DynamicRef;
 use crate::value::Local;
 
 /// A shared field adapter preserving the input target's borrow lifetime.
-pub type FieldGetAdapter =
-    for<'a> fn(DynamicRef<'a, Local>) -> Result<DynamicRef<'a, Local>, FieldAccessError>;
+pub type FieldGetAdapter = for<'a> fn(DynamicRef<'a, Local>) -> Result<DynamicRef<'a, Local>, FieldAccessError>;
 
-/// A mutable field adapter preserving the input target's exclusive borrow lifetime.
-pub type FieldGetMutAdapter =
-    for<'a> fn(DynamicMut<'a, Local>) -> Result<DynamicMut<'a, Local>, FieldAccessError>;
+/// A mutable field adapter preserving the input target's exclusive borrow
+/// lifetime.
+pub type FieldGetMutAdapter = for<'a> fn(DynamicMut<'a, Local>) -> Result<DynamicMut<'a, Local>, FieldAccessError>;
 
 /// A whole-value replacement adapter for a field.
-pub type FieldSetAdapter =
-    for<'a> fn(DynamicMut<'a, Local>, DynamicOwned<Local>) -> Result<(), FieldAccessError>;
+pub type FieldSetAdapter = for<'a> fn(DynamicMut<'a, Local>, DynamicOwned<Local>) -> Result<(), FieldAccessError>;
 
 /// Returns the exact type identity carried by a local shared dynamic value.
 pub(crate) fn dynamic_ref_type_id(value: &DynamicRef<'_, Local>) -> TypeId {

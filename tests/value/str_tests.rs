@@ -1,6 +1,7 @@
 //! Integration tests for `str` dynamic values.
 
-use qubit_reflect::value::{ReflectedMut, ReflectedRef};
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedRef;
 
 /// Confirms shared `str` values use their dedicated non-`Any` variant.
 #[test]

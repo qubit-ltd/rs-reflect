@@ -1,6 +1,8 @@
 //! Integration tests for thread-safe dynamic value mode.
 
-use qubit_reflect::value::{SendReflectedMut, SendReflectedOwned, SendReflectedRef};
+use qubit_reflect::value::SendReflectedMut;
+use qubit_reflect::value::SendReflectedOwned;
+use qubit_reflect::value::SendReflectedRef;
 
 /// Verifies that a wrapper retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: T) {}
@@ -70,10 +72,7 @@ fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
 fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
     let mut value = SendReflectedOwned::new(41_u32);
 
-    assert_eq!(
-        value.as_any().and_then(|value| value.downcast_ref::<u32>()),
-        Some(&41)
-    );
+    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
     *value
         .as_any_mut()
         .and_then(|value| value.downcast_mut::<u32>())
@@ -90,7 +89,8 @@ fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
     assert_eq!(number, 42);
 }
 
-/// Confirms thread-safe `str` variants retain their dedicated accessors after downgrade.
+/// Confirms thread-safe `str` variants retain their dedicated accessors after
+/// downgrade.
 #[test]
 fn test_thread_safe_str_variants_can_be_downgraded() {
     let value = SendReflectedRef::new_str("hello");
@@ -126,9 +126,9 @@ fn test_thread_safe_ref_consuming_downcast_recovers_mismatch() {
         Err(value) => value,
     };
 
-    let number_ref = value.downcast::<u32>().unwrap_or_else(|_| {
-        panic!("an exact consuming downcast should return the thread-safe borrow")
-    });
+    let number_ref = value
+        .downcast::<u32>()
+        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the thread-safe borrow"));
     assert_eq!(number_ref, &42);
 }
 
@@ -142,9 +142,9 @@ fn test_thread_safe_mut_consuming_downcast_recovers_mismatch() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,
     };
-    *value.downcast::<u32>().unwrap_or_else(|_| {
-        panic!("an exact consuming downcast should return the thread-safe mutable borrow")
-    }) = 43;
+    *value
+        .downcast::<u32>()
+        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the thread-safe mutable borrow")) = 43;
 
     assert_eq!(number, 43);
 }

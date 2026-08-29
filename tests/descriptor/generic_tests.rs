@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use qubit_reflect::{Reflect, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 struct GenericRecord<T, const N: usize> {
@@ -28,7 +29,8 @@ fn test_generic_struct_instances_are_unique_and_interned() {
     assert_ne!(left.type_id(), other_length.type_id());
 }
 
-/// Verifies opaque generic members retain only the static bound needed by roots.
+/// Verifies opaque generic members retain only the static bound needed by
+/// roots.
 #[test]
 fn test_opaque_generic_instances_do_not_require_reflect_arguments() {
     let descriptor = TypeDescriptor::of::<OpaqueGenericRecord<Arc<()>, 2>>();

@@ -2,9 +2,11 @@
 
 use std::fmt;
 
-use crate::construct::{ConstructionRecovery, RecoveredConstructionValue};
+use crate::construct::ConstructionRecovery;
+use crate::construct::RecoveredConstructionValue;
 use crate::descriptor::FieldDescriptor;
-use crate::value::{DynamicOwned, Mode};
+use crate::value::DynamicOwned;
+use crate::value::Mode;
 
 /// A mode-specific explicit provider for one omitted field value.
 pub type ConstructionDefaultProvider<M> = fn() -> DynamicOwned<M>;
@@ -37,9 +39,7 @@ impl<M: Mode> fmt::Debug for ConstructionFieldPolicy<M> {
             Self::Required => formatter.write_str("Required"),
             Self::Default(_) => formatter.write_str("Default(<provider>)"),
             Self::ProviderOnly(_) => formatter.write_str("ProviderOnly(<provider>)"),
-            Self::Unavailable(reason) => {
-                formatter.debug_tuple("Unavailable").field(reason).finish()
-            }
+            Self::Unavailable(reason) => formatter.debug_tuple("Unavailable").field(reason).finish(),
         }
     }
 }
@@ -69,10 +69,7 @@ impl<M: Mode> ConstructionField<M> {
     }
 
     /// Declares a field with an explicit generated default provider.
-    pub const fn defaulted(
-        descriptor: &'static FieldDescriptor,
-        provider: ConstructionDefaultProvider<M>,
-    ) -> Self {
+    pub const fn defaulted(descriptor: &'static FieldDescriptor, provider: ConstructionDefaultProvider<M>) -> Self {
         Self {
             descriptor,
             policy: ConstructionFieldPolicy::Default(provider),
@@ -83,10 +80,7 @@ impl<M: Mode> ConstructionField<M> {
     ///
     /// Omitting the field invokes `provider`; directly binding the field is a
     /// validation error and returns every caller-owned input.
-    pub const fn provider_only(
-        descriptor: &'static FieldDescriptor,
-        provider: ConstructionDefaultProvider<M>,
-    ) -> Self {
+    pub const fn provider_only(descriptor: &'static FieldDescriptor, provider: ConstructionDefaultProvider<M>) -> Self {
         Self {
             descriptor,
             policy: ConstructionFieldPolicy::ProviderOnly(provider),
@@ -199,10 +193,7 @@ impl<M: Mode> NamedConstructionInput<M> {
         N: Into<Box<str>>,
     {
         Self {
-            fields: fields
-                .into_iter()
-                .map(|(name, value)| (name.into(), value))
-                .collect(),
+            fields: fields.into_iter().map(|(name, value)| (name.into(), value)).collect(),
         }
     }
 
@@ -217,10 +208,7 @@ impl<M: Mode> NamedConstructionInput<M> {
     }
 
     /// Converts untouched bindings into a recovery payload.
-    pub(crate) fn into_recovery(
-        self,
-        error: crate::construct::ConstructionError,
-    ) -> ConstructionRecovery<M> {
+    pub(crate) fn into_recovery(self, error: crate::construct::ConstructionError) -> ConstructionRecovery<M> {
         let values = self
             .fields
             .into_iter()
@@ -235,10 +223,7 @@ impl<M: Mode> fmt::Debug for NamedConstructionInput<M> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("NamedConstructionInput")
-            .field(
-                "names",
-                &self.fields.iter().map(|(name, _)| name).collect::<Vec<_>>(),
-            )
+            .field("names", &self.fields.iter().map(|(name, _)| name).collect::<Vec<_>>())
             .finish()
     }
 }
@@ -270,10 +255,7 @@ impl<M: Mode> TupleConstructionInput<M> {
     }
 
     /// Converts untouched values into a recovery payload.
-    pub(crate) fn into_recovery(
-        self,
-        error: crate::construct::ConstructionError,
-    ) -> ConstructionRecovery<M> {
+    pub(crate) fn into_recovery(self, error: crate::construct::ConstructionError) -> ConstructionRecovery<M> {
         let values = self
             .values
             .into_iter()
@@ -301,7 +283,8 @@ pub struct StructUpdateInput<M: Mode> {
 }
 
 impl<M: Mode> StructUpdateInput<M> {
-    /// Collects an owned base and overrides without mutating or extracting them.
+    /// Collects an owned base and overrides without mutating or extracting
+    /// them.
     pub const fn new(base: DynamicOwned<M>, overrides: NamedConstructionInput<M>) -> Self {
         Self { base, overrides }
     }
@@ -322,10 +305,7 @@ impl<M: Mode> StructUpdateInput<M> {
     }
 
     /// Converts the untouched base and overrides into ordered recovery values.
-    pub(crate) fn into_recovery(
-        self,
-        error: crate::construct::ConstructionError,
-    ) -> ConstructionRecovery<M> {
+    pub(crate) fn into_recovery(self, error: crate::construct::ConstructionError) -> ConstructionRecovery<M> {
         let mut values = Vec::with_capacity(1 + self.overrides.fields.len());
         values.push(RecoveredConstructionValue::Base(self.base));
         values.extend(

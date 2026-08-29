@@ -1,9 +1,13 @@
 //! Integration tests for `Reflect` enum derives.
 
-use qubit_reflect::descriptor::{DiscriminantOrigin, NumericDiscriminant, TypeKind, VariantKind};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::DiscriminantOrigin;
+use qubit_reflect::descriptor::NumericDiscriminant;
+use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::VariantKind;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::ReflectedRef;
-use qubit_reflect::{Reflect, TypeDescriptor};
 
 #[derive(Reflect)]
 enum DerivedEvent {
@@ -25,9 +29,18 @@ fn test_derive_reflect_builds_enum_variant_descriptors() {
     let descriptor = TypeDescriptor::of::<DerivedEvent>();
 
     assert_eq!(descriptor.kind(), TypeKind::Enum);
-    assert_eq!(descriptor.variant("Ready").expect("unit variant").kind(), VariantKind::Unit);
-    assert_eq!(descriptor.variant("Number").expect("tuple variant").kind(), VariantKind::Tuple);
-    assert_eq!(descriptor.variant("Named").expect("named variant").kind(), VariantKind::Struct);
+    assert_eq!(
+        descriptor.variant("Ready").expect("unit variant").kind(),
+        VariantKind::Unit
+    );
+    assert_eq!(
+        descriptor.variant("Number").expect("tuple variant").kind(),
+        VariantKind::Tuple
+    );
+    assert_eq!(
+        descriptor.variant("Named").expect("named variant").kind(),
+        VariantKind::Struct
+    );
     let named = DerivedEvent::Named {
         value: "payload".into(),
     };
@@ -55,14 +68,17 @@ fn test_derive_reflect_enum_field_access_checks_active_variant() {
             .downcast_ref::<u8>(),
         Some(&7)
     );
-    assert!(number
-        .field_at(0)
-        .expect("tuple field")
-        .get(ReflectedRef::new(&DerivedEvent::Ready))
-        .is_err());
+    assert!(
+        number
+            .field_at(0)
+            .expect("tuple field")
+            .get(ReflectedRef::new(&DerivedEvent::Ready))
+            .is_err()
+    );
 }
 
-/// Verifies a concrete derived enum is discoverable through static registration.
+/// Verifies a concrete derived enum is discoverable through static
+/// registration.
 #[test]
 fn test_derive_reflect_registers_concrete_enum() {
     let registry = ReflectRegistry::initialize().expect("derived enum fragments must validate");

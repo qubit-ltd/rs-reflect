@@ -21,10 +21,7 @@ impl CapabilityId {
     /// Returns [`IdError`] when `value` is malformed. This crate-private
     /// constructor is reserved for future built-in `qubit.reflect.*`
     /// registrations and must not become a downstream API.
-    #[allow(
-        dead_code,
-        reason = "reserved for future built-in capability registrations"
-    )]
+    #[allow(dead_code, reason = "reserved for future built-in capability registrations")]
     pub(crate) fn new_core(value: &str) -> Result<Self, IdError> {
         validate(value, IdAuthority::CORE)?;
         Ok(Self(value.into()))
@@ -63,22 +60,20 @@ pub(crate) struct IdAuthority {
 }
 
 impl IdAuthority {
-    /// Marks an ID as externally owned and ineligible for the reserved namespace.
+    /// Marks an ID as externally owned and ineligible for the reserved
+    /// namespace.
     pub(crate) const EXTERNAL: Self = Self { is_core: false };
 
-    /// Marks an ID as owned by this crate and eligible for the reserved namespace.
+    /// Marks an ID as owned by this crate and eligible for the reserved
+    /// namespace.
     const CORE: Self = Self { is_core: true };
 }
 
 /// Validates a namespaced ID according to its owning authority.
 pub(crate) fn validate(value: &str, authority: IdAuthority) -> Result<(), IdError> {
     validate_segments(value)?;
-    if authority != IdAuthority::CORE
-        && (value == "qubit.reflect" || value.starts_with("qubit.reflect."))
-    {
-        return Err(IdError::ReservedNamespace {
-            value: value.into(),
-        });
+    if authority != IdAuthority::CORE && (value == "qubit.reflect" || value.starts_with("qubit.reflect.")) {
+        return Err(IdError::ReservedNamespace { value: value.into() });
     }
     Ok(())
 }
@@ -89,14 +84,11 @@ fn validate_segments(value: &str) -> Result<(), IdError> {
         || value.split('.').any(|segment| {
             segment.is_empty()
                 || !segment.bytes().enumerate().all(|(index, byte)| {
-                    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_')
-                        || (index > 0 && byte.is_ascii_digit())
+                    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_') || (index > 0 && byte.is_ascii_digit())
                 })
         })
     {
-        return Err(IdError::InvalidFormat {
-            value: value.into(),
-        });
+        return Err(IdError::InvalidFormat { value: value.into() });
     }
     Ok(())
 }

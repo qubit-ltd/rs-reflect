@@ -17,14 +17,7 @@ fn descriptor<T: ?Sized + 'static>(
     let abi = Box::leak(Box::new(abi));
     let parameters = Box::leak(parameters.into_boxed_slice());
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function::<T>(
-        std::any::type_name::<T>(),
-                kind,
-        abi,
-        false,
-        parameters,
-        return_type,
-    )
+    TypeDescriptor::new_function::<T>(std::any::type_name::<T>(), kind, abi, false, parameters, return_type)
 }
 
 /// Creates a C-variadic function-pointer descriptor from resolved signature
@@ -37,14 +30,7 @@ fn variadic_descriptor<T: ?Sized + 'static>(
     let abi = Box::leak(Box::new(FunctionAbi::C));
     let parameters = Box::leak(parameters.into_boxed_slice());
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function::<T>(
-        std::any::type_name::<T>(),
-                kind,
-        abi,
-        true,
-        parameters,
-        return_type,
-    )
+    TypeDescriptor::new_function::<T>(std::any::type_name::<T>(), kind, abi, true, parameters, return_type)
 }
 
 macro_rules! impl_function_pointers {
@@ -192,18 +178,10 @@ impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
 impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
 impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
 impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
-impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
-);
-impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
-);
-impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
-);
-impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
-);
+impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+impl_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
 impl_function_pointers!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
 );
@@ -223,12 +201,10 @@ impl_function_pointers!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD
 );
 impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD,
-    AE
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD, AE
 );
 impl_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD,
-    AE, AF
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD, AE, AF
 );
 
 macro_rules! impl_c_variadic_function_pointers {
@@ -278,18 +254,10 @@ impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, 
 impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R);
 impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S);
 impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T);
-impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U
-);
-impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V
-);
-impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W
-);
-impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X
-);
+impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U);
+impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V);
+impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W);
+impl_c_variadic_function_pointers!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X);
 impl_c_variadic_function_pointers!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
 );
@@ -309,10 +277,8 @@ impl_c_variadic_function_pointers!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD
 );
 impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD,
-    AE
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD, AE
 );
 impl_c_variadic_function_pointers!(
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD,
-    AE, AF
+    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, AA, AB, AC, AD, AE, AF
 );

@@ -39,7 +39,8 @@ pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: Prim
     TypeDescriptor::new_primitive::<T>(query_name, kind)
 }
 
-/// Creates a primitive root descriptor with a descriptor-owned capability resolver.
+/// Creates a primitive root descriptor with a descriptor-owned capability
+/// resolver.
 #[doc(hidden)]
 pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -212,7 +213,8 @@ pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeD
     TypeDescriptor::new_opaque::<T>(query_name)
 }
 
-/// Creates an opaque root descriptor with a descriptor-owned capability resolver.
+/// Creates an opaque root descriptor with a descriptor-owned capability
+/// resolver.
 #[doc(hidden)]
 pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -252,13 +254,5 @@ pub const fn variant(
     fields: &'static [FieldDescriptor],
     active_test: VariantActiveAdapter,
 ) -> VariantDescriptor {
-    VariantDescriptor::new(
-        declaring_type,
-        index,
-        rust_name,
-        query_name,
-        kind,
-        fields,
-        active_test,
-    )
+    VariantDescriptor::new(declaring_type, index, rust_name, query_name, kind, fields, active_test)
 }

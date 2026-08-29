@@ -15,11 +15,7 @@ impl<T: Reflect> Reflect for Vec<T> {
     /// Returns the interned descriptor for this vector specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_sequence::<Self>(
-                std::any::type_name::<Self>(),
-                                SequenceKind::Vec,
-                resolved::<T>(),
-            )
+            TypeDescriptor::new_sequence::<Self>(std::any::type_name::<Self>(), SequenceKind::Vec, resolved::<T>())
         })
     }
 }

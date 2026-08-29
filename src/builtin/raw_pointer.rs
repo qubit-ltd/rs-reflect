@@ -12,27 +12,21 @@ fn resolved<T: Reflect + ?Sized>() -> &'static TypeRef {
 }
 
 impl<T: Reflect + ?Sized> Reflect for *const T {
-    /// Returns the interned descriptor for this const raw-pointer specialization.
+    /// Returns the interned descriptor for this const raw-pointer
+    /// specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_raw_pointer::<Self>(
-                std::any::type_name::<Self>(),
-                                Mutability::Const,
-                resolved::<T>(),
-            )
+            TypeDescriptor::new_raw_pointer::<Self>(std::any::type_name::<Self>(), Mutability::Const, resolved::<T>())
         })
     }
 }
 
 impl<T: Reflect + ?Sized> Reflect for *mut T {
-    /// Returns the interned descriptor for this mutable raw-pointer specialization.
+    /// Returns the interned descriptor for this mutable raw-pointer
+    /// specialization.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_raw_pointer::<Self>(
-                std::any::type_name::<Self>(),
-                                Mutability::Mutable,
-                resolved::<T>(),
-            )
+            TypeDescriptor::new_raw_pointer::<Self>(std::any::type_name::<Self>(), Mutability::Mutable, resolved::<T>())
         })
     }
 }

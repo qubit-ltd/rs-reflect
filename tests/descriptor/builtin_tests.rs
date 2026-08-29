@@ -70,15 +70,11 @@ fn test_builtin_container_descriptors_preserve_family_and_arguments() {
         TypeDescriptor::of::<String>(),
     ));
     assert_eq!(
-        set.as_set()
-            .expect("HashSet should expose the set typed view")
-            .kind(),
+        set.as_set().expect("HashSet should expose the set typed view").kind(),
         SetKind::HashSet
     );
     assert_eq!(
-        map.as_map()
-            .expect("BTreeMap should expose the map typed view")
-            .kind(),
+        map.as_map().expect("BTreeMap should expose the map typed view").kind(),
         MapKind::BTreeMap
     );
     assert!(std::ptr::eq(
@@ -147,25 +143,10 @@ fn test_builtin_tuple_array_and_function_descriptors_expose_typed_views() {
     let array = TypeDescriptor::of::<[bool; 3]>();
     let function = TypeDescriptor::of::<fn(u8) -> String>();
 
+    assert_eq!(tuple.as_tuple().expect("tuple typed view should exist").arity(), 2);
+    assert_eq!(array.as_array().expect("array typed view should exist").length(), 3);
     assert_eq!(
-        tuple
-            .as_tuple()
-            .expect("tuple typed view should exist")
-            .arity(),
-        2
-    );
-    assert_eq!(
-        array
-            .as_array()
-            .expect("array typed view should exist")
-            .length(),
-        3
-    );
-    assert_eq!(
-        function
-            .as_function()
-            .expect("function typed view should exist")
-            .kind(),
+        function.as_function().expect("function typed view should exist").kind(),
         FunctionPointerKind::Safe
     );
     assert_eq!(
@@ -188,9 +169,7 @@ fn test_builtin_interner_is_concurrent_and_distinguishes_generic_arguments() {
     let first = TypeDescriptor::of::<Vec<u32>>();
 
     for thread in threads {
-        let descriptor = thread
-            .join()
-            .expect("descriptor lookup thread should not panic");
+        let descriptor = thread.join().expect("descriptor lookup thread should not panic");
         assert!(std::ptr::eq(first, descriptor));
     }
 

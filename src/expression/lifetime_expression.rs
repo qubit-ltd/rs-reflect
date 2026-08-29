@@ -2,8 +2,8 @@
 
 /// A lifetime that appears in a type, bound, or generic declaration.
 ///
-/// Named lifetimes omit the leading apostrophe so they can be compared and displayed without
-/// retaining parser tokens.
+/// Named lifetimes omit the leading apostrophe so they can be compared and
+/// displayed without retaining parser tokens.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LifetimeExpression {
     /// The distinguished `'static` lifetime.

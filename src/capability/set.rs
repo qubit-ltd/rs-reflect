@@ -3,7 +3,8 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
-use crate::capability::{CapabilityDescriptor, CapabilityKey};
+use crate::capability::CapabilityDescriptor;
+use crate::capability::CapabilityKey;
 use crate::identity::CapabilityId;
 
 /// The machine-readable reason a capability set could not be formed.
@@ -93,7 +94,8 @@ impl TypeCapabilities {
         &self.descriptors
     }
 
-    /// Returns whether the set contains the key's exact ID and adapter contract.
+    /// Returns whether the set contains the key's exact ID and adapter
+    /// contract.
     pub fn contains<A: 'static>(&self, key: CapabilityKey<A>) -> bool {
         self.find(key.id())
             .is_some_and(|descriptor| descriptor.adapter_type() == key.adapter_type())
@@ -126,7 +128,8 @@ impl Default for TypeCapabilities {
     }
 }
 
-/// Returns the shared empty set used by descriptors without registered capabilities.
+/// Returns the shared empty set used by descriptors without registered
+/// capabilities.
 pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
     static EMPTY: OnceLock<TypeCapabilities> = OnceLock::new();
     EMPTY.get_or_init(TypeCapabilities::default)

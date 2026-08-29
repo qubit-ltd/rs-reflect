@@ -3,8 +3,12 @@
 use std::any::TypeId;
 
 use crate::capability::CapabilityDescriptor;
-use crate::descriptor::{ImplDescriptor, TraitDefinitionDescriptor, TraitId, TypeDescriptor};
-use crate::identity::{CapabilityId, FragmentIdentity};
+use crate::descriptor::ImplDescriptor;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::descriptor::TraitId;
+use crate::descriptor::TypeDescriptor;
+use crate::identity::CapabilityId;
+use crate::identity::FragmentIdentity;
 
 /// Const-constructible stable source and content facts for one fragment.
 ///
@@ -214,10 +218,13 @@ inventory::collect!(RegistrationFragment);
 macro_rules! register_builtin_type {
     ($module:ident, $type:ty, $fingerprint:expr) => {
         mod $module {
-            use super::{
-                FragmentKind, FragmentPayload, RegistrationFragment, RuntimeIdentity,
-                StaticFragmentIdentity, TypeDescriptor, TypeId,
-            };
+            use super::FragmentKind;
+            use super::FragmentPayload;
+            use super::RegistrationFragment;
+            use super::RuntimeIdentity;
+            use super::StaticFragmentIdentity;
+            use super::TypeDescriptor;
+            use super::TypeId;
 
             /// Returns the exact process-local built-in type identity.
             fn runtime_identity() -> RuntimeIdentity {

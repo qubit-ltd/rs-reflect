@@ -16,11 +16,7 @@ fn resolved<T: Reflect>() -> &'static TypeRef {
 
 /// Builds the descriptor shared by every set family specialization.
 fn descriptor<Set: ?Sized + 'static, Element: Reflect>(kind: SetKind) -> TypeDescriptor {
-    TypeDescriptor::new_set::<Set>(
-        std::any::type_name::<Set>(),
-                kind,
-        resolved::<Element>(),
-    )
+    TypeDescriptor::new_set::<Set>(std::any::type_name::<Set>(), kind, resolved::<Element>())
 }
 
 impl<T: Reflect, Hasher: 'static> Reflect for HashSet<T, Hasher> {
