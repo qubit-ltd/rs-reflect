@@ -1,0 +1,27 @@
+[package]
+name = "qubit-reflect"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Haixing Hu <starfish.hu@gmail.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/qubit-ltd/rs-reflect"
+description = "Macro-based structural and executable reflection for Rust"
+homepage = "https://github.com/qubit-ltd/rs-reflect"
+documentation = "https://docs.rs/qubit-reflect"
+readme = "README.md"
+keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
+categories = ["development-tools"]
+publish = false
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/README.zh_CN.md",
+    "/src/**",
+    "/doc/**",
+    "/tests/**",
+    "/benches/**",
+]
+
+[dependencies]
