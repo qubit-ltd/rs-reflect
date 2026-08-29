@@ -24,6 +24,33 @@ enum ReprEvent {
     Second,
 }
 
+#[derive(Reflect)]
+enum GenericEvent<T> {
+    Value(T),
+    Empty,
+}
+
+#[test]
+fn test_derive_reflect_generic_enum_interns_concrete_instances() {
+    let _ = GenericEvent::Value(1_u8);
+    let _ = GenericEvent::<String>::Empty;
+    let u8_descriptor = TypeDescriptor::of::<GenericEvent<u8>>();
+    let text_descriptor = TypeDescriptor::of::<GenericEvent<String>>();
+    assert!(!std::ptr::eq(u8_descriptor, text_descriptor));
+    assert!(std::ptr::eq(u8_descriptor, TypeDescriptor::of::<GenericEvent<u8>>()));
+    assert!(std::ptr::eq(
+        u8_descriptor
+            .variant("Value")
+            .expect("value variant")
+            .field_at(0)
+            .expect("payload")
+            .field_type()
+            .as_resolved()
+            .expect("resolved payload"),
+        TypeDescriptor::of::<u8>(),
+    ));
+}
+
 /// Verifies unit, tuple, and named variants retain their source shapes.
 #[test]
 fn test_derive_reflect_builds_enum_variant_descriptors() {
