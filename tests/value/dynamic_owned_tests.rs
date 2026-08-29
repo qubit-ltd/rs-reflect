@@ -2,8 +2,8 @@
 
 use qubit_reflect::value::{ReflectedOwned, SendReflectedOwned};
 
-#[test]
 /// Confirms an owned downcast failure returns a usable original wrapper.
+#[test]
 fn test_downcast_owned_failure_returns_the_original_wrapper() {
     let value = ReflectedOwned::new(String::from("owned value"));
     let value = value
@@ -18,8 +18,8 @@ fn test_downcast_owned_failure_returns_the_original_wrapper() {
     assert_eq!(text, "owned value");
 }
 
-#[test]
 /// Confirms local owned values expose safe `Any` interoperability.
+#[test]
 fn test_owned_any_interoperation_preserves_type_identity() {
     let mut value = ReflectedOwned::new(41_u32);
 
@@ -42,10 +42,11 @@ fn test_owned_any_interoperation_preserves_type_identity() {
     assert_eq!(*value, 42);
 }
 
-#[test]
 /// Confirms a thread-safe owned value can be irreversibly downgraded.
+#[test]
 fn test_thread_safe_owned_can_be_downgraded_to_local() {
     let value = SendReflectedOwned::new(String::from("thread-safe"));
+    assert_send_and_sync(&value);
     let value = value.into_local();
 
     let text = match value.downcast::<String>() {
@@ -54,3 +55,6 @@ fn test_thread_safe_owned_can_be_downgraded_to_local() {
     };
     assert_eq!(text, "thread-safe");
 }
+
+/// Verifies that a value retains both thread-safety auto traits.
+fn assert_send_and_sync<T: Send + Sync>(_: &T) {}

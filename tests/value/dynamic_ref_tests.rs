@@ -2,8 +2,8 @@
 
 use qubit_reflect::value::{ReflectedMut, ReflectedRef};
 
-#[test]
 /// Confirms a failed shared downcast leaves the original borrow usable.
+#[test]
 fn test_ref_downcast_failure_keeps_the_borrow_usable() {
     let number = 42_u32;
     let value = ReflectedRef::new(&number);
@@ -13,8 +13,8 @@ fn test_ref_downcast_failure_keeps_the_borrow_usable() {
     assert!(value.is::<u32>());
 }
 
-#[test]
 /// Confirms a failed mutable downcast leaves the original borrow usable.
+#[test]
 fn test_mut_downcast_failure_keeps_the_borrow_usable() {
     let mut number = 42_u32;
     let mut value = ReflectedMut::new(&mut number);
@@ -28,8 +28,8 @@ fn test_mut_downcast_failure_keeps_the_borrow_usable() {
     assert_eq!(number, 43);
 }
 
-#[test]
 /// Confirms shared and mutable borrows expose safe `Any` interoperability.
+#[test]
 fn test_borrowed_any_interoperation_preserves_type_identity() {
     let mut number = 42_u32;
     let value = ReflectedRef::new(&number);

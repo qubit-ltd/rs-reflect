@@ -46,6 +46,42 @@ pub trait Mode: sealed::Sealed {
 pub enum Local {}
 
 /// The dynamic value mode with compile-time `Send` and `Sync` constraints.
+///
+/// Thread-safe constructors reject values that do not meet their documented
+/// bounds at compile time.
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedOwned;
+/// use std::rc::Rc;
+///
+/// let _ = SendReflectedOwned::new(Rc::new(1_u32));
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedRef;
+/// use std::cell::Cell;
+///
+/// let value = Cell::new(1_u32);
+/// let _ = SendReflectedRef::new(&value);
+/// ```
+///
+/// ```compile_fail
+/// use qubit_reflect::value::SendReflectedMut;
+/// use std::rc::Rc;
+///
+/// let mut value = Rc::new(1_u32);
+/// let _ = SendReflectedMut::new(&mut value);
+/// ```
+///
+/// Dynamic borrows cannot be promoted to `'static`.
+///
+/// ```compile_fail
+/// use qubit_reflect::value::ReflectedRef;
+///
+/// fn promote<'a>(value: ReflectedRef<'a>) -> ReflectedRef<'static> {
+///     value
+/// }
+/// ```
 pub enum ThreadSafe {}
 
 impl sealed::Sealed for Local {}
