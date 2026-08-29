@@ -2,19 +2,21 @@
 
 use std::any::TypeId;
 
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::FieldDescriptor;
 use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-use qubit_reflect::descriptor::Reflect;
 use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeDescriptor;
 use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::descriptor::TypeRef;
 use qubit_reflect::identity::Visibility;
 
-struct NamedRecord;
+struct NamedRecord {
+    number: u8,
+}
 
 static NAMED_RECORD: TypeDescriptor =
-    TypeDescriptor::new_struct::<NamedRecord>("type_descriptor_tests::NamedRecord", "record", StructKind::Named, &[]);
+    qubit_reflect::__private::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
 
 impl Reflect for NamedRecord {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -22,25 +24,12 @@ impl Reflect for NamedRecord {
     }
 }
 
-struct EmptyTuple;
-
-static EMPTY_TUPLE: TypeDescriptor =
-    TypeDescriptor::new_tuple::<EmptyTuple>("type_descriptor_tests::EmptyTuple", "empty_tuple", &[]);
-
-impl Reflect for EmptyTuple {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &EMPTY_TUPLE
-    }
-}
+static UNIT_TUPLE: TypeDescriptor = qubit_reflect::__private::descriptor::tuple::<()>("unit", &[]);
 
 struct ReflectedMember;
 
-static REFLECTED_MEMBER: TypeDescriptor = TypeDescriptor::new_struct::<ReflectedMember>(
-    "type_descriptor_tests::ReflectedMember",
-    "reflected_member",
-    StructKind::Unit,
-    &[],
-);
+static REFLECTED_MEMBER: TypeDescriptor =
+    qubit_reflect::__private::descriptor::struct_type::<ReflectedMember>("reflected_member", StructKind::Unit, &[]);
 
 impl Reflect for ReflectedMember {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -54,10 +43,9 @@ fn opaque_container_descriptor() -> &'static TypeDescriptor {
     &OPAQUE_CONTAINER
 }
 
-static OPAQUE_MEMBER: OpaqueTypeDescriptor =
-    OpaqueTypeDescriptor::new::<ReflectedMember>("type_descriptor_tests::ReflectedMember");
+static OPAQUE_MEMBER: OpaqueTypeDescriptor = qubit_reflect::__private::descriptor::opaque_member::<ReflectedMember>();
 static OPAQUE_MEMBER_TYPE: TypeRef = TypeRef::Opaque(&OPAQUE_MEMBER);
-static OPAQUE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
+static OPAQUE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descriptor::field(
     opaque_container_descriptor,
     0,
     Some("member"),
@@ -65,8 +53,7 @@ static OPAQUE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
     &OPAQUE_MEMBER_TYPE,
     Visibility::Private,
 )];
-static OPAQUE_CONTAINER: TypeDescriptor = TypeDescriptor::new_struct::<OpaqueContainer>(
-    "type_descriptor_tests::OpaqueContainer",
+static OPAQUE_CONTAINER: TypeDescriptor = qubit_reflect::__private::descriptor::struct_type::<OpaqueContainer>(
     "opaque_container",
     StructKind::Named,
     &OPAQUE_FIELDS,
@@ -85,7 +72,7 @@ fn recursive_node_descriptor() -> &'static TypeDescriptor {
 }
 
 static RECURSIVE_NODE_TYPE: TypeRef = TypeRef::Resolved(&RECURSIVE_NODE);
-static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
+static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descriptor::field(
     recursive_node_descriptor,
     0,
     Some("next"),
@@ -93,8 +80,7 @@ static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
     &RECURSIVE_NODE_TYPE,
     Visibility::Private,
 )];
-static RECURSIVE_NODE: TypeDescriptor = TypeDescriptor::new_struct::<RecursiveNode>(
-    "type_descriptor_tests::RecursiveNode",
+static RECURSIVE_NODE: TypeDescriptor = qubit_reflect::__private::descriptor::struct_type::<RecursiveNode>(
     "recursive_node",
     StructKind::Named,
     &RECURSIVE_FIELDS,
@@ -110,10 +96,12 @@ impl Reflect for RecursiveNode {
 #[test]
 fn test_type_descriptor_exposes_identity_names_and_struct_shape() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
+    let record = NamedRecord { number: 7 };
 
+    assert_eq!(record.number, 7);
     assert!(std::ptr::eq(descriptor, NamedRecord::type_descriptor()));
     assert_eq!(descriptor.type_id(), TypeId::of::<NamedRecord>());
-    assert_eq!(descriptor.type_name(), "type_descriptor_tests::NamedRecord");
+    assert_eq!(descriptor.type_name(), std::any::type_name::<NamedRecord>());
     assert_eq!(descriptor.query_name(), "record");
     assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
     assert_eq!(descriptor.as_struct().map(|view| view.kind()), Some(StructKind::Named));
@@ -124,9 +112,11 @@ fn test_type_descriptor_exposes_identity_names_and_struct_shape() {
 /// Verifies the empty tuple is represented as a tuple of arity zero.
 #[test]
 fn test_type_descriptor_represents_unit_as_zero_arity_tuple() {
-    let descriptor = TypeDescriptor::of::<EmptyTuple>();
+    let descriptor = &UNIT_TUPLE;
 
     assert_eq!(descriptor.kind(), TypeKind::Tuple);
+    assert_eq!(descriptor.type_id(), TypeId::of::<()>());
+    assert_eq!(descriptor.type_name(), std::any::type_name::<()>());
     assert_eq!(descriptor.as_tuple().map(|view| view.arity()), Some(0));
     assert!(
         descriptor

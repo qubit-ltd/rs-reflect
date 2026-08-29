@@ -11,6 +11,11 @@ pub(crate) fn type_id_of<T: ?Sized + 'static>() -> TypeId {
     TypeId::of::<T>()
 }
 
+/// Returns the compiler-provided diagnostic name for `T`.
+pub(crate) fn type_name_of<T: ?Sized + 'static>() -> &'static str {
+    std::any::type_name::<T>()
+}
+
 /// A type used by a reflected declaration or member.
 #[derive(Clone)]
 pub enum TypeRef {
@@ -77,19 +82,19 @@ impl fmt::Debug for TypeRef {
 /// whole-value adapters are added.
 pub struct OpaqueTypeDescriptor {
     type_id: fn() -> TypeId,
-    type_name: &'static str,
+    type_name: fn() -> &'static str,
 }
 
 impl OpaqueTypeDescriptor {
     /// Creates an immutable opaque member descriptor for `T`.
     ///
-    /// The supplied name is diagnostic only and does not participate in Rust
-    /// type identity.
+    /// Its diagnostic name is resolved from `T` only when queried, so static
+    /// generated descriptor data cannot substitute a different type name.
     #[doc(hidden)]
-    pub const fn new<T: ?Sized + 'static>(type_name: &'static str) -> Self {
+    pub(crate) const fn new<T: ?Sized + 'static>() -> Self {
         Self {
             type_id: type_id_of::<T>,
-            type_name,
+            type_name: type_name_of::<T>,
         }
     }
 
@@ -99,8 +104,8 @@ impl OpaqueTypeDescriptor {
     }
 
     /// Returns the diagnostic Rust type name.
-    pub const fn type_name(&self) -> &'static str {
-        self.type_name
+    pub fn type_name(&self) -> &'static str {
+        (self.type_name)()
     }
 }
 
@@ -111,7 +116,7 @@ impl fmt::Debug for OpaqueTypeDescriptor {
         formatter
             .debug_struct("OpaqueTypeDescriptor")
             .field("type_id", &self.type_id())
-            .field("type_name", &self.type_name)
+            .field("type_name", &self.type_name())
             .finish()
     }
 }

@@ -35,6 +35,7 @@ use crate::descriptor::TypeKind;
 use crate::descriptor::TypeRef;
 use crate::descriptor::VariantDescriptor;
 use crate::descriptor::type_ref::type_id_of;
+use crate::descriptor::type_ref::type_name_of;
 use crate::expression::FunctionAbi;
 
 /// The sole public generic contract for types that provide a static reflection
@@ -72,7 +73,7 @@ enum TypeDescriptorData {
 /// descriptor returned by [`Reflect`].
 pub struct TypeDescriptor {
     type_id: fn() -> TypeId,
-    type_name: &'static str,
+    type_name: fn() -> &'static str,
     query_name: &'static str,
     data: TypeDescriptorData,
     fields: &'static [FieldDescriptor],
@@ -88,13 +89,8 @@ impl TypeDescriptor {
 
     /// Creates a primitive root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_primitive<T: ?Sized + 'static>(
-        type_name: &'static str,
-        query_name: &'static str,
-        kind: PrimitiveKind,
-    ) -> Self {
+    pub(crate) const fn new_primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Primitive(PrimitiveTypeDescriptor::new(kind)),
             &[],
@@ -104,13 +100,8 @@ impl TypeDescriptor {
 
     /// Creates a text root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_text<T: ?Sized + 'static>(
-        type_name: &'static str,
-        query_name: &'static str,
-        kind: TextKind,
-    ) -> Self {
+    pub(crate) const fn new_text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Text(TextTypeDescriptor::new(kind)),
             &[],
@@ -120,14 +111,12 @@ impl TypeDescriptor {
 
     /// Creates a struct root for generated descriptor data.
     #[doc(hidden)]
-    pub const fn new_struct<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_struct<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: StructKind,
         fields: &'static [FieldDescriptor],
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Struct(StructTypeDescriptor::new(kind)),
             fields,
@@ -137,30 +126,18 @@ impl TypeDescriptor {
 
     /// Creates an enum root for generated descriptor data.
     #[doc(hidden)]
-    pub const fn new_enum<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_enum<T: ?Sized + 'static>(
         query_name: &'static str,
         variants: &'static [VariantDescriptor],
     ) -> Self {
-        Self::new::<T>(
-            type_name,
-            query_name,
-            TypeDescriptorData::Enum(EnumTypeDescriptor),
-            &[],
-            variants,
-        )
+        Self::new::<T>(query_name, TypeDescriptorData::Enum(EnumTypeDescriptor), &[], variants)
     }
 
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
     /// data.
     #[doc(hidden)]
-    pub const fn new_tuple<T: ?Sized + 'static>(
-        type_name: &'static str,
-        query_name: &'static str,
-        elements: &'static [TypeRef],
-    ) -> Self {
+    pub(crate) const fn new_tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Tuple(TupleTypeDescriptor::new(elements)),
             &[],
@@ -170,14 +147,12 @@ impl TypeDescriptor {
 
     /// Creates an array root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_array<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_array<T: ?Sized + 'static>(
         query_name: &'static str,
         element: &'static TypeRef,
         length: usize,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Array(ArrayTypeDescriptor::new(element, length)),
             &[],
@@ -187,13 +162,8 @@ impl TypeDescriptor {
 
     /// Creates an optional root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_optional<T: ?Sized + 'static>(
-        type_name: &'static str,
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Optional(OptionalTypeDescriptor::new(element)),
             &[],
@@ -203,14 +173,12 @@ impl TypeDescriptor {
 
     /// Creates a sequence root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_sequence<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_sequence<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: SequenceKind,
         element: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Sequence(SequenceTypeDescriptor::new(kind, element)),
             &[],
@@ -220,14 +188,12 @@ impl TypeDescriptor {
 
     /// Creates a set root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_set<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_set<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: SetKind,
         element: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Set(SetTypeDescriptor::new(kind, element)),
             &[],
@@ -237,15 +203,13 @@ impl TypeDescriptor {
 
     /// Creates a map root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_map<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_map<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: MapKind,
         key: &'static TypeRef,
         value: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Map(MapTypeDescriptor::new(kind, key, value)),
             &[],
@@ -255,14 +219,12 @@ impl TypeDescriptor {
 
     /// Creates a smart-pointer root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_smart_pointer<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_smart_pointer<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: SmartPointerKind,
         pointee: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new(kind, pointee)),
             &[],
@@ -272,14 +234,12 @@ impl TypeDescriptor {
 
     /// Creates a reference root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_reference<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_reference<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: ReferenceKind,
         target: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Reference(ReferenceTypeDescriptor::new(kind, target)),
             &[],
@@ -289,13 +249,8 @@ impl TypeDescriptor {
 
     /// Creates a slice root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_slice<T: ?Sized + 'static>(
-        type_name: &'static str,
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Slice(SliceTypeDescriptor::new(element)),
             &[],
@@ -305,14 +260,12 @@ impl TypeDescriptor {
 
     /// Creates a raw-pointer root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_raw_pointer<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_raw_pointer<T: ?Sized + 'static>(
         query_name: &'static str,
         mutability: Mutability,
         pointee: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new(mutability, pointee)),
             &[],
@@ -322,8 +275,7 @@ impl TypeDescriptor {
 
     /// Creates a function-pointer root for built-in descriptor data.
     #[doc(hidden)]
-    pub const fn new_function<T: ?Sized + 'static>(
-        type_name: &'static str,
+    pub(crate) const fn new_function<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: FunctionPointerKind,
         abi: &'static FunctionAbi,
@@ -332,7 +284,6 @@ impl TypeDescriptor {
         return_type: &'static TypeRef,
     ) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::Function(FunctionTypeDescriptor::new(
                 kind,
@@ -348,9 +299,8 @@ impl TypeDescriptor {
 
     /// Creates a trait-object root for generated descriptor data.
     #[doc(hidden)]
-    pub const fn new_trait_object<T: ?Sized + 'static>(type_name: &'static str, query_name: &'static str) -> Self {
+    pub(crate) const fn new_trait_object<T: ?Sized + 'static>(query_name: &'static str) -> Self {
         Self::new::<T>(
-            type_name,
             query_name,
             TypeDescriptorData::TraitObject(TraitObjectTypeDescriptor),
             &[],
@@ -360,20 +310,13 @@ impl TypeDescriptor {
 
     /// Creates an intentionally opaque root for generated descriptor data.
     #[doc(hidden)]
-    pub const fn new_opaque<T: ?Sized + 'static>(type_name: &'static str, query_name: &'static str) -> Self {
-        Self::new::<T>(
-            type_name,
-            query_name,
-            TypeDescriptorData::Opaque(OpaqueTypeView),
-            &[],
-            &[],
-        )
+    pub(crate) const fn new_opaque<T: ?Sized + 'static>(query_name: &'static str) -> Self {
+        Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
     }
 
     /// Builds common immutable root state without exposing an independently
     /// mutable builder.
     const fn new<T: ?Sized + 'static>(
-        type_name: &'static str,
         query_name: &'static str,
         data: TypeDescriptorData,
         fields: &'static [FieldDescriptor],
@@ -381,7 +324,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self {
             type_id: type_id_of::<T>,
-            type_name,
+            type_name: type_name_of::<T>,
             query_name,
             data,
             fields,
@@ -395,8 +338,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the diagnostic Rust type name.
-    pub const fn type_name(&self) -> &'static str {
-        self.type_name
+    pub fn type_name(&self) -> &'static str {
+        (self.type_name)()
     }
 
     /// Returns the immutable lookup name, which may differ from
@@ -614,7 +557,7 @@ impl fmt::Debug for TypeDescriptor {
         formatter
             .debug_struct("TypeDescriptor")
             .field("type_id", &self.type_id())
-            .field("type_name", &self.type_name)
+            .field("type_name", &self.type_name())
             .field("query_name", &self.query_name)
             .field("kind", &self.kind())
             .field("field_count", &self.fields.len())

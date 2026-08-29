@@ -34,7 +34,7 @@ impl VariantDescriptor {
     /// must be ordered by source index. This constructor performs no
     /// allocation and never calls the resolver.
     #[doc(hidden)]
-    pub const fn new(
+    pub(crate) const fn new(
         declaring_type: TypeDescriptorResolver,
         index: usize,
         rust_name: &'static str,

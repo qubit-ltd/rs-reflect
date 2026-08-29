@@ -30,7 +30,7 @@ impl FieldDescriptor {
     /// fields use `None` for both names. This constructor performs no
     /// allocation and never calls the resolver.
     #[doc(hidden)]
-    pub const fn new(
+    pub(crate) const fn new(
         declaring_type: TypeDescriptorResolver,
         index: usize,
         rust_name: Option<&'static str>,
