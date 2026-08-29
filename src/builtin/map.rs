@@ -18,8 +18,7 @@ fn resolved<T: Reflect>() -> &'static TypeRef {
 fn descriptor<T: ?Sized + 'static, K: Reflect, V: Reflect>(kind: MapKind) -> TypeDescriptor {
     TypeDescriptor::new_map::<T>(
         std::any::type_name::<T>(),
-        std::any::type_name::<T>(),
-        kind,
+                kind,
         resolved::<K>(),
         resolved::<V>(),
     )

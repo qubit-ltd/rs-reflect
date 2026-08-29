@@ -17,8 +17,7 @@ impl<T: Reflect> Reflect for Vec<T> {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_sequence::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                SequenceKind::Vec,
+                                SequenceKind::Vec,
                 resolved::<T>(),
             )
         })

@@ -19,8 +19,7 @@ fn descriptor<T: ?Sized + 'static>(
     let return_type = Box::leak(Box::new(return_type));
     TypeDescriptor::new_function::<T>(
         std::any::type_name::<T>(),
-        std::any::type_name::<T>(),
-        kind,
+                kind,
         abi,
         false,
         parameters,
@@ -40,8 +39,7 @@ fn variadic_descriptor<T: ?Sized + 'static>(
     let return_type = Box::leak(Box::new(return_type));
     TypeDescriptor::new_function::<T>(
         std::any::type_name::<T>(),
-        std::any::type_name::<T>(),
-        kind,
+                kind,
         abi,
         true,
         parameters,

@@ -13,8 +13,7 @@ macro_rules! impl_tuple {
                 interner::intern::<Self>(|| {
                     TypeDescriptor::new_tuple::<Self>(
                         std::any::type_name::<Self>(),
-                        std::any::type_name::<Self>(),
-                        &[],
+                                                &[],
                     )
                 })
             }
@@ -28,8 +27,7 @@ macro_rules! impl_tuple {
                     let elements = Box::leak(Box::new([$(TypeRef::Resolved($type::type_descriptor())),+]));
                     TypeDescriptor::new_tuple::<Self>(
                         std::any::type_name::<Self>(),
-                        std::any::type_name::<Self>(),
-                        elements,
+                                                elements,
                     )
                 })
             }

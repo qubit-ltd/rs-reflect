@@ -110,6 +110,15 @@ impl Reflect for String {
     }
 }
 
+static STR_DESCRIPTOR: TypeDescriptor = crate::__private::descriptor::text::<str>("str", TextKind::Str);
+
+impl Reflect for str {
+    /// Returns `str`'s unique static descriptor.
+    fn type_descriptor() -> &'static TypeDescriptor {
+        &STR_DESCRIPTOR
+    }
+}
+
 #[path = "../registry/interner.rs"]
 mod interner;
 

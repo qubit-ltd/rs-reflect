@@ -16,8 +16,7 @@ impl<T: Reflect> Reflect for [T] {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_slice::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                resolved::<T>(),
+                                resolved::<T>(),
             )
         })
     }

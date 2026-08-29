@@ -17,8 +17,7 @@ impl<T: Reflect + ?Sized> Reflect for &'static T {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_reference::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                ReferenceKind::Shared,
+                                ReferenceKind::Shared,
                 resolved::<T>(),
             )
         })
@@ -31,8 +30,7 @@ impl<T: Reflect + ?Sized> Reflect for &'static mut T {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_reference::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                ReferenceKind::Mutable,
+                                ReferenceKind::Mutable,
                 resolved::<T>(),
             )
         })

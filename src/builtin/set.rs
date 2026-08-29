@@ -18,8 +18,7 @@ fn resolved<T: Reflect>() -> &'static TypeRef {
 fn descriptor<Set: ?Sized + 'static, Element: Reflect>(kind: SetKind) -> TypeDescriptor {
     TypeDescriptor::new_set::<Set>(
         std::any::type_name::<Set>(),
-        std::any::type_name::<Set>(),
-        kind,
+                kind,
         resolved::<Element>(),
     )
 }

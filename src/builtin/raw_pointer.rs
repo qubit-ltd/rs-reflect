@@ -17,8 +17,7 @@ impl<T: Reflect + ?Sized> Reflect for *const T {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_raw_pointer::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                Mutability::Const,
+                                Mutability::Const,
                 resolved::<T>(),
             )
         })
@@ -31,8 +30,7 @@ impl<T: Reflect + ?Sized> Reflect for *mut T {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_raw_pointer::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                Mutability::Mutable,
+                                Mutability::Mutable,
                 resolved::<T>(),
             )
         })
