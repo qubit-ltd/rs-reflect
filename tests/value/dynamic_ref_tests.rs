@@ -49,3 +49,37 @@ fn test_borrowed_any_interoperation_preserves_type_identity() {
 
     assert_eq!(number, 43);
 }
+
+/// Confirms consuming a shared wrapper exposes the original borrow lifetime
+/// and returns the wrapper unchanged after an exact-type mismatch.
+#[test]
+fn test_ref_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
+    let number = 42_u32;
+    let value = ReflectedRef::new(&number);
+    let value = match value.downcast::<String>() {
+        Ok(_) => panic!("a mismatched consuming downcast must fail"),
+        Err(value) => value,
+    };
+
+    let number_ref = value.downcast::<u32>().unwrap_or_else(|_| {
+        panic!("an exact consuming downcast should return the original borrow")
+    });
+    assert_eq!(number_ref, &42);
+}
+
+/// Confirms consuming a mutable wrapper returns an exclusive borrow with the
+/// original lifetime and preserves the wrapper after a mismatch.
+#[test]
+fn test_mut_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
+    let mut number = 42_u32;
+    let value = ReflectedMut::new(&mut number);
+    let value = match value.downcast::<String>() {
+        Ok(_) => panic!("a mismatched consuming downcast must fail"),
+        Err(value) => value,
+    };
+    *value.downcast::<u32>().unwrap_or_else(|_| {
+        panic!("an exact consuming downcast should return the original mutable borrow")
+    }) = 43;
+
+    assert_eq!(number, 43);
+}

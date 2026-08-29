@@ -2,9 +2,13 @@
 
 use std::fmt;
 
+use crate::access::VariantActiveAdapter;
+use crate::access::field_adapter::dynamic_ref_type_id;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
+use crate::error::TypeMismatch;
+use crate::value::ReflectedRef;
 
 /// The declared shape of an enum variant.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -25,6 +29,7 @@ pub struct VariantDescriptor {
     query_name: &'static str,
     kind: VariantKind,
     fields: &'static [FieldDescriptor],
+    active_test: VariantActiveAdapter,
 }
 
 impl VariantDescriptor {
@@ -41,6 +46,7 @@ impl VariantDescriptor {
         query_name: &'static str,
         kind: VariantKind,
         fields: &'static [FieldDescriptor],
+        active_test: VariantActiveAdapter,
     ) -> Self {
         Self {
             declaring_type,
@@ -49,6 +55,7 @@ impl VariantDescriptor {
             query_name,
             kind,
             fields,
+            active_test,
         }
     }
 
@@ -86,7 +93,9 @@ impl VariantDescriptor {
     ///
     /// `None` means the variant has no field with that lookup name.
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields.iter().find(|field| field.query_name() == Some(name))
+        self.fields
+            .iter()
+            .find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a field by source index.
@@ -94,6 +103,19 @@ impl VariantDescriptor {
     /// `None` means the index is outside this variant's field range.
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
         self.fields.get(index)
+    }
+
+    /// Returns whether this variant is active for an exact declaring enum value.
+    ///
+    /// A target of another type returns [`TypeMismatch`] without invoking the
+    /// generated adapter.
+    pub fn is_active(&self, value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
+        let expected = self.declaring_type().type_id();
+        let actual = dynamic_ref_type_id(&value);
+        if actual != expected {
+            return Err(TypeMismatch::new(expected, actual));
+        }
+        (self.active_test)(value)
     }
 }
 
@@ -109,6 +131,7 @@ impl fmt::Debug for VariantDescriptor {
             .field("query_name", &self.query_name)
             .field("kind", &self.kind)
             .field("field_count", &self.fields.len())
+            .field("has_active_test", &true)
             .finish()
     }
 }
