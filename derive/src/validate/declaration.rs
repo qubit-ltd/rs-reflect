@@ -1,0 +1,424 @@
+//! Semantic validation for reflection declarations.
+
+use std::collections::{HashMap, HashSet};
+
+use proc_macro2::Span;
+
+use crate::ir::{
+    DeclarationIr, GenericKindIr, GenericsIr, HelperAttributeIr, HelperName, HelperValueIr,
+    ImplDeclarationIr, MethodIr, ParsedDeclaration, SpecializationIr, TraitDeclarationIr,
+    TypeDeclarationIr, TypeDeclarationKindIr, ValidatedDeclaration,
+};
+
+/// Accumulates diagnostics that can be proven independently in one macro input.
+#[derive(Default)]
+struct ErrorCollector {
+    error: Option<syn::Error>,
+}
+
+impl ErrorCollector {
+    /// Adds one diagnostic while retaining every earlier diagnostic.
+    fn push(&mut self, error: syn::Error) {
+        if let Some(combined) = &mut self.error {
+            combined.combine(error);
+        } else {
+            self.error = Some(error);
+        }
+    }
+
+    /// Converts the aggregate into a validation result.
+    fn finish(self, declaration: DeclarationIr) -> syn::Result<ValidatedDeclaration> {
+        match self.error {
+            Some(error) => Err(error),
+            None => Ok(ValidatedDeclaration { declaration }),
+        }
+    }
+}
+
+/// Validates all locally provable invariants in parsed reflection IR.
+///
+/// Returns a combined `syn::Error` whose component spans point at the offending helpers.
+pub(crate) fn validate_declaration(
+    declaration: ParsedDeclaration,
+) -> syn::Result<ValidatedDeclaration> {
+    let mut errors = ErrorCollector::default();
+    match &declaration.declaration {
+        DeclarationIr::Type(value) => validate_type(value, &mut errors),
+        DeclarationIr::Trait(value) => validate_trait(value, &mut errors),
+        DeclarationIr::Impl(value) => validate_impl(value, &mut errors),
+    }
+    errors.finish(declaration.declaration)
+}
+
+/// Validates a struct, enum, or rejected union declaration.
+fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
+    validate_attributes(&declaration.attributes, errors);
+    if declaration.kind == TypeDeclarationKindIr::Union {
+        errors.push(syn::Error::new(
+            declaration.span,
+            "Reflect cannot be derived for unions",
+        ));
+    }
+    validate_query_name(&declaration.attributes, errors);
+    validate_fields(&declaration.fields, errors);
+    validate_query_name_scope(
+        declaration.fields.iter().filter_map(|field| {
+            field
+                .name
+                .as_ref()
+                .map(|name| (name.to_string(), &field.attributes, field.span))
+        }),
+        "field",
+        errors,
+    );
+    validate_query_name_scope(
+        declaration
+            .variants
+            .iter()
+            .map(|variant| (variant.name.to_string(), &variant.attributes, variant.span)),
+        "variant",
+        errors,
+    );
+    for variant in &declaration.variants {
+        validate_attributes(&variant.attributes, errors);
+        validate_query_name(&variant.attributes, errors);
+        validate_fields(&variant.fields, errors);
+        validate_query_name_scope(
+            variant.fields.iter().filter_map(|field| {
+                field
+                    .name
+                    .as_ref()
+                    .map(|name| (name.to_string(), &field.attributes, field.span))
+            }),
+            "field",
+            errors,
+        );
+    }
+}
+
+/// Validates field helper policies in source order.
+fn validate_fields(fields: &[crate::ir::FieldIr], errors: &mut ErrorCollector) {
+    for field in fields {
+        validate_attributes(&field.attributes, errors);
+        validate_query_name(&field.attributes, errors);
+        if field.name.is_none()
+            && let Some(rename) = field
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == HelperName::Rename)
+        {
+            errors.push(syn::Error::new(
+                rename.span,
+                "`rename` is not supported on an unnamed field",
+            ));
+        }
+    }
+}
+
+/// Validates trait-level mappings, methods, and associated-item helpers.
+fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
+    validate_attributes(&declaration.attributes, errors);
+    validate_external_traits(declaration, errors);
+    for method in &declaration.methods {
+        validate_method(method, errors);
+    }
+    for associated in &declaration.associated_types {
+        validate_attributes(&associated.attributes, errors);
+    }
+    for associated in &declaration.associated_consts {
+        validate_attributes(&associated.attributes, errors);
+    }
+    validate_method_query_names(&declaration.methods, errors);
+}
+
+/// Validates impl-level identity, specialization, methods, and associated items.
+fn validate_impl(declaration: &ImplDeclarationIr, errors: &mut ErrorCollector) {
+    validate_attributes(&declaration.attributes, errors);
+    if declaration.trait_path.is_none() {
+        for attribute in &declaration.attributes {
+            if attribute.name == HelperName::ExternalTraitId {
+                errors.push(syn::Error::new(
+                    attribute.span,
+                    "`external_trait_id` is only valid on a trait impl",
+                ));
+            }
+        }
+    }
+    for attribute in &declaration.attributes {
+        if let HelperValueIr::ExternalTraitId(id) = &attribute.value {
+            validate_stable_id(id, attribute.span, errors);
+        }
+    }
+    for specialization in &declaration.specializations {
+        validate_specialization(specialization, &declaration.generics, errors);
+    }
+    for method in &declaration.methods {
+        validate_method(method, errors);
+    }
+    for associated in &declaration.associated_types {
+        validate_attributes(&associated.attributes, errors);
+    }
+    for associated in &declaration.associated_consts {
+        validate_attributes(&associated.attributes, errors);
+    }
+    validate_method_query_names(&declaration.methods, errors);
+}
+
+/// Validates one method and each of its concrete specialization declarations.
+fn validate_method(method: &MethodIr, errors: &mut ErrorCollector) {
+    validate_attributes(&method.attributes, errors);
+    validate_query_name(&method.attributes, errors);
+    for specialization in &method.specializations {
+        validate_specialization(specialization, &method.generics, errors);
+    }
+}
+
+/// Validates legality, cardinality, values, and mutually exclusive helper policies.
+fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
+    let mut seen = HashMap::new();
+    for attribute in attributes {
+        if !attribute.name.supports(attribute.target) {
+            errors.push(syn::Error::new(
+                attribute.span,
+                format!(
+                    "`{}` is not valid on a {}",
+                    attribute.name.as_str(),
+                    attribute.target.as_str()
+                ),
+            ));
+        }
+        let repeatable = matches!(
+            attribute.name,
+            HelperName::Specialize | HelperName::ExternalTrait
+        );
+        if !repeatable && seen.insert(attribute.name, attribute.span).is_some() {
+            errors.push(syn::Error::new(
+                attribute.span,
+                format!("duplicate `{}` reflection helper", attribute.name.as_str()),
+            ));
+        }
+        if let HelperValueIr::Paths(paths) = &attribute.value {
+            let mut path_names = HashSet::new();
+            for path in paths {
+                if !path_names.insert(path.source.clone()) {
+                    errors.push(syn::Error::new(
+                        path.span,
+                        format!("duplicate capability `{}`", path.source),
+                    ));
+                }
+            }
+        }
+    }
+    validate_conflicts(attributes, errors);
+}
+
+/// Validates policy pairs that would otherwise request contradictory adapters.
+fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
+    if let Some(skip) = attributes
+        .iter()
+        .find(|attribute| attribute.name == HelperName::Skip)
+    {
+        let conflicts = match skip.target {
+            crate::ir::HelperTarget::Field => {
+                [HelperName::ReadOnly, HelperName::NoConstruct].as_slice()
+            }
+            crate::ir::HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
+            crate::ir::HelperTarget::Method => [
+                HelperName::NoInvoke,
+                HelperName::CatchUnwind,
+                HelperName::ThreadSafe,
+            ]
+            .as_slice(),
+            _ => [].as_slice(),
+        };
+        for conflict in conflicts {
+            report_conflict(attributes, HelperName::Skip, *conflict, errors);
+        }
+    }
+    if attributes
+        .iter()
+        .any(|attribute| attribute.name == HelperName::NoInvoke)
+    {
+        report_conflict(
+            attributes,
+            HelperName::NoInvoke,
+            HelperName::CatchUnwind,
+            errors,
+        );
+        report_conflict(
+            attributes,
+            HelperName::NoInvoke,
+            HelperName::ThreadSafe,
+            errors,
+        );
+    }
+}
+
+/// Reports one mutually exclusive helper pair when both keys are present.
+fn report_conflict(
+    attributes: &[HelperAttributeIr],
+    left: HelperName,
+    right: HelperName,
+    errors: &mut ErrorCollector,
+) {
+    if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == right) {
+        errors.push(syn::Error::new(
+            attribute.span,
+            format!(
+                "`{}` cannot be combined with `{}`",
+                left.as_str(),
+                right.as_str()
+            ),
+        ));
+    }
+}
+
+/// Validates that rename literals are non-empty.
+fn validate_query_name(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
+    if let Some(rename) = attributes
+        .iter()
+        .find(|attribute| attribute.name == HelperName::Rename)
+        && rename.rename().is_some_and(str::is_empty)
+    {
+        errors.push(syn::Error::new(
+            rename.span,
+            "reflection rename cannot be empty",
+        ));
+    }
+}
+
+/// Validates query-name uniqueness in one member scope.
+fn validate_query_name_scope<'a>(
+    members: impl Iterator<Item = (String, &'a Vec<HelperAttributeIr>, Span)>,
+    member_kind: &str,
+    errors: &mut ErrorCollector,
+) {
+    let mut names = HashMap::new();
+    for (rust_name, attributes, span) in members {
+        let query_name = attributes
+            .iter()
+            .find_map(HelperAttributeIr::rename)
+            .unwrap_or(&rust_name)
+            .to_owned();
+        if names.insert(query_name.clone(), span).is_some() {
+            errors.push(syn::Error::new(
+                span,
+                format!("duplicate {member_kind} query name `{query_name}`"),
+            ));
+        }
+    }
+}
+
+/// Validates query-name uniqueness across methods in one trait or impl.
+fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector) {
+    validate_query_name_scope(
+        methods
+            .iter()
+            .map(|method| (method.name.to_string(), &method.attributes, method.span)),
+        "method",
+        errors,
+    );
+}
+
+/// Validates external trait IDs and detects same-input path or ID conflicts.
+fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
+    let mut paths = HashSet::new();
+    let mut ids = HashSet::new();
+    for mapping in &declaration.external_traits {
+        validate_stable_id(&mapping.id, mapping.id_span, errors);
+        if !paths.insert(mapping.path.source.clone()) {
+            errors.push(syn::Error::new(
+                mapping.span,
+                format!(
+                    "external trait path `{}` is mapped more than once",
+                    mapping.path.source
+                ),
+            ));
+        }
+        if !ids.insert(mapping.id.clone()) {
+            errors.push(syn::Error::new(
+                mapping.id_span,
+                format!(
+                    "external trait ID `{}` is mapped more than once",
+                    mapping.id
+                ),
+            ));
+        }
+    }
+}
+
+/// Validates the stable dot-separated identifier grammar and reserved namespace.
+fn validate_stable_id(value: &str, span: Span, errors: &mut ErrorCollector) {
+    let valid = !value.is_empty()
+        && value.split('.').all(|segment| {
+            let mut characters = segment.chars();
+            characters
+                .next()
+                .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
+                && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+        });
+    if !valid {
+        errors.push(syn::Error::new(
+            span,
+            format!("`{value}` is not a dot-separated stable identifier"),
+        ));
+    }
+    if value == "qubit.reflect" || value.starts_with("qubit.reflect.") {
+        errors.push(syn::Error::new(
+            span,
+            "external IDs cannot use the reserved `qubit.reflect` namespace",
+        ));
+    }
+}
+
+/// Validates named specialization completeness and RHS syntax by parameter kind.
+fn validate_specialization(
+    specialization: &SpecializationIr,
+    generics: &GenericsIr,
+    errors: &mut ErrorCollector,
+) {
+    let expected: HashMap<_, _> = generics
+        .params
+        .iter()
+        .filter(|parameter| parameter.kind != GenericKindIr::Lifetime)
+        .map(|parameter| (parameter.name.as_str(), parameter.kind))
+        .collect();
+    let mut seen = HashSet::new();
+    for binding in &specialization.bindings {
+        if !seen.insert(binding.name.as_str()) {
+            errors.push(syn::Error::new(
+                binding.span,
+                format!("duplicate specialization argument `{}`", binding.name),
+            ));
+        }
+        let Some(kind) = expected.get(binding.name.as_str()) else {
+            errors.push(syn::Error::new(
+                binding.span,
+                format!("unknown specialization parameter `{}`", binding.name),
+            ));
+            continue;
+        };
+        let parse_result = match kind {
+            GenericKindIr::Type => syn::parse2::<syn::Type>(binding.value.clone()).map(|_| ()),
+            GenericKindIr::Const => syn::parse2::<syn::Expr>(binding.value.clone()).map(|_| ()),
+            GenericKindIr::Lifetime => unreachable!("lifetime parameters are filtered above"),
+        };
+        if let Err(error) = parse_result {
+            errors.push(syn::Error::new(
+                binding.span,
+                format!(
+                    "invalid specialization value for `{}`: {error}",
+                    binding.name
+                ),
+            ));
+        }
+    }
+    for name in expected.keys() {
+        if !seen.contains(name) {
+            errors.push(syn::Error::new(
+                specialization.span,
+                format!("missing specialization argument `{name}`"),
+            ));
+        }
+    }
+}

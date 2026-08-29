@@ -3,22 +3,42 @@
 #![forbid(unsafe_code)]
 
 use proc_macro::TokenStream;
-use quote::quote;
 
-/// Rejects `Reflect` derive invocations until reflection generation is implemented.
-#[proc_macro_derive(Reflect)]
-pub fn derive_reflect(_input: TokenStream) -> TokenStream {
-    quote!(compile_error!("qubit-reflect: Reflect derive is not implemented yet");).into()
+mod ir;
+mod parse;
+mod validate;
+
+use ir::{DeclarationIr, MacroKind};
+use parse::parse_declaration;
+use validate::validate_declaration;
+
+/// Parses and validates a `Reflect` derive declaration.
+#[proc_macro_derive(Reflect, attributes(reflect))]
+pub fn derive_reflect(input: TokenStream) -> TokenStream {
+    process_macro(MacroKind::Derive, TokenStream::new(), input)
 }
 
-/// Rejects `#[reflect]` attribute invocations until reflection generation is implemented.
+/// Parses and validates a reflected trait declaration.
 #[proc_macro_attribute]
-pub fn reflect(_attribute: TokenStream, _item: TokenStream) -> TokenStream {
-    quote!(compile_error!("qubit-reflect: #[reflect] is not implemented yet");).into()
+pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
+    process_macro(MacroKind::Trait, attribute, item)
 }
 
-/// Rejects `#[reflect_impl]` attribute invocations until reflection generation is implemented.
+/// Parses and validates a reflected impl declaration.
 #[proc_macro_attribute]
-pub fn reflect_impl(_attribute: TokenStream, _item: TokenStream) -> TokenStream {
-    quote!(compile_error!("qubit-reflect: #[reflect_impl] is not implemented yet");).into()
+pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
+    process_macro(MacroKind::Impl, attribute, item)
+}
+
+/// Runs the shared parse/validate pipeline and returns the declaration retained for expansion.
+fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
+    let result = parse_declaration(kind, args.into(), input.into()).and_then(validate_declaration);
+    match result {
+        Ok(validated) => match validated.declaration {
+            DeclarationIr::Type(_) => TokenStream::new(),
+            DeclarationIr::Trait(declaration) => declaration.retained_tokens.into(),
+            DeclarationIr::Impl(declaration) => declaration.retained_tokens.into(),
+        },
+        Err(error) => error.into_compile_error().into(),
+    }
 }
