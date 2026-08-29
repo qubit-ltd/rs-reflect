@@ -228,6 +228,8 @@ fn test_reflect_impl_registers_inherent_and_external_fragments() {
     assert_eq!(Sample.reflected_value(), 11);
     assert_eq!(Sample.default_value(), 13);
     assert_eq!(Sample.private_method(), 3);
+    assert_eq!(Sample::reflected_c_abi(), 29);
+    assert_eq!(Sample.reflected_borrowed_path(), "borrowed");
 }
 
 #[test]
