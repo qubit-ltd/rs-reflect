@@ -1,1 +1,1 @@
-//! Placeholder for cross-crate registry integration tests.
+//! The `registry-app` workspace package verifies cross-crate aggregation.

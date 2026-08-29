@@ -1,0 +1,9 @@
+[package]
+name = "registry-impl-b"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+qubit-reflect = { path = "../.." }
+registry-types = { path = "../registry-types" }

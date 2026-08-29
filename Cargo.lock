@@ -123,6 +123,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "registry-app"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+ "registry-impl-a",
+ "registry-impl-b",
+ "registry-types",
+]
+
+[[package]]
+name = "registry-impl-a"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+ "registry-types",
+]
+
+[[package]]
+name = "registry-impl-b"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+ "registry-types",
+]
+
+[[package]]
+name = "registry-types"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
