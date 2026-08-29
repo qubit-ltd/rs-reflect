@@ -1,5 +1,5 @@
 error: Reflect cannot be derived for unions
- --> tests/ui/fail/derive_union.rs:4:7
+ --> tests/ui/fail/derive_union.rs:6:7
   |
-4 | union Unsupported {
+6 | union Unsupported {
   |       ^^^^^^^^^^^
