@@ -3,6 +3,7 @@
 use std::any::TypeId;
 use std::fmt;
 
+use crate::capability::{CapabilityKey, TypeCapabilities};
 use crate::descriptor::ArrayTypeDescriptor;
 use crate::descriptor::EnumTypeDescriptor;
 use crate::descriptor::FieldDescriptor;
@@ -78,6 +79,7 @@ pub struct TypeDescriptor {
     data: TypeDescriptorData,
     fields: &'static [FieldDescriptor],
     variants: &'static [VariantDescriptor],
+    capabilities: fn() -> &'static TypeCapabilities,
 }
 
 impl TypeDescriptor {
@@ -314,6 +316,53 @@ impl TypeDescriptor {
         Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
     }
 
+    /// Creates an opaque root with an explicit static capability resolver.
+    #[doc(hidden)]
+    pub(crate) const fn new_opaque_with_capabilities<T: ?Sized + 'static>(
+        query_name: &'static str,
+        capabilities: fn() -> &'static TypeCapabilities,
+    ) -> Self {
+        Self::new_with_capabilities::<T>(
+            query_name,
+            TypeDescriptorData::Opaque(OpaqueTypeView),
+            &[],
+            &[],
+            capabilities,
+        )
+    }
+
+    /// Creates a primitive root with an explicit static capability resolver.
+    #[doc(hidden)]
+    pub(crate) const fn new_primitive_with_capabilities<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: PrimitiveKind,
+        capabilities: fn() -> &'static TypeCapabilities,
+    ) -> Self {
+        Self::new_with_capabilities::<T>(
+            query_name,
+            TypeDescriptorData::Primitive(PrimitiveTypeDescriptor::new(kind)),
+            &[],
+            &[],
+            capabilities,
+        )
+    }
+
+    /// Creates a text root with an explicit static capability resolver.
+    #[doc(hidden)]
+    pub(crate) const fn new_text_with_capabilities<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: TextKind,
+        capabilities: fn() -> &'static TypeCapabilities,
+    ) -> Self {
+        Self::new_with_capabilities::<T>(
+            query_name,
+            TypeDescriptorData::Text(TextTypeDescriptor::new(kind)),
+            &[],
+            &[],
+            capabilities,
+        )
+    }
+
     /// Builds common immutable root state without exposing an independently
     /// mutable builder.
     const fn new<T: ?Sized + 'static>(
@@ -322,6 +371,23 @@ impl TypeDescriptor {
         fields: &'static [FieldDescriptor],
         variants: &'static [VariantDescriptor],
     ) -> Self {
+        Self::new_with_capabilities::<T>(
+            query_name,
+            data,
+            fields,
+            variants,
+            crate::capability::empty_capabilities,
+        )
+    }
+
+    /// Builds common immutable root state with a descriptor-owned capability resolver.
+    const fn new_with_capabilities<T: ?Sized + 'static>(
+        query_name: &'static str,
+        data: TypeDescriptorData,
+        fields: &'static [FieldDescriptor],
+        variants: &'static [VariantDescriptor],
+        capabilities: fn() -> &'static TypeCapabilities,
+    ) -> Self {
         Self {
             type_id: type_id_of::<T>,
             type_name: type_name_of::<T>,
@@ -329,6 +395,7 @@ impl TypeDescriptor {
             data,
             fields,
             variants,
+            capabilities,
         }
     }
 
@@ -346,6 +413,19 @@ impl TypeDescriptor {
     /// [`Self::type_name`].
     pub const fn query_name(&self) -> &'static str {
         self.query_name
+    }
+
+    /// Returns this descriptor's immutable registered capability set.
+    pub fn capabilities(&self) -> &'static TypeCapabilities {
+        (self.capabilities)()
+    }
+
+    /// Retrieves one executable capability adapter through its typed key.
+    ///
+    /// `None` means this descriptor did not register the key, registered a
+    /// different contract, or records a fact without an operation adapter.
+    pub fn get_capability<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
+        self.capabilities().get(key)
     }
 
     /// Returns the stable hierarchical type category.
@@ -562,6 +642,7 @@ impl fmt::Debug for TypeDescriptor {
             .field("kind", &self.kind())
             .field("field_count", &self.fields.len())
             .field("variant_count", &self.variants.len())
+            .field("capability_count", &self.capabilities().descriptors().len())
             .finish()
     }
 }

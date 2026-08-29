@@ -2,6 +2,7 @@
 
 use std::any::TypeId;
 use std::rc::Rc;
+use std::sync::OnceLock;
 
 use qubit_reflect::capability::{
     CapabilityConflictKind, CapabilityDescriptor, CapabilityKey, TypeCapabilities,
@@ -19,15 +20,41 @@ struct TextAdapter(&'static str);
 #[derive(Debug)]
 struct NumberAdapter;
 
+#[derive(Debug, Eq, PartialEq)]
+struct ExtensionAdapter(&'static str);
+
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
 struct LocalOnly {
     values: Rc<Vec<u32>>,
 }
 
+#[derive(Clone, Default)]
+struct SendSync;
+
+struct ExtensionRegistration;
+
+#[derive(Clone)]
+struct DuplicateRegistration;
+
 struct ReflectedRoot;
 
+/// Builds the test root's capability set once for its static descriptor.
+fn reflected_root_capabilities() -> &'static TypeCapabilities {
+    static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
+    CAPABILITIES.get_or_init(|| {
+        TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(
+            extension_key(),
+            ExtensionAdapter("descriptor"),
+        )])
+        .expect("the test extension capability must be valid")
+    })
+}
+
 static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =
-    TypeDescriptor::new_opaque::<ReflectedRoot>("capability_tests::ReflectedRoot", "ReflectedRoot");
+    qubit_reflect::__private::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
+        "ReflectedRoot",
+        reflected_root_capabilities,
+    );
 
 impl Reflect for ReflectedRoot {
     /// Returns the test type's unique descriptor.
@@ -38,10 +65,19 @@ impl Reflect for ReflectedRoot {
 
 register_reflected_type!(ReflectedRoot);
 register_type_capabilities!(LocalOnly: Clone, Default);
+register_type_capabilities!(SendSync: Clone, Default, Send, Sync);
+register_type_capabilities!(ExtensionRegistration: [extension_key() => ExtensionAdapter("registered")]);
+register_type_capabilities!(DuplicateRegistration: Clone);
+register_type_capabilities!(DuplicateRegistration: Clone);
 
 /// Creates a valid third-party capability ID for a test.
 fn external_id(value: &str) -> CapabilityId {
     CapabilityId::new(value).expect("the test capability ID must be valid")
+}
+
+/// Returns the typed third-party extension key used by static registrations.
+fn extension_key() -> CapabilityKey<ExtensionAdapter> {
+    CapabilityKey::new(external_id("example.capability.extension"))
 }
 
 /// Confirms descriptors retain unknown contracts and iterate by stable ID order.
@@ -137,6 +173,39 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
     );
 }
 
+/// Confirms descriptors expose their own typed capability set without a registry lookup.
+#[test]
+fn test_type_descriptor_navigates_its_owned_typed_capabilities() {
+    let descriptor = TypeDescriptor::of::<ReflectedRoot>();
+
+    assert_eq!(
+        descriptor.get_capability(extension_key()),
+        Some(&ExtensionAdapter("descriptor"))
+    );
+    assert_eq!(descriptor.capabilities().descriptors().len(), 1);
+}
+
+/// Confirms built-in descriptors register core facts and executable operations.
+#[test]
+fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
+    let primitive = TypeDescriptor::of::<u32>();
+    let text = TypeDescriptor::of::<String>();
+
+    assert!(primitive.capabilities().contains(send_key()));
+    assert!(primitive.capabilities().contains(sync_key()));
+    assert!(primitive.get_capability(clone_key()).is_some());
+    assert!(primitive.get_capability(default_key()).is_some());
+    assert_eq!(
+        text.get_capability(clone_key())
+            .expect("String must have an actual clone adapter")
+            .clone_owned(&ReflectedOwned::new(String::from("text")))
+            .expect("the registered String adapter must accept String")
+            .downcast_ref::<String>()
+            .map(String::as_str),
+        Some("text")
+    );
+}
+
 /// Confirms explicit registration is exact and does not infer thread safety.
 #[test]
 fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
@@ -157,6 +226,40 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
         .clone_owned(&ReflectedOwned::new(source.clone()))
         .expect("the registered local concrete type must clone dynamically");
     assert_eq!(cloned.downcast_ref::<LocalOnly>(), Some(&source));
+}
+
+/// Confirms explicitly declared thread-safety facts have no operation adapter.
+#[test]
+fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotion() {
+    let capabilities = registered_type_capabilities::<SendSync>()
+        .expect("the concrete thread-safe registration must be compatible");
+
+    assert!(capabilities.contains(send_key()));
+    assert!(capabilities.contains(sync_key()));
+    assert_eq!(capabilities.get(send_key()), None);
+    assert_eq!(capabilities.get(sync_key()), None);
+}
+
+/// Confirms macro registration accepts a third-party typed key and adapter.
+#[test]
+fn test_concrete_registration_accepts_third_party_typed_adapter() {
+    let capabilities = registered_type_capabilities::<ExtensionRegistration>()
+        .expect("the extension registration must be compatible");
+
+    assert_eq!(
+        capabilities.get(extension_key()),
+        Some(&ExtensionAdapter("registered"))
+    );
+}
+
+/// Confirms matching IDs emitted by independent fragments remain an explicit conflict.
+#[test]
+fn test_concrete_registration_rejects_cross_fragment_duplicate_capability() {
+    let error = registered_type_capabilities::<DuplicateRegistration>()
+        .expect_err("two linked fragments cannot silently claim one capability ID");
+
+    assert_eq!(error.kind(), CapabilityConflictKind::DuplicateId);
+    assert_eq!(error.id().as_str(), "qubit.reflect.clone");
 }
 
 /// Confirms reflected-type registration returns the existing descriptor root.
