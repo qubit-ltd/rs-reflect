@@ -14,10 +14,23 @@ mod variant_descriptor;
 pub use field_descriptor::FieldDescriptor;
 pub use field_descriptor::TypeDescriptorResolver;
 pub use generic_descriptor::ConcreteGenericDescriptor;
-pub use impl_descriptor::ImplDescriptor;
-pub use impl_descriptor::ImplKind;
-pub use method_descriptor::MethodDescriptor;
-pub use trait_descriptor::TraitDescriptor;
+pub use impl_descriptor::{
+    AssociatedConstBindingDescriptor, AssociatedConstImplementationSource, AssociatedConstReader,
+    AssociatedTypeBindingDescriptor, ImplDefinitionDescriptor, ImplDescriptor,
+    ImplDescriptorBuildError, ImplKind, MethodLookup, MethodQualifier,
+};
+pub use method_descriptor::{
+    InvocationAdapter, InvocationUnavailableReason, MethodDescriptor, MethodDescriptorBuilder,
+    MethodDeclarationOwner, MethodImplementationSource, MethodInstanceBuildError,
+    MethodInstanceDescriptor, MethodQualifiers, MethodVisibility, ParameterDescriptor,
+    ParameterPassingMode, ParameterPatternDescriptor, ReceiverDescriptor, ReturnDescriptor,
+    ReturnKind,
+};
+pub use trait_descriptor::{
+    AppliedTraitId, AssociatedConstDescriptor, AssociatedTypeDescriptor, SupertraitClosure,
+    TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitDescriptorBuildError,
+    TraitDescriptorBuilder, TraitDescriptorRef, TraitId,
+};
 pub use type_descriptor::Reflect;
 pub use type_descriptor::TypeDescriptor;
 pub use type_kind::FunctionPointerKind;
