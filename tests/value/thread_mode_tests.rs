@@ -111,3 +111,44 @@ fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
         .make_ascii_uppercase();
     assert_eq!(text, "HELLO");
 }
+
+/// Confirms consuming thread-safe `str` extraction returns the original shared
+/// borrow and preserves a non-`str` wrapper on failure.
+#[test]
+fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
+    let text = String::from("hello");
+    let extracted = match SendReflectedRef::new_str(text.as_str()).into_str() {
+        Ok(extracted) => extracted,
+        Err(_) => panic!("a dedicated thread-safe str wrapper must extract successfully"),
+    };
+    assert_eq!(extracted, "hello");
+
+    let number = 42_u32;
+    let value = match SendReflectedRef::new(&number).into_str() {
+        Ok(_) => panic!("a thread-safe Any wrapper must not extract as str"),
+        Err(value) => value,
+    };
+    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
+}
+
+/// Confirms consuming thread-safe mutable `str` extraction returns the
+/// original exclusive borrow and preserves a non-`str` wrapper on failure.
+#[test]
+fn test_thread_safe_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
+    let mut text = String::from("hello");
+    match SendReflectedMut::new_str_mut(text.as_mut_str()).into_str_mut() {
+        Ok(extracted) => extracted.make_ascii_uppercase(),
+        Err(_) => panic!("a dedicated thread-safe mutable str wrapper must extract successfully"),
+    }
+    assert_eq!(text, "HELLO");
+
+    let mut number = 42_u32;
+    let mut value = match SendReflectedMut::new(&mut number).into_str_mut() {
+        Ok(_) => panic!("a thread-safe Any wrapper must not extract as mutable str"),
+        Err(value) => value,
+    };
+    *value
+        .downcast_mut::<u32>()
+        .expect("failed str extraction must return the original wrapper") = 43;
+    assert_eq!(number, 43);
+}

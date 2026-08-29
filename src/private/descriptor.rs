@@ -1,5 +1,6 @@
 //! Hidden factories for immutable static descriptor data.
 
+use crate::access::VariantActiveAdapter;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::FunctionPointerKind;
@@ -239,6 +240,15 @@ pub const fn variant(
     query_name: &'static str,
     kind: VariantKind,
     fields: &'static [FieldDescriptor],
+    active_test: VariantActiveAdapter,
 ) -> VariantDescriptor {
-    VariantDescriptor::new(declaring_type, index, rust_name, query_name, kind, fields)
+    VariantDescriptor::new(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        kind,
+        fields,
+        active_test,
+    )
 }

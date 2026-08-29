@@ -2,6 +2,7 @@
 
 use std::any::TypeId;
 
+use qubit_reflect::__private::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessPolicy;
 use qubit_reflect::descriptor::FieldDescriptor;
@@ -56,9 +57,9 @@ fn set_secret(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), Fie
 }
 
 static SECRET_TYPE: OpaqueTypeDescriptor =
-    OpaqueTypeDescriptor::new::<String>("alloc::string::String");
+    descriptor::opaque_member::<String>();
 static SECRET_TYPE_REF: TypeRef = TypeRef::Opaque(&SECRET_TYPE);
-static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
+static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
     account_descriptor,
     0,
     Some("secret"),
@@ -72,9 +73,9 @@ static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
     Some(get_secret_mut),
     Some(set_secret),
 )];
-static ACCOUNT_DESCRIPTOR: TypeDescriptor = TypeDescriptor::new_struct::<Account>(
+static ACCOUNT_DESCRIPTOR: TypeDescriptor =
+    descriptor::struct_type::<Account>(
     "field_tests::Account",
-    "Account",
     StructKind::Named,
     &ACCOUNT_FIELDS,
 );

@@ -2,6 +2,7 @@
 
 use std::any::TypeId;
 
+use qubit_reflect::__private::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessPolicy;
 use qubit_reflect::access::FieldIdentity;
@@ -88,9 +89,10 @@ fn get_done_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, Fiel
     }
 }
 
-static U32_TYPE: OpaqueTypeDescriptor = OpaqueTypeDescriptor::new::<u32>("u32");
+static U32_TYPE: OpaqueTypeDescriptor =
+    descriptor::opaque_member::<u32>();
 static U32_TYPE_REF: TypeRef = TypeRef::Opaque(&U32_TYPE);
-static PROGRESS_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
+static PROGRESS_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
     event_descriptor,
     0,
     None,
@@ -105,7 +107,7 @@ static PROGRESS_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
     None,
 )
 .with_variant(0, "Progress")];
-static DONE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
+static DONE_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
     event_descriptor,
     0,
     None,
@@ -121,7 +123,7 @@ static DONE_FIELDS: [FieldDescriptor; 1] = [FieldDescriptor::new(
 )
 .with_variant(1, "Done")];
 static EVENT_VARIANTS: [VariantDescriptor; 2] = [
-    VariantDescriptor::new(
+    descriptor::variant(
         event_descriptor,
         0,
         "Progress",
@@ -130,7 +132,7 @@ static EVENT_VARIANTS: [VariantDescriptor; 2] = [
         &PROGRESS_FIELDS,
         is_progress,
     ),
-    VariantDescriptor::new(
+    descriptor::variant(
         event_descriptor,
         1,
         "Done",
@@ -140,8 +142,10 @@ static EVENT_VARIANTS: [VariantDescriptor; 2] = [
         is_done,
     ),
 ];
-static EVENT_DESCRIPTOR: TypeDescriptor =
-    TypeDescriptor::new_enum::<Event>("variant_tests::Event", "Event", &EVENT_VARIANTS);
+static EVENT_DESCRIPTOR: TypeDescriptor = descriptor::enum_type::<Event>(
+    "variant_tests::Event",
+    &EVENT_VARIANTS,
+);
 
 /// Verifies active testing is checked against the enum root and distinguishes
 /// every declared variant.
