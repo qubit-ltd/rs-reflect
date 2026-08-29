@@ -1,22 +1,23 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for the root type descriptor and its typed views.
-
 use std::any::TypeId;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::FieldDescriptor;
-use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::descriptor::TypeRef;
-use qubit_reflect::identity::Visibility;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::TypeDescriptor;
+use reflect::descriptor::FieldDescriptor;
+use reflect::descriptor::OpaqueTypeDescriptor;
+use reflect::descriptor::StructKind;
+use reflect::descriptor::TypeKind;
+use reflect::descriptor::TypeRef;
+use reflect::identity::Visibility;
 
 struct NamedRecord {
     number: u8,
 }
 
 static NAMED_RECORD: TypeDescriptor =
-    qubit_reflect::__private::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
+    reflect::__private::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
 
 impl Reflect for NamedRecord {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -24,12 +25,12 @@ impl Reflect for NamedRecord {
     }
 }
 
-static UNIT_TUPLE: TypeDescriptor = qubit_reflect::__private::descriptor::tuple::<()>("unit", &[]);
+static UNIT_TUPLE: TypeDescriptor = reflect::__private::descriptor::tuple::<()>("unit", &[]);
 
 struct ReflectedMember;
 
 static REFLECTED_MEMBER: TypeDescriptor =
-    qubit_reflect::__private::descriptor::struct_type::<ReflectedMember>("reflected_member", StructKind::Unit, &[]);
+    reflect::__private::descriptor::struct_type::<ReflectedMember>("reflected_member", StructKind::Unit, &[]);
 
 impl Reflect for ReflectedMember {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -43,9 +44,9 @@ fn opaque_container_descriptor() -> &'static TypeDescriptor {
     &OPAQUE_CONTAINER
 }
 
-static OPAQUE_MEMBER: OpaqueTypeDescriptor = qubit_reflect::__private::descriptor::opaque_member::<ReflectedMember>();
+static OPAQUE_MEMBER: OpaqueTypeDescriptor = reflect::__private::descriptor::opaque_member::<ReflectedMember>();
 static OPAQUE_MEMBER_TYPE: TypeRef = TypeRef::Opaque(&OPAQUE_MEMBER);
-static OPAQUE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descriptor::field(
+static OPAQUE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::descriptor::field(
     opaque_container_descriptor,
     0,
     Some("member"),
@@ -53,7 +54,7 @@ static OPAQUE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descript
     &OPAQUE_MEMBER_TYPE,
     Visibility::Private,
 )];
-static OPAQUE_CONTAINER: TypeDescriptor = qubit_reflect::__private::descriptor::struct_type::<OpaqueContainer>(
+static OPAQUE_CONTAINER: TypeDescriptor = reflect::__private::descriptor::struct_type::<OpaqueContainer>(
     "opaque_container",
     StructKind::Named,
     &OPAQUE_FIELDS,
@@ -72,7 +73,7 @@ fn recursive_node_descriptor() -> &'static TypeDescriptor {
 }
 
 static RECURSIVE_NODE_TYPE: TypeRef = TypeRef::Resolved(&RECURSIVE_NODE);
-static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descriptor::field(
+static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::descriptor::field(
     recursive_node_descriptor,
     0,
     Some("next"),
@@ -80,7 +81,7 @@ static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [qubit_reflect::__private::descr
     &RECURSIVE_NODE_TYPE,
     Visibility::Private,
 )];
-static RECURSIVE_NODE: TypeDescriptor = qubit_reflect::__private::descriptor::struct_type::<RecursiveNode>(
+static RECURSIVE_NODE: TypeDescriptor = reflect::__private::descriptor::struct_type::<RecursiveNode>(
     "recursive_node",
     StructKind::Named,
     &RECURSIVE_FIELDS,

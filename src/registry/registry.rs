@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Frozen registry snapshot and public deterministic lookup views.
 
 use std::any::TypeId;

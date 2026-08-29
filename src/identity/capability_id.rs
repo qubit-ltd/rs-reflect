@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Stable identities for reflection capabilities.
 
 use crate::error::IdError;

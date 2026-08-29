@@ -1,12 +1,13 @@
+// qubit-style: allow explicit-imports
 //! Integration coverage for callable invocation adapter descriptors.
-
-use qubit_reflect::descriptor::InvocationAdapter;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationFailure;
-use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
+use qubit_reflect as reflect;
+use reflect::descriptor::InvocationAdapter;
+use reflect::invoke::Invocation;
+use reflect::invoke::InvocationFailure;
+use reflect::invoke::InvocationOutput;
+use reflect::value::DynamicOwned;
+use reflect::value::Local;
+use reflect::value::ThreadSafe;
 
 /// Returns one owned output through the local invocation boundary.
 fn return_seven<'call>(

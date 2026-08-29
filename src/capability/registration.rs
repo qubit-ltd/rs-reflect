@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Link-time records for explicit concrete reflection registrations.
 
 use std::any::TypeId;

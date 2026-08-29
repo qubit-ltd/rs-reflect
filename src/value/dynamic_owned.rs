@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Owned dynamic values with mode-specific erased storage.
 
 use std::any::Any;

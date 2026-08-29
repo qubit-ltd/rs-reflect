@@ -1,53 +1,55 @@
+// qubit-style: allow explicit-imports
 use std::any::TypeId;
 use std::sync::LazyLock;
 
-use qubit_reflect::descriptor::AssociatedConstBindingDescriptor;
-use qubit_reflect::descriptor::AssociatedConstDescriptor;
-use qubit_reflect::descriptor::AssociatedConstImplementationSource;
-use qubit_reflect::descriptor::AssociatedConstReader;
-use qubit_reflect::descriptor::AssociatedTypeBindingDescriptor;
-use qubit_reflect::descriptor::AssociatedTypeDescriptor;
-use qubit_reflect::descriptor::ImplDefinitionDescriptor;
-use qubit_reflect::descriptor::ImplDescriptor;
-use qubit_reflect::descriptor::ImplKind;
-use qubit_reflect::descriptor::InvocationAdapter;
-use qubit_reflect::descriptor::InvocationUnavailableReason;
-use qubit_reflect::descriptor::MethodDeclarationOwner;
-use qubit_reflect::descriptor::MethodDescriptor;
-use qubit_reflect::descriptor::MethodImplementationSource;
-use qubit_reflect::descriptor::MethodInstanceBuildError;
-use qubit_reflect::descriptor::MethodInstanceDescriptor;
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::descriptor::MethodQualifier;
-use qubit_reflect::descriptor::MethodQualifiers;
-use qubit_reflect::descriptor::MethodVisibility;
-use qubit_reflect::descriptor::ParameterDescriptor;
-use qubit_reflect::descriptor::ParameterPassingMode;
-use qubit_reflect::descriptor::ParameterPatternDescriptor;
-use qubit_reflect::descriptor::PrimitiveKind;
-use qubit_reflect::descriptor::ReceiverDescriptor;
-use qubit_reflect::descriptor::ReturnDescriptor;
-use qubit_reflect::descriptor::ReturnKind;
-use qubit_reflect::descriptor::TraitCompleteness;
-use qubit_reflect::descriptor::TraitDefinitionDescriptor;
-use qubit_reflect::descriptor::TraitDescriptor;
-use qubit_reflect::descriptor::TraitDescriptorBuildError;
-use qubit_reflect::descriptor::TraitId;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::descriptor::TypeDescriptorResolver;
-use qubit_reflect::expression::ConcreteTypeExpression;
-use qubit_reflect::expression::DiagnosticText;
-use qubit_reflect::expression::GenericArgument;
-use qubit_reflect::expression::GenericDefinitionDescriptor;
-use qubit_reflect::expression::GenericParameterDescriptor;
-use qubit_reflect::expression::LifetimeExpression;
-use qubit_reflect::expression::PredicateDescriptor;
-use qubit_reflect::expression::TypeExpression;
-use qubit_reflect::identity::ExternalTraitId;
-use qubit_reflect::identity::FragmentIdentity;
-use qubit_reflect::identity::MemberId;
-use qubit_reflect::identity::Visibility;
-use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect as reflect;
+use reflect::descriptor::AssociatedConstBindingDescriptor;
+use reflect::descriptor::AssociatedConstDescriptor;
+use reflect::descriptor::AssociatedConstImplementationSource;
+use reflect::descriptor::AssociatedConstReader;
+use reflect::descriptor::AssociatedTypeBindingDescriptor;
+use reflect::descriptor::AssociatedTypeDescriptor;
+use reflect::descriptor::ImplDefinitionDescriptor;
+use reflect::descriptor::ImplDescriptor;
+use reflect::descriptor::ImplKind;
+use reflect::descriptor::InvocationAdapter;
+use reflect::descriptor::InvocationUnavailableReason;
+use reflect::descriptor::MethodDeclarationOwner;
+use reflect::descriptor::MethodDescriptor;
+use reflect::descriptor::MethodImplementationSource;
+use reflect::descriptor::MethodInstanceBuildError;
+use reflect::descriptor::MethodInstanceDescriptor;
+use reflect::descriptor::MethodLookup;
+use reflect::descriptor::MethodQualifier;
+use reflect::descriptor::MethodQualifiers;
+use reflect::descriptor::MethodVisibility;
+use reflect::descriptor::ParameterDescriptor;
+use reflect::descriptor::ParameterPassingMode;
+use reflect::descriptor::ParameterPatternDescriptor;
+use reflect::descriptor::PrimitiveKind;
+use reflect::descriptor::ReceiverDescriptor;
+use reflect::descriptor::ReturnDescriptor;
+use reflect::descriptor::ReturnKind;
+use reflect::descriptor::TraitCompleteness;
+use reflect::descriptor::TraitDefinitionDescriptor;
+use reflect::descriptor::TraitDescriptor;
+use reflect::descriptor::TraitDescriptorBuildError;
+use reflect::descriptor::TraitId;
+use reflect::descriptor::TypeDescriptor;
+use reflect::descriptor::TypeDescriptorResolver;
+use reflect::expression::ConcreteTypeExpression;
+use reflect::expression::DiagnosticText;
+use reflect::expression::GenericArgument;
+use reflect::expression::GenericDefinitionDescriptor;
+use reflect::expression::GenericParameterDescriptor;
+use reflect::expression::LifetimeExpression;
+use reflect::expression::PredicateDescriptor;
+use reflect::expression::TypeExpression;
+use reflect::identity::ExternalTraitId;
+use reflect::identity::FragmentIdentity;
+use reflect::identity::MemberId;
+use reflect::identity::Visibility;
+use reflect::value::ReflectedOwned;
 
 struct RootMarker;
 struct MiddleMarker;
@@ -136,12 +138,12 @@ static MIDDLE_TRAIT: LazyLock<&'static TraitDescriptor> = LazyLock::new(|| {
 });
 
 fn target_type() -> &'static TypeDescriptor {
-    static TARGET: TypeDescriptor = qubit_reflect::__private::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
+    static TARGET: TypeDescriptor = reflect::__private::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
     &TARGET
 }
 
 fn concrete_u32_expression() -> TypeExpression {
-    TypeExpression::Concrete(qubit_reflect::expression::ConcreteTypeExpression {
+    TypeExpression::Concrete(reflect::expression::ConcreteTypeExpression {
         path: vec!["u32".into()].into_boxed_slice(),
         arguments: Box::new([]),
         diagnostic: DiagnosticText::from("u32"),

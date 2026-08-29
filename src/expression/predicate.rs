@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Where-clause and trait-bound predicates.
 
 use std::hash::Hash;

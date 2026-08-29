@@ -1,10 +1,11 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for reflected trait declarations.
-
 use std::any::TypeId;
 
-use qubit_reflect::descriptor::TraitId;
-use qubit_reflect::reflect;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect as reflect;
+use reflect::descriptor::TraitId;
+use reflect::reflect;
+use reflect::registry::ReflectRegistry;
 
 #[reflect]
 trait ReflectedService {
@@ -201,7 +202,7 @@ fn test_reflect_trait_accepts_explicit_external_supertrait_mapping() {
     assert_eq!(payload.applied().methods()[0].rust_name(), "work");
     assert_eq!(
         payload.applied().methods()[0].receiver(),
-        Some(&qubit_reflect::descriptor::ReceiverDescriptor::Shared)
+        Some(&reflect::descriptor::ReceiverDescriptor::Shared)
     );
     let direct_paths: Vec<_> = payload
         .applied()
@@ -230,30 +231,30 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert_eq!(generic_method.rust_name(), "generic");
     assert_eq!(generic_method.generic_definition().parameters.len(), 4);
     assert_eq!(generic_method.generic_definition().predicates.len(), 2);
-    let qubit_reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } =
+    let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } =
         &generic_method.generic_definition().parameters[1]
     else {
         panic!("generic method must retain its lifetime parameter")
     };
     assert_eq!(bounds.len(), 1);
-    let qubit_reflect::expression::GenericParameterDescriptor::Const { ty, .. } =
+    let reflect::expression::GenericParameterDescriptor::Const { ty, .. } =
         &generic_method.generic_definition().parameters[3]
     else {
         panic!("generic method must retain its const parameter")
     };
     assert!(
-        matches!(ty.as_ref(), qubit_reflect::expression::TypeExpression::Concrete(value) if value.path[0].as_ref() == "usize")
+        matches!(ty.as_ref(), reflect::expression::TypeExpression::Concrete(value) if value.path[0].as_ref() == "usize")
     );
     assert!(matches!(
         generic_method.parameters()[0].signature_type(),
-        qubit_reflect::expression::TypeExpression::Reference(value)
-            if matches!(value.target.as_ref(), qubit_reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "U")
+        reflect::expression::TypeExpression::Reference(value)
+            if matches!(value.target.as_ref(), reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "U")
     ));
     let service = <ServiceMarkerProbe as ReflectedService>::__qubit_reflect_trait_payload();
     assert_eq!(service.applied().methods().len(), 2);
     assert_eq!(
         service.applied().methods()[0].receiver(),
-        Some(&qubit_reflect::descriptor::ReceiverDescriptor::Shared)
+        Some(&reflect::descriptor::ReceiverDescriptor::Shared)
     );
     assert!(!service.applied().methods()[0].has_default());
     assert!(service.applied().methods()[1].has_default());
@@ -270,48 +271,42 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         )
         .expect("literal-default trait must register");
     let parameters = literal_defaults.generic_definition().parameters.as_ref();
-    let qubit_reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } = &parameters[1] else {
+    let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } = &parameters[1] else {
         panic!("expected a lifetime parameter")
     };
     assert_eq!(
         bounds.as_ref(),
-        [qubit_reflect::expression::LifetimeExpression::Named("b".into())]
+        [reflect::expression::LifetimeExpression::Named("b".into())]
     );
-    let qubit_reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[2] else {
+    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[2] else {
         panic!("expected the signed const parameter")
     };
-    assert_eq!(
-        default,
-        &Some(qubit_reflect::expression::ConstExpression::SignedInteger(-7))
-    );
-    let qubit_reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[3] else {
+    assert_eq!(default, &Some(reflect::expression::ConstExpression::SignedInteger(-7)));
+    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[3] else {
         panic!("expected the unsigned const parameter")
     };
     assert_eq!(
         default,
-        &Some(qubit_reflect::expression::ConstExpression::UnsignedInteger(42))
+        &Some(reflect::expression::ConstExpression::UnsignedInteger(42))
     );
-    let qubit_reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[4] else {
+    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[4] else {
         panic!("expected the character const parameter")
     };
-    assert_eq!(
-        default,
-        &Some(qubit_reflect::expression::ConstExpression::Character('\n'))
-    );
+    assert_eq!(default, &Some(reflect::expression::ConstExpression::Character('\n')));
     let maybe = <ServiceMarkerProbe as MaybeService<str>>::__qubit_reflect_trait_payload();
     assert_eq!(maybe.applied().arguments().len(), 1);
     let definition = maybe.definition();
-    let qubit_reflect::expression::GenericParameterDescriptor::Type { bounds, .. } =
+    let reflect::expression::GenericParameterDescriptor::Type { bounds, .. } =
         &definition.generic_definition().parameters[0]
     else {
         panic!("expected type parameter")
     };
-    let qubit_reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, .. } = &bounds[0] else {
+    let reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, .. } = &bounds[0] else {
         panic!("expected type bound")
     };
     assert_eq!(
         bound_modifiers.as_ref(),
-        [qubit_reflect::expression::TraitBoundModifier::Maybe]
+        [reflect::expression::TraitBoundModifier::Maybe]
     );
     let registry = ReflectRegistry::initialize().expect("registry must initialize");
     let hrtb = registry
@@ -323,7 +318,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         .expect("where-bound trait must register");
     let predicates = where_bound.generic_definition().predicates.as_ref();
     assert_eq!(predicates.len(), 1);
-    let qubit_reflect::expression::PredicateDescriptor::TypeBound {
+    let reflect::expression::PredicateDescriptor::TypeBound {
         bounds,
         bound_modifiers,
         higher_ranked_lifetimes,
@@ -336,8 +331,8 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert_eq!(
         bound_modifiers.as_ref(),
         [
-            qubit_reflect::expression::TraitBoundModifier::None,
-            qubit_reflect::expression::TraitBoundModifier::None,
+            reflect::expression::TraitBoundModifier::None,
+            reflect::expression::TraitBoundModifier::None,
         ]
     );
     assert_eq!(higher_ranked_lifetimes.len(), 1);
@@ -347,9 +342,9 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert!(matches!(
         lifetime_bound.generic_definition().predicates.as_ref(),
         [
-            qubit_reflect::expression::PredicateDescriptor::TypeBound { .. },
-            qubit_reflect::expression::PredicateDescriptor::TypeOutlives {
-                lifetime: qubit_reflect::expression::LifetimeExpression::Static,
+            reflect::expression::PredicateDescriptor::TypeBound { .. },
+            reflect::expression::PredicateDescriptor::TypeOutlives {
+                lifetime: reflect::expression::LifetimeExpression::Static,
                 ..
             },
         ]
@@ -360,23 +355,23 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     let structural = <ServiceMarkerProbe as StructuralService>::__qubit_reflect_trait_payload();
     assert_eq!(
         structural.definition().visibility(),
-        &qubit_reflect::identity::Visibility::Crate
+        &reflect::identity::Visibility::Crate
     );
     let structural_call = StructuralService::structural(&ServiceMarkerProbe, Vec::new());
     assert_eq!(structural_call(std::ptr::null()), 0);
     let parameter = &structural.applied().methods()[0].parameters()[0];
-    let qubit_reflect::expression::TypeExpression::Concrete(vector) = parameter.signature_type() else {
+    let reflect::expression::TypeExpression::Concrete(vector) = parameter.signature_type() else {
         panic!("Vec parameter must remain a structured concrete path")
     };
     assert_eq!(vector.path[0].as_ref(), "Vec");
-    let qubit_reflect::expression::GenericArgument::Type(qubit_reflect::expression::TypeExpression::Array(array)) =
+    let reflect::expression::GenericArgument::Type(reflect::expression::TypeExpression::Array(array)) =
         &vector.arguments[0]
     else {
         panic!("Vec element must preserve its array argument")
     };
     assert!(matches!(
         array.length,
-        qubit_reflect::expression::ConstExpression::UnsignedInteger(4)
+        reflect::expression::ConstExpression::UnsignedInteger(4)
     ));
     let return_value = structural.applied().methods()[0]
         .return_value()
@@ -384,7 +379,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         .expect("structural method must retain its return type");
     assert!(matches!(
         return_value,
-        qubit_reflect::expression::TypeExpression::FunctionPointer(_)
+        reflect::expression::TypeExpression::FunctionPointer(_)
     ));
     assert_lifetime_parameter_bound::<ServiceMarkerProbe>();
     assert_eq!(
@@ -395,7 +390,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     );
     let assoc = <ServiceMarkerProbe as AssocHrtb>::__qubit_reflect_trait_payload();
     assert_eq!(assoc.applied().associated_types()[0].bounds().len(), 1);
-    let qubit_reflect::expression::PredicateDescriptor::TypeBound {
+    let reflect::expression::PredicateDescriptor::TypeBound {
         bound_modifiers,
         higher_ranked_lifetimes,
         ..
@@ -405,7 +400,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     };
     assert_eq!(
         bound_modifiers.as_ref(),
-        [qubit_reflect::expression::TraitBoundModifier::None]
+        [reflect::expression::TraitBoundModifier::None]
     );
     assert_eq!(higher_ranked_lifetimes.len(), 1);
 }

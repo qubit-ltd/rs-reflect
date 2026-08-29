@@ -1,5 +1,5 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for built-in descriptor families and interning.
-
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -7,17 +7,18 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
 
-use qubit_reflect::descriptor::FunctionPointerKind;
-use qubit_reflect::descriptor::MapKind;
-use qubit_reflect::descriptor::Mutability;
-use qubit_reflect::descriptor::PrimitiveKind;
-use qubit_reflect::descriptor::ReferenceKind;
-use qubit_reflect::descriptor::SequenceKind;
-use qubit_reflect::descriptor::SetKind;
-use qubit_reflect::descriptor::SmartPointerKind;
-use qubit_reflect::descriptor::TextKind;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect as reflect;
+use reflect::descriptor::FunctionPointerKind;
+use reflect::descriptor::MapKind;
+use reflect::descriptor::Mutability;
+use reflect::descriptor::PrimitiveKind;
+use reflect::descriptor::ReferenceKind;
+use reflect::descriptor::SequenceKind;
+use reflect::descriptor::SetKind;
+use reflect::descriptor::SmartPointerKind;
+use reflect::descriptor::TextKind;
+use reflect::descriptor::TypeDescriptor;
+use reflect::descriptor::TypeKind;
 
 /// Verifies scalar and text built-ins retain their exact public category.
 #[test]

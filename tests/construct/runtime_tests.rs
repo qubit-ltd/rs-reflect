@@ -1,42 +1,42 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for the reflected construction runtime.
-
 mod construction_runtime {
-
     use std::any::TypeId;
     use std::cell::Cell;
     use std::rc::Rc;
 
-    use qubit_reflect::__private::descriptor;
-    use qubit_reflect::access::VariantActiveAdapter;
-    use qubit_reflect::construct::ConstructionError;
-    use qubit_reflect::construct::ConstructionField;
-    use qubit_reflect::construct::ConstructionRecovery;
-    use qubit_reflect::construct::ConstructionShape;
-    use qubit_reflect::construct::ConstructionUnavailableReason;
-    use qubit_reflect::construct::NamedConstructionInput;
-    use qubit_reflect::construct::RecoveredConstructionValue;
-    use qubit_reflect::construct::StructConstructor;
-    use qubit_reflect::construct::StructUpdateInput;
-    use qubit_reflect::construct::StructUpdater;
-    use qubit_reflect::construct::TupleConstructionInput;
-    use qubit_reflect::construct::UpdateField;
-    use qubit_reflect::construct::ValidatedConstructionInput;
-    use qubit_reflect::construct::ValidatedUpdateInput;
-    use qubit_reflect::construct::VariantConstructor;
-    use qubit_reflect::descriptor::FieldDescriptor;
-    use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-    use qubit_reflect::descriptor::StructKind;
-    use qubit_reflect::descriptor::TypeDescriptor;
-    use qubit_reflect::descriptor::TypeRef;
-    use qubit_reflect::descriptor::VariantDescriptor;
-    use qubit_reflect::descriptor::VariantKind;
-    use qubit_reflect::identity::Visibility;
-    use qubit_reflect::value::DynamicOwned;
-    use qubit_reflect::value::Local;
-    use qubit_reflect::value::Mode;
-    use qubit_reflect::value::ReflectedOwned;
-    use qubit_reflect::value::ReflectedRef;
-    use qubit_reflect::value::ThreadSafe;
+    use qubit_reflect as reflect;
+    use reflect::__private::descriptor;
+    use reflect::access::VariantActiveAdapter;
+    use reflect::construct::ConstructionError;
+    use reflect::construct::ConstructionField;
+    use reflect::construct::ConstructionRecovery;
+    use reflect::construct::ConstructionShape;
+    use reflect::construct::ConstructionUnavailableReason;
+    use reflect::construct::NamedConstructionInput;
+    use reflect::construct::RecoveredConstructionValue;
+    use reflect::construct::StructConstructor;
+    use reflect::construct::StructUpdateInput;
+    use reflect::construct::StructUpdater;
+    use reflect::construct::TupleConstructionInput;
+    use reflect::construct::UpdateField;
+    use reflect::construct::ValidatedConstructionInput;
+    use reflect::construct::ValidatedUpdateInput;
+    use reflect::construct::VariantConstructor;
+    use reflect::descriptor::FieldDescriptor;
+    use reflect::descriptor::OpaqueTypeDescriptor;
+    use reflect::descriptor::StructKind;
+    use reflect::descriptor::TypeDescriptor;
+    use reflect::descriptor::TypeRef;
+    use reflect::descriptor::VariantDescriptor;
+    use reflect::descriptor::VariantKind;
+    use reflect::identity::Visibility;
+    use reflect::value::DynamicOwned;
+    use reflect::value::Local;
+    use reflect::value::Mode;
+    use reflect::value::ReflectedOwned;
+    use reflect::value::ReflectedRef;
+    use reflect::value::ThreadSafe;
 
     #[derive(Debug, Eq, PartialEq)]
     struct Profile {
@@ -92,7 +92,7 @@ mod construction_runtime {
     }
 
     /// Tests whether the unit variant is active after descriptor validation.
-    fn started_is_active(value: ReflectedRef<'_>) -> Result<bool, qubit_reflect::error::TypeMismatch> {
+    fn started_is_active(value: ReflectedRef<'_>) -> Result<bool, reflect::error::TypeMismatch> {
         let event = value
             .downcast_ref::<Event>()
             .unwrap_or_else(|| unreachable!("the descriptor validates the enum root type"));
@@ -100,7 +100,7 @@ mod construction_runtime {
     }
 
     /// Tests whether the named variant is active after descriptor validation.
-    fn failed_is_active(value: ReflectedRef<'_>) -> Result<bool, qubit_reflect::error::TypeMismatch> {
+    fn failed_is_active(value: ReflectedRef<'_>) -> Result<bool, reflect::error::TypeMismatch> {
         let event = value
             .downcast_ref::<Event>()
             .unwrap_or_else(|| unreachable!("the descriptor validates the enum root type"));

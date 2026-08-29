@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Validated adapter input and shared pre-execution validation helpers.
 
 use std::any::TypeId;

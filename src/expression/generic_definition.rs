@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Generic parameter declarations and their where predicates.
 
 use std::hash::Hash;

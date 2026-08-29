@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Source policies controlling reflected field access.
 
 /// The source policy controlling which field adapters callers may use.

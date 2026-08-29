@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Errors for dynamic values with an unexpected Rust type.
 
 use std::any::TypeId;

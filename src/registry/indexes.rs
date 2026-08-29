@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Private hash indexes behind the immutable public registry snapshot.
 
 use std::any::TypeId;

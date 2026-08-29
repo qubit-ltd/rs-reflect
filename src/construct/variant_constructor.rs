@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Enum-variant construction adapter contract and descriptor-bound dispatch.
 
 use std::any::TypeId;

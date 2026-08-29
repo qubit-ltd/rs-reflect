@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Immutable errors reported while aggregating registration fragments.
 
 use std::sync::Arc;

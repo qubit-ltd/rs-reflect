@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Immutable structural facts about reflected enum variants.
 
 use std::fmt;

@@ -1,13 +1,14 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for `Reflect` struct derives.
-
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ReflectedRef;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::TypeDescriptor;
+use reflect::descriptor::StructKind;
+use reflect::descriptor::TypeKind;
+use reflect::registry::ReflectRegistry;
+use reflect::value::ReflectedMut;
+use reflect::value::ReflectedOwned;
+use reflect::value::ReflectedRef;
 
 #[derive(Reflect)]
 struct DerivedNamed {
@@ -152,7 +153,7 @@ fn test_derive_reflect_opaque_generic_field_does_not_require_reflect_bound() {
 
     assert!(matches!(
         descriptor.field_at(0).expect("opaque field").field_type(),
-        qubit_reflect::descriptor::TypeRef::Opaque(_)
+        reflect::descriptor::TypeRef::Opaque(_)
     ));
 }
 
@@ -186,15 +187,9 @@ fn test_derive_reflect_honors_field_names_visibility_and_access_policies() {
     assert_eq!(payload.query_name(), Some("payload"));
     assert_eq!(
         payload.visibility().as_declared(),
-        Some(&qubit_reflect::identity::Visibility::Crate)
+        Some(&reflect::identity::Visibility::Crate)
     );
-    assert_eq!(
-        payload.access_policy(),
-        qubit_reflect::access::FieldAccessPolicy::ReadOnly
-    );
-    assert_eq!(
-        skipped.access_policy(),
-        qubit_reflect::access::FieldAccessPolicy::Skipped
-    );
+    assert_eq!(payload.access_policy(), reflect::access::FieldAccessPolicy::ReadOnly);
+    assert_eq!(skipped.access_policy(), reflect::access::FieldAccessPolicy::Skipped);
     assert_eq!(values.skipped, "hidden");
 }

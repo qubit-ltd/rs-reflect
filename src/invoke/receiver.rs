@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Invocation receiver values and receiver expectations.
 
 use std::any::TypeId;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! The unique root descriptor and [`Reflect`] query trait.
 
 use std::any::TypeId;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Stable, hierarchical categories for reflected Rust types.
 
 /// A Rust primitive represented by a root descriptor.

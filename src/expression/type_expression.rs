@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Structural representations of Rust type expressions.
 
 use std::hash::Hash;

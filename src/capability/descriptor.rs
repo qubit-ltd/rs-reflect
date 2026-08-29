@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Type-erased descriptors for capability facts and operation adapters.
 
 use std::any::Any;

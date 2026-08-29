@@ -1,9 +1,10 @@
+// qubit-style: allow explicit-imports
 //! Integration tests for concrete generic reflection instances.
-
 use std::sync::Arc;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
+use qubit_reflect as reflect;
+use reflect::Reflect;
+use reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 struct GenericRecord<T, const N: usize> {

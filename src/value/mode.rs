@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Compile-time mode markers for dynamic value wrappers.
 
 use std::marker::PhantomData;

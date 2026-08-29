@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Positional argument values and their validation expectations.
 
 use std::any::TypeId;

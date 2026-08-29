@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Kind-specific, immutable views of root type descriptors.
 
 use crate::descriptor::FunctionPointerKind;

@@ -1,3 +1,4 @@
+// qubit-style: allow public-type-layout
 //! Outputs returned by reflected method adapters.
 
 use crate::invoke::InvocationMode;
