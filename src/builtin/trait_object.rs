@@ -10,8 +10,7 @@ impl Reflect for dyn std::fmt::Debug {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_trait_object::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-            )
+                            )
         })
     }
 }

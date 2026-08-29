@@ -16,8 +16,7 @@ impl<T: Reflect, const LENGTH: usize> Reflect for [T; LENGTH] {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_array::<Self>(
                 std::any::type_name::<Self>(),
-                std::any::type_name::<Self>(),
-                resolved::<T>(),
+                                resolved::<T>(),
                 LENGTH,
             )
         })

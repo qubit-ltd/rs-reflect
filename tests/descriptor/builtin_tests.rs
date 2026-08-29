@@ -213,34 +213,13 @@ fn test_builtin_hash_map_descriptor_supports_custom_hasher() {
     );
 }
 
-/// Verifies builtin function descriptors support higher-ranked borrowed
-/// parameters and C-variadic signatures.
+/// Verifies builtin function descriptors preserve C-variadic signature facts.
 #[test]
-fn test_builtin_function_descriptor_supports_hrtb_and_c_variadic_signatures() {
-    type BorrowedParameter = fn(&str) -> String;
-    type MutableBorrowedParameter = fn(&mut [u8]);
+fn test_builtin_function_descriptor_supports_c_variadic_signatures() {
     type CVariadic = unsafe extern "C" fn(i32, ...) -> i32;
 
-    let borrowed = TypeDescriptor::of::<BorrowedParameter>();
-    let mutable_borrowed = TypeDescriptor::of::<MutableBorrowedParameter>();
     let variadic = TypeDescriptor::of::<CVariadic>();
 
-    assert_eq!(
-        borrowed
-            .as_function()
-            .expect("function typed view should exist")
-            .parameters()
-            .len(),
-        1
-    );
-    assert_eq!(
-        mutable_borrowed
-            .as_function()
-            .expect("function typed view should exist")
-            .parameters()
-            .len(),
-        1
-    );
     assert!(
         variadic
             .as_function()

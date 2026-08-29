@@ -22,8 +22,7 @@ macro_rules! impl_smart_pointer {
                 interner::intern::<Self>(|| {
                     TypeDescriptor::new_smart_pointer::<Self>(
                         std::any::type_name::<Self>(),
-                        std::any::type_name::<Self>(),
-                        $kind,
+                                                $kind,
                         resolved::<T>(),
                     )
                 })
