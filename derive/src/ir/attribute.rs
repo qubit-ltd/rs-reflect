@@ -20,6 +20,7 @@ pub(crate) enum HelperName {
     Specialize,
     ExternalTraitId,
     ExternalTrait,
+    Supertrait,
 }
 
 impl HelperName {
@@ -39,6 +40,7 @@ impl HelperName {
             Self::Specialize => "specialize",
             Self::ExternalTraitId => "external_trait_id",
             Self::ExternalTrait => "external_trait",
+            Self::Supertrait => "supertrait",
         }
     }
 
@@ -186,6 +188,11 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::ExternalTrait,
         source_name: "external_trait",
+        targets: TargetSet::new(TRAIT),
+    },
+    HelperRule {
+        name: HelperName::Supertrait,
+        source_name: "supertrait",
         targets: TargetSet::new(TRAIT),
     },
 ];

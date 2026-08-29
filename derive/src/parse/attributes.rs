@@ -124,6 +124,9 @@ fn convert_meta(
         HelperName::Capabilities => {
             parse_path_list(&meta, "capabilities").map(crate::ir::HelperValueIr::Paths)
         }
+        HelperName::Supertrait => {
+            parse_path_list(&meta, "supertrait").map(crate::ir::HelperValueIr::Paths)
+        }
         HelperName::Default => parse_default(&meta).map(crate::ir::HelperValueIr::DefaultPath),
         HelperName::Specialize => {
             parse_specialization(&meta).map(crate::ir::HelperValueIr::Specialization)

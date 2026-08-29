@@ -7,8 +7,9 @@ use proc_macro::TokenStream;
 mod ir;
 mod parse;
 mod validate;
+mod expand;
 
-use ir::{DeclarationIr, MacroKind};
+use ir::MacroKind;
 use parse::parse_and_validate_declaration;
 
 /// Parses and validates a `Reflect` derive declaration.
@@ -33,11 +34,7 @@ pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
 fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
     let result = parse_and_validate_declaration(kind, args.into(), input.into());
     match result {
-        Ok(validated) => match validated.declaration {
-            DeclarationIr::Type(_) => TokenStream::new(),
-            DeclarationIr::Trait(declaration) => declaration.retained_tokens.into(),
-            DeclarationIr::Impl(declaration) => declaration.retained_tokens.into(),
-        },
+        Ok(validated) => expand::expand(validated.declaration).into(),
         Err(error) => error.into_compile_error().into(),
     }
 }

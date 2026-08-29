@@ -29,7 +29,7 @@ pub use method_descriptor::{
 pub use trait_descriptor::{
     AppliedTraitId, AssociatedConstDescriptor, AssociatedTypeDescriptor, SupertraitClosure,
     TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitDescriptorBuildError,
-    TraitDescriptorBuilder, TraitDescriptorRef, TraitId,
+    TraitDescriptorBuilder, TraitDescriptorRef, TraitId, TraitImplPayload, external_supertrait,
 };
 pub use type_descriptor::Reflect;
 pub use type_descriptor::TypeDescriptor;

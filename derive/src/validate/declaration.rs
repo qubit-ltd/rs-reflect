@@ -348,25 +348,23 @@ fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector
 
 /// Validates external trait IDs and detects same-input path or ID conflicts.
 fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
-    let mut bound_paths = HashSet::new();
-    collect_bound_paths(&declaration.supertraits, &mut bound_paths);
-    collect_generic_bound_paths(&declaration.generics, &mut bound_paths);
-    for method in &declaration.methods {
-        collect_generic_bound_paths(&method.generics, &mut bound_paths);
-    }
-    for associated_type in &declaration.associated_types {
-        collect_bound_paths(&associated_type.bounds, &mut bound_paths);
-        collect_generic_bound_paths(&associated_type.generics, &mut bound_paths);
-    }
+    let direct_supertraits: HashSet<_> = declaration
+        .supertraits
+        .iter()
+        .filter_map(|bound| match bound {
+            crate::ir::GenericBoundIr::Trait { path, .. } => Some(path.source.as_str()),
+            _ => None,
+        })
+        .collect();
     let mut paths = HashSet::new();
     let mut ids = HashSet::new();
     for mapping in &declaration.external_traits {
         validate_stable_id(&mapping.id, mapping.id_span, errors);
-        if !bound_paths.contains(&mapping.path.source) {
+        if !direct_supertraits.contains(mapping.path.source.as_str()) {
             errors.push(syn::Error::new(
                 mapping.path.span,
                 format!(
-                    "external trait mapping `{}` does not match a trait bound",
+                    "external trait mapping `{}` does not match a direct supertrait",
                     mapping.path.source
                 ),
             ));
@@ -390,25 +388,32 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
             ));
         }
     }
-}
-
-/// Adds all trait paths in a direct bound list to the declaration-wide set.
-fn collect_bound_paths(bounds: &[crate::ir::GenericBoundIr], paths: &mut HashSet<String>) {
-    for bound in bounds {
-        if let crate::ir::GenericBoundIr::Trait { path, .. } = bound {
-            paths.insert(path.source.clone());
+    let mut reflected_paths = HashSet::new();
+    for path in &declaration.reflected_supertraits {
+        if !direct_supertraits.contains(path.source.as_str()) {
+            errors.push(syn::Error::new(
+                path.span,
+                format!(
+                    "reflected supertrait `{}` does not match a direct supertrait",
+                    path.source
+                ),
+            ));
+        }
+        if !reflected_paths.insert(path.source.clone()) {
+            errors.push(syn::Error::new(
+                path.span,
+                format!("reflected supertrait `{}` is listed more than once", path.source),
+            ));
         }
     }
-}
-
-/// Adds trait paths from generic parameters and where predicates.
-fn collect_generic_bound_paths(generics: &GenericsIr, paths: &mut HashSet<String>) {
-    for parameter in &generics.params {
-        collect_bound_paths(&parameter.bounds, paths);
-    }
-    for predicate in &generics.where_predicates {
-        if let crate::ir::WherePredicateIr::Type { bounds, .. } = predicate {
-            collect_bound_paths(bounds, paths);
+    for path in direct_supertraits {
+        if !paths.contains(path) && !reflected_paths.contains(path) {
+            errors.push(syn::Error::new(
+                declaration.span,
+                format!(
+                    "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or #[reflect(external_trait({path}, id = \"...\"))]"
+                ),
+            ));
         }
     }
 }

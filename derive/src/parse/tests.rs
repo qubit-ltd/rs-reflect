@@ -293,14 +293,14 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
             trait Invalid: Send {}
         },
     );
-    assert!(
-        unused_mapping.contains("external trait mapping `NotABound` does not match a trait bound")
-    );
+    assert!(unused_mapping.contains(
+        "external trait mapping `NotABound` does not match a direct supertrait"
+    ));
 }
 
 #[test]
-fn test_external_mappings_cover_method_and_associated_type_bounds() {
-    let declaration = parse_valid(
+fn test_external_mappings_reject_non_supertrait_bounds() {
+    let diagnostics = parse_invalid(
         MacroKind::Trait,
         quote!(
             external_trait(Send, id = "core.marker.Send"),
@@ -317,11 +317,9 @@ fn test_external_mappings_cover_method_and_associated_type_bounds() {
             }
         },
     );
-    let DeclarationIr::Trait(declaration) = &declaration.declaration else {
-        panic!("expected a trait declaration");
-    };
-    assert_eq!(declaration.associated_types[0].generics.params.len(), 1);
-    assert_eq!(declaration.associated_types[0].bounds.len(), 1);
+    assert!(diagnostics.contains("external trait mapping `Send` does not match a direct supertrait"));
+    assert!(diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait"));
+    assert!(diagnostics.contains("external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"));
 }
 
 #[test]
@@ -578,4 +576,20 @@ fn test_parse_preserves_parenthesized_path_and_bare_function_binders() {
     assert_eq!(inputs.len(), 1);
     assert_eq!(inputs[0].source, "T");
     assert_eq!(output.as_deref().map(|ty| ty.source.as_str()), Some("T"));
+}
+
+#[test]
+fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
+    let diagnostic = parse_invalid(
+        MacroKind::Trait,
+        TokenStream::new(),
+        quote! { trait Broken: std::fmt::Debug {} },
+    );
+    assert!(diagnostic.contains("direct supertrait `std :: fmt :: Debug` needs"));
+
+    parse_valid(
+        MacroKind::Trait,
+        quote!(supertrait(Parent), external_trait(std::fmt::Debug, id = "std.fmt.Debug")),
+        quote! { trait Child: Parent + std::fmt::Debug {} },
+    );
 }

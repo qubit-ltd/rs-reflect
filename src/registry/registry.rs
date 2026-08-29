@@ -3,7 +3,7 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
-use crate::descriptor::TypeDescriptor;
+use crate::descriptor::{TraitDefinitionDescriptor, TraitId, TypeDescriptor};
 use crate::error::RegistryError;
 use crate::registry::builder::{build_inventory_registry, initialize_cached};
 use crate::registry::indexes::RegistryIndexes;
@@ -39,6 +39,53 @@ impl<'registry> TypeCandidates<'registry> {
 impl<'registry> IntoIterator for TypeCandidates<'registry> {
     type Item = &'static TypeDescriptor;
     type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDescriptor>>;
+
+    /// Iterates over candidates in stable fragment order.
+    fn into_iter(self) -> Self::IntoIter {
+        self.descriptors.iter().copied()
+    }
+}
+
+/// An ordered borrowed view over trait declarations sharing one diagnostic path.
+#[derive(Clone, Copy, Debug)]
+pub struct TraitCandidates<'registry> {
+    descriptors: &'registry [&'static TraitDefinitionDescriptor],
+}
+
+impl<'registry> TraitCandidates<'registry> {
+    /// Creates a borrowed candidate view over a registry-owned slice.
+    pub(crate) const fn new(descriptors: &'registry [&'static TraitDefinitionDescriptor]) -> Self {
+        Self { descriptors }
+    }
+
+    /// Returns candidates in stable fragment order.
+    pub fn iter(
+        self,
+    ) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
+        self.descriptors.iter().copied()
+    }
+
+    /// Returns the number of matching declarations.
+    pub const fn len(self) -> usize {
+        self.descriptors.len()
+    }
+
+    /// Returns whether no declarations match.
+    pub const fn is_empty(self) -> bool {
+        self.descriptors.is_empty()
+    }
+
+    /// Returns the sole matching declaration, rejecting ambiguous path lookups.
+    pub fn only(self) -> Option<&'static TraitDefinitionDescriptor> {
+        (self.descriptors.len() == 1).then(|| self.descriptors[0])
+    }
+}
+
+impl<'registry> IntoIterator for TraitCandidates<'registry> {
+    type Item = &'static TraitDefinitionDescriptor;
+    type IntoIter = std::iter::Copied<
+        std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>,
+    >;
 
     /// Iterates over candidates in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -100,5 +147,36 @@ impl ReflectRegistry {
     /// Enumerates all statically registered roots in stable fragment order.
     pub fn types(&self) -> &[&'static TypeDescriptor] {
         &self.types
+    }
+
+    /// Finds a reflected or external trait declaration by its process-local identity.
+    ///
+    /// `None` means no linked registration fragment declared the requested trait.
+    pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
+        self.indexes.traits_by_id.get(trait_id).copied()
+    }
+
+    /// Finds the sole reflected trait declaration with a diagnostic Rust path.
+    ///
+    /// `None` means no linked reflected trait declaration has the exact path,
+    /// or the path is ambiguous across linked fragments.
+    pub fn trait_definition_by_path(
+        &self,
+        rust_path: &str,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
+        self.find_trait_definitions_by_path(rust_path).only()
+    }
+
+    /// Finds every trait declaration with a diagnostic Rust path in stable order.
+    pub fn find_trait_definitions_by_path(
+        &self,
+        rust_path: &str,
+    ) -> TraitCandidates<'_> {
+        TraitCandidates::new(
+            self.indexes
+                .traits_by_rust_path
+                .get(rust_path)
+                .map_or(&[], Box::as_ref),
+        )
     }
 }

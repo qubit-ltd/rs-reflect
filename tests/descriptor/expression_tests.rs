@@ -91,6 +91,7 @@ fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
             bounds: Box::new([PredicateDescriptor::TypeBound {
                 subject: TypeExpression::SelfType,
                 bounds: Box::new([iterator]),
+                bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
                 higher_ranked_lifetimes: Box::default(),
                 diagnostic: DiagnosticText::default(),
             }]),
@@ -136,6 +137,7 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
     let predicate = PredicateDescriptor::TypeBound {
         subject: TypeExpression::Parameter("F".into()),
         bounds: Box::new([bound]),
+        bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
         higher_ranked_lifetimes: Box::new([LifetimeExpression::Named("a".into())]),
         diagnostic: DiagnosticText::default(),
     };
@@ -186,6 +188,7 @@ fn test_generic_definition_navigates_const_generic_and_predicates() {
         predicates: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::Parameter("T".into()),
             bounds: Box::new([concrete(&["Clone"], Vec::new())]),
+            bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),
@@ -353,6 +356,7 @@ fn test_type_expression_navigates_array_trait_object_and_never() {
         bounds: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::SelfType,
             bounds: Box::new([concrete(&["Display"], Vec::new())]),
+            bound_modifiers: Box::new([qubit_reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),

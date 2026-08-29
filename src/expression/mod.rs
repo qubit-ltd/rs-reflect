@@ -9,7 +9,7 @@ mod type_expression;
 pub use generic_argument::{ConstExpression, ConstGenericArgument, GenericArgument};
 pub use generic_definition::{GenericDefinitionDescriptor, GenericParameterDescriptor};
 pub use lifetime_expression::LifetimeExpression;
-pub use predicate::PredicateDescriptor;
+pub use predicate::{PredicateDescriptor, TraitBoundModifier};
 pub use type_expression::{
     ArrayTypeExpression, AssociatedTypeExpression, ConcreteTypeExpression, DiagnosticText,
     FunctionAbi, FunctionPointerExpression, FunctionSafety, OpaqueTypeExpression,

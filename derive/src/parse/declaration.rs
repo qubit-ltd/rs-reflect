@@ -183,6 +183,15 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipel
             _ => None,
         })
         .collect();
+    let reflected_supertraits = attributes
+        .iter()
+        .filter(|attribute| attribute.name == crate::ir::HelperName::Supertrait)
+        .filter_map(|attribute| match &attribute.value {
+            crate::ir::HelperValueIr::Paths(paths) => Some(paths.iter().cloned()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
     let (methods, associated_types, associated_consts) = convert_trait_items(&item, &mut errors);
     strip_trait_helpers(&mut item);
     Ok(ParsedPipeline {
@@ -194,6 +203,7 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipel
                 supertraits: item.supertraits.iter().map(convert_bound).collect(),
                 attributes,
                 external_traits,
+                reflected_supertraits,
                 methods,
                 associated_types,
                 associated_consts,

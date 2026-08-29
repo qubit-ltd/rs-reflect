@@ -9,6 +9,6 @@ mod indexes;
 )]
 mod registry;
 
-pub use registry::{ReflectRegistry, TypeCandidates};
+pub use registry::{ReflectRegistry, TraitCandidates, TypeCandidates};
 
 pub(crate) use builder::{build_registry, initialize_registry};
