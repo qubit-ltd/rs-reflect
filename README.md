@@ -7,9 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-`qubit-reflect` is a requirements-first Rust crate for macro-generated structural and executable reflection. It is intended to provide shared type, field, method, trait, implementation, variant, access, invocation, and construction metadata for higher-level frameworks.
-
-The repository is currently an initial scaffold. No public reflection API has been implemented or stabilized.
+`qubit-reflect` provides macro-generated structural and executable reflection on stable Rust. It supplies immutable type, field, variant, method, trait, implementation, access, invocation, construction, and registry metadata for higher-level frameworks.
 
 ## Intended Users
 
@@ -17,11 +15,14 @@ The planned crate is intended for framework and library authors who need checked
 
 ## Installation
 
-The crate is not published and is not ready for use as a dependency. Installation instructions will be added after the first public API is implemented.
+```toml
+[dependencies]
+qubit-reflect = "0.1"
+```
 
 ## Current Status
 
-The current repository contains CI infrastructure, crate metadata, and the initial Chinese requirements specification. It does not yet provide the planned derive or attribute macros.
+The crate exports `Reflect`, `reflect`, and `reflect_impl`, together with runtime descriptor and registry APIs. See the [Chinese user guide](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md) for a scenario-led introduction.
 
 ## Planned Scope
 
@@ -30,6 +31,7 @@ The target design covers structural descriptors, checked field access, method in
 ## Learn More
 
 - [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
+- [Chinese user guide](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [简体中文 README](README.zh_CN.md)
 
 ## Testing

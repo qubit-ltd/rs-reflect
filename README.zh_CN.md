@@ -7,9 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`qubit-reflect` 是一个需求先行的 Rust 宏反射 crate，目标是为上层框架统一提供类型、字段、方法、trait、impl、枚举变体、安全访问、动态调用和动态构造信息。
-
-仓库目前只是初始骨架，尚未实现或稳定任何公共反射 API。
+`qubit-reflect` 在稳定 Rust 上提供宏生成的结构化与可执行反射，为上层框架统一提供类型、字段、方法、trait、impl、枚举变体、安全访问、动态调用、动态构造和注册表信息。
 
 ## 面向读者
 
@@ -17,11 +15,14 @@
 
 ## 安装
 
-crate 尚未发布，也不应作为可用依赖接入。首版公共 API 实现后再补充安装方法。
+```toml
+[dependencies]
+qubit-reflect = "0.1"
+```
 
 ## 当前状态
 
-仓库目前只包含 CI 基础设施、crate 元数据和中文版初步需求规范，尚未提供规划中的 derive 或属性宏。
+crate 已导出 `Reflect`、`reflect` 和 `reflect_impl`，以及 descriptor 与 registry runtime API。请阅读[中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)获取完整场景示例。
 
 ## 规划范围
 
@@ -30,6 +31,7 @@ crate 尚未发布，也不应作为可用依赖接入。首版公共 API 实现
 ## 延伸阅读
 
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
+- [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [English README](README.md)
 
 ## 测试
