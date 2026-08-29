@@ -63,5 +63,5 @@ pub use typed_view::StructTypeDescriptor;
 pub use typed_view::TextTypeDescriptor;
 pub use typed_view::TraitObjectTypeDescriptor;
 pub use typed_view::TupleTypeDescriptor;
-pub use variant_descriptor::VariantDescriptor;
+pub use variant_descriptor::{DiscriminantOrigin, NumericDiscriminant, VariantDescriptor};
 pub use variant_descriptor::VariantKind;
