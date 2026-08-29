@@ -1,15 +1,18 @@
 //! Token expansion for validated reflection declarations.
 
-mod traits;
+mod enums;
 mod impls;
 mod structs;
-mod enums;
+mod traits;
 
 use proc_macro2::TokenStream;
 
 use crate::ir::DeclarationIr;
+use crate::ir::HelperAttributeIr;
+use crate::ir::HelperValueIr;
 
-/// Expands one validated declaration while retaining unsupported staged declarations verbatim.
+/// Expands one validated declaration while retaining unsupported staged
+/// declarations verbatim.
 pub(crate) fn expand(declaration: DeclarationIr) -> TokenStream {
     match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
@@ -32,4 +35,16 @@ fn facade_path() -> Option<TokenStream> {
         }
         Err(_) => None,
     }
+}
+
+/// Resolves an explicit downstream facade before falling back to Cargo's
+/// dependency-name lookup for direct `qubit-reflect` users.
+fn facade_path_for(attributes: &[HelperAttributeIr]) -> Option<TokenStream> {
+    attributes
+        .iter()
+        .find_map(|attribute| match &attribute.value {
+            HelperValueIr::RuntimeCrate(path) => Some(path.tokens.clone()),
+            _ => None,
+        })
+        .or_else(facade_path)
 }

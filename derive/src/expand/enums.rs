@@ -1,28 +1,42 @@
 //! Expansion of non-generic reflected enum declarations.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::format_ident;
+use quote::quote;
 
-use crate::ir::{HelperName, TypeDeclarationIr, TypeDeclarationKindIr, VariantKindIr};
+use crate::ir::HelperName;
+use crate::ir::TypeDeclarationIr;
+use crate::ir::TypeDeclarationKindIr;
+use crate::ir::VariantKindIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
 pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Enum || !declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
-    let Some(facade) = super::facade_path() else { return TokenStream::new(); };
+    let Some(facade) = super::facade_path_for(&declaration.attributes) else {
+        return TokenStream::new();
+    };
     let name = declaration.name;
     let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
     let registration_module = format_ident!("__qubit_reflect_enum_registration_{fingerprint:016x}");
-    let query_name = declaration.attributes.iter().find_map(|attribute| attribute.rename())
-        .unwrap_or(&name.to_string()).to_owned();
+    let query_name = declaration
+        .attributes
+        .iter()
+        .find_map(|attribute| attribute.rename())
+        .unwrap_or(&name.to_string())
+        .to_owned();
     let integer_repr = declaration
         .variants
         .iter()
         .all(|variant| variant.kind == VariantKindIr::Unit)
         .then(|| integer_repr(&declaration.retained_tokens))
         .flatten();
-    if declaration.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque) {
+    if declaration
+        .attributes
+        .iter()
+        .any(|attribute| attribute.name == HelperName::Opaque)
+    {
         let registration = registration(&facade, &name, &registration_module, fingerprint);
         return quote! {
             impl #facade::Reflect for #name {
@@ -35,7 +49,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             #registration
         };
     }
-    let adapters = declaration.variants.iter().flat_map(|variant| adapters(&name, variant, &facade));
+    let adapters = declaration
+        .variants
+        .iter()
+        .flat_map(|variant| adapters(&name, variant, &facade));
     let variants = declaration
         .variants
         .iter()
@@ -58,12 +75,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
 }
 
 /// Emits the static registry fragment for one concrete derived enum root.
-fn registration(
-    facade: &TokenStream,
-    name: &syn::Ident,
-    module: &syn::Ident,
-    fingerprint: u64,
-) -> TokenStream {
+fn registration(facade: &TokenStream, name: &syn::Ident, module: &syn::Ident, fingerprint: u64) -> TokenStream {
     quote! {
         #[doc(hidden)]
         mod #module {
@@ -105,57 +117,63 @@ fn adapters(name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenStr
     let variant_name = &variant.name;
     let variant_index = variant.index;
     let variant_name_text = variant_name.to_string();
-    variant.fields.iter().flat_map(|field| {
-        let index = field.index;
-        let get = format_ident!("__qubit_reflect_get_variant_{variant_index}_field_{index}");
-        let get_mut = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}");
-        let set = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}");
-        let ty = &field.ty.tokens;
-        let binding = format_ident!("__qubit_reflect_value_{index}");
-        let rust_name = field.name.as_ref().map(|value| value.to_string());
-        let rust_name = match rust_name { Some(value) => quote!(Some(#value)), None => quote!(None) };
-        let pattern = match variant.kind {
-            VariantKindIr::Struct => {
-                let field_name = field.name.as_ref().expect("validated struct variant field");
-                quote!(#name::#variant_name { #field_name: #binding, .. })
-            }
-            VariantKindIr::Tuple => {
-                let bindings = (0..variant.fields.len()).map(|position| {
-                    if position == index { quote!(#binding) } else { quote!(_) }
-                });
-                quote!(#name::#variant_name(#(#bindings),*))
-            }
-            VariantKindIr::Unit => return Vec::new(),
-        };
-        let inactive = quote!(#facade::access::FieldAccessError::inactive_variant(
-            #facade::access::FieldIdentity::new_variant(
-                ::std::any::TypeId::of::<#name>(), ::std::any::type_name::<#name>(), #index, #rust_name,
-                #variant_index, #variant_name_text,
-            ), #variant_index, #variant_name_text,
-        ));
-        vec![quote! {
-            fn #get<'a>(target: #facade::value::ReflectedRef<'a>)
-                -> ::core::result::Result<#facade::value::ReflectedRef<'a>, #facade::access::FieldAccessError>
-            {
-                let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                match value { #pattern => Ok(#facade::value::ReflectedRef::new(#binding)), _ => Err(#inactive) }
-            }
-            fn #get_mut<'a>(target: #facade::value::ReflectedMut<'a>)
-                -> ::core::result::Result<#facade::value::ReflectedMut<'a>, #facade::access::FieldAccessError>
-            {
-                let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                match value { #pattern => Ok(#facade::value::ReflectedMut::new(#binding)), _ => Err(#inactive) }
-            }
-            fn #set(target: #facade::value::ReflectedMut<'_>, replacement: #facade::value::ReflectedOwned)
-                -> ::core::result::Result<(), #facade::access::FieldAccessError>
-            {
-                let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                let replacement = #facade::value::ReflectedOwned::downcast::<#ty>(replacement)
-                    .unwrap_or_else(|_| unreachable!("validated enum field value"));
-                match value { #pattern => { *#binding = replacement; Ok(()) }, _ => Err(#inactive) }
-            }
-        }]
-    }).collect()
+    variant
+        .fields
+        .iter()
+        .flat_map(|field| {
+            let index = field.index;
+            let get = format_ident!("__qubit_reflect_get_variant_{variant_index}_field_{index}");
+            let get_mut = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}");
+            let set = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}");
+            let ty = &field.ty.tokens;
+            let binding = format_ident!("__qubit_reflect_value_{index}");
+            let rust_name = field.name.as_ref().map(|value| value.to_string());
+            let rust_name = match rust_name {
+                Some(value) => quote!(Some(#value)),
+                None => quote!(None),
+            };
+            let pattern = match variant.kind {
+                VariantKindIr::Struct => {
+                    let field_name = field.name.as_ref().expect("validated struct variant field");
+                    quote!(#name::#variant_name { #field_name: #binding, .. })
+                }
+                VariantKindIr::Tuple => {
+                    let bindings = (0..variant.fields.len())
+                        .map(|position| if position == index { quote!(#binding) } else { quote!(_) });
+                    quote!(#name::#variant_name(#(#bindings),*))
+                }
+                VariantKindIr::Unit => return Vec::new(),
+            };
+            let inactive = quote!(#facade::access::FieldAccessError::inactive_variant(
+                #facade::access::FieldIdentity::new_variant(
+                    ::std::any::TypeId::of::<#name>(), ::std::any::type_name::<#name>(), #index, #rust_name,
+                    #variant_index, #variant_name_text,
+                ), #variant_index, #variant_name_text,
+            ));
+            vec![quote! {
+                fn #get<'a>(target: #facade::value::ReflectedRef<'a>)
+                    -> ::core::result::Result<#facade::value::ReflectedRef<'a>, #facade::access::FieldAccessError>
+                {
+                    let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    match value { #pattern => Ok(#facade::value::ReflectedRef::new(#binding)), _ => Err(#inactive) }
+                }
+                fn #get_mut<'a>(target: #facade::value::ReflectedMut<'a>)
+                    -> ::core::result::Result<#facade::value::ReflectedMut<'a>, #facade::access::FieldAccessError>
+                {
+                    let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    match value { #pattern => Ok(#facade::value::ReflectedMut::new(#binding)), _ => Err(#inactive) }
+                }
+                fn #set(target: #facade::value::ReflectedMut<'_>, replacement: #facade::value::ReflectedOwned)
+                    -> ::core::result::Result<(), #facade::access::FieldAccessError>
+                {
+                    let value = target.downcast::<#name>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    let replacement = #facade::value::ReflectedOwned::downcast::<#ty>(replacement)
+                        .unwrap_or_else(|_| unreachable!("validated enum field value"));
+                    match value { #pattern => { *#binding = replacement; Ok(()) }, _ => Err(#inactive) }
+                }
+            }]
+        })
+        .collect()
 }
 
 fn variant_descriptor(
@@ -167,7 +185,12 @@ fn variant_descriptor(
     let variant_name = &variant.name;
     let variant_index = variant.index;
     let variant_rust_name = variant_name.to_string();
-    let query_name = variant.attributes.iter().find_map(|attribute| attribute.rename()).unwrap_or(&variant_rust_name).to_owned();
+    let query_name = variant
+        .attributes
+        .iter()
+        .find_map(|attribute| attribute.rename())
+        .unwrap_or(&variant_rust_name)
+        .to_owned();
     let kind = match variant.kind {
         VariantKindIr::Unit => quote!(#facade::descriptor::VariantKind::Unit),
         VariantKindIr::Tuple => quote!(#facade::descriptor::VariantKind::Tuple),
@@ -230,14 +253,21 @@ fn variant_descriptor(
 fn integer_repr(tokens: &TokenStream) -> Option<String> {
     let input: syn::DeriveInput = syn::parse2(tokens.clone()).ok()?;
     input.attrs.iter().find_map(|attribute| {
-        if !attribute.path().is_ident("repr") { return None; }
-        let syn::Meta::List(list) = &attribute.meta else { return None; };
-        let values = list.parse_args_with(
-            syn::punctuated::Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated,
-        ).ok()?;
-        values.into_iter().map(|value| value.to_string()).find(|value| matches!(value.as_str(),
-            "i8" | "i16" | "i32" | "i64" | "i128" | "isize" |
-            "u8" | "u16" | "u32" | "u64" | "u128" | "usize"))
+        if !attribute.path().is_ident("repr") {
+            return None;
+        }
+        let syn::Meta::List(list) = &attribute.meta else {
+            return None;
+        };
+        let values = list
+            .parse_args_with(syn::punctuated::Punctuated::<syn::Ident, syn::Token![,]>::parse_terminated)
+            .ok()?;
+        values.into_iter().map(|value| value.to_string()).find(|value| {
+            matches!(
+                value.as_str(),
+                "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64" | "u128" | "usize"
+            )
+        })
     })
 }
 
@@ -248,12 +278,22 @@ fn numeric_discriminant(
     repr: Option<&str>,
     facade: &TokenStream,
 ) -> TokenStream {
-    let Some(repr) = repr else { return quote!(None); };
+    let Some(repr) = repr else {
+        return quote!(None);
+    };
     let variant = match repr {
-        "i8" => quote!(I8), "i16" => quote!(I16), "i32" => quote!(I32),
-        "i64" => quote!(I64), "i128" => quote!(I128), "isize" => quote!(Isize),
-        "u8" => quote!(U8), "u16" => quote!(U16), "u32" => quote!(U32),
-        "u64" => quote!(U64), "u128" => quote!(U128), "usize" => quote!(Usize),
+        "i8" => quote!(I8),
+        "i16" => quote!(I16),
+        "i32" => quote!(I32),
+        "i64" => quote!(I64),
+        "i128" => quote!(I128),
+        "isize" => quote!(Isize),
+        "u8" => quote!(U8),
+        "u16" => quote!(U16),
+        "u32" => quote!(U32),
+        "u64" => quote!(U64),
+        "u128" => quote!(U128),
+        "usize" => quote!(Usize),
         _ => return quote!(None),
     };
     let repr = syn::Ident::new(repr, variant_name.span());

@@ -52,6 +52,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "model-facade-app"
+version = "0.1.0"
+dependencies = [
+ "model-facade-derive",
+ "model-facade-runtime",
+]
+
+[[package]]
+name = "model-facade-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "model-facade-runtime"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

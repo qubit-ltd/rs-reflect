@@ -1,0 +1,9 @@
+[package]
+name = "model-facade-app"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+model-facade-derive = { path = "../model-facade-derive" }
+model-facade-runtime = { path = "../model-facade-runtime" }
