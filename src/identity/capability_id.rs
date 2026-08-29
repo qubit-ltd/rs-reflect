@@ -12,16 +12,7 @@ impl CapabilityId {
     /// Returns [`IdError`] when `value` is malformed or uses the reserved
     /// `qubit.reflect` namespace.
     pub fn new(value: &str) -> Result<Self, IdError> {
-        validate(value, IdAuthority::EXTERNAL)?;
-        Ok(Self(value.into()))
-    }
-
-    /// Creates a capability ID for use by the reflection library itself.
-    ///
-    /// Returns [`IdError`] when `value` is not a dot-separated ASCII identifier.
-    #[doc(hidden)]
-    pub fn new_core(value: &str) -> Result<Self, IdError> {
-        validate(value, IdAuthority::CORE)?;
+        validate(value)?;
         Ok(Self(value.into()))
     }
 
@@ -51,26 +42,10 @@ impl std::str::FromStr for CapabilityId {
     }
 }
 
-/// Determines whether an ID is owned by the reflection library or an external crate.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct IdAuthority {
-    is_core: bool,
-}
-
-impl IdAuthority {
-    /// Marks an ID as externally owned and therefore ineligible for the reserved namespace.
-    pub const EXTERNAL: Self = Self { is_core: false };
-
-    /// Marks an ID as owned by this crate and eligible for the reserved namespace.
-    pub(crate) const CORE: Self = Self { is_core: true };
-}
-
-/// Validates an ID according to its owner.
-pub(crate) fn validate(value: &str, authority: IdAuthority) -> Result<(), IdError> {
+/// Validates an externally owned namespaced ID.
+pub(crate) fn validate(value: &str) -> Result<(), IdError> {
     validate_segments(value)?;
-    if authority != IdAuthority::CORE
-        && (value == "qubit.reflect" || value.starts_with("qubit.reflect."))
-    {
+    if value == "qubit.reflect" || value.starts_with("qubit.reflect.") {
         return Err(IdError::ReservedNamespace {
             value: value.into(),
         });
