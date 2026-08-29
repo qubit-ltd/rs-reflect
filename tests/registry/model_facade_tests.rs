@@ -1,1 +1,1 @@
-//! Placeholder for model facade registry integration tests.
+//! The `model-facade-app` workspace package verifies this downstream contract.

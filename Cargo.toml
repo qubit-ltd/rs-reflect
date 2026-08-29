@@ -24,7 +24,13 @@ include = [
 ]
 
 [workspace]
-members = [".", "derive"]
+members = [
+    ".",
+    "derive",
+    "test-crates/model-facade-runtime",
+    "test-crates/model-facade-derive",
+    "test-crates/model-facade-app",
+]
 exclude = ["fuzz"]
 resolver = "3"
 

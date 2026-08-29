@@ -1,16 +1,22 @@
 //! Expansion of reflected struct declarations.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::format_ident;
+use quote::quote;
 
-use crate::ir::{GenericKindIr, HelperName, TypeDeclarationIr, TypeDeclarationKindIr, VisibilityIr};
+use crate::ir::GenericKindIr;
+use crate::ir::HelperName;
+use crate::ir::TypeDeclarationIr;
+use crate::ir::TypeDeclarationKindIr;
+use crate::ir::VisibilityIr;
 
-/// Expands a concrete struct into a static root descriptor and safe field adapters.
+/// Expands a concrete struct into a static root descriptor and safe field
+/// adapters.
 pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
-    let Some(facade) = super::facade_path() else {
+    let Some(facade) = super::facade_path_for(&declaration.attributes) else {
         return TokenStream::new();
     };
     let name = declaration.name;
@@ -27,7 +33,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .filter(|parameter| {
             declaration.fields.iter().any(|field| {
-                !field.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque)
+                !field
+                    .attributes
+                    .iter()
+                    .any(|attribute| attribute.name == HelperName::Opaque)
                     && type_uses_identifier(&field.ty.tokens, &parameter.name)
             })
         })
@@ -63,10 +72,11 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
-    let adapter_definitions: Vec<_> = if opaque_root {
-        Vec::new()
-    } else {
-        declaration.fields.iter().map(|field| {
+    let adapter_definitions: Vec<_> =
+        if opaque_root {
+            Vec::new()
+        } else {
+            declaration.fields.iter().map(|field| {
         let index = field.index;
         let get = format_ident!("__qubit_reflect_get_field_{index}");
         let get_mut = format_ident!("__qubit_reflect_get_mut_field_{index}");
@@ -108,7 +118,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             }
         }
         }).collect()
-    };
+        };
     let fields: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -152,7 +162,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let struct_kind = match declaration.fields.len() {
         0 => quote!(#facade::descriptor::StructKind::Unit),
         1 if declaration.fields[0].name.is_none() => quote!(#facade::descriptor::StructKind::Newtype),
-        _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => quote!(#facade::descriptor::StructKind::Tuple),
+        _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => {
+            quote!(#facade::descriptor::StructKind::Tuple)
+        }
         _ => quote!(#facade::descriptor::StructKind::Named),
     };
     let descriptor = if opaque_root {

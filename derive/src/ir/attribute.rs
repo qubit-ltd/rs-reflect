@@ -1,8 +1,10 @@
 //! Helper-attribute IR and the shared helper target matrix.
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
 
-use crate::ir::{PathIr, TypeIr};
+use crate::ir::PathIr;
+use crate::ir::TypeIr;
 
 /// Identifies a supported reflection helper key.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -21,6 +23,7 @@ pub(crate) enum HelperName {
     ExternalTraitId,
     ExternalTrait,
     Supertrait,
+    RuntimeCrate,
 }
 
 impl HelperName {
@@ -41,6 +44,7 @@ impl HelperName {
             Self::ExternalTraitId => "external_trait_id",
             Self::ExternalTrait => "external_trait",
             Self::Supertrait => "supertrait",
+            Self::RuntimeCrate => "crate",
         }
     }
 
@@ -195,9 +199,15 @@ const HELPER_RULES: &[HelperRule] = &[
         source_name: "supertrait",
         targets: TargetSet::new(TRAIT),
     },
+    HelperRule {
+        name: HelperName::RuntimeCrate,
+        source_name: "crate",
+        targets: TargetSet::new(TYPE),
+    },
 ];
 
-/// One parsed helper occurrence, retained separately until duplicate validation.
+/// One parsed helper occurrence, retained separately until duplicate
+/// validation.
 #[derive(Clone, Debug)]
 pub(crate) struct HelperAttributeIr {
     /// The normalized helper key.
@@ -222,6 +232,7 @@ pub(crate) enum HelperValueIr {
     Specialization(SpecializationIr),
     ExternalTraitId(String),
     ExternalTrait(ExternalTraitIr),
+    RuntimeCrate(PathIr),
 }
 
 /// A named concrete specialization before type/const kind resolution.
