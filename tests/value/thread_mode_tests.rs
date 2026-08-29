@@ -1,6 +1,6 @@
 //! Integration tests for thread-safe dynamic value mode.
 
-use qubit_reflect::value::{SendReflectedMut, SendReflectedRef};
+use qubit_reflect::value::{SendReflectedMut, SendReflectedOwned, SendReflectedRef};
 
 /// Verifies that a wrapper retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: T) {}
@@ -12,6 +12,21 @@ fn test_thread_safe_ref_can_be_downgraded_without_losing_the_borrow() {
     assert_send_and_sync(SendReflectedRef::new(&number));
 
     let value = SendReflectedRef::new(&number).into_local();
+    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
+}
+
+/// Confirms the thread-safe shared `Any` boundary supports direct type
+/// inspection before its independent downgrade path.
+#[test]
+fn test_thread_safe_ref_any_and_downcast_are_available_before_downgrade() {
+    let number = 42_u32;
+    let value = SendReflectedRef::new(&number);
+
+    assert!(value.as_any().is_some());
+    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
+    assert_eq!(value.downcast_ref::<String>(), None);
+
+    let value = value.into_local();
     assert_eq!(value.downcast_ref::<u32>(), Some(&42));
 }
 
@@ -31,12 +46,57 @@ fn test_thread_safe_mut_can_be_downgraded_without_losing_the_borrow() {
     assert_eq!(number, 43);
 }
 
+/// Confirms the thread-safe mutable `Any` boundary supports direct mutation
+/// before its independent downgrade path.
+#[test]
+fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
+    let mut number = 42_u32;
+    let mut value = SendReflectedMut::new(&mut number);
+
+    assert!(value.as_any().is_some());
+    *value
+        .as_any_mut()
+        .and_then(|value| value.downcast_mut::<u32>())
+        .expect("the thread-safe Any boundary retains the stored u32") = 43;
+    assert_eq!(value.downcast_ref::<u32>(), Some(&43));
+
+    let value = value.into_local();
+    assert_eq!(value.downcast_ref::<u32>(), Some(&43));
+}
+
+/// Confirms the thread-safe owned `Any` boundary supports type recovery
+/// without first downgrading to local mode.
+#[test]
+fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
+    let mut value = SendReflectedOwned::new(41_u32);
+
+    assert_eq!(
+        value.as_any().and_then(|value| value.downcast_ref::<u32>()),
+        Some(&41)
+    );
+    *value
+        .as_any_mut()
+        .and_then(|value| value.downcast_mut::<u32>())
+        .expect("the thread-safe Any boundary retains the stored u32") = 42;
+
+    let value = match value.downcast::<String>() {
+        Ok(_) => panic!("a mismatched thread-safe owned downcast must fail"),
+        Err(value) => value,
+    };
+    let number = match value.downcast::<u32>() {
+        Ok(number) => number,
+        Err(_) => panic!("a matching thread-safe owned downcast must recover the value"),
+    };
+    assert_eq!(number, 42);
+}
+
 /// Confirms thread-safe `str` variants retain their dedicated accessors after downgrade.
 #[test]
 fn test_thread_safe_str_variants_can_be_downgraded() {
     let value = SendReflectedRef::new_str("hello");
     assert_send_and_sync(value);
     let value = SendReflectedRef::new_str("hello");
+    assert!(value.as_any().is_none());
     assert_eq!(value.into_local().as_str(), Some("hello"));
 
     let mut text = String::from("hello");
@@ -44,6 +104,7 @@ fn test_thread_safe_str_variants_can_be_downgraded() {
     assert_send_and_sync(value);
     {
         let value = SendReflectedMut::new_str_mut(text.as_mut_str());
+        assert!(value.as_any().is_none());
         let mut value = value.into_local();
         value
             .as_str_mut()
