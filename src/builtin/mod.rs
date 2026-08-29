@@ -109,3 +109,19 @@ impl Reflect for String {
         &STRING_DESCRIPTOR
     }
 }
+
+#[path = "../registry/interner.rs"]
+mod interner;
+
+mod array;
+mod function;
+mod map;
+mod option;
+mod pointer;
+mod raw_pointer;
+mod reference;
+mod sequence;
+mod set;
+mod slice;
+mod trait_object;
+mod tuple;
