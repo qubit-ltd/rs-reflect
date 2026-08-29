@@ -4,10 +4,10 @@
 
 use proc_macro::TokenStream;
 
+mod expand;
 mod ir;
 mod parse;
 mod validate;
-mod expand;
 
 use ir::MacroKind;
 use parse::parse_and_validate_declaration;
@@ -30,7 +30,8 @@ pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
     process_macro(MacroKind::Impl, attribute, item)
 }
 
-/// Runs the shared parse/validate pipeline and returns the declaration retained for expansion.
+/// Runs the shared parse/validate pipeline and returns the declaration retained
+/// for expansion.
 fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
     let result = parse_and_validate_declaration(kind, args.into(), input.into());
     match result {

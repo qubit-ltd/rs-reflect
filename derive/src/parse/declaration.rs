@@ -1,30 +1,67 @@
 //! Parsing of derive, trait, and impl declarations.
 
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::ToTokens;
+use quote::quote;
+use syn::Data;
+use syn::DeriveInput;
+use syn::Fields;
+use syn::FnArg;
+use syn::GenericParam;
+use syn::Generics;
+use syn::ImplItem;
+use syn::Item;
+use syn::ItemImpl;
+use syn::ItemTrait;
+use syn::Pat;
+use syn::ReturnType;
+use syn::TraitItem;
+use syn::Visibility;
 use syn::spanned::Spanned;
-use syn::{
-    Data, DeriveInput, Fields, FnArg, GenericParam, Generics, ImplItem, Item, ItemImpl, ItemTrait,
-    Pat, ReturnType, TraitItem, Visibility,
-};
 
-use crate::ir::{
-    AssociatedConstIr, AssociatedTypeIr, DeclarationIr, FieldIr, GenericBoundIr, GenericDefaultIr,
-    GenericKindIr, GenericParamIr, GenericsIr, HelperAttributeIr, HelperTarget, ImplDeclarationIr,
-    MacroKind, MethodIr, MethodQualifiersIr, ParameterIr, ParameterPatternIr,
-    ParameterPatternKindIr, ParsedDeclaration, ReceiverIr, ReceiverKindIr, ReturnTypeIr,
-    TraitDeclarationIr, TypeDeclarationIr, TypeDeclarationKindIr, ValidatedDeclaration, VariantIr,
-    VariantKindIr, VisibilityIr, WherePredicateIr,
-};
-use crate::parse::attributes::{
-    ErrorCollector, parse_attributes, parse_helper_tokens, remove_reflect_attributes,
-};
-use crate::parse::type_ir::{convert_bound, convert_path, convert_type};
+use crate::ir::AssociatedConstIr;
+use crate::ir::AssociatedTypeIr;
+use crate::ir::DeclarationIr;
+use crate::ir::FieldIr;
+use crate::ir::GenericBoundIr;
+use crate::ir::GenericDefaultIr;
+use crate::ir::GenericKindIr;
+use crate::ir::GenericParamIr;
+use crate::ir::GenericsIr;
+use crate::ir::HelperAttributeIr;
+use crate::ir::HelperTarget;
+use crate::ir::ImplDeclarationIr;
+use crate::ir::MacroKind;
+use crate::ir::MethodIr;
+use crate::ir::MethodQualifiersIr;
+use crate::ir::ParameterIr;
+use crate::ir::ParameterPatternIr;
+use crate::ir::ParameterPatternKindIr;
+use crate::ir::ParsedDeclaration;
+use crate::ir::ReceiverIr;
+use crate::ir::ReceiverKindIr;
+use crate::ir::ReturnTypeIr;
+use crate::ir::TraitDeclarationIr;
+use crate::ir::TypeDeclarationIr;
+use crate::ir::TypeDeclarationKindIr;
+use crate::ir::ValidatedDeclaration;
+use crate::ir::VariantIr;
+use crate::ir::VariantKindIr;
+use crate::ir::VisibilityIr;
+use crate::ir::WherePredicateIr;
+use crate::parse::attributes::ErrorCollector;
+use crate::parse::attributes::parse_attributes;
+use crate::parse::attributes::parse_helper_tokens;
+use crate::parse::attributes::remove_reflect_attributes;
+use crate::parse::type_ir::convert_bound;
+use crate::parse::type_ir::convert_path;
+use crate::parse::type_ir::convert_type;
 use crate::validate::validation_error;
 
 /// Parses a procedural macro invocation into shared declaration IR.
 ///
-/// Returns combined syntax diagnostics when the input target or helper grammar is invalid.
+/// Returns combined syntax diagnostics when the input target or helper grammar
+/// is invalid.
 #[allow(
     dead_code,
     reason = "the staged parse API is exercised directly by unit tests and later expansion tasks"
@@ -41,7 +78,8 @@ pub(crate) fn parse_declaration(
     }
 }
 
-/// Parses and validates one macro invocation while aggregating recoverable diagnostics.
+/// Parses and validates one macro invocation while aggregating recoverable
+/// diagnostics.
 pub(crate) fn parse_and_validate_declaration(
     kind: MacroKind,
     args: TokenStream,
@@ -64,18 +102,15 @@ pub(crate) fn parse_and_validate_declaration(
     }
 }
 
-/// Holds parser diagnostics alongside IR until the validation pipeline completes.
+/// Holds parser diagnostics alongside IR until the validation pipeline
+/// completes.
 struct ParsedPipeline {
     declaration: ParsedDeclaration,
     error: Option<syn::Error>,
 }
 
 /// Runs only the syntax and IR conversion phase for one macro kind.
-fn parse_pipeline(
-    kind: MacroKind,
-    args: TokenStream,
-    input: TokenStream,
-) -> syn::Result<ParsedPipeline> {
+fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
         MacroKind::Trait => parse_trait(args, input),
@@ -121,8 +156,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipe
                 .iter()
                 .enumerate()
                 .map(|(index, variant)| {
-                    let attributes =
-                        parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
+                    let attributes = parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
                     let kind = match variant.fields {
                         Fields::Unit => VariantKindIr::Unit,
                         Fields::Unnamed(_) => VariantKindIr::Tuple,
@@ -165,7 +199,8 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipe
     })
 }
 
-/// Parses a `#[reflect]` trait input and removes nested helpers from retained tokens.
+/// Parses a `#[reflect]` trait input and removes nested helpers from retained
+/// tokens.
 fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     let item: Item = syn::parse2(input)?;
     let Item::Trait(mut item) = item else {
@@ -215,7 +250,8 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipel
     })
 }
 
-/// Parses a `#[reflect_impl]` impl input and removes nested helpers from retained tokens.
+/// Parses a `#[reflect_impl]` impl input and removes nested helpers from
+/// retained tokens.
 fn parse_impl(args: TokenStream, input: TokenStream) -> syn::Result<ParsedPipeline> {
     let item: Item = syn::parse2(input)?;
     let Item::Impl(mut item) = item else {
@@ -295,11 +331,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     name: ty.ident.to_string(),
                     kind: GenericKindIr::Type,
                     bounds: ty.bounds.iter().map(convert_bound).collect(),
-                    default: ty
-                        .default
-                        .as_ref()
-                        .map(convert_type)
-                        .map(GenericDefaultIr::Type),
+                    default: ty.default.as_ref().map(convert_type).map(GenericDefaultIr::Type),
                     const_type: None,
                     declaration: ty.to_token_stream(),
                     span: ty.span(),
@@ -341,9 +373,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                         .iter()
                         .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                         .filter_map(|parameter| match parameter {
-                            GenericParam::Lifetime(lifetime) => {
-                                Some(lifetime.lifetime.to_token_stream().to_string())
-                            }
+                            GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
                             _ => None,
                         })
                         .collect(),
@@ -365,18 +395,10 @@ fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
     match visibility {
         Visibility::Public(_) => VisibilityIr::Public,
         Visibility::Inherited => VisibilityIr::Inherited,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => {
-            VisibilityIr::Crate
-        }
-        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => {
-            VisibilityIr::Super
-        }
-        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => {
-            VisibilityIr::SelfValue
-        }
-        Visibility::Restricted(restricted) => {
-            VisibilityIr::Restricted(convert_path(&restricted.path))
-        }
+        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => VisibilityIr::Crate,
+        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => VisibilityIr::Super,
+        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => VisibilityIr::SelfValue,
+        Visibility::Restricted(restricted) => VisibilityIr::Restricted(convert_path(&restricted.path)),
     }
 }
 
@@ -501,10 +523,7 @@ fn convert_method(
             FnArg::Typed(value) => {
                 let pattern_tokens = value.pat.to_token_stream();
                 let (name, kind) = match value.pat.as_ref() {
-                    Pat::Ident(identifier) => (
-                        Some(identifier.ident.to_string()),
-                        ParameterPatternKindIr::Identifier,
-                    ),
+                    Pat::Ident(identifier) => (Some(identifier.ident.to_string()), ParameterPatternKindIr::Identifier),
                     Pat::Wild(_) => (None, ParameterPatternKindIr::Wildcard),
                     _ => (None, ParameterPatternKindIr::Destructure),
                 };
@@ -533,11 +552,10 @@ fn convert_method(
         is_const: signature.constness.is_some(),
         is_async: signature.asyncness.is_some(),
         is_unsafe: signature.unsafety.is_some(),
-        abi: signature.abi.as_ref().map(|abi| {
-            abi.name
-                .as_ref()
-                .map_or_else(|| "C".to_owned(), syn::LitStr::value)
-        }),
+        abi: signature
+            .abi
+            .as_ref()
+            .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), syn::LitStr::value)),
         is_variadic: signature.variadic.is_some(),
     };
     MethodIr {

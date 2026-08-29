@@ -1,15 +1,26 @@
 //! Expansion of reflected trait declarations and their registration fragments.
 
-use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, ToTokens};
+use proc_macro2::Ident;
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use quote::quote;
 
-use crate::ir::{
-    GenericBoundIr, GenericKindIr, GenericsIr, ParameterPatternKindIr, PathArgumentIr,
-    PathArgumentsIr, ReceiverKindIr, ReturnTypeIr, TraitDeclarationIr, TypeIr, TypeKindIr,
-    WherePredicateIr,
-};
+use crate::ir::GenericBoundIr;
+use crate::ir::GenericKindIr;
+use crate::ir::GenericsIr;
+use crate::ir::ParameterPatternKindIr;
+use crate::ir::PathArgumentIr;
+use crate::ir::PathArgumentsIr;
+use crate::ir::ReceiverKindIr;
+use crate::ir::ReturnTypeIr;
+use crate::ir::TraitDeclarationIr;
+use crate::ir::TypeIr;
+use crate::ir::TypeKindIr;
+use crate::ir::WherePredicateIr;
 
-/// Expands a validated reflected trait without changing its ordinary Rust semantics.
+/// Expands a validated reflected trait without changing its ordinary Rust
+/// semantics.
 pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
     let facade = match facade_path() {
         Some(path) => path,
@@ -19,26 +30,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
     let suffix = format!("{fingerprint:016x}");
     let marker = Ident::new(&format!("__QubitReflectTraitMarker_{suffix}"), declaration.span);
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
-    let generic_factory = Ident::new(
-        &format!("__qubit_reflect_trait_generics_{suffix}"),
-        declaration.span,
-    );
-    let definition_factory = Ident::new(
-        &format!("__qubit_reflect_trait_definition_{suffix}"),
-        declaration.span,
-    );
-    let identity_factory = Ident::new(
-        &format!("__qubit_reflect_trait_identity_{suffix}"),
-        declaration.span,
-    );
+    let generic_factory = Ident::new(&format!("__qubit_reflect_trait_generics_{suffix}"), declaration.span);
+    let definition_factory = Ident::new(&format!("__qubit_reflect_trait_definition_{suffix}"), declaration.span);
+    let identity_factory = Ident::new(&format!("__qubit_reflect_trait_identity_{suffix}"), declaration.span);
     let payload_factory = Ident::new(
         &format!("__qubit_reflect_trait_fragment_payload_{suffix}"),
         declaration.span,
     );
-    let support = Ident::new(
-        &format!("__qubit_reflect_trait_support_{suffix}"),
-        declaration.span,
-    );
+    let support = Ident::new(&format!("__qubit_reflect_trait_support_{suffix}"), declaration.span);
     let rust_path = Ident::new(
         &format!("__QUBIT_REFLECT_TRAIT_PATH_{}", suffix.to_ascii_uppercase()),
         declaration.span,
@@ -56,44 +55,40 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
         crate::ir::VisibilityIr::Public => quote!(#facade::identity::Visibility::Public),
         crate::ir::VisibilityIr::Crate => quote!(#facade::identity::Visibility::Crate),
         crate::ir::VisibilityIr::Super => quote!(#facade::identity::Visibility::Super),
-        crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => quote!(#facade::identity::Visibility::Private),
-        crate::ir::VisibilityIr::Restricted(path) => { let path = syn::LitStr::new(&path.source, declaration.span); quote!(#facade::identity::Visibility::Restricted(#path.into())) },
+        crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
+            quote!(#facade::identity::Visibility::Private)
+        }
+        crate::ir::VisibilityIr::Restricted(path) => {
+            let path = syn::LitStr::new(&path.source, declaration.span);
+            quote!(#facade::identity::Visibility::Restricted(#path.into()))
+        }
     };
-    let direct_supertraits = declaration
-        .supertraits
-        .iter()
-        .filter_map(|bound| match bound {
-            GenericBoundIr::Trait { path, .. } => {
-                if let Some(external) = declaration
-                    .external_traits
-                    .iter()
-                    .find(|external| external.path.source == path.source)
-                {
-                    let id = syn::LitStr::new(&external.id, declaration.span);
-                    let diagnostic_path = syn::LitStr::new(&path.source, declaration.span);
-                    let arguments = path
-                        .segments
-                        .last()
-                        .map(|segment| {
-                            external_supertrait_arguments(
-                                &segment.arguments,
-                                &declaration,
-                                &facade,
-                            )
-                        })
-                        .unwrap_or_default();
-                    Some(quote!(#facade::__private::external_supertrait::<Self>(
-                        #id,
-                        #diagnostic_path,
-                        vec![#(#arguments),*],
-                    )))
-                } else {
-                    let path = &path.tokens;
-                    Some(quote!(<Self as #path>::__qubit_reflect_trait_payload().applied()))
-                }
+    let direct_supertraits = declaration.supertraits.iter().filter_map(|bound| match bound {
+        GenericBoundIr::Trait { path, .. } => {
+            if let Some(external) = declaration
+                .external_traits
+                .iter()
+                .find(|external| external.path.source == path.source)
+            {
+                let id = syn::LitStr::new(&external.id, declaration.span);
+                let diagnostic_path = syn::LitStr::new(&path.source, declaration.span);
+                let arguments = path
+                    .segments
+                    .last()
+                    .map(|segment| external_supertrait_arguments(&segment.arguments, &declaration, &facade))
+                    .unwrap_or_default();
+                Some(quote!(#facade::__private::external_supertrait::<Self>(
+                    #id,
+                    #diagnostic_path,
+                    vec![#(#arguments),*],
+                )))
+            } else {
+                let path = &path.tokens;
+                Some(quote!(<Self as #path>::__qubit_reflect_trait_payload().applied()))
             }
-            _ => None,
-        });
+        }
+        _ => None,
+    });
     let applied_arguments = declaration.generics.params.iter().filter_map(|parameter| {
         if parameter.kind == GenericKindIr::Const {
             let identifier = Ident::new(&parameter.name, declaration.span);
@@ -162,10 +157,18 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
             None => quote!(None),
         };
         let parameters = method.parameters.iter().map(|parameter| {
-            let name = parameter.name.as_deref().map(|name| syn::LitStr::new(name, parameter.span));
-            let name = match name { Some(name) => quote!(Some(#name)), None => quote!(None) };
+            let name = parameter
+                .name
+                .as_deref()
+                .map(|name| syn::LitStr::new(name, parameter.span));
+            let name = match name {
+                Some(name) => quote!(Some(#name)),
+                None => quote!(None),
+            };
             let pattern = match parameter.pattern.kind {
-                ParameterPatternKindIr::Identifier => quote!(#facade::descriptor::ParameterPatternDescriptor::Identifier),
+                ParameterPatternKindIr::Identifier => {
+                    quote!(#facade::descriptor::ParameterPatternDescriptor::Identifier)
+                }
                 ParameterPatternKindIr::Wildcard => quote!(#facade::descriptor::ParameterPatternDescriptor::Wildcard),
                 ParameterPatternKindIr::Destructure => {
                     let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
@@ -173,7 +176,9 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
                 }
             };
             let passing = match &parameter.ty.kind {
-                TypeKindIr::Reference { mutable: true, .. } => quote!(#facade::descriptor::ParameterPassingMode::MutableBorrow),
+                TypeKindIr::Reference { mutable: true, .. } => {
+                    quote!(#facade::descriptor::ParameterPassingMode::MutableBorrow)
+                }
                 TypeKindIr::Reference { .. } => quote!(#facade::descriptor::ParameterPassingMode::SharedBorrow),
                 _ => quote!(#facade::descriptor::ParameterPassingMode::Owned),
             };
@@ -202,7 +207,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
         let is_variadic = qualifiers.is_variadic;
         let has_default = method.has_default;
         let abi = qualifiers.abi.as_deref().map(|abi| syn::LitStr::new(abi, method.span));
-        let abi = match abi { Some(abi) => quote!(Some(#facade::expression::FunctionAbi::Other(#abi.into()))), None => quote!(None) };
+        let abi = match abi {
+            Some(abi) => quote!(Some(#facade::expression::FunctionAbi::Other(#abi.into()))),
+            None => quote!(None),
+        };
         quote! {
             #facade::descriptor::MethodDescriptor::builder(
                 #facade::identity::MemberId::new(
@@ -430,9 +438,11 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
         Ok(item) => item,
         Err(error) => return error.into_compile_error(),
     };
-    if trait_item.items.iter().any(|item| {
-        matches!(item, syn::TraitItem::Fn(function) if function.sig.ident == hook)
-    }) {
+    if trait_item
+        .items
+        .iter()
+        .any(|item| matches!(item, syn::TraitItem::Fn(function) if function.sig.ident == hook))
+    {
         return syn::Error::new(
             declaration.span,
             "`__qubit_reflect_trait_payload` is reserved by #[reflect]",
@@ -553,7 +563,8 @@ fn fingerprint(input: &str) -> u64 {
     })
 }
 
-/// Converts generic declaration facts into the runtime generic descriptor model.
+/// Converts generic declaration facts into the runtime generic descriptor
+/// model.
 pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let parameters = generics.params.iter().map(|parameter| {
         let name = syn::LitStr::new(&parameter.name, parameter.span);
@@ -683,16 +694,24 @@ fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> Toke
     quote!(#facade::expression::LifetimeExpression::Named(#lifetime.into()))
 }
 
-/// Converts the type forms required by trait item descriptors into runtime expressions.
+/// Converts the type forms required by trait item descriptors into runtime
+/// expressions.
 pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => quote!(#facade::expression::TypeExpression::Never),
         TypeKindIr::Path(path) => path_expression(path, ty, facade),
-        TypeKindIr::Reference { lifetime, mutable, element } => {
+        TypeKindIr::Reference {
+            lifetime,
+            mutable,
+            element,
+        } => {
             let target = type_expression(element, facade);
             let lifetime = match lifetime.as_deref() {
                 Some("'static") => quote!(#facade::expression::LifetimeExpression::Static),
-                Some(value) => { let value = syn::LitStr::new(value.trim_start_matches('\''), ty.span); quote!(#facade::expression::LifetimeExpression::Named(#value.into())) },
+                Some(value) => {
+                    let value = syn::LitStr::new(value.trim_start_matches('\''), ty.span);
+                    quote!(#facade::expression::LifetimeExpression::Named(#value.into()))
+                }
                 None => quote!(#facade::expression::LifetimeExpression::Elided),
             };
             quote!(#facade::expression::TypeExpression::Reference(#facade::expression::ReferenceTypeExpression {
@@ -720,12 +739,36 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
                 mutable: #mutable, target: Box::new(#target), diagnostic: #facade::expression::DiagnosticText::default(),
             }))
         }
-        TypeKindIr::BareFunction { lifetimes, inputs, output, is_unsafe, abi, is_variadic } => {
-            let higher_ranked_lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, ty.span, facade));
+        TypeKindIr::BareFunction {
+            lifetimes,
+            inputs,
+            output,
+            is_unsafe,
+            abi,
+            is_variadic,
+        } => {
+            let higher_ranked_lifetimes = lifetimes
+                .iter()
+                .map(|value| lifetime_expression(value, ty.span, facade));
             let parameters = inputs.iter().map(|value| type_expression(value, facade));
-            let return_type = output.as_deref().map(|value| type_expression(value, facade)).unwrap_or_else(|| quote!(#facade::expression::TypeExpression::Tuple(Box::new([]))));
-            let safety = if *is_unsafe { quote!(#facade::expression::FunctionSafety::Unsafe) } else { quote!(#facade::expression::FunctionSafety::Safe) };
-            let abi = match abi.as_deref() { Some("C") => quote!(#facade::expression::FunctionAbi::C), Some("system") => quote!(#facade::expression::FunctionAbi::System), Some(value) => { let value = syn::LitStr::new(value, ty.span); quote!(#facade::expression::FunctionAbi::Other(#value.into())) }, None => quote!(#facade::expression::FunctionAbi::Rust) };
+            let return_type = output
+                .as_deref()
+                .map(|value| type_expression(value, facade))
+                .unwrap_or_else(|| quote!(#facade::expression::TypeExpression::Tuple(Box::new([]))));
+            let safety = if *is_unsafe {
+                quote!(#facade::expression::FunctionSafety::Unsafe)
+            } else {
+                quote!(#facade::expression::FunctionSafety::Safe)
+            };
+            let abi = match abi.as_deref() {
+                Some("C") => quote!(#facade::expression::FunctionAbi::C),
+                Some("system") => quote!(#facade::expression::FunctionAbi::System),
+                Some(value) => {
+                    let value = syn::LitStr::new(value, ty.span);
+                    quote!(#facade::expression::FunctionAbi::Other(#value.into()))
+                }
+                None => quote!(#facade::expression::FunctionAbi::Rust),
+            };
             quote!(#facade::expression::TypeExpression::FunctionPointer(#facade::expression::FunctionPointerExpression {
                 abi: #abi, safety: #safety, variadic: #is_variadic, higher_ranked_lifetimes: Box::new([#(#higher_ranked_lifetimes),*]), parameters: Box::new([#(#parameters),*]), return_type: Box::new(#return_type), diagnostic: #facade::expression::DiagnosticText::default(),
             }))
@@ -762,14 +805,37 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
     }
     if let Some(qualified) = &path.qualified_self {
         let self_type = type_expression(&qualified.ty, facade);
-        let item = path.segments.last().map(|segment| syn::LitStr::new(&segment.name, ty.span)).expect("qualified path has an item");
-        let arguments = path.segments.last().map(|segment| path_arguments(&segment.arguments, facade, ty.span)).unwrap_or_default();
-        let trait_segments = path.segments.iter().take(qualified.position).map(|segment| syn::LitStr::new(&segment.name, ty.span));
-        let trait_path = if qualified.has_as { quote!(Some(Box::new(#facade::expression::TypeExpression::Concrete(#facade::expression::ConcreteTypeExpression { path: Box::new([#(#trait_segments.into()),*]), arguments: Box::new([]), diagnostic: #facade::expression::DiagnosticText::default() })))) } else { quote!(None) };
+        let item = path
+            .segments
+            .last()
+            .map(|segment| syn::LitStr::new(&segment.name, ty.span))
+            .expect("qualified path has an item");
+        let arguments = path
+            .segments
+            .last()
+            .map(|segment| path_arguments(&segment.arguments, facade, ty.span))
+            .unwrap_or_default();
+        let trait_segments = path
+            .segments
+            .iter()
+            .take(qualified.position)
+            .map(|segment| syn::LitStr::new(&segment.name, ty.span));
+        let trait_path = if qualified.has_as {
+            quote!(Some(Box::new(#facade::expression::TypeExpression::Concrete(#facade::expression::ConcreteTypeExpression { path: Box::new([#(#trait_segments.into()),*]), arguments: Box::new([]), diagnostic: #facade::expression::DiagnosticText::default() }))))
+        } else {
+            quote!(None)
+        };
         return quote!(#facade::expression::TypeExpression::Associated(#facade::expression::AssociatedTypeExpression { self_type: Box::new(#self_type), trait_path: #trait_path, item: #item.into(), arguments: Box::new([#(#arguments),*]), diagnostic: #facade::expression::DiagnosticText::from(#diagnostic) }));
     }
-    let segments = path.segments.iter().map(|segment| syn::LitStr::new(&segment.name, ty.span));
-    let arguments = path.segments.last().map(|segment| path_arguments(&segment.arguments, facade, ty.span)).unwrap_or_default();
+    let segments = path
+        .segments
+        .iter()
+        .map(|segment| syn::LitStr::new(&segment.name, ty.span));
+    let arguments = path
+        .segments
+        .last()
+        .map(|segment| path_arguments(&segment.arguments, facade, ty.span))
+        .unwrap_or_default();
     quote!(#facade::expression::TypeExpression::Concrete(#facade::expression::ConcreteTypeExpression { path: Box::new([#(#segments.into()),*]), arguments: Box::new([#(#arguments),*]), diagnostic: #facade::expression::DiagnosticText::from(#diagnostic) }))
 }
 
@@ -791,7 +857,8 @@ fn path_arguments(arguments: &PathArgumentsIr, facade: &TokenStream, span: Span)
     }
 }
 
-/// Materializes direct external-supertrait arguments at the trait hook's concrete instance.
+/// Materializes direct external-supertrait arguments at the trait hook's
+/// concrete instance.
 fn external_supertrait_arguments(
     arguments: &PathArgumentsIr,
     declaration: &TraitDeclarationIr,
@@ -808,9 +875,11 @@ fn external_supertrait_arguments(
                 ..
             }) if path.segments.len() == 1 => {
                 let name = &path.segments[0].name;
-                let parameter = declaration.generics.params.iter().find(|parameter| {
-                    parameter.kind == GenericKindIr::Type && parameter.name == *name
-                })?;
+                let parameter = declaration
+                    .generics
+                    .params
+                    .iter()
+                    .find(|parameter| parameter.kind == GenericKindIr::Type && parameter.name == *name)?;
                 let identifier = Ident::new(&parameter.name, parameter.span);
                 Some(quote!(#facade::expression::GenericArgument::Type(
                     #facade::expression::TypeExpression::Concrete(
@@ -841,13 +910,41 @@ fn bound_predicates(bounds: &[GenericBoundIr], facade: &TokenStream, span: Span)
 
 fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
-    if let Ok(value) = syn::parse2::<syn::Lit>(value.clone()) { match value { syn::Lit::Bool(value) => { let value = value.value; return quote!(#facade::expression::ConstExpression::Boolean(#value)); }, syn::Lit::Char(value) => { let value = value.value(); return quote!(#facade::expression::ConstExpression::Character(#value)); }, syn::Lit::Int(value) => { if let Ok(value) = value.base10_parse::<u128>() { return quote!(#facade::expression::ConstExpression::UnsignedInteger(#value)); } }, _ => {} } }
-    if let Ok(syn::Expr::Unary(value)) = syn::parse2::<syn::Expr>(value.clone()) && matches!(value.op, syn::UnOp::Neg(_)) && let syn::Expr::Lit(literal) = *value.expr && let syn::Lit::Int(value) = literal.lit && let Ok(value) = value.base10_parse::<i128>() { let value = -value; return quote!(#facade::expression::ConstExpression::SignedInteger(#value)); }
+    if let Ok(value) = syn::parse2::<syn::Lit>(value.clone()) {
+        match value {
+            syn::Lit::Bool(value) => {
+                let value = value.value;
+                return quote!(#facade::expression::ConstExpression::Boolean(#value));
+            }
+            syn::Lit::Char(value) => {
+                let value = value.value();
+                return quote!(#facade::expression::ConstExpression::Character(#value));
+            }
+            syn::Lit::Int(value) => {
+                if let Ok(value) = value.base10_parse::<u128>() {
+                    return quote!(#facade::expression::ConstExpression::UnsignedInteger(#value));
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Ok(syn::Expr::Unary(value)) = syn::parse2::<syn::Expr>(value.clone())
+        && matches!(value.op, syn::UnOp::Neg(_))
+        && let syn::Expr::Lit(literal) = *value.expr
+        && let syn::Lit::Int(value) = literal.lit
+        && let Ok(value) = value.base10_parse::<i128>()
+    {
+        let value = -value;
+        return quote!(#facade::expression::ConstExpression::SignedInteger(#value));
+    }
     let source = syn::LitStr::new(&source, Span::call_site());
-    quote!(compile_error!(concat!("unsupported const expression in #[reflect] trait: ", #source)))
+    quote!(compile_error!(
+        concat!("unsupported const expression in #[reflect] trait: ", #source)
+    ))
 }
 
-/// Converts the literal const-default subset that has a structural runtime representation.
+/// Converts the literal const-default subset that has a structural runtime
+/// representation.
 fn const_expression(value: &TokenStream, facade: &TokenStream) -> TokenStream {
     let expression = syn::parse2::<syn::Expr>(value.clone());
     let expression = match expression {
@@ -868,26 +965,21 @@ fn const_expression(value: &TokenStream, facade: &TokenStream) -> TokenStream {
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        syn::Expr::Unary(expression) if matches!(expression.op, syn::UnOp::Neg(_)) => {
-            match expression.expr.as_ref() {
-                syn::Expr::Lit(expression) => match &expression.lit {
-                    syn::Lit::Int(value) => integer_const_expression(value, true, facade)
-                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
-                    _ => unsupported_const_default(value),
-                },
+        syn::Expr::Unary(expression) if matches!(expression.op, syn::UnOp::Neg(_)) => match expression.expr.as_ref() {
+            syn::Expr::Lit(expression) => match &expression.lit {
+                syn::Lit::Int(value) => integer_const_expression(value, true, facade)
+                    .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
                 _ => unsupported_const_default(value),
-            }
-        }
+            },
+            _ => unsupported_const_default(value),
+        },
         _ => unsupported_const_default(value),
     }
 }
 
-/// Converts an integer literal without relying on its whitespace-normalized token rendering.
-fn integer_const_expression(
-    value: &syn::LitInt,
-    negative: bool,
-    facade: &TokenStream,
-) -> Option<TokenStream> {
+/// Converts an integer literal without relying on its whitespace-normalized
+/// token rendering.
+fn integer_const_expression(value: &syn::LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
@@ -900,10 +992,13 @@ fn integer_const_expression(
     }
 }
 
-/// Emits a deterministic compile error for const defaults without a runtime structural value.
+/// Emits a deterministic compile error for const defaults without a runtime
+/// structural value.
 fn unsupported_const_default(value: impl quote::ToTokens) -> TokenStream {
     let source = syn::LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
-    quote!(compile_error!(concat!("unsupported non-literal const default in #[reflect] trait: ", #source)))
+    quote!(compile_error!(
+        concat!("unsupported non-literal const default in #[reflect] trait: ", #source)
+    ))
 }
 
 #[cfg(test)]
@@ -913,7 +1008,8 @@ mod tests {
 
     use super::const_expression;
 
-    /// Verifies that literals retain their structural value rather than their token spelling.
+    /// Verifies that literals retain their structural value rather than their
+    /// token spelling.
     #[test]
     fn test_const_default_accepts_signed_suffixed_and_escaped_literals() {
         let facade = quote!(qubit_reflect);
@@ -929,7 +1025,8 @@ mod tests {
         assert!(escaped.contains("'\\n'"));
     }
 
-    /// Verifies that symbolic defaults fail explicitly instead of becoming symbolic values.
+    /// Verifies that symbolic defaults fail explicitly instead of becoming
+    /// symbolic values.
     #[test]
     fn test_const_default_rejects_non_literal_expression() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);

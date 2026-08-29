@@ -1,6 +1,7 @@
 //! `syn`-independent type and path representation.
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
 
 use crate::ir::GenericBoundIr;
 
@@ -45,18 +46,9 @@ pub(crate) enum PathArgumentIr {
     Lifetime(String),
     Type(TypeIr),
     Const(TokenStream),
-    AssociatedType {
-        name: String,
-        ty: TypeIr,
-    },
-    AssociatedConst {
-        name: String,
-        value: TokenStream,
-    },
-    Constraint {
-        name: String,
-        bounds: Vec<GenericBoundIr>,
-    },
+    AssociatedType { name: String, ty: TypeIr },
+    AssociatedConst { name: String, value: TokenStream },
+    Constraint { name: String, bounds: Vec<GenericBoundIr> },
     Other(TokenStream),
 }
 
