@@ -3,7 +3,7 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
-use crate::descriptor::{TraitDefinitionDescriptor, TraitId, TypeDescriptor};
+use crate::descriptor::{ImplDescriptor, TraitDefinitionDescriptor, TraitId, TypeDescriptor};
 use crate::error::RegistryError;
 use crate::registry::builder::{build_inventory_registry, initialize_cached};
 use crate::registry::indexes::RegistryIndexes;
@@ -147,6 +147,18 @@ impl ReflectRegistry {
     /// Enumerates all statically registered roots in stable fragment order.
     pub fn types(&self) -> &[&'static TypeDescriptor] {
         &self.types
+    }
+
+    /// Returns every reflected implementation targeting `type_id`.
+    ///
+    /// The slice is empty when no linked implementation fragment targets the
+    /// exact root. Its order is the registry's stable fragment order, so a
+    /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
+    pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
+        self.indexes
+            .impls_by_target
+            .get(&type_id)
+            .map_or(&[], Box::as_ref)
     }
 
     /// Finds a reflected or external trait declaration by its process-local identity.

@@ -251,13 +251,47 @@ pub enum InvocationUnavailableReason {
 #[derive(Clone, Copy, Debug)]
 pub struct InvocationAdapter {
     entry_point: fn(),
+    local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
+    thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
 }
 
 impl InvocationAdapter {
     /// Creates an opaque adapter token for generated descriptor data.
     #[doc(hidden)]
     pub const fn new(entry_point: fn()) -> Self {
-        Self { entry_point }
+        Self {
+            entry_point,
+            local: None,
+            thread_safe: None,
+        }
+    }
+
+    /// Creates a descriptor for one callable local invocation entry point.
+    ///
+    /// The generated function is higher-ranked over the invocation lifetime,
+    /// so it cannot extend erased input borrows beyond one invocation.
+    #[doc(hidden)]
+    pub const fn local(entry_point: crate::invoke::InvocationAdapter<crate::value::Local>) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: Some(entry_point),
+            thread_safe: None,
+        }
+    }
+
+    /// Creates a descriptor for one callable thread-safe invocation entry point.
+    ///
+    /// The entry point's type preserves both the call lifetime and the runtime
+    /// `Send` boundary required by [`ThreadSafe`](crate::value::ThreadSafe).
+    #[doc(hidden)]
+    pub const fn thread_safe(
+        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: None,
+            thread_safe: Some(entry_point),
+        }
     }
 
     /// Returns the opaque entry-point identity.
@@ -265,7 +299,42 @@ impl InvocationAdapter {
     pub const fn entry_point(&self) -> fn() {
         self.entry_point
     }
+
+    /// Invokes the local generated entry point when this descriptor has one.
+    ///
+    /// Returns `None` for legacy descriptor-only entries and for adapters that
+    /// are available exclusively in another invocation mode.
+    pub fn invoke_local<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::InvocationFailure<'call, crate::value::Local>,
+        >,
+    > {
+        self.local.map(|entry_point| entry_point(invocation))
+    }
+
+    /// Invokes the thread-safe generated entry point when this descriptor has one.
+    ///
+    /// Returns `None` when this method was not explicitly generated with a
+    /// thread-safe adapter.
+    pub fn invoke_thread_safe<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::ThreadSafe>,
+            crate::invoke::InvocationFailure<'call, crate::value::ThreadSafe>,
+        >,
+    > {
+        self.thread_safe.map(|entry_point| entry_point(invocation))
+    }
 }
+
+/// Serves as a stable opaque token for adapters whose real entry point is typed.
+fn unavailable_entry_point() {}
 
 /// An immutable reflected method declaration.
 #[derive(Clone, Debug)]
