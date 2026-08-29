@@ -6,7 +6,7 @@ mod lifetime_expression;
 mod predicate;
 mod type_expression;
 
-pub use generic_argument::{ConstExpression, GenericArgument};
+pub use generic_argument::{ConstExpression, ConstGenericArgument, GenericArgument};
 pub use generic_definition::{GenericDefinitionDescriptor, GenericParameterDescriptor};
 pub use lifetime_expression::LifetimeExpression;
 pub use predicate::PredicateDescriptor;

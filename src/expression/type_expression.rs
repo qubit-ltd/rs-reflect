@@ -2,28 +2,35 @@
 
 use std::hash::{Hash, Hasher};
 
-use crate::expression::{ConstExpression, GenericArgument, LifetimeExpression, PredicateDescriptor};
+use crate::expression::{
+    ConstExpression, GenericArgument, LifetimeExpression, PredicateDescriptor,
+};
 
-/// Source-oriented text that supplements diagnostics without changing descriptor identity.
+macro_rules! impl_identity_without_diagnostic {
+    ($type:ty { $first:ident $(, $field:ident)* $(,)? }) => {
+        impl PartialEq for $type {
+            fn eq(&self, other: &Self) -> bool {
+                self.$first == other.$first $(&& self.$field == other.$field)*
+            }
+        }
+
+        impl Eq for $type {}
+
+        impl Hash for $type {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                self.$first.hash(state);
+                $(self.$field.hash(state);)*
+            }
+        }
+    };
+}
+
+/// Source-oriented text that supplements diagnostics.
 ///
-/// Equality and hashing deliberately ignore the text so equivalent structural expressions have
-/// the same identity regardless of formatting, aliases, or parser source spans.
-#[derive(Clone, Debug, Default)]
+/// This value has ordinary text equality and hashing. Descriptor implementations deliberately
+/// exclude diagnostic fields from their structural identity.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DiagnosticText(pub Option<Box<str>>);
-
-impl PartialEq for DiagnosticText {
-    /// Compares diagnostic annotations without making them part of structural identity.
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
-impl Eq for DiagnosticText {}
-
-impl Hash for DiagnosticText {
-    /// Omits diagnostic annotations from structural hashes.
-    fn hash<H: Hasher>(&self, _state: &mut H) {}
-}
 
 impl From<&str> for DiagnosticText {
     fn from(value: &str) -> Self {
@@ -69,7 +76,7 @@ pub enum TypeExpression {
 }
 
 /// A concrete type path and its final-segment generic arguments.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ConcreteTypeExpression {
     /// Path segments in declaration order, for example `std`, `vec`, and `Vec`.
     pub path: Box<[Box<str>]>,
@@ -79,24 +86,36 @@ pub struct ConcreteTypeExpression {
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(ConcreteTypeExpression { path, arguments });
+
 /// An associated type projection.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct AssociatedTypeExpression {
-    /// The type or trait-qualified base of the projection.
-    pub base: Box<TypeExpression>,
-    /// The associated type name.
-    pub name: Box<str>,
+    /// The self type whose associated item is projected.
+    pub self_type: Box<TypeExpression>,
+    /// The optional qualifying trait path from an `as Trait` clause.
+    pub trait_path: Option<Box<TypeExpression>>,
+    /// The associated item name.
+    pub item: Box<str>,
     /// Generic arguments applied to the associated type.
     pub arguments: Box<[GenericArgument]>,
     /// Optional source-oriented diagnostic text excluded from identity.
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(AssociatedTypeExpression {
+    self_type,
+    trait_path,
+    item,
+    arguments
+});
+
 /// A shared or mutable reference type.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ReferenceTypeExpression {
-    /// An explicit lifetime, or `None` when the lifetime is elided.
-    pub lifetime: Option<LifetimeExpression>,
+    /// The reference lifetime, including [`LifetimeExpression::Elided`] when
+    /// omitted.
+    pub lifetime: LifetimeExpression,
     /// Whether this is a mutable reference.
     pub mutable: bool,
     /// The referenced type.
@@ -105,8 +124,14 @@ pub struct ReferenceTypeExpression {
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(ReferenceTypeExpression {
+    lifetime,
+    mutable,
+    target
+});
+
 /// A const or mutable raw pointer type.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct RawPointerTypeExpression {
     /// Whether this is a mutable raw pointer.
     pub mutable: bool,
@@ -116,8 +141,10 @@ pub struct RawPointerTypeExpression {
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(RawPointerTypeExpression { mutable, target });
+
 /// An array type and its structural length expression.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ArrayTypeExpression {
     /// The repeated element type.
     pub element: Box<TypeExpression>,
@@ -126,6 +153,8 @@ pub struct ArrayTypeExpression {
     /// Optional source-oriented diagnostic text excluded from identity.
     pub diagnostic: DiagnosticText,
 }
+
+impl_identity_without_diagnostic!(ArrayTypeExpression { element, length });
 
 /// A function pointer's calling convention.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -150,7 +179,7 @@ pub enum FunctionSafety {
 }
 
 /// A function pointer signature.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct FunctionPointerExpression {
     /// The function's ABI.
     pub abi: FunctionAbi,
@@ -168,8 +197,17 @@ pub struct FunctionPointerExpression {
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(FunctionPointerExpression {
+    abi,
+    safety,
+    variadic,
+    higher_ranked_lifetimes,
+    parameters,
+    return_type
+});
+
 /// A `dyn Trait` object and the predicates it must satisfy.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct TraitObjectExpression {
     /// Trait and lifetime predicates in declaration order.
     pub bounds: Box<[PredicateDescriptor]>,
@@ -177,11 +215,15 @@ pub struct TraitObjectExpression {
     pub diagnostic: DiagnosticText,
 }
 
+impl_identity_without_diagnostic!(TraitObjectExpression { bounds });
+
 /// An `impl Trait` opaque type and the predicates it must satisfy.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct OpaqueTypeExpression {
     /// Trait and lifetime predicates in declaration order.
     pub bounds: Box<[PredicateDescriptor]>,
     /// Optional source-oriented diagnostic text excluded from identity.
     pub diagnostic: DiagnosticText,
 }
+
+impl_identity_without_diagnostic!(OpaqueTypeExpression { bounds });
