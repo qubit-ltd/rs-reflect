@@ -39,6 +39,188 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     let column = location.column as u32;
     let module = format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
     let target_source = declaration.target_type.source;
+    let invocation_adapter_definitions = declaration
+        .methods
+        .iter()
+        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .enumerate()
+        .filter_map(|(index, method)| {
+            let supported_receiver = matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                None
+                    | Some(ReceiverKindIr::Value)
+                    | Some(ReceiverKindIr::SharedReference)
+                    | Some(ReceiverKindIr::MutableReference)
+            );
+            let is_safe_associated = !has_trait
+                && supported_receiver
+                && method.parameters.is_empty()
+                && method.generics.params.is_empty()
+                && !method.qualifiers.is_unsafe
+                && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
+                && matches!(
+                    method.return_type,
+                    ReturnTypeIr::Unit
+                        | ReturnTypeIr::Type(crate::ir::TypeIr {
+                            kind: TypeKindIr::Path(_),
+                            ..
+                        })
+                );
+            if !is_safe_associated {
+                return None;
+            }
+            let method_name = &method.name;
+            let adapter_name = format_ident!("__qubit_reflect_invoke_{index}");
+            let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+            let receiver_expectation = if matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                Some(ReceiverKindIr::Value)
+            ) {
+                quote!(#facade::invoke::ReceiverExpectation::owned::<#target>())
+            } else if matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                Some(ReceiverKindIr::MutableReference)
+            ) {
+                quote!(#facade::invoke::ReceiverExpectation::borrowed_mut::<#target>())
+            } else if method.receiver.is_some() {
+                quote!(#facade::invoke::ReceiverExpectation::borrowed::<#target>())
+            } else {
+                quote!(#facade::invoke::ReceiverExpectation::none())
+            };
+            let receiver_binding = if matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                Some(ReceiverKindIr::Value)
+            ) {
+                quote! {
+                    let (receiver, _arguments) = validated.into_parts();
+                    let receiver: #target = match receiver {
+                        Some(#facade::invoke::InvocationReceiver::Owned(value)) =>
+                            #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#target>(value)
+                                .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
+                        _ => unreachable!("validation checked receiver mode"),
+                    };
+                }
+            } else if matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                Some(ReceiverKindIr::MutableReference)
+            ) {
+                quote! {
+                    let (receiver, _arguments) = validated.into_parts();
+                    let receiver: &mut #target = match receiver {
+                        Some(#facade::invoke::InvocationReceiver::Mut(value)) =>
+                            #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#target>(value)
+                                .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
+                        _ => unreachable!("validation checked receiver mode"),
+                    };
+                }
+            } else if method.receiver.is_some() {
+                quote! {
+                    let (receiver, _arguments) = validated.into_parts();
+                    let receiver: &#target = match receiver {
+                        Some(#facade::invoke::InvocationReceiver::Ref(value)) =>
+                            #facade::value::DynamicRef::<#facade::value::Local>::downcast::<#target>(value)
+                                .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
+                        Some(#facade::invoke::InvocationReceiver::Mut(value)) => {
+                            let value = #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#target>(value)
+                                .unwrap_or_else(|_| unreachable!("validation checked receiver type"));
+                            &*value
+                        }
+                        _ => unreachable!("validation checked receiver mode"),
+                    };
+                }
+            } else {
+                quote! { let _validated = validated; }
+            };
+            let output = match method.return_type {
+                ReturnTypeIr::Unit => quote! {
+                    #receiver_binding
+                    <#target>::#method_name(receiver);
+                    #facade::invoke::InvocationOutput::Unit
+                },
+                ReturnTypeIr::Type(_) => quote! {
+                    #receiver_binding
+                    #facade::invoke::InvocationOutput::Owned(
+                        #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                            <#target>::#method_name(receiver),
+                        ),
+                    )
+                },
+            };
+            let output = if method.receiver.is_some() {
+                output
+            } else {
+                match method.return_type {
+                    ReturnTypeIr::Unit => quote! {
+                        let _validated = validated;
+                        <#target>::#method_name();
+                        #facade::invoke::InvocationOutput::Unit
+                    },
+                    ReturnTypeIr::Type(_) => quote! {
+                        let _validated = validated;
+                        #facade::invoke::InvocationOutput::Owned(
+                            #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                                <#target>::#method_name(),
+                            ),
+                        )
+                    },
+                }
+            };
+            Some(quote! {
+                fn #adapter_name<'call>(
+                    invocation: #facade::invoke::Invocation<'call, #facade::value::Local>,
+                ) -> ::core::result::Result<
+                    #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
+                    #facade::invoke::InvocationFailure<'call, #facade::value::Local>,
+                > {
+                    let identity = #facade::identity::MemberId::new(
+                        #target_source, "method", #index, fragment_identity(),
+                    );
+                    let validated = invocation.validate(
+                        &identity,
+                        #receiver_expectation,
+                        &[],
+                    )?;
+                    Ok({ #output })
+                }
+
+                static #descriptor_name: #facade::descriptor::InvocationAdapter =
+                    #facade::descriptor::InvocationAdapter::local(#adapter_name);
+            })
+        });
+    let invocation_adapter_entries = declaration
+        .methods
+        .iter()
+        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .enumerate()
+        .map(|(index, method)| {
+            let supported_receiver = matches!(
+                method.receiver.as_ref().map(|receiver| receiver.kind),
+                None
+                    | Some(ReceiverKindIr::Value)
+                    | Some(ReceiverKindIr::SharedReference)
+                    | Some(ReceiverKindIr::MutableReference)
+            );
+            let is_safe_associated = !has_trait
+                && supported_receiver
+                && method.parameters.is_empty()
+                && method.generics.params.is_empty()
+                && !method.qualifiers.is_unsafe
+                && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
+                && matches!(
+                    method.return_type,
+                    ReturnTypeIr::Unit
+                        | ReturnTypeIr::Type(crate::ir::TypeIr {
+                            kind: TypeKindIr::Path(_),
+                            ..
+                        })
+                );
+            if is_safe_associated {
+                let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+                quote!(Some(&#descriptor_name))
+            } else {
+                quote!(None)
+            }
+        });
     let method_entries = declaration
         .methods
         .iter()
@@ -319,6 +501,8 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
         mod #module {
             use super::*;
 
+            #(#invocation_adapter_definitions)*
+
             fn fragment_identity() -> #facade::identity::FragmentIdentity {
                 #facade::identity::FragmentIdentity::new(
                     env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
@@ -393,15 +577,24 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             }
                         }).collect()
                     } else {
-                        methods.iter().map(|method| {
+                        let adapters: &[Option<&'static #facade::descriptor::InvocationAdapter>] =
+                            &[#(#invocation_adapter_entries),*];
+                        methods.iter().zip(adapters.iter().copied()).map(|(method, adapter)| {
+                            let unavailable_reasons: ::std::boxed::Box<[
+                                #facade::descriptor::InvocationUnavailableReason
+                            ]> = if adapter.is_some() {
+                                ::std::vec![] .into_boxed_slice()
+                            } else {
+                                ::std::vec![
+                                    #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy,
+                                ].into_boxed_slice()
+                            };
                             #facade::descriptor::MethodInstanceDescriptor::new(
                                 method,
                                 None,
                                 #facade::descriptor::MethodImplementationSource::Declared,
-                                None,
-                                ::std::boxed::Box::new([
-                                    #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy,
-                                ]),
+                                adapter,
+                                unavailable_reasons,
                             ).expect("generated inherent method instance is consistent")
                         }).collect()
                     };
