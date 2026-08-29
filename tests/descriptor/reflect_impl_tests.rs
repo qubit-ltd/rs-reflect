@@ -67,6 +67,14 @@ impl Sample {
     fn reflected_shared(&self) -> u8 {
         19
     }
+
+    fn reflected_borrowed_path(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed("borrowed")
+    }
+
+    extern "C" fn reflected_c_abi() -> u8 {
+        29
+    }
 }
 
 struct Counter(u8);
@@ -190,6 +198,25 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 23);
+}
+
+#[test]
+fn test_reflect_impl_does_not_generate_adapter_for_non_rust_abi() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let qubit_reflect::descriptor::MethodLookup::Unique(instance) =
+        qubit_reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            MethodQualifier::Inherent,
+            "reflected_c_abi",
+        )
+    else {
+        panic!("non-Rust ABI method instance must remain describable");
+    };
+    assert!(instance.adapter().is_none());
+    assert!(instance
+        .unavailable_reasons()
+        .contains(&qubit_reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi));
 }
 
 #[test]

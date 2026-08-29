@@ -4,8 +4,8 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::ir::{
-    HelperName, HelperValueIr, ImplDeclarationIr, ParameterPatternKindIr, ReceiverKindIr,
-    ReturnTypeIr, TypeKindIr, VisibilityIr,
+    HelperName, HelperValueIr, ImplDeclarationIr, ParameterPatternKindIr, PathArgumentIr,
+    PathArgumentsIr, ReceiverKindIr, ReturnTypeIr, TypeIr, TypeKindIr, VisibilityIr,
 };
 
 /// Expands an impl unchanged and submits a lazily-built implementation fragment.
@@ -57,6 +57,9 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && method.parameters.is_empty()
                 && method.generics.params.is_empty()
                 && !method.qualifiers.is_unsafe
+                && method.qualifiers.abi.is_none()
+                && !method.qualifiers.is_variadic
+                && !return_contains_non_static_lifetime(&method.return_type)
                 && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
                 && matches!(
                     method.return_type,
@@ -205,6 +208,9 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && method.parameters.is_empty()
                 && method.generics.params.is_empty()
                 && !method.qualifiers.is_unsafe
+                && method.qualifiers.abi.is_none()
+                && !method.qualifiers.is_variadic
+                && !return_contains_non_static_lifetime(&method.return_type)
                 && !method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
                 && matches!(
                     method.return_type,
@@ -585,9 +591,18 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             ]> = if adapter.is_some() {
                                 ::std::vec![] .into_boxed_slice()
                             } else {
-                                ::std::vec![
-                                    #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy,
-                                ].into_boxed_slice()
+                                let reason = if method.qualifiers().is_unsafe {
+                                    #facade::descriptor::InvocationUnavailableReason::UnsafeMethod
+                                } else if method.qualifiers().abi.is_some() {
+                                    #facade::descriptor::InvocationUnavailableReason::UnsupportedAbi
+                                } else if method.qualifiers().is_variadic {
+                                    #facade::descriptor::InvocationUnavailableReason::Variadic
+                                } else if !method.generic_definition().parameters.is_empty() {
+                                    #facade::descriptor::InvocationUnavailableReason::UnspecializedGeneric
+                                } else {
+                                    #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy
+                                };
+                                ::std::vec![reason].into_boxed_slice()
                             };
                             #facade::descriptor::MethodInstanceDescriptor::new(
                                 method,
@@ -644,4 +659,45 @@ fn fingerprint(value: &str) -> u64 {
     value.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
     })
+}
+
+/// Returns whether a return declaration carries a borrow that cannot cross the
+/// owned dynamic-value boundary.
+fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
+    matches!(return_type, ReturnTypeIr::Type(ty) if type_contains_non_static_lifetime(ty))
+}
+
+/// Recursively detects path arguments whose lifetime is not explicitly static.
+fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
+    match &ty.kind {
+        TypeKindIr::Path(path) => {
+            path.qualified_self
+                .as_ref()
+                .is_some_and(|qualified| type_contains_non_static_lifetime(&qualified.ty))
+                || path.segments.iter().any(|segment| match &segment.arguments {
+                    PathArgumentsIr::None => false,
+                    PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Lifetime(lifetime) => lifetime != "'static",
+                        PathArgumentIr::Type(ty) => type_contains_non_static_lifetime(ty),
+                        PathArgumentIr::AssociatedType { ty, .. } => type_contains_non_static_lifetime(ty),
+                        PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } | PathArgumentIr::Constraint { .. } | PathArgumentIr::Other(_) => false,
+                    }),
+                    PathArgumentsIr::Parenthesized { inputs, output } => {
+                        inputs.iter().any(type_contains_non_static_lifetime)
+                            || output.as_deref().is_some_and(type_contains_non_static_lifetime)
+                    }
+                })
+        }
+        TypeKindIr::Reference { .. } => true,
+        TypeKindIr::Tuple(items) => items.iter().any(type_contains_non_static_lifetime),
+        TypeKindIr::Slice(element) | TypeKindIr::Array { element, .. } | TypeKindIr::Pointer { element, .. } => {
+            type_contains_non_static_lifetime(element)
+        }
+        TypeKindIr::BareFunction { lifetimes, inputs, output, .. } => {
+            lifetimes.iter().any(|lifetime| lifetime != "'static")
+                || inputs.iter().any(type_contains_non_static_lifetime)
+                || output.as_deref().is_some_and(type_contains_non_static_lifetime)
+        }
+        TypeKindIr::TraitObject { .. } | TypeKindIr::ImplTrait { .. } | TypeKindIr::Never | TypeKindIr::Infer | TypeKindIr::Macro | TypeKindIr::Other => false,
+    }
 }
