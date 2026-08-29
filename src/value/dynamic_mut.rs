@@ -65,6 +65,30 @@ impl<'a> DynamicMut<'a, Local> {
             .and_then(|value| value.downcast_mut::<T>())
     }
 
+    /// Consumes this wrapper and returns the original mutable borrow when its
+    /// exact type is `T`.
+    ///
+    /// Unlike [`Self::downcast_mut`], the returned reference retains the
+    /// wrapper's original `'a` lifetime. A mismatch, including the dedicated
+    /// `str` variant, returns the untouched wrapper so its exclusive borrow is
+    /// not lost.
+    pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            LocalMutStorage::Any(value) if value.is::<T>() => Ok(value
+                .downcast_mut::<T>()
+                .expect("the exact type ID was checked")),
+            LocalMutStorage::Any(value) => Err(Self {
+                storage: LocalMutStorage::Any(value),
+                marker,
+            }),
+            LocalMutStorage::Str(value) => Err(Self {
+                storage: LocalMutStorage::Str(value),
+                marker,
+            }),
+        }
+    }
+
     /// Returns this value through its local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
@@ -146,6 +170,29 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut()
             .and_then(|value| value.downcast_mut::<T>())
+    }
+
+    /// Consumes this wrapper and returns the original thread-safe mutable borrow
+    /// when its exact type is `T`.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// A mismatch, including the dedicated `str` variant, returns the untouched
+    /// thread-safe wrapper and preserves its `Send + Sync` erased boundary.
+    pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            ThreadSafeMutStorage::Any(value) if value.is::<T>() => Ok(value
+                .downcast_mut::<T>()
+                .expect("the exact type ID was checked")),
+            ThreadSafeMutStorage::Any(value) => Err(Self {
+                storage: ThreadSafeMutStorage::Any(value),
+                marker,
+            }),
+            ThreadSafeMutStorage::Str(value) => Err(Self {
+                storage: ThreadSafeMutStorage::Str(value),
+                marker,
+            }),
+        }
     }
 
     /// Returns this value through its thread-safe `Any` boundary.

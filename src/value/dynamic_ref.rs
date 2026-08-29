@@ -59,6 +59,29 @@ impl<'a> DynamicRef<'a, Local> {
             .and_then(|value| (value as &dyn Any).downcast_ref::<T>())
     }
 
+    /// Consumes this wrapper and returns the original shared borrow when its
+    /// exact type is `T`.
+    ///
+    /// Unlike [`Self::downcast_ref`], the returned reference retains the
+    /// wrapper's original `'a` lifetime. A mismatch, including the dedicated
+    /// `str` variant, returns the untouched wrapper so its borrow is not lost.
+    pub fn downcast<T: 'static>(self) -> Result<&'a T, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            LocalRefStorage::Any(value) if value.is::<T>() => Ok(value
+                .downcast_ref::<T>()
+                .expect("the exact type ID was checked")),
+            LocalRefStorage::Any(value) => Err(Self {
+                storage: LocalRefStorage::Any(value),
+                marker,
+            }),
+            LocalRefStorage::Str(value) => Err(Self {
+                storage: LocalRefStorage::Str(value),
+                marker,
+            }),
+        }
+    }
+
     /// Returns this value through its local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
@@ -114,6 +137,30 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any()
             .and_then(|value| (value as &dyn Any).downcast_ref::<T>())
+    }
+
+    /// Consumes this wrapper and returns the original thread-safe shared borrow
+    /// when its exact type is `T`.
+    ///
+    /// The returned reference retains the wrapper's original `'a` lifetime.
+    /// A mismatch, including the dedicated `str` variant, returns the untouched
+    /// thread-safe wrapper and preserves its `Sync` erased boundary.
+    pub fn downcast<T: 'static>(self) -> Result<&'a T, Self> {
+        let Self { storage, marker } = self;
+        match storage {
+            ThreadSafeRefStorage::Any(value) if (value as &dyn Any).is::<T>() => Ok((value
+                as &dyn Any)
+                .downcast_ref::<T>()
+                .expect("the exact type ID was checked")),
+            ThreadSafeRefStorage::Any(value) => Err(Self {
+                storage: ThreadSafeRefStorage::Any(value),
+                marker,
+            }),
+            ThreadSafeRefStorage::Str(value) => Err(Self {
+                storage: ThreadSafeRefStorage::Str(value),
+                marker,
+            }),
+        }
     }
 
     /// Returns this value through its thread-safe `Any` boundary.
