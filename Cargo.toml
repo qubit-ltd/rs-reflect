@@ -12,7 +12,6 @@ documentation = "https://docs.rs/qubit-reflect"
 readme = "README.md"
 keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
 categories = ["development-tools"]
-publish = false
 include = [
     "/Cargo.toml",
     "/LICENSE",
@@ -24,4 +23,19 @@ include = [
     "/benches/**",
 ]
 
+[workspace]
+members = [".", "derive"]
+resolver = "3"
+
+[features]
+default = ["derive"]
+derive = ["dep:qubit-reflect-derive"]
+
 [dependencies]
+inventory = "0.3"
+thiserror = "2"
+qubit-reflect-derive = { version = "=0.1.0", path = "derive", optional = true }
+
+[[test]]
+name = "integration_tests"
+path = "tests/mod.rs"
