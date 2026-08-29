@@ -74,6 +74,15 @@ fn test_visibility_preserves_restricted_path() {
     assert_eq!(visibility.restricted_path(), Some("crate::model"));
 }
 
+/// Verifies an empty restricted path is not treated as a valid restriction.
+#[test]
+fn test_visibility_rejects_empty_restricted_path() {
+    let visibility = Visibility::from_source("pub(in )");
+
+    assert_eq!(visibility.kind(), VisibilityKind::Private);
+    assert_eq!(visibility.restricted_path(), None);
+}
+
 /// Verifies registry errors retain their machine-readable kind after inexpensive cloning.
 #[test]
 fn test_registry_error_clone_preserves_kind() {

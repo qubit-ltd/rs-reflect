@@ -43,7 +43,11 @@ impl Visibility {
             "pub(self)" | "" => Self::Private,
             value if value.starts_with("pub(in ") && value.ends_with(')') => {
                 let path = &value[7..value.len() - 1];
-                Self::Restricted(path.into())
+                if path.is_empty() {
+                    Self::Private
+                } else {
+                    Self::Restricted(path.into())
+                }
             }
             _ => Self::Private,
         }
