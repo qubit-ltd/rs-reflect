@@ -21,6 +21,22 @@ pub enum VariantKind {
     Struct,
 }
 
+/// Whether a variant's discriminant was written explicitly in Rust source.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum DiscriminantOrigin {
+    /// Rust assigned the value from declaration order and preceding values.
+    Implicit,
+    /// The variant declaration contains an explicit discriminant expression.
+    Explicit,
+}
+
+/// The exact integer representation of an enum discriminant value.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum NumericDiscriminant {
+    I8(i8), I16(i16), I32(i32), I64(i64), I128(i128), Isize(isize),
+    U8(u8), U16(u16), U32(u32), U64(u64), U128(u128), Usize(usize),
+}
+
 /// The immutable structural description of one reflected enum variant.
 pub struct VariantDescriptor {
     declaring_type: TypeDescriptorResolver,
@@ -30,6 +46,8 @@ pub struct VariantDescriptor {
     kind: VariantKind,
     fields: &'static [FieldDescriptor],
     active_test: VariantActiveAdapter,
+    discriminant_origin: DiscriminantOrigin,
+    numeric_discriminant: Option<NumericDiscriminant>,
 }
 
 impl VariantDescriptor {
@@ -56,7 +74,21 @@ impl VariantDescriptor {
             kind,
             fields,
             active_test,
+            discriminant_origin: DiscriminantOrigin::Implicit,
+            numeric_discriminant: None,
         }
+    }
+
+    /// Records source discriminant facts supplied by generated enum metadata.
+    #[doc(hidden)]
+    pub const fn with_discriminant(
+        mut self,
+        origin: DiscriminantOrigin,
+        numeric: Option<NumericDiscriminant>,
+    ) -> Self {
+        self.discriminant_origin = origin;
+        self.numeric_discriminant = numeric;
+        self
     }
 
     /// Returns the enum root that contains this variant.
@@ -82,6 +114,16 @@ impl VariantDescriptor {
     /// Returns whether the variant is unit-, tuple-, or struct-shaped.
     pub const fn kind(&self) -> VariantKind {
         self.kind
+    }
+
+    /// Returns whether the discriminant appeared explicitly in source.
+    pub const fn discriminant_origin(&self) -> DiscriminantOrigin {
+        self.discriminant_origin
+    }
+
+    /// Returns a numeric discriminant only for fieldless integer-`repr` enums.
+    pub const fn numeric_discriminant(&self) -> Option<NumericDiscriminant> {
+        self.numeric_discriminant
     }
 
     /// Returns fields in source declaration order.

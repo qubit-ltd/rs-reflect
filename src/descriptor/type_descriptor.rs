@@ -628,6 +628,16 @@ impl TypeDescriptor {
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor> {
         self.variants.get(index)
     }
+
+    /// Finds the fieldless integer-`repr` variant with the exact numeric value.
+    pub fn variant_by_discriminant(
+        &self,
+        discriminant: crate::descriptor::NumericDiscriminant,
+    ) -> Option<&VariantDescriptor> {
+        self.variants
+            .iter()
+            .find(|variant| variant.numeric_discriminant() == Some(discriminant))
+    }
 }
 
 impl fmt::Debug for TypeDescriptor {

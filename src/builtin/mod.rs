@@ -120,7 +120,7 @@ impl Reflect for str {
 }
 
 #[path = "../registry/interner.rs"]
-mod interner;
+pub(crate) mod interner;
 
 mod array;
 mod function;

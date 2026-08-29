@@ -22,6 +22,16 @@ use crate::descriptor::VariantKind;
 use crate::expression::FunctionAbi;
 use crate::identity::Visibility;
 
+/// Interns a runtime-created descriptor for one concrete type specialization.
+///
+/// Generated implementations use this for generic types, whose descriptor
+/// cannot be stored in a single local static without conflating distinct
+/// substitutions.
+#[doc(hidden)]
+pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'static TypeDescriptor {
+    crate::builtin::interner::intern::<T>(build)
+}
+
 /// Creates a primitive root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]

@@ -14,6 +14,8 @@ pub use inventory;
 #[doc(hidden)]
 pub use crate::descriptor::TraitImplPayload;
 #[doc(hidden)]
+pub use descriptor::intern_type;
+#[doc(hidden)]
 pub use crate::descriptor::external_supertrait;
 #[doc(hidden)]
 pub use registration::{
