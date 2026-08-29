@@ -1,6 +1,7 @@
 //! Token expansion for validated reflection declarations.
 
 mod traits;
+mod impls;
 
 use proc_macro2::TokenStream;
 
@@ -11,6 +12,6 @@ pub(crate) fn expand(declaration: DeclarationIr) -> TokenStream {
     match declaration {
         DeclarationIr::Type(_) => TokenStream::new(),
         DeclarationIr::Trait(declaration) => traits::expand(declaration),
-        DeclarationIr::Impl(declaration) => declaration.retained_tokens,
+        DeclarationIr::Impl(declaration) => impls::expand_impl(declaration),
     }
 }
