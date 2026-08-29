@@ -4,7 +4,7 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::ir::{
-    HelperName, HelperValueIr, ImplDeclarationIr, ParameterPatternKindIr, PathArgumentIr,
+    HelperName, HelperValueIr, ImplDeclarationIr, ParameterIr, ParameterPatternKindIr, PathArgumentIr,
     PathArgumentsIr, ReceiverKindIr, ReturnTypeIr, TypeIr, TypeKindIr, VisibilityIr,
 };
 
@@ -52,9 +52,13 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             );
-            let is_safe_associated = !has_trait
+            let supported_parameters = method
+                .parameters
+                .iter()
+                .all(|parameter| supports_invocation_parameter(&parameter.ty));
+            let is_safe_invocation = !has_trait
                 && supported_receiver
-                && method.parameters.is_empty()
+                && supported_parameters
                 && method.generics.params.is_empty()
                 && !method.qualifiers.is_unsafe
                 && method.qualifiers.abi.is_none()
@@ -69,7 +73,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             ..
                         })
                 );
-            if !is_safe_associated {
+            if !is_safe_invocation {
                 return None;
             }
             let method_name = &method.name;
@@ -95,7 +99,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 Some(ReceiverKindIr::Value)
             ) {
                 quote! {
-                    let (receiver, _arguments) = validated.into_parts();
+                    let (receiver, arguments) = validated.into_parts();
                     let receiver: #target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Owned(value)) =>
                             #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#target>(value)
@@ -108,7 +112,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 Some(ReceiverKindIr::MutableReference)
             ) {
                 quote! {
-                    let (receiver, _arguments) = validated.into_parts();
+                    let (receiver, arguments) = validated.into_parts();
                     let receiver: &mut #target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Mut(value)) =>
                             #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#target>(value)
@@ -118,7 +122,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 }
             } else if method.receiver.is_some() {
                 quote! {
-                    let (receiver, _arguments) = validated.into_parts();
+                    let (receiver, arguments) = validated.into_parts();
                     let receiver: &#target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Ref(value)) =>
                             #facade::value::DynamicRef::<#facade::value::Local>::downcast::<#target>(value)
@@ -132,40 +136,76 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     };
                 }
             } else {
-                quote! { let _validated = validated; }
+                quote! { let (_receiver, arguments) = validated.into_parts(); }
             };
+            let parameter_expectations = method
+                .parameters
+                .iter()
+                .map(|parameter| invocation_argument_expectation(parameter, &facade));
+            let argument_bindings: Vec<_> = method
+                .parameters
+                .iter()
+                .map(|parameter| invocation_argument_binding(parameter, &facade))
+                .collect();
+            let call_arguments: Vec<_> = method.parameters.iter().map(|parameter| {
+                format_ident!("__qubit_reflect_argument_{}", parameter.index)
+            }).collect();
             let output = match method.return_type {
-                ReturnTypeIr::Unit => quote! {
-                    #receiver_binding
-                    <#target>::#method_name(receiver);
-                    #facade::invoke::InvocationOutput::Unit
-                },
-                ReturnTypeIr::Type(_) => quote! {
-                    #receiver_binding
-                    #facade::invoke::InvocationOutput::Owned(
-                        #facade::value::DynamicOwned::<#facade::value::Local>::new(
-                            <#target>::#method_name(receiver),
-                        ),
-                    )
-                },
+                ReturnTypeIr::Unit => {
+                    let argument_bindings = &argument_bindings;
+                    let call_arguments = &call_arguments;
+                    quote! {
+                        #receiver_binding
+                        let mut arguments = arguments.into_vec().into_iter();
+                        #(#argument_bindings)*
+                        <#target>::#method_name(receiver, #(#call_arguments),*);
+                        #facade::invoke::InvocationOutput::Unit
+                    }
+                }
+                ReturnTypeIr::Type(_) => {
+                    let argument_bindings = &argument_bindings;
+                    let call_arguments = &call_arguments;
+                    quote! {
+                        #receiver_binding
+                        let mut arguments = arguments.into_vec().into_iter();
+                        #(#argument_bindings)*
+                        #facade::invoke::InvocationOutput::Owned(
+                            #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                                <#target>::#method_name(receiver, #(#call_arguments),*),
+                            ),
+                        )
+                    }
+                }
             };
             let output = if method.receiver.is_some() {
                 output
             } else {
                 match method.return_type {
-                    ReturnTypeIr::Unit => quote! {
-                        let _validated = validated;
-                        <#target>::#method_name();
-                        #facade::invoke::InvocationOutput::Unit
-                    },
-                    ReturnTypeIr::Type(_) => quote! {
-                        let _validated = validated;
-                        #facade::invoke::InvocationOutput::Owned(
-                            #facade::value::DynamicOwned::<#facade::value::Local>::new(
-                                <#target>::#method_name(),
-                            ),
-                        )
-                    },
+                    ReturnTypeIr::Unit => {
+                        let argument_bindings = &argument_bindings;
+                        let call_arguments = &call_arguments;
+                        quote! {
+                            #receiver_binding
+                            let mut arguments = arguments.into_vec().into_iter();
+                            #(#argument_bindings)*
+                            <#target>::#method_name(#(#call_arguments),*);
+                            #facade::invoke::InvocationOutput::Unit
+                        }
+                    }
+                    ReturnTypeIr::Type(_) => {
+                        let argument_bindings = &argument_bindings;
+                        let call_arguments = &call_arguments;
+                        quote! {
+                            #receiver_binding
+                            let mut arguments = arguments.into_vec().into_iter();
+                            #(#argument_bindings)*
+                            #facade::invoke::InvocationOutput::Owned(
+                                #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                                    <#target>::#method_name(#(#call_arguments),*),
+                                ),
+                            )
+                        }
+                    }
                 }
             };
             Some(quote! {
@@ -181,7 +221,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let validated = invocation.validate(
                         &identity,
                         #receiver_expectation,
-                        &[],
+                        &[#(#parameter_expectations),*],
                     )?;
                     Ok({ #output })
                 }
@@ -203,9 +243,13 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             );
-            let is_safe_associated = !has_trait
+            let supported_parameters = method
+                .parameters
+                .iter()
+                .all(|parameter| supports_invocation_parameter(&parameter.ty));
+            let is_safe_invocation = !has_trait
                 && supported_receiver
-                && method.parameters.is_empty()
+                && supported_parameters
                 && method.generics.params.is_empty()
                 && !method.qualifiers.is_unsafe
                 && method.qualifiers.abi.is_none()
@@ -220,7 +264,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             ..
                         })
                 );
-            if is_safe_associated {
+            if is_safe_invocation {
                 let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
                 quote!(Some(&#descriptor_name))
             } else {
@@ -638,6 +682,106 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             }
 
             #external_registration
+        }
+    }
+}
+
+/// Returns whether a parameter can cross the safe dynamic invocation boundary.
+fn supports_invocation_parameter(ty: &TypeIr) -> bool {
+    match &ty.kind {
+        TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
+        _ => supports_owned_dynamic_type(ty),
+    }
+}
+
+/// Returns whether an owned dynamic value can safely represent `ty`.
+fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
+    matches!(
+        ty.kind,
+        TypeKindIr::Path(_)
+            | TypeKindIr::Tuple(_)
+            | TypeKindIr::Array { .. }
+            | TypeKindIr::Pointer { .. }
+            | TypeKindIr::BareFunction { .. }
+    )
+}
+
+/// Expands the exact runtime expectation for one positional parameter.
+fn invocation_argument_expectation(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
+    match &parameter.ty.kind {
+        TypeKindIr::Reference {
+            mutable: true,
+            element,
+            ..
+        } => {
+            let element = &element.tokens;
+            quote!(#facade::invoke::ArgumentExpectation::borrowed_mut::<#element>())
+        }
+        TypeKindIr::Reference { element, .. } => {
+            let element = &element.tokens;
+            quote!(#facade::invoke::ArgumentExpectation::borrowed::<#element>())
+        }
+        _ => {
+            let ty = &parameter.ty.tokens;
+            quote!(#facade::invoke::ArgumentExpectation::owned::<#ty>())
+        }
+    }
+}
+
+/// Expands one post-validation extraction while preserving borrowed lifetimes.
+fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
+    let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
+    match &parameter.ty.kind {
+        TypeKindIr::Reference {
+            mutable: true,
+            element,
+            ..
+        } => {
+            let element = &element.tokens;
+            quote! {
+                let #argument = match arguments
+                    .next()
+                    .expect("validation checked argument count")
+                {
+                    #facade::invoke::InvocationArg::Mut(value) =>
+                        #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#element>(value)
+                            .unwrap_or_else(|_| unreachable!("validation checked argument type")),
+                    _ => unreachable!("validation checked argument mode"),
+                };
+            }
+        }
+        TypeKindIr::Reference { element, .. } => {
+            let element = &element.tokens;
+            quote! {
+                let #argument = match arguments
+                    .next()
+                    .expect("validation checked argument count")
+                {
+                    #facade::invoke::InvocationArg::Ref(value) =>
+                        #facade::value::DynamicRef::<#facade::value::Local>::downcast::<#element>(value)
+                            .unwrap_or_else(|_| unreachable!("validation checked argument type")),
+                    #facade::invoke::InvocationArg::Mut(value) => {
+                        let value = #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#element>(value)
+                            .unwrap_or_else(|_| unreachable!("validation checked argument type"));
+                        &*value
+                    }
+                    _ => unreachable!("validation checked argument mode"),
+                };
+            }
+        }
+        _ => {
+            let ty = &parameter.ty.tokens;
+            quote! {
+                let #argument: #ty = match arguments
+                    .next()
+                    .expect("validation checked argument count")
+                {
+                    #facade::invoke::InvocationArg::Owned(value) =>
+                        #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#ty>(value)
+                            .unwrap_or_else(|_| unreachable!("validation checked argument type")),
+                    _ => unreachable!("validation checked argument mode"),
+                };
+            }
         }
     }
 }
