@@ -440,16 +440,59 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 quote!(None)
             }
         });
-    let method_specialization_arguments = declaration
+    let generic_specialization_adapter_definitions = declaration
         .methods
         .iter()
         .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
-        .map(|method| {
-            let arguments = method
+        .enumerate()
+        .flat_map(|(method_index, method)| {
+            let target = target.clone();
+            let target_source = target_source.clone();
+            let facade = facade.clone();
+            method.specializations.iter().enumerate().filter_map(move |(specialization_index, specialization)| {
+                simple_generic_specialization_adapter(
+                    method,
+                    specialization,
+                    &target,
+                    &target_source,
+                    &facade,
+                    method_index,
+                    specialization_index,
+                )
+            })
+        });
+    let method_specialization_entries = declaration
+        .methods
+        .iter()
+        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .enumerate()
+        .map(|(method_index, method)| {
+            let entries = method
                 .specializations
                 .iter()
-                .map(|specialization| specialization_arguments(specialization, &method.generics, &facade));
-            quote!(::std::vec![#(#arguments),*])
+                .enumerate()
+                .map(|(specialization_index, specialization)| {
+                    let arguments = specialization_arguments(specialization, &method.generics, &facade);
+                    let adapter_name = format_ident!(
+                        "__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}"
+                    );
+                    if simple_generic_specialization_adapter(
+                        method,
+                        specialization,
+                        &target,
+                        &target_source,
+                        &facade,
+                        method_index,
+                        specialization_index,
+                    )
+                    .is_some()
+                    {
+                        quote!((#arguments, Some(&#adapter_name)))
+                    } else {
+                        quote!((#arguments, None))
+                    }
+                });
+            quote!(::std::vec![#(#entries),*])
         });
     let method_entries = declaration
         .methods
@@ -732,6 +775,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             use super::*;
 
             #(#invocation_adapter_definitions)*
+            #(#generic_specialization_adapter_definitions)*
 
             fn fragment_identity() -> #facade::identity::FragmentIdentity {
                 #facade::identity::FragmentIdentity::new(
@@ -809,19 +853,29 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     } else {
                         let adapters: &[Option<&'static #facade::descriptor::InvocationAdapter>] =
                             &[#(#invocation_adapter_entries),*];
-                        let specializations = ::std::vec![#(#method_specialization_arguments),*];
+                        let specializations: ::std::vec::Vec<::std::vec::Vec<(
+                            ::std::boxed::Box<[#facade::expression::GenericArgument]>,
+                            Option<&'static #facade::descriptor::InvocationAdapter>,
+                        )>> = ::std::vec![#(#method_specialization_entries),*];
                         methods.iter().zip(adapters.iter().copied()).enumerate().flat_map(|(index, (method, adapter))| {
                             if !specializations[index].is_empty() {
-                                return specializations[index].iter().cloned().map(|arguments| {
+                                return specializations[index].iter().cloned().map(|(arguments, adapter)| {
+                                    let unavailable_reasons: ::std::boxed::Box<[
+                                        #facade::descriptor::InvocationUnavailableReason
+                                    ]> = if adapter.is_some() {
+                                        ::std::vec![].into_boxed_slice()
+                                    } else {
+                                        ::std::vec![
+                                            #facade::descriptor::InvocationUnavailableReason::UnsupportedSpecialization,
+                                        ].into_boxed_slice()
+                                    };
                                     #facade::descriptor::MethodInstanceDescriptor::with_arguments(
                                         method,
                                         None,
                                         #facade::descriptor::MethodImplementationSource::Declared,
-                                        None,
+                                        adapter,
                                         arguments,
-                                        ::std::boxed::Box::new([
-                                            #facade::descriptor::InvocationUnavailableReason::UnsupportedSpecialization,
-                                        ]),
+                                        unavailable_reasons,
                                     ).expect("generated generic method specialization is consistent")
                                 }).collect::<::std::vec::Vec<_>>();
                             }
@@ -999,6 +1053,134 @@ fn specialization_arguments(
         }
     });
     quote!(::std::boxed::Box::new([#(#arguments),*]))
+}
+
+/// Generates a local adapter for the safely erasable subset of an explicitly
+/// registered generic associated function. More complex signatures remain
+/// registered as specializations but explicitly unavailable.
+fn simple_generic_specialization_adapter(
+    method: &MethodIr,
+    specialization: &SpecializationIr,
+    target: &TokenStream,
+    target_source: &str,
+    facade: &TokenStream,
+    method_index: usize,
+    specialization_index: usize,
+) -> Option<TokenStream> {
+    if method.receiver.is_some()
+        || method.qualifiers.is_async
+        || method.qualifiers.is_unsafe
+        || method.qualifiers.abi.is_some()
+        || method.qualifiers.is_variadic
+        || method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
+        || method.generics.params.iter().any(|parameter| parameter.kind != GenericKindIr::Type)
+    {
+        return None;
+    }
+    let type_arguments: Vec<_> = method
+        .generics
+        .params
+        .iter()
+        .map(|parameter| specialization_type_argument(specialization, &parameter.name))
+        .collect::<Option<_>>()?;
+    let parameter_types: Vec<_> = method
+        .parameters
+        .iter()
+        .map(|parameter| specialize_direct_type_parameter(&parameter.ty, &method.generics, specialization))
+        .collect::<Option<_>>()?;
+    let return_type = match &method.return_type {
+        ReturnTypeIr::Unit => None,
+        ReturnTypeIr::Type(ty) => Some(specialize_direct_type_parameter(ty, &method.generics, specialization)?),
+    };
+    let argument_expectations = parameter_types
+        .iter()
+        .map(|ty| quote!(#facade::invoke::ArgumentExpectation::owned::<#ty>()));
+    let argument_bindings = parameter_types.iter().enumerate().map(|(index, ty)| {
+        let argument = format_ident!("__qubit_reflect_specialized_argument_{index}");
+        quote! {
+            let #argument: #ty = match arguments.next().expect("validation checked argument count") {
+                #facade::invoke::InvocationArg::Owned(value) =>
+                    #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#ty>(value)
+                        .unwrap_or_else(|_| unreachable!("validation checked argument type")),
+                _ => unreachable!("validation checked argument mode"),
+            };
+        }
+    });
+    let call_arguments = (0..parameter_types.len()).map(|index| format_ident!("__qubit_reflect_specialized_argument_{index}"));
+    let method_name = &method.name;
+    let adapter_name = format_ident!("__qubit_reflect_invoke_specialization_{method_index}_{specialization_index}");
+    let descriptor_name = format_ident!(
+        "__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}"
+    );
+    let output = match return_type {
+        None => quote! {
+            <#target>::#method_name::<#(#type_arguments),*>(#(#call_arguments),*);
+            #facade::invoke::InvocationOutput::Unit
+        },
+        Some(_) => quote! {
+            #facade::invoke::InvocationOutput::Owned(
+                #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                    <#target>::#method_name::<#(#type_arguments),*>(#(#call_arguments),*),
+                ),
+            )
+        },
+    };
+    Some(quote! {
+        fn #adapter_name<'call>(
+            invocation: #facade::invoke::Invocation<'call, #facade::value::Local>,
+        ) -> ::core::result::Result<
+            #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
+            #facade::invoke::InvocationFailure<'call, #facade::value::Local>,
+        > {
+            let identity = #facade::identity::MemberId::new(
+                #target_source,
+                "method-specialization",
+                #method_index,
+                fragment_identity(),
+            );
+            let validated = invocation.validate(
+                &identity,
+                #facade::invoke::ReceiverExpectation::none(),
+                &[#(#argument_expectations),*],
+            )?;
+            let (_receiver, arguments) = validated.into_parts();
+            let mut arguments = arguments.into_vec().into_iter();
+            #(#argument_bindings)*
+            Ok(#output)
+        }
+
+        static #descriptor_name: #facade::descriptor::InvocationAdapter =
+            #facade::descriptor::InvocationAdapter::local(#adapter_name);
+    })
+}
+
+/// Resolves one named type argument from a validated specialization.
+fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
+    match &specialization.bindings.iter().find(|binding| binding.name == name)?.value {
+        SpecializationValueIr::Type(ty) => Some(ty.tokens.clone()),
+        SpecializationValueIr::AmbiguousPath(tokens) => Some(tokens.clone()),
+        SpecializationValueIr::Const(_) => None,
+    }
+}
+
+/// Replaces a direct generic type parameter with its registered concrete type.
+fn specialize_direct_type_parameter(
+    ty: &TypeIr,
+    generics: &crate::ir::GenericsIr,
+    specialization: &SpecializationIr,
+) -> Option<TokenStream> {
+    let TypeKindIr::Path(path) = &ty.kind else {
+        return None;
+    };
+    if path.segments.len() != 1 || !matches!(path.segments[0].arguments, PathArgumentsIr::None) {
+        return Some(ty.tokens.clone());
+    }
+    let name = &path.segments[0].name;
+    if generics.params.iter().any(|parameter| parameter.kind == GenericKindIr::Type && parameter.name == *name) {
+        specialization_type_argument(specialization, name)
+    } else {
+        Some(ty.tokens.clone())
+    }
 }
 
 /// Returns whether an owned dynamic value can safely represent `ty`.
