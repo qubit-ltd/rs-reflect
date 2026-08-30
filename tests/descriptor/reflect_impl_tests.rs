@@ -228,11 +228,22 @@ fn test_reflect_impl_registers_explicit_generic_method_specialization() {
         panic!("registered generic specialization must be discoverable");
     };
     assert_eq!(instance.arguments().len(), 1);
-    assert!(instance.adapter().is_none());
-    assert_eq!(
-        instance.unavailable_reasons(),
-        &[reflect::descriptor::InvocationUnavailableReason::UnsupportedSpecialization],
-    );
+    let adapter = instance
+        .adapter()
+        .expect("simple registered specialization needs an adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            reflect::value::Local,
+        >::new(31_u8))]))
+        .expect("local adapter must be present")
+        .expect("specialized invocation must validate");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("specialized method must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+        panic!("specialized output must retain its concrete type");
+    };
+    assert_eq!(value, 31);
 }
 
 #[test]
