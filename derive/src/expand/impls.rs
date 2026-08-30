@@ -3,6 +3,7 @@
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use proc_macro2::TokenTree;
 use quote::format_ident;
 use quote::quote;
 
@@ -31,10 +32,44 @@ use crate::ir::VisibilityIr;
 /// of linker startup and uses the T12 registration protocol exclusively.
 pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     if !declaration.generics.params.is_empty() {
-        // Concrete specialization registration is T20's responsibility. A
-        // blanket impl cannot honestly claim one `TypeId` fragment here.
-        return declaration.retained_tokens;
+        return expand_generic_impl_specializations(declaration);
     }
+    expand_concrete_impl(declaration, quote!(::std::vec![]))
+}
+
+/// Retains a generic impl and emits one concrete registration fragment for
+/// every explicit specialization.
+///
+/// Blanket and constrained impls have no finite runtime `TypeId` set, so an
+/// impl without `specialize(...)` deliberately remains descriptor-only.
+fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenStream {
+    let retained = declaration.retained_tokens.clone();
+    let Some(facade) = facade_path() else {
+        return retained;
+    };
+    if declaration.specializations.is_empty() {
+        return retained;
+    }
+    let fragments = declaration.specializations.iter().map(|specialization| {
+        let specialization_arguments = specialization_arguments(specialization, &declaration.generics, &facade);
+        let arguments = quote!(#specialization_arguments.into_vec());
+        let replacements = specialization_replacements(specialization);
+        let mut concrete = declaration.clone();
+        concrete.retained_tokens = TokenStream::new();
+        concrete.specializations.clear();
+        substitute_type_tokens(&mut concrete.target_type, &replacements);
+        if let Some(trait_path) = &mut concrete.trait_path {
+            trait_path.tokens = substitute_tokens(&trait_path.tokens, &replacements);
+            trait_path.source = trait_path.tokens.to_string();
+        }
+        substitute_impl_method_types(&mut concrete, &replacements);
+        expand_concrete_impl(concrete, arguments)
+    });
+    quote!(#retained #(#fragments)*)
+}
+
+/// Expands one concrete implementation registration fragment.
+fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStream) -> TokenStream {
     let Some(facade) = facade_path() else {
         // Parser-only consumers of the standalone derive crate intentionally
         // have no runtime facade. Retaining the validated Rust impl preserves
@@ -43,6 +78,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     };
     let retained = declaration.retained_tokens;
     let target = declaration.target_type.tokens;
+    let impl_generic_definition = super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
     let trait_path = declaration.trait_path.as_ref().map(|path| path.tokens.clone());
     let has_trait = trait_path.is_some();
     let external_id = declaration
@@ -52,7 +88,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
         });
-    let fingerprint = fingerprint(&retained.to_string());
+    let fingerprint = fingerprint(&format!("{}{}", retained, target));
     let location = declaration.span.start();
     let line = location.line as u32;
     let column = location.column as u32;
@@ -951,11 +987,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             #kind,
                             #trait_definition,
                             ::std::boxed::Box::leak(::std::boxed::Box::new(
-                                #facade::expression::GenericDefinitionDescriptor {
-                                    parameters: ::std::boxed::Box::new([]),
-                                    predicates: ::std::boxed::Box::new([]),
-                                    diagnostic: ::core::default::Default::default(),
-                                },
+                                #impl_generic_definition,
                             )),
                         ).expect("generated impl definition is consistent"),
                     ));
@@ -1051,7 +1083,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let mut builder = #facade::descriptor::ImplDescriptor::builder(
                         definition,
                         || <#target as #facade::Reflect>::type_descriptor(),
-                    ).methods(methods).method_instances(method_instances);
+                    ).methods(methods).method_instances(method_instances).arguments(#impl_arguments);
                     if let Some(trait_descriptor) = #implemented_trait {
                         builder = builder.implemented_trait(trait_descriptor);
                     }
@@ -1073,6 +1105,132 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             }
 
             #external_registration
+        }
+    }
+}
+
+/// Builds replacement tokens for one validated type or const specialization.
+fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident, TokenStream)> {
+    specialization
+        .bindings
+        .iter()
+        .map(|binding| {
+            let tokens = match &binding.value {
+                SpecializationValueIr::Type(ty) => ty.tokens.clone(),
+                SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => tokens.clone(),
+            };
+            (Ident::new(&binding.name, binding.span), tokens)
+        })
+        .collect()
+}
+
+/// Replaces generic identifiers recursively while retaining source grouping.
+fn substitute_tokens(tokens: &TokenStream, replacements: &[(Ident, TokenStream)]) -> TokenStream {
+    tokens
+        .clone()
+        .into_iter()
+        .flat_map(|tree| match tree {
+            TokenTree::Ident(ident) => replacements
+                .iter()
+                .find(|(name, _)| *name == ident)
+                .map(|(_, tokens)| tokens.clone())
+                .unwrap_or_else(|| TokenStream::from(TokenTree::Ident(ident))),
+            TokenTree::Group(group) => {
+                let mut replacement = proc_macro2::Group::new(
+                    group.delimiter(),
+                    substitute_tokens(&group.stream(), replacements),
+                );
+                replacement.set_span(group.span());
+                TokenStream::from(TokenTree::Group(replacement))
+            }
+            other => TokenStream::from(other),
+        })
+        .collect()
+}
+
+/// Replaces impl generic references in method signature types while retaining
+/// their structural IR for descriptor rendering.
+fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, replacements: &[(Ident, TokenStream)]) {
+    for method in &mut declaration.methods {
+        if let Some(receiver) = &mut method.receiver {
+            substitute_type_tokens(&mut receiver.ty, replacements);
+        }
+        for parameter in &mut method.parameters {
+            substitute_type_tokens(&mut parameter.ty, replacements);
+        }
+        if let ReturnTypeIr::Type(ty) = &mut method.return_type {
+            substitute_type_tokens(ty, replacements);
+        }
+    }
+}
+
+/// Recursively substitutes one type and every nested type retained by its IR.
+fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
+    ty.tokens = substitute_tokens(&ty.tokens, replacements);
+    ty.source = ty.tokens.to_string();
+    match &mut ty.kind {
+        TypeKindIr::Path(path) => substitute_path_tokens(path, replacements),
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Pointer { element, .. } => substitute_type_tokens(element, replacements),
+        TypeKindIr::Tuple(elements) => {
+            for element in elements {
+                substitute_type_tokens(element, replacements);
+            }
+        }
+        TypeKindIr::Array { element, length } => {
+            substitute_type_tokens(element, replacements);
+            *length = substitute_tokens(length, replacements);
+        }
+        TypeKindIr::BareFunction { inputs, output, .. } => {
+            for input in inputs {
+                substitute_type_tokens(input, replacements);
+            }
+            if let Some(output) = output {
+                substitute_type_tokens(output, replacements);
+            }
+        }
+        TypeKindIr::TraitObject { .. }
+        | TypeKindIr::ImplTrait { .. }
+        | TypeKindIr::Never
+        | TypeKindIr::Infer
+        | TypeKindIr::Macro
+        | TypeKindIr::Other => {}
+    }
+}
+
+/// Substitutes nested type and const tokens in one path IR.
+fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
+    path.tokens = substitute_tokens(&path.tokens, replacements);
+    path.source = path.tokens.to_string();
+    if let Some(qualified_self) = &mut path.qualified_self {
+        substitute_type_tokens(&mut qualified_self.ty, replacements);
+    }
+    for segment in &mut path.segments {
+        match &mut segment.arguments {
+            PathArgumentsIr::None => {}
+            PathArgumentsIr::AngleBracketed(arguments) => {
+                for argument in arguments {
+                    match argument {
+                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                            substitute_type_tokens(ty, replacements);
+                        }
+                        PathArgumentIr::Const(tokens)
+                        | PathArgumentIr::AssociatedConst { value: tokens, .. } => {
+                            *tokens = substitute_tokens(tokens, replacements);
+                        }
+                        PathArgumentIr::Lifetime(_) | PathArgumentIr::Constraint { .. } | PathArgumentIr::Other(_) => {}
+                    }
+                }
+            }
+            PathArgumentsIr::Parenthesized { inputs, output } => {
+                for input in inputs {
+                    substitute_type_tokens(input, replacements);
+                }
+                if let Some(output) = output {
+                    substitute_type_tokens(output, replacements);
+                }
+            }
         }
     }
 }
@@ -1214,7 +1372,7 @@ fn specialization_arguments(
             _ => None,
         }
     });
-    quote!(::std::boxed::Box::new([#(#arguments),*]))
+    quote!(::std::vec![#(#arguments),*].into_boxed_slice())
 }
 
 /// Generates a local adapter for the safely erasable subset of an explicitly

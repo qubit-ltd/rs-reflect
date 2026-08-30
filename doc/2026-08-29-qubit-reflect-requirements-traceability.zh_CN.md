@@ -192,7 +192,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MAC-018 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
-| REQ-MAC-020 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-020 | T13、T14、T15、T16、T17、T20、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/{descriptor,ui}/` |
 | REQ-MAC-021 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MTH-001 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MTH-002 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
