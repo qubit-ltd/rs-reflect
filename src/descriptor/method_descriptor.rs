@@ -8,6 +8,7 @@ use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::expression::FunctionAbi;
+use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::TypeExpression;
 use crate::identity::MemberId;
@@ -234,6 +235,9 @@ pub enum InvocationUnavailableReason {
     UnsupportedParameterPattern,
     /// The declaration is generic and has no registered specialization.
     UnspecializedGeneric,
+    /// A concrete specialization was registered but has no safe generated
+    /// invocation adapter.
+    UnsupportedSpecialization,
     /// The declaration is unsafe.
     UnsafeMethod,
     /// The declared ABI has no safe adapter.
@@ -617,6 +621,7 @@ pub struct MethodInstanceDescriptor {
     implementation_method: Option<&'static MethodDescriptor>,
     implementation_source: MethodImplementationSource,
     adapter: Option<&'static InvocationAdapter>,
+    arguments: Box<[GenericArgument]>,
     unavailable_reasons: Box<[InvocationUnavailableReason]>,
 }
 
@@ -681,6 +686,27 @@ impl MethodInstanceDescriptor {
         adapter: Option<&'static InvocationAdapter>,
         unavailable_reasons: Box<[InvocationUnavailableReason]>,
     ) -> Result<Self, MethodInstanceBuildError> {
+        Self::with_arguments(
+            declaration,
+            implementation_method,
+            implementation_source,
+            adapter,
+            Box::new([]),
+            unavailable_reasons,
+        )
+    }
+
+    /// Creates a concrete method specialization with its generic arguments in
+    /// declaration order.
+    #[doc(hidden)]
+    pub fn with_arguments(
+        declaration: &'static MethodDescriptor,
+        implementation_method: Option<&'static MethodDescriptor>,
+        implementation_source: MethodImplementationSource,
+        adapter: Option<&'static InvocationAdapter>,
+        arguments: Box<[GenericArgument]>,
+        unavailable_reasons: Box<[InvocationUnavailableReason]>,
+    ) -> Result<Self, MethodInstanceBuildError> {
         if implementation_source == MethodImplementationSource::Required && adapter.is_some() {
             return Err(MethodInstanceBuildError::RequiredMethodHasAdapter);
         }
@@ -722,6 +748,7 @@ impl MethodInstanceDescriptor {
             implementation_method,
             implementation_source,
             adapter,
+            arguments,
             unavailable_reasons,
         })
     }
@@ -757,6 +784,12 @@ impl MethodInstanceDescriptor {
     /// `None` means callers must inspect [`Self::unavailable_reasons`].
     pub const fn adapter(&self) -> Option<&'static InvocationAdapter> {
         self.adapter
+    }
+
+    /// Returns the concrete type and const arguments of this method
+    /// specialization in declaration order.
+    pub const fn arguments(&self) -> &[GenericArgument] {
+        &self.arguments
     }
 
     /// Returns stable reasons that prevent dynamic invocation.

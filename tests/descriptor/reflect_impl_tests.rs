@@ -88,6 +88,12 @@ impl Sample {
         first + second
     }
 
+    #[reflect(specialize(T = u8))]
+    #[allow(dead_code)]
+    fn reflected_generic<T>(value: T) -> T {
+        value
+    }
+
     async fn reflected_async_argument(value: u8) -> u8 {
         value + 3
     }
@@ -208,6 +214,25 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 19);
+}
+
+#[test]
+fn test_reflect_impl_registers_explicit_generic_method_specialization() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_generic",
+    ) else {
+        panic!("registered generic specialization must be discoverable");
+    };
+    assert_eq!(instance.arguments().len(), 1);
+    assert!(instance.adapter().is_none());
+    assert_eq!(
+        instance.unavailable_reasons(),
+        &[reflect::descriptor::InvocationUnavailableReason::UnsupportedSpecialization],
+    );
 }
 
 #[test]

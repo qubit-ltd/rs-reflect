@@ -8,6 +8,7 @@ use quote::quote;
 
 use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
+use crate::ir::GenericKindIr;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
 use crate::ir::ParameterIr;
@@ -16,6 +17,8 @@ use crate::ir::PathArgumentIr;
 use crate::ir::PathArgumentsIr;
 use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
+use crate::ir::SpecializationIr;
+use crate::ir::SpecializationValueIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::VisibilityIr;
@@ -437,6 +440,17 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 quote!(None)
             }
         });
+    let method_specialization_arguments = declaration
+        .methods
+        .iter()
+        .filter(|method| !method.attributes.iter().any(|attribute| attribute.name == HelperName::Skip))
+        .map(|method| {
+            let arguments = method
+                .specializations
+                .iter()
+                .map(|specialization| specialization_arguments(specialization, &method.generics, &facade));
+            quote!(::std::vec![#(#arguments),*])
+        });
     let method_entries = declaration
         .methods
         .iter()
@@ -795,7 +809,22 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     } else {
                         let adapters: &[Option<&'static #facade::descriptor::InvocationAdapter>] =
                             &[#(#invocation_adapter_entries),*];
-                        methods.iter().zip(adapters.iter().copied()).map(|(method, adapter)| {
+                        let specializations = ::std::vec![#(#method_specialization_arguments),*];
+                        methods.iter().zip(adapters.iter().copied()).enumerate().flat_map(|(index, (method, adapter))| {
+                            if !specializations[index].is_empty() {
+                                return specializations[index].iter().cloned().map(|arguments| {
+                                    #facade::descriptor::MethodInstanceDescriptor::with_arguments(
+                                        method,
+                                        None,
+                                        #facade::descriptor::MethodImplementationSource::Declared,
+                                        None,
+                                        arguments,
+                                        ::std::boxed::Box::new([
+                                            #facade::descriptor::InvocationUnavailableReason::UnsupportedSpecialization,
+                                        ]),
+                                    ).expect("generated generic method specialization is consistent")
+                                }).collect::<::std::vec::Vec<_>>();
+                            }
                             let unavailable_reasons: ::std::boxed::Box<[
                                 #facade::descriptor::InvocationUnavailableReason
                             ]> = if adapter.is_some() {
@@ -816,14 +845,14 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                                 };
                                 ::std::vec![reason].into_boxed_slice()
                             };
-                            #facade::descriptor::MethodInstanceDescriptor::new(
+                            ::std::vec![#facade::descriptor::MethodInstanceDescriptor::new(
                                 method,
                                 None,
                                 #facade::descriptor::MethodImplementationSource::Declared,
                                 adapter,
                                 unavailable_reasons,
-                            ).expect("generated inherent method instance is consistent")
-                        }).collect()
+                            ).expect("generated inherent method instance is consistent")]
+                        }).collect::<::std::vec::Vec<_>>()
                     };
                     let mut builder = #facade::descriptor::ImplDescriptor::builder(
                         definition,
@@ -910,6 +939,66 @@ fn is_box_self_type(ty: &TypeIr) -> bool {
         ("Box", PathArgumentsIr::AngleBracketed(arguments))
             if matches!(arguments.as_slice(), [PathArgumentIr::Type(argument)] if is_self_type(argument))
     )
+}
+
+/// Emits concrete arguments for one validated method specialization.
+fn specialization_arguments(
+    specialization: &SpecializationIr,
+    generics: &crate::ir::GenericsIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    let arguments = generics.params.iter().filter_map(|parameter| {
+        if parameter.kind == GenericKindIr::Lifetime {
+            return None;
+        }
+        let binding = specialization.bindings.iter().find(|binding| binding.name == parameter.name)?;
+        match (parameter.kind, &binding.value) {
+            (GenericKindIr::Type, SpecializationValueIr::Type(ty)) => {
+                let expression = super::traits::type_expression(ty, facade);
+                Some(quote!(#facade::expression::GenericArgument::Type(#expression)))
+            }
+            (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(tokens)) => Some(quote!(
+                #facade::expression::GenericArgument::Type(
+                    #facade::expression::TypeExpression::Concrete(
+                        #facade::expression::ConcreteTypeExpression {
+                            path: ::std::boxed::Box::new([stringify!(#tokens).into()]),
+                            arguments: ::std::boxed::Box::new([]),
+                            diagnostic: #facade::expression::DiagnosticText::from(stringify!(#tokens)),
+                        },
+                    ),
+                )
+            )),
+            (GenericKindIr::Const, value) => {
+                let tokens = match value {
+                    SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => tokens,
+                    SpecializationValueIr::Type(_) => return None,
+                };
+                let declared_type = parameter.const_type.as_ref()?.source.as_str();
+                let declared_type_literal = syn::LitStr::new(declared_type, parameter.span);
+                Some(quote!(
+                    #facade::expression::GenericArgument::Const(
+                        #facade::expression::ConstGenericArgument {
+                            declared_type: ::std::boxed::Box::new(
+                                #facade::expression::TypeExpression::Concrete(
+                                    #facade::expression::ConcreteTypeExpression {
+                                        path: ::std::boxed::Box::new([#declared_type_literal.into()]),
+                                        arguments: ::std::boxed::Box::new([]),
+                                        diagnostic: #facade::expression::DiagnosticText::from(#declared_type_literal),
+                                    },
+                                ),
+                            ),
+                            value: #facade::expression::ConstExpression::Path(
+                                ::std::boxed::Box::new([stringify!(#tokens).into()]),
+                            ),
+                            normalized_diagnostic: stringify!(#tokens).into(),
+                        },
+                    )
+                ))
+            }
+            _ => None,
+        }
+    });
+    quote!(::std::boxed::Box::new([#(#arguments),*]))
 }
 
 /// Returns whether an owned dynamic value can safely represent `ty`.
