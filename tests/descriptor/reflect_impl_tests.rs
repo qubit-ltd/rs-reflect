@@ -94,6 +94,12 @@ impl Sample {
         value
     }
 
+    #[reflect(specialize(N = 5))]
+    #[allow(dead_code)]
+    fn reflected_const_generic<const N: usize>(value: usize) -> usize {
+        value + N
+    }
+
     async fn reflected_async_argument(value: u8) -> u8 {
         value + 3
     }
@@ -244,6 +250,36 @@ fn test_reflect_impl_registers_explicit_generic_method_specialization() {
         panic!("specialized output must retain its concrete type");
     };
     assert_eq!(value, 31);
+}
+
+#[test]
+fn test_reflect_impl_invokes_explicit_const_generic_method_specialization() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_const_generic",
+    ) else {
+        panic!("registered const specialization must be discoverable");
+    };
+    assert_eq!(instance.arguments().len(), 1);
+    let adapter = instance
+        .adapter()
+        .expect("registered const specialization needs an adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            reflect::value::Local,
+        >::new(7_usize))]))
+        .expect("local adapter must be present")
+        .expect("specialized invocation must validate");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("specialized method must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<usize>(value) else {
+        panic!("specialized output must retain its concrete type");
+    };
+    assert_eq!(value, 12);
 }
 
 #[test]

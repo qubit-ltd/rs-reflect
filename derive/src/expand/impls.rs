@@ -1073,15 +1073,19 @@ fn simple_generic_specialization_adapter(
         || method.qualifiers.abi.is_some()
         || method.qualifiers.is_variadic
         || method.attributes.iter().any(|attribute| attribute.name == HelperName::NoInvoke)
-        || method.generics.params.iter().any(|parameter| parameter.kind != GenericKindIr::Type)
+        || method.generics.params.iter().any(|parameter| parameter.kind == GenericKindIr::Lifetime)
     {
         return None;
     }
-    let type_arguments: Vec<_> = method
+    let generic_arguments: Vec<_> = method
         .generics
         .params
         .iter()
-        .map(|parameter| specialization_type_argument(specialization, &parameter.name))
+        .map(|parameter| match parameter.kind {
+            GenericKindIr::Type => specialization_type_argument(specialization, &parameter.name),
+            GenericKindIr::Const => specialization_const_argument(specialization, &parameter.name),
+            GenericKindIr::Lifetime => None,
+        })
         .collect::<Option<_>>()?;
     let parameter_types: Vec<_> = method
         .parameters
@@ -1114,13 +1118,13 @@ fn simple_generic_specialization_adapter(
     );
     let output = match return_type {
         None => quote! {
-            <#target>::#method_name::<#(#type_arguments),*>(#(#call_arguments),*);
+            <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*);
             #facade::invoke::InvocationOutput::Unit
         },
         Some(_) => quote! {
             #facade::invoke::InvocationOutput::Owned(
                 #facade::value::DynamicOwned::<#facade::value::Local>::new(
-                    <#target>::#method_name::<#(#type_arguments),*>(#(#call_arguments),*),
+                    <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*),
                 ),
             )
         },
@@ -1160,6 +1164,14 @@ fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -
         SpecializationValueIr::Type(ty) => Some(ty.tokens.clone()),
         SpecializationValueIr::AmbiguousPath(tokens) => Some(tokens.clone()),
         SpecializationValueIr::Const(_) => None,
+    }
+}
+
+/// Resolves one named const argument from a validated specialization.
+fn specialization_const_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
+    match &specialization.bindings.iter().find(|binding| binding.name == name)?.value {
+        SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => Some(tokens.clone()),
+        SpecializationValueIr::Type(_) => None,
     }
 }
 
