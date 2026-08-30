@@ -807,6 +807,8 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                                     #facade::descriptor::InvocationUnavailableReason::UnsupportedAbi
                                 } else if method.qualifiers().is_variadic {
                                     #facade::descriptor::InvocationUnavailableReason::Variadic
+                                } else if matches!(method.receiver(), Some(#facade::descriptor::ReceiverDescriptor::Explicit(_))) {
+                                    #facade::descriptor::InvocationUnavailableReason::UnsupportedReceiver
                                 } else if !method.generic_definition().parameters.is_empty() {
                                     #facade::descriptor::InvocationUnavailableReason::UnspecializedGeneric
                                 } else {

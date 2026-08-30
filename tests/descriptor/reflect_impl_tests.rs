@@ -174,6 +174,11 @@ impl SmartReceiver {
     fn pinned_box(self: Pin<Box<Self>>) -> u8 {
         self.0
     }
+
+    #[allow(dead_code)]
+    fn pinned_ref(self: Pin<&Self>) -> u8 {
+        self.0
+    }
 }
 
 #[test]
@@ -306,6 +311,22 @@ fn test_reflect_impl_generates_callable_adapters_for_owned_smart_receivers() {
         };
         assert_eq!(value, (expected as u8) + 11);
     }
+}
+
+#[test]
+fn test_reflect_impl_reports_pinned_borrow_receiver_without_adapter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(SmartReceiver::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "pinned_ref")
+    else {
+        panic!("pinned receiver method must be discoverable");
+    };
+    assert!(instance.adapter().is_none());
+    assert_eq!(
+        instance.unavailable_reasons(),
+        &[reflect::descriptor::InvocationUnavailableReason::UnsupportedReceiver],
+    );
 }
 
 #[test]
