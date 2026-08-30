@@ -1,30 +1,300 @@
-# `qubit-reflect` 需求追踪矩阵
+# qubit-reflect 需求追踪矩阵
 
-本矩阵的规范 ID 集合以
-[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) 为唯一来源。实施计划的
-“逐项需求映射”章节（从 `REQ-SYS-001` 开始）保留每个 ID 独立的一行映射；该章节是本矩阵的
-机器可核验明细，避免在两份文档中复制 284 行而产生漂移。
+本矩阵逐项对应最终需求规范中的全部 284 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个实现入口和至少一个验证入口；路径指向实现文件或其按职责组织的直接目录。
 
 ## 验证方法
 
 ```bash
 rg -o 'REQ-[A-Z]+-[0-9]+' doc/2026-08-28-qubit-reflect-requirements.zh_CN.md | sort -u > /tmp/reflect-requirements
-rg -o 'REQ-[A-Z]+-[0-9]+' doc/2026-08-29-qubit-reflect-implementation-plan.zh_CN.md | sort -u > /tmp/reflect-plan
-diff -u /tmp/reflect-requirements /tmp/reflect-plan
+rg -o 'REQ-[A-Z]+-[0-9]+' doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md | sort -u > /tmp/reflect-traceability
+diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 ```
 
-## 实现与测试入口
+## 逐项实现与验证映射
 
-| 需求范围 | 实现入口 | 验证入口 |
-| --- | --- | --- |
-| `REQ-DESC-*`、`REQ-TYPE-*`、`REQ-GEN-*` | `src/descriptor/`、`src/builtin/`、`derive/src/expand/` | `tests/descriptor/` |
-| `REQ-VAL-*`、`REQ-ACC-*` | `src/value/`、`src/access/` | `tests/value/`、`tests/access/` |
-| `REQ-INV-*`、`REQ-MTH-*` | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
-| `REQ-CON-*`、`REQ-VAR-*` | `src/construct/`、`derive/src/expand/{structs,enums}.rs` | `tests/construct/`、`tests/descriptor/derive_*_tests.rs` |
-| `REQ-AGG-*`、`REQ-TRT-*` | `src/registry/`、`src/descriptor/` | `tests/registry/`、`test-crates/registry-*` |
-| `REQ-MAC-*`、`REQ-ERR-*` | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
-| `REQ-INT-*`、`REQ-OUT-*`、`REQ-ACCPT-*` | `src/lib.rs`、`README*`、`doc/` | workspace、doctest、CI 对等检查 |
-
-每个具体 requirement 的任务映射位于
-[实施计划的逐项需求映射](2026-08-29-qubit-reflect-implementation-plan.zh_CN.md#逐项需求映射)，并以该
-需求范围中的实现和验证入口为最终代码证据。
+| 需求 | 实施任务 | 实现入口 | 验证入口 |
+| --- | --- | --- | --- |
+| REQ-ACC-001 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-002 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-003 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-004 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-005 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-006 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-007 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACC-008 | T08、T14、T15、T22 | `src/access/` | `tests/access/` |
+| REQ-ACCPT-001 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-002 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-003 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-004 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-005 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-006 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-007 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-008 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-009 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-010 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-011 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-012 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-013 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-014 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-015 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-016 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-017 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-018 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-019 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-020 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-021 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-022 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-023 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-024 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-025 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-026 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-027 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-028 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-029 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-030 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-031 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-032 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-033 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-034 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-035 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-036 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-037 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-038 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-039 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-040 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-041 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-042 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-043 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-044 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-045 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-046 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-047 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-048 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-AGG-001 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-002 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-003 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-004 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-005 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-006 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-007 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-008 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-009 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-010 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-011 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-012 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-013 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-014 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-AGG-015 | T12、T17、T20、T21、T26 | `src/registry/` | `tests/registry/`、`test-crates/registry-app/` |
+| REQ-CON-001 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-002 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-003 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-004 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-005 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-006 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-007 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-008 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-009 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-010 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-011 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-012 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-013 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-CON-014 | T10、T15、T19、T22 | `src/construct/`、`derive/src/expand/construction.rs` | `tests/construct/{runtime_tests,adapter_tests}.rs` |
+| REQ-DESC-001 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-002 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-003 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-004 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-005 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-006 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-007 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-008 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-009 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-010 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-DESC-011 | T02、T03、T05、T11、T25 | `src/descriptor/` | `tests/descriptor/` |
+| REQ-ERR-001 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-002 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-003 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-004 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-005 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-006 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-007 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-008 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-009 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-010 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-011 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-ERR-012 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/`、`src/{access,invoke,construct}/` | `tests/{access,invoke,construct}/`、`tests/ui/` |
+| REQ-FLD-001 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-002 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-003 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-004 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-005 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-006 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-007 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-008 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-009 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-010 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-FLD-011 | T05、T08、T14、T22 | `src/access/`、`src/descriptor/field_descriptor.rs` | `tests/access/` |
+| REQ-GEN-001 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-002 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-003 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-004 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-005 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-006 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-007 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-008 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-009 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-010 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-011 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-012 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-INT-001 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-002 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-003 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-004 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-005 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-006 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-007 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-008 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-009 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-010 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-011 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INT-012 | T23、T25、T26 | `src/lib.rs`、`test-crates/model-facade-*/` | `tests/registry/model_facade_tests.rs`、`test-crates/model-facade-app/` |
+| REQ-INV-001 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-002 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-003 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-004 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-005 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-006 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-007 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-008 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-009 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-010 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-011 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-012 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-013 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-014 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-015 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-016 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-MAC-001 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-002 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-003 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-004 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-005 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-006 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-007 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-008 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-009 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-010 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-011 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-012 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-013 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-014 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-015 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-016 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-018 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-020 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-021 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MTH-001 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-002 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-003 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-004 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-005 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-006 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-007 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-008 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-009 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-010 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-011 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-012 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-MTH-013 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
+| REQ-OUT-001 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-002 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-003 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-004 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-005 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-006 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-007 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-008 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-009 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-OUT-010 | T01、T05、T06、T07、T12、T23、T26 | `src/`、`derive/src/` | `tests/`、`test-crates/` |
+| REQ-SYS-001 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-002 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-003 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-004 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-005 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-006 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-007 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-008 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-009 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-010 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-011 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-012 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-013 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-TRT-001 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-002 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-003 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-004 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-005 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-006 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-007 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-008 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-009 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-010 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-011 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-012 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-013 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-014 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TRT-015 | T11、T16、T17、T20、T21 | `src/descriptor/{trait_descriptor,impl_descriptor}.rs`、`src/registry/effective_type_view.rs` | `tests/descriptor/{trait_tests,reflect_trait_tests}.rs`、`test-crates/registry-app/` |
+| REQ-TYPE-001 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-002 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-003 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-004 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-005 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-006 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-007 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-008 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-009 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-010 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-011 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-012 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-013 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-014 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-015 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-016 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-017 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-018 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-019 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-020 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-021 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-022 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-023 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-024 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-025 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-026 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-027 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-028 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-TYPE-029 | T05、T06、T14、T15 | `src/builtin/`、`src/descriptor/type_descriptor.rs` | `tests/descriptor/{builtin_tests,type_descriptor_tests}.rs` |
+| REQ-VAL-001 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-002 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-003 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-004 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-005 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-006 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-007 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-008 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-009 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-010 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-011 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-012 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-013 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-014 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAL-015 | T04、T22 | `src/value/` | `tests/value/` |
+| REQ-VAR-001 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-002 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-003 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-004 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-005 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-006 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-007 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-008 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+| REQ-VAR-009 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
