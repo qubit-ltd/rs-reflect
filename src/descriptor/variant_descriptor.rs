@@ -5,10 +5,16 @@ use std::fmt;
 
 use crate::access::VariantActiveAdapter;
 use crate::access::field_adapter::dynamic_ref_type_id;
+use crate::construct::ConstructionError;
+use crate::construct::ConstructionRecovery;
+use crate::construct::NamedConstructionInput;
+use crate::construct::TupleConstructionInput;
+use crate::construct::VariantConstructionDescriptor;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::error::TypeMismatch;
+use crate::value::ReflectedOwned;
 use crate::value::ReflectedRef;
 
 /// The declared shape of an enum variant.
@@ -59,6 +65,7 @@ pub struct VariantDescriptor {
     active_test: VariantActiveAdapter,
     discriminant_origin: DiscriminantOrigin,
     numeric_discriminant: Option<NumericDiscriminant>,
+    construction: Option<VariantConstructionDescriptor>,
 }
 
 impl VariantDescriptor {
@@ -87,6 +94,7 @@ impl VariantDescriptor {
             active_test,
             discriminant_origin: DiscriminantOrigin::Implicit,
             numeric_discriminant: None,
+            construction: None,
         }
     }
 
@@ -96,6 +104,52 @@ impl VariantDescriptor {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
         self
+    }
+
+    /// Attaches a generated dynamic-construction entry point to this variant.
+    #[doc(hidden)]
+    pub const fn with_construction(mut self, construction: VariantConstructionDescriptor) -> Self {
+        self.construction = Some(construction);
+        self
+    }
+
+    /// Returns the generated from-zero construction entry point, if enabled
+    /// for this variant.
+    pub const fn construction(&self) -> Option<&VariantConstructionDescriptor> {
+        self.construction.as_ref()
+    }
+
+    /// Constructs a named variant through its generated local adapter.
+    pub fn construct_struct(
+        &self,
+        input: NamedConstructionInput<crate::value::Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.construction() {
+            Some(construction) => construction.local_constructor().construct_named(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Constructs a tuple variant through its generated local adapter.
+    pub fn construct_tuple(
+        &self,
+        input: TupleConstructionInput<crate::value::Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Constructs a unit variant through its generated local adapter.
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.construction() {
+            Some(construction) => construction.local_constructor().construct_unit(),
+            None => Err(ConstructionRecovery::new(
+                ConstructionError::TargetUnavailable,
+                Vec::new(),
+            )),
+        }
     }
 
     /// Returns the enum root that contains this variant.

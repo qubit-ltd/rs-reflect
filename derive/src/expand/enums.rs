@@ -18,7 +18,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let Some(facade) = super::facade_path_for(&declaration.attributes) else {
         return TokenStream::new();
     };
-    let name = declaration.name;
+    let name = declaration.name.clone();
     let reflected_parameters: Vec<_> = declaration.generics.params.iter()
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .filter(|parameter| declaration.variants.iter().any(|variant| variant.fields.iter().any(|field|
@@ -36,6 +36,15 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     };
     {
         let where_clause = generics.make_where_clause();
+        for parameter in declaration
+            .generics
+            .params
+            .iter()
+            .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
+        {
+            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
+        }
         for parameter in &type_parameters {
             where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
@@ -80,25 +89,44 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .variants
         .iter()
         .flat_map(|variant| adapters(&name, variant, &facade));
+    let construction_adapters = declaration
+        .variants
+        .iter()
+        .map(|variant| super::construction::variant_adapters(variant, &facade));
     let variants = declaration
         .variants
         .iter()
         .map(|variant| variant_descriptor(&name, &quote!(#name #type_generics), variant, &facade, integer_repr.as_deref()));
+    let enum_descriptor = if declaration.generics.params.is_empty() {
+        quote!(#facade::__private::descriptor::enum_type::<Self>(#query_name, variants))
+    } else {
+        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        quote! {
+            #facade::__private::descriptor::with_concrete_generic(
+                #facade::__private::descriptor::enum_type::<Self>(#query_name, variants),
+                ::std::boxed::Box::leak(::std::boxed::Box::new(#generic)),
+            )
+        }
+    };
     let registration = registration(&facade, &name, &registration_module, fingerprint, !declaration.generics.params.is_empty());
-    quote! {
-        impl #impl_generics #name #type_generics #where_clause { #(#adapters)* }
+    let root_descriptor = quote! {
+        impl #impl_generics #name #type_generics #where_clause {
+            #(#adapters)*
+            #(#construction_adapters)*
+        }
 
         impl #impl_generics #facade::Reflect for #name #type_generics #where_clause {
             fn type_descriptor() -> &'static #facade::TypeDescriptor {
                 #facade::__private::intern_type::<Self>(|| {
                     let variants = ::std::boxed::Box::leak(::std::vec![#(#variants),*].into_boxed_slice());
-                    #facade::__private::descriptor::enum_type::<Self>(#query_name, variants)
+                    #enum_descriptor
                 })
             }
         }
 
         #registration
-    }
+    };
+    root_descriptor
 }
 
 /// Emits the static registry fragment for one concrete derived enum root.
@@ -195,14 +223,14 @@ fn adapters(_name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenSt
                 ), #variant_index, #variant_name_text,
             ));
             vec![quote! {
-                fn #get<'a>(target: #facade::value::ReflectedRef<'a>)
-                    -> ::core::result::Result<#facade::value::ReflectedRef<'a>, #facade::access::FieldAccessError>
+                fn #get<'__qubit_reflect>(target: #facade::value::ReflectedRef<'__qubit_reflect>)
+                    -> ::core::result::Result<#facade::value::ReflectedRef<'__qubit_reflect>, #facade::access::FieldAccessError>
                 {
                     let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
                     match value { #pattern => Ok(#facade::value::ReflectedRef::new(#binding)), _ => Err(#inactive) }
                 }
-                fn #get_mut<'a>(target: #facade::value::ReflectedMut<'a>)
-                    -> ::core::result::Result<#facade::value::ReflectedMut<'a>, #facade::access::FieldAccessError>
+                fn #get_mut<'__qubit_reflect>(target: #facade::value::ReflectedMut<'__qubit_reflect>)
+                    -> ::core::result::Result<#facade::value::ReflectedMut<'__qubit_reflect>, #facade::access::FieldAccessError>
                 {
                     let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
                     match value { #pattern => Ok(#facade::value::ReflectedMut::new(#binding)), _ => Err(#inactive) }
@@ -279,10 +307,12 @@ fn variant_descriptor(
             ::std::boxed::Box::leak(::std::boxed::Box::new(#field_type)), #facade::identity::Visibility::Private)
             .with_access(#policy).with_variant(#variant_index, #variant_rust_name))
     });
+    let construction = super::construction::variant_descriptor(variant, facade);
     quote! {{
         let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
         #facade::__private::descriptor::variant(<#self_type as #facade::Reflect>::type_descriptor, #variant_index, #variant_rust_name, #query_name, #kind, fields, <#self_type>::#active)
             .with_discriminant(#origin, #numeric_discriminant)
+            #construction
     }}
 }
 

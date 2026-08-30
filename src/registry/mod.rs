@@ -1,6 +1,7 @@
 //! Reflection registry APIs.
 
 mod builder;
+mod effective_type_view;
 pub(crate) mod fragment;
 mod indexes;
 #[allow(
@@ -11,6 +12,7 @@ mod registry;
 
 pub(crate) use builder::build_registry;
 pub(crate) use builder::initialize_registry;
+pub use effective_type_view::EffectiveTypeView;
 pub use registry::ReflectRegistry;
 pub use registry::TraitCandidates;
 pub use registry::TypeCandidates;

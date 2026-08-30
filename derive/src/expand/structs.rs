@@ -19,7 +19,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let Some(facade) = super::facade_path_for(&declaration.attributes) else {
         return TokenStream::new();
     };
-    let name = declaration.name;
+    let name = declaration.name.clone();
     let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
     let registration_module = format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
     let opaque_root = declaration
@@ -55,6 +55,15 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     };
     {
         let where_clause = generics.make_where_clause();
+        for parameter in declaration
+            .generics
+            .params
+            .iter()
+            .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
+        {
+            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
+        }
         for parameter in &type_parameter_names {
             where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
@@ -90,16 +99,16 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             }
         };
         quote! {
-            fn #get<'a>(target: #facade::value::ReflectedRef<'a>)
-                -> ::core::result::Result<#facade::value::ReflectedRef<'a>, #facade::access::FieldAccessError>
+            fn #get<'__qubit_reflect>(target: #facade::value::ReflectedRef<'__qubit_reflect>)
+                -> ::core::result::Result<#facade::value::ReflectedRef<'__qubit_reflect>, #facade::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
                 Ok(#facade::value::ReflectedRef::new(&value.#access))
             }
 
-            fn #get_mut<'a>(target: #facade::value::ReflectedMut<'a>)
-                -> ::core::result::Result<#facade::value::ReflectedMut<'a>, #facade::access::FieldAccessError>
+            fn #get_mut<'__qubit_reflect>(target: #facade::value::ReflectedMut<'__qubit_reflect>)
+                -> ::core::result::Result<#facade::value::ReflectedMut<'__qubit_reflect>, #facade::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
@@ -119,6 +128,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
         }).collect()
         };
+    let construction_adapters = if opaque_root {
+        TokenStream::new()
+    } else {
+        super::construction::struct_adapters(&declaration, &facade)
+    };
+    let construction_descriptor = super::construction::struct_descriptor(&facade);
     let fields: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -167,13 +182,22 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
         _ => quote!(#facade::descriptor::StructKind::Named),
     };
-    let descriptor = if opaque_root {
+    let root_descriptor = if opaque_root {
         quote!(#facade::__private::descriptor::opaque_root::<Self>(#query_name))
     } else {
         quote! {
             let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-            #facade::__private::descriptor::struct_type::<Self>(#query_name, #struct_kind, fields)
+            #facade::__private::descriptor::struct_type_with_construction::<Self>(
+                #query_name, #struct_kind, fields, #construction_descriptor,
+            )
         }
+    };
+    let descriptor = if declaration.generics.params.is_empty() {
+        root_descriptor
+    } else {
+        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        quote!(#facade::__private::descriptor::with_concrete_generic({ #root_descriptor },
+            ::std::boxed::Box::leak(::std::boxed::Box::new(#generic))))
     };
     let registration = registration(
         &facade,
@@ -183,7 +207,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         !declaration.generics.params.is_empty(),
     );
     quote! {
-        impl #impl_generics #name #type_generics #where_clause { #(#adapter_definitions)* }
+        impl #impl_generics #name #type_generics #where_clause {
+            #(#adapter_definitions)*
+            #construction_adapters
+        }
 
         impl #impl_generics #facade::Reflect for #name #type_generics #where_clause {
             fn type_descriptor() -> &'static #facade::TypeDescriptor {

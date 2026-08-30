@@ -11,9 +11,11 @@
 mod error;
 mod input;
 mod recovery;
+mod struct_construction_descriptor;
 mod struct_constructor;
 mod update;
 mod validated;
+mod variant_construction_descriptor;
 mod variant_constructor;
 
 pub use error::ConstructionError;
@@ -30,6 +32,7 @@ pub use input::UpdateField;
 pub use input::UpdateFieldPolicy;
 pub use recovery::ConstructionRecovery;
 pub use recovery::RecoveredConstructionValue;
+pub use struct_construction_descriptor::StructConstructionDescriptor;
 pub use struct_constructor::StructConstructionAdapter;
 pub use struct_constructor::StructConstructor;
 pub use update::StructUpdateAdapter;
@@ -37,5 +40,6 @@ pub use update::StructUpdater;
 pub use validated::ValidatedConstructionInput;
 pub use validated::ValidatedOverride;
 pub use validated::ValidatedUpdateInput;
+pub use variant_construction_descriptor::VariantConstructionDescriptor;
 pub use variant_constructor::VariantConstructionAdapter;
 pub use variant_constructor::VariantConstructor;

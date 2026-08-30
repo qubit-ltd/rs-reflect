@@ -6,7 +6,13 @@ use std::fmt;
 
 use crate::capability::CapabilityKey;
 use crate::capability::TypeCapabilities;
+use crate::construct::ConstructionError;
+use crate::construct::ConstructionRecovery;
+use crate::construct::NamedConstructionInput;
+use crate::construct::StructConstructionDescriptor;
+use crate::construct::TupleConstructionInput;
 use crate::descriptor::ArrayTypeDescriptor;
+use crate::descriptor::ConcreteGenericDescriptor;
 use crate::descriptor::EnumTypeDescriptor;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::FunctionPointerKind;
@@ -40,6 +46,7 @@ use crate::descriptor::VariantDescriptor;
 use crate::descriptor::type_ref::type_id_of;
 use crate::descriptor::type_ref::type_name_of;
 use crate::expression::FunctionAbi;
+use crate::value::ReflectedOwned;
 
 /// The sole public generic contract for types that provide a static reflection
 /// descriptor.
@@ -82,6 +89,8 @@ pub struct TypeDescriptor {
     fields: &'static [FieldDescriptor],
     variants: &'static [VariantDescriptor],
     capabilities: fn() -> &'static TypeCapabilities,
+    construction: Option<StructConstructionDescriptor>,
+    generic: Option<&'static ConcreteGenericDescriptor>,
 }
 
 impl TypeDescriptor {
@@ -89,6 +98,52 @@ impl TypeDescriptor {
     /// implementation.
     pub fn of<T: Reflect + ?Sized>() -> &'static Self {
         T::type_descriptor()
+    }
+
+    /// Returns generated construction and owned-update entry points for a
+    /// reflected struct root, if that root exposes them.
+    pub const fn struct_construction(&self) -> Option<&StructConstructionDescriptor> {
+        self.construction.as_ref()
+    }
+
+    /// Returns the declaration and concrete substitution facts for a generic
+    /// root instance, if this root was derived from generic source.
+    pub const fn concrete_generic(&self) -> Option<&'static ConcreteGenericDescriptor> {
+        self.generic
+    }
+
+    /// Constructs a named struct through its generated local adapter.
+    pub fn construct_struct(
+        &self,
+        input: NamedConstructionInput<crate::value::Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_named(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Constructs a tuple or newtype struct through its generated local
+    /// adapter.
+    pub fn construct_tuple(
+        &self,
+        input: TupleConstructionInput<crate::value::Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Constructs a unit struct through its generated local adapter.
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_unit(),
+            None => Err(ConstructionRecovery::new(
+                ConstructionError::TargetUnavailable,
+                Vec::new(),
+            )),
+        }
     }
 
     /// Creates a primitive root for generated or built-in descriptor data.
@@ -126,6 +181,20 @@ impl TypeDescriptor {
             fields,
             &[],
         )
+    }
+
+    /// Attaches generated struct construction entry points to this root.
+    #[doc(hidden)]
+    pub const fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
+        self.construction = Some(construction);
+        self
+    }
+
+    /// Attaches generic declaration and concrete-instance facts to this root.
+    #[doc(hidden)]
+    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
+        self.generic = Some(generic);
+        self
     }
 
     /// Creates an enum root for generated descriptor data.
@@ -399,6 +468,8 @@ impl TypeDescriptor {
             fields,
             variants,
             capabilities,
+            construction: None,
+            generic: None,
         }
     }
 
