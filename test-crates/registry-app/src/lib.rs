@@ -18,5 +18,15 @@ mod tests {
         let implementations = registry.implementations(RegistryUser::type_descriptor().type_id());
         assert_eq!(implementations.len(), 2);
         assert!(implementations.iter().all(|implementation| implementation.implemented_trait().is_some()));
+
+        let effective = registry.effective_view(RegistryUser::type_descriptor().type_id());
+        assert_eq!(effective.implementations().len(), 2);
+        assert_eq!(effective.methods().len(), 2);
+        let names: Vec<_> = effective
+            .methods()
+            .iter()
+            .map(|method| method.declaration().query_name())
+            .collect();
+        assert_eq!(names, ["label_a", "label_b"]);
     }
 }

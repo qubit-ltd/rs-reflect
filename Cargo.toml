@@ -66,3 +66,7 @@ harness = false
 [[bench]]
 name = "registry_init"
 harness = false
+
+[[bench]]
+name = "dynamic_operations"
+harness = false

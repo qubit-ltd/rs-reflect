@@ -1,0 +1,5 @@
+error: `no_construct` is not valid on a type
+ --> tests/ui/fail/no_construct_type.rs:4:11
+  |
+4 | #[reflect(no_construct)]
+  |           ^^^^^^^^^^^^
