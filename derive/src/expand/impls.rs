@@ -113,13 +113,18 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                 .receiver
                 .as_ref()
                 .and_then(typed_pinned_receiver_mutable);
+            let typed_extension_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             ) || typed_owned_receiver.is_some()
-                || typed_pinned_receiver.is_some();
+                || typed_pinned_receiver.is_some()
+                || typed_extension_receiver.is_some();
             let supported_parameters = method
                 .parameters
                 .iter()
@@ -316,7 +321,40 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
             } else {
                 quote!(#facade::invoke::ReceiverExpectation::none())
             };
-            let receiver_binding = if matches!(
+            let receiver_binding = if let Some(receiver_type) = &typed_extension_receiver {
+                quote! {
+                    let (receiver, arguments) = validated.into_parts();
+                    let receiver = match receiver {
+                        Some(receiver) => receiver,
+                        None => return Err(#facade::invoke::Invocation::associated(arguments).reject(
+                            &identity,
+                            #facade::invoke::InvocationErrorKind::ReceiverAdapterRejected {
+                                expected_name: ::std::any::type_name::<#receiver_type>(),
+                            },
+                        )),
+                    };
+                    let adapter = match <#target as #facade::Reflect>::type_descriptor()
+                        .get_capability(#facade::invoke::receiver_adapter_key::<#receiver_type, #mode>())
+                    {
+                        Some(adapter) => adapter,
+                        None => return Err(#facade::invoke::Invocation::new(Some(receiver), arguments).reject(
+                            &identity,
+                            #facade::invoke::InvocationErrorKind::ReceiverAdapterUnavailable {
+                                expected_name: ::std::any::type_name::<#receiver_type>(),
+                            },
+                        )),
+                    };
+                    let receiver: #receiver_type = match adapter(receiver) {
+                        Ok(receiver) => receiver,
+                        Err(receiver) => return Err(#facade::invoke::Invocation::new(Some(receiver), arguments).reject(
+                            &identity,
+                            #facade::invoke::InvocationErrorKind::ReceiverAdapterRejected {
+                                expected_name: ::std::any::type_name::<#receiver_type>(),
+                            },
+                        )),
+                    };
+                }
+            } else if matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 Some(ReceiverKindIr::Value)
             ) {
@@ -375,6 +413,15 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                 .iter()
                 .map(|parameter| invocation_argument_expectation(parameter, &facade))
                 .collect();
+            let invocation_validation = if typed_extension_receiver.is_some() {
+                quote!(invocation.validate_arguments(&identity, &[#(#parameter_expectations),*])?)
+            } else {
+                quote!(invocation.validate(
+                    &identity,
+                    #receiver_expectation,
+                    &[#(#parameter_expectations),*],
+                )?)
+            };
             let argument_bindings: Vec<_> = method
                 .parameters
                 .iter()
@@ -517,11 +564,7 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                     let identity = #facade::identity::MemberId::new(
                         #target_source, "method", #index, fragment_identity(),
                     );
-                    let validated = invocation.validate(
-                        &identity,
-                        #receiver_expectation,
-                        &[#(#parameter_expectations),*],
-                    )?;
+                    let validated = #invocation_validation;
                     Ok({ #output })
                 }
 
@@ -553,6 +596,10 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                 .receiver
                 .as_ref()
                 .and_then(typed_pinned_receiver_mutable);
+            let typed_extension_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
             if typed_pinned_receiver.is_some() {
                 let is_safe_pinned_invocation = !has_trait
                     && supported_parameters
@@ -586,6 +633,7 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             ) || typed_owned_receiver.is_some();
+            let supported_receiver = supported_receiver || typed_extension_receiver.is_some();
             let is_safe_invocation = !has_trait
                 && supported_receiver
                 && supported_parameters
@@ -611,7 +659,29 @@ fn expand_concrete_impl(declaration: ImplDeclarationIr, impl_arguments: TokenStr
                 );
             if is_safe_invocation {
                 let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-                quote!(Some(&#descriptor_name))
+                if let Some(receiver_type) = typed_extension_receiver {
+                    let mode = if method
+                        .attributes
+                        .iter()
+                        .any(|attribute| attribute.name == HelperName::ThreadSafe)
+                    {
+                        quote!(#facade::value::ThreadSafe)
+                    } else {
+                        quote!(#facade::value::Local)
+                    };
+                    quote!(
+                        if <#target as #facade::Reflect>::type_descriptor()
+                            .get_capability(#facade::invoke::receiver_adapter_key::<#receiver_type, #mode>())
+                            .is_some()
+                        {
+                            Some(&#descriptor_name)
+                        } else {
+                            None
+                        }
+                    )
+                } else {
+                    quote!(Some(&#descriptor_name))
+                }
             } else {
                 quote!(None)
             }
@@ -1271,6 +1341,25 @@ fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStr
         }
         _ => None,
     }
+}
+
+/// Returns a non-core explicit receiver type that requires a registered
+/// `ReceiverAdapter` capability for dynamic invocation.
+fn typed_extension_receiver_type(
+    receiver: &crate::ir::ReceiverIr,
+    target: &TokenStream,
+) -> Option<TokenStream> {
+    if receiver.kind != ReceiverKindIr::Typed
+        || typed_pinned_receiver_mutable(receiver).is_some()
+        || typed_owned_receiver_type(receiver, &quote!(Self)).is_some()
+    {
+        return None;
+    }
+    let self_identifier = Ident::new("Self", receiver.span);
+    Some(substitute_tokens(
+        &receiver.ty.tokens,
+        &[(self_identifier, target.clone())],
+    ))
 }
 
 /// Returns whether a typed receiver is `Pin<&mut Self>` (`true`) or

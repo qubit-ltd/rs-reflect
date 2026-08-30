@@ -167,6 +167,14 @@ struct PinnedOnlyReceiver {
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
+struct ExtensionReceiver(u8);
+
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
+struct UnadaptedReceiver;
+
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
 struct SpecializedGenericImpl<T>(std::marker::PhantomData<T>);
 
 #[derive(reflect::Reflect)]
@@ -235,6 +243,35 @@ impl PinnedOnlyReceiver {
         self.value
     }
 }
+
+#[reflect_impl]
+impl ExtensionReceiver {
+    fn extension(self: Pin<Rc<Self>>) -> u8 {
+        self.0
+    }
+}
+
+#[reflect_impl]
+impl UnadaptedReceiver {
+    fn extension(self: Pin<Rc<Self>>) {}
+}
+
+fn extension_receiver_adapter<'call>(
+    receiver: reflect::invoke::InvocationReceiver<'call, reflect::value::Local>,
+) -> Result<Pin<Rc<ExtensionReceiver>>, reflect::invoke::InvocationReceiver<'call, reflect::value::Local>> {
+    match receiver {
+        reflect::invoke::InvocationReceiver::Owned(value) => {
+            reflect::value::DynamicOwned::<reflect::value::Local>::downcast::<Pin<Rc<ExtensionReceiver>>>(value)
+                .map_err(reflect::invoke::InvocationReceiver::Owned)
+        }
+        receiver => Err(receiver),
+    }
+}
+
+reflect::register_type_capabilities!(ExtensionReceiver: [
+    reflect::invoke::receiver_adapter_key::<Pin<Rc<ExtensionReceiver>>, reflect::value::Local>()
+        => extension_receiver_adapter
+]);
 
 #[reflect_impl(specialize(T = u8))]
 impl<T> SpecializedGenericImpl<T> {
@@ -495,6 +532,51 @@ fn test_reflect_impl_invokes_pinned_borrow_receivers_without_erasing_pin() {
         panic!("pinned mutable output must retain type");
     };
     assert_eq!(mutable_value, 42);
+}
+
+#[test]
+fn test_reflect_impl_invokes_an_explicit_receiver_through_a_registered_adapter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(ExtensionReceiver::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "extension")
+    else {
+        panic!("registered extension receiver method must be discoverable");
+    };
+    let adapter = instance
+        .adapter()
+        .expect("registered receiver adapter must enable invocation");
+    let output = adapter
+        .invoke_local(Invocation::owned(
+            DynamicOwned::<reflect::value::Local>::new(Pin::new(Rc::new(ExtensionReceiver(53)))),
+            [],
+        ))
+        .expect("local adapter must be present")
+        .expect("receiver adapter must accept the exact container");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("extension receiver must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+        panic!("extension receiver output must retain its concrete type");
+    };
+    assert_eq!(value, 53);
+}
+
+#[test]
+fn test_reflect_impl_only_describes_an_explicit_receiver_without_an_adapter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(UnadaptedReceiver::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "extension")
+    else {
+        panic!("unadapted explicit receiver method must remain discoverable");
+    };
+    assert!(instance.adapter().is_none());
+    assert!(
+        instance
+            .unavailable_reasons()
+            .contains(&reflect::descriptor::InvocationUnavailableReason::UnsupportedReceiver)
+    );
 }
 
 #[test]

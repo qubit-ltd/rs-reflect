@@ -54,7 +54,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-030 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
 | REQ-ACCPT-031 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
 | REQ-ACCPT-032 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
-| REQ-ACCPT-033 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
+| REQ-ACCPT-033 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/receiver.rs`、`derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-ACCPT-034 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
 | REQ-ACCPT-035 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
 | REQ-ACCPT-036 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/`、`derive/src/`、`doc/` | `tests/`、`benches/`、`fuzz/`、CI |
@@ -166,7 +166,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-INV-007 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
 | REQ-INV-008 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
 | REQ-INV-009 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
-| REQ-INV-010 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
+| REQ-INV-010 | T09、T17、T18、T20、T22 | `src/invoke/{receiver,invocation}.rs`、`derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-INV-011 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
 | REQ-INV-012 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
 | REQ-INV-013 | T09、T17、T18、T20、T22 | `src/invoke/`、`derive/src/expand/impls.rs` | `tests/invoke/{runtime_tests,adapter_tests}.rs` |
@@ -191,7 +191,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-MAC-016 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MAC-018 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
-| REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
+| REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/{descriptor,ui}/` |
 | REQ-MAC-020 | T13、T14、T15、T16、T17、T20、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/{descriptor,ui}/` |
 | REQ-MAC-021 | T13、T14、T15、T16、T17、T22 | `derive/src/{parse,ir,validate,expand}/` | `derive/tests/`、`tests/ui/` |
 | REQ-MTH-001 | T09、T11、T17、T18、T20 | `src/invoke/`、`src/descriptor/method_descriptor.rs` | `tests/invoke/`、`tests/descriptor/reflect_impl_tests.rs` |
