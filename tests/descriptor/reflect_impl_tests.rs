@@ -1,6 +1,7 @@
 // qubit-style: allow explicit-imports
 //! Integration coverage for implementation registration expansion.
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -159,11 +160,29 @@ impl Counter {
 
 struct SmartReceiver(u8);
 
+struct PinnedOnlyReceiver {
+    value: u8,
+    _pin: PhantomPinned,
+}
+
 impl Reflect for SmartReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
             reflect::__private::descriptor::struct_type::<SmartReceiver>("SmartReceiver", StructKind::Named, &[])
+        })
+    }
+}
+
+impl Reflect for PinnedOnlyReceiver {
+    fn type_descriptor() -> &'static reflect::TypeDescriptor {
+        static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
+        DESCRIPTOR.get_or_init(|| {
+            reflect::__private::descriptor::struct_type::<PinnedOnlyReceiver>(
+                "PinnedOnlyReceiver",
+                StructKind::Named,
+                &[],
+            )
         })
     }
 }
@@ -190,6 +209,22 @@ impl SmartReceiver {
     #[allow(dead_code)]
     fn pinned_ref(self: Pin<&Self>) -> u8 {
         self.0
+    }
+
+    #[allow(dead_code)]
+    fn pinned_mut(self: Pin<&mut Self>) -> u8 {
+        self.0
+    }
+}
+
+#[reflect_impl]
+impl PinnedOnlyReceiver {
+    fn pinned_ref(self: Pin<&Self>) -> u8 {
+        self.value
+    }
+
+    fn pinned_mut(self: Pin<&mut Self>) -> u8 {
+        self.value
     }
 }
 
@@ -386,19 +421,54 @@ fn test_reflect_impl_generates_callable_adapters_for_owned_smart_receivers() {
 }
 
 #[test]
-fn test_reflect_impl_reports_pinned_borrow_receiver_without_adapter() {
+fn test_reflect_impl_invokes_pinned_borrow_receivers_without_erasing_pin() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
-    let implementations = registry.implementations(SmartReceiver::type_descriptor().type_id());
-    let reflect::descriptor::MethodLookup::Unique(instance) =
+    let implementations = registry.implementations(PinnedOnlyReceiver::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(shared_instance) =
         reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "pinned_ref")
     else {
         panic!("pinned receiver method must be discoverable");
     };
-    assert!(instance.adapter().is_none());
-    assert_eq!(
-        instance.unavailable_reasons(),
-        &[reflect::descriptor::InvocationUnavailableReason::UnsupportedReceiver],
-    );
+    let shared_adapter = shared_instance.adapter().expect("pinned shared receiver needs adapter");
+    let shared_receiver = Box::pin(PinnedOnlyReceiver {
+        value: 41,
+        _pin: PhantomPinned,
+    });
+    let shared_output = shared_adapter
+        .invoke_pinned_ref_local(reflect::invoke::PinnedRefInvocation::new(shared_receiver.as_ref(), []))
+        .expect("exact typed pinned adapter must be present")
+        .expect("pinned shared invocation must validate");
+    let InvocationOutput::Owned(shared_value) = shared_output else {
+        panic!("pinned shared method must return an owned value");
+    };
+    let Ok(shared_value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(shared_value) else {
+        panic!("pinned shared output must retain type");
+    };
+    assert_eq!(shared_value, 41);
+
+    let reflect::descriptor::MethodLookup::Unique(mutable_instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "pinned_mut")
+    else {
+        panic!("pinned mutable receiver method must be discoverable");
+    };
+    let mutable_adapter = mutable_instance
+        .adapter()
+        .expect("pinned mutable receiver needs adapter");
+    let mut mutable_receiver = Box::pin(PinnedOnlyReceiver {
+        value: 42,
+        _pin: PhantomPinned,
+    });
+    let mutable_output = mutable_adapter
+        .invoke_pinned_mut_local(reflect::invoke::PinnedMutInvocation::new(mutable_receiver.as_mut(), []))
+        .expect("exact typed pinned adapter must be present")
+        .expect("pinned mutable invocation must validate");
+    let InvocationOutput::Owned(mutable_value) = mutable_output else {
+        panic!("pinned mutable method must return an owned value");
+    };
+    let Ok(mutable_value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(mutable_value) else {
+        panic!("pinned mutable output must retain type");
+    };
+    assert_eq!(mutable_value, 42);
 }
 
 #[test]

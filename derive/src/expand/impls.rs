@@ -73,12 +73,17 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 .receiver
                 .as_ref()
                 .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
+            let typed_pinned_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(typed_pinned_receiver_mutable);
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
-            ) || typed_owned_receiver.is_some();
+            ) || typed_owned_receiver.is_some()
+                || typed_pinned_receiver.is_some();
             let supported_parameters = method
                 .parameters
                 .iter()
@@ -106,6 +111,110 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                             ..
                         })
                 );
+            let pinned_receiver_mutable = method
+                .receiver
+                .as_ref()
+                .and_then(typed_pinned_receiver_mutable);
+            if let Some(pinned_mutable) = pinned_receiver_mutable {
+                let is_safe_pinned_invocation = !has_trait
+                    && supported_parameters
+                    && method.generics.params.is_empty()
+                    && !method.qualifiers.is_async
+                    && !method.qualifiers.is_unsafe
+                    && method.qualifiers.abi.is_none()
+                    && !method.qualifiers.is_variadic
+                    && !is_borrow_return(&method.return_type)
+                    && !method
+                        .attributes
+                        .iter()
+                        .any(|attribute| attribute.name == HelperName::NoInvoke)
+                    && matches!(
+                        method.return_type,
+                        ReturnTypeIr::Unit
+                            | ReturnTypeIr::Type(crate::ir::TypeIr {
+                                kind: TypeKindIr::Path(_),
+                                ..
+                            })
+                    );
+                if is_safe_pinned_invocation {
+                    let method_name = &method.name;
+                    let adapter_name = format_ident!("__qubit_reflect_invoke_pinned_{index}");
+                    let adapter_token_name = format_ident!("__QUBIT_REFLECT_PINNED_ADAPTER_{index}");
+                    let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+                    let parameter_expectations: Vec<_> = method
+                        .parameters
+                        .iter()
+                        .map(|parameter| invocation_argument_expectation(parameter, &facade))
+                        .collect();
+                    let mode = quote!(#facade::value::Local);
+                    let argument_bindings: Vec<_> = method
+                        .parameters
+                        .iter()
+                        .map(|parameter| invocation_argument_binding(parameter, &facade, &mode))
+                        .collect();
+                    let call_arguments: Vec<_> = method
+                        .parameters
+                        .iter()
+                        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
+                        .collect();
+                    let invocation_type = if pinned_mutable {
+                        quote!(#facade::invoke::PinnedMutInvocation<'call, #target, #facade::value::Local>)
+                    } else {
+                        quote!(#facade::invoke::PinnedRefInvocation<'call, #target, #facade::value::Local>)
+                    };
+                    let failure_type = if pinned_mutable {
+                        quote!(#facade::invoke::PinnedMutInvocationFailure<'call, #target, #facade::value::Local>)
+                    } else {
+                        quote!(#facade::invoke::PinnedRefInvocationFailure<'call, #target, #facade::value::Local>)
+                    };
+                    let adapter_type = if pinned_mutable {
+                        quote!(#facade::invoke::PinnedMutAdapter<#target, #facade::value::Local>)
+                    } else {
+                        quote!(#facade::invoke::PinnedRefAdapter<#target, #facade::value::Local>)
+                    };
+                    let constructor = if pinned_mutable {
+                        quote!(#facade::descriptor::InvocationAdapter::pinned_mut_local(&#adapter_token_name))
+                    } else {
+                        quote!(#facade::descriptor::InvocationAdapter::pinned_ref_local(&#adapter_token_name))
+                    };
+                    let output = match method.return_type {
+                        ReturnTypeIr::Unit => quote! {
+                            <#target>::#method_name(receiver, #(#call_arguments),*);
+                            #facade::invoke::InvocationOutput::Unit
+                        },
+                        ReturnTypeIr::Type(_) => quote! {
+                            #facade::invoke::InvocationOutput::Owned(
+                                #facade::value::DynamicOwned::<#facade::value::Local>::new(
+                                    <#target>::#method_name(receiver, #(#call_arguments),*),
+                                ),
+                            )
+                        },
+                    };
+                    return Some(quote! {
+                        fn #adapter_name<'call>(
+                            invocation: #invocation_type,
+                        ) -> ::core::result::Result<
+                            #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
+                            #failure_type,
+                        > {
+                            let identity = #facade::identity::MemberId::new(
+                                #target_source, "method", #index, fragment_identity(),
+                            );
+                            let validated = invocation.validate(&identity, &[#(#parameter_expectations),*])?;
+                            let (receiver, arguments) = validated.into_parts();
+                            let mut arguments = arguments.into_vec().into_iter();
+                            #(#argument_bindings)*
+                            Ok(#output)
+                        }
+
+                        static #adapter_token_name: #adapter_type = #adapter_name;
+                        static #descriptor_name: #facade::descriptor::InvocationAdapter = #constructor;
+                    });
+                }
+            }
+            if pinned_receiver_mutable.is_some() {
+                return None;
+            }
             if !is_safe_invocation {
                 return None;
             }
@@ -396,20 +505,51 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
         })
         .enumerate()
         .map(|(index, method)| {
+            let supported_parameters = method
+                .parameters
+                .iter()
+                .all(|parameter| supports_invocation_parameter(&parameter.ty));
             let typed_owned_receiver = method
                 .receiver
                 .as_ref()
                 .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
+            let typed_pinned_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(typed_pinned_receiver_mutable);
+            if typed_pinned_receiver.is_some() {
+                let is_safe_pinned_invocation = !has_trait
+                    && supported_parameters
+                    && method.generics.params.is_empty()
+                    && !method.qualifiers.is_async
+                    && !method.qualifiers.is_unsafe
+                    && method.qualifiers.abi.is_none()
+                    && !method.qualifiers.is_variadic
+                    && !is_borrow_return(&method.return_type)
+                    && !method
+                        .attributes
+                        .iter()
+                        .any(|attribute| attribute.name == HelperName::NoInvoke)
+                    && matches!(
+                        method.return_type,
+                        ReturnTypeIr::Unit
+                            | ReturnTypeIr::Type(crate::ir::TypeIr {
+                                kind: TypeKindIr::Path(_),
+                                ..
+                            })
+                    );
+                if is_safe_pinned_invocation {
+                    let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+                    return quote!(Some(&#descriptor_name));
+                }
+                return quote!(None);
+            }
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
             ) || typed_owned_receiver.is_some();
-            let supported_parameters = method
-                .parameters
-                .iter()
-                .all(|parameter| supports_invocation_parameter(&parameter.ty));
             let is_safe_invocation = !has_trait
                 && supported_receiver
                 && supported_parameters
@@ -973,6 +1113,28 @@ fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStr
         }
         _ => None,
     }
+}
+
+/// Returns whether a typed receiver is `Pin<&mut Self>` (`true`) or
+/// `Pin<&Self>` (`false`).
+fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) -> Option<bool> {
+    if receiver.kind != ReceiverKindIr::Typed {
+        return None;
+    }
+    let TypeKindIr::Path(path) = &receiver.ty.kind else {
+        return None;
+    };
+    let segment = path.segments.last()?;
+    let PathArgumentsIr::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    let [PathArgumentIr::Type(argument)] = arguments.as_slice() else {
+        return None;
+    };
+    let TypeKindIr::Reference { mutable, element, .. } = &argument.kind else {
+        return None;
+    };
+    (segment.name == "Pin" && is_self_type(element)).then_some(*mutable)
 }
 
 /// Returns whether `ty` is the receiver's unqualified `Self` type.

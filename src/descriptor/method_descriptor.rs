@@ -1,6 +1,7 @@
 // qubit-style: allow public-type-layout
 //! Immutable declarations and concrete instances of reflected methods.
 
+use std::any::Any;
 use std::fmt;
 
 use crate::descriptor::ImplDefinitionDescriptor;
@@ -264,6 +265,8 @@ pub struct InvocationAdapter {
     local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
     thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
     catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
+    pinned_ref_local: Option<&'static (dyn Any + Send + Sync)>,
+    pinned_mut_local: Option<&'static (dyn Any + Send + Sync)>,
 }
 
 impl InvocationAdapter {
@@ -275,6 +278,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: None,
             catching_local: None,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
         }
     }
 
@@ -289,6 +294,8 @@ impl InvocationAdapter {
             local: Some(entry_point),
             thread_safe: None,
             catching_local: None,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
         }
     }
 
@@ -304,6 +311,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: Some(entry_point),
             catching_local: None,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
         }
     }
 
@@ -319,6 +328,42 @@ impl InvocationAdapter {
             local: Some(entry_point),
             thread_safe: None,
             catching_local: Some(catching_entry_point),
+            pinned_ref_local: None,
+            pinned_mut_local: None,
+        }
+    }
+
+    /// Creates a descriptor for a typed local `Pin<&T>` entry point.
+    ///
+    /// The concrete adapter remains behind `Any` only for descriptor storage;
+    /// [`Self::invoke_pinned_ref_local`] downcasts it by the caller's `T`
+    /// without erasing or reconstructing the pin proof.
+    #[doc(hidden)]
+    pub const fn pinned_ref_local<T: 'static>(
+        entry_point: &'static crate::invoke::PinnedRefAdapter<T, crate::value::Local>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: None,
+            thread_safe: None,
+            catching_local: None,
+            pinned_ref_local: Some(entry_point),
+            pinned_mut_local: None,
+        }
+    }
+
+    /// Creates a descriptor for a typed local `Pin<&mut T>` entry point.
+    #[doc(hidden)]
+    pub const fn pinned_mut_local<T: 'static>(
+        entry_point: &'static crate::invoke::PinnedMutAdapter<T, crate::value::Local>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: None,
+            thread_safe: None,
+            catching_local: None,
+            pinned_ref_local: None,
+            pinned_mut_local: Some(entry_point),
         }
     }
 
@@ -367,6 +412,48 @@ impl InvocationAdapter {
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
         self.catching_local.map(|entry_point| entry_point(invocation))
+    }
+
+    /// Invokes a typed local `Pin<&T>` entry point when its exact receiver
+    /// type matches this method's generated adapter.
+    ///
+    /// `None` means this method has no such adapter or `T` is not its exact
+    /// receiver type. The `Err` case preserves the original pin and arguments.
+    pub fn invoke_pinned_ref_local<'call, T: 'static>(
+        &self,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+        >,
+    > {
+        self.pinned_ref_local
+            .and_then(|entry_point| {
+                entry_point.downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()
+            })
+            .map(|entry_point| entry_point(invocation))
+    }
+
+    /// Invokes a typed local `Pin<&mut T>` entry point when its exact receiver
+    /// type matches this method's generated adapter.
+    ///
+    /// `None` means this method has no such adapter or `T` is not its exact
+    /// receiver type. The `Err` case preserves the original pin and arguments.
+    pub fn invoke_pinned_mut_local<'call, T: 'static>(
+        &self,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+        >,
+    > {
+        self.pinned_mut_local
+            .and_then(|entry_point| {
+                entry_point.downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()
+            })
+            .map(|entry_point| entry_point(invocation))
     }
 }
 
