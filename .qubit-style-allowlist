@@ -1,0 +1,1 @@
+multiple-public-types | src/invoke/pinned.rs | Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol.
