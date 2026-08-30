@@ -9,6 +9,7 @@ use quote::quote;
 use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
+use crate::ir::MethodIr;
 use crate::ir::ParameterIr;
 use crate::ir::ParameterPatternKindIr;
 use crate::ir::PathArgumentIr;
@@ -82,7 +83,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && !method.qualifiers.is_unsafe
                 && method.qualifiers.abi.is_none()
                 && !method.qualifiers.is_variadic
-                && !return_contains_non_static_lifetime(&method.return_type)
+                && (!return_contains_non_static_lifetime(&method.return_type)
+                    || is_supported_shared_borrow_return(&method.return_type)
+                    || is_supported_mutable_borrow_return(method))
+                && (!method.qualifiers.is_async || !is_borrow_return(&method.return_type))
                 && !method
                     .attributes
                     .iter()
@@ -91,7 +95,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     method.return_type,
                     ReturnTypeIr::Unit
                         | ReturnTypeIr::Type(crate::ir::TypeIr {
-                            kind: TypeKindIr::Path(_),
+                            kind: TypeKindIr::Path(_) | TypeKindIr::Reference { .. },
                             ..
                         })
                 );
@@ -100,7 +104,49 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             }
             let method_name = &method.name;
             let adapter_name = format_ident!("__qubit_reflect_invoke_{index}");
+            let catching_adapter_name = format_ident!("__qubit_reflect_invoke_catching_{index}");
             let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+            let thread_safe = method
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::ThreadSafe);
+            let catching_supported = method
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::CatchUnwind)
+                && !thread_safe
+                && !method.qualifiers.is_async
+                && !is_borrow_return(&method.return_type);
+            let mode = if thread_safe {
+                quote!(#facade::value::ThreadSafe)
+            } else {
+                quote!(#facade::value::Local)
+            };
+            let adapter_constructor = if thread_safe {
+                quote!(#facade::descriptor::InvocationAdapter::thread_safe(#adapter_name))
+            } else if catching_supported {
+                quote!(#facade::descriptor::InvocationAdapter::local_with_catching(
+                    #adapter_name,
+                    #catching_adapter_name,
+                ))
+            } else {
+                quote!(#facade::descriptor::InvocationAdapter::local(#adapter_name))
+            };
+            let adapter_definition = if catching_supported {
+                quote! {
+                    #[cfg(panic = "unwind")]
+                    static #descriptor_name: #facade::descriptor::InvocationAdapter =
+                        #adapter_constructor;
+                    #[cfg(panic = "abort")]
+                    static #descriptor_name: #facade::descriptor::InvocationAdapter =
+                        #facade::descriptor::InvocationAdapter::local(#adapter_name);
+                }
+            } else {
+                quote! {
+                    static #descriptor_name: #facade::descriptor::InvocationAdapter =
+                        #adapter_constructor;
+                }
+            };
             let receiver_expectation = if matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 Some(ReceiverKindIr::Value)
@@ -124,7 +170,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let (receiver, arguments) = validated.into_parts();
                     let receiver: #target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Owned(value)) =>
-                            #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#target>(value)
+                            #facade::value::DynamicOwned::<#mode>::downcast::<#target>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                         _ => unreachable!("validation checked receiver mode"),
                     };
@@ -137,7 +183,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let (receiver, arguments) = validated.into_parts();
                     let receiver: &mut #target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Mut(value)) =>
-                            #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#target>(value)
+                            #facade::value::DynamicMut::<#mode>::downcast::<#target>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                         _ => unreachable!("validation checked receiver mode"),
                     };
@@ -147,10 +193,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let (receiver, arguments) = validated.into_parts();
                     let receiver: &#target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Ref(value)) =>
-                            #facade::value::DynamicRef::<#facade::value::Local>::downcast::<#target>(value)
+                            #facade::value::DynamicRef::<#mode>::downcast::<#target>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                         Some(#facade::invoke::InvocationReceiver::Mut(value)) => {
-                            let value = #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#target>(value)
+                            let value = #facade::value::DynamicMut::<#mode>::downcast::<#target>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked receiver type"));
                             &*value
                         }
@@ -160,84 +206,149 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
             } else {
                 quote! { let (_receiver, arguments) = validated.into_parts(); }
             };
-            let parameter_expectations = method
+            let parameter_expectations: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| invocation_argument_expectation(parameter, &facade));
+                .map(|parameter| invocation_argument_expectation(parameter, &facade))
+                .collect();
             let argument_bindings: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| invocation_argument_binding(parameter, &facade))
+                .map(|parameter| invocation_argument_binding(parameter, &facade, &mode))
                 .collect();
             let call_arguments: Vec<_> = method
                 .parameters
                 .iter()
                 .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
                 .collect();
-            let output = match method.return_type {
-                ReturnTypeIr::Unit => {
-                    let argument_bindings = &argument_bindings;
-                    let call_arguments = &call_arguments;
-                    quote! {
-                        #receiver_binding
-                        let mut arguments = arguments.into_vec().into_iter();
-                        #(#argument_bindings)*
-                        <#target>::#method_name(receiver, #(#call_arguments),*);
-                        #facade::invoke::InvocationOutput::Unit
+            let argument_bindings = &argument_bindings;
+            let parameter_expectations = &parameter_expectations;
+            let call_arguments = &call_arguments;
+            let call = if method.receiver.is_some() {
+                quote!(<#target>::#method_name(receiver, #(#call_arguments),*))
+            } else {
+                quote!(<#target>::#method_name(#(#call_arguments),*))
+            };
+            let borrow_origins = std::iter::once(method.receiver.is_some().then(|| quote!(#facade::invoke::BorrowOrigin::Receiver)))
+                .flatten()
+                .chain(
+                    method
+                        .parameters
+                        .iter()
+                        .filter(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { .. }))
+                        .map(|parameter| {
+                        let index = parameter.index;
+                        quote!(#facade::invoke::BorrowOrigin::Parameter(#index))
+                    }),
+                );
+            let output = match (method.qualifiers.is_async, &method.return_type) {
+                (false, ReturnTypeIr::Unit) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #call;
+                    #facade::invoke::InvocationOutput::Unit
+                },
+                (false, ReturnTypeIr::Type(TypeIr { kind: TypeKindIr::Reference { mutable: false, .. }, .. })) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #facade::invoke::InvocationOutput::Ref {
+                        value: #facade::value::DynamicRef::<#mode>::new(#call),
+                        origins: ::std::boxed::Box::new([#(#borrow_origins),*]),
                     }
-                }
-                ReturnTypeIr::Type(_) => {
-                    let argument_bindings = &argument_bindings;
-                    let call_arguments = &call_arguments;
-                    quote! {
-                        #receiver_binding
-                        let mut arguments = arguments.into_vec().into_iter();
-                        #(#argument_bindings)*
+                },
+                (false, ReturnTypeIr::Type(TypeIr { kind: TypeKindIr::Reference { mutable: true, .. }, .. })) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #facade::invoke::InvocationOutput::Mut {
+                        value: #facade::value::DynamicMut::<#mode>::new(#call),
+                        origin: #facade::invoke::BorrowOrigin::Receiver,
+                    }
+                },
+                (false, ReturnTypeIr::Type(_)) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #facade::invoke::InvocationOutput::Owned(
+                        #facade::value::DynamicOwned::<#mode>::new(#call),
+                    )
+                },
+                (true, ReturnTypeIr::Unit) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #facade::invoke::InvocationOutput::Future(
+                        #facade::invoke::ReflectedFuture::<#mode>::new(async move {
+                            #call.await;
+                            #facade::invoke::InvocationOutput::Unit
+                        }),
+                    )
+                },
+                (true, ReturnTypeIr::Type(_)) => quote! {
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    #facade::invoke::InvocationOutput::Future(
+                        #facade::invoke::ReflectedFuture::<#mode>::new(async move {
+                            #facade::invoke::InvocationOutput::Owned(
+                                #facade::value::DynamicOwned::<#mode>::new(#call.await),
+                            )
+                        }),
+                    )
+                },
+            };
+            let catching_definition = if catching_supported {
+                let catching_call = match method.return_type {
+                    ReturnTypeIr::Unit => quote! {
+                        #call;
+                        #facade::invoke::InvocationOutput::Unit
+                    },
+                    ReturnTypeIr::Type(_) => quote! {
                         #facade::invoke::InvocationOutput::Owned(
                             #facade::value::DynamicOwned::<#facade::value::Local>::new(
-                                <#target>::#method_name(receiver, #(#call_arguments),*),
+                                #call,
                             ),
                         )
+                    },
+                };
+                quote! {
+                    fn #catching_adapter_name<'call>(
+                        invocation: #facade::invoke::Invocation<'call, #facade::value::Local>,
+                    ) -> ::core::result::Result<
+                        ::core::result::Result<
+                            #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
+                            #facade::invoke::InvocationPanic,
+                        >,
+                        #facade::invoke::InvocationFailure<'call, #facade::value::Local>,
+                    > {
+                        let identity = #facade::identity::MemberId::new(
+                            #target_source, "method", #index, fragment_identity(),
+                        );
+                        let validated = invocation.validate(
+                            &identity,
+                            #receiver_expectation,
+                            &[#(#parameter_expectations),*],
+                        )?;
+                        #receiver_binding
+                        let mut arguments = arguments.into_vec().into_iter();
+                        #(#argument_bindings)*
+                        match ::std::panic::catch_unwind(|| { #catching_call }) {
+                            Ok(output) => Ok(Ok(output)),
+                            Err(payload) => Ok(Err(#facade::invoke::InvocationPanic::new(identity, payload))),
+                        }
                     }
                 }
-            };
-            let output = if method.receiver.is_some() {
-                output
             } else {
-                match method.return_type {
-                    ReturnTypeIr::Unit => {
-                        let argument_bindings = &argument_bindings;
-                        let call_arguments = &call_arguments;
-                        quote! {
-                            #receiver_binding
-                            let mut arguments = arguments.into_vec().into_iter();
-                            #(#argument_bindings)*
-                            <#target>::#method_name(#(#call_arguments),*);
-                            #facade::invoke::InvocationOutput::Unit
-                        }
-                    }
-                    ReturnTypeIr::Type(_) => {
-                        let argument_bindings = &argument_bindings;
-                        let call_arguments = &call_arguments;
-                        quote! {
-                            #receiver_binding
-                            let mut arguments = arguments.into_vec().into_iter();
-                            #(#argument_bindings)*
-                            #facade::invoke::InvocationOutput::Owned(
-                                #facade::value::DynamicOwned::<#facade::value::Local>::new(
-                                    <#target>::#method_name(#(#call_arguments),*),
-                                ),
-                            )
-                        }
-                    }
-                }
+                TokenStream::new()
             };
             Some(quote! {
                 fn #adapter_name<'call>(
-                    invocation: #facade::invoke::Invocation<'call, #facade::value::Local>,
+                    invocation: #facade::invoke::Invocation<'call, #mode>,
                 ) -> ::core::result::Result<
-                    #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
-                    #facade::invoke::InvocationFailure<'call, #facade::value::Local>,
+                    #facade::invoke::InvocationOutput<'call, #mode>,
+                    #facade::invoke::InvocationFailure<'call, #mode>,
                 > {
                     let identity = #facade::identity::MemberId::new(
                         #target_source, "method", #index, fragment_identity(),
@@ -250,8 +361,9 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     Ok({ #output })
                 }
 
-                static #descriptor_name: #facade::descriptor::InvocationAdapter =
-                    #facade::descriptor::InvocationAdapter::local(#adapter_name);
+                #catching_definition
+
+                #adapter_definition
             })
         });
     let invocation_adapter_entries = declaration
@@ -282,7 +394,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 && !method.qualifiers.is_unsafe
                 && method.qualifiers.abi.is_none()
                 && !method.qualifiers.is_variadic
-                && !return_contains_non_static_lifetime(&method.return_type)
+                && (!return_contains_non_static_lifetime(&method.return_type)
+                    || is_supported_shared_borrow_return(&method.return_type)
+                    || is_supported_mutable_borrow_return(method))
+                && (!method.qualifiers.is_async || !is_borrow_return(&method.return_type))
                 && !method
                     .attributes
                     .iter()
@@ -291,7 +406,7 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     method.return_type,
                     ReturnTypeIr::Unit
                         | ReturnTypeIr::Type(crate::ir::TypeIr {
-                            kind: TypeKindIr::Path(_),
+                            kind: TypeKindIr::Path(_) | TypeKindIr::Reference { .. },
                             ..
                         })
                 );
@@ -758,7 +873,7 @@ fn invocation_argument_expectation(parameter: &ParameterIr, facade: &TokenStream
 }
 
 /// Expands one post-validation extraction while preserving borrowed lifetimes.
-fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
+fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream, mode: &TokenStream) -> TokenStream {
     let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {
         TypeKindIr::Reference {
@@ -771,7 +886,7 @@ fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) ->
                     .expect("validation checked argument count")
                 {
                     #facade::invoke::InvocationArg::Mut(value) =>
-                        #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#element>(value)
+                        #facade::value::DynamicMut::<#mode>::downcast::<#element>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                     _ => unreachable!("validation checked argument mode"),
                 };
@@ -785,10 +900,10 @@ fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) ->
                     .expect("validation checked argument count")
                 {
                     #facade::invoke::InvocationArg::Ref(value) =>
-                        #facade::value::DynamicRef::<#facade::value::Local>::downcast::<#element>(value)
+                        #facade::value::DynamicRef::<#mode>::downcast::<#element>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                     #facade::invoke::InvocationArg::Mut(value) => {
-                        let value = #facade::value::DynamicMut::<#facade::value::Local>::downcast::<#element>(value)
+                        let value = #facade::value::DynamicMut::<#mode>::downcast::<#element>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked argument type"));
                         &*value
                     }
@@ -804,7 +919,7 @@ fn invocation_argument_binding(parameter: &ParameterIr, facade: &TokenStream) ->
                     .expect("validation checked argument count")
                 {
                     #facade::invoke::InvocationArg::Owned(value) =>
-                        #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#ty>(value)
+                        #facade::value::DynamicOwned::<#mode>::downcast::<#ty>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                     _ => unreachable!("validation checked argument mode"),
                 };
@@ -836,6 +951,46 @@ fn fingerprint(value: &str) -> u64 {
 /// owned dynamic-value boundary.
 fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
     matches!(return_type, ReturnTypeIr::Type(ty) if type_contains_non_static_lifetime(ty))
+}
+
+/// Returns whether a borrowed output can retain the invocation call lifetime.
+fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> bool {
+    matches!(
+        return_type,
+        ReturnTypeIr::Type(TypeIr {
+            kind: TypeKindIr::Reference { mutable: false, .. },
+            ..
+        })
+    )
+}
+
+/// Returns whether this declaration can safely identify a unique mutable-borrow origin.
+fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
+    matches!(
+        method.receiver.as_ref().map(|receiver| receiver.kind),
+        Some(ReceiverKindIr::MutableReference)
+    ) && !method
+        .parameters
+        .iter()
+        .any(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { mutable: true, .. }))
+        && matches!(
+            method.return_type,
+            ReturnTypeIr::Type(TypeIr {
+                kind: TypeKindIr::Reference { mutable: true, .. },
+                ..
+            })
+        )
+}
+
+/// Returns whether the declaration returns any borrow rather than an owned value.
+fn is_borrow_return(return_type: &ReturnTypeIr) -> bool {
+    matches!(
+        return_type,
+        ReturnTypeIr::Type(TypeIr {
+            kind: TypeKindIr::Reference { .. },
+            ..
+        })
+    )
 }
 
 /// Recursively detects path arguments whose lifetime is not explicitly static.

@@ -9,6 +9,7 @@ use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
+use crate::registry::EffectiveTypeView;
 use crate::registry::builder::build_inventory_registry;
 use crate::registry::builder::initialize_cached;
 use crate::registry::indexes::RegistryIndexes;
@@ -148,6 +149,12 @@ impl ReflectRegistry {
     /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
     pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
         self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
+    }
+
+    /// Merges the target's implementation fragments into a deterministic
+    /// effective method view.
+    pub fn effective_view(&self, type_id: TypeId) -> EffectiveTypeView {
+        EffectiveTypeView::new(self.implementations(type_id))
     }
 
     /// Finds a reflected or external trait declaration by its process-local

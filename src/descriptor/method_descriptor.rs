@@ -259,6 +259,7 @@ pub struct InvocationAdapter {
     entry_point: fn(),
     local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
     thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
+    catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
 }
 
 impl InvocationAdapter {
@@ -269,6 +270,7 @@ impl InvocationAdapter {
             entry_point,
             local: None,
             thread_safe: None,
+            catching_local: None,
         }
     }
 
@@ -282,6 +284,7 @@ impl InvocationAdapter {
             entry_point: unavailable_entry_point,
             local: Some(entry_point),
             thread_safe: None,
+            catching_local: None,
         }
     }
 
@@ -296,6 +299,22 @@ impl InvocationAdapter {
             entry_point: unavailable_entry_point,
             local: None,
             thread_safe: Some(entry_point),
+            catching_local: None,
+        }
+    }
+
+    /// Creates a local adapter paired with an explicitly generated catching
+    /// entry point.
+    #[doc(hidden)]
+    pub const fn local_with_catching(
+        entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
+        catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::Local>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: Some(entry_point),
+            thread_safe: None,
+            catching_local: Some(catching_entry_point),
         }
     }
 
@@ -336,6 +355,14 @@ impl InvocationAdapter {
         >,
     > {
         self.thread_safe.map(|entry_point| entry_point(invocation))
+    }
+
+    /// Invokes the explicit local catching entry point when one was generated.
+    pub fn invoke_catching_local<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
+        self.catching_local.map(|entry_point| entry_point(invocation))
     }
 }
 

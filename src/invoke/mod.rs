@@ -14,6 +14,8 @@ mod output;
 mod receiver;
 mod recovery;
 
+pub use adapter::CatchingInvocationAdapter;
+pub use adapter::CatchingInvocationResult;
 pub use adapter::InvocationAdapter;
 pub use argument::ArgumentExpectation;
 pub use argument::InvocationArg;

@@ -138,6 +138,9 @@ impl fmt::Display for ConstructionFieldId {
 /// A machine-readable reason reflected construction failed before execution.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ConstructionError {
+    /// The reflected target did not generate the requested construction path.
+    #[error("dynamic construction is unavailable for this target")]
+    TargetUnavailable,
     /// The selected input form does not match the struct or variant shape.
     #[error("construction shape mismatch: expected {expected}, got {actual}")]
     WrongShape {

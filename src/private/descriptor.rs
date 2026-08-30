@@ -2,6 +2,9 @@
 
 use crate::access::VariantActiveAdapter;
 use crate::capability::TypeCapabilities;
+use crate::construct::StructConstructionDescriptor;
+use crate::construct::VariantConstructionDescriptor;
+use crate::descriptor::ConcreteGenericDescriptor;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::MapKind;
@@ -76,6 +79,26 @@ pub const fn struct_type<T: ?Sized + 'static>(
     fields: &'static [FieldDescriptor],
 ) -> TypeDescriptor {
     TypeDescriptor::new_struct::<T>(query_name, kind, fields)
+}
+
+/// Creates a reflected struct root with generated construction entry points.
+#[doc(hidden)]
+pub const fn struct_type_with_construction<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: StructKind,
+    fields: &'static [FieldDescriptor],
+    construction: StructConstructionDescriptor,
+) -> TypeDescriptor {
+    TypeDescriptor::new_struct::<T>(query_name, kind, fields).with_struct_construction(construction)
+}
+
+/// Attaches generic declaration and concrete-instance facts to a root.
+#[doc(hidden)]
+pub const fn with_concrete_generic(
+    descriptor: TypeDescriptor,
+    generic: &'static ConcreteGenericDescriptor,
+) -> TypeDescriptor {
+    descriptor.with_concrete_generic(generic)
 }
 
 /// Creates an enum root descriptor for `T` with a generated diagnostic type
@@ -255,4 +278,13 @@ pub const fn variant(
     active_test: VariantActiveAdapter,
 ) -> VariantDescriptor {
     VariantDescriptor::new(declaring_type, index, rust_name, query_name, kind, fields, active_test)
+}
+
+/// Attaches generated construction entry points to one enum variant.
+#[doc(hidden)]
+pub const fn variant_with_construction(
+    variant: VariantDescriptor,
+    construction: VariantConstructionDescriptor,
+) -> VariantDescriptor {
+    variant.with_construction(construction)
 }
