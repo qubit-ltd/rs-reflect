@@ -28,6 +28,20 @@ pub enum InvocationErrorKind {
         /// Expected Rust type name retained for diagnostics.
         expected_name: &'static str,
     },
+    /// A method requires an explicitly registered receiver conversion
+    /// capability, but its target descriptor has none for the receiver type.
+    #[error("invocation receiver adapter is not registered for `{expected_name}`")]
+    ReceiverAdapterUnavailable {
+        /// The explicit receiver type required by the method signature.
+        expected_name: &'static str,
+    },
+    /// A registered receiver conversion rejected the supplied receiver while
+    /// returning it untouched for recovery.
+    #[error("invocation receiver adapter rejected the supplied receiver for `{expected_name}`")]
+    ReceiverAdapterRejected {
+        /// The explicit receiver type required by the method signature.
+        expected_name: &'static str,
+    },
     /// The number of supplied positional arguments differs from the signature.
     #[error("invocation argument count mismatch: expected {expected}, got {actual}")]
     ArgumentCountMismatch {

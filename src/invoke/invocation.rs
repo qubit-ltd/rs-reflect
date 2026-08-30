@@ -125,6 +125,54 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         })
     }
 
+    /// Validates only positional arguments while retaining the receiver for a
+    /// separately registered receiver-adapter capability.
+    ///
+    /// This preserves every input until the adapter has accepted the receiver,
+    /// so a later failure can still return the original complete invocation.
+    pub fn validate_arguments(
+        self,
+        method_identity: &MemberId,
+        arguments: &[ArgumentExpectation],
+    ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>> {
+        if self.arguments.len() != arguments.len() {
+            let kind = InvocationErrorKind::ArgumentCountMismatch {
+                expected: arguments.len(),
+                actual: self.arguments.len(),
+            };
+            return Err(self.into_failure(method_identity, kind));
+        }
+        for (index, (actual, expected)) in self.arguments.iter().zip(arguments).enumerate() {
+            if !mode_matches(expected.mode(), actual.mode()) {
+                let kind = InvocationErrorKind::ArgumentModeMismatch {
+                    index,
+                    expected: expected.mode(),
+                    actual: actual.mode(),
+                };
+                return Err(self.into_failure(method_identity, kind));
+            }
+            if expected.type_id() != actual.type_id() {
+                let kind = InvocationErrorKind::ArgumentTypeMismatch {
+                    index,
+                    expected: expected.type_id(),
+                    actual: actual.type_id(),
+                    expected_name: expected.type_name(),
+                };
+                return Err(self.into_failure(method_identity, kind));
+            }
+        }
+        Ok(ValidatedInvocation {
+            receiver: self.receiver,
+            arguments: self.arguments,
+        })
+    }
+
+    /// Rejects an invocation before user code runs while retaining every
+    /// untouched input for recovery.
+    pub fn reject(self, method_identity: &MemberId, kind: InvocationErrorKind) -> InvocationFailure<'call, M> {
+        self.into_failure(method_identity, kind)
+    }
+
     /// Creates an invocation from parts previously returned by validation or
     /// recovery.
     pub(crate) fn from_parts(

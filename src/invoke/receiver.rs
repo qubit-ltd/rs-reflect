@@ -3,6 +3,7 @@
 
 use std::any::TypeId;
 
+use crate::capability::CapabilityKey;
 use crate::invoke::InvocationInputMode;
 use crate::invoke::InvocationMode;
 use crate::value::DynamicMut;
@@ -44,6 +45,24 @@ impl<M: InvocationMode> InvocationReceiver<'_, M> {
             Self::Mut(value) => M::mut_type_id(value),
         }
     }
+}
+
+/// A typed, safe conversion from one caller-supplied receiver container into
+/// an explicit method receiver type.
+///
+/// The adapter must return the original receiver unchanged when conversion is
+/// not possible. This lets generated invocation code preserve the complete
+/// input in [`crate::invoke::InvocationRecovery`] rather than losing an owned
+/// container during a failed conversion.
+pub type ReceiverAdapter<R, M> = for<'call> fn(InvocationReceiver<'call, M>) -> Result<R, InvocationReceiver<'call, M>>;
+
+/// Returns the reserved typed capability key for an explicit receiver type.
+///
+/// Register this key against the reflected target type with
+/// [`crate::register_type_capabilities`] to opt an arbitrary self type into
+/// safe dynamic invocation.
+pub fn receiver_adapter_key<R: 'static, M: InvocationMode>() -> CapabilityKey<ReceiverAdapter<R, M>> {
+    CapabilityKey::new_core("qubit.reflect.receiver_adapter")
 }
 
 /// The receiver shape and exact type required by a method adapter.

@@ -31,6 +31,8 @@ assert_eq!(descriptor.field("id").unwrap().index(), 0);
 
 `ReflectedRef`、`ReflectedMut` 和 `ReflectedOwned` 保留 Local/ThreadSafe 模式与借用生命周期。不要把 descriptor 当作序列化协议：TypeId 与运行时地址只在当前进程内有效。
 
+普通 receiver 以及 `Box<Self>`、`Rc<Self>`、`Arc<Self>` 和受支持的 `Pin` 形式可直接调用。其他合法显式 receiver 必须在目标类型上用 `register_type_capabilities!` 登记 `invoke::receiver_adapter_key::<Receiver, Mode>()`，其 `ReceiverAdapter` 只能在安全转换成功时消费 receiver；转换失败必须返还原 receiver。缺少该 capability 的方法仍可查询完整签名，但不会暴露动态调用 adapter。
+
 ## 验证
 
 开发时运行 `./align-ci.sh`、`./ci-check.sh`，并在修改宏诊断后运行 `cargo test --test ui_tests`。更完整的需求到实现/测试对应关系见追踪矩阵。

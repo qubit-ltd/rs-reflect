@@ -37,6 +37,8 @@ pub use pinned::PinnedRefAdapter;
 pub use pinned::PinnedRefInvocation;
 pub use pinned::PinnedRefInvocationFailure;
 pub use receiver::InvocationReceiver;
+pub use receiver::ReceiverAdapter;
 pub use receiver::ReceiverExpectation;
+pub use receiver::receiver_adapter_key;
 pub use recovery::InvocationFailure;
 pub use recovery::InvocationRecovery;
