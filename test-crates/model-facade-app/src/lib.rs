@@ -1,23 +1,25 @@
-//! Terminal-user fixture that depends only on downstream facade packages.
+//! Terminal fixture: it depends only on the two downstream facade crates.
 
 use model_facade_derive::model_reflect;
 
 #[model_reflect]
-struct User {
-    id: u64,
+pub struct FacadeUser {
+    pub id: u64,
 }
 
 #[cfg(test)]
 mod tests {
-    use model_facade_runtime::Reflect;
+    use model_facade_runtime::descriptor::Reflect;
+    use model_facade_runtime::registry::ReflectRegistry;
 
-    use super::User;
+    use super::FacadeUser;
 
     #[test]
-    fn facade_attribute_delegates_to_reflection_runtime() {
-        let descriptor = User::type_descriptor();
-        assert_eq!(descriptor.query_name(), "User");
-        assert_eq!(descriptor.fields().len(), 1);
-        assert_eq!(descriptor.fields()[0].query_name(), Some("id"));
+    fn downstream_facade_delegates_reflect_derive() {
+        let descriptor = FacadeUser::type_descriptor();
+        assert!(descriptor.type_name().ends_with("FacadeUser"));
+
+        let registry = ReflectRegistry::initialize().expect("facade fragment registers");
+        assert!(registry.get(descriptor.type_id()).is_some());
     }
 }

@@ -19,3 +19,17 @@ path = "fuzz_targets/id_parser.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "type_expression"
+path = "fuzz_targets/type_expression.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "registry_model"
+path = "fuzz_targets/registry_model.rs"
+test = false
+doc = false
+bench = false

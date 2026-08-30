@@ -37,6 +37,14 @@ fn test_derive_reflect_generic_enum_interns_concrete_instances() {
     let u8_descriptor = TypeDescriptor::of::<GenericEvent<u8>>();
     let text_descriptor = TypeDescriptor::of::<GenericEvent<String>>();
     assert!(!std::ptr::eq(u8_descriptor, text_descriptor));
+    assert_eq!(
+        u8_descriptor
+            .concrete_generic()
+            .expect("generic enum instances expose substitutions")
+            .arguments()
+            .len(),
+        1
+    );
     assert!(std::ptr::eq(u8_descriptor, TypeDescriptor::of::<GenericEvent<u8>>()));
     assert!(std::ptr::eq(
         u8_descriptor

@@ -1,6 +1,10 @@
 // qubit-style: allow explicit-imports
 //! Integration coverage for implementation registration expansion.
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::OnceLock;
+use std::task::Context;
+use std::task::Poll;
 
 use qubit_reflect as reflect;
 use reflect::Reflect;
@@ -82,6 +86,20 @@ impl Sample {
         first + second
     }
 
+    async fn reflected_async_argument(value: u8) -> u8 {
+        value + 3
+    }
+
+    #[reflect(thread_safe)]
+    fn reflected_thread_safe_argument(value: u8) -> u8 {
+        value + 4
+    }
+
+    #[reflect(catch_unwind)]
+    fn reflected_panicking() -> u8 {
+        panic!("caught panic")
+    }
+
     fn reflected_shared(&self) -> u8 {
         19
     }
@@ -107,6 +125,14 @@ impl Reflect for Counter {
 
 #[reflect_impl]
 impl Counter {
+    fn reflected_borrowed(&self) -> &u8 {
+        &self.0
+    }
+
+    fn reflected_borrowed_mut(&mut self) -> &mut u8 {
+        &mut self.0
+    }
+
     fn reflected_mut(&mut self) -> u8 {
         self.0 += 1;
         self.0
@@ -203,6 +229,65 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 23);
+}
+
+#[test]
+fn test_reflect_impl_generates_callable_adapter_for_shared_borrowed_output() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Counter::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_borrowed",
+    ) else {
+        panic!("generated borrowed-output method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("shared borrowed output needs adapter");
+    let counter = Counter(23);
+    let output = adapter
+        .invoke_local(Invocation::borrowed(
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&counter),
+            [],
+        ))
+        .expect("local adapter must be present")
+        .expect("validated invocation must call method");
+    let InvocationOutput::Ref { value, origins } = output else {
+        panic!("shared borrowed output must be represented as a dynamic reference");
+    };
+    assert_eq!(value.downcast_ref::<u8>(), Some(&23));
+    assert_eq!(origins.as_ref(), &[reflect::invoke::BorrowOrigin::Receiver]);
+}
+
+#[test]
+fn test_reflect_impl_generates_callable_adapter_for_mutable_borrowed_output() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Counter::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_borrowed_mut",
+    ) else {
+        panic!("generated mutable borrowed-output method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("mutable borrowed output needs adapter");
+    let mut counter = Counter(23);
+    {
+        let output = adapter
+            .invoke_local(Invocation::borrowed_mut(
+                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
+                [],
+            ))
+            .expect("local adapter must be present")
+            .expect("validated invocation must call method");
+        let InvocationOutput::Mut { mut value, origin } = output else {
+            panic!("mutable borrowed output must be represented as a dynamic mutable reference");
+        };
+        assert_eq!(origin, reflect::invoke::BorrowOrigin::Receiver);
+        *value
+            .downcast_mut::<u8>()
+            .expect("mutable output must retain the exact field type") = 42;
+    }
+    assert_eq!(counter.0, 42);
 }
 
 #[test]
@@ -386,4 +471,91 @@ fn test_reflect_impl_preserves_all_owned_arguments_after_validation_failure() {
     };
     assert_eq!(first, 7);
     assert!(DynamicOwned::<reflect::value::Local>::downcast::<String>(second).is_ok());
+}
+
+#[test]
+fn test_reflect_impl_generates_callable_adapter_for_async_method() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_async_argument",
+    ) else {
+        panic!("generated async method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("safe async method needs adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            reflect::value::Local,
+        >::new(39_u8))]))
+        .expect("local adapter must be present")
+        .expect("validated invocation must start method");
+    let InvocationOutput::Future(mut future) = output else {
+        panic!("async method must return a reflected future");
+    };
+    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future) else {
+        panic!("simple async method must complete when polled");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+        panic!("async output must retain its owned value");
+    };
+    assert_eq!(value, 42);
+}
+
+#[test]
+fn test_reflect_impl_generates_explicit_thread_safe_adapter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_thread_safe_argument",
+    ) else {
+        panic!("generated thread-safe method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("explicit thread-safe method needs adapter");
+    assert!(adapter.invoke_local(Invocation::associated([])).is_none());
+    let output = adapter
+        .invoke_thread_safe(Invocation::associated([InvocationArg::Owned(
+            reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::new(38_u8),
+        )]))
+        .expect("thread-safe adapter must be present")
+        .expect("validated invocation must call method");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("thread-safe method must return an owned output");
+    };
+    let Ok(value) = reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::downcast::<u8>(value) else {
+        panic!("thread-safe output must retain its exact type");
+    };
+    assert_eq!(value, 42);
+}
+
+#[test]
+fn test_reflect_impl_generates_explicit_catching_adapter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_panicking",
+    ) else {
+        panic!("generated catching method instance must be discoverable");
+    };
+    let adapter = instance.adapter().expect("catching method needs adapter");
+    let caught = match adapter
+        .invoke_catching_local(Invocation::associated([]))
+        .expect("catching adapter must be present")
+        .expect("validated invocation must begin")
+    {
+        Ok(_) => panic!("the panic must be reported separately from validation failure"),
+        Err(caught) => caught,
+    };
+    assert_eq!(caught.payload().downcast_ref::<&str>(), Some(&"caught panic"));
+}
+
+fn poll_once<F: Future + Unpin>(future: &mut F) -> Poll<F::Output> {
+    let waker = std::task::Waker::noop();
+    let mut context = Context::from_waker(waker);
+    Pin::new(future).poll(&mut context)
 }

@@ -17,6 +17,11 @@ struct OpaqueGenericRecord<T, const N: usize> {
     values: [T; N],
 }
 
+#[derive(Reflect)]
+struct Borrowed<'a> {
+    value: &'a str,
+}
+
 /// Verifies every concrete type and const substitution receives its own root.
 #[test]
 fn test_generic_struct_instances_are_unique_and_interned() {
@@ -28,6 +33,11 @@ fn test_generic_struct_instances_are_unique_and_interned() {
     assert!(std::ptr::eq(left, again));
     assert_ne!(left.type_id(), other_type.type_id());
     assert_ne!(left.type_id(), other_length.type_id());
+    let generic = left
+        .concrete_generic()
+        .expect("derived generic roots expose substitutions");
+    assert_eq!(generic.definition().parameters.len(), 2);
+    assert_eq!(generic.arguments().len(), 2);
 }
 
 /// Verifies opaque generic members retain only the static bound needed by
@@ -41,4 +51,13 @@ fn test_opaque_generic_instances_do_not_require_reflect_arguments() {
 
     assert!(descriptor.as_opaque().is_some());
     assert_eq!(value.values.len(), 2);
+}
+
+#[test]
+fn test_static_lifetime_generic_root_preserves_definition_without_runtime_lifetime_argument() {
+    let descriptor = TypeDescriptor::of::<Borrowed<'static>>();
+    let generic = descriptor.concrete_generic().expect("generic definitions are retained");
+    assert_eq!(generic.definition().parameters.len(), 1);
+    assert!(generic.arguments().is_empty());
+    assert_eq!(Borrowed { value: "static" }.value, "static");
 }
