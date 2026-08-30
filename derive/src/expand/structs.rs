@@ -81,6 +81,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
+    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_resolver = quote!(<#self_type>::#capability_function);
+    let capability_definition = capabilities(&declaration, &facade, &self_type, &capability_function);
     let adapter_definitions: Vec<_> =
         if opaque_root {
             Vec::new()
@@ -183,12 +186,18 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         _ => quote!(#facade::descriptor::StructKind::Named),
     };
     let root_descriptor = if opaque_root {
-        quote!(#facade::__private::descriptor::opaque_root::<Self>(#query_name))
+        quote!(#facade::__private::descriptor::with_capabilities(
+            #facade::__private::descriptor::opaque_root::<Self>(#query_name),
+            #capability_resolver,
+        ))
     } else {
         quote! {
             let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-            #facade::__private::descriptor::struct_type_with_construction::<Self>(
-                #query_name, #struct_kind, fields, #construction_descriptor,
+            #facade::__private::descriptor::with_capabilities(
+                #facade::__private::descriptor::struct_type_with_construction::<Self>(
+                    #query_name, #struct_kind, fields, #construction_descriptor,
+                ),
+                #capability_resolver,
             )
         }
     };
@@ -208,6 +217,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     );
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
+            #capability_definition
             #(#adapter_definitions)*
             #construction_adapters
         }
@@ -219,6 +229,47 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
 
         #registration
+    }
+}
+
+/// Expands the static capability set requested on one derived type.
+pub(crate) fn capabilities(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+    self_type: &TokenStream,
+    function: &syn::Ident,
+) -> TokenStream {
+    let descriptors = declaration.attributes.iter().flat_map(|attribute| {
+        (attribute.name == HelperName::Capabilities)
+            .then_some(&attribute.value)
+            .and_then(|value| match value {
+                crate::ir::HelperValueIr::Paths(paths) => Some(paths),
+                _ => None,
+            })
+            .into_iter()
+            .flatten()
+            .map(|path| match path.source.rsplit("::").next() {
+                Some("Clone") => quote!(#facade::capability::clone_descriptor::<Self>()),
+                Some("Default") => quote!(#facade::capability::default_descriptor::<Self>()),
+                Some("Send") => quote!(#facade::capability::send_descriptor::<Self>()),
+                Some("Sync") => quote!(#facade::capability::sync_descriptor::<Self>()),
+                Some(_) | None => quote!(),
+            })
+    });
+    quote!
+    {
+        fn #function() -> &'static #facade::capability::TypeCapabilities {
+            static CAPABILITIES: ::std::sync::OnceLock<#facade::capability::TypeCapabilities> =
+                ::std::sync::OnceLock::new();
+            CAPABILITIES.get_or_init(|| {
+                let mut descriptors = ::std::vec![#(#descriptors),*];
+                let registered = #facade::capability::registered_type_capabilities::<#self_type>()
+                    .expect("generated capability registration is consistent");
+                descriptors.extend(registered.descriptors().iter().cloned());
+                #facade::capability::TypeCapabilities::try_new(descriptors)
+                    .expect("generated capability declarations are unique")
+            })
+        }
     }
 }
 

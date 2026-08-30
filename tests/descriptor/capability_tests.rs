@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
+use reflect::Reflect as DeriveReflect;
 use reflect::capability::CapabilityConflictKind;
 use reflect::capability::CapabilityDescriptor;
 use reflect::capability::CapabilityKey;
@@ -48,6 +49,13 @@ struct DuplicateRegistration;
 
 struct ReflectedRoot;
 
+#[derive(Clone, Default, DeriveReflect)]
+#[reflect(capabilities(Clone, Default))]
+struct DerivedCapabilities;
+
+#[derive(DeriveReflect)]
+struct DerivedExtensionRegistration;
+
 /// Builds the test root's capability set once for its static descriptor.
 fn reflected_root_capabilities() -> &'static TypeCapabilities {
     static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
@@ -77,6 +85,7 @@ register_type_capabilities!(SendSync: Clone, Default, Send, Sync);
 register_type_capabilities!(ExtensionRegistration: [extension_key() => ExtensionAdapter("registered")]);
 register_type_capabilities!(DuplicateRegistration: Clone);
 register_type_capabilities!(DuplicateRegistration: Clone);
+register_type_capabilities!(DerivedExtensionRegistration: [extension_key() => ExtensionAdapter("derived")]);
 
 /// Creates a valid third-party capability ID for a test.
 fn external_id(value: &str) -> CapabilityId {
@@ -184,6 +193,28 @@ fn test_type_descriptor_navigates_its_owned_typed_capabilities() {
         Some(&ExtensionAdapter("descriptor"))
     );
     assert_eq!(descriptor.capabilities().descriptors().len(), 1);
+}
+
+/// Confirms type-level derive helpers attach their bound-checked capability
+/// adapters to the generated root descriptor.
+#[test]
+fn test_derive_capabilities_attach_to_the_generated_descriptor() {
+    let descriptor = DerivedCapabilities::type_descriptor();
+
+    assert!(descriptor.get_capability(clone_key()).is_some());
+    assert!(descriptor.get_capability(default_key()).is_some());
+}
+
+/// Confirms explicit typed capability registrations join the generated
+/// descriptor capability set without creating another descriptor root.
+#[test]
+fn test_derive_descriptor_includes_explicit_extension_registration() {
+    let descriptor = DerivedExtensionRegistration::type_descriptor();
+
+    assert_eq!(
+        descriptor.get_capability(extension_key()),
+        Some(&ExtensionAdapter("derived"))
+    );
 }
 
 /// Confirms built-in descriptors register core facts and executable operations.

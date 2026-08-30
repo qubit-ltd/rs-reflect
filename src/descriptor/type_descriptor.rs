@@ -473,6 +473,16 @@ impl TypeDescriptor {
         }
     }
 
+    /// Replaces this descriptor's immutable capability resolver.
+    ///
+    /// Generated descriptor roots call this before the root is interned, so
+    /// every query observes one stable capability set for the concrete type.
+    #[doc(hidden)]
+    pub const fn with_capabilities(mut self, capabilities: fn() -> &'static TypeCapabilities) -> Self {
+        self.capabilities = capabilities;
+        self
+    }
+
     /// Returns the process-local Rust type identity.
     pub fn type_id(&self) -> TypeId {
         (self.type_id)()

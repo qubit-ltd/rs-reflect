@@ -101,6 +101,16 @@ pub const fn with_concrete_generic(
     descriptor.with_concrete_generic(generic)
 }
 
+/// Attaches a generated capability resolver to one descriptor root before it
+/// is interned.
+#[doc(hidden)]
+pub const fn with_capabilities(
+    descriptor: TypeDescriptor,
+    capabilities: fn() -> &'static TypeCapabilities,
+) -> TypeDescriptor {
+    descriptor.with_capabilities(capabilities)
+}
+
 /// Creates an enum root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]

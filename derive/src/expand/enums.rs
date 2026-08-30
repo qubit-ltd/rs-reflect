@@ -53,6 +53,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let self_type = quote!(#name #type_generics);
     let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
     let registration_module = format_ident!("__qubit_reflect_enum_registration_{fingerprint:016x}");
     let query_name = declaration
@@ -61,6 +62,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
+    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_resolver = quote!(<#self_type>::#capability_function);
+    let capability_definition = super::structs::capabilities(&declaration, &facade, &self_type, &capability_function);
     let integer_repr = declaration
         .variants
         .iter()
@@ -75,10 +79,16 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     {
         let registration = registration(&facade, &name, &registration_module, fingerprint, !declaration.generics.params.is_empty());
         return quote! {
+            impl #impl_generics #name #type_generics #where_clause {
+                #capability_definition
+            }
             impl #impl_generics #facade::Reflect for #name #type_generics #where_clause {
                 fn type_descriptor() -> &'static #facade::TypeDescriptor {
                     #facade::__private::intern_type::<Self>(|| {
-                        #facade::__private::descriptor::opaque_root::<Self>(#query_name)
+                        #facade::__private::descriptor::with_capabilities(
+                            #facade::__private::descriptor::opaque_root::<Self>(#query_name),
+                            #capability_resolver,
+                        )
                     })
                 }
             }
@@ -98,12 +108,18 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .iter()
         .map(|variant| variant_descriptor(&name, &quote!(#name #type_generics), variant, &facade, integer_repr.as_deref()));
     let enum_descriptor = if declaration.generics.params.is_empty() {
-        quote!(#facade::__private::descriptor::enum_type::<Self>(#query_name, variants))
+        quote!(#facade::__private::descriptor::with_capabilities(
+            #facade::__private::descriptor::enum_type::<Self>(#query_name, variants),
+            #capability_resolver,
+        ))
     } else {
         let generic = super::generics::concrete_descriptor(&declaration, &facade);
         quote! {
             #facade::__private::descriptor::with_concrete_generic(
-                #facade::__private::descriptor::enum_type::<Self>(#query_name, variants),
+                #facade::__private::descriptor::with_capabilities(
+                    #facade::__private::descriptor::enum_type::<Self>(#query_name, variants),
+                    #capability_resolver,
+                ),
                 ::std::boxed::Box::leak(::std::boxed::Box::new(#generic)),
             )
         }
@@ -111,6 +127,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let registration = registration(&facade, &name, &registration_module, fingerprint, !declaration.generics.params.is_empty());
     let root_descriptor = quote! {
         impl #impl_generics #name #type_generics #where_clause {
+            #capability_definition
             #(#adapters)*
             #(#construction_adapters)*
         }
