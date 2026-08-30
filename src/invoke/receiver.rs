@@ -14,9 +14,9 @@ use crate::value::DynamicRef;
 /// Owned receiver containers such as `Box<T>` and `Pin<Box<T>>` retain their
 /// exact container type in [`Self::Owned`]. `Pin<&T>` and `Pin<&mut T>` must
 /// not be lowered to the ordinary borrowed variants because doing so would
-/// discard their pin proof. Generated invocation support therefore needs a
-/// method-specific `ReceiverAdapter` capability that preserves pinned borrows;
-/// absence of that adapter leaves the method describable but not invocable.
+/// discard their pin proof. Generated invocation support therefore uses the
+/// typed pinned invocation contracts for supported pinned borrows; arbitrary
+/// receiver conversions still require a separately registered safe adapter.
 pub enum InvocationReceiver<'call, M: InvocationMode> {
     /// A receiver consumed as `self` or an owned receiver container.
     Owned(DynamicOwned<M>),
