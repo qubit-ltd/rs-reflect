@@ -66,12 +66,16 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
         })
         .enumerate()
         .filter_map(|(index, method)| {
+            let typed_owned_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
-            );
+            ) || typed_owned_receiver.is_some();
             let supported_parameters = method
                 .parameters
                 .iter()
@@ -152,6 +156,8 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                 Some(ReceiverKindIr::Value)
             ) {
                 quote!(#facade::invoke::ReceiverExpectation::owned::<#target>())
+            } else if let Some(receiver_type) = &typed_owned_receiver {
+                quote!(#facade::invoke::ReceiverExpectation::owned::<#receiver_type>())
             } else if matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 Some(ReceiverKindIr::MutableReference)
@@ -171,6 +177,16 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
                     let receiver: #target = match receiver {
                         Some(#facade::invoke::InvocationReceiver::Owned(value)) =>
                             #facade::value::DynamicOwned::<#mode>::downcast::<#target>(value)
+                                .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
+                        _ => unreachable!("validation checked receiver mode"),
+                    };
+                }
+            } else if let Some(receiver_type) = &typed_owned_receiver {
+                quote! {
+                    let (receiver, arguments) = validated.into_parts();
+                    let receiver: #receiver_type = match receiver {
+                        Some(#facade::invoke::InvocationReceiver::Owned(value)) =>
+                            #facade::value::DynamicOwned::<#mode>::downcast::<#receiver_type>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                         _ => unreachable!("validation checked receiver mode"),
                     };
@@ -377,12 +393,16 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
         })
         .enumerate()
         .map(|(index, method)| {
+            let typed_owned_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
             let supported_receiver = matches!(
                 method.receiver.as_ref().map(|receiver| receiver.kind),
                 None | Some(ReceiverKindIr::Value)
                     | Some(ReceiverKindIr::SharedReference)
                     | Some(ReceiverKindIr::MutableReference)
-            );
+            ) || typed_owned_receiver.is_some();
             let supported_parameters = method
                 .parameters
                 .iter()
@@ -838,6 +858,56 @@ fn supports_invocation_parameter(ty: &TypeIr) -> bool {
         TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
         _ => supports_owned_dynamic_type(ty),
     }
+}
+
+/// Returns the exact owned container type for the standard explicit receivers
+/// that can cross the `Any` boundary without losing ownership or pinning.
+fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStream) -> Option<TokenStream> {
+    if receiver.kind != ReceiverKindIr::Typed {
+        return None;
+    }
+    let TypeKindIr::Path(path) = &receiver.ty.kind else {
+        return None;
+    };
+    let segment = path.segments.last()?;
+    let PathArgumentsIr::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    match (segment.name.as_str(), arguments.as_slice()) {
+        ("Box", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
+            Some(quote!(::std::boxed::Box<#target>))
+        }
+        ("Rc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
+            Some(quote!(::std::rc::Rc<#target>))
+        }
+        ("Arc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
+            Some(quote!(::std::sync::Arc<#target>))
+        }
+        ("Pin", [PathArgumentIr::Type(argument)]) if is_box_self_type(argument) => {
+            Some(quote!(::std::pin::Pin<::std::boxed::Box<#target>>))
+        }
+        _ => None,
+    }
+}
+
+/// Returns whether `ty` is the receiver's unqualified `Self` type.
+fn is_self_type(ty: &TypeIr) -> bool {
+    matches!(&ty.kind, TypeKindIr::Path(path) if path.segments.len() == 1 && path.segments[0].name == "Self")
+}
+
+/// Returns whether `ty` is the standard `Box<Self>` receiver container.
+fn is_box_self_type(ty: &TypeIr) -> bool {
+    let TypeKindIr::Path(path) = &ty.kind else {
+        return false;
+    };
+    let Some(segment) = path.segments.last() else {
+        return false;
+    };
+    matches!(
+        (&*segment.name, &segment.arguments),
+        ("Box", PathArgumentsIr::AngleBracketed(arguments))
+            if matches!(arguments.as_slice(), [PathArgumentIr::Type(argument)] if is_self_type(argument))
+    )
 }
 
 /// Returns whether an owned dynamic value can safely represent `ty`.

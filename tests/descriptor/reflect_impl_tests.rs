@@ -2,6 +2,8 @@
 //! Integration coverage for implementation registration expansion.
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::OnceLock;
 use std::task::Context;
 use std::task::Poll;
@@ -143,6 +145,37 @@ impl Counter {
     }
 }
 
+struct SmartReceiver(u8);
+
+impl Reflect for SmartReceiver {
+    fn type_descriptor() -> &'static reflect::TypeDescriptor {
+        static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
+        DESCRIPTOR.get_or_init(|| {
+            reflect::__private::descriptor::struct_type::<SmartReceiver>("SmartReceiver", StructKind::Named, &[])
+        })
+    }
+}
+
+#[reflect_impl]
+impl SmartReceiver {
+    #[allow(clippy::boxed_local)]
+    fn boxed(self: Box<Self>) -> u8 {
+        self.0
+    }
+
+    fn rc(self: Rc<Self>) -> u8 {
+        self.0
+    }
+
+    fn arc(self: Arc<Self>) -> u8 {
+        self.0
+    }
+
+    fn pinned_box(self: Pin<Box<Self>>) -> u8 {
+        self.0
+    }
+}
+
 #[test]
 fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
@@ -229,6 +262,50 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
         panic!("generated value must retain type");
     };
     assert_eq!(value, 23);
+}
+
+#[test]
+fn test_reflect_impl_generates_callable_adapters_for_owned_smart_receivers() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(SmartReceiver::type_descriptor().type_id());
+    let cases: [(&str, DynamicOwned<reflect::value::Local>); 4] = [
+        (
+            "boxed",
+            DynamicOwned::<reflect::value::Local>::new(Box::new(SmartReceiver(11))),
+        ),
+        (
+            "rc",
+            DynamicOwned::<reflect::value::Local>::new(Rc::new(SmartReceiver(12))),
+        ),
+        (
+            "arc",
+            DynamicOwned::<reflect::value::Local>::new(Arc::new(SmartReceiver(13))),
+        ),
+        (
+            "pinned_box",
+            DynamicOwned::<reflect::value::Local>::new(Box::pin(SmartReceiver(14))),
+        ),
+    ];
+
+    for (expected, (name, receiver)) in cases.into_iter().enumerate() {
+        let reflect::descriptor::MethodLookup::Unique(instance) =
+            reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, name)
+        else {
+            panic!("smart receiver method must be discoverable");
+        };
+        let adapter = instance.adapter().expect("supported smart receiver needs an adapter");
+        let output = adapter
+            .invoke_local(Invocation::owned(receiver, []))
+            .expect("local adapter must be present")
+            .expect("validated invocation must call method");
+        let InvocationOutput::Owned(value) = output else {
+            panic!("smart receiver method must return an owned value");
+        };
+        let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+            panic!("generated value must retain type");
+        };
+        assert_eq!(value, (expected as u8) + 11);
+    }
 }
 
 #[test]
