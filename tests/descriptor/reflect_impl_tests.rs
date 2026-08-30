@@ -165,6 +165,14 @@ struct PinnedOnlyReceiver {
     _pin: PhantomPinned,
 }
 
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
+struct SpecializedGenericImpl<T>(std::marker::PhantomData<T>);
+
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
+struct SpecializedConstGenericImpl<const N: usize>;
+
 impl Reflect for SmartReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
@@ -225,6 +233,24 @@ impl PinnedOnlyReceiver {
 
     fn pinned_mut(self: Pin<&mut Self>) -> u8 {
         self.value
+    }
+}
+
+#[reflect_impl(specialize(T = u8))]
+impl<T> SpecializedGenericImpl<T> {
+    fn specialization_value() -> u8 {
+        67
+    }
+
+    fn round_trip(value: T) -> T {
+        value
+    }
+}
+
+#[reflect_impl(specialize(N = 3))]
+impl<const N: usize> SpecializedConstGenericImpl<N> {
+    fn specialization_value() -> usize {
+        N
     }
 }
 
@@ -469,6 +495,102 @@ fn test_reflect_impl_invokes_pinned_borrow_receivers_without_erasing_pin() {
         panic!("pinned mutable output must retain type");
     };
     assert_eq!(mutable_value, 42);
+}
+
+#[test]
+fn test_reflect_impl_registers_explicit_generic_impl_specialization() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(SpecializedGenericImpl::<u8>::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "specialization_value",
+    ) else {
+        panic!("explicit generic impl specialization must register its method");
+    };
+    let implementation = implementations
+        .iter()
+        .find(|implementation| {
+            implementation
+                .method_instances()
+                .iter()
+                .any(|candidate| std::ptr::eq(candidate, instance))
+        })
+        .expect("method instance must belong to one registered generic impl");
+    assert_eq!(implementation.definition().generic_definition().parameters.len(), 1);
+    assert_eq!(implementation.arguments().len(), 1);
+    let adapter = instance
+        .adapter()
+        .expect("concrete generic impl method needs an adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([]))
+        .expect("local adapter must be present")
+        .expect("specialized generic impl invocation must validate");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("specialized generic impl method must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+        panic!("specialized generic impl output must retain its concrete type");
+    };
+    assert_eq!(value, 67);
+
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "round_trip")
+    else {
+        panic!("generic impl method must register for its concrete specialization");
+    };
+    let adapter = instance.adapter().expect("concrete generic method needs an adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            reflect::value::Local,
+        >::new(19_u8))]))
+        .expect("local adapter must be present")
+        .expect("concrete generic impl invocation must validate");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("concrete generic impl method must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<u8>(value) else {
+        panic!("concrete generic impl method output must retain its concrete type");
+    };
+    assert_eq!(value, 19);
+}
+
+#[test]
+fn test_reflect_impl_registers_explicit_const_generic_impl_specialization() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(SpecializedConstGenericImpl::<3>::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "specialization_value",
+    ) else {
+        panic!("explicit const generic impl specialization must register its method");
+    };
+    let implementation = implementations
+        .iter()
+        .find(|implementation| {
+            implementation
+                .method_instances()
+                .iter()
+                .any(|candidate| std::ptr::eq(candidate, instance))
+        })
+        .expect("method instance must belong to one registered const generic impl");
+    assert_eq!(implementation.definition().generic_definition().parameters.len(), 1);
+    assert_eq!(implementation.arguments().len(), 1);
+    let adapter = instance
+        .adapter()
+        .expect("concrete const generic impl method needs an adapter");
+    let output = adapter
+        .invoke_local(Invocation::associated([]))
+        .expect("local adapter must be present")
+        .expect("specialized const generic impl invocation must validate");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("specialized const generic impl method must return an owned value");
+    };
+    let Ok(value) = DynamicOwned::<reflect::value::Local>::downcast::<usize>(value) else {
+        panic!("specialized const generic impl output must retain its concrete type");
+    };
+    assert_eq!(value, 3);
 }
 
 #[test]
