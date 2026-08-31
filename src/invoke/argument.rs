@@ -29,6 +29,58 @@ pub enum InvocationArg<'call, M: InvocationMode> {
     Mut(DynamicMut<'call, M>),
 }
 
+/// One caller-ordered positional or named invocation argument binding.
+///
+/// Named and positional bindings may be interleaved. During descriptor-aware
+/// binding, a positional input selects the first declaration-order parameter
+/// that has not already been occupied by an earlier binding. A named input
+/// selects the unique identifier parameter with that name. Binding validation
+/// never extracts an owned dynamic value.
+pub struct InvocationBinding<'call, M: InvocationMode> {
+    name: Option<Box<str>>,
+    argument: InvocationArg<'call, M>,
+}
+
+impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
+    /// Creates a positional binding.
+    ///
+    /// The binding selects the next unoccupied declaration-order parameter
+    /// when a method descriptor validates the invocation.
+    pub fn positional(argument: InvocationArg<'call, M>) -> Self {
+        Self { name: None, argument }
+    }
+
+    /// Creates a named binding without validating the supplied name.
+    ///
+    /// Validation accepts the name only when exactly one simple identifier
+    /// parameter has that name. Unknown, ambiguous, unavailable, duplicate,
+    /// and missing bindings produce a structured pre-execution error.
+    pub fn named<N>(name: N, argument: InvocationArg<'call, M>) -> Self
+    where
+        N: Into<Box<str>>,
+    {
+        Self {
+            name: Some(name.into()),
+            argument,
+        }
+    }
+
+    /// Returns the caller-supplied name, or `None` for a positional binding.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Returns the bound dynamic argument without consuming it.
+    pub const fn argument(&self) -> &InvocationArg<'call, M> {
+        &self.argument
+    }
+
+    /// Splits the binding into its optional name and untouched argument.
+    pub(crate) fn into_parts(self) -> (Option<Box<str>>, InvocationArg<'call, M>) {
+        (self.name, self.argument)
+    }
+}
+
 impl<M: InvocationMode> InvocationArg<'_, M> {
     /// Returns the input's ownership or borrowing mode.
     pub const fn mode(&self) -> InvocationInputMode {

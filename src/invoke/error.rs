@@ -50,6 +50,64 @@ pub enum InvocationErrorKind {
         /// Supplied positional argument count.
         actual: usize,
     },
+    /// A named binding does not match any declared parameter name.
+    #[error("invocation argument {input_index} has unknown name `{name}`")]
+    UnknownArgumentName {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+        /// Caller-supplied name.
+        name: Box<str>,
+    },
+    /// A name matches more than one declared parameter.
+    #[error("invocation argument {input_index} has ambiguous name `{name}`")]
+    AmbiguousArgumentName {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+        /// Caller-supplied name.
+        name: Box<str>,
+        /// Declaration-order parameter indices sharing the name.
+        parameter_indices: Box<[usize]>,
+    },
+    /// A name refers to a wildcard or destructuring parameter.
+    #[error("invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`")]
+    NamedArgumentUnavailable {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+        /// Declaration-order parameter index.
+        parameter_index: usize,
+        /// Caller-supplied name.
+        name: Box<str>,
+    },
+    /// More than one input attempts to bind the same parameter.
+    #[error("invocation argument {input_index} duplicates parameter {parameter_index}")]
+    DuplicateArgumentBinding {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+        /// Declaration-order parameter index already occupied.
+        parameter_index: usize,
+    },
+    /// A positional input remains after every parameter is occupied.
+    #[error("invocation positional argument {input_index} has no unoccupied parameter")]
+    PositionalArgumentOverflow {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+    },
+    /// No supplied input binds one declared parameter.
+    #[error("invocation is missing parameter {parameter_index}")]
+    MissingArgumentBinding {
+        /// Declaration-order parameter index.
+        parameter_index: usize,
+        /// Identifier name when the parameter has one.
+        name: Option<&'static str>,
+    },
+    /// A raw adapter received a named binding without method descriptors.
+    #[error("invocation argument {input_index} named `{name}` requires descriptor-aware binding")]
+    NamedBindingRequiresDescriptor {
+        /// Zero-based index in the caller's original binding order.
+        input_index: usize,
+        /// Caller-supplied name.
+        name: Box<str>,
+    },
     /// One argument has an incompatible ownership or borrowing mode.
     #[error("invocation argument {index} mode mismatch: expected {expected:?}, got {actual:?}")]
     ArgumentModeMismatch {
@@ -81,7 +139,7 @@ pub enum InvocationErrorKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InvocationError {
     method_identity: Box<MemberId>,
-    kind: InvocationErrorKind,
+    kind: Box<InvocationErrorKind>,
 }
 
 impl InvocationError {
@@ -89,7 +147,7 @@ impl InvocationError {
     pub fn new(method_identity: MemberId, kind: InvocationErrorKind) -> Self {
         Self {
             method_identity: Box::new(method_identity),
-            kind,
+            kind: Box::new(kind),
         }
     }
 
@@ -118,7 +176,12 @@ impl fmt::Display for InvocationError {
     }
 }
 
-impl std::error::Error for InvocationError {}
+impl std::error::Error for InvocationError {
+    /// Returns the machine-readable validation kind as the underlying cause.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.kind.as_ref())
+    }
+}
 
 /// A user panic captured only by an explicitly generated catching adapter.
 ///

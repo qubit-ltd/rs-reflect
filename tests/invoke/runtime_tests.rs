@@ -8,6 +8,10 @@ mod invocation_runtime {
     use std::panic::catch_unwind;
     use std::pin::Pin;
     use std::rc::Rc;
+    use std::sync::Mutex;
+    use std::sync::MutexGuard;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
     use std::task::Context;
     use std::task::Poll;
     use std::task::Waker;
@@ -19,6 +23,7 @@ mod invocation_runtime {
     use reflect::invoke::BorrowOrigin;
     use reflect::invoke::Invocation;
     use reflect::invoke::InvocationArg;
+    use reflect::invoke::InvocationBinding;
     use reflect::invoke::InvocationErrorKind;
     use reflect::invoke::InvocationFailure;
     use reflect::invoke::InvocationInputMode;
@@ -39,6 +44,64 @@ mod invocation_runtime {
         value: i32,
     }
 
+    /// A reflected target used to exercise descriptor-aware argument binding.
+    #[derive(reflect::Reflect)]
+    #[reflect(opaque)]
+    struct NamedInvocationTarget;
+
+    /// Counts entries into the reflected user function.
+    static NAMED_INVOCATION_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Serializes tests that observe the shared invocation-entry counter.
+    static NAMED_INVOCATION_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    #[reflect::reflect_impl]
+    impl NamedInvocationTarget {
+        /// Encodes three differently sized inputs so binding order is visible.
+        fn encode(first: u8, second: u16, third: u32) -> u64 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(first) * 1_000_000 + u64::from(second) * 1_000 + u64::from(third)
+        }
+
+        /// Uses wildcard and destructuring parameters that remain positional.
+        fn encode_patterns(_: u8, (left, right): (u16, u16), named: u32) -> u64 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(left) * 1_000_000 + u64::from(right) * 1_000 + u64::from(named)
+        }
+
+        /// Encodes named inputs through an explicitly generated panic catcher.
+        #[reflect(catch_unwind)]
+        fn encode_catching(first: u8, second: u16, third: u32) -> u64 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(first) * 1_000_000 + u64::from(second) * 1_000 + u64::from(third)
+        }
+
+        /// Encodes named inputs while retaining a pinned shared receiver.
+        fn encode_pinned(self: Pin<&Self>, first: u8, second: u16, third: u32) -> u64 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(first) * 1_000_000 + u64::from(second) * 1_000 + u64::from(third)
+        }
+
+        /// Encodes named inputs while retaining a pinned mutable receiver.
+        fn encode_pinned_mut(self: Pin<&mut Self>, first: u8, second: u16, third: u32) -> u64 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(first) * 1_000_000 + u64::from(second) * 1_000 + u64::from(third)
+        }
+
+        /// Encodes same-typed inputs so raw adapter order mistakes are visible.
+        fn encode_same(first: u8, second: u8) -> u16 {
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u16::from(first) * 100 + u16::from(second)
+        }
+
+        /// Uses an identifier-at-subpattern that remains positional-only.
+        fn encode_at(whole @ (left, right): (u16, u16), named: u32) -> u64 {
+            let _ = whole;
+            NAMED_INVOCATION_CALLS.fetch_add(1, Ordering::SeqCst);
+            u64::from(left) * 1_000_000 + u64::from(right) * 1_000 + u64::from(named)
+        }
+    }
+
     /// Creates a structured identity for one hand-written test adapter.
     fn method_identity(index: usize) -> MemberId {
         MemberId::new(
@@ -54,6 +117,34 @@ mod invocation_runtime {
                 index as u64,
             ),
         )
+    }
+
+    /// Returns the concrete reflected instance for the named-binding fixture.
+    fn named_invocation_method() -> &'static reflect::descriptor::MethodInstanceDescriptor {
+        named_invocation_method_by_name("encode")
+    }
+
+    /// Returns one concrete reflected instance from the named-binding fixture.
+    fn named_invocation_method_by_name(name: &str) -> &'static reflect::descriptor::MethodInstanceDescriptor {
+        let registry =
+            reflect::registry::ReflectRegistry::initialize().expect("the named invocation fixture must register");
+        let implementations =
+            registry.implementations(<NamedInvocationTarget as reflect::Reflect>::type_descriptor().type_id());
+        let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            reflect::descriptor::MethodQualifier::Inherent,
+            name,
+        ) else {
+            panic!("the named invocation method must be uniquely discoverable")
+        };
+        instance
+    }
+
+    /// Locks the named invocation fixture even after an earlier test panic.
+    fn lock_named_invocation_fixture() -> MutexGuard<'static, ()> {
+        NAMED_INVOCATION_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Validates and executes a hand-written mutable receiver adapter.
@@ -366,6 +457,442 @@ mod invocation_runtime {
             DynamicOwned::<Local>::downcast::<String>(value).unwrap_or_else(|_| panic!("owned value should be intact")),
             "owned"
         );
+    }
+
+    /// Verifies named and positional inputs may be interleaved
+    /// deterministically.
+    #[test]
+    fn test_named_positional_named_binding_uses_declaration_order_for_positional_input() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(3_u32))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(1_u8))),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(2_u16))),
+        ]);
+
+        let output = named_invocation_method()
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation")
+            .expect("all three bindings are valid");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the associated function must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            1_002_003
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies positional binding skips a parameter already occupied by name.
+    #[test]
+    fn test_positional_binding_skips_parameter_already_bound_by_name() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(4_u8))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(5_u16))),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(6_u32))),
+        ]);
+
+        let output = named_invocation_method()
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation")
+            .expect("the positional binding must skip the named first parameter");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the associated function must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            4_005_006
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies duplicate bindings fail before extraction and preserve inputs.
+    #[test]
+    fn test_duplicate_named_binding_recovers_original_arguments_without_execution() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(8_u8))),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(9_u32))),
+        ]);
+
+        let result = named_invocation_method()
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation");
+        let Err(failure) = result else {
+            panic!("binding the first parameter twice must fail")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::DuplicateArgumentBinding {
+                input_index: 1,
+                parameter_index: 0,
+            }
+        ));
+        let failure_source =
+            std::error::Error::source(&failure).expect("an invocation failure must expose its structured error");
+        let invocation_error = failure_source
+            .downcast_ref::<reflect::invoke::InvocationError>()
+            .expect("the first source must be InvocationError");
+        assert!(
+            std::error::Error::source(invocation_error)
+                .and_then(|source| source.downcast_ref::<InvocationErrorKind>())
+                .is_some(),
+            "InvocationError must expose InvocationErrorKind as its source"
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.argument_name(0), Some("first"));
+        assert_eq!(failure.recovery.argument_name(1), Some("first"));
+        assert_eq!(failure.recovery.argument_name(2), Some("third"));
+        let (_, arguments) = failure.recovery.into_parts();
+        let [first, second, third] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
+        let InvocationArg::Owned(first) = first else {
+            panic!("the first argument must remain owned")
+        };
+        let InvocationArg::Owned(second) = second else {
+            panic!("the second argument must remain owned")
+        };
+        let InvocationArg::Owned(third) = third else {
+            panic!("the third argument must remain owned")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u8>(first).unwrap_or_else(|_| panic!("the first value must be intact")),
+            7
+        );
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u8>(second).unwrap_or_else(|_| panic!("the second value must be intact")),
+            8
+        );
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u32>(third).unwrap_or_else(|_| panic!("the third value must be intact")),
+            9
+        );
+    }
+
+    /// Verifies adapter validation failure restores caller order after binding.
+    #[test]
+    fn test_named_binding_type_failure_recovers_caller_order_before_execution() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(10_u8))),
+            InvocationBinding::named(
+                "second",
+                InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("wrong"))),
+            ),
+        ]);
+
+        let result = named_invocation_method()
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation");
+        let Err(failure) = result else {
+            panic!("the second parameter must reject the wrong exact type")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
+        ));
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.argument_name(0), Some("third"));
+        assert_eq!(failure.recovery.argument_name(1), None);
+        assert_eq!(failure.recovery.argument_name(2), Some("second"));
+        let (_, arguments) = failure.recovery.into_parts();
+        let [third, first, second] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
+        let InvocationArg::Owned(third) = third else {
+            panic!("the first caller argument must remain owned")
+        };
+        let InvocationArg::Owned(first) = first else {
+            panic!("the second caller argument must remain owned")
+        };
+        let InvocationArg::Owned(second) = second else {
+            panic!("the third caller argument must remain owned")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u32>(third)
+                .unwrap_or_else(|_| panic!("the third-parameter value must be intact")),
+            12
+        );
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u8>(first)
+                .unwrap_or_else(|_| panic!("the positional value must be intact")),
+            10
+        );
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<String>(second)
+                .unwrap_or_else(|_| panic!("the mismatched value must be intact")),
+            "wrong"
+        );
+    }
+
+    /// Verifies wildcard and destructuring parameters remain position-bindable.
+    #[test]
+    fn test_wildcard_and_destructure_parameters_bind_positionally_with_named_identifier() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let method = named_invocation_method_by_name("encode_patterns");
+        assert_eq!(method.effective_method().parameters()[0].name(), None);
+        assert_eq!(method.effective_method().parameters()[1].name(), None);
+        assert_eq!(method.effective_method().parameters()[2].name(), Some("named"));
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(0_u8))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((13_u16, 14_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(15_u32))),
+        ]);
+
+        let output = method
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation")
+            .expect("wildcard and destructuring parameters must support positional binding");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the associated function must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            13_014_015
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies a non-identifier pattern cannot be selected by a guessed name.
+    #[test]
+    fn test_wildcard_parameter_rejects_named_binding_before_execution() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("_", InvocationArg::Owned(DynamicOwned::<Local>::new(16_u8))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((17_u16, 18_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(19_u32))),
+        ]);
+
+        let result = named_invocation_method_by_name("encode_patterns")
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation");
+        let Err(failure) = result else {
+            panic!("a wildcard parameter has no bindable identifier")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::UnknownArgumentName { input_index: 0, name }
+                if name.as_ref() == "_"
+        ));
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.argument_name(0), Some("_"));
+        assert_eq!(failure.recovery.arguments().len(), 3);
+    }
+
+    /// Verifies omitted parameters fail during binding instead of in user code.
+    #[test]
+    fn test_named_binding_reports_missing_parameter_before_execution() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(20_u8))),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(22_u32))),
+        ]);
+
+        let result = named_invocation_method()
+            .invoke_local(invocation)
+            .expect("the generated adapter must support local invocation");
+        let Err(failure) = result else {
+            panic!("the omitted second parameter must fail binding")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::MissingArgumentBinding {
+                parameter_index: 1,
+                name: Some("second"),
+            }
+        ));
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.arguments().len(), 2);
+    }
+
+    /// Verifies catching invocation uses descriptor-aware named binding.
+    #[test]
+    fn test_catching_named_binding_reorders_before_user_code() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(25_u32))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(23_u8))),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(24_u16))),
+        ]);
+
+        let output = named_invocation_method_by_name("encode_catching")
+            .invoke_catching_local(invocation)
+            .expect("the catching adapter must be generated")
+            .expect("binding must pass before entering the catching adapter")
+            .expect("the user function must not panic");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the catching associated function must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            23_024_025
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies a pinned shared receiver supports descriptor-aware bindings.
+    #[test]
+    fn test_pinned_ref_named_binding_reorders_before_user_code() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let target = Box::pin(NamedInvocationTarget);
+        let invocation = reflect::invoke::PinnedRefInvocation::from_bindings(
+            target.as_ref(),
+            [
+                InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(28_u32))),
+                InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(26_u8))),
+                InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(27_u16))),
+            ],
+        );
+
+        let output = named_invocation_method_by_name("encode_pinned")
+            .invoke_pinned_ref_local(invocation)
+            .expect("the pinned shared adapter must be generated")
+            .expect("all pinned shared bindings must validate");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the pinned shared method must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            26_027_028
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies a pinned mutable binding failure preserves caller order.
+    #[test]
+    fn test_pinned_mut_named_binding_failure_recovers_before_user_code() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let mut target = Box::pin(NamedInvocationTarget);
+        let invocation = reflect::invoke::PinnedMutInvocation::from_bindings(
+            target.as_mut(),
+            [
+                InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(31_u32))),
+                InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(29_u8))),
+                InvocationBinding::named(
+                    "second",
+                    InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("wrong"))),
+                ),
+            ],
+        );
+
+        let result = named_invocation_method_by_name("encode_pinned_mut")
+            .invoke_pinned_mut_local(invocation)
+            .expect("the pinned mutable adapter must be generated");
+        let Err(failure) = result else {
+            panic!("the wrong second type must fail before the pinned method runs")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
+        ));
+        assert!(
+            std::error::Error::source(&failure)
+                .and_then(|source| source.downcast_ref::<reflect::invoke::InvocationError>())
+                .is_some(),
+            "a pinned failure must expose its structured invocation error"
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.argument_name(0), Some("third"));
+        assert_eq!(failure.recovery.argument_name(1), Some("first"));
+        assert_eq!(failure.recovery.argument_name(2), Some("second"));
+        let arguments = failure.recovery.arguments();
+        assert_eq!(arguments.len(), 3);
+        assert_eq!(arguments[0].type_id(), TypeId::of::<u32>());
+        assert_eq!(arguments[1].type_id(), TypeId::of::<u8>());
+        assert_eq!(arguments[2].type_id(), TypeId::of::<String>());
+    }
+
+    /// Verifies raw adapters reject named inputs instead of using caller order.
+    #[test]
+    fn test_raw_adapter_rejects_unbound_same_typed_named_arguments() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let method = named_invocation_method_by_name("encode_same");
+        let adapter = method
+            .adapter()
+            .expect("the same-typed fixture must have a generated adapter");
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(34_u8))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(33_u8))),
+        ]);
+
+        let result = adapter.invoke_local(invocation).expect("the raw local adapter exists");
+        let Err(failure) = result else {
+            panic!("a raw adapter must not silently treat named inputs as positional")
+        };
+
+        assert!(matches!(
+            failure.error.kind(),
+            InvocationErrorKind::NamedBindingRequiresDescriptor {
+                input_index: 0,
+                name,
+            } if name.as_ref() == "second"
+        ));
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
+        assert_eq!(failure.recovery.argument_name(0), Some("second"));
+        assert_eq!(failure.recovery.argument_name(1), Some("first"));
+    }
+
+    /// Verifies identifier-at-subpattern metadata remains positional-only.
+    #[test]
+    fn test_identifier_at_subpattern_binds_only_positionally() {
+        let _guard = lock_named_invocation_fixture();
+        NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
+        let method = named_invocation_method_by_name("encode_at");
+        assert_eq!(method.effective_method().parameters()[0].name(), None);
+        assert!(matches!(
+            method.effective_method().parameters()[0].pattern(),
+            reflect::descriptor::ParameterPatternDescriptor::Destructure(_)
+        ));
+        let invocation = Invocation::associated_bindings([
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((35_u16, 36_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(37_u32))),
+        ]);
+
+        let output = method
+            .invoke_local(invocation)
+            .expect("the local adapter must be generated")
+            .expect("the at-subpattern must remain position-bindable");
+
+        let InvocationOutput::Owned(output) = output else {
+            panic!("the at-subpattern method must return an owned value")
+        };
+        assert_eq!(
+            DynamicOwned::<Local>::downcast::<u64>(output)
+                .unwrap_or_else(|_| panic!("the output must retain its exact type")),
+            35_036_037
+        );
+        assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 1);
     }
 
     /// Verifies type validation failure recovers every owned input in original
