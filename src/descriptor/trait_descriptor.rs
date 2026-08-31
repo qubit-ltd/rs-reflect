@@ -34,7 +34,6 @@ use crate::identity::Visibility;
 
 type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImplPayload>>>;
 type DynTraitCache = HashMap<TypeId, &'static OnceLock<TraitDescriptor>>;
-type ExternalSupertraitCache = HashMap<(TypeId, ExternalTraitId, Box<[GenericArgument]>), &'static TraitDescriptor>;
 
 /// The process-local identity source of a reflected or external trait.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -226,7 +225,6 @@ pub fn external_supertrait<T: ?Sized + 'static>(
     rust_path: &'static str,
     arguments: Vec<GenericArgument>,
 ) -> &'static TraitDescriptor {
-    static CACHE: LazyLock<Mutex<ExternalSupertraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
     let external_id =
         ExternalTraitId::new(id).expect("the macro validator must only emit valid external trait identifiers");
     let key = (
@@ -234,8 +232,8 @@ pub fn external_supertrait<T: ?Sized + 'static>(
         external_id.clone(),
         arguments.clone().into_boxed_slice(),
     );
-    let mut cache = CACHE.lock().expect("external trait cache mutex must not be poisoned");
-    cache.entry(key).or_insert_with(|| {
+    let cell = crate::descriptor::internal::trait_cache::external_supertrait_cell(key);
+    cell.get_or_init(|| {
         let definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
             TraitId::External(external_id),
             rust_path.rsplit("::").next().unwrap_or(rust_path).trim(),

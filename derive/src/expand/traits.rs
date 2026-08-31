@@ -8,6 +8,8 @@
 
 //! Expansion of reflected trait declarations and their registration fragments.
 
+mod token_rewrite;
+
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -32,27 +34,7 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::WherePredicateIr;
 
-/// Replaces `Self` inside generated provider types with their explicit owner
-/// parameter while retaining all source grouping and spans.
-fn replace_self_with_owner(tokens: TokenStream, owner: &Ident) -> TokenStream {
-    tokens
-        .into_iter()
-        .map(|tree| match tree {
-            TokenTree::Ident(identifier) if identifier == "Self" => {
-                TokenTree::Ident(Ident::new(&owner.to_string(), identifier.span()))
-            }
-            TokenTree::Group(group) => {
-                let mut replacement = proc_macro2::Group::new(
-                    group.delimiter(),
-                    replace_self_with_owner(group.stream(), owner),
-                );
-                replacement.set_span(group.span());
-                TokenTree::Group(replacement)
-            }
-            other => other,
-        })
-        .collect()
-}
+use token_rewrite::replace_self_with_owner;
 
 /// Conservatively rejects unresolved lifetime shapes before the semantic
 /// `Sized` probe. Rust method selection does not treat an unmet region

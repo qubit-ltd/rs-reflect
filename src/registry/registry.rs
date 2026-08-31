@@ -147,6 +147,17 @@ impl IntoIterator for ImplDefinitionCandidates {
 }
 
 /// The immutable process-wide snapshot of linked reflection fragments.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::registry::ReflectRegistry;
+///
+/// let registry = ReflectRegistry::initialize()?;
+/// let _registered_u8 = registry.get(TypeId::of::<u8>());
+/// # Ok::<(), qubit_reflect::error::RegistryError>(())
+/// ```
 #[derive(Debug)]
 pub struct ReflectRegistry {
     pub(super) types: Box<[&'static TypeDescriptor]>,

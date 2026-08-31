@@ -98,6 +98,16 @@ enum TypeDescriptorData {
 /// Relationships use shared static references. Construction is reserved for
 /// generated and built-in descriptor data; ordinary callers navigate a
 /// descriptor returned by [`Reflect`].
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let descriptor = TypeDescriptor::of::<u32>();
+/// assert_eq!(descriptor.type_name(), "u32");
+/// assert!(descriptor.as_primitive().is_some());
+/// ```
 pub struct TypeDescriptor {
     type_id: fn() -> TypeId,
     type_name: fn() -> &'static str,

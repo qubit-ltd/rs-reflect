@@ -30,6 +30,15 @@ use crate::value::storage::ThreadSafeOwnedStorage;
 /// represented exclusively by [`DynamicRef`](crate::value::DynamicRef) and
 /// [`DynamicMut`](crate::value::DynamicMut)'s dedicated variants, never by an
 /// owned dynamic value.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let value = DynamicOwned::<Local>::new(String::from("ready"));
+/// assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("ready"));
+/// ```
 pub struct DynamicOwned<M: Mode> {
     storage: M::OwnedStorage,
     marker: PhantomData<M::Marker>,

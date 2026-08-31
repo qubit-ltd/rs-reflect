@@ -105,3 +105,7 @@ required-features = ["bench-internals"]
 name = "dynamic_operations"
 harness = false
 required-features = ["derive"]
+
+[[bench]]
+name = "trait_cache_lookup"
+harness = false
