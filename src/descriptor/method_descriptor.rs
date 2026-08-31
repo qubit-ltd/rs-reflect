@@ -632,6 +632,29 @@ pub enum MethodDeclarationOwner {
 }
 
 impl MethodDescriptor {
+    /// Compares the source facts that determine a Rust method signature.
+    pub(crate) fn signature_matches(&self, other: &Self) -> bool {
+        self.rust_name() == other.rust_name()
+            && self.receiver() == other.receiver()
+            && self.parameters().len() == other.parameters().len()
+            && self.parameters().iter().zip(other.parameters()).all(|(left, right)| {
+                left.passing_mode() == right.passing_mode() && left.signature_type() == right.signature_type()
+            })
+            && self.return_value().kind() == other.return_value().kind()
+            && self.return_value().signature_type() == other.return_value().signature_type()
+            && self.qualifiers() == other.qualifiers()
+            && self.generic_definition() == other.generic_definition()
+    }
+
+    /// Compares method signatures in declaration order.
+    pub(crate) fn signatures_match(left: &[Self], right: &[Self]) -> bool {
+        left.len() == right.len()
+            && left
+                .iter()
+                .zip(right)
+                .all(|(left, right)| left.signature_matches(right))
+    }
+
     /// Starts a builder for one method declaration.
     ///
     /// The member identity remains independent of `query_name`, so renaming a
