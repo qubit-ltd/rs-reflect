@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`qubit-reflect` 在稳定 Rust 上提供宏生成的结构化与可执行反射，为上层框架统一提供类型、字段、方法、trait、impl、枚举变体、安全访问、动态调用、动态构造和注册表信息。
+`qubit-reflect` 在稳定 Rust 上提供宏生成的结构化与可执行反射，为上层框架提供不可变 descriptor、安全字段访问、动态调用、动态构造、capability 查询和确定性的进程内注册表。
 
 ## 面向读者
 
-本项目面向需要在稳定 Rust 上检查并访问类型结构的框架和基础库作者，避免依赖源码扫描或 rustc 私有 API。
+本项目面向需要在稳定 Rust 上检查并访问类型结构的框架和基础库作者，避免扫描源码、读取私有布局或依赖 rustc 私有 API。
 
 ## 安装
 
@@ -22,16 +22,55 @@ qubit-reflect = "0.1"
 
 ## 当前状态
 
-crate 已导出 `Reflect`、`reflect` 和 `reflect_impl`，以及 descriptor 与 registry runtime API。请阅读[中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)获取完整场景示例。
+文档约定的反射运行时已经实现，公共入口包括：
 
-## 规划范围
+- 用于 struct 与 enum 的 `#[derive(Reflect)]`；
+- 用于 trait 声明的 `#[reflect]`；
+- 用于 inherent impl 与 trait impl 的 `#[reflect_impl]`；
+- `TypeDescriptor` 及相关不可变 descriptor 视图；
+- 受检动态值、字段访问、方法调用、构造、capability 与 registry 发现；
+- 默认本地模式和显式请求的线程安全模式。
 
-目标设计包括结构 descriptor、安全字段访问、方法调用、trait/impl metadata，以及 struct 和 enum variant 的动态构造。准确 API 仍需经过需求审核。
+crate 使用 `#![forbid(unsafe_code)]`。运行时执行精确校验：不会进行数值转换、字符串解析、`Into` 推导，也不会在类型擦除后凭运行时标志增加 `Send`/`Sync`。
+
+## 快速开始
+
+```rust
+use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
+
+#[derive(Reflect)]
+struct User {
+    id: u64,
+    name: String,
+}
+
+let descriptor = TypeDescriptor::of::<User>();
+let name = descriptor.field("name").expect("反射字段存在");
+let mut user = User { id: 7, name: String::from("Ada") };
+
+assert_eq!(
+    name.get(ReflectedRef::new(&user))
+        .expect("受检读取成功")
+        .downcast_ref::<String>()
+        .map(String::as_str),
+    Some("Ada"),
+);
+
+name.set(
+    ReflectedMut::new(&mut user),
+    ReflectedOwned::new(String::from("Grace")),
+).expect("受检替换成功");
+assert_eq!(user.name, "Grace");
+```
+
+反射始终需要显式选择。`rename` 只改变查询名称，不改变 Rust 身份；`skip`、`read_only`、`no_construct` 与 `no_invoke` 会保留结构事实，只禁用对应操作。
 
 ## 延伸阅读
 
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
+- [英文用户指南](doc/2026-08-29-qubit-reflect-user-guide.md)
+- [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English README](README.md)
 
 ## 测试

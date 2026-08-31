@@ -236,7 +236,8 @@ impl Display for User { /* ... */ }
 - **REQ-MAC-019**：helper 统一使用 `#[reflect(...)]`：类型接受 `rename`/`opaque`/`capabilities(...)`，字段接受
   `rename`/`skip`/`opaque`/`read_only`/`no_construct`/`default`/`default = path`，variant 接受
   `rename`/`skip`/`no_construct`，方法接受 `rename`/`skip`/`no_invoke`/`catch_unwind`/`thread_safe`/
-  `specialize(...)`。属性放错目标、
+  `specialize(...)`，trait 接受 `rename`/`supertrait(...)`/`external_trait(...)`/`dyn_compatible`/
+  `dyn_compatible(Supertrait::AssociatedType, ...)`。属性放错目标、
   同一键重复或互斥策略组合必须编译失败。
 - **REQ-MAC-020**：泛型 impl 的 concrete 登记使用 `#[reflect_impl(specialize(...))]`，泛型方法使用
   `#[reflect(specialize(...))]`；specialization 必须按泛型参数名称提供完整类型/const 实参，重复、未知、遗漏或不满足
@@ -726,7 +727,9 @@ assert_eq!(identity_impl.target_type().type_id(), TypeId::of::<User>());
   trait 声明。此类方法在签名可安全适配时仍可动态调用。
 - **REQ-TRT-010**：`TraitDescriptor` 始终描述 trait 声明；dyn-compatible trait 的 `dyn Trait` 还必须具有独立的
   `TypeDescriptor` 并能导航回对应 `TraitDescriptor`。非 dyn-compatible trait 仍具有完整 `TraitDescriptor`，但
-  不得伪造不存在的 `dyn Trait` 类型 descriptor。
+  不得伪造不存在的 `dyn Trait` 类型 descriptor。attribute 宏无法观察跨文件或跨 crate 的 supertrait 声明时默认
+  不生成 dyn descriptor；作者须用 `dyn_compatible` 显式证明，继承关联类型则以
+  `dyn_compatible(Supertrait::AssociatedType, ...)` 声明。宏生成真实 `dyn Trait` 类型，由 rustc 最终验证该证明。
 - **REQ-TRT-011**：每个未反射 external trait 必须由使用方提供带命名空间的稳定 `ExternalTraitId`；不同 impl 按
   此 ID 汇聚，源码路径只作为可保留的诊断别名。同一 trait 经不同 `use` 别名书写时允许路径不同；显式 ID 是调用者
   对身份相同的声明。若同一目标类型以同一 ID 注册多个不兼容 impl，或汇聚事实发生不可合并冲突，必须确定性失败。

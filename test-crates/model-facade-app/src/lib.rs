@@ -3,7 +3,9 @@
 use model_facade_derive::model_reflect;
 
 #[model_reflect]
+/// A model-facade fixture whose descriptor is generated through delegation.
 pub struct FacadeUser {
+    /// The reflected identifier used by facade integration assertions.
     pub id: u64,
 }
 

@@ -95,10 +95,10 @@ rs-reflect/
 | T15 | T14 | enum derive、variant、discriminant 与构造描述 | `derive/src/expand/enums.rs`、`tests/descriptor/derive_enum_tests.rs` | `cargo test -p qubit-reflect --test integration_tests derive_enum` | T22、T26 | 批量审查 |
 | T16 | T11、T12、T13 | `#[reflect]` trait、marker、隐藏 hook | `derive/src/expand/traits.rs`、`tests/descriptor/reflect_trait_tests.rs` | `cargo test -p qubit-reflect --test integration_tests reflect_trait` | T21、T22、T26 | 立即审查 |
 | T17 | T09、T11、T12、T13 | `#[reflect_impl]` 描述、external trait、方法实例 | `derive/src/expand/impls.rs`、`tests/descriptor/reflect_impl_tests.rs` | `cargo test -p qubit-reflect --test integration_tests reflect_impl` | T18、T21、T22、T26 | 立即审查 |
-| T18 | T17 | 动态方法 adapter、panic、async、receiver、borrow origin | `derive/src/expand/invocation.rs`、`tests/invoke/adapter_tests.rs` | `cargo test -p qubit-reflect --test integration_tests invocation_adapter` | T21、T22、T26 | 立即审查 |
+| T18 | T17 | 动态方法 adapter、panic、async、receiver、borrow origin | `derive/src/expand/impls.rs`、`tests/invoke/adapter_tests.rs` | `cargo test -p qubit-reflect --test integration_tests invocation_adapter` | T21、T22、T26 | 立即审查 |
 | T19 | T10、T14、T15 | struct/variant/update 生成 adapter 与 recovery | `derive/src/expand/construction.rs`、`tests/construct/adapter_tests.rs` | `cargo test -p qubit-reflect --test integration_tests construction_adapter` | T22、T26 | 立即审查 |
 | T20 | T06、T07、T16、T18、T19 | generic concrete、specialization、HRTB、关联项解析 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs`、`tests/descriptor/generic_tests.rs` | `cargo test -p qubit-reflect --test integration_tests generic` | T21、T22、T26 | 立即审查 |
-| T21 | T12、T16、T18、T20 | 跨 crate 汇聚和 trait 有效方法视图 | `test-crates/registry-*/**`、`tests/registry/cross_crate_tests.rs`、`src/registry/effective_view.rs` | `cargo test -p registry-app` | T26 | 立即审查 |
+| T21 | T12、T16、T18、T20 | 跨 crate 汇聚和 trait 有效方法视图 | `test-crates/registry-*/**`、`tests/registry/cross_crate_tests.rs`、`src/registry/effective_type_view.rs` | `cargo test -p registry-app` | T26 | 立即审查 |
 | T22 | T14、T15、T16、T18、T19、T20 | 完整 compile-pass/fail 属性与安全边界矩阵 | `tests/ui/**`、`tests/ui_tests.rs`、`Cargo.toml` UI test 入口 | `TRYBUILD=overwrite cargo test -p qubit-reflect --test ui_tests` 后再次无 overwrite 运行 | T26 | 批量审查 |
 | T23 | T14、T21、T22 | 无真实模型依赖的 facade 委托兼容夹具 | `test-crates/model-facade-{runtime,derive,app}/**`、`tests/registry/model_facade_tests.rs` | `cargo test -p model-facade-app` | T26 | 立即审查 |
 | T24 | T06、T08、T18、T19、T21、T23 | benchmark、fuzz、并发与析构压力验证 | `benches/**`、`fuzz/**`、`tests/registry/stress_tests.rs`、`Cargo.toml` bench | `cargo test -p qubit-reflect --test integration_tests stress`、`cargo bench --no-run` | T26 | 批量审查 |
@@ -1082,7 +1082,7 @@ fragment identity 使用 crate、module、行列、类别和内容指纹；`file
 ### T18：生成动态调用 adapter
 
 **文件：**
-- 新建：`derive/src/expand/invocation.rs`
+- 新建：`derive/src/expand/impls.rs`
 - 修改：`tests/invoke/adapter_tests.rs`
 - 修改：`tests/invoke/mod.rs`
 
@@ -1208,7 +1208,7 @@ pub struct MethodInstanceDescriptor {
 ### T21：实现跨 crate 汇聚与 trait 有效方法视图
 
 **文件：**
-- 新建：`src/registry/effective_view.rs`
+- 新建：`src/registry/effective_type_view.rs`
 - 新建：`test-crates/registry-types/**`
 - 新建：`test-crates/registry-impl-a/**`
 - 新建：`test-crates/registry-impl-b/**`
@@ -1370,7 +1370,7 @@ benchmark 分开测热 descriptor lookup、字段 get/set、方法 invoke、cons
 
 ```bash
 cargo test -p qubit-reflect --test integration_tests stress -- --test-threads=16
-cargo bench --workspace --no-run
+cargo bench --workspace --all-features --no-run
 cargo fuzz --fuzz-dir fuzz build
 ```
 

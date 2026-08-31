@@ -417,6 +417,8 @@ trait 默认方法由 trait hook 为 concrete `Self` 生成 adapter；impl fragm
 - 字段：`rename`、`skip`、`opaque`、`read_only`、`no_construct`、`default`、`default = path`；
 - variant：`rename`、`skip`、`no_construct`；
 - 方法：`rename`、`skip`、`no_invoke`、`catch_unwind`、`thread_safe`、`specialize(...)`；
+- trait：`rename`、`supertrait(...)`、`external_trait(...)`、`dyn_compatible`、
+  `dyn_compatible(Supertrait::AssociatedType, ...)`；
 - impl：`external_trait_id`、`specialize(...)`。
 
 未知键、错误目标、重复键和互斥组合一次宏展开中尽可能合并报告。
@@ -577,6 +579,11 @@ variadic 或目标 ABI 无安全 adapter 的声明只描述并返回稳定不可
 - dyn-compatible trait 另有 `dyn Trait` 类型 descriptor；
 - 非 dyn-compatible trait 仍有独立 `TraitDescriptor`，不伪造 dyn 类型。
 
+宏只自动接受当前声明可语法证明的 dyn compatibility。跨文件、跨 crate 或任意 external supertrait 的对象安全事实
+不可由 stable attribute 宏查询，默认不生成 dyn descriptor；作者可用 `dyn_compatible` 显式承诺。若 dyn 根继承
+关联类型，使用 `dyn_compatible(Supertrait::AssociatedType, ...)` 同时声明 dyn application 的绑定参数和所属直接
+supertrait。生成代码始终写出真实 `dyn Trait`，错误承诺由 rustc 在该 helper 所在宏调用处以 E0038 等错误拒绝。
+
 generic trait 分为 definition 与 applied descriptor。applied identity 包含 trait marker/external ID 和全部 concrete
 类型/const 实参；supertrait 与关联项在 applied view 中完成代换。
 
@@ -587,7 +594,9 @@ alias，`ExternalTraitId` 才是汇聚身份；同一 ID 的不同 `use` 路径�
 关联类型绑定始终先保存结构化 `TypeExpression`。只有 trait 声明或显式 specialization 已提供足够
 `Reflect + 'static` bound 时才生成 resolved handle；宏不得通过 specialization 探测任意 concrete 关联类型。关联
 常量同样始终描述声明，只有其类型可安全进入 owned 动态边界时才生成读取 adapter，并记录值来自默认声明还是 impl
-覆盖。
+覆盖。默认关联常量仅使用 trait 声明环境已经证明的 `Sized + 'static` 事实；未声明该边界的泛型投影保守地保留
+descriptor 和结构化不可读原因，不通过具体 impl 猜测。显式 impl 覆盖和显式 specialization 则在其 concrete
+环境中重新交由 rustc 证明，证明成立时可以生成读取 adapter。
 
 ### 13.3 有效方法视图
 
