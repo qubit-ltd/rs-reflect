@@ -1,36 +1,36 @@
 //! Reflection descriptors for portable function-pointer signatures.
 
+use crate::__private::LazyTypeRef;
 use crate::builtin::interner;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
-use crate::descriptor::TypeRef;
 use crate::expression::FunctionAbi;
 
-/// Creates a function-pointer descriptor from fully resolved signature parts.
+/// Creates a function-pointer descriptor from deferred signature parts.
 fn descriptor<T: ?Sized + 'static>(
     kind: FunctionPointerKind,
     abi: FunctionAbi,
-    parameters: Vec<TypeRef>,
-    return_type: TypeRef,
+    parameters: Vec<LazyTypeRef>,
+    return_type: LazyTypeRef,
 ) -> TypeDescriptor {
     let abi = Box::leak(Box::new(abi));
-    let parameters = Box::leak(parameters.into_boxed_slice());
+    let parameters = crate::__private::descriptor::lazy_type_ref_list(parameters);
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function::<T>(std::any::type_name::<T>(), kind, abi, false, parameters, return_type)
+    TypeDescriptor::new_function_lazy::<T>(std::any::type_name::<T>(), kind, abi, false, parameters, return_type)
 }
 
-/// Creates a C-variadic function-pointer descriptor from resolved signature
+/// Creates a C-variadic function-pointer descriptor from deferred signature
 /// parts.
 fn variadic_descriptor<T: ?Sized + 'static>(
     kind: FunctionPointerKind,
-    parameters: Vec<TypeRef>,
-    return_type: TypeRef,
+    parameters: Vec<LazyTypeRef>,
+    return_type: LazyTypeRef,
 ) -> TypeDescriptor {
     let abi = Box::leak(Box::new(FunctionAbi::C));
-    let parameters = Box::leak(parameters.into_boxed_slice());
+    let parameters = crate::__private::descriptor::lazy_type_ref_list(parameters);
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function::<T>(std::any::type_name::<T>(), kind, abi, true, parameters, return_type)
+    TypeDescriptor::new_function_lazy::<T>(std::any::type_name::<T>(), kind, abi, true, parameters, return_type)
 }
 
 macro_rules! impl_function_pointers {
@@ -41,8 +41,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
                     FunctionAbi::Rust,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -53,8 +53,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
                     FunctionAbi::Rust,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -65,8 +65,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
                     FunctionAbi::C,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -77,8 +77,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
                     FunctionAbi::C,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -89,8 +89,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
                     FunctionAbi::Other("C-unwind".into()),
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -101,8 +101,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
                     FunctionAbi::Other("C-unwind".into()),
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -113,8 +113,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
                     FunctionAbi::System,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -125,8 +125,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
                     FunctionAbi::System,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -137,8 +137,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
                     FunctionAbi::Other("system-unwind".into()),
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -149,8 +149,8 @@ macro_rules! impl_function_pointers {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
                     FunctionAbi::Other("system-unwind".into()),
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -214,8 +214,8 @@ macro_rules! impl_c_variadic_function_pointers {
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| variadic_descriptor::<Self>(
                     FunctionPointerKind::Safe,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }
@@ -225,8 +225,8 @@ macro_rules! impl_c_variadic_function_pointers {
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| variadic_descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
-                    vec![$(TypeRef::Resolved($argument::type_descriptor())),*],
-                    TypeRef::Resolved(Return::type_descriptor()),
+                    vec![$(LazyTypeRef::resolved::<$argument>()),*],
+                    LazyTypeRef::resolved::<Return>(),
                 ))
             }
         }

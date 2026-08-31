@@ -7,12 +7,6 @@ use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::SmartPointerKind;
 use crate::descriptor::TypeDescriptor;
-use crate::descriptor::TypeRef;
-
-/// Allocates a process-lifetime resolved reference to `T`.
-fn resolved<T: Reflect + ?Sized>() -> &'static TypeRef {
-    Box::leak(Box::new(TypeRef::Resolved(T::type_descriptor())))
-}
 
 macro_rules! impl_smart_pointer {
     ($type:ident, $kind:expr) => {
@@ -20,7 +14,11 @@ macro_rules! impl_smart_pointer {
             /// Returns the interned descriptor for this smart-pointer specialization.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
-                    TypeDescriptor::new_smart_pointer::<Self>(std::any::type_name::<Self>(), $kind, resolved::<T>())
+                    TypeDescriptor::new_smart_pointer_lazy::<Self>(
+                        std::any::type_name::<Self>(),
+                        $kind,
+                        crate::__private::descriptor::lazy_type_ref::<T>(),
+                    )
                 })
             }
         }

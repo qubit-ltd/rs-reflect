@@ -26,22 +26,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .attributes
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque);
-    let reflected_parameter_names: Vec<_> = declaration
-        .generics
-        .params
-        .iter()
-        .filter(|parameter| parameter.kind == GenericKindIr::Type)
-        .filter(|parameter| {
-            declaration.fields.iter().any(|field| {
-                !field
-                    .attributes
-                    .iter()
-                    .any(|attribute| attribute.name == HelperName::Opaque)
-                    && type_uses_identifier(&field.ty.tokens, &parameter.name)
-            })
-        })
-        .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
-        .collect();
+    let reflected_field_types = super::generics::reflected_field_types(&declaration);
+    let transparently_reflected_parameters =
+        super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
         .generics
         .params
@@ -53,6 +40,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         Ok(generics) => generics,
         Err(_) => return TokenStream::new(),
     };
+    if !declaration.generics.where_clause.is_empty() {
+        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
+            return TokenStream::new();
+        };
+        generics.where_clause = Some(where_clause);
+    }
     {
         let where_clause = generics.make_where_clause();
         for parameter in declaration
@@ -62,12 +55,22 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameter_names {
-            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#parameter: 'static));
         }
-        for parameter in &reflected_parameter_names {
+        for field_type in &reflected_field_types {
+            let field_type = &field_type.tokens;
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#field_type: #facade::Reflect));
+        }
+        for parameter in &transparently_reflected_parameters {
             where_clause
                 .predicates
                 .push(syn::parse_quote!(#parameter: #facade::Reflect));
@@ -83,12 +86,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .to_owned();
     let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition = capabilities(&declaration, &facade, &self_type, &capability_function);
-    let adapter_definitions: Vec<_> =
-        if opaque_root {
-            Vec::new()
-        } else {
-            declaration.fields.iter().map(|field| {
+    let capability_definition =
+        capabilities(&declaration, &facade, &self_type, &capability_function);
+    let adapter_definitions: Vec<_> = if opaque_root {
+        Vec::new()
+    } else {
+        declaration.fields.iter().map(|field| {
         let index = field.index;
         let get = format_ident!("__qubit_reflect_get_field_{index}");
         let get_mut = format_ident!("__qubit_reflect_get_mut_field_{index}");
@@ -130,7 +133,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             }
         }
         }).collect()
-        };
+    };
     let construction_adapters = if opaque_root {
         TokenStream::new()
     } else {
@@ -152,13 +155,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         });
         let query_name = match query_name { Some(name) => quote!(Some(#name)), None => quote!(None) };
         let ty = &field.ty.tokens;
-        let field_type = if field.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque) {
-            quote!(#facade::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
-                ::std::boxed::Box::new(#facade::__private::descriptor::opaque_member::<#ty>()),
-            )))
-        } else {
-            quote!(#facade::descriptor::TypeRef::Resolved(<#ty as #facade::Reflect>::type_descriptor()))
-        };
+        let opaque_field = field.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque);
         let policy = if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
             quote!(#facade::access::FieldAccessPolicy::Skipped, None, None, None)
         } else if field.attributes.iter().any(|attribute| attribute.name == HelperName::ReadOnly) {
@@ -167,20 +164,44 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             quote!(#facade::access::FieldAccessPolicy::ReadWrite, Some(<#self_type>::#get), Some(<#self_type>::#get_mut), Some(<#self_type>::#set))
         };
         let visibility = visibility(&field.visibility, &facade, field.span);
+        let descriptor = if opaque_field {
+            quote! {
+                #facade::__private::descriptor::field(
+                    <#self_type as #facade::Reflect>::type_descriptor,
+                    #index, #rust_name, #query_name,
+                    ::std::boxed::Box::leak(::std::boxed::Box::new(
+                        #facade::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
+                            ::std::boxed::Box::new(#facade::__private::descriptor::opaque_member::<#ty>()),
+                        )),
+                    )),
+                    #visibility,
+                )
+            }
+        } else {
+            quote! {
+                #facade::__private::descriptor::lazy_field(
+                    <#self_type as #facade::Reflect>::type_descriptor,
+                    #index, #rust_name, #query_name,
+                    #facade::__private::descriptor::lazy_type_ref::<#ty>(),
+                    #visibility,
+                )
+            }
+        };
         quote! {
-            #facade::__private::descriptor::field(
-                <#self_type as #facade::Reflect>::type_descriptor,
-                #index, #rust_name, #query_name,
-                ::std::boxed::Box::leak(::std::boxed::Box::new(#field_type)),
-                #visibility,
-            ).with_access(#policy)
+            #descriptor.with_access(#policy)
         }
         }).collect()
     };
     let struct_kind = match declaration.fields.len() {
         0 => quote!(#facade::descriptor::StructKind::Unit),
-        1 if declaration.fields[0].name.is_none() => quote!(#facade::descriptor::StructKind::Newtype),
-        _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => {
+        1 if declaration.fields[0].name.is_none() => {
+            quote!(#facade::descriptor::StructKind::Newtype)
+        }
+        _ if declaration
+            .fields
+            .first()
+            .is_some_and(|field| field.name.is_none()) =>
+        {
             quote!(#facade::descriptor::StructKind::Tuple)
         }
         _ => quote!(#facade::descriptor::StructKind::Named),
@@ -256,8 +277,7 @@ pub(crate) fn capabilities(
                 Some(_) | None => quote!(),
             })
     });
-    quote!
-    {
+    quote! {
         fn #function() -> &'static #facade::capability::TypeCapabilities {
             static CAPABILITIES: ::std::sync::OnceLock<#facade::capability::TypeCapabilities> =
                 ::std::sync::OnceLock::new();
@@ -314,15 +334,6 @@ fn registration(
     }
 }
 
-/// Returns whether a type token stream mentions one source generic parameter.
-pub(crate) fn type_uses_identifier(tokens: &TokenStream, identifier: &str) -> bool {
-    tokens.clone().into_iter().any(|token| match token {
-        proc_macro2::TokenTree::Ident(value) => value == identifier,
-        proc_macro2::TokenTree::Group(group) => type_uses_identifier(&group.stream(), identifier),
-        _ => false,
-    })
-}
-
 /// Computes a stable FNV-1a content fingerprint for one declaration.
 fn fingerprint(input: &str) -> u64 {
     input.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
@@ -331,12 +342,18 @@ fn fingerprint(input: &str) -> u64 {
 }
 
 /// Expands a normalized source visibility into its public runtime form.
-fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: proc_macro2::Span) -> TokenStream {
+fn visibility(
+    visibility: &VisibilityIr,
+    facade: &TokenStream,
+    span: proc_macro2::Span,
+) -> TokenStream {
     match visibility {
         VisibilityIr::Public => quote!(#facade::identity::Visibility::Public),
         VisibilityIr::Crate => quote!(#facade::identity::Visibility::Crate),
         VisibilityIr::Super => quote!(#facade::identity::Visibility::Super),
-        VisibilityIr::SelfValue | VisibilityIr::Inherited => quote!(#facade::identity::Visibility::Private),
+        VisibilityIr::SelfValue | VisibilityIr::Inherited => {
+            quote!(#facade::identity::Visibility::Private)
+        }
         VisibilityIr::Restricted(path) => {
             let path = syn::LitStr::new(&path.source, span);
             quote!(#facade::identity::Visibility::Restricted(#path.into()))

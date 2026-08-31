@@ -4,15 +4,18 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::ir::HelperName;
+use crate::ir::HelperValueIr;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VariantIr;
 use crate::ir::VariantKindIr;
-use crate::ir::HelperName;
-use crate::ir::HelperValueIr;
 
 /// Emits generated local construction and update adapters for one struct.
-pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn struct_adapters(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
@@ -25,7 +28,9 @@ pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStr
         let provider = format_ident!("__qubit_reflect_default_field_{}", field.index);
         let ty = &field.ty.tokens;
         let expression = match &default.value {
-            HelperValueIr::DefaultPath(None) => quote!(<#ty as ::core::default::Default>::default()),
+            HelperValueIr::DefaultPath(None) => {
+                quote!(<#ty as ::core::default::Default>::default())
+            }
             HelperValueIr::DefaultPath(Some(path)) => {
                 let path = &path.tokens;
                 quote!(#path())
@@ -164,9 +169,11 @@ pub(crate) fn struct_descriptor(facade: &TokenStream) -> TokenStream {
 
 /// Emits a local constructor and its descriptor attachment for one enum variant.
 pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> TokenStream {
-    if variant.attributes.iter().any(|attribute| {
-        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-    }) {
+    if variant
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
+    {
         return TokenStream::new();
     }
     let variant_index = variant.index;
@@ -177,10 +184,15 @@ pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> Tok
             .attributes
             .iter()
             .find(|attribute| attribute.name == HelperName::Default)?;
-        let provider = format_ident!("__qubit_reflect_default_variant_{variant_index}_field_{}", field.index);
+        let provider = format_ident!(
+            "__qubit_reflect_default_variant_{variant_index}_field_{}",
+            field.index
+        );
         let ty = &field.ty.tokens;
         let expression = match &default.value {
-            HelperValueIr::DefaultPath(None) => quote!(<#ty as ::core::default::Default>::default()),
+            HelperValueIr::DefaultPath(None) => {
+                quote!(<#ty as ::core::default::Default>::default())
+            }
             HelperValueIr::DefaultPath(Some(path)) => {
                 let path = &path.tokens;
                 quote!(#path())
@@ -259,9 +271,11 @@ pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> Tok
 
 /// Returns an optional descriptor attachment for one variant.
 pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream) -> TokenStream {
-    if variant.attributes.iter().any(|attribute| {
-        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-    }) {
+    if variant
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
+    {
         return TokenStream::new();
     }
     let constructor = format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);

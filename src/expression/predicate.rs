@@ -8,9 +8,12 @@ use crate::expression::DiagnosticText;
 use crate::expression::LifetimeExpression;
 use crate::expression::TypeExpression;
 
+/// The modifier attached to one structural trait bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TraitBoundModifier {
+    /// The trait bound is required.
     None,
+    /// The trait bound uses Rust's `?Trait` relaxation syntax.
     Maybe,
 }
 
@@ -24,6 +27,7 @@ pub enum PredicateDescriptor {
         subject: TypeExpression,
         /// Trait or lifetime bounds in declaration order.
         bounds: Box<[TypeExpression]>,
+        /// Modifiers corresponding by index to `bounds`.
         bound_modifiers: Box<[TraitBoundModifier]>,
         /// Lifetimes introduced by a higher-ranked trait bound.
         higher_ranked_lifetimes: Box<[LifetimeExpression]>,

@@ -3,6 +3,8 @@
 
 use std::fmt;
 
+use crate::__private::LazyTypeRef;
+use crate::__private::TypeRefSource;
 use crate::access::FieldAccessError;
 use crate::access::FieldAccessOperation;
 use crate::access::FieldAccessPolicy;
@@ -10,6 +12,8 @@ use crate::access::FieldGetAdapter;
 use crate::access::FieldGetMutAdapter;
 use crate::access::FieldIdentity;
 use crate::access::FieldSetAdapter;
+use crate::access::FieldSetFailure;
+use crate::access::FieldSetPreflightAdapter;
 use crate::access::FieldVisibility;
 use crate::access::field_adapter::dynamic_mut_type_id;
 use crate::access::field_adapter::dynamic_owned_type_id;
@@ -34,7 +38,7 @@ pub struct FieldDescriptor {
     index: usize,
     rust_name: Option<&'static str>,
     query_name: Option<&'static str>,
-    field_type: &'static TypeRef,
+    field_type: TypeRefSource,
     visibility: Visibility,
     variant_index: Option<usize>,
     variant_rust_name: Option<&'static str>,
@@ -42,6 +46,7 @@ pub struct FieldDescriptor {
     get: Option<FieldGetAdapter>,
     get_mut: Option<FieldGetMutAdapter>,
     set: Option<FieldSetAdapter>,
+    set_preflight: Option<FieldSetPreflightAdapter>,
 }
 
 impl FieldDescriptor {
@@ -65,7 +70,7 @@ impl FieldDescriptor {
             index,
             rust_name,
             query_name,
-            field_type,
+            field_type: TypeRefSource::Eager(field_type),
             visibility,
             variant_index: None,
             variant_rust_name: None,
@@ -73,6 +78,37 @@ impl FieldDescriptor {
             get: None,
             get_mut: None,
             set: None,
+            set_preflight: None,
+        }
+    }
+
+    /// Creates a field whose resolved type is deferred until navigation.
+    ///
+    /// Generated descriptors use this constructor so recursive type graphs do
+    /// not re-enter a root descriptor while its member list is being built.
+    #[doc(hidden)]
+    pub(crate) const fn new_lazy(
+        declaring_type: TypeDescriptorResolver,
+        index: usize,
+        rust_name: Option<&'static str>,
+        query_name: Option<&'static str>,
+        field_type: &'static LazyTypeRef,
+        visibility: Visibility,
+    ) -> Self {
+        Self {
+            declaring_type,
+            index,
+            rust_name,
+            query_name,
+            field_type: TypeRefSource::Lazy(field_type),
+            visibility,
+            variant_index: None,
+            variant_rust_name: None,
+            access_policy: FieldAccessPolicy::ReadWrite,
+            get: None,
+            get_mut: None,
+            set: None,
+            set_preflight: None,
         }
     }
 
@@ -93,6 +129,17 @@ impl FieldDescriptor {
         self.get = get;
         self.get_mut = get_mut;
         self.set = set;
+        self
+    }
+
+    /// Attaches a non-consuming validation hook that runs immediately before
+    /// the set adapter.
+    ///
+    /// Generated enum fields use this hook to validate the active variant
+    /// while the replacement remains recoverable by the descriptor.
+    #[doc(hidden)]
+    pub const fn with_set_preflight(mut self, set_preflight: Option<FieldSetPreflightAdapter>) -> Self {
+        self.set_preflight = set_preflight;
         self
     }
 
@@ -129,8 +176,10 @@ impl FieldDescriptor {
     }
 
     /// Returns the resolved, explicitly opaque, or symbolic field type.
-    pub const fn field_type(&self) -> &'static TypeRef {
-        self.field_type
+    #[must_use]
+    #[inline(always)]
+    pub fn field_type(&self) -> &'static TypeRef {
+        self.field_type.get()
     }
 
     /// Returns declared struct-field visibility or the explicit fact that an
@@ -192,24 +241,44 @@ impl FieldDescriptor {
     /// declared field value.
     ///
     /// All target, policy, value, and adapter-availability checks complete
-    /// before generated code is invoked, so these failures do not modify the
-    /// target. A symbolic definition-level field has no exact runtime identity
-    /// and therefore returns [`FieldAccessError::Unavailable`].
-    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldAccessError> {
-        self.validate_mutable_target(&target)?;
-        self.validate_policy(FieldAccessOperation::Set)?;
-        let (expected, _) = self
-            .concrete_field_identity()
-            .ok_or_else(|| self.unavailable(FieldAccessOperation::Set))?;
+    /// before generated code is invoked. These failures do not modify the
+    /// target and return the untouched replacement through
+    /// [`FieldSetFailure::recovery`]. A symbolic definition-level field has no
+    /// exact runtime identity and therefore reports
+    /// [`FieldAccessError::Unavailable`].
+    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldSetFailure> {
+        if let Err(error) = self.validate_mutable_target(&target) {
+            return Err(self.set_failure(error, value));
+        }
+        if let Err(error) = self.validate_policy(FieldAccessOperation::Set) {
+            return Err(self.set_failure(error, value));
+        }
+        let (expected, _) = match self.concrete_field_identity() {
+            Some(identity) => identity,
+            None => {
+                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
+            }
+        };
         let actual = dynamic_owned_type_id(&value);
         if actual != expected {
-            return Err(FieldAccessError::ValueTypeMismatch {
+            let error = FieldAccessError::ValueTypeMismatch {
                 field: self.identity(),
                 mismatch: Box::new(TypeMismatch::new(expected, actual)),
-            });
+            };
+            return Err(self.set_failure(error, value));
         }
-        let adapter = self.set.ok_or_else(|| self.unavailable(FieldAccessOperation::Set))?;
-        adapter(target, value)
+        let adapter = match self.set {
+            Some(adapter) => adapter,
+            None => {
+                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
+            }
+        };
+        if let Some(preflight) = self.set_preflight
+            && let Err(error) = preflight(&target)
+        {
+            return Err(self.set_failure(error, value));
+        }
+        adapter(target, value).map_err(FieldSetFailure::after_execution)
     }
 
     /// Validates a shared target without consuming or changing it.
@@ -263,7 +332,7 @@ impl FieldDescriptor {
     /// Returns the exact runtime identity and diagnostic name for a concrete
     /// resolved or explicitly opaque field.
     fn concrete_field_identity(&self) -> Option<(std::any::TypeId, &'static str)> {
-        match self.field_type {
+        match self.field_type() {
             TypeRef::Resolved(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
             TypeRef::Opaque(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
             TypeRef::Symbolic(_) => None,
@@ -299,6 +368,11 @@ impl FieldDescriptor {
             operation,
         }
     }
+
+    /// Pairs a pre-execution set error with the untouched replacement value.
+    fn set_failure(&self, error: FieldAccessError, value: ReflectedOwned) -> FieldSetFailure {
+        FieldSetFailure::before_execution(error, self.identity(), self.query_name, value)
+    }
 }
 
 impl fmt::Debug for FieldDescriptor {
@@ -319,6 +393,7 @@ impl fmt::Debug for FieldDescriptor {
             .field("has_get", &self.get.is_some())
             .field("has_get_mut", &self.get_mut.is_some())
             .field("has_set", &self.set.is_some())
+            .field("has_set_preflight", &self.set_preflight.is_some())
             .finish()
     }
 }

@@ -1,7 +1,11 @@
 //! Integration tests for descriptor APIs.
 
+#[cfg(feature = "derive")]
+mod associated_item_impl_tests;
 mod builtin_tests;
 mod capability_tests;
+#[cfg(feature = "derive")]
+mod default_trait_invocation_tests;
 #[cfg(feature = "derive")]
 mod derive_enum_tests;
 #[cfg(feature = "derive")]

@@ -127,7 +127,7 @@ fn test_read_only_policy_rejects_mutation() {
         .set(ReflectedMut::new(&mut record), ReflectedOwned::new(11_u32))
         .expect_err("read-only fields must reject replacement");
     assert!(matches!(
-        error,
+        error.error(),
         FieldAccessError::ReadOnly {
             operation: FieldAccessOperation::Set,
             ..
@@ -165,12 +165,15 @@ fn test_skipped_policy_preserves_descriptor_and_disables_access() {
             ..
         })
     ));
+    let failure = field
+        .set(ReflectedMut::new(&mut record), ReflectedOwned::new(12_u32))
+        .expect_err("skipped fields must reject replacement");
     assert!(matches!(
-        field.set(ReflectedMut::new(&mut record), ReflectedOwned::new(12_u32)),
-        Err(FieldAccessError::Skipped {
+        failure.error(),
+        FieldAccessError::Skipped {
             operation: FieldAccessOperation::Set,
             ..
-        })
+        }
     ));
     assert_eq!(record.skipped, 9);
 }
