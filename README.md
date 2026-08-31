@@ -7,11 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-`qubit-reflect` provides macro-generated structural and executable reflection on stable Rust. It supplies immutable descriptors plus checked field access, method invocation, value construction, capability lookup, and a deterministic process-local registry.
-
-## Intended Users
-
-The crate is intended for framework and library authors who need checked runtime access to Rust structure without parsing source files, reading private layout, or depending on compiler-private APIs.
+`qubit-reflect` gives framework and library authors opt-in, macro-generated
+reflection on stable Rust. It turns declared Rust types into immutable
+descriptors and exposes checked dynamic field access, construction, method
+invocation, capabilities, and process-local registry discovery—without source
+parsing, private-layout inspection, compiler-private APIs, or `unsafe`.
 
 ## Installation
 
@@ -20,20 +20,17 @@ The crate is intended for framework and library authors who need checked runtime
 qubit-reflect = "0.1"
 ```
 
-## Current Status
-
-The documented reflection runtime is implemented. The public entry points are:
-
-- `#[derive(Reflect)]` for structs and enums;
-- `#[reflect]` for trait declarations;
-- `#[reflect_impl]` for inherent and trait implementations;
-- `TypeDescriptor` and related immutable descriptor views;
-- checked dynamic values, field access, invocation, construction, capabilities, and registry discovery;
-- local and explicitly requested thread-safe operation modes.
-
-The crate is `#![forbid(unsafe_code)]`. Runtime validation is exact: it does not coerce numeric values, parse strings, infer `Into`, or manufacture `Send`/`Sync` after type erasure.
+The default `derive` feature exports `#[derive(Reflect)]`, `#[reflect]`, and
+`#[reflect_impl]`. Disabling default features keeps the runtime and handwritten
+registration APIs, but does not re-export those macros.
 
 ## Quick Start
+
+A schema-driven editor needs to display and replace a field selected by name,
+while ordinary application code continues to own the value. Derive the
+descriptor at the declaration site, find the field, then pass the appropriate
+borrow wrapper. The adapter validates the target, operation policy, and exact
+Rust type before it changes anything.
 
 ```rust
 use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
@@ -45,31 +42,53 @@ struct User {
 }
 
 let descriptor = TypeDescriptor::of::<User>();
-let name = descriptor.field("name").expect("reflected field");
+let name = descriptor.field("name").expect("derived field");
 let mut user = User { id: 7, name: String::from("Ada") };
 
-assert_eq!(
-    name.get(ReflectedRef::new(&user))
-        .expect("checked read")
-        .downcast_ref::<String>()
-        .map(String::as_str),
-    Some("Ada"),
-);
+let current = name.get(ReflectedRef::new(&user)).expect("checked read");
+assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
 name.set(
     ReflectedMut::new(&mut user),
     ReflectedOwned::new(String::from("Grace")),
-).expect("checked replacement");
+)
+.expect("exactly typed replacement");
 assert_eq!(user.name, "Grace");
 ```
 
-Reflection is opt-in. `rename` changes query names without changing Rust identity; `skip`, `read_only`, `no_construct`, and `no_invoke` retain structural facts while disabling the selected operation.
+## Why This Project Exists
+
+Rust deliberately does not offer unrestricted runtime reflection. Frameworks
+that need a type graph, a property editor, plug-in discovery, or dynamic
+dispatch often end up parsing source, maintaining a duplicate schema, or
+erasing values without preserving their ownership and thread-safety boundary.
+`qubit-reflect` keeps the contract in Rust declarations: generated code supplies
+only operations that Rust can prove safe, and descriptors retain structural
+facts even where an operation is unavailable.
+
+## What It Provides
+
+- Immutable descriptors for reflected structs, enums, traits, implementations,
+  generic facts, and supported built-in type families.
+- Checked field reads, mutable borrows, replacements, enum-branch checks, and
+  dynamic construction. Failed owned-input operations return recovery objects.
+- Generated invocation adapters for supported methods, with local and
+  explicitly requested thread-safe modes.
+- A deterministic registry assembled from linked inventory fragments, plus
+  typed `Clone` and `Default` capability adapters.
+
+Reflection is deliberately bounded. It does not coerce numeric values, parse
+strings, infer `Into`, or upgrade a local dynamic value to thread-safe mode.
+`TypeId`, descriptor addresses, and trait markers are process-local identity,
+not serialization or cross-process model identifiers. Unsupported or disabled
+operations remain visible as descriptors with structured unavailable reasons.
 
 ## Learn More
 
-- [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
-- [Chinese user guide](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
+- [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
+- [API documentation](https://docs.rs/qubit-reflect)
+- [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [Requirements traceability matrix](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [简体中文 README](README.zh_CN.md)
 
