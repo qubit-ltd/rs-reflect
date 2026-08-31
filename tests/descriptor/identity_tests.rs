@@ -8,8 +8,13 @@
 
 // qubit-style: allow explicit-imports
 //! Integration tests for type identity and base error APIs.
+use std::any::TypeId;
+use std::str::FromStr;
+
 use qubit_reflect as reflect;
 use reflect::error::RegistryError;
+use reflect::error::RegistryErrorKind;
+use reflect::error::TypeMismatch;
 use reflect::identity::CapabilityId;
 use reflect::identity::ExternalTraitId;
 use reflect::identity::FragmentIdentity;
@@ -20,9 +25,20 @@ use reflect::identity::VisibilityKind;
 /// Verifies namespaced identifiers accept valid external names.
 #[test]
 fn test_namespaced_ids_accept_ascii_identifier_segments() {
-    assert!(CapabilityId::new("example.fixture.clone").is_ok());
+    let capability = CapabilityId::new("example.fixture.clone").expect("valid capability ID");
+    let external = ExternalTraitId::from_str("example.fixture.display").expect("valid trait ID");
+
+    assert_eq!(capability.as_str(), "example.fixture.clone");
+    assert_eq!(capability.as_ref(), "example.fixture.clone");
+    assert_eq!(capability.to_string(), "example.fixture.clone");
+    assert_eq!(
+        CapabilityId::from_str("example.fixture.clone").expect("capability parses"),
+        capability,
+    );
     assert!(CapabilityId::new("Example.fixture_2.Clone3").is_ok());
-    assert!(ExternalTraitId::new("example.fixture.display").is_ok());
+    assert_eq!(external.as_str(), "example.fixture.display");
+    assert_eq!(external.as_ref(), "example.fixture.display");
+    assert_eq!(external.to_string(), "example.fixture.display");
 }
 
 /// Verifies namespaced identifiers reject non-ASCII and malformed segments.
@@ -91,8 +107,72 @@ fn test_visibility_rejects_empty_restricted_path() {
 fn test_registry_error_clone_preserves_kind() {
     let left = FragmentIdentity::new("example", "example::one", 1, 1, "impl", 1);
     let right = FragmentIdentity::new("example", "example::two", 2, 1, "impl", 2);
-    let error = RegistryError::duplicate_fragment(left, right);
+    let error = RegistryError::duplicate_fragment(left.clone(), right.clone());
     let cloned = error.clone();
 
     assert_eq!(error.kind(), cloned.kind());
+    let (actual_left, actual_right) = error
+        .conflicting_fragments()
+        .expect("duplicate error should retain both fragments");
+    assert_eq!(actual_left, &left);
+    assert_eq!(actual_right, &right);
+    assert!(error.fragment_identity().is_none());
+    assert_eq!(error.to_string(), "reflection registry error: DuplicateFragment");
+}
+
+/// Verifies every registry error constructor retains its category and
+/// applicable fragment context.
+#[test]
+fn test_registry_error_constructors_preserve_context() {
+    let left = FragmentIdentity::new("example", "example::left", 1, 1, "impl", 1);
+    let right = FragmentIdentity::new("example", "example::right", 2, 1, "impl", 2);
+    let conflicts = [
+        (
+            RegistryError::identity_conflict(left.clone(), right.clone()),
+            RegistryErrorKind::IdentityConflict,
+        ),
+        (
+            RegistryError::external_trait_id_conflict(left.clone(), right.clone()),
+            RegistryErrorKind::ExternalTraitIdConflict,
+        ),
+        (
+            RegistryError::capability_conflict(left.clone(), right.clone()),
+            RegistryErrorKind::CapabilityConflict,
+        ),
+    ];
+
+    for (error, expected_kind) in conflicts {
+        assert_eq!(error.kind(), expected_kind);
+        assert_eq!(error.conflicting_fragments(), Some((&left, &right)));
+        assert!(error.fragment_identity().is_none());
+    }
+
+    let resolution = RegistryError::impl_trait_resolution(left.clone());
+    assert_eq!(resolution.kind(), RegistryErrorKind::ImplTraitResolution);
+    assert_eq!(resolution.fragment_identity(), Some(&left));
+    assert!(resolution.conflicting_fragments().is_none());
+
+    let unsupported = RegistryError::unsupported_platform();
+    assert_eq!(unsupported.kind(), RegistryErrorKind::UnsupportedPlatform);
+    assert!(unsupported.fragment_identity().is_none());
+    assert!(unsupported.conflicting_fragments().is_none());
+}
+
+/// Verifies type mismatch diagnostics retain exact IDs independently from
+/// optional human-readable names.
+#[test]
+fn test_type_mismatch_preserves_ids_and_optional_names() {
+    let unnamed = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>());
+    assert_eq!(unnamed.expected(), TypeId::of::<u8>());
+    assert_eq!(unnamed.actual(), TypeId::of::<u16>());
+    assert_eq!(unnamed.expected_name(), None);
+    assert_eq!(unnamed.actual_name(), None);
+    assert_eq!(
+        unnamed.to_string(),
+        "dynamic value type did not match the expected type"
+    );
+
+    let named = unnamed.with_diagnostic_names("u8", "u16");
+    assert_eq!(named.expected_name(), Some("u8"));
+    assert_eq!(named.actual_name(), Some("u16"));
 }

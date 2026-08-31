@@ -317,6 +317,7 @@ mod construction_runtime {
         ConstructionField::required(&FAILED_FIELDS[1]),
     ];
     static STARTED_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 0] = [];
+    static STARTED_THREAD_SAFE_FIELDS: [ConstructionField<ThreadSafe>; 0] = [];
 
     /// Builds a profile from descriptor-ordered, already validated values.
     fn construct_profile(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
@@ -408,6 +409,12 @@ mod construction_runtime {
     fn construct_started(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         assert!(input.values().is_empty());
         DynamicOwned::<Local>::new(Event::Started)
+    }
+
+    /// Builds the unit enum variant through the thread-safe erased boundary.
+    fn construct_started_thread_safe(input: ValidatedConstructionInput<ThreadSafe>) -> DynamicOwned<ThreadSafe> {
+        assert!(input.values().is_empty());
+        DynamicOwned::<ThreadSafe>::new(Event::Started)
     }
 
     /// Builds the named enum variant from descriptor-ordered values.
@@ -833,6 +840,11 @@ mod construction_runtime {
         let marker_constructor =
             StructConstructor::new(&MARKER_DESCRIPTOR, &MARKER_CONSTRUCTION_FIELDS, construct_marker);
 
+        assert!(std::ptr::eq(pair_constructor.descriptor(), &PAIR_DESCRIPTOR));
+        assert_eq!(pair_constructor.fields().len(), 2);
+        assert_eq!(pair_constructor.shape(), ConstructionShape::Tuple);
+        assert!(format!("{pair_constructor:?}").contains("StructConstructor"));
+
         let pair = pair_constructor
             .construct_tuple(TupleConstructionInput::new([
                 ReflectedOwned::new(3_u32),
@@ -845,6 +857,14 @@ mod construction_runtime {
 
         assert_eq!(downcast_result::<Pair>(pair), Pair(3, String::from("three")));
         assert_eq!(downcast_result::<Marker>(marker), Marker);
+        assert!(
+            expect_construction_failure(
+                pair_constructor.construct_unit(),
+                "a tuple constructor must reject unit input",
+            )
+            .values()
+            .is_empty()
+        );
     }
 
     #[test]
@@ -906,6 +926,11 @@ mod construction_runtime {
         let failed_constructor =
             VariantConstructor::new(&EVENT_VARIANTS[1], &FAILED_CONSTRUCTION_FIELDS, construct_failed);
 
+        assert!(std::ptr::eq(started_constructor.variant(), &EVENT_VARIANTS[0]));
+        assert!(started_constructor.fields().is_empty());
+        assert_eq!(started_constructor.shape(), ConstructionShape::Unit);
+        assert!(format!("{started_constructor:?}").contains("VariantConstructor"));
+
         let started = started_constructor
             .construct_unit()
             .expect("the unit variant should construct");
@@ -923,6 +948,22 @@ mod construction_runtime {
                 code: 500,
                 message: String::from("timeout"),
             }
+        );
+        assert!(
+            expect_construction_failure(
+                started_constructor.construct_tuple(TupleConstructionInput::new(std::iter::empty::<ReflectedOwned>())),
+                "a unit variant must reject tuple input",
+            )
+            .values()
+            .is_empty()
+        );
+        assert!(
+            expect_construction_failure(
+                failed_constructor.construct_unit(),
+                "a named variant must reject unit input",
+            )
+            .values()
+            .is_empty()
         );
     }
 
@@ -1078,6 +1119,23 @@ mod construction_runtime {
         descriptor::struct_type::<ThreadScalar>("construct::ThreadScalar", StructKind::Newtype, &THREAD_SCALAR_FIELDS);
     static THREAD_SCALAR_CONSTRUCTION_FIELDS: [ConstructionField<ThreadSafe>; 1] =
         [ConstructionField::required(&THREAD_SCALAR_FIELDS[0])];
+    static THREAD_SCALAR_UPDATE_FIELDS: [UpdateField; 1] = [UpdateField::allowed(&THREAD_SCALAR_FIELDS[0])];
+
+    /// Applies one validated thread-safe scalar replacement.
+    fn update_thread_scalar(input: ValidatedUpdateInput<ThreadSafe>) -> DynamicOwned<ThreadSafe> {
+        let (base, overrides) = input.into_parts();
+        let mut value = base
+            .downcast::<ThreadScalar>()
+            .unwrap_or_else(|_| unreachable!("validation guarantees ThreadScalar"));
+        for replacement in overrides.into_vec() {
+            let (index, replacement) = replacement.into_parts();
+            assert_eq!(index, 0);
+            value.0 = replacement
+                .downcast::<u32>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees u32"));
+        }
+        DynamicOwned::<ThreadSafe>::new(value)
+    }
 
     #[test]
     fn test_thread_safe_mode_uses_the_same_exact_validation_contract() {
@@ -1090,9 +1148,86 @@ mod construction_runtime {
             .construct_tuple(TupleConstructionInput::new([DynamicOwned::<ThreadSafe>::new(11_u32)]))
             .expect("thread-safe input should validate without mode conversion");
 
+        assert!(std::ptr::eq(constructor.descriptor(), &THREAD_SCALAR_DESCRIPTOR));
+        assert_eq!(constructor.fields().len(), 1);
+        assert_eq!(constructor.shape(), ConstructionShape::Tuple);
+        assert!(format!("{constructor:?}").contains("StructConstructor"));
+        assert!(
+            expect_construction_failure(
+                constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(
+                    &str,
+                    DynamicOwned<ThreadSafe>,
+                )>())),
+                "a thread-safe tuple constructor must reject named input",
+            )
+            .values()
+            .is_empty()
+        );
+        assert!(
+            expect_construction_failure(
+                constructor.construct_unit(),
+                "a thread-safe tuple constructor must reject unit input",
+            )
+            .values()
+            .is_empty()
+        );
+
         let scalar = value
             .downcast::<ThreadScalar>()
             .unwrap_or_else(|_| panic!("the adapter result should retain thread-safe storage"));
         assert_eq!(scalar, ThreadScalar(11));
+
+        let updater = StructUpdater::new(
+            &THREAD_SCALAR_DESCRIPTOR,
+            &THREAD_SCALAR_UPDATE_FIELDS,
+            update_thread_scalar,
+        );
+        assert!(std::ptr::eq(updater.descriptor(), &THREAD_SCALAR_DESCRIPTOR));
+        assert_eq!(updater.fields().len(), 1);
+        assert!(format!("{updater:?}").contains("StructUpdater"));
+        let updated = updater
+            .update(StructUpdateInput::new(
+                DynamicOwned::<ThreadSafe>::new(ThreadScalar(11)),
+                NamedConstructionInput::new(std::iter::empty::<(&str, DynamicOwned<ThreadSafe>)>()),
+            ))
+            .expect("an exact thread-safe update must succeed");
+        assert_eq!(
+            updated
+                .downcast::<ThreadScalar>()
+                .unwrap_or_else(|_| panic!("the update must retain ThreadScalar")),
+            ThreadScalar(11),
+        );
+
+        let variant = VariantConstructor::new(
+            &EVENT_VARIANTS[0],
+            &STARTED_THREAD_SAFE_FIELDS,
+            construct_started_thread_safe,
+        );
+        assert!(std::ptr::eq(variant.variant(), &EVENT_VARIANTS[0]));
+        assert!(variant.fields().is_empty());
+        assert_eq!(variant.shape(), ConstructionShape::Unit);
+        assert!(format!("{variant:?}").contains("VariantConstructor"));
+        assert!(variant.construct_unit().is_ok());
+        assert!(
+            expect_construction_failure(
+                variant.construct_named(NamedConstructionInput::new(std::iter::empty::<(
+                    &str,
+                    DynamicOwned<ThreadSafe>,
+                )>())),
+                "a thread-safe unit variant must reject named input",
+            )
+            .values()
+            .is_empty()
+        );
+        assert!(
+            expect_construction_failure(
+                variant.construct_tuple(TupleConstructionInput::new(
+                    std::iter::empty::<DynamicOwned<ThreadSafe>>()
+                )),
+                "a thread-safe unit variant must reject tuple input",
+            )
+            .values()
+            .is_empty()
+        );
     }
 }

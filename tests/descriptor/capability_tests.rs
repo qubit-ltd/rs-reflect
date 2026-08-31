@@ -125,6 +125,9 @@ fn test_type_capabilities_preserve_unknown_capabilities_in_stable_order() {
         .collect();
     assert_eq!(ids, ["example.capability.alpha", "example.capability.zeta"]);
     assert!(!capabilities.descriptors()[0].has_adapter());
+    assert_eq!(capabilities.descriptors()[1].adapter_type(), zeta_key.adapter_type());
+    assert!(format!("{:?}", capabilities.descriptors()[1].clone()).contains("CapabilityDescriptor"));
+    assert!(format!("{zeta_key:?}").contains("CapabilityKey"));
     assert_eq!(capabilities.get(zeta_key), Some(&TextAdapter("zeta")));
     assert_eq!(capabilities.get(alpha_key), None);
 }

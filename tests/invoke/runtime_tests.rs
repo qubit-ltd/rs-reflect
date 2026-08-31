@@ -35,6 +35,7 @@ mod invocation_runtime {
     use reflect::invoke::InvocationErrorKind;
     use reflect::invoke::InvocationFailure;
     use reflect::invoke::InvocationInputMode;
+    use reflect::invoke::InvocationMode;
     use reflect::invoke::InvocationOutput;
     use reflect::invoke::InvocationPanic;
     use reflect::invoke::InvocationReceiver;
@@ -1095,6 +1096,49 @@ mod invocation_runtime {
         assert_eq!(
             DynamicOwned::<ThreadSafe>::downcast::<u32>(value).unwrap_or_else(|_| panic!("output should be u32")),
             17
+        );
+    }
+
+    /// Verifies each invocation mode reports exact identities for owned,
+    /// shared, mutable, and dedicated string dynamic values.
+    #[test]
+    fn test_invocation_modes_report_dynamic_value_type_identities() {
+        let local_owned = DynamicOwned::<Local>::new(1_u8);
+        let local_number = 2_u16;
+        let local_ref = DynamicRef::<Local>::new(&local_number);
+        let mut local_mut_number = 3_u32;
+        let local_mut = DynamicMut::<Local>::new(&mut local_mut_number);
+        assert_eq!(
+            <Local as InvocationMode>::owned_type_id(&local_owned),
+            TypeId::of::<u8>()
+        );
+        assert_eq!(<Local as InvocationMode>::ref_type_id(&local_ref), TypeId::of::<u16>());
+        assert_eq!(<Local as InvocationMode>::mut_type_id(&local_mut), TypeId::of::<u32>());
+        assert_eq!(
+            <Local as InvocationMode>::ref_type_id(&DynamicRef::<Local>::new_str("text")),
+            TypeId::of::<str>(),
+        );
+
+        let thread_owned = DynamicOwned::<ThreadSafe>::new(4_u8);
+        let thread_number = 5_u16;
+        let thread_ref = DynamicRef::<ThreadSafe>::new(&thread_number);
+        let mut thread_mut_number = 6_u32;
+        let thread_mut = DynamicMut::<ThreadSafe>::new(&mut thread_mut_number);
+        assert_eq!(
+            <ThreadSafe as InvocationMode>::owned_type_id(&thread_owned),
+            TypeId::of::<u8>(),
+        );
+        assert_eq!(
+            <ThreadSafe as InvocationMode>::ref_type_id(&thread_ref),
+            TypeId::of::<u16>(),
+        );
+        assert_eq!(
+            <ThreadSafe as InvocationMode>::mut_type_id(&thread_mut),
+            TypeId::of::<u32>(),
+        );
+        assert_eq!(
+            <ThreadSafe as InvocationMode>::ref_type_id(&DynamicRef::<ThreadSafe>::new_str("text")),
+            TypeId::of::<str>(),
         );
     }
 

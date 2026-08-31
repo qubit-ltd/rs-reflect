@@ -8,6 +8,8 @@
 
 // qubit-style: allow explicit-imports
 use std::any::TypeId;
+use std::sync::Arc;
+use std::sync::Barrier;
 use std::sync::LazyLock;
 
 use qubit_reflect as reflect;
@@ -17,8 +19,10 @@ use reflect::descriptor::AssociatedConstImplementationSource;
 use reflect::descriptor::AssociatedConstReader;
 use reflect::descriptor::AssociatedTypeBindingDescriptor;
 use reflect::descriptor::AssociatedTypeDescriptor;
+use reflect::descriptor::CatchingAvailability;
 use reflect::descriptor::ImplDefinitionDescriptor;
 use reflect::descriptor::ImplDescriptor;
+use reflect::descriptor::ImplDescriptorBuildError;
 use reflect::descriptor::ImplKind;
 use reflect::descriptor::InvocationAdapter;
 use reflect::descriptor::InvocationUnavailableReason;
@@ -43,6 +47,7 @@ use reflect::descriptor::TraitDefinitionDescriptor;
 use reflect::descriptor::TraitDescriptor;
 use reflect::descriptor::TraitDescriptorBuildError;
 use reflect::descriptor::TraitId;
+use reflect::descriptor::TraitImplPayload;
 use reflect::descriptor::TypeDescriptor;
 use reflect::descriptor::TypeDescriptorResolver;
 use reflect::expression::ConcreteTypeExpression;
@@ -57,13 +62,17 @@ use reflect::identity::ExternalTraitId;
 use reflect::identity::FragmentIdentity;
 use reflect::identity::MemberId;
 use reflect::identity::Visibility;
+use reflect::value::Local;
 use reflect::value::ReflectedOwned;
+use reflect::value::ThreadSafe;
 
 struct RootMarker;
 struct MiddleMarker;
 struct LeafMarker;
 struct GenericMarker;
 struct OtherMarker;
+struct PayloadCacheMarker;
+struct TraitObjectCacheMarker;
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
     LazyLock::new(|| GenericDefinitionDescriptor {
@@ -169,6 +178,19 @@ fn member_id(kind: &str, index: usize) -> MemberId {
 
 fn invocation_adapter_token() {}
 
+fn local_invocation_entry<'call>(
+    _: reflect::invoke::Invocation<'call, Local>,
+) -> Result<reflect::invoke::InvocationOutput<'call, Local>, reflect::invoke::InvocationFailure<'call, Local>> {
+    Ok(reflect::invoke::InvocationOutput::Unit)
+}
+
+fn thread_safe_invocation_entry<'call>(
+    _: reflect::invoke::Invocation<'call, ThreadSafe>,
+) -> Result<reflect::invoke::InvocationOutput<'call, ThreadSafe>, reflect::invoke::InvocationFailure<'call, ThreadSafe>>
+{
+    Ok(reflect::invoke::InvocationOutput::Unit)
+}
+
 static INVOCATION_ADAPTER: InvocationAdapter = InvocationAdapter::new(invocation_adapter_token);
 
 fn read_limit() -> ReflectedOwned {
@@ -197,6 +219,219 @@ fn test_trait_descriptor_navigation_preserves_direct_order_and_builds_sorted_tra
         .map(|descriptor| descriptor.rust_path())
         .collect();
     assert_eq!(all_paths, ["fixture::Middle", "fixture::Root"]);
+}
+
+/// Verifies concurrent first access publishes one external supertrait instance
+/// per exact cache key without conflating distinct external identities.
+#[test]
+fn test_external_supertrait_concurrent_first_access_is_key_stable() {
+    let barrier = Arc::new(Barrier::new(16));
+    let handles: Vec<_> = (0..16)
+        .map(|_| {
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                reflect::__private::external_supertrait::<RootMarker>(
+                    "test.external.concurrent.root",
+                    "fixture::ConcurrentRoot",
+                    Vec::new(),
+                ) as *const TraitDescriptor as usize
+            })
+        })
+        .collect();
+    let addresses: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("cache lookup thread must finish"))
+        .collect();
+    assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
+
+    let distinct = reflect::__private::external_supertrait::<RootMarker>(
+        "test.external.concurrent.other",
+        "fixture::ConcurrentOther",
+        Vec::new(),
+    ) as *const TraitDescriptor as usize;
+    assert_ne!(addresses[0], distinct);
+}
+
+/// Verifies trait payload and trait-object caches initialize each exact type
+/// once and return the published descriptor on hot lookups.
+#[test]
+fn test_trait_payload_and_object_caches_reuse_initialized_values() {
+    ROOT_DEFINITION.initialize_members(|_| (Box::new([]), Box::new([]), Box::new([])));
+    assert!(ROOT_DEFINITION.methods().is_empty());
+
+    let first = TraitImplPayload::cached_with_arguments::<PayloadCacheMarker>(
+        &ROOT_DEFINITION,
+        Vec::new(),
+        |arguments| TraitDescriptor::builder(&ROOT_DEFINITION).arguments(arguments).build(),
+        Vec::new,
+        Vec::new,
+        Vec::new,
+        Vec::new,
+    );
+    let second = TraitImplPayload::cached_with_arguments::<PayloadCacheMarker>(
+        &ROOT_DEFINITION,
+        Vec::new(),
+        |_| panic!("a hot payload lookup must not rebuild its descriptor"),
+        || panic!("a hot payload lookup must not rebuild adapters"),
+        || panic!("a hot payload lookup must not rebuild reasons"),
+        || panic!("a hot payload lookup must not rebuild type resolvers"),
+        || panic!("a hot payload lookup must not rebuild const readers"),
+    );
+    assert!(std::ptr::eq(first.applied(), second.applied()));
+
+    let first = reflect::__private::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        TraitDescriptor::builder(&ROOT_DEFINITION)
+            .build()
+            .expect("the cached trait object fixture must build")
+    });
+    let second = reflect::__private::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        panic!("a hot trait-object lookup must not rebuild its descriptor")
+    });
+    assert!(std::ptr::eq(first, second));
+}
+
+/// Verifies declaration, application, associated-item, payload, and diagnostic
+/// inspection APIs expose all locally retained facts.
+#[test]
+fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
+    let applied = *ROOT_TRAIT;
+    assert_eq!(ROOT_DEFINITION.visibility(), &Visibility::Private);
+    assert_eq!(ROOT_DEFINITION.rust_name(), "Root");
+    assert_eq!(ROOT_DEFINITION.methods().len(), 0);
+    assert_eq!(ROOT_DEFINITION.associated_types().len(), 0);
+    assert_eq!(ROOT_DEFINITION.associated_consts().len(), 0);
+    assert!(applied.arguments().is_empty());
+    assert!(applied.associated_type_arguments().is_empty());
+    assert_eq!(applied.trait_id().definition(), ROOT_DEFINITION.trait_id());
+    assert!(applied.trait_id().arguments().is_empty());
+    assert!(applied.trait_id().associated_type_arguments().is_empty());
+    assert!(applied.all_supertraits().is_empty());
+    assert_eq!(applied.all_supertraits().len(), 0);
+    assert!(format!("{applied:?}").contains("TraitDescriptor"));
+
+    let local_adapter = InvocationAdapter::local(local_invocation_entry);
+    assert!(
+        local_adapter
+            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .is_some()
+    );
+    assert_eq!(
+        local_adapter.catching_availability(),
+        CatchingAvailability::NotRequested
+    );
+    let thread_safe_adapter = InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_invocation_entry);
+    assert!(
+        thread_safe_adapter
+            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .is_some()
+    );
+    assert_eq!(
+        thread_safe_adapter.catching_availability(),
+        CatchingAvailability::UnavailablePanicAbort,
+    );
+
+    let payload = TraitImplPayload::new(&ROOT_DEFINITION, applied);
+    assert!(std::ptr::eq(payload.definition(), &*ROOT_DEFINITION));
+    assert!(std::ptr::eq(payload.applied(), applied));
+    assert!(payload.default_method_adapters().is_empty());
+    assert!(payload.default_method_unavailable_reasons().is_empty());
+    assert!(payload.associated_type_resolvers().is_empty());
+    assert!(payload.associated_const_readers().is_empty());
+
+    let associated_type = AssociatedTypeDescriptor::new(3, "Item", "item", Box::new([]), Some(TypeExpression::Never));
+    assert_eq!(associated_type.index(), 3);
+    assert_eq!(associated_type.rust_name(), "Item");
+    assert_eq!(associated_type.query_name(), "item");
+    assert!(associated_type.bounds().is_empty());
+    assert!(associated_type.generic_definition().parameters.is_empty());
+    assert_eq!(associated_type.default(), Some(&TypeExpression::Never));
+    let gat = AssociatedTypeDescriptor::new_with_generic_definition(
+        5,
+        "Gat",
+        "gat",
+        Box::new([]),
+        None,
+        GenericDefinitionDescriptor {
+            parameters: Box::new([]),
+            predicates: Box::new([]),
+            diagnostic: DiagnosticText::default(),
+        },
+    );
+    assert_eq!(gat.index(), 5);
+    assert!(gat.generic_definition().parameters.is_empty());
+
+    let associated_const = AssociatedConstDescriptor::new(4, "LIMIT", "limit", TypeExpression::Never, true);
+    assert_eq!(associated_const.index(), 4);
+    assert_eq!(associated_const.rust_name(), "LIMIT");
+    assert_eq!(associated_const.query_name(), "limit");
+    assert_eq!(associated_const.declared_type(), &TypeExpression::Never);
+    assert!(associated_const.has_default());
+
+    let errors = [
+        TraitDescriptorBuildError::RecursiveSupertrait {
+            rust_path: "fixture::Root",
+        },
+        TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts,
+        TraitDescriptorBuildError::GenericArgumentCount { expected: 1, actual: 0 },
+        TraitDescriptorBuildError::GenericArgumentKind { index: 0 },
+        TraitDescriptorBuildError::NonConcreteGenericArgument { index: 0 },
+        TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+        TraitDescriptorBuildError::ForeignMethod,
+    ];
+    for error in errors {
+        assert!(!error.to_string().is_empty());
+    }
+
+    for error in [
+        ImplDescriptorBuildError::InherentImplHasTrait,
+        ImplDescriptorBuildError::TraitImplMissingTrait,
+        ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition,
+        ImplDescriptorBuildError::ImplementedTraitDefinitionMismatch,
+        ImplDescriptorBuildError::ForeignMember,
+    ] {
+        assert!(!error.to_string().is_empty());
+    }
+
+    let method_errors = [
+        MethodInstanceBuildError::DeclaredMethodNotOwnedByImpl,
+        MethodInstanceBuildError::TraitMethodNotOwnedByTrait,
+        MethodInstanceBuildError::RequiredMethodHasAdapter,
+        MethodInstanceBuildError::OverriddenMethodMissingImplementation,
+        MethodInstanceBuildError::UnexpectedImplementationMethod,
+        MethodInstanceBuildError::AdapterHasUnavailableReasons,
+        MethodInstanceBuildError::UnavailableMethodMissingReasons,
+    ];
+    for error in method_errors {
+        assert!(!error.to_string().is_empty());
+    }
+
+    let adapter = InvocationAdapter::new(invocation_adapter_token);
+    (adapter.entry_point())();
+    assert_eq!(
+        adapter.catching_availability(),
+        reflect::descriptor::CatchingAvailability::NotRequested,
+    );
+    assert!(
+        adapter
+            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .is_none()
+    );
+    assert!(
+        adapter
+            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .is_none()
+    );
+    assert!(
+        adapter
+            .invoke_catching_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .is_none()
+    );
+    assert!(
+        adapter
+            .invoke_catching_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .is_none()
+    );
 }
 
 #[test]
@@ -268,6 +503,13 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
     assert_eq!(method.visibility(), &MethodVisibility::Declared(Visibility::Crate));
     assert_eq!(method.receiver(), Some(&ReceiverDescriptor::Shared));
     assert_eq!(method.parameter("value").map(ParameterDescriptor::index), Some(0));
+    let parameter = method.parameter_at(0).expect("method parameter should exist");
+    assert_eq!(parameter.index(), 0);
+    assert_eq!(parameter.passing_mode(), ParameterPassingMode::Owned);
+    assert_eq!(
+        parameter.concrete_type().map(TypeDescriptor::type_id),
+        Some(target_type().type_id()),
+    );
     assert_eq!(
         method
             .parameter_at(0)
@@ -276,6 +518,10 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
         Some(target_type().type_id())
     );
     assert_eq!(method.return_value().kind(), ReturnKind::Concrete);
+    assert_eq!(
+        method.return_value().concrete_type().map(TypeDescriptor::type_id),
+        Some(target_type().type_id()),
+    );
     assert!(method.qualifiers().is_async);
     assert_eq!(method.generic_definition().parameters.len(), 1);
     assert_eq!(
@@ -512,6 +758,38 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     assert_eq!(value, 32);
     assert_eq!(generic_impl.definition().generic_definition().parameters.len(), 1);
     assert_eq!(generic_impl.arguments(), arguments);
+    assert_eq!(generic_impl.implementation_methods().len(), 1);
+    assert_eq!(
+        generic_impl.method("same").map(MethodDescriptor::rust_name),
+        Some("same")
+    );
+    assert!(generic_impl.method("missing").is_none());
+    assert!(format!("{generic_impl:?}").contains("ImplDescriptor"));
+    assert!(format!("{ASSOCIATED_CONST_READER:?}").contains("AssociatedConstReader"));
+    assert!(generic_impl.associated_consts()[0].is_readable());
+    assert_eq!(generic_impl.associated_consts()[0].read_unavailable_reason(), None);
+    assert!(instance.adapter().is_some());
+    assert!(instance.arguments().is_empty());
+    assert!(
+        instance
+            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .is_none()
+    );
+    assert!(
+        instance
+            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .is_none()
+    );
+    assert!(
+        instance
+            .invoke_catching_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .is_none()
+    );
+    assert!(
+        instance
+            .invoke_catching_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .is_none()
+    );
     assert_eq!(
         instance
             .implementation_method()

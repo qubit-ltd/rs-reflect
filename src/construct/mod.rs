@@ -48,6 +48,10 @@ pub use update::StructUpdater;
 pub use validated::ValidatedConstructionInput;
 pub use validated::ValidatedOverride;
 pub use validated::ValidatedUpdateInput;
+#[cfg(test)]
+pub(crate) use validated::validate_unit;
+#[cfg(test)]
+pub(crate) use validated::validate_update;
 pub use variant_construction_descriptor::VariantConstructionDescriptor;
 pub use variant_constructor::VariantConstructionAdapter;
 pub use variant_constructor::VariantConstructor;

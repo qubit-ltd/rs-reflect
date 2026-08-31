@@ -136,3 +136,6 @@ pub use value::SendReflectedRef;
 #[doc(hidden)]
 #[path = "private/mod.rs"]
 pub mod __private;
+
+#[cfg(test)]
+mod tests;

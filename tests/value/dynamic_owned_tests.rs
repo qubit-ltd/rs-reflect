@@ -31,6 +31,13 @@ fn test_downcast_owned_failure_returns_the_original_wrapper() {
 fn test_owned_any_interoperation_preserves_type_identity() {
     let mut value = ReflectedOwned::new(41_u32);
 
+    assert_eq!(value.downcast_ref::<u32>(), Some(&41));
+    assert_eq!(
+        *value
+            .downcast_mut::<u32>()
+            .expect("the local owned value should downcast mutably"),
+        41,
+    );
     assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
     *value
         .as_any_mut()
@@ -60,6 +67,30 @@ fn test_thread_safe_owned_can_be_downgraded_to_local() {
         Err(_) => panic!("the downgraded wrapper must still contain a String"),
     };
     assert_eq!(text, "thread-safe");
+}
+
+/// Confirms thread-safe owned values expose all typed and `Any` inspection
+/// paths before downgrade.
+#[test]
+fn test_thread_safe_owned_typed_and_any_access_preserve_value() {
+    let mut value = SendReflectedOwned::new(51_u32);
+    assert!(value.is::<u32>());
+    assert!(!value.is::<String>());
+    assert_eq!(value.downcast_ref::<u32>(), Some(&51));
+    *value
+        .downcast_mut::<u32>()
+        .expect("thread-safe owned value should downcast mutably") = 52;
+    assert_eq!(value.downcast_ref::<u32>(), Some(&52));
+
+    let value = value
+        .into_any()
+        .unwrap_or_else(|_| panic!("owned value should expose Any"));
+    assert_eq!(
+        value
+            .downcast::<u32>()
+            .unwrap_or_else(|_| panic!("Any payload should retain exact type")),
+        Box::new(52),
+    );
 }
 
 /// Verifies that a value retains both thread-safety auto traits.

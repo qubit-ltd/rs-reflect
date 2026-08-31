@@ -245,6 +245,10 @@ fn test_derive_reflect_records_and_reverse_looks_up_integer_discriminants() {
     let first = descriptor.variant("First").expect("first variant");
     let second = descriptor.variant("Second").expect("second variant");
 
+    assert_eq!(first.index(), 0);
+    assert_eq!(second.index(), 1);
+    assert!(first.field("missing").is_none());
+    assert!(format!("{first:?}").contains("VariantDescriptor"));
     assert_eq!(first.discriminant_origin(), DiscriminantOrigin::Explicit);
     assert_eq!(second.discriminant_origin(), DiscriminantOrigin::Implicit);
     assert_eq!(first.numeric_discriminant(), Some(NumericDiscriminant::U8(3)));
