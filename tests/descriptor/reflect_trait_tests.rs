@@ -4,6 +4,7 @@ use std::any::TypeId;
 
 use qubit_reflect as reflect;
 use reflect::descriptor::TraitId;
+use reflect::descriptor::TypeDescriptor;
 use reflect::reflect;
 use reflect::registry::ReflectRegistry;
 
@@ -27,6 +28,73 @@ trait Worker: ReflectedService + Send {
 #[reflect]
 trait DynService {
     fn value(&self) -> usize;
+}
+
+#[reflect(rename = "renamed_dyn_service")]
+trait RenamedDynService {
+    fn renamed_value(&self) -> usize;
+}
+
+#[reflect(external_trait(::std::fmt::Debug, id = "core.fmt.Debug"))]
+trait DebugDynService: ::std::fmt::Debug {
+    fn debug_value(&self) -> usize;
+}
+
+#[reflect]
+trait NonDynService {
+    const VALUE: usize;
+
+    fn generic<T>(&self, value: T) -> T;
+}
+
+#[reflect]
+trait GenericDynService<T, const N: usize> {
+    fn transform(&self, value: T) -> T;
+
+    fn repeat(&self, value: T) -> [T; N];
+
+    fn limit(&self) -> usize {
+        N
+    }
+}
+
+#[reflect]
+trait LifetimeDynService<'a> {
+    fn borrowed(&self, value: &'a str) -> &'a str;
+}
+
+#[reflect]
+trait AssociatedDynService
+where
+    Self::Item: std::fmt::Debug,
+{
+    type Item;
+
+    fn item(&self) -> Self::Item;
+}
+
+#[reflect]
+trait ReceiverDynService {
+    fn consume(self);
+
+    fn boxed(self: Box<Self>);
+
+    fn pinned(self: std::pin::Pin<Box<Self>>);
+}
+
+#[reflect]
+trait LocalDynParent {
+    fn parent(&self) -> usize;
+}
+
+#[reflect(supertrait(LocalDynParent), dyn_compatible)]
+trait LocalDynChild: LocalDynParent {
+    fn child(&self) -> usize;
+}
+
+#[reflect(supertrait(LocalDynChild), dyn_compatible)]
+trait LocalDynGrandchild: LocalDynChild {
+    fn grandchild(&self) -> usize;
 }
 
 #[reflect]
@@ -93,6 +161,9 @@ trait AssocHrtb {
 
 struct ServiceMarkerProbe;
 
+#[derive(Debug)]
+struct UnreflectedDynArgument;
+
 impl ReflectedService for ServiceMarkerProbe {
     type Output = usize;
 
@@ -108,6 +179,86 @@ impl Worker for ServiceMarkerProbe {
 impl DynService for ServiceMarkerProbe {
     fn value(&self) -> usize {
         8
+    }
+}
+
+impl RenamedDynService for ServiceMarkerProbe {
+    fn renamed_value(&self) -> usize {
+        13
+    }
+}
+
+impl std::fmt::Debug for ServiceMarkerProbe {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ServiceMarkerProbe")
+    }
+}
+
+impl DebugDynService for ServiceMarkerProbe {
+    fn debug_value(&self) -> usize {
+        21
+    }
+}
+
+impl NonDynService for ServiceMarkerProbe {
+    const VALUE: usize = 34;
+
+    fn generic<T>(&self, value: T) -> T {
+        value
+    }
+}
+
+impl GenericDynService<u8, 2> for ServiceMarkerProbe {
+    fn transform(&self, value: u8) -> u8 {
+        value
+    }
+
+    fn repeat(&self, value: u8) -> [u8; 2] {
+        [value; 2]
+    }
+}
+
+impl LifetimeDynService<'static> for ServiceMarkerProbe {
+    fn borrowed(&self, value: &'static str) -> &'static str {
+        value
+    }
+}
+
+impl AssociatedDynService for ServiceMarkerProbe {
+    type Item = u8;
+
+    fn item(&self) -> Self::Item {
+        55
+    }
+}
+
+impl ReceiverDynService for ServiceMarkerProbe {
+    fn consume(self) {}
+
+    fn boxed(self: Box<Self>) {
+        drop(self);
+    }
+
+    fn pinned(self: std::pin::Pin<Box<Self>>) {
+        drop(self);
+    }
+}
+
+impl LocalDynParent for ServiceMarkerProbe {
+    fn parent(&self) -> usize {
+        89
+    }
+}
+
+impl LocalDynChild for ServiceMarkerProbe {
+    fn child(&self) -> usize {
+        144
+    }
+}
+
+impl LocalDynGrandchild for ServiceMarkerProbe {
+    fn grandchild(&self) -> usize {
+        233
     }
 }
 
@@ -173,8 +324,28 @@ fn test_reflect_trait_registers_complete_marker_backed_definition() {
 #[test]
 fn test_reflect_trait_preserves_dyn_compatibility_and_default_semantics() {
     let service: &dyn DynService = &ServiceMarkerProbe;
+    let renamed: &dyn RenamedDynService = &ServiceMarkerProbe;
+    let debug: &dyn DebugDynService = &ServiceMarkerProbe;
 
     assert_eq!(service.value(), 8);
+    assert_eq!(renamed.renamed_value(), 13);
+    assert_eq!(debug.debug_value(), 21);
+    assert_eq!(NonDynService::generic(&ServiceMarkerProbe, 34), 34);
+    assert_eq!(<ServiceMarkerProbe as NonDynService>::VALUE, 34);
+    assert_eq!(GenericDynService::<u8, 2>::transform(&ServiceMarkerProbe, 5), 5);
+    assert_eq!(GenericDynService::<u8, 2>::repeat(&ServiceMarkerProbe, 5), [5; 2]);
+    assert_eq!(GenericDynService::<u8, 2>::limit(&ServiceMarkerProbe), 2);
+    assert_eq!(
+        LifetimeDynService::borrowed(&ServiceMarkerProbe, "borrowed"),
+        "borrowed"
+    );
+    assert_eq!(AssociatedDynService::item(&ServiceMarkerProbe), 55);
+    assert_eq!(LocalDynParent::parent(&ServiceMarkerProbe), 89);
+    assert_eq!(LocalDynChild::child(&ServiceMarkerProbe), 144);
+    assert_eq!(LocalDynGrandchild::grandchild(&ServiceMarkerProbe), 233);
+    ReceiverDynService::consume(ServiceMarkerProbe);
+    ReceiverDynService::boxed(Box::new(ServiceMarkerProbe));
+    ReceiverDynService::pinned(Box::pin(ServiceMarkerProbe));
     assert_eq!(ReflectedService::defaulted(&ServiceMarkerProbe), 8);
     assert_eq!(ReflectedService::required(&ServiceMarkerProbe), 8);
     Worker::work(&ServiceMarkerProbe);
@@ -184,6 +355,170 @@ fn test_reflect_trait_preserves_dyn_compatibility_and_default_semantics() {
         &"generic"
     );
     let _ = TypeId::of::<ServiceMarkerProbe>();
+}
+
+#[test]
+fn test_dyn_compatible_trait_object_navigates_to_applied_trait_descriptor() {
+    let descriptor = TypeDescriptor::of::<dyn DynService>();
+    let repeated = TypeDescriptor::of::<dyn DynService>();
+    let trait_object = descriptor
+        .as_trait_object()
+        .expect("a reflected dyn-compatible trait must expose a trait-object view");
+    let applied = trait_object.trait_descriptor();
+    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    let definition = registry
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::DynService")
+        .expect("the reflected trait definition must be registered");
+
+    assert!(std::ptr::eq(descriptor, repeated));
+    assert!(std::ptr::eq(applied, trait_object.trait_descriptor()));
+    assert!(std::ptr::eq(applied.definition(), definition));
+    assert_eq!(descriptor.type_id(), TypeId::of::<dyn DynService>());
+    assert_eq!(descriptor.query_name(), "DynService");
+    assert_eq!(applied.methods()[0].rust_name(), "value");
+
+    let non_dyn_definition = registry
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::NonDynService")
+        .expect("a non-dyn-compatible reflected trait still has a definition descriptor");
+    assert!(matches!(non_dyn_definition.trait_id(), TraitId::Reflected(_)));
+}
+
+#[test]
+fn test_dyn_trait_object_preserves_rename_and_provable_supertrait_navigation() {
+    let renamed = TypeDescriptor::of::<dyn RenamedDynService>();
+    assert_eq!(renamed.query_name(), "renamed_dyn_service");
+    assert_eq!(
+        renamed
+            .as_trait_object()
+            .expect("renamed dyn trait must expose its typed view")
+            .trait_descriptor()
+            .query_name(),
+        "renamed_dyn_service"
+    );
+
+    let with_supertrait = TypeDescriptor::of::<dyn DebugDynService>();
+    let applied = with_supertrait
+        .as_trait_object()
+        .expect("dyn trait with a known-compatible supertrait must have a descriptor")
+        .trait_descriptor();
+    assert_eq!(applied.direct_supertraits().len(), 1);
+    assert_eq!(applied.direct_supertraits()[0].rust_name(), "Debug");
+}
+
+#[test]
+fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures() {
+    let generic = TypeDescriptor::of::<dyn GenericDynService<u8, 2>>();
+    let applied = generic
+        .as_trait_object()
+        .expect("generic dyn application must expose a trait-object view")
+        .trait_descriptor();
+    assert_eq!(applied.arguments().len(), 2);
+    assert!(matches!(
+        applied.methods()[0].parameters()[0].signature_type(),
+        reflect::expression::TypeExpression::Concrete(value)
+            if value.path[0].as_ref() == std::any::type_name::<u8>()
+    ));
+    let output = applied.methods()[0]
+        .return_value()
+        .signature_type()
+        .expect("generic output signature must be retained");
+    assert!(matches!(
+        output,
+        reflect::expression::TypeExpression::Concrete(value)
+            if value.path[0].as_ref() == std::any::type_name::<u8>()
+    ));
+    assert!(matches!(
+        applied.methods()[1]
+            .return_value()
+            .signature_type()
+            .expect("const-generic output signature must be retained"),
+        reflect::expression::TypeExpression::Array(value)
+            if matches!(value.length, reflect::expression::ConstExpression::UnsignedInteger(2))
+    ));
+
+    let lifetime = TypeDescriptor::of::<dyn LifetimeDynService<'static>>();
+    assert_eq!(
+        lifetime
+            .as_trait_object()
+            .expect("concrete lifetime application must be reflected")
+            .trait_descriptor()
+            .rust_name(),
+        "LifetimeDynService"
+    );
+
+    let associated = TypeDescriptor::of::<dyn AssociatedDynService<Item = u8>>();
+    let applied = associated
+        .as_trait_object()
+        .expect("associated-type dyn application must be reflected")
+        .trait_descriptor();
+    assert_eq!(applied.associated_type_arguments().len(), 1);
+    assert!(matches!(
+        applied.methods()[0]
+            .return_value()
+            .signature_type()
+            .expect("associated return must be concrete"),
+        reflect::expression::TypeExpression::Concrete(value)
+            if value.path[0].as_ref() == std::any::type_name::<u8>()
+    ));
+
+    assert_eq!(
+        TypeDescriptor::of::<dyn GenericDynService<UnreflectedDynArgument, 2>>()
+            .as_trait_object()
+            .expect("dyn generic arguments need not implement Reflect")
+            .trait_descriptor()
+            .arguments()
+            .len(),
+        2
+    );
+    assert_eq!(
+        TypeDescriptor::of::<dyn AssociatedDynService<Item = UnreflectedDynArgument>>()
+            .as_trait_object()
+            .expect("dyn associated bindings need not implement Reflect")
+            .trait_descriptor()
+            .associated_type_arguments()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn test_dyn_receivers_and_reflected_supertraits_preserve_navigation() {
+    let receivers = TypeDescriptor::of::<dyn ReceiverDynService>();
+    assert_eq!(
+        receivers
+            .as_trait_object()
+            .expect("supported dyn receivers must retain a descriptor")
+            .trait_descriptor()
+            .methods()
+            .len(),
+        3
+    );
+
+    let child = TypeDescriptor::of::<dyn LocalDynChild>();
+    let child = child
+        .as_trait_object()
+        .expect("local reflected child trait must expose a descriptor")
+        .trait_descriptor();
+    assert_eq!(child.direct_supertraits().len(), 1);
+    assert_eq!(child.direct_supertraits()[0].rust_name(), "LocalDynParent");
+    assert_eq!(child.all_supertraits().len(), 1);
+
+    let grandchild = TypeDescriptor::of::<dyn LocalDynGrandchild>();
+    let grandchild = grandchild
+        .as_trait_object()
+        .expect("three-level reflected child must expose a descriptor")
+        .trait_descriptor();
+    assert_eq!(grandchild.direct_supertraits().len(), 1);
+    assert_eq!(grandchild.direct_supertraits()[0].rust_name(), "LocalDynChild");
+    assert_eq!(grandchild.all_supertraits().len(), 2);
+    assert_eq!(
+        grandchild
+            .all_supertraits()
+            .iter()
+            .map(|descriptor| descriptor.rust_name())
+            .collect::<Vec<_>>(),
+        ["LocalDynChild", "LocalDynParent"]
+    );
 }
 
 #[test]

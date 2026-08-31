@@ -1,0 +1,17 @@
+error[E0277]: the type `&mut Worker` may not be safely transferred across an unwind boundary
+  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe.rs:8:6
+   |
+ 8 |   impl Worker {
+   |  ______^
+ 9 | |     #[reflect(catch_unwind)]
+10 | |     fn run(&mut self) {
+   | |____________^ `&mut Worker` may not be safely transferred across an unwind boundary
+   |
+   = help: the trait `UnwindSafe` is not implemented for `&mut Worker`
+   = note: `UnwindSafe` is implemented for `&Worker`, but not for `&mut Worker`
+note: required by a bound in `__qubit_reflect_assert_unwind_safe`
+  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe.rs:7:1
+   |
+ 7 | #[reflect_impl]
+   | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_unwind_safe`
+   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)

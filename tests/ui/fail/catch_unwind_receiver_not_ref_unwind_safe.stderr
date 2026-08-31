@@ -1,0 +1,23 @@
+error[E0277]: the type `UnsafeCell<u8>` may contain interior mutability and a reference may not be safely transferable across a catch_unwind boundary
+  --> tests/ui/fail/catch_unwind_receiver_not_ref_unwind_safe.rs:13:6
+   |
+13 | impl Worker {
+   |      ^^^^^^ `UnsafeCell<u8>` may contain interior mutability and a reference may not be safely transferable across a catch_unwind boundary
+   |
+   = help: within `Worker`, the trait `RefUnwindSafe` is not implemented for `UnsafeCell<u8>`
+note: required because it appears within the type `Cell<u8>`
+  --> $RUST/core/src/cell.rs
+   |
+   | pub struct Cell<T: ?Sized> {
+   |            ^^^^
+note: required because it appears within the type `Worker`
+  --> tests/ui/fail/catch_unwind_receiver_not_ref_unwind_safe.rs:8:8
+   |
+ 8 | struct Worker {
+   |        ^^^^^^
+note: required by a bound in `__qubit_reflect_assert_ref_unwind_safe`
+  --> tests/ui/fail/catch_unwind_receiver_not_ref_unwind_safe.rs:12:1
+   |
+12 | #[reflect_impl]
+   | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_ref_unwind_safe`
+   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,5 @@
+error: `dyn_compatible` associated-type prefixes must name a direct supertrait
+ --> tests/ui/fail/invalid_dyn_associated_owner.rs:8:31
+  |
+8 | #[reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
+  |                               ^^^^^^^^^^^^^^
