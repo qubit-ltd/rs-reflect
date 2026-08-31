@@ -4,11 +4,13 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
+use crate::expression::TypeExpression;
 use crate::registry::EffectiveTypeView;
 use crate::registry::builder::build_inventory_registry;
 use crate::registry::builder::initialize_cached;
@@ -96,11 +98,47 @@ impl<'registry> IntoIterator for TraitCandidates<'registry> {
     }
 }
 
+/// A deterministic borrowed set of impl definitions matching one symbolic
+/// target expression.
+#[derive(Clone, Debug)]
+pub struct ImplDefinitionCandidates {
+    descriptors: Box<[&'static ImplDefinitionDescriptor]>,
+}
+
+impl ImplDefinitionCandidates {
+    /// Iterates over matching definitions in stable fragment order.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_ {
+        self.descriptors.iter().copied()
+    }
+
+    /// Returns the number of matching definitions.
+    pub const fn len(&self) -> usize {
+        self.descriptors.len()
+    }
+
+    /// Returns whether no impl definition has the requested target.
+    pub const fn is_empty(&self) -> bool {
+        self.descriptors.is_empty()
+    }
+}
+
+impl IntoIterator for ImplDefinitionCandidates {
+    type Item = &'static ImplDefinitionDescriptor;
+    type IntoIter = std::vec::IntoIter<&'static ImplDefinitionDescriptor>;
+
+    /// Iterates over matching definitions in stable fragment order.
+    fn into_iter(self) -> Self::IntoIter {
+        self.descriptors.into_vec().into_iter()
+    }
+}
+
 /// The immutable process-wide snapshot of linked reflection fragments.
 #[derive(Debug)]
 pub struct ReflectRegistry {
     pub(super) types: Box<[&'static TypeDescriptor]>,
+    pub(super) impl_definitions: Box<[&'static ImplDefinitionDescriptor]>,
     pub(super) indexes: RegistryIndexes,
+    pub(super) empty_effective_view: EffectiveTypeView,
 }
 
 impl ReflectRegistry {
@@ -151,10 +189,39 @@ impl ReflectRegistry {
         self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
     }
 
-    /// Merges the target's implementation fragments into a deterministic
-    /// effective method view.
-    pub fn effective_view(&self, type_id: TypeId) -> EffectiveTypeView {
-        EffectiveTypeView::new(self.implementations(type_id))
+    /// Enumerates statically registered generic, blanket, and constrained impl
+    /// declarations in stable source-fragment order.
+    ///
+    /// Generic and blanket definitions appear here even when they have no
+    /// explicitly registered concrete specialization.
+    pub fn impl_definitions(&self) -> &[&'static ImplDefinitionDescriptor] {
+        &self.impl_definitions
+    }
+
+    /// Finds impl declarations whose symbolic target exactly equals `target`.
+    ///
+    /// Diagnostic-only text does not participate because
+    /// [`TypeExpression`] equality is structural.
+    pub fn find_impl_definitions_by_target(&self, target: &TypeExpression) -> ImplDefinitionCandidates {
+        ImplDefinitionCandidates {
+            descriptors: self
+                .impl_definitions
+                .iter()
+                .copied()
+                .filter(|definition| definition.target_type() == target)
+                .collect(),
+        }
+    }
+
+    /// Returns the target's frozen deterministic effective method view.
+    ///
+    /// Repeated calls borrow the same registry-owned view without allocation.
+    /// An unregistered target borrows one stable empty view.
+    pub fn effective_view(&self, type_id: TypeId) -> &EffectiveTypeView {
+        self.indexes
+            .effective_views_by_target
+            .get(&type_id)
+            .unwrap_or(&self.empty_effective_view)
     }
 
     /// Finds a reflected or external trait declaration by its process-local

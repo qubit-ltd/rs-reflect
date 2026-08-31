@@ -4,6 +4,7 @@
 use std::any::TypeId;
 
 use crate::capability::CapabilityDescriptor;
+use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
@@ -69,6 +70,8 @@ pub enum FragmentKind {
     Type,
     /// A reflected or external trait definition descriptor.
     Trait,
+    /// A generic, blanket, constrained, or concrete impl definition.
+    ImplDefinition,
     /// A concrete inherent or trait implementation descriptor.
     Impl,
     /// One capability fact for an exact concrete type.
@@ -83,6 +86,8 @@ pub enum RuntimeIdentity {
     Type(TypeId),
     /// A reflected marker or stable external trait identity.
     Trait(TraitId),
+    /// An impl declaration identified by its stable source fragment.
+    ImplDefinition(FragmentIdentity),
     /// A concrete implementation target.
     Impl(TypeId),
     /// A capability ID attached to an exact concrete type.
@@ -131,6 +136,8 @@ pub enum FragmentPayload {
     Type(&'static TypeDescriptor),
     /// One reflected or external trait definition descriptor.
     Trait(&'static TraitDefinitionDescriptor),
+    /// One impl declaration descriptor without a concrete target instance.
+    ImplDefinition(&'static ImplDefinitionDescriptor),
     /// One concrete implementation descriptor.
     Impl(&'static ImplDescriptor),
     /// One capability fact for an exact concrete type.
@@ -143,6 +150,7 @@ impl FragmentPayload {
         match self {
             Self::Type(_) => FragmentKind::Type,
             Self::Trait(_) => FragmentKind::Trait,
+            Self::ImplDefinition(_) => FragmentKind::ImplDefinition,
             Self::Impl(_) => FragmentKind::Impl,
             Self::Capability(_) => FragmentKind::Capability,
         }
@@ -153,6 +161,7 @@ impl FragmentPayload {
         match self {
             Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
+            Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
             Self::Capability(registration) => RuntimeIdentity::Capability {
                 target_type_id: registration.target_type_id(),
@@ -273,3 +282,6 @@ register_builtin_type!(usize_registration, usize, 14);
 register_builtin_type!(f32_registration, f32, 15);
 register_builtin_type!(f64_registration, f64, 16);
 register_builtin_type!(string_registration, String, 17);
+register_builtin_type!(str_registration, str, 18);
+register_builtin_type!(unit_tuple_registration, (), 19);
+register_builtin_type!(debug_trait_object_registration, dyn std::fmt::Debug, 20);

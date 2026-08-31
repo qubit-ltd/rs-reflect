@@ -38,6 +38,8 @@ struct EarlyType;
 struct LateType;
 struct IndependentType;
 struct CapabilityTarget;
+struct SameTraitMarkerA;
+struct SameTraitMarkerB;
 
 static EARLY_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<EarlyType>("shared-query");
 static LATE_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<LateType>("shared-query");
@@ -319,6 +321,83 @@ static MISMATCHED_IMPL_FRAGMENT: RegistrationFragment = RegistrationFragment::ne
     impl_payload,
 );
 
+static SAME_TRAIT_A: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<SameTraitMarkerA>()),
+        "SameTrait",
+        "fixture::a::SameTrait",
+        "SameTrait",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static SAME_TRAIT_B: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<SameTraitMarkerB>()),
+        "SameTrait",
+        "fixture::b::SameTrait",
+        "SameTrait",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static AMBIGUOUS_IMPL_DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+    ImplDefinitionDescriptor::new_unresolved_trait(
+        FragmentIdentity::new("registry-fixture", "ambiguous_impl", 79, 1, "impl-definition", 79),
+        TypeExpression::Parameter("T".into()),
+        "SameTrait",
+        None,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+
+fn same_trait_a_identity() -> RuntimeIdentity {
+    RuntimeIdentity::Trait(SAME_TRAIT_A.trait_id().clone())
+}
+
+fn same_trait_b_identity() -> RuntimeIdentity {
+    RuntimeIdentity::Trait(SAME_TRAIT_B.trait_id().clone())
+}
+
+fn same_trait_a_payload() -> FragmentPayload {
+    FragmentPayload::Trait(&SAME_TRAIT_A)
+}
+
+fn same_trait_b_payload() -> FragmentPayload {
+    FragmentPayload::Trait(&SAME_TRAIT_B)
+}
+
+fn ambiguous_impl_definition_identity() -> RuntimeIdentity {
+    RuntimeIdentity::ImplDefinition(AMBIGUOUS_IMPL_DEFINITION.fragment_identity().clone())
+}
+
+fn ambiguous_impl_definition_payload() -> FragmentPayload {
+    FragmentPayload::ImplDefinition(&AMBIGUOUS_IMPL_DEFINITION)
+}
+
+static SAME_TRAIT_FRAGMENT_A: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::Trait,
+    static_identity("same_trait_a", 77, "trait", 77),
+    same_trait_a_identity,
+    same_trait_a_payload,
+);
+static SAME_TRAIT_FRAGMENT_B: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::Trait,
+    static_identity("same_trait_b", 78, "trait", 78),
+    same_trait_b_identity,
+    same_trait_b_payload,
+);
+static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::ImplDefinition,
+    static_identity("ambiguous_impl", 79, "impl-definition", 79),
+    ambiguous_impl_definition_identity,
+    ambiguous_impl_definition_payload,
+);
+
+reflect::__private::inventory::submit! {
+    IMPL_FRAGMENT
+}
+
 static APPLIED_EXTERNAL_TRAIT: LazyLock<TraitDescriptor> = LazyLock::new(|| {
     TraitDescriptor::builder(&EXTERNAL_DEFINITION_LEFT)
         .build()
@@ -512,6 +591,27 @@ fn test_registry_runtime_rejects_impl_registration_identity_mismatch() {
     build_registry(&[&IMPL_FRAGMENT]).expect("a matching impl identity must register");
 }
 
+/// Verifies diagnostic trait names never silently choose between two distinct
+/// reflected marker identities.
+#[test]
+fn test_registry_runtime_rejects_ambiguous_generic_trait_impl_definition() {
+    let error = build_registry(&[
+        &AMBIGUOUS_IMPL_DEFINITION_FRAGMENT,
+        &SAME_TRAIT_FRAGMENT_B,
+        &SAME_TRAIT_FRAGMENT_A,
+    ])
+    .expect_err("an ambiguous diagnostic trait name must not become identity");
+
+    assert_eq!(error.kind(), RegistryErrorKind::ImplTraitResolution);
+    assert_eq!(
+        error
+            .fragment_identity()
+            .expect("the error must identify the impl definition")
+            .module_path(),
+        "ambiguous_impl",
+    );
+}
+
 /// Verifies one target cannot register the same applied trait impl twice.
 #[test]
 fn test_registry_runtime_rejects_duplicate_target_trait_impl() {
@@ -549,4 +649,22 @@ fn test_registry_runtime_keeps_descriptor_queries_independent() {
     let descriptor = TypeDescriptor::of::<IndependentType>();
     assert_eq!(descriptor.type_id(), TypeId::of::<IndependentType>());
     assert_eq!(descriptor.query_name(), "independent");
+}
+
+/// Verifies public effective-view lookup reuses one frozen target view and one
+/// stable empty view instead of allocating on each query.
+#[test]
+fn test_registry_runtime_reuses_frozen_effective_views() {
+    let registry = ReflectRegistry::initialize().expect("the linked registry must initialize");
+    let first = registry.effective_view(TypeId::of::<IndependentType>());
+    let second = registry.effective_view(TypeId::of::<IndependentType>());
+    let missing_first = registry.effective_view(TypeId::of::<CapabilityTarget>());
+    let missing_second = registry.effective_view(TypeId::of::<CapabilityTarget>());
+
+    assert!(std::ptr::eq(first, second));
+    assert!(std::ptr::eq(missing_first, missing_second));
+    assert!(!std::ptr::eq(first, missing_first));
+    assert_eq!(first.implementations().len(), 1);
+    assert!(missing_first.implementations().is_empty());
+    assert!(missing_first.methods().is_empty());
 }

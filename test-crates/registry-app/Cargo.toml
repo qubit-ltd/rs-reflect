@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-qubit-reflect = { path = "../.." }
+renamed-reflect = { package = "qubit-reflect", path = "../.." }
 registry-impl-a = { path = "../registry-impl-a" }
 registry-impl-b = { path = "../registry-impl-b" }
 registry-types = { path = "../registry-types" }
