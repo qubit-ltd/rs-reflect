@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   rust-ci:
-    uses: qubit-ltd/rs-ci/.github/workflows/rust-ci.yml@main
+    uses: qubit-ltd/rs-ci/.github/workflows/rust-ci.yml@a955f8641a177f34209b3cf4f646f26cac9b2304
     with:
       coverage_enforce_thresholds: "1"
       run_windows_tests: true
