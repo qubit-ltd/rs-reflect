@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Atomic owned-struct update validation and adapter dispatch.
 
@@ -45,11 +53,15 @@ impl<M: Mode + 'static> StructUpdater<M> {
     }
 
     /// Returns the concrete struct root descriptor.
+    #[must_use]
+    #[inline(always)]
     pub const fn descriptor(&self) -> &'static TypeDescriptor {
         self.descriptor
     }
 
     /// Returns update policies in source declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn fields(&self) -> &'static [UpdateField] {
         self.fields
     }

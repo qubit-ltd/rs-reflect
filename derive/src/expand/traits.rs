@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Expansion of reflected trait declarations and their registration fragments.
 
 use proc_macro2::Ident;
@@ -2448,6 +2456,7 @@ pub(crate) fn generic_definition(
     })
 }
 
+/// Converts generic bounds into runtime predicate descriptors.
 fn generic_bounds(
     bounds: &[GenericBoundIr],
     subject: &syn::LitStr,
@@ -2588,6 +2597,7 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
     }
 }
 
+/// Converts one parsed path into a runtime type-expression token stream.
 fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) -> TokenStream {
     let diagnostic = syn::LitStr::new(&ty.source, ty.span);
     if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
@@ -2641,6 +2651,7 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
     quote!(#facade::expression::TypeExpression::Concrete(#facade::expression::ConcreteTypeExpression { path: Box::new([#(#segments.into()),*]), arguments: Box::new([#(#arguments),*]), diagnostic: #facade::expression::DiagnosticText::from(#diagnostic) }))
 }
 
+/// Converts parsed path arguments into runtime generic-argument expressions.
 fn path_arguments(
     arguments: &PathArgumentsIr,
     facade: &TokenStream,
@@ -2719,6 +2730,7 @@ fn external_supertrait_arguments(
         .collect()
 }
 
+/// Converts trait-object or opaque-type bounds into runtime predicates.
 fn bound_predicates(
     bounds: &[GenericBoundIr],
     facade: &TokenStream,
@@ -2727,6 +2739,7 @@ fn bound_predicates(
     bounds.iter().filter_map(|bound| match bound { GenericBoundIr::Trait { path, modifier, lifetimes } => { let source = syn::LitStr::new(&path.source, span); let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe) }; let lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, span, facade)); Some(quote!(#facade::expression::PredicateDescriptor::TypeBound { subject: #facade::expression::TypeExpression::SelfType, bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::expression::ConcreteTypeExpression { path: Box::new([#source.into()]), arguments: Box::new([]), diagnostic: #facade::expression::DiagnosticText::from(#source) })]), bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default() })) }, GenericBoundIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::expression::PredicateDescriptor::TypeOutlives { ty: #facade::expression::TypeExpression::SelfType, lifetime: #value, diagnostic: #facade::expression::DiagnosticText::default() })) }, _ => None }).collect()
 }
 
+/// Converts a parsed const expression into structural runtime metadata.
 fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = syn::parse2::<syn::Ident>(value.clone()) {

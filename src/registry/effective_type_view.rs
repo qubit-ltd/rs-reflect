@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Deterministic effective-method views over one registered reflected root.
 
 use crate::descriptor::ImplDescriptor;
@@ -56,6 +64,8 @@ impl EffectiveTypeView {
     }
 
     /// Returns all contributing impl fragments in registry-stable order.
+    #[must_use]
+    #[inline(always)]
     pub const fn implementations(&self) -> &[&'static ImplDescriptor] {
         &self.implementations
     }
@@ -63,6 +73,7 @@ impl EffectiveTypeView {
     /// Returns effective methods in deterministic implementation and source
     /// declaration order. An explicit trait implementation replaces its
     /// corresponding defaulted method instance.
+    #[must_use]
     pub const fn methods(&self) -> &[&'static MethodInstanceDescriptor] {
         &self.methods
     }

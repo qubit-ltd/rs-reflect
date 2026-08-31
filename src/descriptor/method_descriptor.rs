@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Immutable declarations and concrete instances of reflected methods.
 
@@ -75,6 +83,8 @@ impl ParameterDescriptor {
     }
 
     /// Returns the zero-based non-receiver parameter index.
+    #[must_use]
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.index
     }
@@ -82,21 +92,29 @@ impl ParameterDescriptor {
     /// Returns the identifier used for named binding.
     ///
     /// `None` denotes a wildcard or destructuring pattern.
+    #[must_use]
+    #[inline(always)]
     pub const fn name(&self) -> Option<&'static str> {
         self.name
     }
 
     /// Returns the parser-independent source pattern category.
+    #[must_use]
+    #[inline(always)]
     pub const fn pattern(&self) -> &ParameterPatternDescriptor {
         &self.pattern
     }
 
     /// Returns how the argument crosses the method boundary.
+    #[must_use]
+    #[inline(always)]
     pub const fn passing_mode(&self) -> ParameterPassingMode {
         self.passing_mode
     }
 
     /// Returns the declared, possibly symbolic parameter type.
+    #[must_use]
+    #[inline(always)]
     pub const fn signature_type(&self) -> &TypeExpression {
         &self.signature_type
     }
@@ -104,6 +122,8 @@ impl ParameterDescriptor {
     /// Returns the exact reflected parameter type when it is known.
     ///
     /// `None` denotes a symbolic, opaque, or otherwise unresolved type.
+    #[must_use]
+    #[inline(always)]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
     }
@@ -170,6 +190,8 @@ impl ReturnDescriptor {
     }
 
     /// Returns the structural return category.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> ReturnKind {
         self.kind
     }
@@ -177,6 +199,8 @@ impl ReturnDescriptor {
     /// Returns the declared return type expression.
     ///
     /// `None` means the unit or never category carries the complete fact.
+    #[must_use]
+    #[inline(always)]
     pub const fn signature_type(&self) -> Option<&TypeExpression> {
         self.signature_type.as_ref()
     }
@@ -185,6 +209,8 @@ impl ReturnDescriptor {
     ///
     /// `None` denotes unit, never, a reference, opaque output, or an unresolved
     /// symbolic type.
+    #[must_use]
+    #[inline(always)]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
     }
@@ -451,12 +477,16 @@ impl InvocationAdapter {
 
     /// Returns the opaque entry-point identity.
     #[doc(hidden)]
+    #[must_use]
+    #[inline(always)]
     pub const fn entry_point(&self) -> fn() {
         self.entry_point
     }
 
     /// Reports whether an explicitly requested panic-catching entry point is
     /// callable in this binary.
+    #[must_use]
+    #[inline(always)]
     pub const fn catching_availability(&self) -> CatchingAvailability {
         self.catching_availability
     }
@@ -616,31 +646,43 @@ impl MethodDescriptor {
     }
 
     /// Returns the stable composite member identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn identity(&self) -> &MemberId {
         &self.identity
     }
 
     /// Returns the Rust declaration name.
+    #[must_use]
+    #[inline(always)]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the lookup name.
+    #[must_use]
+    #[inline(always)]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns normalized source visibility facts.
+    #[must_use]
+    #[inline(always)]
     pub const fn visibility(&self) -> &MethodVisibility {
         &self.visibility
     }
 
     /// Returns the receiver, or `None` for an associated function.
+    #[must_use]
+    #[inline(always)]
     pub const fn receiver(&self) -> Option<&ReceiverDescriptor> {
         self.receiver.as_ref()
     }
 
     /// Returns non-receiver parameters in source declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn parameters(&self) -> &[ParameterDescriptor] {
         &self.parameters
     }
@@ -660,21 +702,29 @@ impl MethodDescriptor {
     }
 
     /// Returns the declared return facts.
+    #[must_use]
+    #[inline(always)]
     pub const fn return_value(&self) -> &ReturnDescriptor {
         &self.return_value
     }
 
     /// Returns callability-related source qualifiers.
+    #[must_use]
+    #[inline(always)]
     pub const fn qualifiers(&self) -> &MethodQualifiers {
         &self.qualifiers
     }
 
     /// Returns generic parameters and predicates in source order.
+    #[must_use]
+    #[inline(always)]
     pub const fn generic_definition(&self) -> &GenericDefinitionDescriptor {
         &self.generic_definition
     }
 
     /// Returns whether the trait declaration supplies a default body.
+    #[must_use]
+    #[inline(always)]
     pub const fn has_default(&self) -> bool {
         self.has_default
     }
@@ -682,6 +732,8 @@ impl MethodDescriptor {
     /// Returns the owning trait definition for a trait method.
     ///
     /// `None` means this method is declared by an impl definition.
+    #[must_use]
+    #[inline(always)]
     pub const fn declaring_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(descriptor) => Some(descriptor),
@@ -692,6 +744,8 @@ impl MethodDescriptor {
     /// Returns the owning impl definition for an implementation method.
     ///
     /// `None` means this method is declared by a trait definition.
+    #[must_use]
+    #[inline(always)]
     pub const fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(_) => None,
@@ -1013,6 +1067,8 @@ impl MethodInstanceDescriptor {
     }
 
     /// Returns the declaration shared by this concrete specialization.
+    #[must_use]
+    #[inline(always)]
     pub const fn declaration(&self) -> &'static MethodDescriptor {
         self.declaration
     }
@@ -1020,11 +1076,15 @@ impl MethodInstanceDescriptor {
     /// Returns the explicit impl method used by an overridden instance.
     ///
     /// `None` means the instance is required or uses its trait default.
+    #[must_use]
+    #[inline(always)]
     pub const fn implementation_method(&self) -> Option<&'static MethodDescriptor> {
         self.implementation_method
     }
 
     /// Returns the effective declaration or explicit implementation method.
+    #[must_use]
+    #[inline(always)]
     pub const fn effective_method(&self) -> &'static MethodDescriptor {
         match self.implementation_method {
             Some(method) => method,
@@ -1034,6 +1094,8 @@ impl MethodInstanceDescriptor {
 
     /// Returns whether the implementation is required, defaulted, or
     /// overridden.
+    #[must_use]
+    #[inline(always)]
     pub const fn implementation_source(&self) -> MethodImplementationSource {
         self.implementation_source
     }
@@ -1041,17 +1103,23 @@ impl MethodInstanceDescriptor {
     /// Returns the safe invocation adapter when one is available.
     ///
     /// `None` means callers must inspect [`Self::unavailable_reasons`].
+    #[must_use]
+    #[inline(always)]
     pub const fn adapter(&self) -> Option<&'static InvocationAdapter> {
         self.adapter
     }
 
     /// Returns the concrete type and const arguments of this method
     /// specialization in declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
 
     /// Returns stable reasons that prevent dynamic invocation.
+    #[must_use]
+    #[inline(always)]
     pub const fn unavailable_reasons(&self) -> &[InvocationUnavailableReason] {
         &self.unavailable_reasons
     }

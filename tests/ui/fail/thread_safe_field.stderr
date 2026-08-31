@@ -1,5 +1,5 @@
 error: `thread_safe` is not valid on a field
- --> tests/ui/fail/thread_safe_field.rs:5:15
-  |
-5 |     #[reflect(thread_safe)]
-  |               ^^^^^^^^^^^
+  --> tests/ui/fail/thread_safe_field.rs:13:15
+   |
+13 |     #[reflect(thread_safe)]
+   |               ^^^^^^^^^^^

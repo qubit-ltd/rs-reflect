@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Stable identities for distributed registration fragments.
 
@@ -33,26 +41,38 @@ impl FragmentIdentity {
     }
 
     /// Returns the crate that declared this fragment.
+    #[must_use]
+    #[inline(always)]
     pub fn declaring_crate(&self) -> &str {
         &self.declaring_crate
     }
     /// Returns the declaring module path.
+    #[must_use]
+    #[inline(always)]
     pub fn module_path(&self) -> &str {
         &self.module_path
     }
     /// Returns the declaration line number.
+    #[must_use]
+    #[inline(always)]
     pub fn line(&self) -> u32 {
         self.line
     }
     /// Returns the declaration column number.
+    #[must_use]
+    #[inline(always)]
     pub fn column(&self) -> u32 {
         self.column
     }
     /// Returns the category of members declared by this fragment.
+    #[must_use]
+    #[inline(always)]
     pub fn member_kind(&self) -> &str {
         &self.member_kind
     }
     /// Returns the deterministic fingerprint of normalized macro input.
+    #[must_use]
+    #[inline(always)]
     pub fn content_fingerprint(&self) -> u64 {
         self.content_fingerprint
     }

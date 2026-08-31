@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Deterministic immutable capability collections.
 
@@ -29,21 +37,29 @@ pub struct CapabilityConflict {
 
 impl CapabilityConflict {
     /// Returns the machine-readable conflict class.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> CapabilityConflictKind {
         self.kind
     }
 
     /// Returns the stable ID claimed by both descriptors.
+    #[must_use]
+    #[inline(always)]
     pub const fn id(&self) -> &CapabilityId {
         &self.id
     }
 
     /// Returns the first descriptor's process-local adapter contract identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn first_adapter_type(&self) -> TypeId {
         self.first_adapter_type
     }
 
     /// Returns the second descriptor's process-local adapter contract identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn second_adapter_type(&self) -> TypeId {
         self.second_adapter_type
     }
@@ -91,6 +107,8 @@ impl TypeCapabilities {
     }
 
     /// Returns descriptors in stable capability-ID order.
+    #[must_use]
+    #[inline(always)]
     pub const fn descriptors(&self) -> &[CapabilityDescriptor] {
         &self.descriptors
     }

@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Stable visibility categories for source declarations.
 
@@ -56,6 +64,8 @@ impl Visibility {
     }
 
     /// Returns this visibility's stable category.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> VisibilityKind {
         match self {
             Self::Public => VisibilityKind::Public,
@@ -68,6 +78,8 @@ impl Visibility {
 
     /// Returns the retained restricted path, or `None` for other visibility
     /// kinds.
+    #[must_use]
+    #[inline(always)]
     pub fn restricted_path(&self) -> Option<&str> {
         match self {
             Self::Restricted(path) => Some(path),

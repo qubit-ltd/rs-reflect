@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Struct construction adapter contract and descriptor-bound dispatch.
 
@@ -47,16 +55,22 @@ impl<M: Mode + 'static> StructConstructor<M> {
     }
 
     /// Returns the concrete struct root descriptor.
+    #[must_use]
+    #[inline(always)]
     pub const fn descriptor(&self) -> &'static TypeDescriptor {
         self.descriptor
     }
 
     /// Returns field construction policies in source declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
     }
 
     /// Returns the shape required by this struct constructor.
+    #[must_use]
+    #[inline(always)]
     pub fn shape(&self) -> ConstructionShape {
         match self
             .descriptor

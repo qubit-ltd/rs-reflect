@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow multiple-public-types
 //! Typed invocation inputs that retain a borrowed receiver's pin guarantee.
 
@@ -62,11 +70,15 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     }
 
     /// Returns the pinned shared receiver without weakening its pin guarantee.
+    #[must_use]
+    #[inline(always)]
     pub const fn receiver(&self) -> Pin<&'call T> {
         self.receiver
     }
 
     /// Returns arguments in their current caller or declaration order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -145,11 +157,15 @@ pub struct PinnedRefInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, M> {
     /// Returns the recovered pinned receiver.
+    #[must_use]
+    #[inline(always)]
     pub const fn receiver(&self) -> Pin<&'call T> {
         self.receiver
     }
 
     /// Returns recovered arguments in their original order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -236,6 +252,8 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     }
 
     /// Returns arguments in their current caller or declaration order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -314,6 +332,8 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, 
     }
 
     /// Returns recovered arguments in their original order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }

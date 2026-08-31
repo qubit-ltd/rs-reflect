@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Ownership recovery for reflected field replacement failures.
 
@@ -25,16 +33,22 @@ impl FieldSetRecovery {
     }
 
     /// Returns the field whose replacement was rejected.
+    #[must_use]
+    #[inline(always)]
     pub const fn field(&self) -> &FieldIdentity {
         &self.field
     }
 
     /// Returns the original query name, or `None` for a positional field.
+    #[must_use]
+    #[inline(always)]
     pub const fn query_name(&self) -> Option<&'static str> {
         self.query_name
     }
 
     /// Returns the untouched replacement value.
+    #[must_use]
+    #[inline(always)]
     pub const fn value(&self) -> &ReflectedOwned {
         &self.value
     }
@@ -131,6 +145,8 @@ impl FieldSetFailure {
     }
 
     /// Returns the machine-readable field access error.
+    #[must_use]
+    #[inline(always)]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error
     }
@@ -139,6 +155,8 @@ impl FieldSetFailure {
     ///
     /// `None` means an adapter already accepted ownership before it reported
     /// the error.
+    #[must_use]
+    #[inline(always)]
     pub fn recovery(&self) -> Option<&FieldSetRecovery> {
         self.recovery.as_deref()
     }

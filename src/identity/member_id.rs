@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Composite identities for reflected members.
 
@@ -25,18 +33,26 @@ impl MemberId {
     }
 
     /// Returns the identity of the descriptor declaring this member.
+    #[must_use]
+    #[inline(always)]
     pub fn declaring_identity(&self) -> &str {
         &self.declaring_identity
     }
     /// Returns the member category.
+    #[must_use]
+    #[inline(always)]
     pub fn kind(&self) -> &str {
         &self.kind
     }
     /// Returns the member's declaration index within its category.
+    #[must_use]
+    #[inline(always)]
     pub fn index(&self) -> usize {
         self.index
     }
     /// Returns the fragment that contributed this member.
+    #[must_use]
+    #[inline(always)]
     pub fn fragment(&self) -> &FragmentIdentity {
         &self.fragment
     }

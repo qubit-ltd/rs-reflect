@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Immutable structural facts about reflected enum variants.
 
@@ -127,6 +135,8 @@ impl VariantDescriptor {
 
     /// Returns the generated from-zero construction entry point, if enabled
     /// for this variant.
+    #[must_use]
+    #[inline(always)]
     pub const fn construction(&self) -> Option<&VariantConstructionDescriptor> {
         self.construction.as_ref()
     }
@@ -165,41 +175,57 @@ impl VariantDescriptor {
     }
 
     /// Returns the enum root that contains this variant.
+    #[must_use]
+    #[inline(always)]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
 
     /// Returns the zero-based source declaration index.
+    #[must_use]
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the immutable Rust variant name.
+    #[must_use]
+    #[inline(always)]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the immutable lookup name.
+    #[must_use]
+    #[inline(always)]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns whether the variant is unit-, tuple-, or struct-shaped.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> VariantKind {
         self.kind
     }
 
     /// Returns whether the discriminant appeared explicitly in source.
+    #[must_use]
+    #[inline(always)]
     pub const fn discriminant_origin(&self) -> DiscriminantOrigin {
         self.discriminant_origin
     }
 
     /// Returns a numeric discriminant only for fieldless integer-`repr` enums.
+    #[must_use]
+    #[inline(always)]
     pub const fn numeric_discriminant(&self) -> Option<NumericDiscriminant> {
         self.numeric_discriminant
     }
 
     /// Returns fields in source declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn fields(&self) -> &'static [FieldDescriptor] {
         self.fields
     }

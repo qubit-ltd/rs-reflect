@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Expansion of non-generic reflected enum declarations.
 
 use proc_macro2::TokenStream;
@@ -321,6 +329,7 @@ fn fingerprint(input: &str) -> u64 {
     })
 }
 
+/// Generates active-variant and field-access adapters for one enum variant.
 fn adapters(
     _name: &syn::Ident,
     variant: &crate::ir::VariantIr,
@@ -416,6 +425,7 @@ fn adapters(
     definitions
 }
 
+/// Generates the descriptor for one reflected enum variant.
 fn variant_descriptor(
     name: &syn::Ident,
     self_type: &TokenStream,

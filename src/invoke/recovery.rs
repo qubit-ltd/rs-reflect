@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Recovery payloads for invocation failures before user code runs.
 
@@ -31,11 +39,15 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     }
 
     /// Returns the recovered receiver, or `None` for an associated function.
+    #[must_use]
+    #[inline(always)]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
         self.receiver.as_ref()
     }
 
     /// Returns all recovered arguments in their original caller order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         &self.arguments
     }

@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow type-file-name
 //! Hidden distributed-registration protocol for generated macro output.
 
@@ -49,7 +57,8 @@ pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegis
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
-    crate::registry::aggregate_benchmark_registry_facts(&facts.0)
+    let BenchmarkRegistryFacts(facts) = facts;
+    crate::registry::aggregate_benchmark_registry_facts(facts)
 }
 
 /// Initializes a caller-supplied cache from static fragments.

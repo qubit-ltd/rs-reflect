@@ -1,26 +1,26 @@
 error[E0277]: the trait bound `std::string::String: Copy` is not satisfied
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:11:15
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:19:15
    |
-11 | impl<T: Copy> Constrained<T> {}
+19 | impl<T: Copy> Constrained<T> {}
    |               ^^^^^^^^^^^^^^ the trait `Copy` is not implemented for `std::string::String`
    |
 help: the trait `__QubitReflectImplSpecializationApplies` is implemented for `Constrained<T>`
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:10:1
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:18:1
    |
-10 | #[reflect_impl(specialize(T = String))]
+18 | #[reflect_impl(specialize(T = String))]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 note: required for `Constrained<std::string::String>` to implement `__QubitReflectImplSpecializationApplies`
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:10:1
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:18:1
    |
-10 | #[reflect_impl(specialize(T = String))]
+18 | #[reflect_impl(specialize(T = String))]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-11 | impl<T: Copy> Constrained<T> {}
+19 | impl<T: Copy> Constrained<T> {}
    |         ----  ^^^^^^^^^^^^^^
    |         |
    |         unsatisfied trait bound introduced here
 note: required by a bound in `assert_applies`
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:10:1
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization.rs:18:1
    |
-10 | #[reflect_impl(specialize(T = String))]
+18 | #[reflect_impl(specialize(T = String))]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `assert_applies`
    = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
