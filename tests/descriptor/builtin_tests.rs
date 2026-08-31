@@ -9,6 +9,7 @@
 // qubit-style: allow explicit-imports
 //! Integration tests for built-in descriptor families and interning.
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
@@ -31,6 +32,7 @@ use reflect::descriptor::StructKind;
 use reflect::descriptor::TextKind;
 use reflect::descriptor::TypeDescriptor;
 use reflect::descriptor::TypeKind;
+use reflect::expression::FunctionAbi;
 
 struct LazyOptionalElement;
 
@@ -416,6 +418,7 @@ fn test_builtin_function_relations_resolve_lazily() {
 fn test_builtin_pointer_descriptors_preserve_pointee_and_mode() {
     let smart_pointer = TypeDescriptor::of::<Arc<u32>>();
     let shared_reference = TypeDescriptor::of::<&'static u32>();
+    let mutable_reference = TypeDescriptor::of::<&'static mut u32>();
     let raw_pointer = TypeDescriptor::of::<*mut u32>();
     let slice = TypeDescriptor::of::<[u32]>();
 
@@ -432,6 +435,13 @@ fn test_builtin_pointer_descriptors_preserve_pointee_and_mode() {
             .expect("shared reference should expose the reference typed view")
             .kind(),
         ReferenceKind::Shared
+    );
+    assert_eq!(
+        mutable_reference
+            .as_reference()
+            .expect("mutable reference should expose the reference typed view")
+            .kind(),
+        ReferenceKind::Mutable
     );
     assert_eq!(
         raw_pointer
@@ -556,17 +566,113 @@ fn test_builtin_hash_map_descriptor_supports_custom_hasher() {
     );
 }
 
+/// Verifies both standard set implementations retain their concrete family.
+#[test]
+fn test_builtin_set_descriptors_preserve_collection_family() {
+    let hash_set = TypeDescriptor::of::<HashSet<u8>>();
+    let btree_set = TypeDescriptor::of::<BTreeSet<u8>>();
+
+    assert_eq!(hash_set.as_set().expect("HashSet typed view").kind(), SetKind::HashSet,);
+    assert_eq!(
+        btree_set.as_set().expect("BTreeSet typed view").kind(),
+        SetKind::BTreeSet,
+    );
+}
+
+/// Verifies all supported fixed-arity calling conventions retain safety and
+/// ABI metadata.
+#[test]
+fn test_builtin_function_descriptors_cover_supported_calling_conventions() {
+    type SafeRust = fn(u8) -> u16;
+    type UnsafeRust = unsafe fn(u8) -> u16;
+    type SafeC = extern "C" fn(u8) -> u16;
+    type UnsafeC = unsafe extern "C" fn(u8) -> u16;
+    type SafeCUnwind = extern "C-unwind" fn(u8) -> u16;
+    type UnsafeCUnwind = unsafe extern "C-unwind" fn(u8) -> u16;
+    type SafeSystem = extern "system" fn(u8) -> u16;
+    type UnsafeSystem = unsafe extern "system" fn(u8) -> u16;
+    type SafeSystemUnwind = extern "system-unwind" fn(u8) -> u16;
+    type UnsafeSystemUnwind = unsafe extern "system-unwind" fn(u8) -> u16;
+
+    let cases = [
+        (
+            TypeDescriptor::of::<SafeRust>(),
+            FunctionPointerKind::Safe,
+            FunctionAbi::Rust,
+        ),
+        (
+            TypeDescriptor::of::<UnsafeRust>(),
+            FunctionPointerKind::Unsafe,
+            FunctionAbi::Rust,
+        ),
+        (TypeDescriptor::of::<SafeC>(), FunctionPointerKind::Safe, FunctionAbi::C),
+        (
+            TypeDescriptor::of::<UnsafeC>(),
+            FunctionPointerKind::Unsafe,
+            FunctionAbi::C,
+        ),
+        (
+            TypeDescriptor::of::<SafeCUnwind>(),
+            FunctionPointerKind::Safe,
+            FunctionAbi::Other(String::from("C-unwind").into()),
+        ),
+        (
+            TypeDescriptor::of::<UnsafeCUnwind>(),
+            FunctionPointerKind::Unsafe,
+            FunctionAbi::Other(String::from("C-unwind").into()),
+        ),
+        (
+            TypeDescriptor::of::<SafeSystem>(),
+            FunctionPointerKind::Safe,
+            FunctionAbi::System,
+        ),
+        (
+            TypeDescriptor::of::<UnsafeSystem>(),
+            FunctionPointerKind::Unsafe,
+            FunctionAbi::System,
+        ),
+        (
+            TypeDescriptor::of::<SafeSystemUnwind>(),
+            FunctionPointerKind::Safe,
+            FunctionAbi::Other(String::from("system-unwind").into()),
+        ),
+        (
+            TypeDescriptor::of::<UnsafeSystemUnwind>(),
+            FunctionPointerKind::Unsafe,
+            FunctionAbi::Other(String::from("system-unwind").into()),
+        ),
+    ];
+
+    for (descriptor, expected_kind, expected_abi) in cases {
+        let function = descriptor.as_function().expect("function typed view");
+        assert_eq!(function.kind(), expected_kind);
+        assert_eq!(*function.abi(), expected_abi);
+        assert!(!function.is_variadic());
+    }
+}
+
 /// Verifies builtin function descriptors preserve C-variadic signature facts.
 #[test]
 fn test_builtin_function_descriptor_supports_c_variadic_signatures() {
-    type CVariadic = unsafe extern "C" fn(i32, ...) -> i32;
+    type SafeCVariadic = extern "C" fn(i32, ...) -> i32;
+    type UnsafeCVariadic = unsafe extern "C" fn(i32, ...) -> i32;
 
-    let variadic = TypeDescriptor::of::<CVariadic>();
+    let safe_variadic = TypeDescriptor::of::<SafeCVariadic>();
+    let unsafe_variadic = TypeDescriptor::of::<UnsafeCVariadic>();
 
+    assert!(safe_variadic.as_function().expect("safe variadic view").is_variadic());
+    assert_eq!(
+        safe_variadic.as_function().expect("safe variadic view").kind(),
+        FunctionPointerKind::Safe,
+    );
     assert!(
-        variadic
+        unsafe_variadic
             .as_function()
-            .expect("function typed view should exist")
+            .expect("unsafe variadic view")
             .is_variadic()
+    );
+    assert_eq!(
+        unsafe_variadic.as_function().expect("unsafe variadic view").kind(),
+        FunctionPointerKind::Unsafe,
     );
 }

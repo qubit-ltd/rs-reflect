@@ -34,6 +34,8 @@ fn test_thread_safe_ref_any_and_downcast_are_available_before_downgrade() {
     let value = SendReflectedRef::new(&number);
 
     assert!(value.as_any().is_some());
+    assert!(value.is::<u32>());
+    assert_eq!(value.as_str(), None);
     assert_eq!(value.downcast_ref::<u32>(), Some(&42));
     assert_eq!(value.downcast_ref::<String>(), None);
 
@@ -65,6 +67,9 @@ fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
     let mut value = SendReflectedMut::new(&mut number);
 
     assert!(value.as_any().is_some());
+    assert!(value.is::<u32>());
+    assert_eq!(value.as_str(), None);
+    assert_eq!(value.as_str_mut(), None);
     *value
         .as_any_mut()
         .and_then(|value| value.downcast_mut::<u32>())
@@ -122,6 +127,10 @@ fn test_thread_safe_str_variants_can_be_downgraded() {
     }
 
     assert_eq!(text, "HELLO");
+
+    let mut text = String::from("hello");
+    let mut value = SendReflectedMut::new_str_mut(text.as_mut_str());
+    assert!(value.as_any_mut().is_none());
 }
 
 /// Confirms consuming thread-safe shared downcasts preserve both the original

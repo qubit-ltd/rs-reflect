@@ -318,9 +318,17 @@ fn test_reflect_trait_registers_complete_marker_backed_definition() {
     let candidates =
         registry.find_trait_definitions_by_path("integration_tests::descriptor::reflect_trait_tests::ReflectedService");
     assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates.iter().count(), 1);
+    assert_eq!(candidates.into_iter().count(), 1);
     assert!(std::ptr::eq(
         candidates.only().expect("a unique path must have one candidate"),
         definition
+    ));
+    assert!(std::ptr::eq(
+        registry
+            .trait_definition(definition.trait_id())
+            .expect("the exact trait identity must resolve"),
+        definition,
     ));
     assert!(
         registry

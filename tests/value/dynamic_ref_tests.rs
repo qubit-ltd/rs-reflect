@@ -21,6 +21,7 @@ fn test_ref_downcast_failure_keeps_the_borrow_usable() {
     assert_eq!(value.downcast_ref::<String>(), None);
     assert_eq!(value.downcast_ref::<u32>(), Some(&42));
     assert!(value.is::<u32>());
+    assert_eq!(value.as_str(), None);
 }
 
 /// Confirms a failed mutable downcast leaves the original borrow usable.
@@ -30,6 +31,9 @@ fn test_mut_downcast_failure_keeps_the_borrow_usable() {
     {
         let mut value = ReflectedMut::new(&mut number);
 
+        assert!(value.is::<u32>());
+        assert_eq!(value.as_str(), None);
+        assert_eq!(value.as_str_mut(), None);
         assert_eq!(value.downcast_mut::<String>(), None);
         *value
             .downcast_mut::<u32>()

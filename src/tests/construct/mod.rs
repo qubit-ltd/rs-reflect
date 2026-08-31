@@ -6,10 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for reflected invocation APIs.
+//! Crate-internal construction tests.
 
-mod adapter_tests;
 mod error_tests;
-mod pinned_tests;
-mod recovery_tests;
-mod runtime_tests;
+mod validated_tests;

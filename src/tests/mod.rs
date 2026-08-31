@@ -6,10 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for reflected invocation APIs.
+//! Crate-internal tests for contracts that cannot be constructed through the
+//! public API.
 
-mod adapter_tests;
-mod error_tests;
-mod pinned_tests;
-mod recovery_tests;
-mod runtime_tests;
+mod api_gap_tests;
+mod construct;
+mod descriptor;
+mod private;
+mod registry;
+mod value;

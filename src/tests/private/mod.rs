@@ -6,10 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for reflected invocation APIs.
+//! Crate-internal tests for generated-code support factories.
 
-mod adapter_tests;
-mod error_tests;
-mod pinned_tests;
-mod recovery_tests;
-mod runtime_tests;
+mod assertion_tests;
+mod descriptor_tests;
+#[cfg(feature = "bench-internals")]
+mod registration_tests;

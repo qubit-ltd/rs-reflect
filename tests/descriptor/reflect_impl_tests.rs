@@ -1334,10 +1334,18 @@ fn test_reflect_impl_registers_generic_definition_without_concrete_instance() {
     assert_eq!(definition.methods()[2].rust_name(), "skipped_definition_method");
     let candidates = registry.find_impl_definitions_by_target(definition.target_type());
     assert_eq!(candidates.len(), 1);
+    assert!(!candidates.is_empty());
     assert!(std::ptr::eq(
         candidates.iter().next().expect("the exact target must match"),
         definition,
     ));
+    assert_eq!(
+        registry
+            .find_impl_definitions_by_target(definition.target_type())
+            .into_iter()
+            .count(),
+        1,
+    );
     assert!(
         registry
             .implementations(TypeId::of::<GenericImplDefinitionOnly<'static, u8, 7>>())

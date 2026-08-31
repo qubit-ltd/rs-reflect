@@ -10,12 +10,15 @@
 //! Integration tests for safe reflected field access.
 use std::any::TypeId;
 use std::cell::Cell;
+use std::error::Error;
 use std::rc::Rc;
 
 use qubit_reflect as reflect;
 use reflect::__private::descriptor;
 use reflect::access::FieldAccessError;
+use reflect::access::FieldAccessOperation;
 use reflect::access::FieldAccessPolicy;
+use reflect::access::FieldIdentity;
 use reflect::descriptor::FieldDescriptor;
 use reflect::descriptor::OpaqueTypeDescriptor;
 use reflect::descriptor::StructKind;
@@ -103,6 +106,20 @@ fn set_probe(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), Fiel
     Ok(())
 }
 
+/// Accepts erased ownership and then reports an adapter-phase error without
+/// recovery.
+fn reject_probe(_target: ReflectedMut<'_>, _value: ReflectedOwned) -> Result<(), FieldAccessError> {
+    Err(FieldAccessError::Unavailable {
+        field: FieldIdentity::new(
+            TypeId::of::<RecoveryRecord>(),
+            std::any::type_name::<RecoveryRecord>(),
+            0,
+            Some("value"),
+        ),
+        operation: FieldAccessOperation::Set,
+    })
+}
+
 static SECRET_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<String>();
 static SECRET_TYPE_REF: TypeRef = TypeRef::Opaque(&SECRET_TYPE);
 static ACCOUNT_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
@@ -124,7 +141,7 @@ static ACCOUNT_DESCRIPTOR: TypeDescriptor =
 static DROP_PROBE_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<DropProbe>();
 static DROP_PROBE_TYPE_REF: TypeRef = TypeRef::Opaque(&DROP_PROBE_TYPE);
 static SYMBOLIC_TYPE_REF: TypeRef = TypeRef::Symbolic(TypeExpression::SelfType);
-static RECOVERY_FIELDS: [FieldDescriptor; 5] = [
+static RECOVERY_FIELDS: [FieldDescriptor; 6] = [
     descriptor::field(
         recovery_record_descriptor,
         0,
@@ -169,6 +186,15 @@ static RECOVERY_FIELDS: [FieldDescriptor; 5] = [
         Visibility::Private,
     )
     .with_access(FieldAccessPolicy::ReadWrite, None, None, Some(set_probe)),
+    descriptor::field(
+        recovery_record_descriptor,
+        0,
+        Some("value"),
+        Some("value"),
+        &DROP_PROBE_TYPE_REF,
+        Visibility::Private,
+    )
+    .with_access(FieldAccessPolicy::ReadWrite, None, None, Some(reject_probe)),
 ];
 static RECOVERY_RECORD_DESCRIPTOR: TypeDescriptor =
     descriptor::struct_type::<RecoveryRecord>("field_tests::RecoveryRecord", StructKind::Named, &RECOVERY_FIELDS);
@@ -217,6 +243,11 @@ fn test_field_descriptor_reads_and_writes_private_field() {
     let mut account = Account {
         secret: String::from("initial"),
     };
+
+    assert_eq!(field.visibility().as_declared(), Some(&Visibility::Private));
+    assert!(!field.visibility().is_variant_inherited());
+    assert_eq!(field.access_policy(), FieldAccessPolicy::ReadWrite);
+    assert!(format!("{field:?}").contains("FieldDescriptor"));
 
     let borrowed = field
         .get(ReflectedRef::new(&account))
@@ -414,4 +445,108 @@ fn test_field_set_symbolic_type_recovers_replacement_without_dropping() {
     assert_named_probe_recovered(failure, &drops, "value");
     drop(target);
     assert_eq!(drops_in_target.get(), 1);
+}
+
+/// Verifies recovery and failure inspection APIs retain metadata across both
+/// pre-execution and adapter-phase errors.
+#[test]
+fn test_field_set_recovery_inspection_and_consuming_paths() {
+    let field = &RECOVERY_FIELDS[2];
+    let drops_in_target = Rc::new(Cell::new(0));
+    let mut target = RecoveryRecord {
+        value: DropProbe {
+            drops: Rc::clone(&drops_in_target),
+        },
+    };
+    let (drops, value) = create_drop_probe();
+    let failure = field
+        .set(ReflectedMut::new(&mut target), value)
+        .expect_err("missing adapter should fail before execution");
+
+    assert!(failure.as_ref() == failure.error());
+    assert!(failure.source().is_some());
+    assert!(format!("{failure:?}").contains("FieldSetFailure"));
+    assert!(failure.to_string().contains("no adapter"));
+    let recovery = failure
+        .into_recovery()
+        .unwrap_or_else(|_| panic!("pre-execution failure should retain recovery"));
+    assert_eq!(recovery.field().declaring_type(), TypeId::of::<RecoveryRecord>());
+    assert_eq!(
+        recovery.field().declaring_type_name(),
+        std::any::type_name::<RecoveryRecord>()
+    );
+    assert_eq!(recovery.field().rust_name(), Some("value"));
+    assert_eq!(recovery.field().variant_index(), None);
+    assert_eq!(recovery.field().variant_rust_name(), None);
+    assert_eq!(recovery.query_name(), Some("value"));
+    assert!(recovery.value().is::<DropProbe>());
+    assert!(recovery.value_by_name("other").is_none());
+    assert!(recovery.value_at(1).is_none());
+    assert!(format!("{recovery:?}").contains("FieldSetRecovery"));
+
+    let Err(recovery) = recovery.into_value_by_name("other") else {
+        panic!("mismatched name should retain recovery");
+    };
+    let Err(recovery) = recovery.into_value_at(1) else {
+        panic!("mismatched index should retain recovery");
+    };
+    drop(recovery.into_value());
+    assert_eq!(drops.get(), 1);
+
+    let (_, value) = create_drop_probe();
+    let adapter_failure = RECOVERY_FIELDS[5]
+        .set(ReflectedMut::new(&mut target), value)
+        .expect_err("adapter should report an execution-phase error");
+    assert!(adapter_failure.recovery().is_none());
+    assert!(matches!(
+        adapter_failure.into_recovery(),
+        Err(FieldAccessError::Unavailable { .. })
+    ));
+
+    let (_, value) = create_drop_probe();
+    let failure = field
+        .set(ReflectedMut::new(&mut target), value)
+        .expect_err("missing adapter should fail before execution");
+    let (error, recovery) = failure.into_parts();
+    assert!(matches!(error, FieldAccessError::Unavailable { .. }));
+    drop(recovery.expect("recovery should be present").into_value());
+
+    let (_, value) = create_drop_probe();
+    let failure = field
+        .set(ReflectedMut::new(&mut target), value)
+        .expect_err("missing adapter should fail before execution");
+    assert!(matches!(failure.into_error(), FieldAccessError::Unavailable { .. }));
+    drop(target);
+    assert_eq!(drops_in_target.get(), 1);
+}
+
+/// Verifies field identity display distinguishes struct, tuple, and enum
+/// source forms while preserving variant metadata.
+#[test]
+fn test_field_identity_preserves_all_source_forms() {
+    let named = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, Some("secret"));
+    let positional = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, None);
+    let variant_named = FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, Some("value"), 3, "Data");
+    let variant_positional = FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, None, 3, "Data");
+
+    assert_eq!(named.to_string(), "Account::secret");
+    assert_eq!(positional.to_string(), "Account field #2");
+    assert_eq!(variant_named.to_string(), "Account::Data.value");
+    assert_eq!(variant_positional.to_string(), "Account::Data field #1");
+    assert_eq!(variant_named.variant_index(), Some(3));
+    assert_eq!(variant_named.variant_rust_name(), Some("Data"));
+}
+
+/// Verifies each field access operation has a stable API spelling and every
+/// error exposes its common field identity.
+#[test]
+fn test_field_access_operations_and_errors_preserve_context() {
+    assert_eq!(FieldAccessOperation::Get.to_string(), "get");
+    assert_eq!(FieldAccessOperation::GetMut.to_string(), "get_mut");
+    assert_eq!(FieldAccessOperation::Set.to_string(), "set");
+
+    let field = FieldIdentity::new(TypeId::of::<Account>(), "Account", 0, Some("secret"));
+    let inactive = FieldAccessError::inactive_variant(field.clone(), 1, "Disabled");
+    assert_eq!(inactive.field(), &field);
+    assert!(inactive.to_string().contains("inactive variant Disabled"));
 }

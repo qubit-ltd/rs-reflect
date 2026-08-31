@@ -6,10 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for reflected invocation APIs.
+//! Crate-internal descriptor construction tests.
 
-mod adapter_tests;
-mod error_tests;
-mod pinned_tests;
-mod recovery_tests;
-mod runtime_tests;
+mod trait_descriptor_tests;
+mod type_descriptor_tests;
+mod variant_descriptor_tests;

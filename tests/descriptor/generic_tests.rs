@@ -234,6 +234,12 @@ fn test_generic_struct_instances_are_unique_and_interned() {
         .expect("derived generic roots expose substitutions");
     assert_eq!(generic.definition().parameters.len(), 2);
     assert_eq!(generic.arguments().len(), 2);
+    assert_eq!(generic.definition_index(0), Some(0));
+    assert_eq!(generic.definition_index(2), None);
+    assert_eq!(generic.argument_index(1), Some(1));
+    assert!(generic.argument_for_definition(0).is_some());
+    assert!(generic.type_argument_for_definition(0).is_some());
+    assert!(generic.const_argument_value_for_definition(1).is_some());
 }
 
 /// Verifies a concrete type argument resolves lazily to its unique reflected
