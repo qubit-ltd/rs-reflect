@@ -9,6 +9,7 @@
 //! Expansion helpers for generic root-instance metadata.
 
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
 
 use crate::ir::GenericBoundIr;
@@ -89,6 +90,53 @@ pub(crate) fn concrete_descriptor(
             ::std::boxed::Box::leak(::std::vec![#(#const_argument_values),*].into_boxed_slice()),
         )
     })
+}
+
+/// Returns the stable hidden provider name shared with facade macros that
+/// augment one reflected generic declaration.
+pub(crate) fn definition_provider_name(name: &syn::Ident) -> syn::Ident {
+    let source = name.to_string();
+    let mut snake = String::new();
+    for (index, character) in source.chars().enumerate() {
+        if character.is_ascii_uppercase() {
+            if index != 0 {
+                snake.push('_');
+            }
+            snake.push(character.to_ascii_lowercase());
+        } else {
+            snake.push(character);
+        }
+    }
+    format_ident!(
+        "__qubit_reflect_generic_definition_{}",
+        snake,
+    )
+}
+
+/// Emits a non-generic provider for the declaration-level generic metadata.
+///
+/// Unlike `Reflect::type_descriptor`, this provider can be called without
+/// choosing a concrete monomorph. Domain derive crates use it to register one
+/// template while still reusing reflection's canonical generic IR.
+pub(crate) fn definition_provider(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    if declaration.generics.params.is_empty() {
+        return TokenStream::new();
+    }
+    let function = definition_provider_name(&declaration.name);
+    let definition =
+        super::traits::generic_definition(&declaration.generics, declaration.span, facade);
+    quote! {
+        #[doc(hidden)]
+        fn #function() -> &'static #facade::expression::GenericDefinitionDescriptor {
+            static DEFINITION: ::std::sync::OnceLock<
+                #facade::expression::GenericDefinitionDescriptor,
+            > = ::std::sync::OnceLock::new();
+            DEFINITION.get_or_init(|| #definition)
+        }
+    }
 }
 
 /// Returns every visible field type that generated descriptor navigation must

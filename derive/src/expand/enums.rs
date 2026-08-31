@@ -174,6 +174,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque)
     {
+        let generic_definition_provider =
+            super::generics::definition_provider(&declaration, &facade);
         let registration = registration(
             &facade,
             &name,
@@ -196,6 +198,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
                 }
             }
             #registration
+            #generic_definition_provider
         };
     }
     let adapters = declaration
@@ -260,6 +263,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         fingerprint,
         !declaration.generics.params.is_empty(),
     );
+    let generic_definition_provider =
+        super::generics::definition_provider(&declaration, &facade);
     let root_descriptor = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -277,6 +282,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
 
         #registration
+        #generic_definition_provider
     };
     root_descriptor
 }

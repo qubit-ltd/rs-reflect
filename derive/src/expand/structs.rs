@@ -244,6 +244,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         fingerprint,
         !declaration.generics.params.is_empty(),
     );
+    let generic_definition_provider =
+        super::generics::definition_provider(&declaration, &facade);
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -258,6 +260,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         }
 
         #registration
+        #generic_definition_provider
     }
 }
 
@@ -282,7 +285,10 @@ pub(crate) fn capabilities(
                 Some("Default") => quote!(#facade::capability::default_descriptor::<Self>()),
                 Some("Send") => quote!(#facade::capability::send_descriptor::<Self>()),
                 Some("Sync") => quote!(#facade::capability::sync_descriptor::<Self>()),
-                Some(_) | None => quote!(),
+                Some(_) | None => {
+                    let tokens = &path.tokens;
+                    quote!(#tokens::<Self>())
+                }
             })
     });
     quote! {
