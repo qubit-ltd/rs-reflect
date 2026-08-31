@@ -67,6 +67,22 @@ use crate::value::ReflectedOwned;
 
 /// The sole public generic contract for types that provide a static reflection
 /// descriptor.
+///
+/// # Examples
+///
+/// ```
+/// #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+///
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct User {
+///     id: u64,
+/// }
+///
+/// let descriptor = <User as Reflect>::type_descriptor();
+/// assert!(std::ptr::eq(descriptor, TypeDescriptor::of::<User>()));
+/// ```
 pub trait Reflect: 'static {
     /// Returns the unique root descriptor for `Self`.
     fn type_descriptor() -> &'static TypeDescriptor;

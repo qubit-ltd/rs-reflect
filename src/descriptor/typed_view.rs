@@ -261,7 +261,7 @@ impl OptionalTypeDescriptor {
 /// A standard ordered-sequence family.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SequenceKind {
-    /// [`Vec<T>`](Vec).
+    /// [`Vec<T>`].
     Vec,
 }
 
@@ -307,9 +307,9 @@ impl SequenceTypeDescriptor {
 /// A standard set family.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SetKind {
-    /// [`HashSet<T>`](std::collections::HashSet).
+    /// `HashSet<T>`.
     HashSet,
-    /// [`BTreeSet<T>`](std::collections::BTreeSet).
+    /// `BTreeSet<T>`.
     BTreeSet,
 }
 
@@ -355,9 +355,9 @@ impl SetTypeDescriptor {
 /// A standard map family.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MapKind {
-    /// [`HashMap<K, V>`](std::collections::HashMap).
+    /// `HashMap<K, V>`.
     HashMap,
-    /// [`BTreeMap<K, V>`](std::collections::BTreeMap).
+    /// `BTreeMap<K, V>`.
     BTreeMap,
 }
 

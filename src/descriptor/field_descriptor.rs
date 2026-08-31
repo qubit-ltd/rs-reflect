@@ -41,6 +41,24 @@ use crate::value::ReflectedRef;
 pub type TypeDescriptorResolver = fn() -> &'static TypeDescriptor;
 
 /// The immutable structural description of one reflected field.
+///
+/// # Examples
+///
+/// ```
+/// #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+///
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct User {
+///     name: String,
+/// }
+///
+/// let field = TypeDescriptor::of::<User>()
+///     .field("name")
+///     .expect("the derived field exists");
+/// assert_eq!(field.rust_name(), Some("name"));
+/// ```
 pub struct FieldDescriptor {
     declaring_type: TypeDescriptorResolver,
     index: usize,
