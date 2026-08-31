@@ -39,6 +39,7 @@ impl BenchmarkRecord {
     }
 }
 
+/// Measures one operation and prints its elapsed wall-clock duration.
 fn measure(name: &str, operation: impl FnOnce()) {
     let started = Instant::now();
     operation();
