@@ -6,24 +6,16 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow type-file-name
 //! Transactional validation and construction of frozen registry snapshots.
 
 use std::any::TypeId;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-#[cfg(feature = "bench-internals")]
-use crate::capability::CapabilityDescriptor;
-#[cfg(feature = "bench-internals")]
-use crate::capability::CapabilityKey;
 use crate::descriptor::AppliedTraitId;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::ImplKind;
-use crate::descriptor::MethodDescriptor;
-use crate::descriptor::TraitCompleteness;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
@@ -32,57 +24,16 @@ use crate::identity::CapabilityId;
 use crate::identity::ExternalTraitId;
 use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
-use crate::registry::fragment::FragmentKind;
 use crate::registry::fragment::FragmentPayload;
 use crate::registry::fragment::RegistrationFragment;
-use crate::registry::fragment::RuntimeIdentity;
 use crate::registry::indexes::RegistryIndexes;
+use crate::registry::internal::BuiltFragment;
+use crate::registry::internal::MaterializedFragment;
+use crate::registry::internal::PendingFragment;
 use crate::registry::registry::ReflectRegistry;
-
-/// A sorted fragment paired with its already materialized stable identity.
-struct PendingFragment {
-    fragment: &'static RegistrationFragment,
-    identity: FragmentIdentity,
-}
-
-/// A built fragment retained until every cross-fragment check succeeds.
-struct BuiltFragment {
-    identity: FragmentIdentity,
-    payload: FragmentPayload,
-}
-
-/// A materialized payload plus the kind and target declared by its static
-/// registration record.
-struct MaterializedFragment {
-    identity: FragmentIdentity,
-    declared_kind: FragmentKind,
-    declared_target: RuntimeIdentity,
-    payload: FragmentPayload,
-}
-
-/// Prepared adapter-free capability facts used by the post-materialization
-/// registry aggregation benchmark.
-#[cfg(feature = "bench-internals")]
-pub(crate) struct BenchmarkRegistryFacts {
-    fragments: Box<[BenchmarkRegistryFact]>,
-}
-
-/// One prepared benchmark fact whose string parsing and allocation are kept
-/// outside the measured aggregation loop.
-#[cfg(feature = "bench-internals")]
-struct BenchmarkRegistryFact {
-    identity: FragmentIdentity,
-    target_type_id: TypeId,
-    descriptor: CapabilityDescriptor,
-}
-
-/// Marker type used to instantiate a benchmark-only reflected target.
-#[cfg(feature = "bench-internals")]
-struct BenchmarkTarget;
 
 /// Accumulates validated payloads without exposing partial registry state.
 #[derive(Default)]
-// qubit-style: allow multiple-public-types
 struct RegistryBuilder {
     types: Vec<&'static TypeDescriptor>,
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
@@ -149,7 +100,7 @@ impl RegistryBuilder {
         let definition_id = descriptor.trait_id().clone();
         if let TraitId::External(external_id) = &definition_id {
             if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id) {
-                if !compatible_external_traits(first_descriptor, descriptor) {
+                if !descriptor.is_compatible_with(first_descriptor) {
                     return Err(RegistryError::external_trait_id_conflict(
                         first_identity.clone(),
                         identity.clone(),
@@ -237,7 +188,7 @@ impl RegistryBuilder {
                         .copied()
                         .filter(|descriptor| {
                             matches!(descriptor.trait_id(), TraitId::Reflected(_))
-                                && impl_definition_facts_match(definition, descriptor)
+                                && definition.matches_trait_definition(descriptor)
                         })
                         .collect();
                     let [candidate] = compatible.as_slice() else {
@@ -266,7 +217,7 @@ impl RegistryBuilder {
     /// validation.
     fn finish(mut self) -> ReflectRegistry {
         for implementations in self.impls_by_target.values_mut() {
-            implementations.sort_by(compare_impls);
+            implementations.sort_by(|left, right| left.registry_cmp(right));
         }
 
         let types_by_type_name = group_types(&self.types, TypeDescriptor::type_name);
@@ -334,55 +285,6 @@ fn reflected_trait_path_matches(source_path: &str, registered_path: &str) -> boo
             .is_some_and(|prefix| prefix.ends_with("::"))
 }
 
-/// Returns whether complete declaration facts uniquely support an import alias
-/// whose source path cannot otherwise be linked to a reflected trait marker.
-fn impl_definition_facts_match(definition: &ImplDefinitionDescriptor, candidate: &TraitDefinitionDescriptor) -> bool {
-    if candidate.completeness() != TraitCompleteness::Complete {
-        return false;
-    }
-    let has_facts = !definition.methods().is_empty()
-        || !definition.associated_types().is_empty()
-        || !definition.associated_consts().is_empty();
-    has_facts
-        && ordered_method_facts_match(definition.methods(), candidate.methods())
-        && definition
-            .associated_types()
-            .iter()
-            .map(|item| item.rust_name())
-            .eq(candidate.associated_types().iter().map(|item| item.rust_name()))
-        && definition
-            .associated_consts()
-            .iter()
-            .map(|item| (item.rust_name(), item.declared_type()))
-            .eq(candidate
-                .associated_consts()
-                .iter()
-                .map(|item| (item.rust_name(), item.declared_type())))
-}
-
-/// Compares full Rust method signatures in declaration order.
-fn ordered_method_facts_match(left: &[MethodDescriptor], right: &[MethodDescriptor]) -> bool {
-    left.len() == right.len()
-        && left
-            .iter()
-            .zip(right)
-            .all(|(left, right)| method_signature_matches(left, right))
-}
-
-/// Compares the source facts that determine a Rust method signature.
-fn method_signature_matches(left: &MethodDescriptor, right: &MethodDescriptor) -> bool {
-    left.rust_name() == right.rust_name()
-        && left.receiver() == right.receiver()
-        && left.parameters().len() == right.parameters().len()
-        && left.parameters().iter().zip(right.parameters()).all(|(left, right)| {
-            left.passing_mode() == right.passing_mode() && left.signature_type() == right.signature_type()
-        })
-        && left.return_value().kind() == right.return_value().kind()
-        && left.return_value().signature_type() == right.return_value().signature_type()
-        && left.qualifiers() == right.qualifiers()
-        && left.generic_definition() == right.generic_definition()
-}
-
 /// Builds a registry from all linker-discovered fragments.
 pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(inventory::iter::<RegistrationFragment>.into_iter())
@@ -391,56 +293,6 @@ pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryErro
 /// Builds a registry from an explicit static fragment slice.
 pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(fragments.iter().copied())
-}
-
-/// Prepares unique adapter-free capability facts outside benchmark timing.
-#[cfg(feature = "bench-internals")]
-pub(crate) fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
-    let fragments = (0..fragment_count)
-        .rev()
-        .map(|index| {
-            let capability_id = CapabilityId::new(&format!("benchmark.registry.fragment{index}"))
-                .expect("generated benchmark capability ID must be valid");
-            BenchmarkRegistryFact {
-                identity: FragmentIdentity::new(
-                    "qubit-reflect-benchmark",
-                    "synthetic",
-                    u32::try_from(index).expect("benchmark fragment index must fit u32"),
-                    1,
-                    "capability",
-                    index as u64,
-                ),
-                target_type_id: TypeId::of::<BenchmarkTarget>(),
-                descriptor: CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(capability_id)),
-            }
-        })
-        .collect();
-    BenchmarkRegistryFacts { fragments }
-}
-
-/// Aggregates prepared materialized facts through the production validation,
-/// indexing, and freezing path.
-#[cfg(feature = "bench-internals")]
-pub(crate) fn aggregate_benchmark_registry_facts(
-    facts: &BenchmarkRegistryFacts,
-) -> Result<ReflectRegistry, RegistryError> {
-    let fragments = facts
-        .fragments
-        .iter()
-        .map(|fact| MaterializedFragment {
-            identity: fact.identity.clone(),
-            declared_kind: FragmentKind::Capability,
-            declared_target: RuntimeIdentity::Capability {
-                target_type_id: fact.target_type_id,
-                capability_id: fact.descriptor.id().clone(),
-            },
-            payload: FragmentPayload::Capability(crate::registry::fragment::CapabilityRegistration::new(
-                fact.target_type_id,
-                fact.descriptor.clone(),
-            )),
-        })
-        .collect();
-    validate_and_freeze_materialized(fragments)
 }
 
 /// Initializes a supplied cache from an explicit static fragment slice.
@@ -491,7 +343,7 @@ fn build_registry_from_iter(
 
 /// Validates and freezes already materialized fragments through the common
 /// post-factory registry path.
-fn validate_and_freeze_materialized(
+pub(crate) fn validate_and_freeze_materialized(
     mut fragments: Vec<MaterializedFragment>,
 ) -> Result<ReflectRegistry, RegistryError> {
     fragments.sort_by(|left, right| left.identity.cmp(&right.identity));
@@ -533,27 +385,12 @@ fn validate_identities<'identity>(
         if left == right {
             return Err(RegistryError::duplicate_fragment(left.clone(), right.clone()));
         }
-        if same_source_identity(left, right) {
+        if left.same_source_identity(right) {
             return Err(RegistryError::identity_conflict(left.clone(), right.clone()));
         }
         left = right;
     }
     Ok(())
-}
-
-/// Compares stable source facts while deliberately excluding content
-/// fingerprint.
-fn same_source_identity(left: &FragmentIdentity, right: &FragmentIdentity) -> bool {
-    left.declaring_crate() == right.declaring_crate()
-        && left.module_path() == right.module_path()
-        && left.line() == right.line()
-        && left.column() == right.column()
-        && left.member_kind() == right.member_kind()
-}
-
-/// Returns whether two aliases contribute mergeable facts for one external ID.
-fn compatible_external_traits(left: &TraitDefinitionDescriptor, right: &TraitDefinitionDescriptor) -> bool {
-    left.completeness() == right.completeness() && left.generic_definition() == right.generic_definition()
 }
 
 /// Groups descriptors by one static name without leaking hash iteration order.
@@ -584,43 +421,4 @@ fn group_traits(
         .into_iter()
         .map(|(path, descriptors)| (path, descriptors.into_boxed_slice()))
         .collect()
-}
-
-/// Orders concrete implementations by namespace and stable source identity.
-fn compare_impls(left: &&'static ImplDescriptor, right: &&'static ImplDescriptor) -> Ordering {
-    impl_kind_rank(left.kind())
-        .cmp(&impl_kind_rank(right.kind()))
-        .then_with(|| compare_impl_namespaces(left, right))
-        .then_with(|| {
-            left.definition()
-                .fragment_identity()
-                .cmp(right.definition().fragment_identity())
-        })
-}
-
-/// Returns the deterministic inherent-before-trait rank.
-const fn impl_kind_rank(kind: ImplKind) -> u8 {
-    match kind {
-        ImplKind::Inherent => 0,
-        ImplKind::Trait => 1,
-    }
-}
-
-/// Orders reflected impls by path and external impls by stable external ID.
-fn compare_impl_namespaces(left: &ImplDescriptor, right: &ImplDescriptor) -> Ordering {
-    let left_trait = left.implemented_trait();
-    let right_trait = right.implemented_trait();
-    match (left_trait, right_trait) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(left_trait), Some(right_trait)) => {
-            match (left_trait.definition().trait_id(), right_trait.definition().trait_id()) {
-                (TraitId::Reflected(_), TraitId::Reflected(_)) => left_trait.rust_path().cmp(right_trait.rust_path()),
-                (TraitId::External(left_id), TraitId::External(right_id)) => left_id.cmp(right_id),
-                (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
-                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
-            }
-        }
-    }
 }
