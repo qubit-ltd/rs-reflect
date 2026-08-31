@@ -41,7 +41,7 @@ pub(super) fn convert_path(path: &Path) -> PathIr {
 
 /// Converts a `syn::Type` at the parser boundary so later stages never store
 /// it.
-pub(super) fn convert_type(ty: &Type) -> TypeIr {
+pub(crate) fn convert_type(ty: &Type) -> TypeIr {
     let tokens = ty.to_token_stream();
     let kind = match ty {
         Type::Path(path) => {
@@ -78,20 +78,27 @@ pub(super) fn convert_type(ty: &Type) -> TypeIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    syn::GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    syn::GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),
-            inputs: function.inputs.iter().map(|input| convert_type(&input.ty)).collect(),
+            inputs: function
+                .inputs
+                .iter()
+                .map(|input| convert_type(&input.ty))
+                .collect(),
             output: match &function.output {
                 ReturnType::Default => None,
                 ReturnType::Type(_, ty) => Some(Box::new(convert_type(ty))),
             },
             is_unsafe: function.unsafety.is_some(),
-            abi: function
-                .abi
-                .as_ref()
-                .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), syn::LitStr::value)),
+            abi: function.abi.as_ref().map(|abi| {
+                abi.name
+                    .as_ref()
+                    .map_or_else(|| "C".to_owned(), syn::LitStr::value)
+            }),
             is_variadic: function.variadic.is_some(),
         },
         Type::TraitObject(object) => TypeKindIr::TraitObject {
@@ -129,7 +136,9 @@ fn convert_path_arguments(arguments: &PathArguments) -> PathArgumentsIr {
                         PathArgumentIr::Lifetime(lifetime.to_token_stream().to_string())
                     }
                     syn::GenericArgument::Type(ty) => PathArgumentIr::Type(convert_type(ty)),
-                    syn::GenericArgument::Const(value) => PathArgumentIr::Const(value.to_token_stream()),
+                    syn::GenericArgument::Const(value) => {
+                        PathArgumentIr::Const(value.to_token_stream())
+                    }
                     syn::GenericArgument::AssocType(binding) => PathArgumentIr::AssociatedType {
                         name: binding.ident.to_string(),
                         ty: convert_type(&binding.ty),
@@ -159,7 +168,9 @@ fn convert_path_arguments(arguments: &PathArguments) -> PathArgumentsIr {
 /// Converts a lifetime or trait bound into semantic IR.
 pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
     match bound {
-        TypeParamBound::Lifetime(lifetime) => GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string()),
+        TypeParamBound::Lifetime(lifetime) => {
+            GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string())
+        }
         TypeParamBound::Trait(trait_bound) => GenericBoundIr::Trait {
             path: convert_path(&trait_bound.path),
             modifier: match trait_bound.modifier {
@@ -171,7 +182,9 @@ pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    syn::GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    syn::GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),

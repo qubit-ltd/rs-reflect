@@ -23,6 +23,7 @@ pub(crate) enum HelperName {
     ExternalTraitId,
     ExternalTrait,
     Supertrait,
+    DynCompatible,
     RuntimeCrate,
 }
 
@@ -44,6 +45,7 @@ impl HelperName {
             Self::ExternalTraitId => "external_trait_id",
             Self::ExternalTrait => "external_trait",
             Self::Supertrait => "supertrait",
+            Self::DynCompatible => "dyn_compatible",
             Self::RuntimeCrate => "crate",
         }
     }
@@ -132,7 +134,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::Rename,
         source_name: "rename",
-        targets: TargetSet::new(TYPE | FIELD | VARIANT | METHOD),
+        targets: TargetSet::new(TYPE | FIELD | VARIANT | METHOD | TRAIT),
     },
     HelperRule {
         name: HelperName::Opaque,
@@ -200,6 +202,11 @@ const HELPER_RULES: &[HelperRule] = &[
         targets: TargetSet::new(TRAIT),
     },
     HelperRule {
+        name: HelperName::DynCompatible,
+        source_name: "dyn_compatible",
+        targets: TargetSet::new(TRAIT),
+    },
+    HelperRule {
         name: HelperName::RuntimeCrate,
         source_name: "crate",
         targets: TargetSet::new(TYPE),
@@ -232,6 +239,7 @@ pub(crate) enum HelperValueIr {
     Specialization(SpecializationIr),
     ExternalTraitId(String),
     ExternalTrait(ExternalTraitIr),
+    DynCompatible(Vec<PathIr>),
     RuntimeCrate(PathIr),
 }
 

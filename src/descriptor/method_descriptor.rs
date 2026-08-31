@@ -8,6 +8,7 @@ use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
+use crate::descriptor::trait_descriptor::TraitApplicationSubstitutions;
 use crate::expression::FunctionAbi;
 use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
@@ -255,6 +256,18 @@ pub enum InvocationUnavailableReason {
     DisabledByPolicy,
 }
 
+/// Availability of an explicitly requested panic-catching invocation entry
+/// point.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum CatchingAvailability {
+    /// No catching adapter was requested for this method.
+    NotRequested,
+    /// The explicitly requested catching adapter is callable.
+    Available,
+    /// Catching was requested but the binary uses abort-on-panic semantics.
+    UnavailablePanicAbort,
+}
+
 /// An opaque invocation entry point supplied by a later invocation layer.
 ///
 /// This descriptor layer records adapter identity and availability. The
@@ -265,6 +278,8 @@ pub struct InvocationAdapter {
     local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
     thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
     catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
+    catching_thread_safe: Option<crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>>,
+    catching_availability: CatchingAvailability,
     pinned_ref_local: Option<&'static (dyn Any + Send + Sync)>,
     pinned_mut_local: Option<&'static (dyn Any + Send + Sync)>,
 }
@@ -278,6 +293,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: None,
             catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::NotRequested,
             pinned_ref_local: None,
             pinned_mut_local: None,
         }
@@ -294,6 +311,8 @@ impl InvocationAdapter {
             local: Some(entry_point),
             thread_safe: None,
             catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::NotRequested,
             pinned_ref_local: None,
             pinned_mut_local: None,
         }
@@ -311,6 +330,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: Some(entry_point),
             catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::NotRequested,
             pinned_ref_local: None,
             pinned_mut_local: None,
         }
@@ -328,6 +349,63 @@ impl InvocationAdapter {
             local: Some(entry_point),
             thread_safe: None,
             catching_local: Some(catching_entry_point),
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::Available,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
+        }
+    }
+
+    /// Creates a thread-safe adapter paired with an explicitly generated
+    /// catching entry point.
+    #[doc(hidden)]
+    pub const fn thread_safe_with_catching(
+        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
+        catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: None,
+            thread_safe: Some(entry_point),
+            catching_local: None,
+            catching_thread_safe: Some(catching_entry_point),
+            catching_availability: CatchingAvailability::Available,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
+        }
+    }
+
+    /// Creates a local adapter whose requested catching entry point is
+    /// unavailable because this binary aborts on panic.
+    #[doc(hidden)]
+    pub const fn local_with_unavailable_catching(
+        entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: Some(entry_point),
+            thread_safe: None,
+            catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::UnavailablePanicAbort,
+            pinned_ref_local: None,
+            pinned_mut_local: None,
+        }
+    }
+
+    /// Creates a thread-safe adapter whose requested catching entry point is
+    /// unavailable because this binary aborts on panic.
+    #[doc(hidden)]
+    pub const fn thread_safe_with_unavailable_catching(
+        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
+    ) -> Self {
+        Self {
+            entry_point: unavailable_entry_point,
+            local: None,
+            thread_safe: Some(entry_point),
+            catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::UnavailablePanicAbort,
             pinned_ref_local: None,
             pinned_mut_local: None,
         }
@@ -347,6 +425,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: None,
             catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::NotRequested,
             pinned_ref_local: Some(entry_point),
             pinned_mut_local: None,
         }
@@ -362,6 +442,8 @@ impl InvocationAdapter {
             local: None,
             thread_safe: None,
             catching_local: None,
+            catching_thread_safe: None,
+            catching_availability: CatchingAvailability::NotRequested,
             pinned_ref_local: None,
             pinned_mut_local: Some(entry_point),
         }
@@ -373,7 +455,17 @@ impl InvocationAdapter {
         self.entry_point
     }
 
+    /// Reports whether an explicitly requested panic-catching entry point is
+    /// callable in this binary.
+    pub const fn catching_availability(&self) -> CatchingAvailability {
+        self.catching_availability
+    }
+
     /// Invokes the local generated entry point when this descriptor has one.
+    ///
+    /// This raw adapter entry point accepts positional inputs only. Named
+    /// bindings return `NamedBindingRequiresDescriptor`; use
+    /// [`MethodInstanceDescriptor::invoke_local`] for descriptor-aware binding.
     ///
     /// Returns `None` for legacy descriptor-only entries and for adapters that
     /// are available exclusively in another invocation mode.
@@ -392,6 +484,9 @@ impl InvocationAdapter {
     /// Invokes the thread-safe generated entry point when this descriptor has
     /// one.
     ///
+    /// This raw adapter entry point accepts positional inputs only. Use
+    /// [`MethodInstanceDescriptor::invoke_thread_safe`] for named bindings.
+    ///
     /// Returns `None` when this method was not explicitly generated with a
     /// thread-safe adapter.
     pub fn invoke_thread_safe<'call>(
@@ -407,6 +502,9 @@ impl InvocationAdapter {
     }
 
     /// Invokes the explicit local catching entry point when one was generated.
+    ///
+    /// This raw adapter entry point accepts positional inputs only. Use
+    /// [`MethodInstanceDescriptor::invoke_catching_local`] for named bindings.
     pub fn invoke_catching_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
@@ -414,8 +512,21 @@ impl InvocationAdapter {
         self.catching_local.map(|entry_point| entry_point(invocation))
     }
 
+    /// Invokes the explicit thread-safe catching entry point when one was
+    /// generated.
+    pub fn invoke_catching_thread_safe<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
+        self.catching_thread_safe.map(|entry_point| entry_point(invocation))
+    }
+
     /// Invokes a typed local `Pin<&T>` entry point when its exact receiver
     /// type matches this method's generated adapter.
+    ///
+    /// This raw adapter entry point accepts positional inputs only. Use
+    /// [`MethodInstanceDescriptor::invoke_pinned_ref_local`] for named
+    /// bindings.
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
@@ -437,6 +548,10 @@ impl InvocationAdapter {
 
     /// Invokes a typed local `Pin<&mut T>` entry point when its exact receiver
     /// type matches this method's generated adapter.
+    ///
+    /// This raw adapter entry point accepts positional inputs only. Use
+    /// [`MethodInstanceDescriptor::invoke_pinned_mut_local`] for named
+    /// bindings.
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
@@ -582,6 +697,45 @@ impl MethodDescriptor {
             MethodDeclarationOwner::Trait(_) => None,
             MethodDeclarationOwner::Impl(descriptor) => Some(descriptor),
         }
+    }
+
+    /// Applies concrete trait arguments to every signature relationship while
+    /// preserving the declaration identity and source metadata.
+    pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
+        let mut result = self.clone();
+        for parameter in &mut result.parameters {
+            parameter.signature_type = substitutions.type_expression(&parameter.signature_type);
+        }
+        result.return_value.signature_type = result
+            .return_value
+            .signature_type
+            .as_ref()
+            .map(|expression| substitutions.type_expression(expression));
+        result.generic_definition.predicates = result
+            .generic_definition
+            .predicates
+            .iter()
+            .map(|predicate| substitutions.predicate(predicate))
+            .collect();
+        result
+    }
+
+    /// Returns whether applying the substitutions changes any method-level
+    /// signature or predicate fact.
+    pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
+        self.parameters
+            .iter()
+            .any(|parameter| substitutions.type_expression(&parameter.signature_type) != parameter.signature_type)
+            || self
+                .return_value
+                .signature_type
+                .as_ref()
+                .is_some_and(|expression| substitutions.type_expression(expression) != *expression)
+            || self
+                .generic_definition
+                .predicates
+                .iter()
+                .any(|predicate| substitutions.predicate(predicate) != *predicate)
     }
 }
 
@@ -783,6 +937,24 @@ impl MethodInstanceDescriptor {
         )
     }
 
+    /// Binds and invokes this concrete method through its thread-safe
+    /// panic-catching adapter.
+    ///
+    /// Returns `None` when this instance has no explicitly generated
+    /// thread-safe catching adapter.
+    pub fn invoke_catching_thread_safe<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
+        let entry_point = self.adapter?.catching_thread_safe?;
+        Some(
+            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+                Ok(invocation) => entry_point(invocation),
+                Err(failure) => Err(failure),
+            },
+        )
+    }
+
     /// Creates a concrete method specialization with its generic arguments in
     /// declaration order.
     #[doc(hidden)]
@@ -882,5 +1054,142 @@ impl MethodInstanceDescriptor {
     /// Returns stable reasons that prevent dynamic invocation.
     pub const fn unavailable_reasons(&self) -> &[InvocationUnavailableReason] {
         &self.unavailable_reasons
+    }
+
+    /// Binds and invokes this concrete method through its local adapter.
+    ///
+    /// Positional inputs bind the next unoccupied declaration-order parameter;
+    /// named inputs may be interleaved and bind only a unique simple
+    /// identifier parameter. Binding, receiver, mode, and exact-type checks
+    /// all occur before the generated adapter extracts any owned value. Their
+    /// failures therefore retain the complete original invocation recovery.
+    ///
+    /// Returns `None` when this instance has no local adapter. Otherwise the
+    /// result contains either the invocation output or a structured
+    /// pre-execution failure.
+    pub fn invoke_local<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::InvocationFailure<'call, crate::value::Local>,
+        >,
+    > {
+        let entry_point = self.adapter?.local?;
+        Some(
+            invocation
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .and_then(entry_point),
+        )
+    }
+
+    /// Binds and invokes this concrete method through its thread-safe adapter.
+    ///
+    /// Binding uses the same interleaved named/positional rules and complete
+    /// pre-execution recovery contract as [`Self::invoke_local`].
+    ///
+    /// Returns `None` when this instance has no explicitly generated
+    /// thread-safe adapter. Otherwise the result contains either the invocation
+    /// output or a structured pre-execution failure.
+    pub fn invoke_thread_safe<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::ThreadSafe>,
+            crate::invoke::InvocationFailure<'call, crate::value::ThreadSafe>,
+        >,
+    > {
+        let entry_point = self.adapter?.thread_safe?;
+        Some(
+            invocation
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .and_then(entry_point),
+        )
+    }
+
+    /// Binds and invokes this concrete method through its local panic-catching
+    /// adapter.
+    ///
+    /// Named and positional inputs follow the same descriptor-aware binding
+    /// and complete pre-execution recovery contract as [`Self::invoke_local`].
+    /// A panic after successful validation is returned as
+    /// [`InvocationPanic`](crate::invoke::InvocationPanic), independently of
+    /// binding or type-validation failures.
+    ///
+    /// Returns `None` when this instance has no explicitly generated local
+    /// catching adapter.
+    pub fn invoke_catching_local<'call>(
+        &self,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
+        let entry_point = self.adapter?.catching_local?;
+        Some(
+            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+                Ok(invocation) => entry_point(invocation),
+                Err(failure) => Err(failure),
+            },
+        )
+    }
+
+    /// Binds and invokes this concrete method through a typed local
+    /// `Pin<&T>` adapter.
+    ///
+    /// Named and positional arguments follow the same descriptor-aware rules
+    /// and complete pre-execution recovery contract as [`Self::invoke_local`].
+    /// The receiver remains typed and pinned throughout binding and adapter
+    /// validation.
+    ///
+    /// Returns `None` when this instance has no pinned shared adapter for the
+    /// exact receiver type `T`.
+    pub fn invoke_pinned_ref_local<'call, T: 'static>(
+        &self,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+        >,
+    > {
+        let entry_point = self
+            .adapter?
+            .pinned_ref_local?
+            .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()?;
+        Some(
+            invocation
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .and_then(entry_point),
+        )
+    }
+
+    /// Binds and invokes this concrete method through a typed local
+    /// `Pin<&mut T>` adapter.
+    ///
+    /// Named and positional arguments follow the same descriptor-aware rules
+    /// and complete pre-execution recovery contract as [`Self::invoke_local`].
+    /// The receiver remains typed and pinned throughout binding and adapter
+    /// validation.
+    ///
+    /// Returns `None` when this instance has no pinned mutable adapter for the
+    /// exact receiver type `T`.
+    pub fn invoke_pinned_mut_local<'call, T: 'static>(
+        &self,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+    ) -> Option<
+        Result<
+            crate::invoke::InvocationOutput<'call, crate::value::Local>,
+            crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+        >,
+    > {
+        let entry_point = self
+            .adapter?
+            .pinned_mut_local?
+            .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()?;
+        Some(
+            invocation
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .and_then(entry_point),
+        )
     }
 }

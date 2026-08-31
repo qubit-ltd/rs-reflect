@@ -2,6 +2,7 @@
 //! Reflected inherent and trait implementation descriptors.
 
 use std::fmt;
+use std::sync::OnceLock;
 
 use super::trait_descriptor::generic_argument_is_concrete;
 use crate::descriptor::AssociatedConstDescriptor;
@@ -10,6 +11,7 @@ use crate::descriptor::MethodDescriptor;
 use crate::descriptor::MethodInstanceDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitDescriptor;
+use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::expression::GenericArgument;
@@ -34,8 +36,60 @@ pub struct ImplDefinitionDescriptor {
     fragment_identity: FragmentIdentity,
     target_type: TypeExpression,
     kind: ImplKind,
-    implemented_trait: Option<&'static TraitDefinitionDescriptor>,
+    implemented_trait: OnceLock<&'static TraitDefinitionDescriptor>,
+    implemented_trait_id: Option<TraitId>,
+    implemented_trait_path: Option<Box<str>>,
     generic_definition: &'static GenericDefinitionDescriptor,
+    methods: OnceLock<Box<[MethodDescriptor]>>,
+    associated_types: OnceLock<Box<[ImplAssociatedTypeDescriptor]>>,
+    associated_consts: OnceLock<Box<[ImplAssociatedConstDescriptor]>>,
+}
+
+/// One associated type explicitly bound by an impl definition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImplAssociatedTypeDescriptor {
+    rust_name: &'static str,
+}
+
+impl ImplAssociatedTypeDescriptor {
+    /// Creates declaration-level associated type binding facts.
+    #[doc(hidden)]
+    pub const fn new(rust_name: &'static str) -> Self {
+        Self { rust_name }
+    }
+
+    /// Returns the Rust associated type name.
+    pub const fn rust_name(&self) -> &'static str {
+        self.rust_name
+    }
+}
+
+/// One associated constant explicitly bound by an impl definition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImplAssociatedConstDescriptor {
+    rust_name: &'static str,
+    declared_type: TypeExpression,
+}
+
+impl ImplAssociatedConstDescriptor {
+    /// Creates declaration-level associated constant binding facts.
+    #[doc(hidden)]
+    pub const fn new(rust_name: &'static str, declared_type: TypeExpression) -> Self {
+        Self {
+            rust_name,
+            declared_type,
+        }
+    }
+
+    /// Returns the Rust associated constant name.
+    pub const fn rust_name(&self) -> &'static str {
+        self.rust_name
+    }
+
+    /// Returns the declared constant type.
+    pub const fn declared_type(&self) -> &TypeExpression {
+        &self.declared_type
+    }
 }
 
 impl ImplDefinitionDescriptor {
@@ -52,13 +106,48 @@ impl ImplDefinitionDescriptor {
         generic_definition: &'static GenericDefinitionDescriptor,
     ) -> Result<Self, ImplDescriptorBuildError> {
         validate_kind(kind, implemented_trait.is_some())?;
+        let implemented_trait_cell = OnceLock::new();
+        if let Some(descriptor) = implemented_trait {
+            implemented_trait_cell
+                .set(descriptor)
+                .expect("a newly-created impl definition has no trait link");
+        }
         Ok(Self {
             fragment_identity,
             target_type,
             kind,
-            implemented_trait,
+            implemented_trait: implemented_trait_cell,
+            implemented_trait_id: implemented_trait.map(|descriptor| descriptor.trait_id().clone()),
+            implemented_trait_path: implemented_trait.map(|descriptor| descriptor.rust_path().into()),
             generic_definition,
+            methods: OnceLock::new(),
+            associated_types: OnceLock::new(),
+            associated_consts: OnceLock::new(),
         })
+    }
+
+    /// Creates a trait impl definition whose declaration link is resolved by
+    /// the immutable registry after all trait fragments have been collected.
+    #[doc(hidden)]
+    pub fn new_unresolved_trait(
+        fragment_identity: FragmentIdentity,
+        target_type: TypeExpression,
+        implemented_trait_path: impl Into<Box<str>>,
+        implemented_trait_id: Option<TraitId>,
+        generic_definition: &'static GenericDefinitionDescriptor,
+    ) -> Self {
+        Self {
+            fragment_identity,
+            target_type,
+            kind: ImplKind::Trait,
+            implemented_trait: OnceLock::new(),
+            implemented_trait_id,
+            implemented_trait_path: Some(implemented_trait_path.into()),
+            generic_definition,
+            methods: OnceLock::new(),
+            associated_types: OnceLock::new(),
+            associated_consts: OnceLock::new(),
+        }
     }
 
     /// Returns the source/content identity of this impl fragment.
@@ -79,13 +168,71 @@ impl ImplDefinitionDescriptor {
     /// Returns the implemented trait definition.
     ///
     /// `None` identifies an inherent impl definition.
-    pub const fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
-        self.implemented_trait
+    pub fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
+        self.implemented_trait.get().copied()
+    }
+
+    /// Returns the diagnostic trait path recorded by the impl declaration.
+    pub fn implemented_trait_path(&self) -> Option<&str> {
+        self.implemented_trait_path.as_deref()
+    }
+
+    /// Returns an exact trait identity supplied by the impl declaration when
+    /// one is available before registry linking.
+    pub fn implemented_trait_id(&self) -> Option<&TraitId> {
+        self.implemented_trait_id.as_ref()
+    }
+
+    /// Resolves a symbolic trait link exactly once while freezing the global
+    /// registry.
+    pub(crate) fn resolve_implemented_trait(&'static self, descriptor: &'static TraitDefinitionDescriptor) -> bool {
+        match self.implemented_trait.get() {
+            Some(existing) => std::ptr::eq(*existing, descriptor),
+            None => self.implemented_trait.set(descriptor).is_ok(),
+        }
     }
 
     /// Returns generic parameters and predicates in source order.
     pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
+    }
+
+    /// Returns methods declared by this impl definition in source order.
+    pub fn methods(&self) -> &[MethodDescriptor] {
+        self.methods.get().map_or(&[], Box::as_ref)
+    }
+
+    /// Returns associated types explicitly bound by this impl in source order.
+    pub fn associated_types(&self) -> &[ImplAssociatedTypeDescriptor] {
+        self.associated_types.get().map_or(&[], Box::as_ref)
+    }
+
+    /// Returns associated constants explicitly bound by this impl in source
+    /// order.
+    pub fn associated_consts(&self) -> &[ImplAssociatedConstDescriptor] {
+        self.associated_consts.get().map_or(&[], Box::as_ref)
+    }
+
+    /// Initializes declaration-level methods exactly once.
+    #[doc(hidden)]
+    pub fn initialize_methods(&'static self, initialize: impl FnOnce(&'static Self) -> Box<[MethodDescriptor]>) {
+        self.methods.get_or_init(|| initialize(self));
+    }
+
+    /// Initializes declaration-level associated-item facts exactly once.
+    #[doc(hidden)]
+    pub fn initialize_associated_items(
+        &'static self,
+        initialize: impl FnOnce(
+            &'static Self,
+        ) -> (
+            Box<[ImplAssociatedTypeDescriptor]>,
+            Box<[ImplAssociatedConstDescriptor]>,
+        ),
+    ) {
+        let (associated_types, associated_consts) = initialize(self);
+        self.associated_types.get_or_init(|| associated_types);
+        self.associated_consts.get_or_init(|| associated_consts);
     }
 }
 
@@ -98,21 +245,48 @@ pub enum AssociatedConstImplementationSource {
     Overridden,
 }
 
+/// Why an associated constant has no safe owned-value reader.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum AssociatedConstReadUnavailableReason {
+    /// The generated code cannot prove that the declared value type is sized
+    /// and `'static`, as required by the local owned dynamic boundary.
+    UnprovenOwnedValue,
+}
+
 /// A safe reader for one concrete associated constant value.
 pub struct AssociatedConstReader {
-    read: fn() -> ReflectedOwned,
+    read: AssociatedConstReadAdapter,
+}
+
+enum AssociatedConstReadAdapter {
+    Function(fn() -> ReflectedOwned),
+    Closure(&'static (dyn Fn() -> ReflectedOwned + Send + Sync)),
 }
 
 impl AssociatedConstReader {
     /// Creates a reader from generated safe adapter code.
     #[doc(hidden)]
     pub const fn new(read: fn() -> ReflectedOwned) -> Self {
-        Self { read }
+        Self {
+            read: AssociatedConstReadAdapter::Function(read),
+        }
+    }
+
+    /// Creates a reader from a compiler-proven sized `'static` value getter.
+    #[doc(hidden)]
+    pub fn from_getter<T: 'static>(getter: fn() -> T) -> Self {
+        let read = Box::leak(Box::new(move || ReflectedOwned::new(getter())));
+        Self {
+            read: AssociatedConstReadAdapter::Closure(read),
+        }
     }
 
     /// Reads a fresh owned reflected value.
     pub fn read(&self) -> ReflectedOwned {
-        (self.read)()
+        match self.read {
+            AssociatedConstReadAdapter::Function(read) => read(),
+            AssociatedConstReadAdapter::Closure(read) => read(),
+        }
     }
 }
 
@@ -172,6 +346,7 @@ pub struct AssociatedConstBindingDescriptor {
     declaration: &'static AssociatedConstDescriptor,
     implementation_source: AssociatedConstImplementationSource,
     reader: Option<&'static AssociatedConstReader>,
+    read_unavailable_reason: Option<AssociatedConstReadUnavailableReason>,
 }
 
 impl AssociatedConstBindingDescriptor {
@@ -182,10 +357,15 @@ impl AssociatedConstBindingDescriptor {
         implementation_source: AssociatedConstImplementationSource,
         reader: Option<&'static AssociatedConstReader>,
     ) -> Self {
+        let read_unavailable_reason = match reader {
+            Some(_) => None,
+            None => Some(AssociatedConstReadUnavailableReason::UnprovenOwnedValue),
+        };
         Self {
             declaration,
             implementation_source,
             reader,
+            read_unavailable_reason,
         }
     }
 
@@ -202,6 +382,13 @@ impl AssociatedConstBindingDescriptor {
     /// Returns whether a safe owned-value reader is available.
     pub const fn is_readable(&self) -> bool {
         self.reader.is_some()
+    }
+
+    /// Returns the structured reason why no safe reader is available.
+    ///
+    /// `None` means [`Self::read`] can produce a fresh owned value.
+    pub const fn read_unavailable_reason(&self) -> Option<AssociatedConstReadUnavailableReason> {
+        self.read_unavailable_reason
     }
 
     /// Reads the associated constant through its safe adapter.
