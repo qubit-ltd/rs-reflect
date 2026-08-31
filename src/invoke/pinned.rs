@@ -7,9 +7,8 @@ use std::pin::Pin;
 use crate::identity::MemberId;
 use crate::invoke::ArgumentExpectation;
 use crate::invoke::InvocationArg;
+use crate::invoke::InvocationBinding;
 use crate::invoke::InvocationError;
-use crate::invoke::InvocationErrorKind;
-use crate::invoke::InvocationInputMode;
 use crate::invoke::InvocationMode;
 use crate::invoke::InvocationOutput;
 
@@ -31,7 +30,7 @@ pub type PinnedMutAdapter<T, M> =
 /// values without reconstructing a pin proof from an ordinary reference.
 pub struct PinnedRefInvocation<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call T>,
-    arguments: Box<[InvocationArg<'call, M>]>,
+    invocation: crate::invoke::Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
@@ -43,7 +42,22 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            arguments: arguments.into_iter().collect(),
+            invocation: crate::invoke::Invocation::associated(arguments),
+        }
+    }
+
+    /// Creates an invocation from a pinned shared receiver and caller-ordered
+    /// named or positional bindings.
+    ///
+    /// A descriptor-aware method-instance entry point validates and reorders
+    /// these bindings before the generated pinned adapter runs.
+    pub fn from_bindings<I>(receiver: Pin<&'call T>, bindings: I) -> Self
+    where
+        I: IntoIterator<Item = InvocationBinding<'call, M>>,
+    {
+        Self {
+            receiver,
+            invocation: crate::invoke::Invocation::associated_bindings(bindings),
         }
     }
 
@@ -52,9 +66,36 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
         self.receiver
     }
 
-    /// Returns arguments in declaration order.
+    /// Returns arguments in their current caller or declaration order.
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
-        &self.arguments
+        self.invocation.arguments()
+    }
+
+    /// Returns the original name of one caller-ordered binding.
+    ///
+    /// `Some(name)` identifies a named binding. `None` identifies either a
+    /// positional binding or an index outside the supplied input range.
+    pub fn argument_name(&self, index: usize) -> Option<&str> {
+        self.invocation.argument_name(index)
+    }
+
+    /// Resolves bindings against one concrete method declaration.
+    pub(crate) fn bind_arguments(
+        self,
+        method_identity: &MemberId,
+        parameters: &[crate::descriptor::ParameterDescriptor],
+    ) -> Result<Self, PinnedRefInvocationFailure<'call, T, M>> {
+        let Self { receiver, invocation } = self;
+        match invocation.bind_arguments(method_identity, parameters) {
+            Ok(invocation) => Ok(Self { receiver, invocation }),
+            Err(failure) => Err(PinnedRefInvocationFailure {
+                error: failure.error,
+                recovery: PinnedRefInvocationRecovery {
+                    receiver,
+                    invocation: failure.recovery.into_invocation(),
+                },
+            }),
+        }
     }
 
     /// Validates argument count, passing modes, and exact erased types.
@@ -66,27 +107,19 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
         method_identity: &MemberId,
         arguments: &[ArgumentExpectation],
     ) -> Result<PinnedValidatedRefInvocation<'call, T, M>, PinnedRefInvocationFailure<'call, T, M>> {
-        if let Err(kind) = validate_arguments(&self.arguments, arguments) {
-            return Err(self.into_failure(method_identity, kind));
-        }
-        Ok(PinnedValidatedRefInvocation {
-            receiver: self.receiver,
-            arguments: self.arguments,
-        })
-    }
-
-    /// Creates a failure retaining the original inputs.
-    fn into_failure(
-        self,
-        method_identity: &MemberId,
-        kind: InvocationErrorKind,
-    ) -> PinnedRefInvocationFailure<'call, T, M> {
-        PinnedRefInvocationFailure {
-            error: InvocationError::new(method_identity.clone(), kind),
-            recovery: PinnedRefInvocationRecovery {
-                receiver: self.receiver,
-                arguments: self.arguments,
-            },
+        let Self { receiver, invocation } = self;
+        match invocation.validate_arguments(method_identity, arguments) {
+            Ok(validated) => {
+                let (_, arguments) = validated.into_parts();
+                Ok(PinnedValidatedRefInvocation { receiver, arguments })
+            }
+            Err(failure) => Err(PinnedRefInvocationFailure {
+                error: failure.error,
+                recovery: PinnedRefInvocationRecovery {
+                    receiver,
+                    invocation: failure.recovery.into_invocation(),
+                },
+            }),
         }
     }
 }
@@ -107,7 +140,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedValidatedRefInvocation<'call, T,
 /// Complete input retained after a pinned shared invocation fails validation.
 pub struct PinnedRefInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call T>,
-    arguments: Box<[InvocationArg<'call, M>]>,
+    invocation: crate::invoke::Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, M> {
@@ -118,14 +151,19 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, 
 
     /// Returns recovered arguments in their original order.
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
-        &self.arguments
+        self.invocation.arguments()
+    }
+
+    /// Returns the original name of one recovered caller binding.
+    pub fn argument_name(&self, index: usize) -> Option<&str> {
+        self.invocation.argument_name(index)
     }
 
     /// Reconstitutes the exact typed invocation for inspection or retry.
     pub fn into_invocation(self) -> PinnedRefInvocation<'call, T, M> {
         PinnedRefInvocation {
             receiver: self.receiver,
-            arguments: self.arguments,
+            invocation: self.invocation,
         }
     }
 }
@@ -156,12 +194,17 @@ impl<T: ?Sized, M: InvocationMode> fmt::Display for PinnedRefInvocationFailure<'
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedRefInvocationFailure<'_, T, M> {}
+impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedRefInvocationFailure<'_, T, M> {
+    /// Returns the structured invocation error as the underlying cause.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
 
 /// Invocation input for a `Pin<&mut T>` receiver.
 pub struct PinnedMutInvocation<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call mut T>,
-    arguments: Box<[InvocationArg<'call, M>]>,
+    invocation: crate::invoke::Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
@@ -173,7 +216,51 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            arguments: arguments.into_iter().collect(),
+            invocation: crate::invoke::Invocation::associated(arguments),
+        }
+    }
+
+    /// Creates an invocation from a pinned mutable receiver and caller-ordered
+    /// named or positional bindings.
+    ///
+    /// A descriptor-aware method-instance entry point validates and reorders
+    /// these bindings before the generated pinned adapter runs.
+    pub fn from_bindings<I>(receiver: Pin<&'call mut T>, bindings: I) -> Self
+    where
+        I: IntoIterator<Item = InvocationBinding<'call, M>>,
+    {
+        Self {
+            receiver,
+            invocation: crate::invoke::Invocation::associated_bindings(bindings),
+        }
+    }
+
+    /// Returns arguments in their current caller or declaration order.
+    pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
+        self.invocation.arguments()
+    }
+
+    /// Returns the original name of one caller-ordered binding.
+    pub fn argument_name(&self, index: usize) -> Option<&str> {
+        self.invocation.argument_name(index)
+    }
+
+    /// Resolves bindings against one concrete method declaration.
+    pub(crate) fn bind_arguments(
+        self,
+        method_identity: &MemberId,
+        parameters: &[crate::descriptor::ParameterDescriptor],
+    ) -> Result<Self, PinnedMutInvocationFailure<'call, T, M>> {
+        let Self { receiver, invocation } = self;
+        match invocation.bind_arguments(method_identity, parameters) {
+            Ok(invocation) => Ok(Self { receiver, invocation }),
+            Err(failure) => Err(PinnedMutInvocationFailure {
+                error: failure.error,
+                recovery: PinnedMutInvocationRecovery {
+                    receiver,
+                    invocation: failure.recovery.into_invocation(),
+                },
+            }),
         }
     }
 
@@ -184,27 +271,19 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
         method_identity: &MemberId,
         arguments: &[ArgumentExpectation],
     ) -> Result<PinnedValidatedMutInvocation<'call, T, M>, PinnedMutInvocationFailure<'call, T, M>> {
-        if let Err(kind) = validate_arguments(&self.arguments, arguments) {
-            return Err(self.into_failure(method_identity, kind));
-        }
-        Ok(PinnedValidatedMutInvocation {
-            receiver: self.receiver,
-            arguments: self.arguments,
-        })
-    }
-
-    /// Creates a failure retaining the original inputs.
-    fn into_failure(
-        self,
-        method_identity: &MemberId,
-        kind: InvocationErrorKind,
-    ) -> PinnedMutInvocationFailure<'call, T, M> {
-        PinnedMutInvocationFailure {
-            error: InvocationError::new(method_identity.clone(), kind),
-            recovery: PinnedMutInvocationRecovery {
-                receiver: self.receiver,
-                arguments: self.arguments,
-            },
+        let Self { receiver, invocation } = self;
+        match invocation.validate_arguments(method_identity, arguments) {
+            Ok(validated) => {
+                let (_, arguments) = validated.into_parts();
+                Ok(PinnedValidatedMutInvocation { receiver, arguments })
+            }
+            Err(failure) => Err(PinnedMutInvocationFailure {
+                error: failure.error,
+                recovery: PinnedMutInvocationRecovery {
+                    receiver,
+                    invocation: failure.recovery.into_invocation(),
+                },
+            }),
         }
     }
 }
@@ -225,7 +304,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedValidatedMutInvocation<'call, T,
 /// Complete input retained after a pinned mutable invocation fails validation.
 pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call mut T>,
-    arguments: Box<[InvocationArg<'call, M>]>,
+    invocation: crate::invoke::Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, M> {
@@ -236,14 +315,19 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, 
 
     /// Returns recovered arguments in their original order.
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
-        &self.arguments
+        self.invocation.arguments()
+    }
+
+    /// Returns the original name of one recovered caller binding.
+    pub fn argument_name(&self, index: usize) -> Option<&str> {
+        self.invocation.argument_name(index)
     }
 
     /// Reconstitutes the exact typed invocation for inspection or retry.
     pub fn into_invocation(self) -> PinnedMutInvocation<'call, T, M> {
         PinnedMutInvocation {
             receiver: self.receiver,
-            arguments: self.arguments,
+            invocation: self.invocation,
         }
     }
 }
@@ -275,40 +359,9 @@ impl<T: ?Sized, M: InvocationMode> fmt::Display for PinnedMutInvocationFailure<'
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedMutInvocationFailure<'_, T, M> {}
-
-/// Validates arguments without extracting any erased value.
-fn validate_arguments<M: InvocationMode>(
-    actual: &[InvocationArg<'_, M>],
-    expected: &[ArgumentExpectation],
-) -> Result<(), InvocationErrorKind> {
-    if actual.len() != expected.len() {
-        return Err(InvocationErrorKind::ArgumentCountMismatch {
-            expected: expected.len(),
-            actual: actual.len(),
-        });
+impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedMutInvocationFailure<'_, T, M> {
+    /// Returns the structured invocation error as the underlying cause.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
     }
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        if !mode_matches(expected.mode(), actual.mode()) {
-            return Err(InvocationErrorKind::ArgumentModeMismatch {
-                index,
-                expected: expected.mode(),
-                actual: actual.mode(),
-            });
-        }
-        if expected.type_id() != actual.type_id() {
-            return Err(InvocationErrorKind::ArgumentTypeMismatch {
-                index,
-                expected: expected.type_id(),
-                actual: actual.type_id(),
-                expected_name: expected.type_name(),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// Returns whether an actual argument can safely satisfy an expected mode.
-fn mode_matches(expected: InvocationInputMode, actual: InvocationInputMode) -> bool {
-    expected == actual || (expected == InvocationInputMode::Ref && actual == InvocationInputMode::Mut)
 }

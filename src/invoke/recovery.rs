@@ -13,6 +13,7 @@ use crate::invoke::InvocationReceiver;
 pub struct InvocationRecovery<'call, M: InvocationMode> {
     receiver: Option<InvocationReceiver<'call, M>>,
     arguments: Box<[InvocationArg<'call, M>]>,
+    argument_names: Box<[Option<Box<str>>]>,
 }
 
 impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
@@ -20,8 +21,13 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     pub(crate) fn new(
         receiver: Option<InvocationReceiver<'call, M>>,
         arguments: Box<[InvocationArg<'call, M>]>,
+        argument_names: Box<[Option<Box<str>>]>,
     ) -> Self {
-        Self { receiver, arguments }
+        Self {
+            receiver,
+            arguments,
+            argument_names,
+        }
     }
 
     /// Returns the recovered receiver, or `None` for an associated function.
@@ -29,20 +35,28 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
         self.receiver.as_ref()
     }
 
-    /// Returns all recovered arguments in their original positional order.
+    /// Returns all recovered arguments in their original caller order.
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         &self.arguments
     }
 
-    /// Consumes the recovery and returns the receiver and ordered arguments.
+    /// Returns the original name of one recovered caller binding.
+    ///
+    /// `Some(name)` identifies a named binding. `None` identifies either a
+    /// positional binding or an index outside the recovered input range.
+    pub fn argument_name(&self, index: usize) -> Option<&str> {
+        self.argument_names.get(index).and_then(|name| name.as_deref())
+    }
+
+    /// Consumes the recovery and returns the receiver and caller-ordered
+    /// arguments.
     pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 
     /// Reconstitutes the exact invocation so a caller can inspect or retry it.
     pub fn into_invocation(self) -> Invocation<'call, M> {
-        let (receiver, arguments) = self.into_parts();
-        Invocation::from_parts(receiver, arguments)
+        Invocation::from_parts(self.receiver, self.arguments, self.argument_names)
     }
 }
 
@@ -54,6 +68,14 @@ impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
             .debug_struct("InvocationRecovery")
             .field("receiver_mode", &self.receiver.as_ref().map(InvocationReceiver::mode))
             .field("argument_count", &self.arguments.len())
+            .field(
+                "argument_names",
+                &self
+                    .argument_names
+                    .iter()
+                    .map(|name| name.as_deref())
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -85,4 +107,9 @@ impl<M: InvocationMode> fmt::Display for InvocationFailure<'_, M> {
     }
 }
 
-impl<M: InvocationMode> std::error::Error for InvocationFailure<'_, M> {}
+impl<M: InvocationMode> std::error::Error for InvocationFailure<'_, M> {
+    /// Returns the structured invocation error as the underlying cause.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
