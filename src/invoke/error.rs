@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Structured invocation validation and caught-panic errors.
 
@@ -152,11 +160,15 @@ impl InvocationError {
     }
 
     /// Returns the structured identity of the method being invoked.
+    #[must_use]
+    #[inline(always)]
     pub fn method_identity(&self) -> &MemberId {
         &self.method_identity
     }
 
     /// Returns the stable machine-readable validation reason.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> &InvocationErrorKind {
         &self.kind
     }
@@ -203,11 +215,15 @@ impl InvocationPanic {
     }
 
     /// Returns the structured identity of the method that panicked.
+    #[must_use]
+    #[inline(always)]
     pub fn method_identity(&self) -> &MemberId {
         &self.method_identity
     }
 
     /// Returns the retained panic payload without interpreting its text.
+    #[must_use]
+    #[inline(always)]
     pub fn payload(&self) -> &(dyn Any + Send) {
         self.payload.as_ref()
     }

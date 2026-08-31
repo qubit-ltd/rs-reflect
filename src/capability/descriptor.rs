@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Type-erased descriptors for capability facts and operation adapters.
 
@@ -38,16 +46,22 @@ impl CapabilityDescriptor {
     }
 
     /// Returns the stable capability identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn id(&self) -> &CapabilityId {
         &self.id
     }
 
     /// Returns the process-local identity of the adapter contract.
+    #[must_use]
+    #[inline(always)]
     pub const fn adapter_type(&self) -> TypeId {
         self.adapter_type
     }
 
     /// Returns whether this descriptor carries an executable adapter.
+    #[must_use]
+    #[inline(always)]
     pub const fn has_adapter(&self) -> bool {
         self.adapter.is_some()
     }

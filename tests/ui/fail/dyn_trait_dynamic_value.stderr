@@ -1,7 +1,7 @@
 error[E0277]: the size for values of type `dyn Service` cannot be known at compilation time
-  --> tests/ui/fail/dyn_trait_dynamic_value.rs:10:31
+  --> tests/ui/fail/dyn_trait_dynamic_value.rs:18:31
    |
-10 |     let _ = ReflectedRef::new(value);
+18 |     let _ = ReflectedRef::new(value);
    |             ----------------- ^^^^^ doesn't have a size known at compile-time
    |             |
    |             required by a bound introduced by this call

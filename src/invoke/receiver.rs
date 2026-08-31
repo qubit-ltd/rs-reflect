@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Invocation receiver values and receiver expectations.
 
@@ -29,6 +37,8 @@ pub enum InvocationReceiver<'call, M: InvocationMode> {
 
 impl<M: InvocationMode> InvocationReceiver<'_, M> {
     /// Returns the receiver's ownership or borrowing mode.
+    #[must_use]
+    #[inline(always)]
     pub const fn mode(&self) -> InvocationInputMode {
         match self {
             Self::Owned(_) => InvocationInputMode::Owned,
@@ -38,6 +48,8 @@ impl<M: InvocationMode> InvocationReceiver<'_, M> {
     }
 
     /// Returns the exact process-local Rust type identity of the receiver.
+    #[must_use]
+    #[inline(always)]
     pub fn type_id(&self) -> TypeId {
         match self {
             Self::Owned(value) => M::owned_type_id(value),

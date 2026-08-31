@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Immutable errors reported while aggregating registration fragments.
 
@@ -78,14 +86,20 @@ impl RegistryError {
     }
 
     /// Returns the stable machine-readable error category.
+    #[must_use]
+    #[inline(always)]
     pub fn kind(&self) -> RegistryErrorKind {
-        self.0.kind
+        let Self(data) = self;
+        data.kind
     }
 
     /// Returns the two conflicting fragments when this error originated from a
     /// conflict.
+    #[must_use]
+    #[inline(always)]
     pub fn conflicting_fragments(&self) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
-        match (&self.0.left, &self.0.right) {
+        let Self(data) = self;
+        match (&data.left, &data.right) {
             (Some(left), Some(right)) => Some((left, right)),
             _ => None,
         }
@@ -93,8 +107,11 @@ impl RegistryError {
 
     /// Returns the single implicated fragment for a non-conflict aggregation
     /// error.
+    #[must_use]
+    #[inline(always)]
     pub fn fragment_identity(&self) -> Option<&FragmentIdentity> {
-        match (&self.0.left, &self.0.right) {
+        let Self(data) = self;
+        match (&data.left, &data.right) {
             (Some(fragment), None) => Some(fragment),
             _ => None,
         }

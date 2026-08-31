@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Helper-attribute IR and the shared helper target matrix.
 
 use proc_macro2::Span;
@@ -111,7 +119,8 @@ impl TargetSet {
 
     /// Returns whether `target` belongs to this set.
     const fn contains(self, target: HelperTarget) -> bool {
-        self.0 & target.bit() != 0
+        let Self(bits) = self;
+        bits & target.bit() != 0
     }
 }
 

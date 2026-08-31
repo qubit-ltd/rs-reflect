@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Immutable structural facts about reflected fields.
 
@@ -156,21 +164,29 @@ impl FieldDescriptor {
     }
 
     /// Returns the root type that contains this field.
+    #[must_use]
+    #[inline(always)]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
 
     /// Returns the zero-based source declaration index.
+    #[must_use]
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the Rust field name, or `None` for tuple and newtype fields.
+    #[must_use]
+    #[inline(always)]
     pub const fn rust_name(&self) -> Option<&'static str> {
         self.rust_name
     }
 
     /// Returns the lookup name, or `None` for tuple and newtype fields.
+    #[must_use]
+    #[inline(always)]
     pub const fn query_name(&self) -> Option<&'static str> {
         self.query_name
     }
@@ -184,6 +200,8 @@ impl FieldDescriptor {
 
     /// Returns declared struct-field visibility or the explicit fact that an
     /// enum-variant field inherits its enclosing access boundary.
+    #[must_use]
+    #[inline(always)]
     pub const fn visibility(&self) -> FieldVisibility<'_> {
         match self.variant_index {
             Some(_) => FieldVisibility::VariantInherited,
@@ -192,6 +210,8 @@ impl FieldDescriptor {
     }
 
     /// Returns the source policy controlling this field's dynamic adapters.
+    #[must_use]
+    #[inline(always)]
     pub const fn access_policy(&self) -> FieldAccessPolicy {
         self.access_policy
     }
@@ -199,6 +219,8 @@ impl FieldDescriptor {
     /// Returns the containing variant's source index for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    #[must_use]
+    #[inline(always)]
     pub const fn variant_index(&self) -> Option<usize> {
         self.variant_index
     }
@@ -206,6 +228,8 @@ impl FieldDescriptor {
     /// Returns the containing variant's Rust name for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    #[must_use]
+    #[inline(always)]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
         self.variant_rust_name
     }

@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Runtime field identity retained by access errors.
 
@@ -60,21 +68,29 @@ impl FieldIdentity {
     }
 
     /// Returns the declaring root's process-local Rust type identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn declaring_type(&self) -> TypeId {
         self.declaring_type
     }
 
     /// Returns the declaring root's diagnostic Rust type name.
+    #[must_use]
+    #[inline(always)]
     pub const fn declaring_type_name(&self) -> &'static str {
         self.declaring_type_name
     }
 
     /// Returns the field's zero-based source declaration index.
+    #[must_use]
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the source Rust name, or `None` for positional fields.
+    #[must_use]
+    #[inline(always)]
     pub const fn rust_name(&self) -> Option<&'static str> {
         self.rust_name
     }
@@ -82,6 +98,8 @@ impl FieldIdentity {
     /// Returns the containing variant's source index for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    #[must_use]
+    #[inline(always)]
     pub const fn variant_index(&self) -> Option<usize> {
         self.variant_index
     }
@@ -89,6 +107,8 @@ impl FieldIdentity {
     /// Returns the containing variant's Rust name for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    #[must_use]
+    #[inline(always)]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
         self.variant_rust_name
     }

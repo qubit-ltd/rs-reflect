@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! The unique root descriptor and [`Reflect`] query trait.
 
@@ -111,12 +119,16 @@ impl TypeDescriptor {
 
     /// Returns generated construction and owned-update entry points for a
     /// reflected struct root, if that root exposes them.
+    #[must_use]
+    #[inline(always)]
     pub const fn struct_construction(&self) -> Option<&StructConstructionDescriptor> {
         self.construction.as_ref()
     }
 
     /// Returns the declaration and concrete substitution facts for a generic
     /// root instance, if this root was derived from generic source.
+    #[must_use]
+    #[inline(always)]
     pub const fn concrete_generic(&self) -> Option<&'static ConcreteGenericDescriptor> {
         self.generic
     }
@@ -694,22 +706,30 @@ impl TypeDescriptor {
     }
 
     /// Returns the process-local Rust type identity.
+    #[must_use]
+    #[inline(always)]
     pub fn type_id(&self) -> TypeId {
         (self.type_id)()
     }
 
     /// Returns the diagnostic Rust type name.
+    #[must_use]
+    #[inline(always)]
     pub fn type_name(&self) -> &'static str {
         (self.type_name)()
     }
 
     /// Returns the immutable lookup name, which may differ from
     /// [`Self::type_name`].
+    #[must_use]
+    #[inline(always)]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns this descriptor's immutable registered capability set.
+    #[must_use]
+    #[inline(always)]
     pub fn capabilities(&self) -> &'static TypeCapabilities {
         (self.capabilities)()
     }
@@ -723,6 +743,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the stable hierarchical type category.
+    #[must_use]
+    #[inline(always)]
     pub const fn kind(&self) -> TypeKind {
         match &self.data {
             TypeDescriptorData::Primitive(view) => TypeKind::Primitive(view.kind()),
@@ -746,6 +768,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the primitive view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_primitive(&self) -> Option<&PrimitiveTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Primitive(view) => Some(view),
@@ -754,6 +778,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the text view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_text(&self) -> Option<&TextTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Text(view) => Some(view),
@@ -762,6 +788,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the struct view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_struct(&self) -> Option<&StructTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Struct(view) => Some(view),
@@ -770,6 +798,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the enum view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_enum(&self) -> Option<&EnumTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Enum(view) => Some(view),
@@ -778,6 +808,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the tuple view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_tuple(&self) -> Option<&TupleTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Tuple(view) => Some(view),
@@ -786,6 +818,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the array view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_array(&self) -> Option<&ArrayTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Array(view) => Some(view),
@@ -794,6 +828,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the optional view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_optional(&self) -> Option<&OptionalTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Optional(view) => Some(view),
@@ -802,6 +838,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the sequence view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_sequence(&self) -> Option<&SequenceTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Sequence(view) => Some(view),
@@ -810,6 +848,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the set view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_set(&self) -> Option<&SetTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Set(view) => Some(view),
@@ -818,6 +858,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the map view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_map(&self) -> Option<&MapTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Map(view) => Some(view),
@@ -826,6 +868,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the smart-pointer view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_smart_pointer(&self) -> Option<&SmartPointerTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::SmartPointer(view) => Some(view),
@@ -834,6 +878,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the reference view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_reference(&self) -> Option<&ReferenceTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Reference(view) => Some(view),
@@ -842,6 +888,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the slice view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_slice(&self) -> Option<&SliceTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Slice(view) => Some(view),
@@ -850,6 +898,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the raw-pointer view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_raw_pointer(&self) -> Option<&RawPointerTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::RawPointer(view) => Some(view),
@@ -858,6 +908,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the function-pointer view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_function(&self) -> Option<&FunctionTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::Function(view) => Some(view),
@@ -866,6 +918,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the trait-object view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_trait_object(&self) -> Option<&TraitObjectTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::TraitObject(view) => Some(view),
@@ -874,6 +928,8 @@ impl TypeDescriptor {
     }
 
     /// Returns the opaque-root view, or `None` for every other kind.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_opaque(&self) -> Option<&OpaqueTypeView> {
         match &self.data {
             TypeDescriptorData::Opaque(view) => Some(view),
@@ -884,6 +940,8 @@ impl TypeDescriptor {
     /// Returns direct struct fields in source declaration order.
     ///
     /// Non-struct roots, including enum roots, return an empty slice.
+    #[must_use]
+    #[inline(always)]
     pub const fn fields(&self) -> &'static [FieldDescriptor] {
         self.fields
     }
@@ -905,6 +963,8 @@ impl TypeDescriptor {
     /// Returns enum variants in source declaration order.
     ///
     /// Non-enum roots return an empty slice.
+    #[must_use]
+    #[inline(always)]
     pub const fn variants(&self) -> &'static [VariantDescriptor] {
         self.variants
     }

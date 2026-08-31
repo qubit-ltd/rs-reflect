@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Built-in capability identities and safe dynamic operation adapters.
 
@@ -54,6 +62,8 @@ impl DefaultAdapter {
     }
 
     /// Creates a local dynamic value containing `T::default()`.
+    #[must_use]
+    #[inline(always)]
     pub fn create(&self) -> DynamicOwned<Local> {
         (self.create)()
     }

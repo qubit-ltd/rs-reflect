@@ -1,7 +1,7 @@
 error[E0277]: the type `UnsafeCell<u8>` may contain interior mutability and a reference may not be safely transferable across a catch_unwind boundary
-  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:18:20
+  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:26:20
    |
-18 |     fn run(value: &Fragile) -> u8 {
+26 |     fn run(value: &Fragile) -> u8 {
    |                    ^^^^^^^ `UnsafeCell<u8>` may contain interior mutability and a reference may not be safely transferable across a catch_unwind boundary
    |
    = help: within `Fragile`, the trait `RefUnwindSafe` is not implemented for `UnsafeCell<u8>`
@@ -11,13 +11,13 @@ note: required because it appears within the type `Cell<u8>`
    | pub struct Cell<T: ?Sized> {
    |            ^^^^
 note: required because it appears within the type `Fragile`
-  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:8:8
+  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:16:8
    |
- 8 | struct Fragile {
+16 | struct Fragile {
    |        ^^^^^^^
 note: required by a bound in `__qubit_reflect_assert_ref_unwind_safe`
-  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:15:1
+  --> tests/ui/fail/catch_unwind_shared_parameter_not_ref_unwind_safe.rs:23:1
    |
-15 | #[reflect_impl]
+23 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_ref_unwind_safe`
    = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)

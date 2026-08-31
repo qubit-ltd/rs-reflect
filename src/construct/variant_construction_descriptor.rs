@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Descriptor-queryable construction entry points for reflected enum variants.
 
 use crate::construct::VariantConstructor;
@@ -17,6 +25,8 @@ impl VariantConstructionDescriptor {
     }
 
     /// Returns the local owned constructor for this variant.
+    #[must_use]
+    #[inline(always)]
     pub fn local_constructor(&self) -> &'static VariantConstructor<Local> {
         (self.local_constructor)()
     }

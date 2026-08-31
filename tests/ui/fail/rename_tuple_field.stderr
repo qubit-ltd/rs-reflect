@@ -1,5 +1,5 @@
 error: `rename` is not supported on an unnamed field
- --> tests/ui/fail/rename_tuple_field.rs:4:26
-  |
-4 | struct Invalid(#[reflect(rename = "value")] u32);
-  |                          ^^^^^^
+  --> tests/ui/fail/rename_tuple_field.rs:12:26
+   |
+12 | struct Invalid(#[reflect(rename = "value")] u32);
+   |                          ^^^^^^

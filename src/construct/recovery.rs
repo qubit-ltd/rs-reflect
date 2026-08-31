@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Complete ownership recovery for pre-execution construction failures.
 
@@ -62,6 +70,8 @@ impl<M: Mode> ConstructionRecovery<M> {
     }
 
     /// Returns the machine-readable validation error.
+    #[must_use]
+    #[inline(always)]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
     }
@@ -70,6 +80,8 @@ impl<M: Mode> ConstructionRecovery<M> {
     ///
     /// Update recovery places the base first, followed by overrides in caller
     /// order.
+    #[must_use]
+    #[inline(always)]
     pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
         &self.values
     }

@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Concrete generic-instance navigation shared by root descriptors.
 
@@ -63,6 +71,8 @@ impl ConcreteGenericDescriptor {
     }
 
     /// Returns the declaration shared by every concrete instance.
+    #[must_use]
+    #[inline(always)]
     pub const fn definition(&self) -> &'static GenericDefinitionDescriptor {
         self.definition
     }
@@ -74,6 +84,8 @@ impl ConcreteGenericDescriptor {
     /// expression; use [`Self::type_argument`] for its exact concrete root.
     /// Use [`Self::definition_index`] or [`Self::argument_index`] when
     /// declaration-level parameter positions are required.
+    #[must_use]
+    #[inline(always)]
     pub const fn arguments(&self) -> &'static [GenericArgument] {
         self.arguments
     }

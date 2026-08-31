@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Parsing for the shared `reflect` helper grammar.
 
 use proc_macro2::TokenStream;
@@ -283,15 +291,15 @@ fn parse_specialization(meta: &Meta) -> syn::Result<SpecializationIr> {
             "`specialize` requires named arguments",
         ));
     };
-    let bindings = syn::parse2::<SpecializationBindings>(list.tokens.clone())?;
-    if bindings.0.is_empty() {
+    let SpecializationBindings(bindings) = syn::parse2::<SpecializationBindings>(list.tokens.clone())?;
+    if bindings.is_empty() {
         return Err(syn::Error::new(
             list.span(),
             "`specialize` requires at least one named argument",
         ));
     }
     Ok(SpecializationIr {
-        bindings: bindings.0,
+        bindings,
         span: list.span(),
     })
 }

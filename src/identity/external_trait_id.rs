@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Stable identities for traits that are not reflected themselves.
 
@@ -20,8 +28,11 @@ impl ExternalTraitId {
     }
 
     /// Returns the stable textual representation of this ID.
+    #[must_use]
+    #[inline(always)]
     pub fn as_str(&self) -> &str {
-        &self.0
+        let Self(value) = self;
+        value
     }
 }
 

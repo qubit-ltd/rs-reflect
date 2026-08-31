@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Positional argument values and their validation expectations.
 
@@ -66,11 +74,15 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
     }
 
     /// Returns the caller-supplied name, or `None` for a positional binding.
+    #[must_use]
+    #[inline(always)]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Returns the bound dynamic argument without consuming it.
+    #[must_use]
+    #[inline(always)]
     pub const fn argument(&self) -> &InvocationArg<'call, M> {
         &self.argument
     }
@@ -83,6 +95,8 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
 
 impl<M: InvocationMode> InvocationArg<'_, M> {
     /// Returns the input's ownership or borrowing mode.
+    #[must_use]
+    #[inline(always)]
     pub const fn mode(&self) -> InvocationInputMode {
         match self {
             Self::Owned(_) => InvocationInputMode::Owned,
@@ -92,6 +106,8 @@ impl<M: InvocationMode> InvocationArg<'_, M> {
     }
 
     /// Returns the exact process-local Rust type identity of the input.
+    #[must_use]
+    #[inline(always)]
     pub fn type_id(&self) -> TypeId {
         match self {
             Self::Owned(value) => M::owned_type_id(value),

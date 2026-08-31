@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Enum-variant construction adapter contract and descriptor-bound dispatch.
 
@@ -49,16 +57,22 @@ impl<M: Mode + 'static> VariantConstructor<M> {
     }
 
     /// Returns the immutable enum variant descriptor.
+    #[must_use]
+    #[inline(always)]
     pub const fn variant(&self) -> &'static VariantDescriptor {
         self.variant
     }
 
     /// Returns field construction policies in source declaration order.
+    #[must_use]
+    #[inline(always)]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
     }
 
     /// Returns the input shape required by this variant.
+    #[must_use]
+    #[inline(always)]
     pub const fn shape(&self) -> ConstructionShape {
         match self.variant.kind() {
             VariantKind::Struct => ConstructionShape::Named,

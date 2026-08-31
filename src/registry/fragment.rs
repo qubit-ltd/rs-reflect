@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Static records submitted by generated reflection code.
 
@@ -118,11 +126,15 @@ impl CapabilityRegistration {
     }
 
     /// Returns the exact concrete target type.
+    #[must_use]
+    #[inline(always)]
     pub(crate) const fn target_type_id(&self) -> TypeId {
         self.target_type_id
     }
 
     /// Returns the immutable capability descriptor.
+    #[must_use]
+    #[inline(always)]
     pub(crate) const fn descriptor(&self) -> &CapabilityDescriptor {
         &self.descriptor
     }
@@ -146,6 +158,8 @@ pub enum FragmentPayload {
 
 impl FragmentPayload {
     /// Returns the payload category used to validate its static declaration.
+    #[must_use]
+    #[inline(always)]
     pub(crate) const fn kind(&self) -> FragmentKind {
         match self {
             Self::Type(_) => FragmentKind::Type,
@@ -157,6 +171,8 @@ impl FragmentPayload {
     }
 
     /// Computes the process-local target represented by this payload.
+    #[must_use]
+    #[inline(always)]
     pub(crate) fn runtime_identity(&self) -> RuntimeIdentity {
         match self {
             Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
@@ -203,21 +219,29 @@ impl RegistrationFragment {
     }
 
     /// Returns the statically declared payload category.
+    #[must_use]
+    #[inline(always)]
     pub(crate) const fn kind(&self) -> FragmentKind {
         self.kind
     }
 
     /// Materializes the stable source and content identity.
+    #[must_use]
+    #[inline(always)]
     pub(crate) fn identity(&self) -> FragmentIdentity {
         self.identity.to_owned()
     }
 
     /// Materializes the process-local target identity.
+    #[must_use]
+    #[inline(always)]
     pub(crate) fn target_identity(&self) -> RuntimeIdentity {
         (self.target_identity)()
     }
 
     /// Builds the immutable payload during registry initialization.
+    #[must_use]
+    #[inline(always)]
     pub(crate) fn build(&self) -> FragmentPayload {
         (self.build)()
     }

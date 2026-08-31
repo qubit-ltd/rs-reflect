@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Mutable borrowed dynamic values with mode-specific erased storage.
 
@@ -95,6 +103,8 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns this value through its local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&dyn Any> {
         match &self.storage {
             LocalMutStorage::Any(value) => Some(&**value),
@@ -115,6 +125,8 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             LocalMutStorage::Any(_) => None,
@@ -219,6 +231,8 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns this value through its thread-safe `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&(dyn Any + Send + Sync)> {
         match &self.storage {
             ThreadSafeMutStorage::Any(value) => Some(&**value),
@@ -239,6 +253,8 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             ThreadSafeMutStorage::Any(_) => None,

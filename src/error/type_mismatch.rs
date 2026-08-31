@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Errors for dynamic values with an unexpected Rust type.
 
@@ -32,18 +40,26 @@ impl TypeMismatch {
         self
     }
     /// Returns the expected runtime type ID.
+    #[must_use]
+    #[inline(always)]
     pub const fn expected(&self) -> TypeId {
         self.expected
     }
     /// Returns the actual runtime type ID.
+    #[must_use]
+    #[inline(always)]
     pub const fn actual(&self) -> TypeId {
         self.actual
     }
     /// Returns the expected type's diagnostic name when it is available.
+    #[must_use]
+    #[inline(always)]
     pub const fn expected_name(&self) -> Option<&'static str> {
         self.expected_name
     }
     /// Returns the actual type's diagnostic name when it is available.
+    #[must_use]
+    #[inline(always)]
     pub const fn actual_name(&self) -> Option<&'static str> {
         self.actual_name
     }

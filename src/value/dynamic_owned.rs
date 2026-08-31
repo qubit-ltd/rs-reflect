@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Owned dynamic values with mode-specific erased storage.
 
@@ -60,6 +68,8 @@ impl DynamicOwned<Local> {
     /// Returns the stored value through its local `Any` boundary.
     ///
     /// Owned dynamic values currently always contain an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&dyn Any> {
         let LocalOwnedStorage::Any(value) = &self.storage;
         Some(value.as_ref())
@@ -134,6 +144,8 @@ impl DynamicOwned<ThreadSafe> {
     /// Returns the stored value through its thread-safe `Any` boundary.
     ///
     /// Owned dynamic values currently always contain an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&(dyn Any + Send + Sync)> {
         let ThreadSafeOwnedStorage::Any(value) = &self.storage;
         Some(value.as_ref())

@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Validated adapter input and shared pre-execution validation helpers.
 
@@ -28,6 +36,8 @@ pub struct ValidatedConstructionInput<M: Mode> {
 
 impl<M: Mode> ValidatedConstructionInput<M> {
     /// Returns values in exact descriptor source-index order.
+    #[must_use]
+    #[inline(always)]
     pub fn values(&self) -> &[DynamicOwned<M>] {
         &self.values
     }
@@ -56,11 +66,15 @@ pub struct ValidatedOverride<M: Mode> {
 
 impl<M: Mode> ValidatedOverride<M> {
     /// Returns the declared source field index.
+    #[must_use]
+    #[inline(always)]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the exact validated whole-field replacement value.
+    #[must_use]
+    #[inline(always)]
     pub const fn value(&self) -> &DynamicOwned<M> {
         &self.value
     }
@@ -89,11 +103,15 @@ pub struct ValidatedUpdateInput<M: Mode> {
 
 impl<M: Mode> ValidatedUpdateInput<M> {
     /// Returns the exact validated owned root value.
+    #[must_use]
+    #[inline(always)]
     pub const fn base(&self) -> &DynamicOwned<M> {
         &self.base
     }
 
     /// Returns supplied overrides in descriptor source-index order.
+    #[must_use]
+    #[inline(always)]
     pub fn overrides(&self) -> &[ValidatedOverride<M>] {
         &self.overrides
     }

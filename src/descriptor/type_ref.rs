@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Resolved, opaque, and symbolic references between descriptors.
 
@@ -32,6 +40,8 @@ impl TypeRef {
     /// Returns the root descriptor for a resolved reference.
     ///
     /// `None` means this reference is explicitly opaque or still symbolic.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_resolved(&self) -> Option<&'static TypeDescriptor> {
         match self {
             Self::Resolved(descriptor) => Some(descriptor),
@@ -42,6 +52,8 @@ impl TypeRef {
     /// Returns the member-local opaque descriptor for an opaque reference.
     ///
     /// `None` means this reference is resolved or still symbolic.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_opaque(&self) -> Option<&'static OpaqueTypeDescriptor> {
         match self {
             Self::Opaque(descriptor) => Some(descriptor),
@@ -53,6 +65,8 @@ impl TypeRef {
     ///
     /// `None` means this reference already denotes a concrete resolved or
     /// opaque type.
+    #[must_use]
+    #[inline(always)]
     pub const fn as_symbolic(&self) -> Option<&TypeExpression> {
         match self {
             Self::Symbolic(expression) => Some(expression),
@@ -100,11 +114,15 @@ impl OpaqueTypeDescriptor {
     }
 
     /// Returns the exact process-local Rust type identity.
+    #[must_use]
+    #[inline(always)]
     pub fn type_id(&self) -> TypeId {
         (self.type_id)()
     }
 
     /// Returns the diagnostic Rust type name.
+    #[must_use]
+    #[inline(always)]
     pub fn type_name(&self) -> &'static str {
         (self.type_name)()
     }

@@ -1,7 +1,15 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow explicit-imports
-use qubit_reflect as reflect;
 use std::rc::Rc;
 
+use qubit_reflect as reflect;
 use reflect::Reflect;
 
 #[derive(Reflect)]

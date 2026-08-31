@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Shared borrowed dynamic values with mode-specific erased storage.
 
@@ -86,6 +94,8 @@ impl<'a> DynamicRef<'a, Local> {
     /// Returns this value through its local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&dyn Any> {
         match &self.storage {
             LocalRefStorage::Any(value) => Some(*value),
@@ -96,6 +106,8 @@ impl<'a> DynamicRef<'a, Local> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             LocalRefStorage::Any(_) => None,
@@ -181,6 +193,8 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns this value through its thread-safe `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    #[must_use]
+    #[inline(always)]
     pub fn as_any(&self) -> Option<&(dyn Any + Sync)> {
         match &self.storage {
             ThreadSafeRefStorage::Any(value) => Some(*value),
@@ -191,6 +205,8 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    #[must_use]
+    #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             ThreadSafeRefStorage::Any(_) => None,

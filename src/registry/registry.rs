@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 // qubit-style: allow public-type-layout
 //! Frozen registry snapshot and public deterministic lookup views.
 
@@ -107,16 +115,22 @@ pub struct ImplDefinitionCandidates {
 
 impl ImplDefinitionCandidates {
     /// Iterates over matching definitions in stable fragment order.
+    #[must_use]
+    #[inline(always)]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_ {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching definitions.
+    #[must_use]
+    #[inline(always)]
     pub const fn len(&self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no impl definition has the requested target.
+    #[must_use]
+    #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.descriptors.is_empty()
     }
@@ -176,6 +190,8 @@ impl ReflectRegistry {
     }
 
     /// Enumerates all statically registered roots in stable fragment order.
+    #[must_use]
+    #[inline(always)]
     pub fn types(&self) -> &[&'static TypeDescriptor] {
         &self.types
     }
@@ -194,6 +210,8 @@ impl ReflectRegistry {
     ///
     /// Generic and blanket definitions appear here even when they have no
     /// explicitly registered concrete specialization.
+    #[must_use]
+    #[inline(always)]
     pub fn impl_definitions(&self) -> &[&'static ImplDefinitionDescriptor] {
         &self.impl_definitions
     }
