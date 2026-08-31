@@ -2,7 +2,9 @@
 
 use registry_types::RegistryUser;
 
+/// Second external trait used to verify cross-crate impl aggregation.
 pub trait LabelB {
+    /// Returns the label contributed by implementation fragment B.
     fn label_b(&self) -> u8;
 }
 

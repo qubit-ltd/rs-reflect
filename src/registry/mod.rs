@@ -10,9 +10,16 @@ mod indexes;
 )]
 mod registry;
 
+#[cfg(feature = "bench-internals")]
+pub(crate) use builder::BenchmarkRegistryFacts;
+#[cfg(feature = "bench-internals")]
+pub(crate) use builder::aggregate_benchmark_registry_facts;
 pub(crate) use builder::build_registry;
 pub(crate) use builder::initialize_registry;
+#[cfg(feature = "bench-internals")]
+pub(crate) use builder::prepare_benchmark_registry_facts;
 pub use effective_type_view::EffectiveTypeView;
+pub use registry::ImplDefinitionCandidates;
 pub use registry::ReflectRegistry;
 pub use registry::TraitCandidates;
 pub use registry::TypeCandidates;

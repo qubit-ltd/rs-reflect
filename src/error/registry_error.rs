@@ -16,6 +16,9 @@ pub enum RegistryErrorKind {
     ExternalTraitIdConflict,
     /// Capability registrations use an incompatible ID or contract.
     CapabilityConflict,
+    /// A generic trait impl definition could not resolve one unique trait
+    /// declaration.
+    ImplTraitResolution,
     /// The target platform cannot support distributed registration.
     UnsupportedPlatform,
 }
@@ -54,6 +57,16 @@ impl RegistryError {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
 
+    /// Creates an error when a symbolic generic trait impl cannot resolve one
+    /// unique linked trait declaration.
+    pub fn impl_trait_resolution(fragment: FragmentIdentity) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::ImplTraitResolution,
+            left: Some(fragment),
+            right: None,
+        }))
+    }
+
     /// Creates an error when the current platform lacks
     /// distributed-registration support.
     pub fn unsupported_platform() -> Self {
@@ -74,6 +87,15 @@ impl RegistryError {
     pub fn conflicting_fragments(&self) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
         match (&self.0.left, &self.0.right) {
             (Some(left), Some(right)) => Some((left, right)),
+            _ => None,
+        }
+    }
+
+    /// Returns the single implicated fragment for a non-conflict aggregation
+    /// error.
+    pub fn fragment_identity(&self) -> Option<&FragmentIdentity> {
+        match (&self.0.left, &self.0.right) {
+            (Some(fragment), None) => Some(fragment),
             _ => None,
         }
     }

@@ -6,6 +6,7 @@ use qubit_reflect as reflect;
 use reflect::Reflect;
 use reflect::TypeDescriptor;
 use reflect::descriptor::FieldDescriptor;
+use reflect::descriptor::MethodLookup;
 use reflect::descriptor::OpaqueTypeDescriptor;
 use reflect::descriptor::StructKind;
 use reflect::descriptor::TypeKind;
@@ -93,6 +94,31 @@ impl Reflect for RecursiveNode {
     }
 }
 
+#[derive(reflect::Reflect)]
+struct AggregatedNavigationTarget;
+
+trait AmbiguousNavigationMethod {
+    fn repeated(&self) -> u8;
+}
+
+#[reflect::reflect_impl(external_trait_id = "fixture.type_descriptor.ambiguous")]
+impl AmbiguousNavigationMethod for AggregatedNavigationTarget {
+    fn repeated(&self) -> u8 {
+        1
+    }
+}
+
+#[reflect::reflect_impl]
+impl AggregatedNavigationTarget {
+    fn inherent_only(&self) -> u8 {
+        2
+    }
+
+    fn repeated(&self) -> u8 {
+        3
+    }
+}
+
 /// Verifies root identity, names, shape, and `Reflect` navigation.
 #[test]
 fn test_type_descriptor_exposes_identity_names_and_struct_shape() {
@@ -175,4 +201,62 @@ fn test_type_descriptor_graph_is_send_and_sync() {
     assert_send_and_sync::<TypeRef>();
     assert_send_and_sync::<OpaqueTypeDescriptor>();
     assert_send_and_sync::<FieldDescriptor>();
+}
+
+/// Verifies the root descriptor is the unified navigation entry point for all
+/// registered impl fragments and their effective method instances.
+#[test]
+fn test_type_descriptor_navigates_registered_implementations_and_methods() {
+    let descriptor = TypeDescriptor::of::<AggregatedNavigationTarget>();
+    let implementations = descriptor
+        .impls()
+        .expect("the linked reflection registry should initialize");
+    let methods = descriptor
+        .methods()
+        .expect("effective methods should be available through the root descriptor");
+
+    assert_eq!(implementations.len(), 2);
+    assert!(
+        implementations
+            .iter()
+            .all(|implementation| std::ptr::eq(implementation.target_type(), descriptor))
+    );
+    assert!(
+        methods
+            .iter()
+            .any(|method| method.declaration().query_name() == "inherent_only")
+    );
+    assert_eq!(
+        methods
+            .iter()
+            .filter(|method| method.declaration().query_name() == "repeated")
+            .count(),
+        2
+    );
+}
+
+/// Verifies unqualified lookup distinguishes a unique method from a name that
+/// occurs in both the inherent and trait namespaces.
+#[test]
+fn test_type_descriptor_methods_named_reports_ambiguity() {
+    let descriptor = TypeDescriptor::of::<AggregatedNavigationTarget>();
+
+    assert!(matches!(
+        descriptor
+            .methods_named("missing")
+            .expect("registry initialization should succeed"),
+        MethodLookup::Missing
+    ));
+    assert!(matches!(
+        descriptor
+            .methods_named("inherent_only")
+            .expect("registry initialization should succeed"),
+        MethodLookup::Unique(_)
+    ));
+    assert!(matches!(
+        descriptor
+            .methods_named("repeated")
+            .expect("registry initialization should succeed"),
+        MethodLookup::Ambiguous
+    ));
 }
