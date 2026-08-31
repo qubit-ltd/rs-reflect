@@ -7,11 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`qubit-reflect` 在稳定 Rust 上提供宏生成的结构化与可执行反射，为上层框架提供不可变 descriptor、安全字段访问、动态调用、动态构造、capability 查询和确定性的进程内注册表。
-
-## 面向读者
-
-本项目面向需要在稳定 Rust 上检查并访问类型结构的框架和基础库作者，避免扫描源码、读取私有布局或依赖 rustc 私有 API。
+`qubit-reflect` 为框架和基础库作者提供稳定 Rust 上的显式反射能力。它在类型声明处通过宏生成代码，把类型转换为不可变描述符（descriptor），并提供受检的字段访问、动态构造、方法调用、能力查询和进程内注册表发现；整个过程不扫描源码、不读取私有内存布局、不依赖 rustc 私有 API，也不使用 `unsafe`。
 
 ## 安装
 
@@ -20,20 +16,12 @@
 qubit-reflect = "0.1"
 ```
 
-## 当前状态
-
-文档约定的反射运行时已经实现，公共入口包括：
-
-- 用于 struct 与 enum 的 `#[derive(Reflect)]`；
-- 用于 trait 声明的 `#[reflect]`；
-- 用于 inherent impl 与 trait impl 的 `#[reflect_impl]`；
-- `TypeDescriptor` 及相关不可变 descriptor 视图；
-- 受检动态值、字段访问、方法调用、构造、capability 与 registry 发现；
-- 默认本地模式和显式请求的线程安全模式。
-
-crate 使用 `#![forbid(unsafe_code)]`。运行时执行精确校验：不会进行数值转换、字符串解析、`Into` 推导，也不会在类型擦除后凭运行时标志增加 `Send`/`Sync`。
+默认启用的 `derive` feature 会导出 `#[derive(Reflect)]`、`#[reflect]` 和
+`#[reflect_impl]`。关闭默认 feature 后，运行时和手写注册 API 仍然可用，但这三个宏不会被重导出。
 
 ## 快速开始
+
+假设正在编写一个由模式驱动的编辑器：它需要按字段名显示和修改对象，而业务代码仍然保有对象。只需在声明处派生描述符，按名称取得字段，再传入正确的借用包装器。真正执行前，适配器会检查目标类型、访问策略和替换值的精确 Rust 类型。
 
 ```rust
 use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
@@ -45,31 +33,39 @@ struct User {
 }
 
 let descriptor = TypeDescriptor::of::<User>();
-let name = descriptor.field("name").expect("反射字段存在");
+let name = descriptor.field("name").expect("派生字段存在");
 let mut user = User { id: 7, name: String::from("Ada") };
 
-assert_eq!(
-    name.get(ReflectedRef::new(&user))
-        .expect("受检读取成功")
-        .downcast_ref::<String>()
-        .map(String::as_str),
-    Some("Ada"),
-);
+let current = name.get(ReflectedRef::new(&user)).expect("受检读取成功");
+assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
 name.set(
     ReflectedMut::new(&mut user),
     ReflectedOwned::new(String::from("Grace")),
-).expect("受检替换成功");
+)
+.expect("替换值类型精确匹配");
 assert_eq!(user.name, "Grace");
 ```
 
-反射始终需要显式选择。`rename` 只改变查询名称，不改变 Rust 身份；`skip`、`read_only`、`no_construct` 与 `no_invoke` 会保留结构事实，只禁用对应操作。
+## 为什么需要它
+
+Rust 有意不提供不受限制的运行时反射。需要类型图、属性编辑器、插件发现或动态分发的框架，往往只能解析源码、维护一份重复的模式，或在类型擦除时丢失所有权和线程安全边界。`qubit-reflect` 将这些约定留在 Rust 声明中：生成代码只暴露 Rust 能够证明安全的操作；即使某个操作不可用，描述符仍会保留结构事实。
+
+## 核心能力与边界
+
+- 描述已反射的 struct、enum、trait、impl、泛型信息，以及支持的内置类型族。
+- 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；涉及所有权的失败会返回可恢复的输入。
+- 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
+- 聚合链接产物中的 inventory fragment，生成确定性的注册表，并提供类型安全的 `Clone`、`Default` capability adapter。
+
+反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、descriptor 地址和 trait marker 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
 
 ## 延伸阅读
 
-- [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- [英文用户指南](doc/2026-08-29-qubit-reflect-user-guide.md)
+- [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
+- [API 文档](https://docs.rs/qubit-reflect)
+- [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English README](README.md)
 
