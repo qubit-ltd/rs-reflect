@@ -76,4 +76,13 @@ impl FragmentIdentity {
     pub fn content_fingerprint(&self) -> u64 {
         self.content_fingerprint
     }
+
+    /// Returns whether two identities share source coordinates and member kind.
+    pub(crate) fn same_source_identity(&self, other: &Self) -> bool {
+        self.declaring_crate == other.declaring_crate
+            && self.module_path == other.module_path
+            && self.line == other.line
+            && self.column == other.column
+            && self.member_kind == other.member_kind
+    }
 }

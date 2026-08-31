@@ -9,6 +9,7 @@
 // qubit-style: allow public-type-layout
 //! Reflected inherent and trait implementation descriptors.
 
+use std::cmp::Ordering;
 use std::fmt;
 use std::sync::OnceLock;
 
@@ -36,6 +37,16 @@ pub enum ImplKind {
     Inherent,
     /// A trait implementation block.
     Trait,
+}
+
+impl ImplKind {
+    /// Returns the deterministic inherent-before-trait registry rank.
+    pub(crate) const fn registry_rank(self) -> u8 {
+        match self {
+            Self::Inherent => 0,
+            Self::Trait => 1,
+        }
+    }
 }
 
 /// Declaration facts for a generic, blanket, or concrete impl block.
@@ -107,6 +118,30 @@ impl ImplAssociatedConstDescriptor {
 }
 
 impl ImplDefinitionDescriptor {
+    /// Returns whether complete declaration facts identify the same trait.
+    pub(crate) fn matches_trait_definition(&self, candidate: &TraitDefinitionDescriptor) -> bool {
+        if candidate.completeness() != crate::descriptor::TraitCompleteness::Complete {
+            return false;
+        }
+        let has_facts =
+            !self.methods().is_empty() || !self.associated_types().is_empty() || !self.associated_consts().is_empty();
+        has_facts
+            && MethodDescriptor::signatures_match(self.methods(), candidate.methods())
+            && self
+                .associated_types()
+                .iter()
+                .map(|item| item.rust_name())
+                .eq(candidate.associated_types().iter().map(|item| item.rust_name()))
+            && self
+                .associated_consts()
+                .iter()
+                .map(|item| (item.rust_name(), item.declared_type()))
+                .eq(candidate
+                    .associated_consts()
+                    .iter()
+                    .map(|item| (item.rust_name(), item.declared_type())))
+    }
+
     /// Creates an impl definition without claiming a concrete target instance.
     ///
     /// Returns [`ImplDescriptorBuildError`] when `kind` and
@@ -519,6 +554,54 @@ pub struct ImplDescriptor {
 }
 
 impl ImplDescriptor {
+    /// Returns whether two descriptors represent the same concrete impl
+    /// application.
+    pub(crate) fn same_application(&self, other: &Self) -> bool {
+        self.kind() == other.kind()
+            && self.definition().fragment_identity() == other.definition().fragment_identity()
+            && self.arguments() == other.arguments()
+            && self.target_type().type_id() == other.target_type().type_id()
+    }
+
+    /// Orders implementations by kind, namespace, and source identity.
+    pub(crate) fn registry_cmp(&self, other: &Self) -> Ordering {
+        self.kind()
+            .registry_rank()
+            .cmp(&other.kind().registry_rank())
+            .then_with(|| self.namespace_cmp(other))
+            .then_with(|| {
+                self.definition()
+                    .fragment_identity()
+                    .cmp(other.definition().fragment_identity())
+            })
+    }
+
+    /// Orders implementation namespaces deterministically.
+    fn namespace_cmp(&self, other: &Self) -> Ordering {
+        match (self.implemented_trait(), other.implemented_trait()) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(left), Some(right)) => match (left.definition().trait_id(), right.definition().trait_id()) {
+                (TraitId::Reflected(_), TraitId::Reflected(_)) => left.rust_path().cmp(right.rust_path()),
+                (TraitId::External(left), TraitId::External(right)) => left.cmp(right),
+                (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
+                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
+            },
+        }
+    }
+
+    /// Returns whether this implementation belongs to a lookup namespace.
+    pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
+        match qualifier {
+            MethodQualifier::Any => true,
+            MethodQualifier::Inherent => self.kind() == ImplKind::Inherent,
+            MethodQualifier::Trait(expected) => self
+                .implemented_trait()
+                .is_some_and(|actual| actual.same_application(expected)),
+        }
+    }
+
     /// Starts a concrete impl builder for `definition` and `target_type`.
     pub fn builder(
         definition: &'static ImplDefinitionDescriptor,
@@ -609,7 +692,7 @@ impl ImplDescriptor {
     ) -> MethodLookup<'a> {
         let mut found = None;
         for implementation in implementations {
-            if !matches_qualifier(implementation, qualifier) {
+            if !implementation.matches_qualifier(qualifier) {
                 continue;
             }
             for instance in implementation.method_instances() {
@@ -808,16 +891,5 @@ fn validate_kind(kind: ImplKind, has_trait: bool) -> Result<(), ImplDescriptorBu
         (ImplKind::Inherent, true) => Err(ImplDescriptorBuildError::InherentImplHasTrait),
         (ImplKind::Trait, false) => Err(ImplDescriptorBuildError::TraitImplMissingTrait),
         _ => Ok(()),
-    }
-}
-
-/// Returns whether `implementation` belongs to the requested namespace.
-fn matches_qualifier(implementation: &ImplDescriptor, qualifier: MethodQualifier<'_>) -> bool {
-    match qualifier {
-        MethodQualifier::Any => true,
-        MethodQualifier::Inherent => implementation.kind() == ImplKind::Inherent,
-        MethodQualifier::Trait(expected) => implementation
-            .implemented_trait()
-            .is_some_and(|actual| actual.same_application(expected)),
     }
 }

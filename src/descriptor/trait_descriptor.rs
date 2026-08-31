@@ -271,6 +271,12 @@ pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
 }
 
 impl TraitDefinitionDescriptor {
+    /// Returns whether two declarations can be merged for one external trait
+    /// ID.
+    pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
+        self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
+    }
+
     /// Creates immutable trait definition facts.
     #[doc(hidden)]
     pub const fn new(

@@ -9,7 +9,6 @@
 //! Deterministic effective-method views over one registered reflected root.
 
 use crate::descriptor::ImplDescriptor;
-use crate::descriptor::ImplKind;
 use crate::descriptor::MethodImplementationSource;
 use crate::descriptor::MethodInstanceDescriptor;
 use crate::descriptor::MethodLookup;
@@ -83,7 +82,7 @@ impl EffectiveTypeView {
     pub fn lookup_method<'a>(&'a self, qualifier: MethodQualifier<'_>, name: &str) -> MethodLookup<'a> {
         let mut found = None;
         for (implementation, instance) in self.method_implementations.iter().zip(&self.methods) {
-            if !matches_qualifier(implementation, qualifier) || instance.declaration().query_name() != name {
+            if !implementation.matches_qualifier(qualifier) || instance.declaration().query_name() != name {
                 continue;
             }
             if found.is_some() {
@@ -105,7 +104,7 @@ fn same_method_application(
 ) -> bool {
     if current.declaration().identity() != candidate.declaration().identity()
         || current.arguments() != candidate.arguments()
-        || !same_impl_application(current_implementation, candidate_implementation)
+        || !current_implementation.same_application(candidate_implementation)
     {
         return false;
     }
@@ -116,27 +115,6 @@ fn same_method_application(
         (None, None) => true,
         (Some(current_trait), Some(candidate_trait)) => current_trait.same_application(candidate_trait),
         _ => false,
-    }
-}
-
-/// Returns whether two descriptors represent the same concrete impl
-/// application before method specialization is considered.
-fn same_impl_application(current: &ImplDescriptor, candidate: &ImplDescriptor) -> bool {
-    current.kind() == candidate.kind()
-        && current.definition().fragment_identity() == candidate.definition().fragment_identity()
-        && current.arguments() == candidate.arguments()
-        && current.target_type().type_id() == candidate.target_type().type_id()
-}
-
-/// Returns whether an effective method's concrete implementation belongs to
-/// the requested namespace.
-fn matches_qualifier(implementation: &ImplDescriptor, qualifier: MethodQualifier<'_>) -> bool {
-    match qualifier {
-        MethodQualifier::Any => true,
-        MethodQualifier::Inherent => implementation.kind() == ImplKind::Inherent,
-        MethodQualifier::Trait(expected) => implementation
-            .implemented_trait()
-            .is_some_and(|actual| actual.same_application(expected)),
     }
 }
 
