@@ -1,3 +1,4 @@
+// qubit-style: allow type-file-name
 //! Hidden distributed-registration protocol for generated macro output.
 
 use std::sync::OnceLock;
@@ -25,6 +26,30 @@ pub use crate::registry::fragment::StaticFragmentIdentity;
 #[doc(hidden)]
 pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     crate::registry::build_registry(fragments)
+}
+
+/// Prepared synthetic facts for post-materialization registry aggregation
+/// benchmarks.
+///
+/// This type is absent unless the non-default `bench-internals` feature is
+/// enabled.
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub struct BenchmarkRegistryFacts(crate::registry::BenchmarkRegistryFacts);
+
+/// Prepares adapter-free capability facts outside the measured aggregation.
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
+    BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(fragment_count))
+}
+
+/// Runs production post-materialization validation, indexing, and freezing on
+/// prepared benchmark facts.
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
+    crate::registry::aggregate_benchmark_registry_facts(&facts.0)
 }
 
 /// Initializes a caller-supplied cache from static fragments.
