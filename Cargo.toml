@@ -40,6 +40,7 @@ resolver = "3"
 
 [features]
 default = ["derive"]
+bench-internals = []
 derive = ["dep:qubit-reflect-derive"]
 
 [dependencies]
@@ -59,6 +60,38 @@ name = "ui_tests"
 path = "tests/ui_tests.rs"
 required-features = ["derive"]
 
+[[test]]
+name = "type_descriptor_registry_failure_tests"
+path = "tests/type_descriptor_registry_failure_tests.rs"
+
+[[test]]
+name = "builtin_registry_freeze_tests"
+path = "tests/builtin_registry_freeze_tests.rs"
+
+[[test]]
+name = "builtin_registry_concurrency_tests"
+path = "tests/builtin_registry_concurrency_tests.rs"
+
+[[test]]
+name = "invocation_capability_tests"
+path = "tests/invocation_capability_tests.rs"
+
+[[test]]
+name = "invocation_macro_contract_tests"
+path = "tests/invocation_macro_contract_tests.rs"
+required-features = ["derive"]
+
+[[test]]
+name = "panic_abort_invocation_tests"
+path = "tests/panic_abort_invocation_tests.rs"
+required-features = ["derive"]
+
+[[bin]]
+name = "panic_abort_invocation_fixture"
+path = "tests/fixtures/panic_abort_invocation.rs"
+required-features = ["derive"]
+test = false
+
 [[bench]]
 name = "descriptor_lookup"
 harness = false
@@ -66,7 +99,9 @@ harness = false
 [[bench]]
 name = "registry_init"
 harness = false
+required-features = ["bench-internals"]
 
 [[bench]]
 name = "dynamic_operations"
 harness = false
+required-features = ["derive"]
