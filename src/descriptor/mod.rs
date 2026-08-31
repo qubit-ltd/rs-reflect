@@ -11,6 +11,7 @@
 mod field_descriptor;
 mod generic_descriptor;
 mod impl_descriptor;
+mod internal;
 mod method_descriptor;
 mod trait_descriptor;
 mod type_descriptor;

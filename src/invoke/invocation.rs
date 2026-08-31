@@ -29,6 +29,17 @@ use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
 
 /// An explicit receiver and caller-ordered arguments sharing one call lifetime.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::Invocation;
+/// use qubit_reflect::value::Local;
+///
+/// let invocation = Invocation::<Local>::associated([]);
+/// assert!(invocation.receiver().is_none());
+/// assert!(invocation.arguments().is_empty());
+/// ```
 pub struct Invocation<'call, M: InvocationMode> {
     receiver: Option<InvocationReceiver<'call, M>>,
     arguments: Box<[InvocationArg<'call, M>]>,
