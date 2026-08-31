@@ -76,11 +76,13 @@ struct BenchmarkRegistryFact {
     descriptor: CapabilityDescriptor,
 }
 
+/// Marker type used to instantiate a benchmark-only reflected target.
 #[cfg(feature = "bench-internals")]
 struct BenchmarkTarget;
 
 /// Accumulates validated payloads without exposing partial registry state.
 #[derive(Default)]
+// qubit-style: allow multiple-public-types
 struct RegistryBuilder {
     types: Vec<&'static TypeDescriptor>,
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
