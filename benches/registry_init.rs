@@ -34,10 +34,12 @@ struct RegistryBenchmarkType;
 static REGISTRY_BENCHMARK_DESCRIPTOR: TypeDescriptor =
     reflect::__private::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
 
+/// Returns the runtime identity used by the benchmark fixture.
 fn benchmark_runtime_identity() -> RuntimeIdentity {
     RuntimeIdentity::Type(TypeId::of::<RegistryBenchmarkType>())
 }
 
+/// Returns the descriptor payload used by the benchmark fixture.
 fn benchmark_payload() -> FragmentPayload {
     FragmentPayload::Type(&REGISTRY_BENCHMARK_DESCRIPTOR)
 }
@@ -53,6 +55,7 @@ reflect::__private::inventory::submit! {
     REGISTRY_BENCHMARK_FRAGMENT
 }
 
+/// Measures repeated execution of one benchmark operation.
 fn measure_repeated<T>(name: &str, repetitions: usize, mut operation: impl FnMut() -> T) {
     let started = Instant::now();
     for _ in 0..repetitions {
