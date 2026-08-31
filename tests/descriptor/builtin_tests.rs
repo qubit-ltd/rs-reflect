@@ -6,6 +6,8 @@ use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
 use reflect::descriptor::FunctionPointerKind;
@@ -13,12 +15,145 @@ use reflect::descriptor::MapKind;
 use reflect::descriptor::Mutability;
 use reflect::descriptor::PrimitiveKind;
 use reflect::descriptor::ReferenceKind;
+use reflect::descriptor::Reflect;
 use reflect::descriptor::SequenceKind;
 use reflect::descriptor::SetKind;
 use reflect::descriptor::SmartPointerKind;
+use reflect::descriptor::StructKind;
 use reflect::descriptor::TextKind;
 use reflect::descriptor::TypeDescriptor;
 use reflect::descriptor::TypeKind;
+
+struct LazyOptionalElement;
+
+static LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
+static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor =
+    reflect::__private::descriptor::struct_type::<LazyOptionalElement>("lazy_optional_element", StructKind::Unit, &[]);
+
+impl Reflect for LazyOptionalElement {
+    /// Counts and returns the stable descriptor used to observe lazy relation
+    /// resolution.
+    fn type_descriptor() -> &'static TypeDescriptor {
+        LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.fetch_add(1, Ordering::SeqCst);
+        &LAZY_OPTIONAL_ELEMENT_DESCRIPTOR
+    }
+}
+
+struct LazyBoxPointee;
+
+static LAZY_BOX_POINTEE_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
+static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor =
+    reflect::__private::descriptor::struct_type::<LazyBoxPointee>("lazy_box_pointee", StructKind::Unit, &[]);
+
+impl Reflect for LazyBoxPointee {
+    /// Counts and returns the stable descriptor used to observe lazy relation
+    /// resolution.
+    fn type_descriptor() -> &'static TypeDescriptor {
+        LAZY_BOX_POINTEE_INITIALIZATIONS.fetch_add(1, Ordering::SeqCst);
+        &LAZY_BOX_POINTEE_DESCRIPTOR
+    }
+}
+
+macro_rules! define_lazy_probe {
+    ($type_name:ident, $counter:ident, $descriptor:ident, $query_name:literal) => {
+        struct $type_name;
+
+        static $counter: AtomicUsize = AtomicUsize::new(0);
+        static $descriptor: TypeDescriptor =
+            reflect::__private::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
+
+        impl Reflect for $type_name {
+            /// Counts and returns one stable descriptor used to observe lazy
+            /// relation resolution.
+            fn type_descriptor() -> &'static TypeDescriptor {
+                $counter.fetch_add(1, Ordering::SeqCst);
+                &$descriptor
+            }
+        }
+    };
+}
+
+define_lazy_probe!(
+    LazySequenceElement,
+    LAZY_SEQUENCE_CALLS,
+    LAZY_SEQUENCE_DESCRIPTOR,
+    "lazy_sequence_element"
+);
+define_lazy_probe!(LazySetElement, LAZY_SET_CALLS, LAZY_SET_DESCRIPTOR, "lazy_set_element");
+define_lazy_probe!(LazyMapKey, LAZY_MAP_KEY_CALLS, LAZY_MAP_KEY_DESCRIPTOR, "lazy_map_key");
+define_lazy_probe!(
+    LazyMapValue,
+    LAZY_MAP_VALUE_CALLS,
+    LAZY_MAP_VALUE_DESCRIPTOR,
+    "lazy_map_value"
+);
+define_lazy_probe!(
+    LazyArrayElement,
+    LAZY_ARRAY_CALLS,
+    LAZY_ARRAY_DESCRIPTOR,
+    "lazy_array_element"
+);
+define_lazy_probe!(
+    LazyTupleFirst,
+    LAZY_TUPLE_FIRST_CALLS,
+    LAZY_TUPLE_FIRST_DESCRIPTOR,
+    "lazy_tuple_first"
+);
+define_lazy_probe!(
+    LazyTupleSecond,
+    LAZY_TUPLE_SECOND_CALLS,
+    LAZY_TUPLE_SECOND_DESCRIPTOR,
+    "lazy_tuple_second"
+);
+define_lazy_probe!(
+    LazyReferenceTarget,
+    LAZY_REFERENCE_CALLS,
+    LAZY_REFERENCE_DESCRIPTOR,
+    "lazy_reference_target"
+);
+define_lazy_probe!(LazyRawPointee, LAZY_RAW_CALLS, LAZY_RAW_DESCRIPTOR, "lazy_raw_pointee");
+define_lazy_probe!(
+    LazySliceElement,
+    LAZY_SLICE_CALLS,
+    LAZY_SLICE_DESCRIPTOR,
+    "lazy_slice_element"
+);
+define_lazy_probe!(
+    LazyFunctionParameter,
+    LAZY_FUNCTION_PARAMETER_CALLS,
+    LAZY_FUNCTION_PARAMETER_DESCRIPTOR,
+    "lazy_function_parameter"
+);
+define_lazy_probe!(
+    LazyFunctionReturn,
+    LAZY_FUNCTION_RETURN_CALLS,
+    LAZY_FUNCTION_RETURN_DESCRIPTOR,
+    "lazy_function_return"
+);
+define_lazy_probe!(
+    ConcurrentElementA,
+    CONCURRENT_A_CALLS,
+    CONCURRENT_A_DESCRIPTOR,
+    "concurrent_a"
+);
+define_lazy_probe!(
+    ConcurrentElementB,
+    CONCURRENT_B_CALLS,
+    CONCURRENT_B_DESCRIPTOR,
+    "concurrent_b"
+);
+define_lazy_probe!(
+    ConcurrentMapKey,
+    CONCURRENT_KEY_CALLS,
+    CONCURRENT_KEY_DESCRIPTOR,
+    "concurrent_key"
+);
+define_lazy_probe!(
+    ConcurrentMapValue,
+    CONCURRENT_VALUE_CALLS,
+    CONCURRENT_VALUE_DESCRIPTOR,
+    "concurrent_value"
+);
 
 /// Verifies scalar and text built-ins retain their exact public category.
 #[test]
@@ -34,6 +169,24 @@ fn test_builtin_primitive_and_text_descriptors_have_exact_kinds() {
     assert_eq!(unsigned.kind(), TypeKind::Primitive(PrimitiveKind::U64));
     assert_eq!(string.kind(), TypeKind::Text(TextKind::String));
     assert_eq!(text.kind(), TypeKind::Text(TextKind::Str));
+}
+
+/// Verifies the built-in `dyn Debug` root links to an incomplete external
+/// trait declaration rather than exposing an unlinked marker view.
+#[test]
+fn test_builtin_debug_trait_object_links_to_trait_descriptor() {
+    let descriptor = TypeDescriptor::of::<dyn std::fmt::Debug>();
+    let trait_descriptor = descriptor
+        .as_trait_object()
+        .expect("dyn Debug must expose a trait-object typed view")
+        .trait_descriptor();
+
+    assert_eq!(trait_descriptor.rust_name(), "Debug");
+    assert_eq!(trait_descriptor.rust_path(), "std::fmt::Debug");
+    assert_eq!(
+        trait_descriptor.completeness(),
+        reflect::descriptor::TraitCompleteness::ExternalIncomplete
+    );
 }
 
 /// Verifies generic built-ins preserve their family and resolved type
@@ -94,6 +247,160 @@ fn test_builtin_container_descriptors_preserve_family_and_arguments() {
             .expect("BTreeMap value should resolve"),
         TypeDescriptor::of::<String>(),
     ));
+}
+
+/// Verifies `Option<T>` and `Box<T>` publish complete root shapes before their
+/// child relationships are resolved.
+#[test]
+fn test_builtin_optional_and_box_relations_resolve_lazily() {
+    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    let optional = TypeDescriptor::of::<Option<LazyOptionalElement>>();
+    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    let optional_element = optional
+        .as_optional()
+        .expect("Option should expose the optional typed view")
+        .element_type()
+        .as_resolved()
+        .expect("Option element should resolve when navigated");
+    assert!(std::ptr::eq(optional_element, &LAZY_OPTIONAL_ELEMENT_DESCRIPTOR));
+    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 1);
+
+    assert_eq!(LAZY_BOX_POINTEE_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    let boxed = TypeDescriptor::of::<Box<LazyBoxPointee>>();
+    assert_eq!(LAZY_BOX_POINTEE_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    let pointee = boxed
+        .as_smart_pointer()
+        .expect("Box should expose the smart-pointer typed view")
+        .pointee_type()
+        .as_resolved()
+        .expect("Box pointee should resolve when navigated");
+    assert!(std::ptr::eq(pointee, &LAZY_BOX_POINTEE_DESCRIPTOR));
+    assert_eq!(LAZY_BOX_POINTEE_INITIALIZATIONS.load(Ordering::SeqCst), 1);
+}
+
+/// Verifies collection roots do not resolve their element, key, or value
+/// descriptors before the corresponding typed-view relationship is queried.
+#[test]
+fn test_builtin_collection_relations_resolve_lazily() {
+    let sequence = TypeDescriptor::of::<Vec<LazySequenceElement>>();
+    let set = TypeDescriptor::of::<HashSet<LazySetElement>>();
+    let map = TypeDescriptor::of::<BTreeMap<LazyMapKey, LazyMapValue>>();
+    assert_eq!(LAZY_SEQUENCE_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_SET_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_MAP_KEY_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_MAP_VALUE_CALLS.load(Ordering::SeqCst), 0);
+
+    let sequence_element = sequence
+        .as_sequence()
+        .expect("Vec should expose the sequence view")
+        .element_type()
+        .as_resolved()
+        .expect("Vec element should resolve when navigated");
+    let set_element = set
+        .as_set()
+        .expect("HashSet should expose the set view")
+        .element_type()
+        .as_resolved()
+        .expect("set element should resolve when navigated");
+    let map_view = map.as_map().expect("BTreeMap should expose the map view");
+    let map_key = map_view
+        .key_type()
+        .as_resolved()
+        .expect("map key should resolve when navigated");
+    let map_value = map_view
+        .value_type()
+        .as_resolved()
+        .expect("map value should resolve when navigated");
+
+    assert!(std::ptr::eq(sequence_element, &LAZY_SEQUENCE_DESCRIPTOR));
+    assert!(std::ptr::eq(set_element, &LAZY_SET_DESCRIPTOR));
+    assert!(std::ptr::eq(map_key, &LAZY_MAP_KEY_DESCRIPTOR));
+    assert!(std::ptr::eq(map_value, &LAZY_MAP_VALUE_DESCRIPTOR));
+}
+
+/// Verifies array and tuple roots publish before their child descriptors and
+/// cache stable resolved slices when navigation begins.
+#[test]
+fn test_builtin_array_and_tuple_relations_resolve_lazily() {
+    let array = TypeDescriptor::of::<[LazyArrayElement; 3]>();
+    let tuple = TypeDescriptor::of::<(LazyTupleFirst, LazyTupleSecond)>();
+    assert_eq!(LAZY_ARRAY_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_TUPLE_FIRST_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_TUPLE_SECOND_CALLS.load(Ordering::SeqCst), 0);
+
+    let array_element = array
+        .as_array()
+        .expect("array should expose its typed view")
+        .element_type()
+        .as_resolved()
+        .expect("array element should resolve when navigated");
+    let elements = tuple.as_tuple().expect("tuple should expose its typed view").elements();
+    assert!(std::ptr::eq(array_element, &LAZY_ARRAY_DESCRIPTOR));
+    assert!(std::ptr::eq(
+        elements[0].as_resolved().expect("first tuple element should resolve"),
+        &LAZY_TUPLE_FIRST_DESCRIPTOR,
+    ));
+    assert!(std::ptr::eq(
+        elements[1].as_resolved().expect("second tuple element should resolve"),
+        &LAZY_TUPLE_SECOND_DESCRIPTOR,
+    ));
+}
+
+/// Verifies reference, raw-pointer, and slice roots defer target resolution
+/// until their typed relationships are navigated.
+#[test]
+fn test_builtin_reference_pointer_and_slice_relations_resolve_lazily() {
+    let reference = TypeDescriptor::of::<&'static LazyReferenceTarget>();
+    let raw = TypeDescriptor::of::<*const LazyRawPointee>();
+    let slice = TypeDescriptor::of::<[LazySliceElement]>();
+    assert_eq!(LAZY_REFERENCE_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_RAW_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_SLICE_CALLS.load(Ordering::SeqCst), 0);
+
+    let reference_target = reference
+        .as_reference()
+        .expect("reference should expose its typed view")
+        .target_type()
+        .as_resolved()
+        .expect("reference target should resolve when navigated");
+    let raw_pointee = raw
+        .as_raw_pointer()
+        .expect("raw pointer should expose its typed view")
+        .pointee_type()
+        .as_resolved()
+        .expect("raw pointee should resolve when navigated");
+    let slice_element = slice
+        .as_slice()
+        .expect("slice should expose its typed view")
+        .element_type()
+        .as_resolved()
+        .expect("slice element should resolve when navigated");
+
+    assert!(std::ptr::eq(reference_target, &LAZY_REFERENCE_DESCRIPTOR));
+    assert!(std::ptr::eq(raw_pointee, &LAZY_RAW_DESCRIPTOR));
+    assert!(std::ptr::eq(slice_element, &LAZY_SLICE_DESCRIPTOR));
+}
+
+/// Verifies function roots defer both parameter and return descriptor
+/// resolution until signature navigation.
+#[test]
+fn test_builtin_function_relations_resolve_lazily() {
+    type LazyFunction = fn(LazyFunctionParameter) -> LazyFunctionReturn;
+
+    let function = TypeDescriptor::of::<LazyFunction>();
+    assert_eq!(LAZY_FUNCTION_PARAMETER_CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(LAZY_FUNCTION_RETURN_CALLS.load(Ordering::SeqCst), 0);
+
+    let view = function.as_function().expect("function should expose its typed view");
+    let parameter = view.parameters()[0]
+        .as_resolved()
+        .expect("function parameter should resolve when navigated");
+    let return_type = view
+        .return_type()
+        .as_resolved()
+        .expect("function return should resolve when navigated");
+    assert!(std::ptr::eq(parameter, &LAZY_FUNCTION_PARAMETER_DESCRIPTOR));
+    assert!(std::ptr::eq(return_type, &LAZY_FUNCTION_RETURN_DESCRIPTOR));
 }
 
 /// Verifies pointer-like built-ins preserve pointee type and pointer mode.
@@ -175,6 +482,54 @@ fn test_builtin_interner_is_concurrent_and_distinguishes_generic_arguments() {
     }
 
     assert!(!std::ptr::eq(first, TypeDescriptor::of::<Vec<String>>()));
+}
+
+/// Verifies several distinct composite specializations can be initialized at
+/// the same instant without cross-contaminating their identities or roots.
+#[test]
+fn test_builtin_interner_concurrently_initializes_multiple_composite_types() {
+    use std::sync::Barrier;
+
+    type SequenceA = Vec<ConcurrentElementA>;
+    type SequenceB = Vec<ConcurrentElementB>;
+    type OptionalA = Option<Box<ConcurrentElementA>>;
+    type Map = BTreeMap<ConcurrentMapKey, ConcurrentMapValue>;
+
+    let barrier = Arc::new(Barrier::new(33));
+    let workers: Vec<_> = (0..32)
+        .map(|index| {
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                let (group, descriptor) = match index % 4 {
+                    0 => (0, TypeDescriptor::of::<SequenceA>()),
+                    1 => (1, TypeDescriptor::of::<SequenceB>()),
+                    2 => (2, TypeDescriptor::of::<OptionalA>()),
+                    _ => (3, TypeDescriptor::of::<Map>()),
+                };
+                (
+                    group,
+                    descriptor as *const TypeDescriptor as usize,
+                    descriptor.type_id(),
+                )
+            })
+        })
+        .collect();
+    barrier.wait();
+
+    let mut roots = [None; 4];
+    let mut identities = [None; 4];
+    for worker in workers {
+        let (group, address, identity) = worker.join().expect("composite lookup worker should complete");
+        assert_eq!(*roots[group].get_or_insert(address), address);
+        assert_eq!(*identities[group].get_or_insert(identity), identity);
+    }
+    for left in 0..identities.len() {
+        for right in left + 1..identities.len() {
+            assert_ne!(identities[left], identities[right]);
+            assert_ne!(roots[left], roots[right]);
+        }
+    }
 }
 
 /// Verifies built-in map descriptors cover non-default hasher specializations.

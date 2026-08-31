@@ -1,9 +1,9 @@
 //! Reflection descriptors for tuple types.
 
+use crate::__private::LazyTypeRef;
 use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
-use crate::descriptor::TypeRef;
 
 macro_rules! impl_tuple {
     () => {
@@ -11,10 +11,7 @@ macro_rules! impl_tuple {
             /// Returns the interned descriptor for the unit tuple.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
-                    TypeDescriptor::new_tuple::<Self>(
-                        std::any::type_name::<Self>(),
-                                                &[],
-                    )
+                    TypeDescriptor::new_tuple::<Self>(std::any::type_name::<Self>(), &[])
                 })
             }
         }
@@ -24,10 +21,12 @@ macro_rules! impl_tuple {
             /// Returns the interned descriptor for this tuple specialization.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
-                    let elements = Box::leak(Box::new([$(TypeRef::Resolved($type::type_descriptor())),+]));
-                    TypeDescriptor::new_tuple::<Self>(
+                    let elements = crate::__private::descriptor::lazy_type_ref_list(
+                        vec![$(LazyTypeRef::resolved::<$type>()),+],
+                    );
+                    TypeDescriptor::new_tuple_lazy::<Self>(
                         std::any::type_name::<Self>(),
-                                                elements,
+                        elements,
                     )
                 })
             }

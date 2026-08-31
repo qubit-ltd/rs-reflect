@@ -1,1 +1,2 @@
 multiple-public-types | src/invoke/pinned.rs | Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol.
+multiple-public-types | src/private/descriptor.rs | Generated-code probes and descriptor factories form one hidden macro protocol.

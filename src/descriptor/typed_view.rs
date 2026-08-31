@@ -1,6 +1,10 @@
 // qubit-style: allow public-type-layout
 //! Kind-specific, immutable views of root type descriptors.
 
+use crate::__private::LazyTypeRef;
+use crate::__private::LazyTypeRefList;
+use crate::__private::TypeRefListSource;
+use crate::__private::TypeRefSource;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::Mutability;
 use crate::descriptor::PrimitiveKind;
@@ -8,6 +12,7 @@ use crate::descriptor::ReferenceKind;
 use crate::descriptor::SmartPointerKind;
 use crate::descriptor::StructKind;
 use crate::descriptor::TextKind;
+use crate::descriptor::TraitDescriptor;
 use crate::descriptor::TypeRef;
 use crate::expression::FunctionAbi;
 
@@ -66,49 +71,131 @@ impl StructTypeDescriptor {
     }
 }
 
+/// One normalized component of an enum's explicit `repr(...)` declarations.
+///
+/// Values are structural metadata rather than diagnostic strings. The enum
+/// view exposes components in a stable canonical order, independent of their
+/// source order.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum EnumRepr {
+    /// Rust's native representation was requested explicitly.
+    Rust,
+    /// The C-compatible representation was requested.
+    C,
+    /// The transparent representation was requested.
+    Transparent,
+    /// An `i8` discriminant representation.
+    I8,
+    /// An `i16` discriminant representation.
+    I16,
+    /// An `i32` discriminant representation.
+    I32,
+    /// An `i64` discriminant representation.
+    I64,
+    /// An `i128` discriminant representation.
+    I128,
+    /// An `isize` discriminant representation.
+    Isize,
+    /// A `u8` discriminant representation.
+    U8,
+    /// A `u16` discriminant representation.
+    U16,
+    /// A `u32` discriminant representation.
+    U32,
+    /// A `u64` discriminant representation.
+    U64,
+    /// A `u128` discriminant representation.
+    U128,
+    /// A `usize` discriminant representation.
+    Usize,
+    /// An explicit minimum alignment in bytes.
+    Align(usize),
+}
+
 /// The typed view of a declared enum.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct EnumTypeDescriptor;
+#[derive(Clone, Copy, Debug)]
+pub struct EnumTypeDescriptor {
+    representations: &'static [EnumRepr],
+}
+
+impl EnumTypeDescriptor {
+    /// Creates an enum view from normalized explicit representation metadata.
+    pub(crate) const fn new(representations: &'static [EnumRepr]) -> Self {
+        Self { representations }
+    }
+
+    /// Returns normalized explicit `repr(...)` components.
+    ///
+    /// An empty slice means the enum has no explicit representation
+    /// declaration. Components use canonical order and never contain
+    /// diagnostic text.
+    pub const fn representations(&self) -> &'static [EnumRepr] {
+        self.representations
+    }
+}
 
 /// The typed view of a tuple descriptor.
 #[derive(Clone, Copy, Debug)]
 pub struct TupleTypeDescriptor {
-    elements: &'static [TypeRef],
+    elements: TypeRefListSource,
 }
 
 impl TupleTypeDescriptor {
     /// Creates a tuple view for internal descriptor construction.
     pub(crate) const fn new(elements: &'static [TypeRef]) -> Self {
-        Self { elements }
+        Self {
+            elements: TypeRefListSource::Eager(elements),
+        }
+    }
+
+    /// Creates a tuple view whose element list resolves on first navigation.
+    pub(crate) const fn new_lazy(elements: &'static LazyTypeRefList) -> Self {
+        Self {
+            elements: TypeRefListSource::Lazy(elements),
+        }
     }
 
     /// Returns the tuple element types in declaration order.
-    pub const fn elements(&self) -> &'static [TypeRef] {
-        self.elements
+    pub fn elements(&self) -> &'static [TypeRef] {
+        self.elements.get()
     }
 
     /// Returns the tuple arity. The unit type `()` therefore has arity zero.
     pub const fn arity(&self) -> usize {
-        self.elements.len()
+        match self.elements {
+            TypeRefListSource::Eager(elements) => elements.len(),
+            TypeRefListSource::Lazy(elements) => elements.len(),
+        }
     }
 }
 
 /// The typed view of a fixed-length array descriptor.
 #[derive(Clone, Copy, Debug)]
 pub struct ArrayTypeDescriptor {
-    element: &'static TypeRef,
+    element: TypeRefSource,
     length: usize,
 }
 
 impl ArrayTypeDescriptor {
     /// Creates an array view for internal descriptor construction.
     pub(crate) const fn new(element: &'static TypeRef, length: usize) -> Self {
-        Self { element, length }
+        Self {
+            element: TypeRefSource::Eager(element),
+            length,
+        }
+    }
+
+    /// Creates an array view whose element resolves on first navigation.
+    pub(crate) const fn new_lazy(element: &'static LazyTypeRef, length: usize) -> Self {
+        Self {
+            element: TypeRefSource::Lazy(element),
+            length,
+        }
     }
 
     /// Returns the repeated element type.
-    pub const fn element_type(&self) -> &'static TypeRef {
-        self.element
+    pub fn element_type(&self) -> &'static TypeRef {
+        self.element.get()
     }
 
     /// Returns the compile-time array length.
@@ -120,18 +207,30 @@ impl ArrayTypeDescriptor {
 /// The typed view of an optional descriptor.
 #[derive(Clone, Copy, Debug)]
 pub struct OptionalTypeDescriptor {
-    element: &'static TypeRef,
+    element: TypeRefSource,
 }
 
 impl OptionalTypeDescriptor {
     /// Creates an optional view for internal descriptor construction.
     pub(crate) const fn new(element: &'static TypeRef) -> Self {
-        Self { element }
+        Self {
+            element: TypeRefSource::Eager(element),
+        }
+    }
+
+    /// Creates an optional view whose element is resolved on first
+    /// navigation.
+    pub(crate) const fn new_lazy(element: &'static LazyTypeRef) -> Self {
+        Self {
+            element: TypeRefSource::Lazy(element),
+        }
     }
 
     /// Returns the optional element type.
-    pub const fn element_type(&self) -> &'static TypeRef {
-        self.element
+    #[must_use]
+    #[inline(always)]
+    pub fn element_type(&self) -> &'static TypeRef {
+        self.element.get()
     }
 }
 
@@ -146,13 +245,24 @@ pub enum SequenceKind {
 #[derive(Clone, Copy, Debug)]
 pub struct SequenceTypeDescriptor {
     kind: SequenceKind,
-    element: &'static TypeRef,
+    element: TypeRefSource,
 }
 
 impl SequenceTypeDescriptor {
     /// Creates a sequence view for internal descriptor construction.
     pub(crate) const fn new(kind: SequenceKind, element: &'static TypeRef) -> Self {
-        Self { kind, element }
+        Self {
+            kind,
+            element: TypeRefSource::Eager(element),
+        }
+    }
+
+    /// Creates a sequence view whose element resolves on first navigation.
+    pub(crate) const fn new_lazy(kind: SequenceKind, element: &'static LazyTypeRef) -> Self {
+        Self {
+            kind,
+            element: TypeRefSource::Lazy(element),
+        }
     }
 
     /// Returns the concrete standard-library sequence family.
@@ -161,8 +271,8 @@ impl SequenceTypeDescriptor {
     }
 
     /// Returns the sequence element type.
-    pub const fn element_type(&self) -> &'static TypeRef {
-        self.element
+    pub fn element_type(&self) -> &'static TypeRef {
+        self.element.get()
     }
 }
 
@@ -179,13 +289,24 @@ pub enum SetKind {
 #[derive(Clone, Copy, Debug)]
 pub struct SetTypeDescriptor {
     kind: SetKind,
-    element: &'static TypeRef,
+    element: TypeRefSource,
 }
 
 impl SetTypeDescriptor {
     /// Creates a set view for internal descriptor construction.
     pub(crate) const fn new(kind: SetKind, element: &'static TypeRef) -> Self {
-        Self { kind, element }
+        Self {
+            kind,
+            element: TypeRefSource::Eager(element),
+        }
+    }
+
+    /// Creates a set view whose element resolves on first navigation.
+    pub(crate) const fn new_lazy(kind: SetKind, element: &'static LazyTypeRef) -> Self {
+        Self {
+            kind,
+            element: TypeRefSource::Lazy(element),
+        }
     }
 
     /// Returns the concrete standard-library set family.
@@ -194,8 +315,8 @@ impl SetTypeDescriptor {
     }
 
     /// Returns the set element type.
-    pub const fn element_type(&self) -> &'static TypeRef {
-        self.element
+    pub fn element_type(&self) -> &'static TypeRef {
+        self.element.get()
     }
 }
 
@@ -212,14 +333,28 @@ pub enum MapKind {
 #[derive(Clone, Copy, Debug)]
 pub struct MapTypeDescriptor {
     kind: MapKind,
-    key: &'static TypeRef,
-    value: &'static TypeRef,
+    key: TypeRefSource,
+    value: TypeRefSource,
 }
 
 impl MapTypeDescriptor {
     /// Creates a map view for internal descriptor construction.
     pub(crate) const fn new(kind: MapKind, key: &'static TypeRef, value: &'static TypeRef) -> Self {
-        Self { kind, key, value }
+        Self {
+            kind,
+            key: TypeRefSource::Eager(key),
+            value: TypeRefSource::Eager(value),
+        }
+    }
+
+    /// Creates a map view whose key and value resolve independently on first
+    /// navigation.
+    pub(crate) const fn new_lazy(kind: MapKind, key: &'static LazyTypeRef, value: &'static LazyTypeRef) -> Self {
+        Self {
+            kind,
+            key: TypeRefSource::Lazy(key),
+            value: TypeRefSource::Lazy(value),
+        }
     }
 
     /// Returns the concrete standard-library map family.
@@ -228,13 +363,13 @@ impl MapTypeDescriptor {
     }
 
     /// Returns the map key type.
-    pub const fn key_type(&self) -> &'static TypeRef {
-        self.key
+    pub fn key_type(&self) -> &'static TypeRef {
+        self.key.get()
     }
 
     /// Returns the map value type.
-    pub const fn value_type(&self) -> &'static TypeRef {
-        self.value
+    pub fn value_type(&self) -> &'static TypeRef {
+        self.value.get()
     }
 }
 
@@ -242,13 +377,25 @@ impl MapTypeDescriptor {
 #[derive(Clone, Copy, Debug)]
 pub struct SmartPointerTypeDescriptor {
     kind: SmartPointerKind,
-    pointee: &'static TypeRef,
+    pointee: TypeRefSource,
 }
 
 impl SmartPointerTypeDescriptor {
     /// Creates a smart-pointer view for internal descriptor construction.
     pub(crate) const fn new(kind: SmartPointerKind, pointee: &'static TypeRef) -> Self {
-        Self { kind, pointee }
+        Self {
+            kind,
+            pointee: TypeRefSource::Eager(pointee),
+        }
+    }
+
+    /// Creates a smart-pointer view whose pointee is resolved on first
+    /// navigation.
+    pub(crate) const fn new_lazy(kind: SmartPointerKind, pointee: &'static LazyTypeRef) -> Self {
+        Self {
+            kind,
+            pointee: TypeRefSource::Lazy(pointee),
+        }
     }
 
     /// Returns the concrete smart-pointer family.
@@ -257,8 +404,10 @@ impl SmartPointerTypeDescriptor {
     }
 
     /// Returns the pointee type.
-    pub const fn pointee_type(&self) -> &'static TypeRef {
-        self.pointee
+    #[must_use]
+    #[inline(always)]
+    pub fn pointee_type(&self) -> &'static TypeRef {
+        self.pointee.get()
     }
 }
 
@@ -266,13 +415,24 @@ impl SmartPointerTypeDescriptor {
 #[derive(Clone, Copy, Debug)]
 pub struct ReferenceTypeDescriptor {
     kind: ReferenceKind,
-    target: &'static TypeRef,
+    target: TypeRefSource,
 }
 
 impl ReferenceTypeDescriptor {
     /// Creates a reference view for internal descriptor construction.
     pub(crate) const fn new(kind: ReferenceKind, target: &'static TypeRef) -> Self {
-        Self { kind, target }
+        Self {
+            kind,
+            target: TypeRefSource::Eager(target),
+        }
+    }
+
+    /// Creates a reference view whose target resolves on first navigation.
+    pub(crate) const fn new_lazy(kind: ReferenceKind, target: &'static LazyTypeRef) -> Self {
+        Self {
+            kind,
+            target: TypeRefSource::Lazy(target),
+        }
     }
 
     /// Returns whether the reference is shared or mutable.
@@ -281,26 +441,35 @@ impl ReferenceTypeDescriptor {
     }
 
     /// Returns the referenced type.
-    pub const fn target_type(&self) -> &'static TypeRef {
-        self.target
+    pub fn target_type(&self) -> &'static TypeRef {
+        self.target.get()
     }
 }
 
 /// The typed view of an unsized slice.
 #[derive(Clone, Copy, Debug)]
 pub struct SliceTypeDescriptor {
-    element: &'static TypeRef,
+    element: TypeRefSource,
 }
 
 impl SliceTypeDescriptor {
     /// Creates a slice view for internal descriptor construction.
     pub(crate) const fn new(element: &'static TypeRef) -> Self {
-        Self { element }
+        Self {
+            element: TypeRefSource::Eager(element),
+        }
+    }
+
+    /// Creates a slice view whose element resolves on first navigation.
+    pub(crate) const fn new_lazy(element: &'static LazyTypeRef) -> Self {
+        Self {
+            element: TypeRefSource::Lazy(element),
+        }
     }
 
     /// Returns the slice element type.
-    pub const fn element_type(&self) -> &'static TypeRef {
-        self.element
+    pub fn element_type(&self) -> &'static TypeRef {
+        self.element.get()
     }
 }
 
@@ -308,13 +477,24 @@ impl SliceTypeDescriptor {
 #[derive(Clone, Copy, Debug)]
 pub struct RawPointerTypeDescriptor {
     mutability: Mutability,
-    pointee: &'static TypeRef,
+    pointee: TypeRefSource,
 }
 
 impl RawPointerTypeDescriptor {
     /// Creates a raw-pointer view for internal descriptor construction.
     pub(crate) const fn new(mutability: Mutability, pointee: &'static TypeRef) -> Self {
-        Self { mutability, pointee }
+        Self {
+            mutability,
+            pointee: TypeRefSource::Eager(pointee),
+        }
+    }
+
+    /// Creates a raw-pointer view whose pointee resolves on first navigation.
+    pub(crate) const fn new_lazy(mutability: Mutability, pointee: &'static LazyTypeRef) -> Self {
+        Self {
+            mutability,
+            pointee: TypeRefSource::Lazy(pointee),
+        }
     }
 
     /// Returns whether the pointer is const or mutable.
@@ -323,8 +503,8 @@ impl RawPointerTypeDescriptor {
     }
 
     /// Returns the pointee type.
-    pub const fn pointee_type(&self) -> &'static TypeRef {
-        self.pointee
+    pub fn pointee_type(&self) -> &'static TypeRef {
+        self.pointee.get()
     }
 }
 
@@ -334,8 +514,8 @@ pub struct FunctionTypeDescriptor {
     kind: FunctionPointerKind,
     abi: &'static FunctionAbi,
     variadic: bool,
-    parameters: &'static [TypeRef],
-    return_type: &'static TypeRef,
+    parameters: TypeRefListSource,
+    return_type: TypeRefSource,
 }
 
 impl FunctionTypeDescriptor {
@@ -351,8 +531,26 @@ impl FunctionTypeDescriptor {
             kind,
             abi,
             variadic,
-            parameters,
-            return_type,
+            parameters: TypeRefListSource::Eager(parameters),
+            return_type: TypeRefSource::Eager(return_type),
+        }
+    }
+
+    /// Creates a function view whose signature relationships resolve on first
+    /// navigation.
+    pub(crate) const fn new_lazy(
+        kind: FunctionPointerKind,
+        abi: &'static FunctionAbi,
+        variadic: bool,
+        parameters: &'static LazyTypeRefList,
+        return_type: &'static LazyTypeRef,
+    ) -> Self {
+        Self {
+            kind,
+            abi,
+            variadic,
+            parameters: TypeRefListSource::Lazy(parameters),
+            return_type: TypeRefSource::Lazy(return_type),
         }
     }
 
@@ -372,19 +570,43 @@ impl FunctionTypeDescriptor {
     }
 
     /// Returns parameter types in declaration order.
-    pub const fn parameters(&self) -> &'static [TypeRef] {
-        self.parameters
+    pub fn parameters(&self) -> &'static [TypeRef] {
+        self.parameters.get()
     }
 
     /// Returns the function return type.
-    pub const fn return_type(&self) -> &'static TypeRef {
-        self.return_type
+    pub fn return_type(&self) -> &'static TypeRef {
+        self.return_type.get()
     }
 }
 
 /// The typed view of a dyn-compatible trait object.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct TraitObjectTypeDescriptor;
+#[derive(Clone, Copy)]
+pub struct TraitObjectTypeDescriptor {
+    trait_descriptor: fn() -> &'static TraitDescriptor,
+}
+
+impl TraitObjectTypeDescriptor {
+    /// Creates a trait-object view backed by a lazy applied-trait resolver.
+    pub(crate) const fn new(trait_descriptor: fn() -> &'static TraitDescriptor) -> Self {
+        Self { trait_descriptor }
+    }
+
+    /// Returns the applied trait declaration represented by this object type.
+    pub fn trait_descriptor(&self) -> &'static TraitDescriptor {
+        (self.trait_descriptor)()
+    }
+}
+
+impl std::fmt::Debug for TraitObjectTypeDescriptor {
+    /// Formats the linked trait identity without expanding its full graph.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TraitObjectTypeDescriptor")
+            .field("trait", &self.trait_descriptor().rust_path())
+            .finish()
+    }
+}
 
 /// The typed view of an intentionally opaque root descriptor.
 #[derive(Clone, Copy, Debug, Default)]

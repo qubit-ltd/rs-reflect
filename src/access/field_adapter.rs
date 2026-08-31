@@ -18,6 +18,13 @@ pub type FieldGetMutAdapter = for<'a> fn(DynamicMut<'a, Local>) -> Result<Dynami
 /// A whole-value replacement adapter for a field.
 pub type FieldSetAdapter = for<'a> fn(DynamicMut<'a, Local>, DynamicOwned<Local>) -> Result<(), FieldAccessError>;
 
+/// A non-consuming validation hook run immediately before a field set adapter.
+///
+/// Generated enum fields use this hook to reject an inactive variant while
+/// the descriptor still owns and can recover the replacement value.
+#[doc(hidden)]
+pub type FieldSetPreflightAdapter = for<'a> fn(&DynamicMut<'a, Local>) -> Result<(), FieldAccessError>;
+
 /// Returns the exact type identity carried by a local shared dynamic value.
 pub(crate) fn dynamic_ref_type_id(value: &DynamicRef<'_, Local>) -> TypeId {
     match value.as_any() {

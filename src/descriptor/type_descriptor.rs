@@ -4,6 +4,8 @@
 use std::any::TypeId;
 use std::fmt;
 
+use crate::__private::LazyTypeRef;
+use crate::__private::LazyTypeRefList;
 use crate::capability::CapabilityKey;
 use crate::capability::TypeCapabilities;
 use crate::construct::ConstructionError;
@@ -13,12 +15,17 @@ use crate::construct::StructConstructionDescriptor;
 use crate::construct::TupleConstructionInput;
 use crate::descriptor::ArrayTypeDescriptor;
 use crate::descriptor::ConcreteGenericDescriptor;
+use crate::descriptor::EnumRepr;
 use crate::descriptor::EnumTypeDescriptor;
 use crate::descriptor::FieldDescriptor;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::FunctionTypeDescriptor;
+use crate::descriptor::ImplDescriptor;
 use crate::descriptor::MapKind;
 use crate::descriptor::MapTypeDescriptor;
+use crate::descriptor::MethodInstanceDescriptor;
+use crate::descriptor::MethodLookup;
+use crate::descriptor::MethodQualifier;
 use crate::descriptor::Mutability;
 use crate::descriptor::OpaqueTypeView;
 use crate::descriptor::OptionalTypeDescriptor;
@@ -45,7 +52,9 @@ use crate::descriptor::TypeRef;
 use crate::descriptor::VariantDescriptor;
 use crate::descriptor::type_ref::type_id_of;
 use crate::descriptor::type_ref::type_name_of;
+use crate::error::RegistryError;
 use crate::expression::FunctionAbi;
+use crate::registry::ReflectRegistry;
 use crate::value::ReflectedOwned;
 
 /// The sole public generic contract for types that provide a static reflection
@@ -203,7 +212,22 @@ impl TypeDescriptor {
         query_name: &'static str,
         variants: &'static [VariantDescriptor],
     ) -> Self {
-        Self::new::<T>(query_name, TypeDescriptorData::Enum(EnumTypeDescriptor), &[], variants)
+        Self::new_enum_with_repr::<T>(query_name, variants, &[])
+    }
+
+    /// Creates an enum root with normalized explicit representation metadata.
+    #[doc(hidden)]
+    pub(crate) const fn new_enum_with_repr<T: ?Sized + 'static>(
+        query_name: &'static str,
+        variants: &'static [VariantDescriptor],
+        representations: &'static [EnumRepr],
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Enum(EnumTypeDescriptor::new(representations)),
+            &[],
+            variants,
+        )
     }
 
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
@@ -213,6 +237,21 @@ impl TypeDescriptor {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Tuple(TupleTypeDescriptor::new(elements)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a tuple root whose element relationships resolve on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_tuple_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        elements: &'static LazyTypeRefList,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Tuple(TupleTypeDescriptor::new_lazy(elements)),
             &[],
             &[],
         )
@@ -233,12 +272,43 @@ impl TypeDescriptor {
         )
     }
 
+    /// Creates an array root whose element relationship resolves on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_array_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        element: &'static LazyTypeRef,
+        length: usize,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Array(ArrayTypeDescriptor::new_lazy(element, length)),
+            &[],
+            &[],
+        )
+    }
+
     /// Creates an optional root for built-in descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Optional(OptionalTypeDescriptor::new(element)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates an optional root whose element relationship is resolved on
+    /// first navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_optional_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        element: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(element)),
             &[],
             &[],
         )
@@ -259,6 +329,22 @@ impl TypeDescriptor {
         )
     }
 
+    /// Creates a sequence root whose element relationship resolves on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_sequence_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: SequenceKind,
+        element: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Sequence(SequenceTypeDescriptor::new_lazy(kind, element)),
+            &[],
+            &[],
+        )
+    }
+
     /// Creates a set root for built-in descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_set<T: ?Sized + 'static>(
@@ -269,6 +355,22 @@ impl TypeDescriptor {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Set(SetTypeDescriptor::new(kind, element)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a set root whose element relationship resolves on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_set_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: SetKind,
+        element: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Set(SetTypeDescriptor::new_lazy(kind, element)),
             &[],
             &[],
         )
@@ -290,6 +392,23 @@ impl TypeDescriptor {
         )
     }
 
+    /// Creates a map root whose key and value relationships resolve on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_map_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: MapKind,
+        key: &'static LazyTypeRef,
+        value: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Map(MapTypeDescriptor::new_lazy(kind, key, value)),
+            &[],
+            &[],
+        )
+    }
+
     /// Creates a smart-pointer root for built-in descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_smart_pointer<T: ?Sized + 'static>(
@@ -300,6 +419,22 @@ impl TypeDescriptor {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new(kind, pointee)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a smart-pointer root whose pointee relationship is resolved on
+    /// first navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_smart_pointer_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: SmartPointerKind,
+        pointee: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new_lazy(kind, pointee)),
             &[],
             &[],
         )
@@ -320,12 +455,43 @@ impl TypeDescriptor {
         )
     }
 
+    /// Creates a reference root whose target relationship resolves on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_reference_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: ReferenceKind,
+        target: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Reference(ReferenceTypeDescriptor::new_lazy(kind, target)),
+            &[],
+            &[],
+        )
+    }
+
     /// Creates a slice root for built-in descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Slice(SliceTypeDescriptor::new(element)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a slice root whose element relationship resolves on first
+    /// navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_slice_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        element: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Slice(SliceTypeDescriptor::new_lazy(element)),
             &[],
             &[],
         )
@@ -341,6 +507,22 @@ impl TypeDescriptor {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new(mutability, pointee)),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a raw-pointer root whose pointee relationship resolves on
+    /// first navigation.
+    #[doc(hidden)]
+    pub(crate) const fn new_raw_pointer_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        mutability: Mutability,
+        pointee: &'static LazyTypeRef,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new_lazy(mutability, pointee)),
             &[],
             &[],
         )
@@ -370,12 +552,40 @@ impl TypeDescriptor {
         )
     }
 
-    /// Creates a trait-object root for generated descriptor data.
+    /// Creates a function-pointer root whose signature relationships resolve
+    /// on first navigation.
     #[doc(hidden)]
-    pub(crate) const fn new_trait_object<T: ?Sized + 'static>(query_name: &'static str) -> Self {
+    pub(crate) const fn new_function_lazy<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: FunctionPointerKind,
+        abi: &'static FunctionAbi,
+        variadic: bool,
+        parameters: &'static LazyTypeRefList,
+        return_type: &'static LazyTypeRef,
+    ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::TraitObject(TraitObjectTypeDescriptor),
+            TypeDescriptorData::Function(FunctionTypeDescriptor::new_lazy(
+                kind,
+                abi,
+                variadic,
+                parameters,
+                return_type,
+            )),
+            &[],
+            &[],
+        )
+    }
+
+    /// Creates a trait-object root for generated descriptor data.
+    #[doc(hidden)]
+    pub(crate) const fn new_trait_object<T: ?Sized + 'static>(
+        query_name: &'static str,
+        trait_descriptor: fn() -> &'static crate::descriptor::TraitDescriptor,
+    ) -> Self {
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::TraitObject(TraitObjectTypeDescriptor::new(trait_descriptor)),
             &[],
             &[],
         )
@@ -721,6 +931,42 @@ impl TypeDescriptor {
         self.variants
             .iter()
             .find(|variant| variant.numeric_discriminant() == Some(discriminant))
+    }
+
+    /// Returns every linked reflected implementation targeting this exact
+    /// root in deterministic registry order.
+    ///
+    /// Both the returned slice and its descriptors belong to the immutable
+    /// process-wide registry. A cached [`RegistryError`] is returned when
+    /// distributed registration could not be aggregated.
+    pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
+        let registry = ReflectRegistry::initialize()?;
+        Ok(registry.implementations(self.type_id()))
+    }
+
+    /// Returns the frozen effective method instances for this exact root.
+    ///
+    /// The view includes inherent methods and concrete trait methods, with
+    /// defaulted trait methods replaced by their effective override where
+    /// applicable. The slice is empty when no reflected impl targets this
+    /// root. A cached [`RegistryError`] is returned when aggregation failed.
+    pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
+        let registry = ReflectRegistry::initialize()?;
+        Ok(registry.effective_view(self.type_id()).methods())
+    }
+
+    /// Looks up an effective method by query name across all namespaces.
+    ///
+    /// [`MethodLookup::Missing`] means no method matched, while
+    /// [`MethodLookup::Ambiguous`] means multiple inherent or trait namespaces
+    /// use the name. Callers that need a qualified namespace can use
+    /// [`crate::registry::EffectiveTypeView::lookup_method`] on a registry
+    /// view. A cached [`RegistryError`] is returned when aggregation failed.
+    pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
+        let registry = ReflectRegistry::initialize()?;
+        Ok(registry
+            .effective_view(self.type_id())
+            .lookup_method(MethodQualifier::Any, name))
     }
 }
 
