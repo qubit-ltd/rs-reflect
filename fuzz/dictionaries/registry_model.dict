@@ -1,0 +1,6 @@
+type_a="\x00"
+type_b="\x01"
+cap_u8="\x02"
+cap_u16="\x03"
+duplicate_a="\x00\x00"
+capability_conflict="\x02\x03"

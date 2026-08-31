@@ -1,0 +1,5 @@
+external="example.capability"
+reserved="qubit.reflect.clone"
+empty_segment="example..capability"
+leading_digit="1example.capability"
+underscore="example_capability.v1"
