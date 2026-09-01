@@ -20,9 +20,9 @@ use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
 use crate::expression::TypeExpression;
 use crate::registry::EffectiveTypeView;
-use crate::registry::builder::build_inventory_registry;
-use crate::registry::builder::initialize_cached;
 use crate::registry::indexes::RegistryIndexes;
+use crate::registry::registry_builder::build_inventory_registry;
+use crate::registry::registry_builder::initialize_cached;
 
 /// A borrowed, deterministic set of type-descriptor name matches.
 #[derive(Clone, Copy, Debug)]
@@ -37,16 +37,22 @@ impl<'registry> TypeCandidates<'registry> {
     }
 
     /// Returns candidates in stable fragment order.
+    #[must_use]
+    #[inline(always)]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching descriptors.
+    #[must_use]
+    #[inline(always)]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no descriptor matched the requested name.
+    #[must_use]
+    #[inline(always)]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
@@ -76,21 +82,29 @@ impl<'registry> TraitCandidates<'registry> {
     }
 
     /// Returns candidates in stable fragment order.
+    #[must_use]
+    #[inline(always)]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching declarations.
+    #[must_use]
+    #[inline(always)]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no declarations match.
+    #[must_use]
+    #[inline(always)]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
 
     /// Returns the sole matching declaration, rejecting ambiguous path lookups.
+    #[must_use]
+    #[inline(always)]
     pub fn only(self) -> Option<&'static TraitDefinitionDescriptor> {
         (self.descriptors.len() == 1).then(|| self.descriptors[0])
     }

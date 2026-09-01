@@ -14,7 +14,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::descriptor;
+use qubit_reflect::__private::codegen_v1::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessOperation;
 use qubit_reflect::access::FieldAccessPolicy;

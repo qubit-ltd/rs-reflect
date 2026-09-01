@@ -37,8 +37,9 @@ use qubit_reflect::expression::FunctionAbi;
 struct LazyOptionalElement;
 
 static LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
-static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::struct_type::<LazyOptionalElement>("lazy_optional_element", StructKind::Unit, &[]);
+static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
+    LazyOptionalElement,
+>("lazy_optional_element", StructKind::Unit, &[]);
 
 impl Reflect for LazyOptionalElement {
     /// Counts and returns the stable descriptor used to observe lazy relation
@@ -52,8 +53,9 @@ impl Reflect for LazyOptionalElement {
 struct LazyBoxPointee;
 
 static LAZY_BOX_POINTEE_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
-static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::struct_type::<LazyBoxPointee>("lazy_box_pointee", StructKind::Unit, &[]);
+static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
+    LazyBoxPointee,
+>("lazy_box_pointee", StructKind::Unit, &[]);
 
 impl Reflect for LazyBoxPointee {
     /// Counts and returns the stable descriptor used to observe lazy relation
@@ -70,7 +72,7 @@ macro_rules! define_lazy_probe {
 
         static $counter: AtomicUsize = AtomicUsize::new(0);
         static $descriptor: TypeDescriptor =
-            reflect::__private::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
+            reflect::__private::codegen_v1::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
 
         impl Reflect for $type_name {
             /// Counts and returns one stable descriptor used to observe lazy

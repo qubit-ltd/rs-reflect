@@ -542,6 +542,38 @@ pub enum MethodLookup<'a> {
 }
 
 /// One explicitly registered concrete instance of an impl definition.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+/// #[cfg(feature = "derive")]
+/// use qubit_reflect::reflect_impl;
+///
+/// #[cfg(feature = "derive")]
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct Service;
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect_impl(crate = qubit_reflect)]
+/// impl Service {
+///     fn ping(&self) {}
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let implementation = TypeDescriptor::of::<Service>()
+///     .impls()?
+///     .first()
+///     .expect("reflected implementation");
+/// assert_eq!(implementation.target_type().query_name(), "Service");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 pub struct ImplDescriptor {
     definition: &'static ImplDefinitionDescriptor,
     target_type: TypeDescriptorResolver,

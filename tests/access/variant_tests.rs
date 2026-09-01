@@ -10,7 +10,7 @@
 //! Integration tests for reflected enum variant access.
 use std::any::TypeId;
 
-use qubit_reflect::__private::descriptor;
+use qubit_reflect::__private::codegen_v1::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessPolicy;
 use qubit_reflect::access::FieldIdentity;

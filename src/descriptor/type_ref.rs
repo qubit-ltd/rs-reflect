@@ -26,6 +26,16 @@ pub(crate) fn type_name_of<T: ?Sized + 'static>() -> &'static str {
 }
 
 /// A type used by a reflected declaration or member.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TypeRef;
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let reference = TypeRef::Resolved(TypeDescriptor::of::<u32>());
+/// assert_eq!(reference.as_resolved().map(TypeDescriptor::type_name), Some("u32"));
+/// ```
 #[derive(Clone)]
 pub enum TypeRef {
     /// A concrete reflected type with a unique root descriptor.

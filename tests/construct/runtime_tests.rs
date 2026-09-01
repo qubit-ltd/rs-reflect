@@ -14,7 +14,7 @@ mod construction_runtime {
     use std::rc::Rc;
 
     use qubit_reflect as reflect;
-    use qubit_reflect::__private::descriptor;
+    use qubit_reflect::__private::codegen_v1::descriptor;
     use qubit_reflect::access::VariantActiveAdapter;
     use qubit_reflect::construct::ConstructionError;
     use qubit_reflect::construct::ConstructionField;

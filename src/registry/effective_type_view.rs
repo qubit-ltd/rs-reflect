@@ -16,6 +16,18 @@ use crate::descriptor::MethodQualifier;
 
 /// A frozen effective view of the implementations and methods targeting one
 /// concrete reflected type.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::registry::ReflectRegistry;
+///
+/// let registry = ReflectRegistry::initialize()?;
+/// let view = registry.effective_view(TypeId::of::<u32>());
+/// assert!(view.methods().is_empty());
+/// # Ok::<(), qubit_reflect::error::RegistryError>(())
+/// ```
 #[derive(Debug)]
 pub struct EffectiveTypeView {
     implementations: Box<[&'static ImplDescriptor]>,
@@ -182,11 +194,10 @@ mod tests {
 
     /// Builds one concrete type argument with stable structural identity.
     fn type_argument(name: &str) -> GenericArgument {
-        GenericArgument::Type(TypeExpression::Concrete(ConcreteTypeExpression {
-            path: Box::new([name.into()]),
-            arguments: Box::new([]),
-            diagnostic: DiagnosticText::from(name),
-        }))
+        let expression = ConcreteTypeExpression::new([name], [])
+            .expect("the fixture path contains one segment")
+            .with_diagnostic(name);
+        GenericArgument::Type(TypeExpression::Concrete(expression))
     }
 
     /// Builds one stable fixture member identity.

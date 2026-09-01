@@ -648,22 +648,67 @@ pub struct SupertraitClosure<'a> {
 
 impl<'a> SupertraitClosure<'a> {
     /// Returns applied supertraits in deterministic path order.
+    #[must_use]
+    #[inline(always)]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
         self.descriptors.iter().map(|descriptor| descriptor.descriptor())
     }
 
     /// Returns the number of distinct transitive supertraits.
+    #[must_use]
+    #[inline(always)]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether the closure is empty.
+    #[must_use]
+    #[inline(always)]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
 }
 
 /// An applied trait descriptor with concrete generic arguments.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+/// #[cfg(feature = "derive")]
+/// use qubit_reflect::{reflect, reflect_impl};
+///
+/// #[cfg(feature = "derive")]
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct Service;
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect(crate = qubit_reflect)]
+/// trait Named {
+///     fn name(&self) -> &'static str;
+/// }
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect_impl(crate = qubit_reflect)]
+/// impl Named for Service {
+///     fn name(&self) -> &'static str { "service" }
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let applied = TypeDescriptor::of::<Service>()
+///     .impls()?
+///     .iter()
+///     .find_map(|implementation| implementation.implemented_trait())
+///     .expect("reflected trait implementation");
+/// assert_eq!(applied.definition().rust_name(), "Named");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 pub struct TraitDescriptor {
     definition: &'static TraitDefinitionDescriptor,
     trait_id: AppliedTraitId,

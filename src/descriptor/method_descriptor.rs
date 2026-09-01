@@ -229,27 +229,61 @@ pub enum MethodVisibility {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MethodQualifiers {
     /// Whether the declaration is `async`.
-    pub is_async: bool,
+    pub(crate) is_async: bool,
     /// Whether the declaration is `unsafe`.
-    pub is_unsafe: bool,
+    pub(crate) is_unsafe: bool,
     /// Whether the declaration is `const`.
-    pub is_const: bool,
+    pub(crate) is_const: bool,
     /// The explicitly declared ABI, or `None` for the ordinary Rust ABI.
-    pub abi: Option<FunctionAbi>,
+    pub(crate) abi: Option<FunctionAbi>,
     /// Whether the declaration has a variadic tail.
-    pub is_variadic: bool,
+    pub(crate) is_variadic: bool,
+}
+
+impl MethodQualifiers {
+    /// Creates the complete set of method qualifiers.
+    pub const fn new(
+        is_async: bool,
+        is_unsafe: bool,
+        is_const: bool,
+        abi: Option<FunctionAbi>,
+        is_variadic: bool,
+    ) -> Self {
+        Self {
+            is_async,
+            is_unsafe,
+            is_const,
+            abi,
+            is_variadic,
+        }
+    }
+
+    /// Returns whether the declaration is asynchronous.
+    pub const fn is_async(&self) -> bool {
+        self.is_async
+    }
+    /// Returns whether the declaration is unsafe.
+    pub const fn is_unsafe(&self) -> bool {
+        self.is_unsafe
+    }
+    /// Returns whether the declaration is const.
+    pub const fn is_const(&self) -> bool {
+        self.is_const
+    }
+    /// Returns the explicitly declared ABI.
+    pub const fn abi(&self) -> Option<&FunctionAbi> {
+        self.abi.as_ref()
+    }
+    /// Returns whether the declaration has a variadic tail.
+    pub const fn is_variadic(&self) -> bool {
+        self.is_variadic
+    }
 }
 
 impl Default for MethodQualifiers {
     /// Returns the qualifiers of an ordinary safe Rust method.
     fn default() -> Self {
-        Self {
-            is_async: false,
-            is_unsafe: false,
-            is_const: false,
-            abi: None,
-            is_variadic: false,
-        }
+        Self::new(false, false, false, None, false)
     }
 }
 
@@ -607,6 +641,39 @@ impl InvocationAdapter {
 fn unavailable_entry_point() {}
 
 /// An immutable reflected method declaration.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+/// #[cfg(feature = "derive")]
+/// use qubit_reflect::reflect_impl;
+///
+/// #[cfg(feature = "derive")]
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct Service;
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect_impl(crate = qubit_reflect)]
+/// impl Service {
+///     fn ping(&self) {}
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let method = TypeDescriptor::of::<Service>()
+///     .impls()?
+///     .first()
+///     .and_then(|implementation| implementation.method("ping"))
+///     .expect("reflected method");
+/// assert_eq!(method.rust_name(), "ping");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 #[derive(Clone, Debug)]
 pub struct MethodDescriptor {
     identity: MemberId,

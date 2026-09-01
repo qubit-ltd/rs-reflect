@@ -64,10 +64,10 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert!(format!("{failure:?}").contains("PinnedRefInvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
-    assert_eq!(*failure.recovery.receiver(), 7);
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    let recovered = failure.recovery.into_invocation();
+    assert_eq!(*failure.recovery().receiver(), 7);
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
 
@@ -106,9 +106,9 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert!(format!("{failure:?}").contains("PinnedMutInvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
-    assert_eq!(*failure.recovery.receiver(), 23);
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    let recovered = failure.recovery.into_invocation();
+    assert_eq!(*failure.recovery_mut().receiver(), 23);
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }

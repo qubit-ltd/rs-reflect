@@ -8,7 +8,6 @@
 
 //! Reflection registry APIs.
 
-mod builder;
 mod effective_type_view;
 pub(crate) mod fragment;
 mod indexes;
@@ -18,9 +17,8 @@ mod internal;
     reason = "the planned file layout names the central registry type registry.rs"
 )]
 mod registry;
+mod registry_builder;
 
-pub(crate) use builder::build_registry;
-pub(crate) use builder::initialize_registry;
 pub use effective_type_view::EffectiveTypeView;
 #[cfg(feature = "bench-internals")]
 pub(crate) use internal::benchmark_registry_facts::BenchmarkRegistryFacts;
@@ -32,3 +30,5 @@ pub use registry::ImplDefinitionCandidates;
 pub use registry::ReflectRegistry;
 pub use registry::TraitCandidates;
 pub use registry::TypeCandidates;
+pub(crate) use registry_builder::build_registry;
+pub(crate) use registry_builder::initialize_registry;

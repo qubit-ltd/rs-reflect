@@ -8,6 +8,8 @@
 
 //! Declaration-level semantic IR shared by validation and expansion.
 
+// qubit-style: allow multiple-public-types
+
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;

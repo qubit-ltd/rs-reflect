@@ -10,7 +10,6 @@
 
 use libfuzzer_sys::fuzz_target;
 use qubit_reflect::expression::ConcreteTypeExpression;
-use qubit_reflect::expression::DiagnosticText;
 use qubit_reflect::expression::GenericArgument;
 use qubit_reflect::expression::TypeExpression;
 
@@ -20,11 +19,13 @@ const MAX_INPUT_CHARS: usize = 4_096;
 // arbitrary text.
 fuzz_target!(|data: String| {
     let data = data.chars().take(MAX_INPUT_CHARS).collect::<String>();
-    let expression = TypeExpression::Concrete(ConcreteTypeExpression {
-        path: Box::new([data.clone().into_boxed_str()]),
-        arguments: Box::new([GenericArgument::Type(TypeExpression::Parameter(data.into_boxed_str()))]),
-        diagnostic: DiagnosticText::default(),
-    });
+    let expression = TypeExpression::Concrete(
+        ConcreteTypeExpression::new(
+            [data.clone().into_boxed_str()],
+            [GenericArgument::Type(TypeExpression::Parameter(data.into_boxed_str()))],
+        )
+        .expect("the generated path contains exactly one segment"),
+    );
     assert_eq!(expression, expression.clone());
     let _ = format!("{expression:?}");
 });

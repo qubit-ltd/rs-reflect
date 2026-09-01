@@ -13,6 +13,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use crate::expression::DiagnosticText;
+use crate::expression::ExpressionError;
 use crate::expression::LifetimeExpression;
 use crate::expression::TypeExpression;
 
@@ -30,6 +31,7 @@ pub enum TraitBoundModifier {
 #[derive(Clone, Debug)]
 pub enum PredicateDescriptor {
     /// Bounds placed on a type, for example `T: Display + Send`.
+    #[non_exhaustive]
     TypeBound {
         /// The type being constrained.
         subject: TypeExpression,
@@ -43,6 +45,7 @@ pub enum PredicateDescriptor {
         diagnostic: DiagnosticText,
     },
     /// A lifetime outlives relation such as `'a: 'b`.
+    #[non_exhaustive]
     LifetimeOutlives {
         /// The lifetime that must outlive every bound lifetime.
         lifetime: LifetimeExpression,
@@ -69,6 +72,76 @@ pub enum PredicateDescriptor {
         /// Optional source-oriented diagnostic text excluded from identity.
         diagnostic: DiagnosticText,
     },
+}
+
+impl PredicateDescriptor {
+    /// Creates a type-bound predicate after validating its parallel lists.
+    pub fn type_bound(
+        subject: TypeExpression,
+        bounds: impl Into<Box<[TypeExpression]>>,
+        modifiers: impl Into<Box<[TraitBoundModifier]>>,
+        higher_ranked_lifetimes: impl Into<Box<[LifetimeExpression]>>,
+    ) -> Result<Self, ExpressionError> {
+        let bounds = bounds.into();
+        let bound_modifiers = modifiers.into();
+        if bounds.is_empty() {
+            return Err(ExpressionError::EmptyTypeBounds);
+        }
+        if bounds.len() != bound_modifiers.len() {
+            return Err(ExpressionError::BoundModifierCount {
+                bounds: bounds.len(),
+                modifiers: bound_modifiers.len(),
+            });
+        }
+        Ok(Self::TypeBound {
+            subject,
+            bounds,
+            bound_modifiers,
+            higher_ranked_lifetimes: higher_ranked_lifetimes.into(),
+            diagnostic: DiagnosticText::default(),
+        })
+    }
+
+    /// Creates a lifetime-outlives predicate with at least one bound.
+    pub fn lifetime_outlives(
+        lifetime: LifetimeExpression,
+        bounds: impl Into<Box<[LifetimeExpression]>>,
+    ) -> Result<Self, ExpressionError> {
+        let bounds = bounds.into();
+        if bounds.is_empty() {
+            return Err(ExpressionError::EmptyLifetimeBounds);
+        }
+        Ok(Self::LifetimeOutlives {
+            lifetime,
+            bounds,
+            diagnostic: DiagnosticText::default(),
+        })
+    }
+
+    /// Returns optional source-oriented diagnostic text.
+    #[must_use]
+    pub fn diagnostic(&self) -> Option<&str> {
+        match self {
+            Self::TypeBound { diagnostic, .. }
+            | Self::LifetimeOutlives { diagnostic, .. }
+            | Self::TypeOutlives { diagnostic, .. }
+            | Self::TypeEquality { diagnostic, .. } => diagnostic.as_deref(),
+        }
+    }
+
+    /// Attaches source-oriented diagnostic text without changing structural
+    /// identity.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        let diagnostic = DiagnosticText::from(value.into());
+        match &mut self {
+            Self::TypeBound { diagnostic: target, .. }
+            | Self::LifetimeOutlives { diagnostic: target, .. }
+            | Self::TypeOutlives { diagnostic: target, .. }
+            | Self::TypeEquality { diagnostic: target, .. } => *target = diagnostic,
+        }
+        self
+    }
 }
 
 impl PartialEq for PredicateDescriptor {

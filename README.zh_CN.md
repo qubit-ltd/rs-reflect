@@ -19,6 +19,17 @@ qubit-reflect = "0.1"
 默认启用的 `derive` feature 会导出 `#[derive(Reflect)]`、`#[reflect]` 和
 `#[reflect_impl]`。关闭默认 feature 后，运行时和手写注册 API 仍然可用，但这三个宏不会被重导出。
 
+外部类型的 `Reflect` 实现均需显式选择：
+
+| Feature | 提供的 `Reflect` 实现 |
+| --- | --- |
+| `derive`（默认） | 三个反射宏；不会引入外部类型依赖 |
+| `ecosystem-types` | `bigdecimal`、`chrono`、`uuid` 中的类型 |
+| `qubit-types` | `qubit-datatype`、`qubit-id` 中的类型 |
+
+只使用运行时 API 时，可配置
+`qubit-reflect = { version = "0.1", default-features = false }`。只有确实会穿过反射边界的外部类型族才应启用对应 feature。
+
 ## 快速开始
 
 假设正在编写一个由模式驱动的编辑器：它需要按字段名显示和修改对象，而业务代码仍然保有对象。只需在声明处派生描述符，按名称取得字段，再传入正确的借用包装器。真正执行前，适配器会检查目标类型、访问策略和替换值的精确 Rust 类型。

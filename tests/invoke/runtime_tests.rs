@@ -448,14 +448,14 @@ mod invocation_runtime {
             .expect_err("owned arguments must not be implicitly borrowed");
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::ArgumentModeMismatch {
                 index: 0,
                 expected: InvocationInputMode::Ref,
                 actual: InvocationInputMode::Owned,
             }
         ));
-        let (_, arguments) = failure.recovery.into_parts();
+        let (_, arguments) = failure.into_recovery().into_parts();
         let [InvocationArg::Owned(value)] =
             <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 1]>>::try_into(arguments.into_vec())
                 .unwrap_or_else(|_| panic!("recovery should preserve the argument"))
@@ -542,7 +542,7 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::DuplicateArgumentBinding {
                 input_index: 1,
                 parameter_index: 0,
@@ -560,10 +560,10 @@ mod invocation_runtime {
             "InvocationError must expose InvocationErrorKind as its source"
         );
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.argument_name(0), Some("first"));
-        assert_eq!(failure.recovery.argument_name(1), Some("first"));
-        assert_eq!(failure.recovery.argument_name(2), Some("third"));
-        let (_, arguments) = failure.recovery.into_parts();
+        assert_eq!(failure.recovery().argument_name(0), Some("first"));
+        assert_eq!(failure.recovery().argument_name(1), Some("first"));
+        assert_eq!(failure.recovery().argument_name(2), Some("third"));
+        let (_, arguments) = failure.into_recovery().into_parts();
         let [first, second, third] =
             <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
                 .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
@@ -612,14 +612,14 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
         ));
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.argument_name(0), Some("third"));
-        assert_eq!(failure.recovery.argument_name(1), None);
-        assert_eq!(failure.recovery.argument_name(2), Some("second"));
-        let (_, arguments) = failure.recovery.into_parts();
+        assert_eq!(failure.recovery().argument_name(0), Some("third"));
+        assert_eq!(failure.recovery().argument_name(1), None);
+        assert_eq!(failure.recovery().argument_name(2), Some("second"));
+        let (_, arguments) = failure.into_recovery().into_parts();
         let [third, first, second] =
             <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
                 .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
@@ -699,13 +699,13 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::UnknownArgumentName { input_index: 0, name }
                 if name.as_ref() == "_"
         ));
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.argument_name(0), Some("_"));
-        assert_eq!(failure.recovery.arguments().len(), 3);
+        assert_eq!(failure.recovery().argument_name(0), Some("_"));
+        assert_eq!(failure.recovery().arguments().len(), 3);
     }
 
     /// Verifies omitted parameters fail during binding instead of in user code.
@@ -726,14 +726,14 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::MissingArgumentBinding {
                 parameter_index: 1,
                 name: Some("second"),
             }
         ));
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.arguments().len(), 2);
+        assert_eq!(failure.recovery().arguments().len(), 2);
     }
 
     /// Verifies catching invocation uses descriptor-aware named binding.
@@ -821,7 +821,7 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
         ));
         assert!(
@@ -831,10 +831,10 @@ mod invocation_runtime {
             "a pinned failure must expose its structured invocation error"
         );
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.argument_name(0), Some("third"));
-        assert_eq!(failure.recovery.argument_name(1), Some("first"));
-        assert_eq!(failure.recovery.argument_name(2), Some("second"));
-        let arguments = failure.recovery.arguments();
+        assert_eq!(failure.recovery().argument_name(0), Some("third"));
+        assert_eq!(failure.recovery().argument_name(1), Some("first"));
+        assert_eq!(failure.recovery().argument_name(2), Some("second"));
+        let arguments = failure.recovery().arguments();
         assert_eq!(arguments.len(), 3);
         assert_eq!(arguments[0].type_id(), TypeId::of::<u32>());
         assert_eq!(arguments[1].type_id(), TypeId::of::<u8>());
@@ -861,15 +861,15 @@ mod invocation_runtime {
         };
 
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::NamedBindingRequiresDescriptor {
                 input_index: 0,
                 name,
             } if name.as_ref() == "second"
         ));
         assert_eq!(NAMED_INVOCATION_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(failure.recovery.argument_name(0), Some("second"));
-        assert_eq!(failure.recovery.argument_name(1), Some("first"));
+        assert_eq!(failure.recovery().argument_name(0), Some("second"));
+        assert_eq!(failure.recovery().argument_name(1), Some("first"));
     }
 
     /// Verifies identifier-at-subpattern metadata remains positional-only.
@@ -930,13 +930,13 @@ mod invocation_runtime {
             )
             .expect_err("the second argument has the wrong exact type");
 
-        assert_eq!(failure.error.method_identity(), &identity);
+        assert_eq!(failure.error().method_identity(), &identity);
         let InvocationErrorKind::ArgumentTypeMismatch {
             index,
             expected,
             actual,
             expected_name,
-        } = failure.error.kind()
+        } = failure.error().kind()
         else {
             panic!("the mismatch should identify the argument type")
         };
@@ -944,7 +944,7 @@ mod invocation_runtime {
         assert_eq!(*expected, TypeId::of::<bool>());
         assert_eq!(*actual, TypeId::of::<String>());
         assert_eq!(*expected_name, "bool");
-        let (receiver, arguments) = failure.recovery.into_parts();
+        let (receiver, arguments) = failure.into_recovery().into_parts();
         let Some(InvocationReceiver::Owned(receiver)) = receiver else {
             panic!("owned receiver should be recovered")
         };
@@ -990,7 +990,7 @@ mod invocation_runtime {
             .validate(&identity, ReceiverExpectation::borrowed::<Counter>(), &[])
             .expect_err("a shared receiver is required");
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::ReceiverModeMismatch {
                 expected: Some(InvocationInputMode::Ref),
                 actual: None,
@@ -1007,7 +1007,7 @@ mod invocation_runtime {
             )
             .expect_err("one positional argument is required");
         assert!(matches!(
-            failure.error.kind(),
+            failure.error().kind(),
             InvocationErrorKind::ArgumentCountMismatch { expected: 1, actual: 0 }
         ));
     }

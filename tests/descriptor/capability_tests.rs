@@ -76,9 +76,11 @@ fn reflected_root_capabilities() -> &'static TypeCapabilities {
     })
 }
 
-static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root_with_capabilities::<
-    ReflectedRoot,
->("ReflectedRoot", reflected_root_capabilities);
+static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =
+    reflect::__private::codegen_v1::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
+        "ReflectedRoot",
+        reflected_root_capabilities,
+    );
 
 impl Reflect for ReflectedRoot {
     /// Returns the test type's unique descriptor.
