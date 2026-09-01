@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
@@ -87,13 +88,11 @@ impl EnumReprIr {
 }
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
-pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return TokenStream::new();
     }
-    let Some(facade) = super::facade_path_for(&declaration.attributes) else {
-        return TokenStream::new();
-    };
+    let facade = context.facade().clone();
     let name = declaration.name.clone();
     let reflected_field_types = super::generics::reflected_field_types(&declaration);
     let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
@@ -142,7 +141,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let self_type = quote!(#name #type_generics);
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let registration_module = format_ident!("__qubit_reflect_enum_registration_{fingerprint:016x}");
     let query_name = declaration
         .attributes
@@ -317,13 +316,6 @@ fn registration(
             }
         }
     }
-}
-
-/// Computes a stable FNV-1a content fingerprint for one declaration.
-fn fingerprint(input: &str) -> u64 {
-    input.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-    })
 }
 
 /// Generates active-variant and field-access adapters for one enum variant.

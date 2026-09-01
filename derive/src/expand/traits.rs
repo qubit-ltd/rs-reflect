@@ -19,6 +19,7 @@ use quote::format_ident;
 use quote::quote;
 use token_rewrite::replace_self_with_owner;
 
+use crate::expand::ExpansionContext;
 use crate::ir::GenericBoundIr;
 use crate::ir::GenericKindIr;
 use crate::ir::GenericsIr;
@@ -145,12 +146,9 @@ fn associated_const_type_has_proven_static_shape_in(
 
 /// Expands a validated reflected trait without changing its ordinary Rust
 /// semantics.
-pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
-    let facade = match facade_path() {
-        Some(path) => path,
-        None => return declaration.retained_tokens,
-    };
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
+pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
+    let facade = context.facade().clone();
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let suffix = format!("{fingerprint:016x}");
     let marker = Ident::new(&format!("__QubitReflectTraitMarker_{suffix}"), declaration.span);
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
@@ -2197,25 +2195,6 @@ fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
         GenericBoundIr::Lifetime(_) => false,
         GenericBoundIr::Other(_) => true,
     }
-}
-
-/// Returns the caller-visible path of the reflection facade.
-fn facade_path() -> Option<TokenStream> {
-    match proc_macro_crate::crate_name("qubit-reflect") {
-        Ok(proc_macro_crate::FoundCrate::Itself) => Some(quote!(crate)),
-        Ok(proc_macro_crate::FoundCrate::Name(name)) => {
-            let identifier = Ident::new(&name, Span::call_site());
-            Some(quote!(#identifier))
-        }
-        Err(_) => None,
-    }
-}
-
-/// Computes a stable FNV-1a fingerprint for one normalized declaration.
-fn fingerprint(input: &str) -> u64 {
-    input.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-    })
 }
 
 /// Converts generic declaration facts into the runtime generic descriptor

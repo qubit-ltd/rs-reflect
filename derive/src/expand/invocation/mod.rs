@@ -6,17 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Token expansion for validated reflection declarations.
+//! Shared dynamic-invocation planning and emission.
 
-mod construction;
-mod context;
-mod dispatcher;
-mod enums;
-mod generics;
-mod impls;
-mod invocation;
-mod structs;
-mod traits;
-
-pub(crate) use context::ExpansionContext;
-pub(crate) use dispatcher::dispatch;
+pub(crate) mod plan;
