@@ -65,7 +65,8 @@ pub mod value;
 pub use access::FieldAccessError;
 /// A failed field replacement together with its recoverable inputs.
 pub use access::FieldSetFailure;
-/// The target borrow and replacement value retained after a failed field set.
+/// The target borrow and replacement value retained after a failed field
+/// set.
 pub use access::FieldSetRecovery;
 // Construction facade.
 /// A dynamic construction error.
@@ -105,7 +106,8 @@ pub use invoke::InvocationArg;
 pub use invoke::InvocationFailure;
 /// A unit, owned, borrowed, mutable, or future invocation result.
 pub use invoke::InvocationOutput;
-/// The receiver and arguments retained after pre-execution validation fails.
+/// The receiver and arguments retained after pre-execution validation
+/// fails.
 pub use invoke::InvocationRecovery;
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::Reflect;

@@ -41,7 +41,9 @@ fn test_mutable_str_uses_its_dedicated_accessors() {
 fn test_local_str_consuming_downcast_returns_original_wrapper() {
     let value = ReflectedRef::new_str("hello");
     let value = match value.downcast::<String>() {
-        Ok(_) => panic!("a dedicated str variant must not downcast through Any"),
+        Ok(_) => {
+            panic!("a dedicated str variant must not downcast through Any")
+        }
         Err(value) => value,
     };
     assert_eq!(value.as_str(), Some("hello"));
@@ -49,7 +51,9 @@ fn test_local_str_consuming_downcast_returns_original_wrapper() {
     let mut text = String::from("hello");
     let value = ReflectedMut::new_str_mut(text.as_mut_str());
     let mut value = match value.downcast::<String>() {
-        Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
+        Ok(_) => panic!(
+            "a dedicated mutable str variant must not downcast through Any"
+        ),
         Err(value) => value,
     };
     value
@@ -85,13 +89,17 @@ fn test_local_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let mut text = String::from("hello");
     match ReflectedMut::new_str_mut(text.as_mut_str()).into_str_mut() {
         Ok(extracted) => extracted.make_ascii_uppercase(),
-        Err(_) => panic!("a dedicated mutable str wrapper must extract successfully"),
+        Err(_) => {
+            panic!("a dedicated mutable str wrapper must extract successfully")
+        }
     }
     assert_eq!(text, "HELLO");
 
     let mut number = 42_u32;
     let mut value = match ReflectedMut::new(&mut number).into_str_mut() {
-        Ok(_) => panic!("an Any-compatible wrapper must not extract as mutable str"),
+        Ok(_) => {
+            panic!("an Any-compatible wrapper must not extract as mutable str")
+        }
         Err(value) => value,
     };
     *value

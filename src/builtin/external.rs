@@ -20,10 +20,12 @@ use crate::descriptor::TypeDescriptor;
 
 macro_rules! reflected_opaque {
     ($type:ty, $descriptor:ident, $name:expr) => {
-        static $descriptor: TypeDescriptor = crate::__private::descriptor::opaque_root::<$type>($name);
+        static $descriptor: TypeDescriptor =
+            crate::__private::descriptor::opaque_root::<$type>($name);
 
         impl Reflect for $type {
-            /// Returns the static opaque descriptor for this external value type.
+            /// Returns the static opaque descriptor for this external value
+            /// type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 &$descriptor
             }
@@ -31,7 +33,11 @@ macro_rules! reflected_opaque {
     };
 }
 
-reflected_opaque!(Id, ID_DESCRIPTOR, concat!(stringify!(qubit_id), "::", stringify!(Id)));
+reflected_opaque!(
+    Id,
+    ID_DESCRIPTOR,
+    concat!(stringify!(qubit_id), "::", stringify!(Id))
+);
 reflected_opaque!(
     BigDecimal,
     BIG_DECIMAL_DESCRIPTOR,
@@ -64,7 +70,11 @@ reflected_opaque!(
     DATA_TYPE_DESCRIPTOR,
     concat!(stringify!(qubit_datatype), "::", stringify!(DataType))
 );
-reflected_opaque!(Uuid, UUID_DESCRIPTOR, concat!(stringify!(uuid), "::", stringify!(Uuid)));
+reflected_opaque!(
+    Uuid,
+    UUID_DESCRIPTOR,
+    concat!(stringify!(uuid), "::", stringify!(Uuid))
+);
 
 #[cfg(test)]
 mod tests {

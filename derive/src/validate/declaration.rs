@@ -67,7 +67,9 @@ pub(crate) fn validate_declaration(
 }
 
 /// Collects semantic diagnostics without consuming the parsed declaration.
-pub(crate) fn validation_error(declaration: &DeclarationIr) -> Option<syn::Error> {
+pub(crate) fn validation_error(
+    declaration: &DeclarationIr,
+) -> Option<syn::Error> {
     let mut errors = ErrorCollector::default();
     match declaration {
         DeclarationIr::Type(value) => validate_type(value, &mut errors),
@@ -103,23 +105,25 @@ fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
         errors,
     );
     validate_query_name_scope(
-        declaration
-            .variants
-            .iter()
-            .map(|variant| (variant.name.to_string(), &variant.attributes, variant.span)),
+        declaration.variants.iter().map(|variant| {
+            (variant.name.to_string(), &variant.attributes, variant.span)
+        }),
         "variant",
         errors,
     );
     for variant in &declaration.variants {
         validate_attributes(&variant.attributes, errors);
-        validate_query_name(&variant.attributes, &variant.name.to_string(), errors);
+        validate_query_name(
+            &variant.attributes,
+            &variant.name.to_string(),
+            errors,
+        );
         validate_fields(&variant.fields, errors);
         validate_query_name_scope(
             variant.fields.iter().filter_map(|field| {
-                field
-                    .name
-                    .as_ref()
-                    .map(|name| (name.to_string(), &field.attributes, field.span))
+                field.name.as_ref().map(|name| {
+                    (name.to_string(), &field.attributes, field.span)
+                })
             }),
             "field",
             errors,
@@ -152,7 +156,10 @@ fn validate_fields(fields: &[crate::ir::FieldIr], errors: &mut ErrorCollector) {
 }
 
 /// Validates trait-level mappings, methods, and associated-item helpers.
-fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
+fn validate_trait(
+    declaration: &TraitDeclarationIr,
+    errors: &mut ErrorCollector,
+) {
     validate_attributes(&declaration.attributes, errors);
     validate_query_name(
         &declaration.attributes,
@@ -174,17 +181,18 @@ fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector)
                 continue;
             }
             let owner = &path.segments[..path.segments.len() - 1];
-            let is_direct_supertrait = declaration.supertraits.iter().any(|bound| {
-                let GenericBoundIr::Trait { path, .. } = bound else {
-                    return false;
-                };
-                path.segments.len() == owner.len()
-                    && path
-                        .segments
-                        .iter()
-                        .zip(owner)
-                        .all(|(direct, proven)| direct.name == proven.name)
-            });
+            let is_direct_supertrait =
+                declaration.supertraits.iter().any(|bound| {
+                    let GenericBoundIr::Trait { path, .. } = bound else {
+                        return false;
+                    };
+                    path.segments.len() == owner.len()
+                        && path
+                            .segments
+                            .iter()
+                            .zip(owner)
+                            .all(|(direct, proven)| direct.name == proven.name)
+                });
             if !is_direct_supertrait {
                 errors.push(syn::Error::new(
                     attribute.value_span,
@@ -273,7 +281,10 @@ fn validate_method(method: &MethodIr, errors: &mut ErrorCollector) {
 
 /// Validates legality, cardinality, values, and mutually exclusive helper
 /// policies.
-fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
+fn validate_attributes(
+    attributes: &[HelperAttributeIr],
+    errors: &mut ErrorCollector,
+) {
     let mut seen = HashMap::new();
     for attribute in attributes {
         if !attribute.name.supports(attribute.target) {
@@ -290,10 +301,14 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
             attribute.name,
             HelperName::Specialize | HelperName::ExternalTrait
         );
-        if !repeatable && seen.insert(attribute.name, attribute.span).is_some() {
+        if !repeatable && seen.insert(attribute.name, attribute.span).is_some()
+        {
             errors.push(syn::Error::new(
                 attribute.span,
-                format!("duplicate `{}` reflection helper", attribute.name.as_str()),
+                format!(
+                    "duplicate `{}` reflection helper",
+                    attribute.name.as_str()
+                ),
             ));
         }
         if let HelperValueIr::Paths(paths) = &attribute.value {
@@ -312,7 +327,10 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
 }
 
 /// Validates policy pairs that would otherwise request contradictory adapters.
-fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
+fn validate_conflicts(
+    attributes: &[HelperAttributeIr],
+    errors: &mut ErrorCollector,
+) {
     if let Some(skip) = attributes
         .iter()
         .find(|attribute| attribute.name == HelperName::Skip)
@@ -321,7 +339,9 @@ fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollec
             crate::ir::HelperTarget::Field => {
                 [HelperName::ReadOnly, HelperName::NoConstruct].as_slice()
             }
-            crate::ir::HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
+            crate::ir::HelperTarget::Variant => {
+                [HelperName::NoConstruct].as_slice()
+            }
             crate::ir::HelperTarget::Method => [
                 HelperName::NoInvoke,
                 HelperName::CatchUnwind,
@@ -360,7 +380,9 @@ fn report_conflict(
     right: HelperName,
     errors: &mut ErrorCollector,
 ) {
-    if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == right) {
+    if let Some(attribute) =
+        attributes.iter().find(|attribute| attribute.name == right)
+    {
         errors.push(syn::Error::new(
             attribute.span,
             format!(
@@ -405,9 +427,10 @@ fn validate_query_name_scope<'a>(
             .and_then(HelperAttributeIr::rename)
             .unwrap_or(&rust_name)
             .to_owned();
-        let diagnostic_span = rename.map_or(span, |attribute| attribute.value_span);
-        if let Some((existing_rust_name, _)) =
-            names.insert(query_name.clone(), (rust_name.clone(), diagnostic_span))
+        let diagnostic_span =
+            rename.map_or(span, |attribute| attribute.value_span);
+        if let Some((existing_rust_name, _)) = names
+            .insert(query_name.clone(), (rust_name.clone(), diagnostic_span))
         {
             errors.push(syn::Error::new(
                 diagnostic_span,
@@ -420,23 +443,31 @@ fn validate_query_name_scope<'a>(
 }
 
 /// Validates query-name uniqueness across methods in one trait or impl.
-fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector) {
+fn validate_method_query_names(
+    methods: &[MethodIr],
+    errors: &mut ErrorCollector,
+) {
     validate_query_name_scope(
-        methods
-            .iter()
-            .map(|method| (method.name.to_string(), &method.attributes, method.span)),
+        methods.iter().map(|method| {
+            (method.name.to_string(), &method.attributes, method.span)
+        }),
         "method",
         errors,
     );
 }
 
 /// Validates external trait IDs and detects same-input path or ID conflicts.
-fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
+fn validate_external_traits(
+    declaration: &TraitDeclarationIr,
+    errors: &mut ErrorCollector,
+) {
     let direct_supertraits: HashSet<_> = declaration
         .supertraits
         .iter()
         .filter_map(|bound| match bound {
-            crate::ir::GenericBoundIr::Trait { path, .. } => Some(path.source.as_str()),
+            crate::ir::GenericBoundIr::Trait { path, .. } => {
+                Some(path.source.as_str())
+            }
             _ => None,
         })
         .collect();
@@ -511,10 +542,11 @@ fn validate_stable_id(value: &str, span: Span, errors: &mut ErrorCollector) {
     let valid = !value.is_empty()
         && value.split('.').all(|segment| {
             let mut characters = segment.chars();
-            characters
-                .next()
-                .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
-                && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+            characters.next().is_some_and(|character| {
+                character == '_' || character.is_ascii_alphabetic()
+            }) && characters.all(|character| {
+                character == '_' || character.is_ascii_alphanumeric()
+            })
         });
     if !valid {
         errors.push(syn::Error::new(
@@ -562,7 +594,9 @@ fn validate_specialization(
             (GenericKindIr::Type, SpecializationValueIr::Type(_))
             | (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(_))
             | (GenericKindIr::Const, SpecializationValueIr::Const(_))
-            | (GenericKindIr::Const, SpecializationValueIr::AmbiguousPath(_)) => true,
+            | (GenericKindIr::Const, SpecializationValueIr::AmbiguousPath(_)) => {
+                true
+            }
             (GenericKindIr::Lifetime, _) => {
                 unreachable!("lifetime parameters are filtered above")
             }

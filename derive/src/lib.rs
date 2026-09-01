@@ -40,8 +40,13 @@ pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Runs the shared parse/validate pipeline and returns the declaration retained
 /// for expansion.
-fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
-    let result = parse_and_validate_declaration(kind, args.into(), input.into());
+fn process_macro(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
+    let result =
+        parse_and_validate_declaration(kind, args.into(), input.into());
     match result {
         Ok(validated) => expand::expand(validated.declaration).into(),
         Err(error) => error.into_compile_error().into(),

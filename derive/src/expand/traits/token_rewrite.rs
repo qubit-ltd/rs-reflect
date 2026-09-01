@@ -13,12 +13,18 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 
 /// Replaces `Self` with an explicit owner while retaining grouping and spans.
-pub(super) fn replace_self_with_owner(tokens: TokenStream, owner: &Ident) -> TokenStream {
+pub(super) fn replace_self_with_owner(
+    tokens: TokenStream,
+    owner: &Ident,
+) -> TokenStream {
     tokens
         .into_iter()
         .map(|tree| match tree {
             TokenTree::Ident(identifier) if identifier == "Self" => {
-                TokenTree::Ident(Ident::new(&owner.to_string(), identifier.span()))
+                TokenTree::Ident(Ident::new(
+                    &owner.to_string(),
+                    identifier.span(),
+                ))
             }
             TokenTree::Group(group) => {
                 let mut replacement = proc_macro2::Group::new(

@@ -36,7 +36,10 @@ impl ConcreteGenericDescriptor {
     /// This compatibility constructor is retained for generated code that
     /// only supplies structural arguments.
     #[doc(hidden)]
-    pub const fn new(definition: &'static GenericDefinitionDescriptor, arguments: &'static [GenericArgument]) -> Self {
+    pub const fn new(
+        definition: &'static GenericDefinitionDescriptor,
+        arguments: &'static [GenericArgument],
+    ) -> Self {
         Self {
             definition,
             arguments,
@@ -95,7 +98,10 @@ impl ConcreteGenericDescriptor {
     ///
     /// `None` means `argument_index` is out of range or index metadata is not
     /// available for a compatibility-constructed descriptor.
-    pub const fn definition_index(&self, argument_index: usize) -> Option<usize> {
+    pub const fn definition_index(
+        &self,
+        argument_index: usize,
+    ) -> Option<usize> {
         if argument_index >= self.definition_indices.len() {
             return None;
         }
@@ -115,7 +121,10 @@ impl ConcreteGenericDescriptor {
     /// Returns the structural runtime argument for a definition parameter.
     ///
     /// `None` means the definition parameter is a lifetime or is absent.
-    pub fn argument_for_definition(&self, definition_index: usize) -> Option<&GenericArgument> {
+    pub fn argument_for_definition(
+        &self,
+        definition_index: usize,
+    ) -> Option<&GenericArgument> {
         self.argument_index(definition_index)
             .and_then(|argument_index| self.arguments.get(argument_index))
     }
@@ -133,8 +142,12 @@ impl ConcreteGenericDescriptor {
     /// an unqualified/custom container name requires an explicit runtime
     /// `Reflect` bound on the type parameter before this method exposes its
     /// concrete root.
-    pub fn type_argument(&self, index: usize) -> Option<&'static TypeDescriptor> {
-        if !matches!(self.arguments.get(index), Some(GenericArgument::Type(_))) {
+    pub fn type_argument(
+        &self,
+        index: usize,
+    ) -> Option<&'static TypeDescriptor> {
+        if !matches!(self.arguments.get(index), Some(GenericArgument::Type(_)))
+        {
             return None;
         }
         self.type_arguments
@@ -149,7 +162,10 @@ impl ConcreteGenericDescriptor {
     ///
     /// `None` has the same meaning as [`Self::type_argument`] and also covers
     /// lifetime and const definition parameters.
-    pub fn type_argument_for_definition(&self, definition_index: usize) -> Option<&'static TypeDescriptor> {
+    pub fn type_argument_for_definition(
+        &self,
+        definition_index: usize,
+    ) -> Option<&'static TypeDescriptor> {
         self.argument_index(definition_index)
             .and_then(|argument_index| self.type_argument(argument_index))
     }
@@ -162,7 +178,8 @@ impl ConcreteGenericDescriptor {
     /// dynamic-value boundary. Each successful call allocates a fresh wrapper
     /// containing the const value with its exact Rust declaration type.
     pub fn const_argument_value(&self, index: usize) -> Option<ReflectedOwned> {
-        if !matches!(self.arguments.get(index), Some(GenericArgument::Const(_))) {
+        if !matches!(self.arguments.get(index), Some(GenericArgument::Const(_)))
+        {
             return None;
         }
         self.const_argument_values
@@ -177,8 +194,13 @@ impl ConcreteGenericDescriptor {
     ///
     /// `None` has the same meaning as [`Self::const_argument_value`] and also
     /// covers lifetime and type definition parameters.
-    pub fn const_argument_value_for_definition(&self, definition_index: usize) -> Option<ReflectedOwned> {
+    pub fn const_argument_value_for_definition(
+        &self,
+        definition_index: usize,
+    ) -> Option<ReflectedOwned> {
         self.argument_index(definition_index)
-            .and_then(|argument_index| self.const_argument_value(argument_index))
+            .and_then(|argument_index| {
+                self.const_argument_value(argument_index)
+            })
     }
 }

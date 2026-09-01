@@ -25,11 +25,12 @@ use crate::invoke::InvocationBinding;
 use crate::value::DynamicOwned;
 use crate::value::Local;
 
-static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
-    parameters: Box::new([]),
-    predicates: Box::new([]),
-    diagnostic: DiagnosticText::default(),
-});
+static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> =
+    LazyLock::new(|| GenericDefinitionDescriptor {
+        parameters: Box::new([]),
+        predicates: Box::new([]),
+        diagnostic: DiagnosticText::default(),
+    });
 
 fn fragment(fingerprint: u64) -> FragmentIdentity {
     FragmentIdentity::new("crate", "crate::module", 10, 4, "field", fingerprint)
@@ -44,10 +45,18 @@ fn test_small_identity_and_error_accessors_preserve_input_facts() {
 
     let direct = FieldIdentity::new(TypeId::of::<u8>(), "u8", 0, Some("value"));
     assert_eq!(direct.rust_name(), Some("value"));
-    let variant = FieldIdentity::new_variant(TypeId::of::<u8>(), "u8", 0, None, 2, "Ready");
+    let variant = FieldIdentity::new_variant(
+        TypeId::of::<u8>(),
+        "u8",
+        0,
+        None,
+        2,
+        "Ready",
+    );
     assert_eq!(variant.variant_rust_name(), Some("Ready"));
 
-    let mismatch = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>()).with_diagnostic_names("u8", "u16");
+    let mismatch = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>())
+        .with_diagnostic_names("u8", "u16");
     assert_eq!(mismatch.expected_name(), Some("u8"));
 
     let conflict = RegistryError::duplicate_fragment(fragment(1), fragment(2));
@@ -63,7 +72,10 @@ fn test_small_generic_and_invocation_accessors_preserve_input_facts() {
     assert!(std::ptr::eq(generic.definition(), &*EMPTY_GENERIC));
     assert!(generic.arguments().is_empty());
 
-    let binding = InvocationBinding::<Local>::named("value", InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)));
+    let binding = InvocationBinding::<Local>::named(
+        "value",
+        InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)),
+    );
     assert_eq!(binding.name(), Some("value"));
     assert!(matches!(binding.argument(), InvocationArg::Owned(_)));
 }

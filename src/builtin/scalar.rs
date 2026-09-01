@@ -36,7 +36,11 @@ macro_rules! reflected_primitive {
         }
 
         static $descriptor: TypeDescriptor =
-            crate::__private::descriptor::primitive_with_capabilities::<$type>(stringify!($type), $kind, $capabilities);
+            crate::__private::descriptor::primitive_with_capabilities::<$type>(
+                stringify!($type),
+                $kind,
+                $capabilities,
+            );
 
         impl Reflect for $type {
             /// Returns this built-in type's unique static descriptor.
@@ -47,20 +51,50 @@ macro_rules! reflected_primitive {
     };
 }
 
-reflected_primitive!(bool, PrimitiveKind::Bool, BOOL_DESCRIPTOR, bool_capabilities);
-reflected_primitive!(char, PrimitiveKind::Char, CHAR_DESCRIPTOR, char_capabilities);
+reflected_primitive!(
+    bool,
+    PrimitiveKind::Bool,
+    BOOL_DESCRIPTOR,
+    bool_capabilities
+);
+reflected_primitive!(
+    char,
+    PrimitiveKind::Char,
+    CHAR_DESCRIPTOR,
+    char_capabilities
+);
 reflected_primitive!(i8, PrimitiveKind::I8, I8_DESCRIPTOR, i8_capabilities);
 reflected_primitive!(i16, PrimitiveKind::I16, I16_DESCRIPTOR, i16_capabilities);
 reflected_primitive!(i32, PrimitiveKind::I32, I32_DESCRIPTOR, i32_capabilities);
 reflected_primitive!(i64, PrimitiveKind::I64, I64_DESCRIPTOR, i64_capabilities);
-reflected_primitive!(i128, PrimitiveKind::I128, I128_DESCRIPTOR, i128_capabilities);
-reflected_primitive!(isize, PrimitiveKind::Isize, ISIZE_DESCRIPTOR, isize_capabilities);
+reflected_primitive!(
+    i128,
+    PrimitiveKind::I128,
+    I128_DESCRIPTOR,
+    i128_capabilities
+);
+reflected_primitive!(
+    isize,
+    PrimitiveKind::Isize,
+    ISIZE_DESCRIPTOR,
+    isize_capabilities
+);
 reflected_primitive!(u8, PrimitiveKind::U8, U8_DESCRIPTOR, u8_capabilities);
 reflected_primitive!(u16, PrimitiveKind::U16, U16_DESCRIPTOR, u16_capabilities);
 reflected_primitive!(u32, PrimitiveKind::U32, U32_DESCRIPTOR, u32_capabilities);
 reflected_primitive!(u64, PrimitiveKind::U64, U64_DESCRIPTOR, u64_capabilities);
-reflected_primitive!(u128, PrimitiveKind::U128, U128_DESCRIPTOR, u128_capabilities);
-reflected_primitive!(usize, PrimitiveKind::Usize, USIZE_DESCRIPTOR, usize_capabilities);
+reflected_primitive!(
+    u128,
+    PrimitiveKind::U128,
+    U128_DESCRIPTOR,
+    u128_capabilities
+);
+reflected_primitive!(
+    usize,
+    PrimitiveKind::Usize,
+    USIZE_DESCRIPTOR,
+    usize_capabilities
+);
 reflected_primitive!(f32, PrimitiveKind::F32, F32_DESCRIPTOR, f32_capabilities);
 reflected_primitive!(f64, PrimitiveKind::F64, F64_DESCRIPTOR, f64_capabilities);
 
@@ -79,7 +113,11 @@ fn string_capabilities() -> &'static TypeCapabilities {
 }
 
 static STRING_DESCRIPTOR: TypeDescriptor =
-    crate::__private::descriptor::text_with_capabilities::<String>("String", TextKind::String, string_capabilities);
+    crate::__private::descriptor::text_with_capabilities::<String>(
+        "String",
+        TextKind::String,
+        string_capabilities,
+    );
 
 impl Reflect for String {
     /// Returns `String`'s unique static descriptor.
@@ -88,7 +126,8 @@ impl Reflect for String {
     }
 }
 
-static STR_DESCRIPTOR: TypeDescriptor = crate::__private::descriptor::text::<str>("str", TextKind::Str);
+static STR_DESCRIPTOR: TypeDescriptor =
+    crate::__private::descriptor::text::<str>("str", TextKind::Str);
 
 impl Reflect for str {
     /// Returns `str`'s unique static descriptor.

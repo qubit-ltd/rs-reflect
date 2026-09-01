@@ -24,14 +24,22 @@ fn main() {}
 
 #[cfg(panic = "abort")]
 fn main() {
-    let registry = registry::ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
+    let registry = registry::ReflectRegistry::initialize()
+        .expect("generated fragments must validate");
+    let implementations =
+        registry.implementations(Worker::type_descriptor().type_id());
     let descriptor::MethodLookup::Unique(method) =
-        descriptor::ImplDescriptor::lookup_method(implementations, descriptor::MethodQualifier::Inherent, "marked")
+        descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            descriptor::MethodQualifier::Inherent,
+            "marked",
+        )
     else {
         panic!("the marked method must be discoverable")
     };
-    let adapter = method.adapter().expect("the normal adapter remains available");
+    let adapter = method
+        .adapter()
+        .expect("the normal adapter remains available");
     assert_eq!(
         adapter.catching_availability(),
         descriptor::CatchingAvailability::UnavailablePanicAbort

@@ -24,16 +24,27 @@ use crate::registry::EffectiveTypeView;
 #[derive(Debug)]
 pub(super) struct RegistryIndexes {
     pub(super) types_by_id: HashMap<TypeId, &'static TypeDescriptor>,
-    pub(super) types_by_type_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
-    pub(super) types_by_query_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
-    #[allow(dead_code, reason = "consumed by the T21 effective-view implementation")]
-    pub(super) traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
-    pub(super) traits_by_rust_path: HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>>,
-    #[allow(dead_code, reason = "consumed by the T21 effective-view implementation")]
+    pub(super) types_by_type_name:
+        HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
+    pub(super) types_by_query_name:
+        HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
+    #[allow(
+        dead_code,
+        reason = "consumed by the T21 effective-view implementation"
+    )]
+    pub(super) traits_by_id:
+        HashMap<TraitId, &'static TraitDefinitionDescriptor>,
+    pub(super) traits_by_rust_path:
+        HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>>,
+    #[allow(
+        dead_code,
+        reason = "consumed by the T21 effective-view implementation"
+    )]
     pub(super) impls_by_target: HashMap<TypeId, Box<[&'static ImplDescriptor]>>,
     pub(super) effective_views_by_target: HashMap<TypeId, EffectiveTypeView>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
-    pub(super) capability_fragments: HashMap<(TypeId, CapabilityId), FragmentIdentity>,
+    pub(super) capability_fragments:
+        HashMap<(TypeId, CapabilityId), FragmentIdentity>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
     pub(super) fragment_identities: Box<[FragmentIdentity]>,
 }

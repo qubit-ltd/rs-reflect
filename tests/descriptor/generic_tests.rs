@@ -211,15 +211,22 @@ mod shadowed_runtime_path {
 
 /// Downcasts one reflected const value and compares its exact Rust type and
 /// value with `expected`.
-fn assert_const_value<T>(generic: &reflect::ConcreteGenericDescriptor, index: usize, expected: T)
-where
+fn assert_const_value<T>(
+    generic: &reflect::ConcreteGenericDescriptor,
+    index: usize,
+    expected: T,
+) where
     T: 'static + std::fmt::Debug + PartialEq,
 {
     let actual = generic
         .const_argument_value(index)
-        .unwrap_or_else(|| panic!("const argument {index} must expose an owned value"))
+        .unwrap_or_else(|| {
+            panic!("const argument {index} must expose an owned value")
+        })
         .downcast::<T>()
-        .unwrap_or_else(|_| panic!("const argument {index} must retain its declaration type"));
+        .unwrap_or_else(|_| {
+            panic!("const argument {index} must retain its declaration type")
+        });
     assert_eq!(actual, expected);
 }
 
@@ -261,7 +268,14 @@ fn test_concrete_type_argument_navigates_to_exact_root_descriptor() {
 
     assert!(std::ptr::eq(argument, TypeDescriptor::of::<User>()));
     assert_eq!(argument.type_id(), TypeDescriptor::of::<User>().type_id());
-    assert_eq!(Page { item: User { id: 7 } }.item.id, 7);
+    assert_eq!(
+        Page {
+            item: User { id: 7 }
+        }
+        .item
+        .id,
+        7
+    );
 }
 
 /// Verifies transparent reflected containers retain navigation to nested
@@ -335,7 +349,10 @@ fn test_const_only_generic_field_is_reflected() {
         .and_then(|field| field.field_type().as_resolved())
         .expect("the conditional const field type resolves");
 
-    assert!(std::ptr::eq(field_type, TypeDescriptor::of::<Conditional<3>>()));
+    assert!(std::ptr::eq(
+        field_type,
+        TypeDescriptor::of::<Conditional<3>>()
+    ));
     assert_eq!(generic.arguments().len(), 1);
     assert_const_value(generic, 0, 3_usize);
     let _ = ConditionalField::<3> {
@@ -374,7 +391,9 @@ fn test_const_argument_exposes_typed_reflected_owned_value() {
     let generic = descriptor
         .concrete_generic()
         .expect("derived generic roots expose substitutions");
-    let reflect::expression::GenericArgument::Const(argument) = &generic.arguments()[1] else {
+    let reflect::expression::GenericArgument::Const(argument) =
+        &generic.arguments()[1]
+    else {
         panic!("the second concrete argument must be const");
     };
     let value = generic
@@ -394,7 +413,8 @@ fn test_const_argument_exposes_typed_reflected_owned_value() {
 /// roots.
 #[test]
 fn test_opaque_generic_instances_do_not_require_reflect_arguments() {
-    let descriptor = TypeDescriptor::of::<OpaqueGenericRecord<Unreflected, 2>>();
+    let descriptor =
+        TypeDescriptor::of::<OpaqueGenericRecord<Unreflected, 2>>();
     let value = OpaqueGenericRecord {
         values: [Unreflected, Unreflected],
     };
@@ -422,7 +442,14 @@ fn test_explicit_reflect_bounds_enable_type_argument_navigation() {
 
     assert!(std::ptr::eq(direct, TypeDescriptor::of::<User>()));
     assert!(std::ptr::eq(where_bound, TypeDescriptor::of::<Order>()));
-    assert_eq!(DirectReflectBound { value: User { id: 5 } }.value.id, 5);
+    assert_eq!(
+        DirectReflectBound {
+            value: User { id: 5 }
+        }
+        .value
+        .id,
+        5
+    );
     assert_eq!(
         WhereReflectBound {
             value: Order { number: 6 }
@@ -463,7 +490,10 @@ fn test_imported_reflect_aliases_enable_type_argument_navigation() {
 
     assert!(std::ptr::eq(direct, TypeDescriptor::of::<User>()));
     assert!(std::ptr::eq(where_bound, TypeDescriptor::of::<Order>()));
-    let _ = ImportedDirectReflectBound { value: User { id: 13 } }.value;
+    let _ = ImportedDirectReflectBound {
+        value: User { id: 13 },
+    }
+    .value;
     let _ = ImportedWhereReflectBound {
         value: Order { number: 14 },
     }
@@ -474,7 +504,9 @@ fn test_imported_reflect_aliases_enable_type_argument_navigation() {
 /// mistaken for the actual derive facade.
 #[test]
 fn test_shadowed_runtime_path_does_not_enable_type_argument_navigation() {
-    let descriptor = TypeDescriptor::of::<shadowed_runtime_path::ShadowedBound<Unreflected>>();
+    let descriptor = TypeDescriptor::of::<
+        shadowed_runtime_path::ShadowedBound<Unreflected>,
+    >();
     let generic = descriptor
         .concrete_generic()
         .expect("the shadowed-bound root retains structural metadata");
@@ -499,10 +531,20 @@ fn test_associated_field_uses_complete_type_reflect_bound() {
 
     assert!(generic.type_argument(0).is_none());
     assert!(std::ptr::eq(
-        field.field_type().as_resolved().expect("the item type resolves"),
+        field
+            .field_type()
+            .as_resolved()
+            .expect("the item type resolves"),
         TypeDescriptor::of::<User>(),
     ));
-    assert_eq!(AssociatedItem::<UserFamily> { item: User { id: 11 } }.item.id, 11);
+    assert_eq!(
+        AssociatedItem::<UserFamily> {
+            item: User { id: 11 }
+        }
+        .item
+        .id,
+        11
+    );
 }
 
 /// Verifies a visible custom-container field constrains the container as a
@@ -557,23 +599,35 @@ fn test_runtime_argument_indices_map_to_definition_parameters() {
         .const_argument_value_for_definition(2)
         .expect("the qualified primitive const parameter resolves")
         .downcast::<usize>()
-        .unwrap_or_else(|_| panic!("the const value retains its qualified usize type"));
+        .unwrap_or_else(|_| {
+            panic!("the const value retains its qualified usize type")
+        });
     assert_eq!(length, 3);
-    let reflect::expression::GenericArgument::Type(expression) = &generic.arguments()[0] else {
+    let reflect::expression::GenericArgument::Type(expression) =
+        &generic.arguments()[0]
+    else {
         panic!("the first runtime argument must be a type");
     };
     assert!(matches!(
         expression,
         reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "T"
     ));
-    let reflect::expression::GenericArgument::Const(argument) = &generic.arguments()[1] else {
+    let reflect::expression::GenericArgument::Const(argument) =
+        &generic.arguments()[1]
+    else {
         panic!("the second runtime argument must be const");
     };
-    let reflect::expression::TypeExpression::Concrete(declared_type) = argument.declared_type.as_ref() else {
+    let reflect::expression::TypeExpression::Concrete(declared_type) =
+        argument.declared_type.as_ref()
+    else {
         panic!("the qualified primitive declaration type must stay concrete");
     };
     assert_eq!(
-        declared_type.path.iter().map(Box::as_ref).collect::<Vec<_>>(),
+        declared_type
+            .path
+            .iter()
+            .map(Box::as_ref)
+            .collect::<Vec<_>>(),
         ["core", "primitive", "usize"],
     );
     assert_eq!(
@@ -592,7 +646,22 @@ fn test_runtime_argument_indices_map_to_definition_parameters() {
 /// owned type, including negative and platform-sized integer values.
 #[test]
 fn test_primitive_const_argument_matrix_preserves_exact_types() {
-    type Values = ScalarConsts<true, 'λ', { -8 }, { -16 }, { -32 }, { -64 }, { -128 }, { -7 }, 8, 16, 32, 64, 128, 7>;
+    type Values = ScalarConsts<
+        true,
+        'λ',
+        { -8 },
+        { -16 },
+        { -32 },
+        { -64 },
+        { -128 },
+        { -7 },
+        8,
+        16,
+        32,
+        64,
+        128,
+        7,
+    >;
     let generic = TypeDescriptor::of::<Values>()
         .concrete_generic()
         .expect("the scalar matrix exposes concrete arguments");
@@ -621,7 +690,9 @@ fn test_const_expression_uses_normalized_value_diagnostic() {
     let generic = TypeDescriptor::of::<ExpressionConst<{ 1 + 2 }>>()
         .concrete_generic()
         .expect("the const expression exposes its substitution");
-    let reflect::expression::GenericArgument::Const(argument) = &generic.arguments()[0] else {
+    let reflect::expression::GenericArgument::Const(argument) =
+        &generic.arguments()[0]
+    else {
         panic!("the expression substitution must be const");
     };
 
@@ -656,7 +727,9 @@ fn test_type_argument_lazy_resolution_is_concurrently_cached() {
             std::thread::spawn(move || {
                 barrier.wait();
                 let root = TypeDescriptor::of::<Page<User>>();
-                let generic = root.concrete_generic().expect("the Page root exposes generic metadata");
+                let generic = root
+                    .concrete_generic()
+                    .expect("the Page root exposes generic metadata");
                 let argument = generic
                     .type_argument(0)
                     .expect("the reflected argument resolves lazily");
@@ -670,16 +743,23 @@ fn test_type_argument_lazy_resolution_is_concurrently_cached() {
         .collect();
     let results: Vec<_> = handles
         .into_iter()
-        .map(|handle| handle.join().expect("generic navigation thread must finish"))
+        .map(|handle| {
+            handle
+                .join()
+                .expect("generic navigation thread must finish")
+        })
         .collect();
 
     assert!(results.windows(2).all(|pair| pair[0] == pair[1]));
 }
 
 #[test]
-fn test_static_lifetime_generic_root_preserves_definition_without_runtime_lifetime_argument() {
+fn test_static_lifetime_generic_root_preserves_definition_without_runtime_lifetime_argument()
+ {
     let descriptor = TypeDescriptor::of::<Borrowed<'static>>();
-    let generic = descriptor.concrete_generic().expect("generic definitions are retained");
+    let generic = descriptor
+        .concrete_generic()
+        .expect("generic definitions are retained");
     assert_eq!(generic.definition().parameters.len(), 1);
     assert!(generic.arguments().is_empty());
     assert_eq!(Borrowed { value: "static" }.value, "static");

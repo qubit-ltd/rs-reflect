@@ -26,7 +26,8 @@ const DEFAULT_ID: &str = "qubit.reflect.default";
 /// A safe dynamic clone operation for one exact concrete Rust type.
 #[derive(Clone, Copy)]
 pub struct CloneAdapter {
-    clone_owned: fn(&DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch>,
+    clone_owned:
+        fn(&DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch>,
 }
 
 impl CloneAdapter {
@@ -41,7 +42,10 @@ impl CloneAdapter {
     ///
     /// Returns [`TypeMismatch`] without changing `value` when its concrete type
     /// differs from the type captured by this adapter.
-    pub fn clone_owned(&self, value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
+    pub fn clone_owned(
+        &self,
+        value: &DynamicOwned<Local>,
+    ) -> Result<DynamicOwned<Local>, TypeMismatch> {
         (self.clone_owned)(value)
     }
 }
@@ -106,16 +110,20 @@ pub fn clone_descriptor<T: Clone + 'static>() -> CapabilityDescriptor {
 
 /// Creates a default descriptor and its exact-type dynamic adapter.
 pub fn default_descriptor<T: Default + 'static>() -> CapabilityDescriptor {
-    CapabilityDescriptor::with_adapter(default_key(), DefaultAdapter::new::<T>())
+    CapabilityDescriptor::with_adapter(
+        default_key(),
+        DefaultAdapter::new::<T>(),
+    )
 }
 
 /// Clones one exact dynamic concrete type after checking its runtime identity.
-fn clone_owned<T: Clone + 'static>(value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
+fn clone_owned<T: Clone + 'static>(
+    value: &DynamicOwned<Local>,
+) -> Result<DynamicOwned<Local>, TypeMismatch> {
     let Some(value) = value.downcast_ref::<T>() else {
-        let actual = value
-            .as_any()
-            .map(Any::type_id)
-            .expect("DynamicOwned<Local> always contains Any-compatible storage");
+        let actual = value.as_any().map(Any::type_id).expect(
+            "DynamicOwned<Local> always contains Any-compatible storage",
+        );
         return Err(TypeMismatch::new(TypeId::of::<T>(), actual));
     };
     Ok(DynamicOwned::<Local>::new(value.clone()))

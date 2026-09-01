@@ -45,7 +45,13 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
     if !declaration.generics.params.is_empty() {
         return expand_generic_impl_specializations(declaration);
     }
-    expand_concrete_impl(declaration, quote!(::std::vec![]), None, None, Vec::new())
+    expand_concrete_impl(
+        declaration,
+        quote!(::std::vec![]),
+        None,
+        None,
+        Vec::new(),
+    )
 }
 
 /// Retains a generic impl and emits one concrete registration fragment for
@@ -53,7 +59,9 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
 ///
 /// Blanket and constrained impls have no finite runtime `TypeId` set, so an
 /// impl without `specialize(...)` deliberately remains descriptor-only.
-fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenStream {
+fn expand_generic_impl_specializations(
+    declaration: ImplDeclarationIr,
+) -> TokenStream {
     let retained = declaration.retained_tokens.clone();
     let Some(facade) = facade_path() else {
         return retained;
@@ -64,12 +72,19 @@ fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenS
     }
     let shared_definition = generic_impl_definition_module(&declaration);
     let fragments = declaration.specializations.iter().map(|specialization| {
-        let specialization_arguments =
-            specialization_arguments(specialization, &declaration.generics, &facade);
+        let specialization_arguments = specialization_arguments(
+            specialization,
+            &declaration.generics,
+            &facade,
+        );
         let arguments = quote!(#specialization_arguments.into_vec());
         let replacements = specialization_replacements(specialization);
         let associated_type_resolver_arms =
-            specialization_associated_type_resolver_arms(&declaration, &replacements, &facade);
+            specialization_associated_type_resolver_arms(
+                &declaration,
+                &replacements,
+                &facade,
+            );
         let lifetime_names: Vec<_> = declaration
             .generics
             .params
@@ -83,13 +98,16 @@ fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenS
         substitute_impl_lifetimes(&mut concrete, &lifetime_names);
         substitute_type_tokens(&mut concrete.target_type, &replacements);
         if let Some(trait_path) = &mut concrete.trait_path {
-            trait_path.tokens = substitute_tokens(&trait_path.tokens, &replacements);
+            trait_path.tokens =
+                substitute_tokens(&trait_path.tokens, &replacements);
             trait_path.source = trait_path.tokens.to_string();
         }
         substitute_impl_method_types(&mut concrete, &replacements);
         substitute_impl_associated_item_types(&mut concrete, &replacements);
-        let applicability_witness =
-            impl_specialization_applicability_witness(&declaration, &concrete.target_type.tokens);
+        let applicability_witness = impl_specialization_applicability_witness(
+            &declaration,
+            &concrete.target_type.tokens,
+        );
         let definition = quote!(super::#shared_definition::definition());
         expand_concrete_impl(
             concrete,
@@ -115,9 +133,13 @@ fn expand_generic_impl_definition(
     let line = location.line as u32;
     let column = location.column as u32;
     let module = generic_impl_definition_module(declaration);
-    let target = super::traits::type_expression(&declaration.target_type, facade);
-    let generics =
-        super::traits::generic_definition(&declaration.generics, declaration.span, facade);
+    let target =
+        super::traits::type_expression(&declaration.target_type, facade);
+    let generics = super::traits::generic_definition(
+        &declaration.generics,
+        declaration.span,
+        facade,
+    );
     let methods = definition_method_entries(declaration, facade);
     let associated_types = declaration.associated_types.iter().map(|item| {
         let rust_name = syn::LitStr::new(&item.name.to_string(), item.span);
@@ -131,14 +153,15 @@ fn expand_generic_impl_definition(
             #declared_type,
         ))
     });
-    let external_id = declaration
-        .attributes
-        .iter()
-        .find_map(|attribute| match &attribute.value {
+    let external_id = declaration.attributes.iter().find_map(|attribute| {
+        match &attribute.value {
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
-        });
-    let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
+        }
+    });
+    let definition_constructor = if let Some(trait_path) =
+        &declaration.trait_path
+    {
         let path = trait_path
             .segments
             .iter()
@@ -173,7 +196,10 @@ fn expand_generic_impl_definition(
             ).expect("generated generic impl definition is consistent")
         }
     };
-    let external_registration = match (declaration.trait_path.as_ref(), external_id) {
+    let external_registration = match (
+        declaration.trait_path.as_ref(),
+        external_id,
+    ) {
         (Some(path), Some(id)) => {
             let path = path.tokens.clone();
             quote! {
@@ -474,26 +500,29 @@ fn expand_concrete_impl(
     };
     let retained = declaration.retained_tokens;
     let target = declaration.target_type.tokens;
-    let impl_generic_definition =
-        super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
+    let impl_generic_definition = super::traits::generic_definition(
+        &declaration.generics,
+        declaration.span,
+        &facade,
+    );
     let trait_path = declaration
         .trait_path
         .as_ref()
         .map(|path| path.tokens.clone());
     let trait_call_path = trait_path.clone();
     let has_trait = trait_path.is_some();
-    let external_id = declaration
-        .attributes
-        .iter()
-        .find_map(|attribute| match &attribute.value {
+    let external_id = declaration.attributes.iter().find_map(|attribute| {
+        match &attribute.value {
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
-        });
+        }
+    });
     let fingerprint = fingerprint(&format!("{}{}", retained, target));
     let location = declaration.span.start();
     let line = location.line as u32;
     let column = location.column as u32;
-    let module = format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
+    let module =
+        format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
     let target_source = declaration.target_type.source;
     let invocation_adapter_definitions = declaration
         .methods
@@ -1132,30 +1161,31 @@ fn expand_concrete_impl(
     let invocation_unavailable_reason_entries: Vec<_> = declaration
         .methods
         .iter()
-        .map(|method| invocation_unavailable_reason_entry(method, &target, &facade))
+        .map(|method| {
+            invocation_unavailable_reason_entry(method, &target, &facade)
+        })
         .collect();
-    let generic_specialization_adapter_definitions = declaration
-        .methods
-        .iter()
-        .enumerate()
-        .flat_map(|(method_index, method)| {
-            let target = target.clone();
-            let target_source = target_source.clone();
-            let facade = facade.clone();
-            method.specializations.iter().enumerate().filter_map(
-                move |(specialization_index, specialization)| {
-                    simple_generic_specialization_adapter(
-                        method,
-                        specialization,
-                        &target,
-                        &target_source,
-                        &facade,
-                        method_index,
-                        specialization_index,
-                    )
-                },
-            )
-        });
+    let generic_specialization_adapter_definitions =
+        declaration.methods.iter().enumerate().flat_map(
+            |(method_index, method)| {
+                let target = target.clone();
+                let target_source = target_source.clone();
+                let facade = facade.clone();
+                method.specializations.iter().enumerate().filter_map(
+                    move |(specialization_index, specialization)| {
+                        simple_generic_specialization_adapter(
+                            method,
+                            specialization,
+                            &target,
+                            &target_source,
+                            &facade,
+                            method_index,
+                            specialization_index,
+                        )
+                    },
+                )
+            },
+        );
     let method_specialization_entries = declaration
         .methods
         .iter()
@@ -1788,7 +1818,9 @@ fn specialization_associated_type_resolver_arms(
         .filter_map(|parameter| {
             replacements
                 .iter()
-                .find(|(name, _)| name == &Ident::new(&parameter.name, parameter.span))
+                .find(|(name, _)| {
+                    name == &Ident::new(&parameter.name, parameter.span)
+                })
                 .map(|(_, value)| value)
         })
         .collect();
@@ -1818,7 +1850,9 @@ fn specialization_associated_type_resolver_arms(
 }
 
 /// Builds replacement tokens for one validated type or const specialization.
-fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident, TokenStream)> {
+fn specialization_replacements(
+    specialization: &SpecializationIr,
+) -> Vec<(Ident, TokenStream)> {
     specialization
         .bindings
         .iter()
@@ -1826,7 +1860,9 @@ fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident,
             let tokens = match &binding.value {
                 SpecializationValueIr::Type(ty) => ty.tokens.clone(),
                 SpecializationValueIr::Const(tokens)
-                | SpecializationValueIr::AmbiguousPath(tokens) => tokens.clone(),
+                | SpecializationValueIr::AmbiguousPath(tokens) => {
+                    tokens.clone()
+                }
             };
             (Ident::new(&binding.name, binding.span), tokens)
         })
@@ -1834,7 +1870,10 @@ fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident,
 }
 
 /// Replaces generic identifiers recursively while retaining source grouping.
-fn substitute_tokens(tokens: &TokenStream, replacements: &[(Ident, TokenStream)]) -> TokenStream {
+fn substitute_tokens(
+    tokens: &TokenStream,
+    replacements: &[(Ident, TokenStream)],
+) -> TokenStream {
     tokens
         .clone()
         .into_iter()
@@ -1892,7 +1931,10 @@ fn substitute_impl_associated_item_types(
 }
 
 /// Rebuilds structural type IR after specialization changes a root path.
-fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
+fn reparse_substituted_type(
+    ty: &mut TypeIr,
+    replacements: &[(Ident, TokenStream)],
+) {
     let tokens = substitute_tokens(&ty.tokens, replacements);
     let parsed: syn::Type = syn::parse2(tokens)
         .expect("validated specialization must retain valid associated-item type syntax");
@@ -1900,7 +1942,10 @@ fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream
 }
 
 /// Applies the runtime-root lifetime policy to one specialized impl.
-fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names: &[&str]) {
+fn substitute_impl_lifetimes(
+    declaration: &mut ImplDeclarationIr,
+    lifetime_names: &[&str],
+) {
     substitute_type_lifetimes(&mut declaration.target_type, lifetime_names);
     if let Some(trait_path) = &mut declaration.trait_path {
         substitute_path_lifetimes(trait_path, lifetime_names);
@@ -1908,8 +1953,10 @@ fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names
     for method in &mut declaration.methods {
         if let Some(receiver) = &mut method.receiver {
             substitute_type_lifetimes(&mut receiver.ty, lifetime_names);
-            receiver.declaration =
-                substitute_lifetime_tokens(&receiver.declaration, lifetime_names);
+            receiver.declaration = substitute_lifetime_tokens(
+                &receiver.declaration,
+                lifetime_names,
+            );
         }
         for parameter in &mut method.parameters {
             substitute_type_lifetimes(&mut parameter.ty, lifetime_names);
@@ -1933,14 +1980,15 @@ fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
     ty.tokens = substitute_lifetime_tokens(&ty.tokens, lifetime_names);
     ty.source = ty.tokens.to_string();
     match &mut ty.kind {
-        TypeKindIr::Path(path) => substitute_path_lifetimes(path, lifetime_names),
+        TypeKindIr::Path(path) => {
+            substitute_path_lifetimes(path, lifetime_names)
+        }
         TypeKindIr::Reference {
             lifetime, element, ..
         } => {
-            if lifetime
-                .as_deref()
-                .is_some_and(|lifetime| lifetime_names.contains(&lifetime.trim_start_matches('\'')))
-            {
+            if lifetime.as_deref().is_some_and(|lifetime| {
+                lifetime_names.contains(&lifetime.trim_start_matches('\''))
+            }) {
                 *lifetime = Some("'static".to_owned());
             }
             substitute_type_lifetimes(element, lifetime_names);
@@ -1975,7 +2023,10 @@ fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
 }
 
 /// Substitutes impl lifetimes in one path and its structured arguments.
-fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&str]) {
+fn substitute_path_lifetimes(
+    path: &mut crate::ir::PathIr,
+    lifetime_names: &[&str],
+) {
     path.tokens = substitute_lifetime_tokens(&path.tokens, lifetime_names);
     path.source = path.tokens.to_string();
     if let Some(qualified_self) = &mut path.qualified_self {
@@ -1988,19 +2039,29 @@ fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&st
                 for argument in arguments {
                     match argument {
                         PathArgumentIr::Lifetime(lifetime)
-                            if lifetime_names.contains(&lifetime.trim_start_matches('\'')) =>
+                            if lifetime_names.contains(
+                                &lifetime.trim_start_matches('\''),
+                            ) =>
                         {
                             *lifetime = "'static".to_owned();
                         }
-                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                        PathArgumentIr::Type(ty)
+                        | PathArgumentIr::AssociatedType { ty, .. } => {
                             substitute_type_lifetimes(ty, lifetime_names);
                         }
                         PathArgumentIr::Const(tokens)
-                        | PathArgumentIr::AssociatedConst { value: tokens, .. }
-                        | PathArgumentIr::Other(tokens) => {
-                            *tokens = substitute_lifetime_tokens(tokens, lifetime_names);
+                        | PathArgumentIr::AssociatedConst {
+                            value: tokens,
+                            ..
                         }
-                        PathArgumentIr::Lifetime(_) | PathArgumentIr::Constraint { .. } => {}
+                        | PathArgumentIr::Other(tokens) => {
+                            *tokens = substitute_lifetime_tokens(
+                                tokens,
+                                lifetime_names,
+                            );
+                        }
+                        PathArgumentIr::Lifetime(_)
+                        | PathArgumentIr::Constraint { .. } => {}
                     }
                 }
             }
@@ -2017,7 +2078,10 @@ fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&st
 }
 
 /// Rewrites lifetime token pairs while preserving group delimiters and spans.
-fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> TokenStream {
+fn substitute_lifetime_tokens(
+    tokens: &TokenStream,
+    lifetime_names: &[&str],
+) -> TokenStream {
     let trees: Vec<_> = tokens.clone().into_iter().collect();
     let mut output = TokenStream::new();
     let mut index = 0;
@@ -2048,14 +2112,19 @@ fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> 
 }
 
 /// Recursively substitutes one type and every nested type retained by its IR.
-fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
+fn substitute_type_tokens(
+    ty: &mut TypeIr,
+    replacements: &[(Ident, TokenStream)],
+) {
     ty.tokens = substitute_tokens(&ty.tokens, replacements);
     ty.source = ty.tokens.to_string();
     match &mut ty.kind {
         TypeKindIr::Path(path) => substitute_path_tokens(path, replacements),
         TypeKindIr::Reference { element, .. }
         | TypeKindIr::Slice(element)
-        | TypeKindIr::Pointer { element, .. } => substitute_type_tokens(element, replacements),
+        | TypeKindIr::Pointer { element, .. } => {
+            substitute_type_tokens(element, replacements)
+        }
         TypeKindIr::Tuple(elements) => {
             for element in elements {
                 substitute_type_tokens(element, replacements);
@@ -2083,7 +2152,10 @@ fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]
 }
 
 /// Substitutes nested type and const tokens in one path IR.
-fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
+fn substitute_path_tokens(
+    path: &mut crate::ir::PathIr,
+    replacements: &[(Ident, TokenStream)],
+) {
     path.tokens = substitute_tokens(&path.tokens, replacements);
     path.source = path.tokens.to_string();
     if let Some(qualified_self) = &mut path.qualified_self {
@@ -2095,11 +2167,15 @@ fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, 
             PathArgumentsIr::AngleBracketed(arguments) => {
                 for argument in arguments {
                     match argument {
-                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                        PathArgumentIr::Type(ty)
+                        | PathArgumentIr::AssociatedType { ty, .. } => {
                             substitute_type_tokens(ty, replacements);
                         }
                         PathArgumentIr::Const(tokens)
-                        | PathArgumentIr::AssociatedConst { value: tokens, .. } => {
+                        | PathArgumentIr::AssociatedConst {
+                            value: tokens,
+                            ..
+                        } => {
                             *tokens = substitute_tokens(tokens, replacements);
                         }
                         PathArgumentIr::Lifetime(_)
@@ -2123,7 +2199,9 @@ fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, 
 /// Returns whether a parameter can cross the safe dynamic invocation boundary.
 pub(super) fn supports_invocation_parameter(ty: &TypeIr) -> bool {
     match &ty.kind {
-        TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
+        TypeKindIr::Reference { element, .. } => {
+            supports_owned_dynamic_type(element)
+        }
         _ => supports_owned_dynamic_type(ty),
     }
 }
@@ -2174,7 +2252,10 @@ pub(super) fn thread_safe_invocation_assertions(
     });
     let output = match &method.return_type {
         ReturnTypeIr::Type(ty)
-            if !matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) =>
+            if !matches!(
+                ty.kind,
+                TypeKindIr::Reference { .. } | TypeKindIr::Never
+            ) =>
         {
             let tokens = &ty.tokens;
             let span = ty.span;
@@ -2313,7 +2394,9 @@ pub(super) fn typed_owned_receiver_type(
         ("Arc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
             Some(quote!(::std::sync::Arc<#target>))
         }
-        ("Pin", [PathArgumentIr::Type(argument)]) if is_box_self_type(argument) => {
+        ("Pin", [PathArgumentIr::Type(argument)])
+            if is_box_self_type(argument) =>
+        {
             Some(quote!(::std::pin::Pin<::std::boxed::Box<#target>>))
         }
         _ => None,
@@ -2341,7 +2424,9 @@ fn typed_extension_receiver_type(
 
 /// Returns whether a typed receiver is `Pin<&mut Self>` (`true`) or
 /// `Pin<&Self>` (`false`).
-pub(super) fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) -> Option<bool> {
+pub(super) fn typed_pinned_receiver_mutable(
+    receiver: &crate::ir::ReceiverIr,
+) -> Option<bool> {
     if receiver.kind != ReceiverKindIr::Typed {
         return None;
     }
@@ -2475,15 +2560,25 @@ fn simple_generic_specialization_adapter(
         .params
         .iter()
         .map(|parameter| match parameter.kind {
-            GenericKindIr::Type => specialization_type_argument(specialization, &parameter.name),
-            GenericKindIr::Const => specialization_const_argument(specialization, &parameter.name),
+            GenericKindIr::Type => {
+                specialization_type_argument(specialization, &parameter.name)
+            }
+            GenericKindIr::Const => {
+                specialization_const_argument(specialization, &parameter.name)
+            }
             GenericKindIr::Lifetime => None,
         })
         .collect::<Option<_>>()?;
     let parameter_types: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| specialize_type_tokens(&parameter.ty, &method.generics, specialization))
+        .map(|parameter| {
+            specialize_type_tokens(
+                &parameter.ty,
+                &method.generics,
+                specialization,
+            )
+        })
         .collect::<Option<_>>()?;
     let return_type = match &method.return_type {
         ReturnTypeIr::Unit => None,
@@ -2507,8 +2602,9 @@ fn simple_generic_specialization_adapter(
             };
         }
     });
-    let call_arguments = (0..parameter_types.len())
-        .map(|index| format_ident!("__qubit_reflect_specialized_argument_{index}"));
+    let call_arguments = (0..parameter_types.len()).map(|index| {
+        format_ident!("__qubit_reflect_specialized_argument_{index}")
+    });
     let method_name = &method.name;
     let adapter_name = format_ident!(
         "__qubit_reflect_invoke_specialization_{method_index}_{specialization_index}"
@@ -2586,9 +2682,8 @@ fn specialization_const_argument(
         .find(|binding| binding.name == name)?
         .value
     {
-        SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => {
-            Some(tokens.clone())
-        }
+        SpecializationValueIr::Const(tokens)
+        | SpecializationValueIr::AmbiguousPath(tokens) => Some(tokens.clone()),
         SpecializationValueIr::Type(_) => None,
     }
 }
@@ -2602,11 +2697,16 @@ fn specialize_type_tokens(
     let mut replacements = Vec::new();
     for parameter in &generics.params {
         let tokens = match parameter.kind {
-            GenericKindIr::Type => specialization_type_argument(specialization, &parameter.name),
-            GenericKindIr::Const => specialization_const_argument(specialization, &parameter.name),
+            GenericKindIr::Type => {
+                specialization_type_argument(specialization, &parameter.name)
+            }
+            GenericKindIr::Const => {
+                specialization_const_argument(specialization, &parameter.name)
+            }
             GenericKindIr::Lifetime => None,
         }?;
-        replacements.push((Ident::new(&parameter.name, parameter.span), tokens));
+        replacements
+            .push((Ident::new(&parameter.name, parameter.span), tokens));
     }
     Some(substitute_tokens(&ty.tokens, &replacements))
 }
@@ -2636,24 +2736,25 @@ pub(super) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
 
 /// Returns whether reflection policy explicitly suppresses invocation.
 fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
-    method
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip))
+    method.attributes.iter().any(|attribute| {
+        matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip)
+    })
 }
 
-/// Expands every statically applicable invocation blocker in canonical enum order.
+/// Expands every statically applicable invocation blocker in canonical enum
+/// order.
 pub(super) fn invocation_unavailable_reason_entry(
     method: &MethodIr,
     target: &TokenStream,
     facade: &TokenStream,
 ) -> TokenStream {
     let mut reasons = Vec::new();
-    let unsupported_receiver = method.receiver.as_ref().is_some_and(|receiver| {
-        receiver.kind == ReceiverKindIr::Typed
-            && typed_owned_receiver_type(receiver, target).is_none()
-            && typed_pinned_receiver_mutable(receiver).is_none()
-    });
+    let unsupported_receiver =
+        method.receiver.as_ref().is_some_and(|receiver| {
+            receiver.kind == ReceiverKindIr::Typed
+                && typed_owned_receiver_type(receiver, target).is_none()
+                && typed_pinned_receiver_mutable(receiver).is_none()
+        });
     if unsupported_receiver {
         reasons.push(quote!(
             #facade::descriptor::InvocationUnavailableReason::UnsupportedReceiver
@@ -2679,10 +2780,12 @@ pub(super) fn invocation_unavailable_reason_entry(
             #facade::descriptor::InvocationUnavailableReason::Variadic
         ));
     }
-    let unsupported_borrow = (return_contains_non_static_lifetime(&method.return_type)
-        && !is_supported_shared_borrow_return(&method.return_type)
-        && !is_supported_mutable_borrow_return(method))
-        || (method.qualifiers.is_async && is_borrow_return(&method.return_type));
+    let unsupported_borrow =
+        (return_contains_non_static_lifetime(&method.return_type)
+            && !is_supported_shared_borrow_return(&method.return_type)
+            && !is_supported_mutable_borrow_return(method))
+            || (method.qualifiers.is_async
+                && is_borrow_return(&method.return_type));
     if unsupported_borrow {
         reasons.push(quote!(
             #facade::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn
@@ -2721,7 +2824,8 @@ pub(super) fn invocation_unavailable_reason_entry(
     quote!(&[#(#reasons),*])
 }
 
-/// Returns whether a borrowed parameter uses an unsized shape without a dedicated adapter.
+/// Returns whether a borrowed parameter uses an unsized shape without a
+/// dedicated adapter.
 fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
     matches!(
         &ty.kind,
@@ -2772,7 +2876,8 @@ pub(super) fn invocation_argument_binding(
     facade: &TokenStream,
     mode: &TokenStream,
 ) -> TokenStream {
-    let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
+    let argument =
+        format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {
         TypeKindIr::Reference {
             mutable: true,
@@ -2882,12 +2987,16 @@ fn fingerprint(value: &str) -> u64 {
 
 /// Returns whether a return declaration carries a borrow that cannot cross the
 /// owned dynamic-value boundary.
-pub(super) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
+pub(super) fn return_contains_non_static_lifetime(
+    return_type: &ReturnTypeIr,
+) -> bool {
     lifetime::return_contains_non_static_lifetime(return_type)
 }
 
 /// Returns whether a borrowed output can retain the invocation call lifetime.
-pub(super) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> bool {
+pub(super) fn is_supported_shared_borrow_return(
+    return_type: &ReturnTypeIr,
+) -> bool {
     matches!(
         return_type,
         ReturnTypeIr::Type(TypeIr {
@@ -2897,7 +3006,8 @@ pub(super) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> b
     )
 }
 
-/// Returns whether this declaration can safely identify a unique mutable-borrow origin.
+/// Returns whether this declaration can safely identify a unique mutable-borrow
+/// origin.
 pub(super) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
     matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
@@ -2916,7 +3026,8 @@ pub(super) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
     )
 }
 
-/// Returns whether the declaration returns any borrow rather than an owned value.
+/// Returns whether the declaration returns any borrow rather than an owned
+/// value.
 pub(super) fn is_borrow_return(return_type: &ReturnTypeIr) -> bool {
     matches!(
         return_type,

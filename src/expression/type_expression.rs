@@ -91,7 +91,8 @@ pub enum TypeExpression {
 /// A concrete type path and its final-segment generic arguments.
 #[derive(Clone, Debug)]
 pub struct ConcreteTypeExpression {
-    /// Path segments in declaration order, for example `std`, `vec`, and `Vec`.
+    /// Path segments in declaration order, for example `std`, `vec`, and
+    /// `Vec`.
     pub path: Box<[Box<str>]>,
     /// Generic arguments of the final path segment in declaration order.
     pub arguments: Box<[GenericArgument]>,

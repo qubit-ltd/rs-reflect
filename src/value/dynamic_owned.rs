@@ -71,7 +71,8 @@ impl DynamicOwned<Local> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut()
+            .and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its local `Any` boundary.
@@ -147,7 +148,8 @@ impl DynamicOwned<ThreadSafe> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut()
+            .and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its thread-safe `Any` boundary.

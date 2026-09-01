@@ -41,7 +41,11 @@ use token_rewrite::replace_self_with_owner;
 /// obligation as an autoref fallback candidate, so lifetime uncertainty must
 /// not reach that probe.
 fn associated_const_type_has_proven_static_shape(ty: &TypeIr) -> bool {
-    associated_const_type_has_proven_static_shape_in(ty, &std::collections::HashSet::new(), false)
+    associated_const_type_has_proven_static_shape_in(
+        ty,
+        &std::collections::HashSet::new(),
+        false,
+    )
 }
 
 /// Recursively checks lifetime provenance while tracking higher-ranked
@@ -246,10 +250,17 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
         .to_owned();
     let query_name_literal = syn::LitStr::new(&query_name, declaration.span);
     let visibility = match &declaration.visibility {
-        crate::ir::VisibilityIr::Public => quote!(#facade::identity::Visibility::Public),
-        crate::ir::VisibilityIr::Crate => quote!(#facade::identity::Visibility::Crate),
-        crate::ir::VisibilityIr::Super => quote!(#facade::identity::Visibility::Super),
-        crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
+        crate::ir::VisibilityIr::Public => {
+            quote!(#facade::identity::Visibility::Public)
+        }
+        crate::ir::VisibilityIr::Crate => {
+            quote!(#facade::identity::Visibility::Crate)
+        }
+        crate::ir::VisibilityIr::Super => {
+            quote!(#facade::identity::Visibility::Super)
+        }
+        crate::ir::VisibilityIr::SelfValue
+        | crate::ir::VisibilityIr::Inherited => {
             quote!(#facade::identity::Visibility::Private)
         }
         crate::ir::VisibilityIr::Restricted(path) => {
@@ -362,9 +373,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
             Some((_, entry)) => entry.clone(),
             None => quote!(None),
         });
-    let default_method_unavailable_reason_entries = declaration.methods.iter().map(|method| {
-        super::impls::invocation_unavailable_reason_entry(method, &quote!(Self), &facade)
-    });
+    let default_method_unavailable_reason_entries =
+        declaration.methods.iter().map(|method| {
+            super::impls::invocation_unavailable_reason_entry(
+                method,
+                &quote!(Self),
+                &facade,
+            )
+        });
     let associated_type_resolver_entries = declaration.associated_types.iter().map(|item| {
         if item.generics.params.is_empty() {
             let name = &item.name;
@@ -491,12 +507,13 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
     let associated_const_provider_items = associated_const_providers
         .iter()
         .map(|(provider, _)| provider);
-    let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
-        quote! {
-            #[allow(unused_imports)]
-            use super::*;
-        }
-    });
+    let associated_const_scope_import =
+        (!associated_const_providers.is_empty()).then(|| {
+            quote! {
+                #[allow(unused_imports)]
+                use super::*;
+            }
+        });
     let associated_const_reader_entries =
         associated_const_providers.iter().map(|(_, reader)| reader);
     let methods: Vec<_> = declaration.methods.iter().enumerate().map(|(method_index, method)| {
@@ -807,11 +824,13 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
         }
         _ => Vec::new(),
     });
-    let mut trait_item: syn::ItemTrait = match syn::parse2(declaration.retained_tokens.clone()) {
-        Ok(item) => item,
-        Err(error) => return error.into_compile_error(),
-    };
-    let generate_dyn_descriptor = is_provably_dyn_compatible(&trait_item, &declaration);
+    let mut trait_item: syn::ItemTrait =
+        match syn::parse2(declaration.retained_tokens.clone()) {
+            Ok(item) => item,
+            Err(error) => return error.into_compile_error(),
+        };
+    let generate_dyn_descriptor =
+        is_provably_dyn_compatible(&trait_item, &declaration);
     let trait_ident = &declaration.name;
     let dyn_generics = dyn_trait_generics(&trait_item, &declaration, &facade);
     let dyn_impl_declaration = &dyn_generics.impl_declaration;
@@ -820,7 +839,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr) -> TokenStream {
     let dyn_where_clause = &dyn_generics.where_clause;
     let dyn_type = quote!(dyn #trait_ident #dyn_application);
     let support_dyn_type = quote!(dyn super::#trait_ident #dyn_application);
-    let associated_type_arguments = dyn_generics.associated_type_arguments.iter();
+    let associated_type_arguments =
+        dyn_generics.associated_type_arguments.iter();
     let dyn_direct_supertraits: Vec<_> = declaration
         .supertraits
         .iter()
@@ -1059,7 +1079,9 @@ fn dyn_trait_generics(
     let mut factory_arguments = Vec::new();
     for parameter in &item.generics.params {
         match parameter {
-            syn::GenericParam::Lifetime(_) => application_arguments.push(quote!('static)),
+            syn::GenericParam::Lifetime(_) => {
+                application_arguments.push(quote!('static))
+            }
             syn::GenericParam::Type(parameter) => {
                 let name = &parameter.ident;
                 let bounds = &parameter.bounds;
@@ -1083,7 +1105,9 @@ fn dyn_trait_generics(
     }
     let mut associated_type_arguments = Vec::new();
     for associated in item.items.iter().filter_map(|item| match item {
-        syn::TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
+        syn::TraitItem::Type(associated)
+            if associated_type_requires_dyn_binding(associated) =>
+        {
             Some(associated)
         }
         _ => None,
@@ -1119,7 +1143,9 @@ fn dyn_trait_generics(
         .items
         .iter()
         .filter_map(|item| match item {
-            syn::TraitItem::Type(associated) => Some(associated.ident.to_string()),
+            syn::TraitItem::Type(associated) => {
+                Some(associated.ident.to_string())
+            }
             _ => None,
         })
         .collect();
@@ -1168,16 +1194,19 @@ fn dyn_trait_generics(
         .iter()
         .flat_map(|clause| &clause.predicates)
         .map(|predicate| {
-            let predicate =
-                replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
+            let predicate = replace_declared_lifetimes_with_static(
+                predicate.to_token_stream(),
+                declaration,
+            );
             replace_self_associated_types(predicate, item, declaration)
         })
         .collect();
-    let where_clause = if declared_predicates.is_empty() && impl_predicates.is_empty() {
-        TokenStream::new()
-    } else {
-        quote!(where #(#declared_predicates,)* #(#impl_predicates),*)
-    };
+    let where_clause =
+        if declared_predicates.is_empty() && impl_predicates.is_empty() {
+            TokenStream::new()
+        } else {
+            quote!(where #(#declared_predicates,)* #(#impl_predicates),*)
+        };
     DynTraitGenerics {
         impl_declaration,
         trait_application,
@@ -1217,7 +1246,10 @@ fn replace_declared_lifetimes_with_static(
             TokenTree::Group(group) => {
                 let mut replaced = proc_macro2::Group::new(
                     group.delimiter(),
-                    replace_declared_lifetimes_with_static(group.stream(), declaration),
+                    replace_declared_lifetimes_with_static(
+                        group.stream(),
+                        declaration,
+                    ),
                 );
                 replaced.set_span(group.span());
                 TokenTree::Group(replaced)
@@ -1246,10 +1278,9 @@ fn replace_self_associated_types(
             _ => None,
         })
         .collect();
-    associated.extend(
-        dyn_inherited_associated_types(declaration)
-            .filter_map(|path| path.segments.last().map(|segment| segment.name.clone())),
-    );
+    associated.extend(dyn_inherited_associated_types(declaration).filter_map(
+        |path| path.segments.last().map(|segment| segment.name.clone()),
+    ));
     let input: Vec<_> = tokens.into_iter().collect();
     let mut output = TokenStream::new();
     let mut index = 0;
@@ -1278,7 +1309,11 @@ fn replace_self_associated_types(
             TokenTree::Group(group) => {
                 let mut replaced = proc_macro2::Group::new(
                     group.delimiter(),
-                    replace_self_associated_types(group.stream(), item, declaration),
+                    replace_self_associated_types(
+                        group.stream(),
+                        item,
+                        declaration,
+                    ),
                 );
                 replaced.set_span(group.span());
                 TokenTree::Group(replaced)
@@ -1309,8 +1344,9 @@ fn dyn_reflected_supertrait_path(
     path: &crate::ir::PathIr,
     declaration: &TraitDeclarationIr,
 ) -> TokenStream {
-    let mut syntax: syn::Path = syn::parse2(path.tokens.clone())
-        .expect("validated reflected supertrait paths must parse as Rust paths");
+    let mut syntax: syn::Path = syn::parse2(path.tokens.clone()).expect(
+        "validated reflected supertrait paths must parse as Rust paths",
+    );
     for inherited in dyn_inherited_associated_types(declaration)
         .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
     {
@@ -1329,9 +1365,10 @@ fn dyn_reflected_supertrait_path(
             .expect("validated supertrait path has a segment");
         match &mut segment.arguments {
             syn::PathArguments::None => {
-                segment.arguments = syn::PathArguments::AngleBracketed(syn::parse_quote!(
-                    <#name = #parameter>
-                ));
+                segment.arguments =
+                    syn::PathArguments::AngleBracketed(syn::parse_quote!(
+                        <#name = #parameter>
+                    ));
             }
             syn::PathArguments::AngleBracketed(arguments) => {
                 arguments.args.push(syn::parse_quote!(#name = #parameter));
@@ -1400,7 +1437,10 @@ fn inherited_belongs_to_supertrait(
 /// define which concrete application a declaration-level macro should choose.
 /// Supertraits are limited to standard traits whose dyn compatibility is known
 /// without inspecting another macro expansion.
-fn is_provably_dyn_compatible(item: &syn::ItemTrait, declaration: &TraitDeclarationIr) -> bool {
+fn is_provably_dyn_compatible(
+    item: &syn::ItemTrait,
+    declaration: &TraitDeclarationIr,
+) -> bool {
     if declaration
         .attributes
         .iter()
@@ -1409,11 +1449,9 @@ fn is_provably_dyn_compatible(item: &syn::ItemTrait, declaration: &TraitDeclarat
         return true;
     }
     if where_clause_requires_sized_self(item.generics.where_clause.as_ref())
-        || item
-            .generics
-            .where_clause
-            .as_ref()
-            .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
+        || item.generics.where_clause.as_ref().is_some_and(|clause| {
+            tokens_contain_unprojected_self(clause.to_token_stream())
+        })
         || !item.supertraits.iter().all(is_known_dyn_compatible_bound)
     {
         return false;
@@ -1422,7 +1460,9 @@ fn is_provably_dyn_compatible(item: &syn::ItemTrait, declaration: &TraitDeclarat
         syn::TraitItem::Fn(method) => method_is_dyn_dispatchable(method),
         syn::TraitItem::Type(associated) => {
             associated.generics.params.is_empty()
-                || where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
+                || where_clause_requires_sized_self(
+                    associated.generics.where_clause.as_ref(),
+                )
         }
         syn::TraitItem::Const(_) => false,
         _ => false,
@@ -1440,7 +1480,8 @@ fn is_known_dyn_compatible_bound(bound: &syn::TypeParamBound) -> bool {
             {
                 return false;
             }
-            let path = bound.path.to_token_stream().to_string().replace(' ', "");
+            let path =
+                bound.path.to_token_stream().to_string().replace(' ', "");
             if matches!(
                 path.as_str(),
                 "Sized"
@@ -1481,23 +1522,24 @@ fn is_known_dyn_compatible_bound(bound: &syn::TypeParamBound) -> bool {
 
 /// Returns whether a dyn application must name a concrete binding for this
 /// associated type.
-fn associated_type_requires_dyn_binding(associated: &syn::TraitItemType) -> bool {
+fn associated_type_requires_dyn_binding(
+    associated: &syn::TraitItemType,
+) -> bool {
     !where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
 }
 
 /// Returns whether one method is dispatchable through a trait object or is
 /// explicitly excluded from the vtable by `Self: Sized`.
 fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
-    if where_clause_requires_sized_self(method.sig.generics.where_clause.as_ref()) {
+    if where_clause_requires_sized_self(
+        method.sig.generics.where_clause.as_ref(),
+    ) {
         return true;
     }
     if method.sig.asyncness.is_some()
-        || method
-            .sig
-            .generics
-            .params
-            .iter()
-            .any(|parameter| !matches!(parameter, syn::GenericParam::Lifetime(_)))
+        || method.sig.generics.params.iter().any(|parameter| {
+            !matches!(parameter, syn::GenericParam::Lifetime(_))
+        })
     {
         return false;
     }
@@ -1506,7 +1548,9 @@ fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
         .generics
         .where_clause
         .as_ref()
-        .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
+        .is_some_and(|clause| {
+            tokens_contain_unprojected_self(clause.to_token_stream())
+        })
     {
         return false;
     }
@@ -1518,10 +1562,12 @@ fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
     }
     method.sig.inputs.iter().skip(1).all(|input| {
         let tokens = input.to_token_stream();
-        !tokens_contain_unprojected_self(tokens.clone()) && !tokens_contain_ident(tokens, "impl")
+        !tokens_contain_unprojected_self(tokens.clone())
+            && !tokens_contain_ident(tokens, "impl")
     }) && {
         let output = method.sig.output.to_token_stream();
-        !tokens_contain_unprojected_self(output.clone()) && !tokens_contain_ident(output, "impl")
+        !tokens_contain_unprojected_self(output.clone())
+            && !tokens_contain_ident(output, "impl")
     }
 }
 
@@ -1536,8 +1582,14 @@ fn receiver_is_dyn_dispatchable(receiver: &syn::Receiver) -> bool {
 /// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
 fn receiver_type_is_dyn_dispatchable(ty: &syn::Type) -> bool {
     match ty {
-        syn::Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
-        syn::Type::Reference(reference) => receiver_type_is_dyn_dispatchable(&reference.elem),
+        syn::Type::Path(path)
+            if path.qself.is_none() && path.path.is_ident("Self") =>
+        {
+            true
+        }
+        syn::Type::Reference(reference) => {
+            receiver_type_is_dyn_dispatchable(&reference.elem)
+        }
         syn::Type::Path(path) if path.qself.is_none() => {
             let Some(segment) = path.path.segments.last() else {
                 return false;
@@ -1548,13 +1600,16 @@ fn receiver_type_is_dyn_dispatchable(ty: &syn::Type) -> bool {
             ) {
                 return false;
             }
-            let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+            let syn::PathArguments::AngleBracketed(arguments) =
+                &segment.arguments
+            else {
                 return false;
             };
-            let mut types = arguments.args.iter().filter_map(|argument| match argument {
-                syn::GenericArgument::Type(ty) => Some(ty),
-                _ => None,
-            });
+            let mut types =
+                arguments.args.iter().filter_map(|argument| match argument {
+                    syn::GenericArgument::Type(ty) => Some(ty),
+                    _ => None,
+                });
             let Some(inner) = types.next() else {
                 return false;
             };
@@ -1568,7 +1623,9 @@ fn receiver_type_is_dyn_dispatchable(ty: &syn::Type) -> bool {
 fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
     let tokens: Vec<_> = tokens.into_iter().collect();
     tokens.iter().enumerate().any(|(index, token)| match token {
-        TokenTree::Group(group) => tokens_contain_unprojected_self(group.stream()),
+        TokenTree::Group(group) => {
+            tokens_contain_unprojected_self(group.stream())
+        }
         TokenTree::Ident(identifier) if identifier == "Self" => !matches!(
             tokens.get(index + 1..index + 4),
             Some([
@@ -1582,7 +1639,9 @@ fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
 }
 
 /// Returns whether a where clause contains a direct `Self: Sized` predicate.
-fn where_clause_requires_sized_self(where_clause: Option<&syn::WhereClause>) -> bool {
+fn where_clause_requires_sized_self(
+    where_clause: Option<&syn::WhereClause>,
+) -> bool {
     where_clause.is_some_and(|where_clause| {
         where_clause.predicates.iter().any(|predicate| {
             let syn::WherePredicate::Type(predicate) = predicate else {
@@ -1607,7 +1666,9 @@ fn tokens_contain_self(tokens: TokenStream) -> bool {
 fn tokens_contain_ident(tokens: TokenStream, expected: &str) -> bool {
     tokens.into_iter().any(|token| match token {
         TokenTree::Ident(identifier) => identifier == expected,
-        TokenTree::Group(group) => tokens_contain_ident(group.stream(), expected),
+        TokenTree::Group(group) => {
+            tokens_contain_ident(group.stream(), expected)
+        }
         TokenTree::Punct(_) | TokenTree::Literal(_) => false,
     })
 }
@@ -1623,10 +1684,9 @@ fn default_method_invocation_adapter(
     facade: &TokenStream,
 ) -> Option<(TokenStream, TokenStream)> {
     let target = quote!(Self);
-    let typed_owned_receiver = method
-        .receiver
-        .as_ref()
-        .and_then(|receiver| super::impls::typed_owned_receiver_type(receiver, &target));
+    let typed_owned_receiver = method.receiver.as_ref().and_then(|receiver| {
+        super::impls::typed_owned_receiver_type(receiver, &target)
+    });
     let typed_pinned_receiver = method
         .receiver
         .as_ref()
@@ -1638,10 +1698,9 @@ fn default_method_invocation_adapter(
             | Some(ReceiverKindIr::MutableReference)
     ) || typed_owned_receiver.is_some()
         || typed_pinned_receiver.is_some();
-    let supported_parameters = method
-        .parameters
-        .iter()
-        .all(|parameter| super::impls::supports_invocation_parameter(&parameter.ty));
+    let supported_parameters = method.parameters.iter().all(|parameter| {
+        super::impls::supports_invocation_parameter(&parameter.ty)
+    });
     let has_unproven_associated_type = method
         .parameters
         .iter()
@@ -1692,20 +1751,23 @@ fn default_method_invocation_adapter(
         && !method.qualifiers.is_unsafe
         && method.qualifiers.abi.is_none()
         && !method.qualifiers.is_variadic
-        && (!super::impls::return_contains_non_static_lifetime(&method.return_type)
-            || super::impls::is_supported_shared_borrow_return(&method.return_type)
-            || super::impls::is_supported_mutable_borrow_return(method))
-        && (!method.qualifiers.is_async || !super::impls::is_borrow_return(&method.return_type))
-        && !method
-            .attributes
-            .iter()
-            .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoInvoke))
+        && (!super::impls::return_contains_non_static_lifetime(
+            &method.return_type,
+        ) || super::impls::is_supported_shared_borrow_return(
+            &method.return_type,
+        ) || super::impls::is_supported_mutable_borrow_return(method))
+        && (!method.qualifiers.is_async
+            || !super::impls::is_borrow_return(&method.return_type))
+        && !method.attributes.iter().any(|attribute| {
+            matches!(attribute.name, HelperName::Skip | HelperName::NoInvoke)
+        })
         && super::impls::supports_invocation_return(&method.return_type);
     if !supported {
         return None;
     }
 
-    let adapter_name = format_ident!("__qubit_reflect_invoke_default_{suffix}_{index}");
+    let adapter_name =
+        format_ident!("__qubit_reflect_invoke_default_{suffix}_{index}");
     let method_name = &method.name;
     let thread_safe = method
         .attributes
@@ -1759,7 +1821,11 @@ fn default_method_invocation_adapter(
             None => quote!(#facade::invoke::ReceiverExpectation::none()),
         }
     };
-    let receiver_binding = match method.receiver.as_ref().map(|receiver| receiver.kind) {
+    let receiver_binding = match method
+        .receiver
+        .as_ref()
+        .map(|receiver| receiver.kind)
+    {
         Some(ReceiverKindIr::Value) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver: Self = match receiver {
@@ -1770,7 +1836,8 @@ fn default_method_invocation_adapter(
             };
         },
         Some(ReceiverKindIr::Typed) if typed_owned_receiver.is_some() => {
-            let receiver_type = typed_owned_receiver.as_ref().expect("checked above");
+            let receiver_type =
+                typed_owned_receiver.as_ref().expect("checked above");
             quote! {
                 let (receiver, arguments) = validated.into_parts();
                 let receiver: #receiver_type = match receiver {
@@ -1812,17 +1879,23 @@ fn default_method_invocation_adapter(
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_expectation(parameter, facade))
+        .map(|parameter| {
+            super::impls::invocation_argument_expectation(parameter, facade)
+        })
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            super::impls::invocation_argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
+        .map(|parameter| {
+            format_ident!("__qubit_reflect_argument_{}", parameter.index)
+        })
         .collect();
     let call = if method.receiver.is_some() {
         quote!(Self::#method_name(receiver, #(#call_arguments),*))
@@ -1840,7 +1913,9 @@ fn default_method_invocation_adapter(
         method
             .parameters
             .iter()
-            .filter(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { .. }))
+            .filter(|parameter| {
+                matches!(parameter.ty.kind, TypeKindIr::Reference { .. })
+            })
             .map(|parameter| {
                 let index = parameter.index;
                 quote!(#facade::invoke::BorrowOrigin::Parameter(#index))
@@ -2160,23 +2235,30 @@ fn default_pinned_method_invocation_adapter(
     facade: &TokenStream,
     pinned_mutable: bool,
 ) -> (TokenStream, TokenStream) {
-    let adapter_name = format_ident!("__qubit_reflect_invoke_default_pinned_{suffix}_{index}");
+    let adapter_name =
+        format_ident!("__qubit_reflect_invoke_default_pinned_{suffix}_{index}");
     let method_name = &method.name;
     let mode = quote!(#facade::value::Local);
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_expectation(parameter, facade))
+        .map(|parameter| {
+            super::impls::invocation_argument_expectation(parameter, facade)
+        })
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            super::impls::invocation_argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
+        .map(|parameter| {
+            format_ident!("__qubit_reflect_argument_{}", parameter.index)
+        })
         .collect();
     let invocation_type = if pinned_mutable {
         quote!(#facade::invoke::PinnedMutInvocation<'call, Self, #mode>)
@@ -2270,14 +2352,21 @@ fn type_contains_associated_type(ty: &TypeIr) -> bool {
         TypeKindIr::Path(path) => path_contains_associated_type(path),
         TypeKindIr::Reference { element, .. }
         | TypeKindIr::Slice(element)
-        | TypeKindIr::Pointer { element, .. } => type_contains_associated_type(element),
-        TypeKindIr::Tuple(elements) => elements.iter().any(type_contains_associated_type),
-        TypeKindIr::Array { element, .. } => type_contains_associated_type(element),
+        | TypeKindIr::Pointer { element, .. } => {
+            type_contains_associated_type(element)
+        }
+        TypeKindIr::Tuple(elements) => {
+            elements.iter().any(type_contains_associated_type)
+        }
+        TypeKindIr::Array { element, .. } => {
+            type_contains_associated_type(element)
+        }
         TypeKindIr::BareFunction { inputs, output, .. } => {
             inputs.iter().any(type_contains_associated_type)
                 || output.as_deref().is_some_and(type_contains_associated_type)
         }
-        TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
+        TypeKindIr::TraitObject { bounds, .. }
+        | TypeKindIr::ImplTrait { bounds } => {
             bounds.iter().any(bound_contains_associated_type)
         }
         TypeKindIr::Never => false,
@@ -2296,7 +2385,8 @@ fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
                 PathArgumentsIr::None => false,
                 PathArgumentsIr::AngleBracketed(arguments) => {
                     arguments.iter().any(|argument| match argument {
-                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                        PathArgumentIr::Type(ty)
+                        | PathArgumentIr::AssociatedType { ty, .. } => {
                             type_contains_associated_type(ty)
                         }
                         PathArgumentIr::Constraint { bounds, .. } => {
@@ -2310,7 +2400,9 @@ fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
                 }
                 PathArgumentsIr::Parenthesized { inputs, output } => {
                     inputs.iter().any(type_contains_associated_type)
-                        || output.as_deref().is_some_and(type_contains_associated_type)
+                        || output
+                            .as_deref()
+                            .is_some_and(type_contains_associated_type)
                 }
             })
 }
@@ -2318,7 +2410,9 @@ fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
 /// Checks whether one trait or lifetime bound contains an associated binding.
 fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
     match bound {
-        GenericBoundIr::Trait { path, .. } => path_contains_associated_type(path),
+        GenericBoundIr::Trait { path, .. } => {
+            path_contains_associated_type(path)
+        }
         GenericBoundIr::Lifetime(_) => false,
         GenericBoundIr::Other(_) => true,
     }
@@ -2471,7 +2565,11 @@ fn generic_bounds(
 }
 
 /// Converts source lifetime syntax into the runtime lifetime expression model.
-fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> TokenStream {
+fn lifetime_expression(
+    lifetime: &str,
+    span: Span,
+    facade: &TokenStream,
+) -> TokenStream {
     if lifetime == "'static" {
         return quote!(#facade::expression::LifetimeExpression::Static);
     }
@@ -2481,7 +2579,10 @@ fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> Toke
 
 /// Converts the type forms required by trait item descriptors into runtime
 /// expressions.
-pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn type_expression(
+    ty: &TypeIr,
+    facade: &TokenStream,
+) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => quote!(#facade::expression::TypeExpression::Never),
         TypeKindIr::Path(path) => path_expression(path, ty, facade),
@@ -2492,9 +2593,14 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
         } => {
             let target = type_expression(element, facade);
             let lifetime = match lifetime.as_deref() {
-                Some("'static") => quote!(#facade::expression::LifetimeExpression::Static),
+                Some("'static") => {
+                    quote!(#facade::expression::LifetimeExpression::Static)
+                }
                 Some(value) => {
-                    let value = syn::LitStr::new(value.trim_start_matches('\''), ty.span);
+                    let value = syn::LitStr::new(
+                        value.trim_start_matches('\''),
+                        ty.span,
+                    );
                     quote!(#facade::expression::LifetimeExpression::Named(#value.into()))
                 }
                 None => quote!(#facade::expression::LifetimeExpression::Elided),
@@ -2537,7 +2643,8 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
-            let parameters = inputs.iter().map(|value| type_expression(value, facade));
+            let parameters =
+                inputs.iter().map(|value| type_expression(value, facade));
             let return_type = output
                 .as_deref()
                 .map(|value| type_expression(value, facade))
@@ -2551,7 +2658,9 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
             };
             let abi = match abi.as_deref() {
                 Some("C") => quote!(#facade::expression::FunctionAbi::C),
-                Some("system") => quote!(#facade::expression::FunctionAbi::System),
+                Some("system") => {
+                    quote!(#facade::expression::FunctionAbi::System)
+                }
                 Some(value) => {
                     let value = syn::LitStr::new(value, ty.span);
                     quote!(#facade::expression::FunctionAbi::Other(#value.into()))
@@ -2580,9 +2689,15 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
 }
 
 /// Converts one parsed path into a runtime type-expression token stream.
-fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) -> TokenStream {
+fn path_expression(
+    path: &crate::ir::PathIr,
+    ty: &TypeIr,
+    facade: &TokenStream,
+) -> TokenStream {
     let diagnostic = syn::LitStr::new(&ty.source, ty.span);
-    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
+    if path.qualified_self.is_none()
+        && path.segments.len() == 1
+        && path.segments[0].name == "Self"
     {
         return quote!(#facade::expression::TypeExpression::SelfType);
     }
@@ -2722,7 +2837,10 @@ fn bound_predicates(
 }
 
 /// Converts a parsed const expression into structural runtime metadata.
-fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStream {
+fn const_expression_value(
+    value: &TokenStream,
+    facade: &TokenStream,
+) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = syn::parse2::<syn::Ident>(value.clone()) {
         let name = syn::LitStr::new(&identifier.to_string(), identifier.span());
@@ -2779,15 +2897,26 @@ fn const_expression(value: &TokenStream, facade: &TokenStream) -> TokenStream {
                 let value = value.value();
                 quote!(Some(#facade::expression::ConstExpression::Character(#value)))
             }
-            syn::Lit::Int(value) => integer_const_expression(&value, false, facade)
-                .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
+            syn::Lit::Int(value) => {
+                integer_const_expression(&value, false, facade).unwrap_or_else(
+                    || unsupported_const_default(value.to_token_stream()),
+                )
+            }
             _ => unsupported_const_default(value),
         },
-        syn::Expr::Unary(expression) if matches!(expression.op, syn::UnOp::Neg(_)) => {
+        syn::Expr::Unary(expression)
+            if matches!(expression.op, syn::UnOp::Neg(_)) =>
+        {
             match expression.expr.as_ref() {
                 syn::Expr::Lit(expression) => match &expression.lit {
-                    syn::Lit::Int(value) => integer_const_expression(value, true, facade)
-                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
+                    syn::Lit::Int(value) => {
+                        integer_const_expression(value, true, facade)
+                            .unwrap_or_else(|| {
+                                unsupported_const_default(
+                                    value.to_token_stream(),
+                                )
+                            })
+                    }
                     _ => unsupported_const_default(value),
                 },
                 _ => unsupported_const_default(value),
@@ -2805,7 +2934,8 @@ fn integer_const_expression(
     facade: &TokenStream,
 ) -> Option<TokenStream> {
     let suffix = value.suffix();
-    let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
+    let signed = negative
+        || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
         let value = if negative {
@@ -2813,17 +2943,24 @@ fn integer_const_expression(
         } else {
             magnitude
         };
-        Some(quote!(Some(#facade::expression::ConstExpression::SignedInteger(#value))))
+        Some(
+            quote!(Some(#facade::expression::ConstExpression::SignedInteger(#value))),
+        )
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(quote!(Some(#facade::expression::ConstExpression::UnsignedInteger(#value))))
+        Some(
+            quote!(Some(#facade::expression::ConstExpression::UnsignedInteger(#value))),
+        )
     }
 }
 
 /// Emits a deterministic compile error for const defaults without a runtime
 /// structural value.
 fn unsupported_const_default(value: impl quote::ToTokens) -> TokenStream {
-    let source = syn::LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
+    let source = syn::LitStr::new(
+        &value.into_token_stream().to_string(),
+        Span::call_site(),
+    );
     quote!(compile_error!(
         concat!("unsupported non-literal const default in #[reflect] trait: ", #source)
     ))
@@ -2858,7 +2995,8 @@ mod tests {
     #[test]
     fn test_const_default_rejects_non_literal_expression() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);
-        let rendered = const_expression(&value, &quote!(qubit_reflect)).to_string();
+        let rendered =
+            const_expression(&value, &quote!(qubit_reflect)).to_string();
 
         assert!(rendered.contains("unsupported non-literal const default"));
         assert!(rendered.contains("DEFAULT_LIMIT"));

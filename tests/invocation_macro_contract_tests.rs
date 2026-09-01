@@ -82,10 +82,16 @@ impl Worker {
 }
 
 fn method(name: &str) -> &'static MethodInstanceDescriptor {
-    let registry = ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
+    let registry = ReflectRegistry::initialize()
+        .expect("generated fragments must validate");
+    let implementations =
+        registry.implementations(Worker::type_descriptor().type_id());
     let MethodLookup::Unique(method) =
-        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, name)
+        reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            MethodQualifier::Inherent,
+            name,
+        )
     else {
         panic!("method `{name}` must be uniquely discoverable")
     };
@@ -113,8 +119,13 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
-    assert_eq!(LOCAL_POLLS.with(Cell::get), 0, "the framework must not poll implicitly");
-    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future) else {
+    assert_eq!(
+        LOCAL_POLLS.with(Cell::get),
+        0,
+        "the framework must not poll implicitly"
+    );
+    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future)
+    else {
         panic!("the future must complete on its first explicit poll")
     };
     assert_eq!(LOCAL_POLLS.with(Cell::get), 1);
@@ -135,7 +146,8 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
-    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future) else {
+    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future)
+    else {
         panic!("the future must complete on its first explicit poll")
     };
     let Ok(value) = DynamicOwned::<Local>::downcast::<u8>(value) else {
@@ -145,7 +157,8 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
 }
 
 #[test]
-fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability() {
+fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability()
+ {
     let polls = Arc::new(AtomicUsize::new(0));
     let output = method("send_future")
         .invoke_thread_safe(Invocation::associated([InvocationArg::Owned(
@@ -154,7 +167,9 @@ fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability
         .expect("the explicit thread-safe adapter must exist")
         .expect("owned validation must succeed");
     assert!(
-        method("send_future").invoke_local(Invocation::associated([])).is_none(),
+        method("send_future")
+            .invoke_local(Invocation::associated([]))
+            .is_none(),
         "thread-safe capability must not be inferred as local"
     );
     let InvocationOutput::Future(future) = output else {
@@ -183,9 +198,15 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         ordinary.adapter().unwrap().catching_availability(),
         CatchingAvailability::NotRequested
     );
-    assert!(ordinary.invoke_catching_local(Invocation::associated([])).is_none());
     assert!(
-        ordinary.invoke_thread_safe(Invocation::associated([])).is_none(),
+        ordinary
+            .invoke_catching_local(Invocation::associated([]))
+            .is_none()
+    );
+    assert!(
+        ordinary
+            .invoke_thread_safe(Invocation::associated([]))
+            .is_none(),
         "thread-safe capability must require its explicit attribute"
     );
     let payload = match catch_unwind(AssertUnwindSafe(|| {
@@ -194,10 +215,15 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
             .expect("the normal adapter must exist")
             .expect("validation must succeed")
     })) {
-        Ok(_) => panic!("ordinary invocation must propagate the original panic"),
+        Ok(_) => {
+            panic!("ordinary invocation must propagate the original panic")
+        }
         Err(payload) => payload,
     };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"ordinary panic payload"));
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"ordinary panic payload")
+    );
 
     let catching = method("catching_panic");
     assert_eq!(
@@ -210,10 +236,15 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
             .expect("the normal adapter must remain present")
             .expect("validation must succeed")
     })) {
-        Ok(_) => panic!("normal invocation must still propagate the original panic"),
+        Ok(_) => {
+            panic!("normal invocation must still propagate the original panic")
+        }
         Err(payload) => payload,
     };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"caught panic payload"));
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"caught panic payload")
+    );
     let panic = match catching
         .invoke_catching_local(Invocation::associated([]))
         .expect("the explicit catching adapter must exist")
@@ -222,14 +253,21 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         Ok(_) => panic!("the user panic must be captured"),
         Err(panic) => panic,
     };
-    assert_eq!(panic.payload().downcast_ref::<&str>(), Some(&"caught panic payload"));
+    assert_eq!(
+        panic.payload().downcast_ref::<&str>(),
+        Some(&"caught panic payload")
+    );
 }
 
 #[test]
 fn test_thread_safe_and_catching_attributes_compose_explicitly() {
     let catching = method("thread_safe_catching_panic");
     assert!(catching.invoke_local(Invocation::associated([])).is_none());
-    assert!(catching.invoke_catching_local(Invocation::associated([])).is_none());
+    assert!(
+        catching
+            .invoke_catching_local(Invocation::associated([]))
+            .is_none()
+    );
     assert_eq!(
         catching.adapter().unwrap().catching_availability(),
         CatchingAvailability::Available

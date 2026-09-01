@@ -29,12 +29,14 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     };
     let name = declaration.name.clone();
     let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
-    let registration_module = format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
+    let registration_module =
+        format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
     let opaque_root = declaration
         .attributes
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque);
-    let reflected_field_types = super::generics::reflected_field_types(&declaration);
+    let reflected_field_types =
+        super::generics::reflected_field_types(&declaration);
     let transparently_reflected_parameters =
         super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
@@ -44,12 +46,15 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
-        Ok(generics) => generics,
-        Err(_) => return TokenStream::new(),
-    };
+    let mut generics: syn::Generics =
+        match syn::parse2(declaration.generics.declaration.clone()) {
+            Ok(generics) => generics,
+            Err(_) => return TokenStream::new(),
+        };
     if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
+        let Ok(where_clause) =
+            syn::parse2(declaration.generics.where_clause.clone())
+        else {
             return TokenStream::new();
         };
         generics.where_clause = Some(where_clause);
@@ -62,7 +67,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
-            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            let lifetime = syn::Lifetime::new(
+                &format!("'{}", parameter.name),
+                parameter.span,
+            );
             where_clause
                 .predicates
                 .push(syn::parse_quote!(#lifetime: 'static));
@@ -84,7 +92,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
                 .push(syn::parse_quote!(#parameter: #facade::Reflect));
         }
     }
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) =
+        generics.split_for_impl();
     let self_type = quote!(#name #type_generics);
     let query_name = declaration
         .attributes
@@ -92,7 +101,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
-    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_function =
+        format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
     let capability_definition =
         capabilities(&declaration, &facade, &self_type, &capability_function);
@@ -147,7 +157,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     } else {
         super::construction::struct_adapters(&declaration, &facade)
     };
-    let construction_descriptor = super::construction::struct_descriptor(&facade);
+    let construction_descriptor =
+        super::construction::struct_descriptor(&facade);
     let fields: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -233,7 +244,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let descriptor = if declaration.generics.params.is_empty() {
         root_descriptor
     } else {
-        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        let generic =
+            super::generics::concrete_descriptor(&declaration, &facade);
         quote!(#facade::__private::descriptor::with_concrete_generic({ #root_descriptor },
             ::std::boxed::Box::leak(::std::boxed::Box::new(#generic))))
     };
@@ -281,10 +293,18 @@ pub(crate) fn capabilities(
             .into_iter()
             .flatten()
             .map(|path| match path.source.rsplit("::").next() {
-                Some("Clone") => quote!(#facade::capability::clone_descriptor::<Self>()),
-                Some("Default") => quote!(#facade::capability::default_descriptor::<Self>()),
-                Some("Send") => quote!(#facade::capability::send_descriptor::<Self>()),
-                Some("Sync") => quote!(#facade::capability::sync_descriptor::<Self>()),
+                Some("Clone") => {
+                    quote!(#facade::capability::clone_descriptor::<Self>())
+                }
+                Some("Default") => {
+                    quote!(#facade::capability::default_descriptor::<Self>())
+                }
+                Some("Send") => {
+                    quote!(#facade::capability::send_descriptor::<Self>())
+                }
+                Some("Sync") => {
+                    quote!(#facade::capability::sync_descriptor::<Self>())
+                }
                 Some(_) | None => {
                     let tokens = &path.tokens;
                     quote!(#tokens::<Self>())
