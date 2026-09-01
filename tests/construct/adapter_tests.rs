@@ -68,6 +68,10 @@ fn test_derive_struct_constructor_and_updater_are_descriptor_queryable() {
     let construction = descriptor
         .struct_construction()
         .expect("derived structs expose construction metadata");
+    assert!(std::ptr::eq(
+        construction.local_constructor(),
+        construction.local_constructor(),
+    ));
     let value = descriptor
         .construct_struct(NamedConstructionInput::new([
             ("id", ReflectedOwned::new(7_u32)),
@@ -85,6 +89,10 @@ fn test_derive_struct_constructor_and_updater_are_descriptor_queryable() {
     );
 
     let updater = construction.local_updater().expect("derived structs expose updates");
+    assert!(std::ptr::eq(
+        updater,
+        construction.local_updater().expect("derived structs cache updates"),
+    ));
     let updated = updater
         .update(StructUpdateInput::new(
             ReflectedOwned::new(value),

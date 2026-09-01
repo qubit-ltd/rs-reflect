@@ -285,7 +285,7 @@ pub const fn struct_type<T: ?Sized + 'static>(
 
 /// Creates a reflected struct root with generated construction entry points.
 #[doc(hidden)]
-pub const fn struct_type_with_construction<T: ?Sized + 'static>(
+pub fn struct_type_with_construction<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: StructKind,
     fields: &'static [FieldDescriptor],
