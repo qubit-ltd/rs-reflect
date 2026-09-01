@@ -13,6 +13,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use crate::expression::DiagnosticText;
+use crate::expression::ExpressionError;
 use crate::expression::LifetimeExpression;
 use crate::expression::TypeExpression;
 
@@ -69,6 +70,32 @@ pub enum PredicateDescriptor {
         /// Optional source-oriented diagnostic text excluded from identity.
         diagnostic: DiagnosticText,
     },
+}
+
+impl PredicateDescriptor {
+    /// Creates a type-bound predicate after validating its parallel lists.
+    pub fn type_bound(
+        subject: TypeExpression,
+        bounds: impl Into<Box<[TypeExpression]>>,
+        modifiers: impl Into<Box<[TraitBoundModifier]>>,
+        higher_ranked_lifetimes: impl Into<Box<[LifetimeExpression]>>,
+    ) -> Result<Self, ExpressionError> {
+        let bounds = bounds.into();
+        let bound_modifiers = modifiers.into();
+        if bounds.len() != bound_modifiers.len() {
+            return Err(ExpressionError::BoundModifierCount {
+                bounds: bounds.len(),
+                modifiers: bound_modifiers.len(),
+            });
+        }
+        Ok(Self::TypeBound {
+            subject,
+            bounds,
+            bound_modifiers,
+            higher_ranked_lifetimes: higher_ranked_lifetimes.into(),
+            diagnostic: DiagnosticText::default(),
+        })
+    }
 }
 
 impl PartialEq for PredicateDescriptor {

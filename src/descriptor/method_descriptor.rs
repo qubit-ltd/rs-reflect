@@ -229,27 +229,61 @@ pub enum MethodVisibility {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MethodQualifiers {
     /// Whether the declaration is `async`.
-    pub is_async: bool,
+    pub(crate) is_async: bool,
     /// Whether the declaration is `unsafe`.
-    pub is_unsafe: bool,
+    pub(crate) is_unsafe: bool,
     /// Whether the declaration is `const`.
-    pub is_const: bool,
+    pub(crate) is_const: bool,
     /// The explicitly declared ABI, or `None` for the ordinary Rust ABI.
-    pub abi: Option<FunctionAbi>,
+    pub(crate) abi: Option<FunctionAbi>,
     /// Whether the declaration has a variadic tail.
-    pub is_variadic: bool,
+    pub(crate) is_variadic: bool,
+}
+
+impl MethodQualifiers {
+    /// Creates the complete set of method qualifiers.
+    pub const fn new(
+        is_async: bool,
+        is_unsafe: bool,
+        is_const: bool,
+        abi: Option<FunctionAbi>,
+        is_variadic: bool,
+    ) -> Self {
+        Self {
+            is_async,
+            is_unsafe,
+            is_const,
+            abi,
+            is_variadic,
+        }
+    }
+
+    /// Returns whether the declaration is asynchronous.
+    pub const fn is_async(&self) -> bool {
+        self.is_async
+    }
+    /// Returns whether the declaration is unsafe.
+    pub const fn is_unsafe(&self) -> bool {
+        self.is_unsafe
+    }
+    /// Returns whether the declaration is const.
+    pub const fn is_const(&self) -> bool {
+        self.is_const
+    }
+    /// Returns the explicitly declared ABI.
+    pub const fn abi(&self) -> Option<&FunctionAbi> {
+        self.abi.as_ref()
+    }
+    /// Returns whether the declaration has a variadic tail.
+    pub const fn is_variadic(&self) -> bool {
+        self.is_variadic
+    }
 }
 
 impl Default for MethodQualifiers {
     /// Returns the qualifiers of an ordinary safe Rust method.
     fn default() -> Self {
-        Self {
-            is_async: false,
-            is_unsafe: false,
-            is_const: false,
-            abi: None,
-            is_variadic: false,
-        }
+        Self::new(false, false, false, None, false)
     }
 }
 
@@ -302,13 +336,9 @@ pub enum CatchingAvailability {
 pub struct InvocationAdapter {
     entry_point: fn(),
     local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
-    thread_safe:
-        Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
-    catching_local:
-        Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
-    catching_thread_safe: Option<
-        crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>,
-    >,
+    thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
+    catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
+    catching_thread_safe: Option<crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>>,
     catching_availability: CatchingAvailability,
     pinned_ref_local: Option<&'static (dyn Any + Send + Sync)>,
     pinned_mut_local: Option<&'static (dyn Any + Send + Sync)>,
@@ -335,9 +365,7 @@ impl InvocationAdapter {
     /// The generated function is higher-ranked over the invocation lifetime,
     /// so it cannot extend erased input borrows beyond one invocation.
     #[doc(hidden)]
-    pub const fn local(
-        entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
-    ) -> Self {
+    pub const fn local(entry_point: crate::invoke::InvocationAdapter<crate::value::Local>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
             local: Some(entry_point),
@@ -356,9 +384,7 @@ impl InvocationAdapter {
     /// The entry point's type preserves both the call lifetime and the runtime
     /// `Send` boundary required by [`ThreadSafe`](crate::value::ThreadSafe).
     #[doc(hidden)]
-    pub const fn thread_safe(
-        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
-    ) -> Self {
+    pub const fn thread_safe(entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
             local: None,
@@ -376,9 +402,7 @@ impl InvocationAdapter {
     #[doc(hidden)]
     pub const fn local_with_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
-        catching_entry_point: crate::invoke::CatchingInvocationAdapter<
-            crate::value::Local,
-        >,
+        catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::Local>,
     ) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -397,9 +421,7 @@ impl InvocationAdapter {
     #[doc(hidden)]
     pub const fn thread_safe_with_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
-        catching_entry_point: crate::invoke::CatchingInvocationAdapter<
-            crate::value::ThreadSafe,
-        >,
+        catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>,
     ) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -456,10 +478,7 @@ impl InvocationAdapter {
     /// without erasing or reconstructing the pin proof.
     #[doc(hidden)]
     pub const fn pinned_ref_local<T: 'static>(
-        entry_point: &'static crate::invoke::PinnedRefAdapter<
-            T,
-            crate::value::Local,
-        >,
+        entry_point: &'static crate::invoke::PinnedRefAdapter<T, crate::value::Local>,
     ) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -476,10 +495,7 @@ impl InvocationAdapter {
     /// Creates a descriptor for a typed local `Pin<&mut T>` entry point.
     #[doc(hidden)]
     pub const fn pinned_mut_local<T: 'static>(
-        entry_point: &'static crate::invoke::PinnedMutAdapter<
-            T,
-            crate::value::Local,
-        >,
+        entry_point: &'static crate::invoke::PinnedMutAdapter<T, crate::value::Local>,
     ) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -556,11 +572,8 @@ impl InvocationAdapter {
     pub fn invoke_catching_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
-    ) -> Option<
-        crate::invoke::CatchingInvocationResult<'call, crate::value::Local>,
-    > {
-        self.catching_local
-            .map(|entry_point| entry_point(invocation))
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
+        self.catching_local.map(|entry_point| entry_point(invocation))
     }
 
     /// Invokes the explicit thread-safe catching entry point when one was
@@ -568,14 +581,8 @@ impl InvocationAdapter {
     pub fn invoke_catching_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
-    ) -> Option<
-        crate::invoke::CatchingInvocationResult<
-            'call,
-            crate::value::ThreadSafe,
-        >,
-    > {
-        self.catching_thread_safe
-            .map(|entry_point| entry_point(invocation))
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
+        self.catching_thread_safe.map(|entry_point| entry_point(invocation))
     }
 
     /// Invokes a typed local `Pin<&T>` entry point when its exact receiver
@@ -589,19 +596,11 @@ impl InvocationAdapter {
     /// receiver type. The `Err` case preserves the original pin and arguments.
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
-        invocation: crate::invoke::PinnedRefInvocation<
-            'call,
-            T,
-            crate::value::Local,
-        >,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedRefInvocationFailure<
-                'call,
-                T,
-                crate::value::Local,
-            >,
+            crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
         self.pinned_ref_local
@@ -622,19 +621,11 @@ impl InvocationAdapter {
     /// receiver type. The `Err` case preserves the original pin and arguments.
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
-        invocation: crate::invoke::PinnedMutInvocation<
-            'call,
-            T,
-            crate::value::Local,
-        >,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedMutInvocationFailure<
-                'call,
-                T,
-                crate::value::Local,
-            >,
+            crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
         self.pinned_mut_local
@@ -680,15 +671,11 @@ impl MethodDescriptor {
         self.rust_name() == other.rust_name()
             && self.receiver() == other.receiver()
             && self.parameters().len() == other.parameters().len()
-            && self.parameters().iter().zip(other.parameters()).all(
-                |(left, right)| {
-                    left.passing_mode() == right.passing_mode()
-                        && left.signature_type() == right.signature_type()
-                },
-            )
+            && self.parameters().iter().zip(other.parameters()).all(|(left, right)| {
+                left.passing_mode() == right.passing_mode() && left.signature_type() == right.signature_type()
+            })
             && self.return_value().kind() == other.return_value().kind()
-            && self.return_value().signature_type()
-                == other.return_value().signature_type()
+            && self.return_value().signature_type() == other.return_value().signature_type()
             && self.qualifiers() == other.qualifiers()
             && self.generic_definition() == other.generic_definition()
     }
@@ -712,12 +699,7 @@ impl MethodDescriptor {
         query_name: &'static str,
         declaration_owner: MethodDeclarationOwner,
     ) -> MethodDescriptorBuilder {
-        MethodDescriptorBuilder::new(
-            identity,
-            rust_name,
-            query_name,
-            declaration_owner,
-        )
+        MethodDescriptorBuilder::new(identity, rust_name, query_name, declaration_owner)
     }
 
     /// Returns the stable composite member identity.
@@ -766,9 +748,7 @@ impl MethodDescriptor {
     ///
     /// `None` means no parameter has the requested identifier.
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
-        self.parameters
-            .iter()
-            .find(|parameter| parameter.name() == Some(name))
+        self.parameters.iter().find(|parameter| parameter.name() == Some(name))
     }
 
     /// Returns a non-receiver parameter by declaration index.
@@ -811,9 +791,7 @@ impl MethodDescriptor {
     /// `None` means this method is declared by an impl definition.
     #[must_use]
     #[inline(always)]
-    pub const fn declaring_trait(
-        &self,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub const fn declaring_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(descriptor) => Some(descriptor),
             MethodDeclarationOwner::Impl(_) => None,
@@ -825,9 +803,7 @@ impl MethodDescriptor {
     /// `None` means this method is declared by a trait definition.
     #[must_use]
     #[inline(always)]
-    pub const fn declaring_impl(
-        &self,
-    ) -> Option<&'static ImplDefinitionDescriptor> {
+    pub const fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(_) => None,
             MethodDeclarationOwner::Impl(descriptor) => Some(descriptor),
@@ -836,14 +812,10 @@ impl MethodDescriptor {
 
     /// Applies concrete trait arguments to every signature relationship while
     /// preserving the declaration identity and source metadata.
-    pub(crate) fn substituted_for_trait_application(
-        &self,
-        substitutions: &TraitApplicationSubstitutions,
-    ) -> Self {
+    pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
         let mut result = self.clone();
         for parameter in &mut result.parameters {
-            parameter.signature_type =
-                substitutions.type_expression(&parameter.signature_type);
+            parameter.signature_type = substitutions.type_expression(&parameter.signature_type);
         }
         result.return_value.signature_type = result
             .return_value
@@ -861,22 +833,20 @@ impl MethodDescriptor {
 
     /// Returns whether applying the substitutions changes any method-level
     /// signature or predicate fact.
-    pub(crate) fn needs_trait_application_substitution(
-        &self,
-        substitutions: &TraitApplicationSubstitutions,
-    ) -> bool {
-        self.parameters.iter().any(|parameter| {
-            substitutions.type_expression(&parameter.signature_type)
-                != parameter.signature_type
-        }) || self.return_value.signature_type.as_ref().is_some_and(
-            |expression| {
-                substitutions.type_expression(expression) != *expression
-            },
-        ) || self
-            .generic_definition
-            .predicates
+    pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
+        self.parameters
             .iter()
-            .any(|predicate| substitutions.predicate(predicate) != *predicate)
+            .any(|parameter| substitutions.type_expression(&parameter.signature_type) != parameter.signature_type)
+            || self
+                .return_value
+                .signature_type
+                .as_ref()
+                .is_some_and(|expression| substitutions.type_expression(expression) != *expression)
+            || self
+                .generic_definition
+                .predicates
+                .iter()
+                .any(|predicate| substitutions.predicate(predicate) != *predicate)
     }
 }
 
@@ -954,10 +924,7 @@ impl MethodDescriptorBuilder {
     }
 
     /// Copies the method's generic declaration and preserves source order.
-    pub fn generic_definition(
-        mut self,
-        generic_definition: &GenericDefinitionDescriptor,
-    ) -> Self {
+    pub fn generic_definition(mut self, generic_definition: &GenericDefinitionDescriptor) -> Self {
         self.generic_definition = generic_definition.clone();
         self
     }
@@ -1089,18 +1056,10 @@ impl MethodInstanceDescriptor {
     pub fn invoke_catching_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
-    ) -> Option<
-        crate::invoke::CatchingInvocationResult<
-            'call,
-            crate::value::ThreadSafe,
-        >,
-    > {
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
         let entry_point = self.adapter?.catching_thread_safe?;
         Some(
-            match invocation.bind_arguments(
-                self.effective_method().identity(),
-                self.effective_method().parameters(),
-            ) {
+            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
                 Ok(invocation) => entry_point(invocation),
                 Err(failure) => Err(failure),
             },
@@ -1118,27 +1077,19 @@ impl MethodInstanceDescriptor {
         arguments: Box<[GenericArgument]>,
         unavailable_reasons: Box<[InvocationUnavailableReason]>,
     ) -> Result<Self, MethodInstanceBuildError> {
-        if implementation_source == MethodImplementationSource::Required
-            && adapter.is_some()
-        {
+        if implementation_source == MethodImplementationSource::Required && adapter.is_some() {
             return Err(MethodInstanceBuildError::RequiredMethodHasAdapter);
         }
         match implementation_source {
-            MethodImplementationSource::Declared
-                if declaration.declaring_impl().is_none() =>
-            {
-                return Err(
-                    MethodInstanceBuildError::DeclaredMethodNotOwnedByImpl,
-                );
+            MethodImplementationSource::Declared if declaration.declaring_impl().is_none() => {
+                return Err(MethodInstanceBuildError::DeclaredMethodNotOwnedByImpl);
             }
             MethodImplementationSource::Required
             | MethodImplementationSource::Defaulted
             | MethodImplementationSource::Overridden
                 if declaration.declaring_trait().is_none() =>
             {
-                return Err(
-                    MethodInstanceBuildError::TraitMethodNotOwnedByTrait,
-                );
+                return Err(MethodInstanceBuildError::TraitMethodNotOwnedByTrait);
             }
             _ => {}
         }
@@ -1152,9 +1103,7 @@ impl MethodInstanceDescriptor {
                 | MethodImplementationSource::Defaulted,
                 Some(_),
             ) => {
-                return Err(
-                    MethodInstanceBuildError::UnexpectedImplementationMethod,
-                );
+                return Err(MethodInstanceBuildError::UnexpectedImplementationMethod);
             }
             _ => {}
         }
@@ -1162,9 +1111,7 @@ impl MethodInstanceDescriptor {
             return Err(MethodInstanceBuildError::AdapterHasUnavailableReasons);
         }
         if adapter.is_none() && unavailable_reasons.is_empty() {
-            return Err(
-                MethodInstanceBuildError::UnavailableMethodMissingReasons,
-            );
+            return Err(MethodInstanceBuildError::UnavailableMethodMissingReasons);
         }
         Ok(Self {
             declaration,
@@ -1188,9 +1135,7 @@ impl MethodInstanceDescriptor {
     /// `None` means the instance is required or uses its trait default.
     #[must_use]
     #[inline(always)]
-    pub const fn implementation_method(
-        &self,
-    ) -> Option<&'static MethodDescriptor> {
+    pub const fn implementation_method(&self) -> Option<&'static MethodDescriptor> {
         self.implementation_method
     }
 
@@ -1259,10 +1204,7 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.local?;
         Some(
             invocation
-                .bind_arguments(
-                    self.effective_method().identity(),
-                    self.effective_method().parameters(),
-                )
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
                 .and_then(entry_point),
         )
     }
@@ -1287,10 +1229,7 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.thread_safe?;
         Some(
             invocation
-                .bind_arguments(
-                    self.effective_method().identity(),
-                    self.effective_method().parameters(),
-                )
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
                 .and_then(entry_point),
         )
     }
@@ -1309,15 +1248,10 @@ impl MethodInstanceDescriptor {
     pub fn invoke_catching_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
-    ) -> Option<
-        crate::invoke::CatchingInvocationResult<'call, crate::value::Local>,
-    > {
+    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
         let entry_point = self.adapter?.catching_local?;
         Some(
-            match invocation.bind_arguments(
-                self.effective_method().identity(),
-                self.effective_method().parameters(),
-            ) {
+            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
                 Ok(invocation) => entry_point(invocation),
                 Err(failure) => Err(failure),
             },
@@ -1336,34 +1270,20 @@ impl MethodInstanceDescriptor {
     /// exact receiver type `T`.
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
-        invocation: crate::invoke::PinnedRefInvocation<
-            'call,
-            T,
-            crate::value::Local,
-        >,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedRefInvocationFailure<
-                'call,
-                T,
-                crate::value::Local,
-            >,
+            crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
         let entry_point = self
             .adapter?
             .pinned_ref_local?
-            .downcast_ref::<crate::invoke::PinnedRefAdapter<
-            T,
-            crate::value::Local,
-        >>()?;
+            .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()?;
         Some(
             invocation
-                .bind_arguments(
-                    self.effective_method().identity(),
-                    self.effective_method().parameters(),
-                )
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
                 .and_then(entry_point),
         )
     }
@@ -1380,34 +1300,20 @@ impl MethodInstanceDescriptor {
     /// exact receiver type `T`.
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
-        invocation: crate::invoke::PinnedMutInvocation<
-            'call,
-            T,
-            crate::value::Local,
-        >,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedMutInvocationFailure<
-                'call,
-                T,
-                crate::value::Local,
-            >,
+            crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
         let entry_point = self
             .adapter?
             .pinned_mut_local?
-            .downcast_ref::<crate::invoke::PinnedMutAdapter<
-            T,
-            crate::value::Local,
-        >>()?;
+            .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()?;
         Some(
             invocation
-                .bind_arguments(
-                    self.effective_method().identity(),
-                    self.effective_method().parameters(),
-                )
+                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
                 .and_then(entry_point),
         )
     }

@@ -49,11 +49,39 @@ pub enum GenericArgument {
 #[derive(Clone, Debug)]
 pub struct ConstGenericArgument {
     /// The const parameter's declared type.
-    pub declared_type: Box<TypeExpression>,
+    pub(crate) declared_type: Box<TypeExpression>,
     /// The const argument's structural value.
-    pub value: ConstExpression,
+    pub(crate) value: ConstExpression,
     /// A normalized, source-oriented rendering of the const argument.
-    pub normalized_diagnostic: Box<str>,
+    pub(crate) normalized_diagnostic: Box<str>,
+}
+
+impl ConstGenericArgument {
+    /// Creates a typed structural const argument.
+    pub fn new(
+        declared_type: TypeExpression,
+        value: ConstExpression,
+        normalized_diagnostic: impl Into<Box<str>>,
+    ) -> Self {
+        Self {
+            declared_type: Box::new(declared_type),
+            value,
+            normalized_diagnostic: normalized_diagnostic.into(),
+        }
+    }
+
+    /// Returns the declared const parameter type.
+    pub fn declared_type(&self) -> &TypeExpression {
+        &self.declared_type
+    }
+    /// Returns the structural const value.
+    pub fn value(&self) -> &ConstExpression {
+        &self.value
+    }
+    /// Returns the normalized source-oriented rendering.
+    pub fn normalized_diagnostic(&self) -> &str {
+        &self.normalized_diagnostic
+    }
 }
 
 impl PartialEq for ConstGenericArgument {

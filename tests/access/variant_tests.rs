@@ -10,7 +10,7 @@
 //! Integration tests for reflected enum variant access.
 use std::any::TypeId;
 
-use qubit_reflect::__private::descriptor;
+use qubit_reflect::__private::codegen_v1::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessPolicy;
 use qubit_reflect::access::FieldIdentity;
@@ -54,23 +54,14 @@ fn is_done(value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
 }
 
 /// Reads the payload only while `Progress` is active.
-fn get_progress_value<'a>(
-    target: ReflectedRef<'a>,
-) -> Result<ReflectedRef<'a>, FieldAccessError> {
-    let event = target.downcast::<Event>().unwrap_or_else(|_| {
-        panic!("the descriptor must validate the field target type")
-    });
+fn get_progress_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
+    let event = target
+        .downcast::<Event>()
+        .unwrap_or_else(|_| panic!("the descriptor must validate the field target type"));
     match event {
         Event::Progress(value) => Ok(ReflectedRef::new(value)),
         Event::Done(_) => Err(FieldAccessError::inactive_variant(
-            FieldIdentity::new_variant(
-                TypeId::of::<Event>(),
-                "variant_tests::Event",
-                0,
-                None,
-                0,
-                "Progress",
-            ),
+            FieldIdentity::new_variant(TypeId::of::<Event>(), "variant_tests::Event", 0, None, 0, "Progress"),
             0,
             "Progress",
         )),
@@ -78,23 +69,14 @@ fn get_progress_value<'a>(
 }
 
 /// Reads the payload only while `Done` is active.
-fn get_done_value<'a>(
-    target: ReflectedRef<'a>,
-) -> Result<ReflectedRef<'a>, FieldAccessError> {
-    let event = target.downcast::<Event>().unwrap_or_else(|_| {
-        panic!("the descriptor must validate the field target type")
-    });
+fn get_done_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
+    let event = target
+        .downcast::<Event>()
+        .unwrap_or_else(|_| panic!("the descriptor must validate the field target type"));
     match event {
         Event::Done(value) => Ok(ReflectedRef::new(value)),
         Event::Progress(_) => Err(FieldAccessError::inactive_variant(
-            FieldIdentity::new_variant(
-                TypeId::of::<Event>(),
-                "variant_tests::Event",
-                0,
-                None,
-                1,
-                "Done",
-            ),
+            FieldIdentity::new_variant(TypeId::of::<Event>(), "variant_tests::Event", 0, None, 1, "Done"),
             1,
             "Done",
         )),
@@ -103,36 +85,18 @@ fn get_done_value<'a>(
 
 static U32_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<u32>();
 static U32_TYPE_REF: TypeRef = TypeRef::Opaque(&U32_TYPE);
-static PROGRESS_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
-    event_descriptor,
-    0,
-    None,
-    None,
-    &U32_TYPE_REF,
-    Visibility::Private,
-)
-.with_access(
-    FieldAccessPolicy::ReadWrite,
-    Some(get_progress_value),
-    None,
-    None,
-)
-.with_variant(0, "Progress")];
-static DONE_FIELDS: [FieldDescriptor; 1] = [descriptor::field(
-    event_descriptor,
-    0,
-    None,
-    None,
-    &U32_TYPE_REF,
-    Visibility::Private,
-)
-.with_access(
-    FieldAccessPolicy::ReadWrite,
-    Some(get_done_value),
-    None,
-    None,
-)
-.with_variant(1, "Done")];
+static PROGRESS_FIELDS: [FieldDescriptor; 1] =
+    [
+        descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
+            .with_access(FieldAccessPolicy::ReadWrite, Some(get_progress_value), None, None)
+            .with_variant(0, "Progress"),
+    ];
+static DONE_FIELDS: [FieldDescriptor; 1] =
+    [
+        descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
+            .with_access(FieldAccessPolicy::ReadWrite, Some(get_done_value), None, None)
+            .with_variant(1, "Done"),
+    ];
 static EVENT_VARIANTS: [VariantDescriptor; 2] = [
     descriptor::variant(
         event_descriptor,
@@ -153,8 +117,7 @@ static EVENT_VARIANTS: [VariantDescriptor; 2] = [
         is_done,
     ),
 ];
-static EVENT_DESCRIPTOR: TypeDescriptor =
-    descriptor::enum_type::<Event>("variant_tests::Event", &EVENT_VARIANTS);
+static EVENT_DESCRIPTOR: TypeDescriptor = descriptor::enum_type::<Event>("variant_tests::Event", &EVENT_VARIANTS);
 
 /// Verifies active testing is checked against the enum root and distinguishes
 /// every declared variant.
@@ -209,8 +172,7 @@ fn test_variant_field_rejects_inactive_variant_without_panicking() {
 #[test]
 fn test_variant_fields_include_variant_in_runtime_identity() {
     let other = NotAnEvent;
-    let progress_error = match PROGRESS_FIELDS[0].get(ReflectedRef::new(&other))
-    {
+    let progress_error = match PROGRESS_FIELDS[0].get(ReflectedRef::new(&other)) {
         Ok(_) => panic!("the wrong target type must be rejected"),
         Err(error) => error,
     };
@@ -224,12 +186,6 @@ fn test_variant_fields_include_variant_in_runtime_identity() {
     assert_eq!(progress_error.field().variant_rust_name(), Some("Progress"));
     assert_eq!(done_error.field().variant_index(), Some(1));
     assert_eq!(done_error.field().variant_rust_name(), Some("Done"));
-    assert_eq!(
-        PROGRESS_FIELDS[0].visibility(),
-        FieldVisibility::VariantInherited
-    );
-    assert_eq!(
-        DONE_FIELDS[0].visibility(),
-        FieldVisibility::VariantInherited
-    );
+    assert_eq!(PROGRESS_FIELDS[0].visibility(), FieldVisibility::VariantInherited);
+    assert_eq!(DONE_FIELDS[0].visibility(), FieldVisibility::VariantInherited);
 }

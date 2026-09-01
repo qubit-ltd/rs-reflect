@@ -13,14 +13,14 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::registration::CapabilityRegistration;
-use qubit_reflect::__private::registration::FragmentKind;
-use qubit_reflect::__private::registration::FragmentPayload;
-use qubit_reflect::__private::registration::RegistrationFragment;
-use qubit_reflect::__private::registration::RuntimeIdentity;
-use qubit_reflect::__private::registration::StaticFragmentIdentity;
-use qubit_reflect::__private::registration::build_registry;
-use qubit_reflect::__private::registration::initialize_registry;
+use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::testing::CapabilityRegistration;
+use qubit_reflect::__private::testing::build_registry;
+use qubit_reflect::__private::testing::initialize_registry;
 use qubit_reflect::Reflect;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
@@ -50,13 +50,11 @@ struct SameTraitMarkerA;
 struct SameTraitMarkerB;
 
 static EARLY_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::opaque_root::<EarlyType>("shared-query");
+    reflect::__private::codegen_v1::descriptor::opaque_root::<EarlyType>("shared-query");
 static LATE_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::opaque_root::<LateType>("shared-query");
+    reflect::__private::codegen_v1::descriptor::opaque_root::<LateType>("shared-query");
 static INDEPENDENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::opaque_root::<IndependentType>(
-        "independent",
-    );
+    reflect::__private::codegen_v1::descriptor::opaque_root::<IndependentType>("independent");
 
 impl Reflect for IndependentType {
     /// Returns a descriptor whose structural query is independent of the
@@ -73,20 +71,11 @@ const fn static_identity(
     member_kind: &'static str,
     fingerprint: u64,
 ) -> StaticFragmentIdentity {
-    StaticFragmentIdentity::new(
-        "registry-fixture",
-        module,
-        line,
-        1,
-        member_kind,
-        fingerprint,
-    )
+    StaticFragmentIdentity::new("registry-fixture", module, line, 1, member_kind, fingerprint)
 }
 
-const EARLY_IDENTITY: StaticFragmentIdentity =
-    static_identity("a_early", 10, "type", 10);
-const LATE_IDENTITY: StaticFragmentIdentity =
-    static_identity("z_late", 20, "type", 20);
+const EARLY_IDENTITY: StaticFragmentIdentity = static_identity("a_early", 10, "type", 10);
+const LATE_IDENTITY: StaticFragmentIdentity = static_identity("z_late", 20, "type", 20);
 
 /// Returns the runtime identity of the early reflected type.
 fn early_runtime_identity() -> RuntimeIdentity {
@@ -114,22 +103,17 @@ static EARLY_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
     early_runtime_identity,
     early_payload,
 );
-static LATE_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
-    FragmentKind::Type,
-    LATE_IDENTITY,
-    late_runtime_identity,
-    late_payload,
-);
+static LATE_FRAGMENT: RegistrationFragment =
+    RegistrationFragment::new(FragmentKind::Type, LATE_IDENTITY, late_runtime_identity, late_payload);
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     LATE_FRAGMENT
 }
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     EARLY_FRAGMENT
 }
 
-const DUPLICATE_IDENTITY: StaticFragmentIdentity =
-    static_identity("duplicate", 30, "type", 30);
+const DUPLICATE_IDENTITY: StaticFragmentIdentity = static_identity("duplicate", 30, "type", 30);
 
 static DUPLICATE_LEFT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Type,
@@ -144,10 +128,8 @@ static DUPLICATE_RIGHT: RegistrationFragment = RegistrationFragment::new(
     late_payload,
 );
 
-const FIRST_CONTENT_IDENTITY: StaticFragmentIdentity =
-    static_identity("content", 40, "type", 1);
-const SECOND_CONTENT_IDENTITY: StaticFragmentIdentity =
-    static_identity("content", 40, "type", 2);
+const FIRST_CONTENT_IDENTITY: StaticFragmentIdentity = static_identity("content", 40, "type", 1);
+const SECOND_CONTENT_IDENTITY: StaticFragmentIdentity = static_identity("content", 40, "type", 2);
 
 static CONTENT_LEFT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Type,
@@ -162,15 +144,12 @@ static CONTENT_RIGHT: RegistrationFragment = RegistrationFragment::new(
     late_payload,
 );
 
-const FIRST_CAPABILITY_IDENTITY: StaticFragmentIdentity =
-    static_identity("capability_a", 50, "capability", 1);
-const SECOND_CAPABILITY_IDENTITY: StaticFragmentIdentity =
-    static_identity("capability_b", 51, "capability", 2);
+const FIRST_CAPABILITY_IDENTITY: StaticFragmentIdentity = static_identity("capability_a", 50, "capability", 1);
+const SECOND_CAPABILITY_IDENTITY: StaticFragmentIdentity = static_identity("capability_b", 51, "capability", 2);
 
 /// Creates the shared capability ID used to provoke a cross-fragment conflict.
 fn shared_capability_id() -> CapabilityId {
-    CapabilityId::new("fixture.registry.shared")
-        .expect("the fixture capability ID must be valid")
+    CapabilityId::new("fixture.registry.shared").expect("the fixture capability ID must be valid")
 }
 
 /// Returns the audited runtime identity of the shared capability.
@@ -214,69 +193,58 @@ static CAPABILITY_RIGHT: RegistrationFragment = RegistrationFragment::new(
 );
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::default(),
-        predicates: Box::default(),
-        diagnostic: DiagnosticText::default(),
-    });
-static ONE_TYPE_PARAMETER: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: vec![GenericParameterDescriptor::Type {
+    LazyLock::new(|| GenericDefinitionDescriptor::new(Box::default(), Box::default()));
+static ONE_TYPE_PARAMETER: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| {
+    GenericDefinitionDescriptor::new(
+        vec![GenericParameterDescriptor::Type {
             name: "T".into(),
             bounds: Box::default(),
             default: None,
             diagnostic: DiagnosticText::default(),
         }]
         .into_boxed_slice(),
-        predicates: Box::default(),
-        diagnostic: DiagnosticText::default(),
-    });
+        Box::default(),
+    )
+});
 
-static EXTERNAL_DEFINITION_LEFT: LazyLock<TraitDefinitionDescriptor> =
-    LazyLock::new(|| {
-        TraitDefinitionDescriptor::new(
-            TraitId::External(shared_external_trait_id()),
-            "Shared",
-            "fixture::left::Shared",
-            "shared",
-            TraitCompleteness::ExternalIncomplete,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-    });
-static EXTERNAL_DEFINITION_RIGHT: LazyLock<TraitDefinitionDescriptor> =
-    LazyLock::new(|| {
-        TraitDefinitionDescriptor::new(
-            TraitId::External(shared_external_trait_id()),
-            "Shared",
-            "fixture::right::Shared",
-            "shared",
-            TraitCompleteness::ExternalIncomplete,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-    });
-static EXTERNAL_DEFINITION_CONFLICT: LazyLock<TraitDefinitionDescriptor> =
-    LazyLock::new(|| {
-        TraitDefinitionDescriptor::new(
-            TraitId::External(shared_external_trait_id()),
-            "Shared",
-            "fixture::left::Shared",
-            "shared",
-            TraitCompleteness::ExternalIncomplete,
-            &ONE_TYPE_PARAMETER,
-        )
-    });
+static EXTERNAL_DEFINITION_LEFT: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::External(shared_external_trait_id()),
+        "Shared",
+        "fixture::left::Shared",
+        "shared",
+        TraitCompleteness::ExternalIncomplete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static EXTERNAL_DEFINITION_RIGHT: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::External(shared_external_trait_id()),
+        "Shared",
+        "fixture::right::Shared",
+        "shared",
+        TraitCompleteness::ExternalIncomplete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static EXTERNAL_DEFINITION_CONFLICT: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::External(shared_external_trait_id()),
+        "Shared",
+        "fixture::left::Shared",
+        "shared",
+        TraitCompleteness::ExternalIncomplete,
+        &ONE_TYPE_PARAMETER,
+    )
+});
 /// Creates the shared external-trait ID used to provoke a path conflict.
 fn shared_external_trait_id() -> ExternalTraitId {
-    ExternalTraitId::new("fixture.registry.external")
-        .expect("the fixture external trait ID must be valid")
+    ExternalTraitId::new("fixture.registry.external").expect("the fixture external trait ID must be valid")
 }
 
-const FIRST_EXTERNAL_IDENTITY: StaticFragmentIdentity =
-    static_identity("external_a", 60, "trait", 1);
-const SECOND_EXTERNAL_IDENTITY: StaticFragmentIdentity =
-    static_identity("external_b", 61, "trait", 2);
-const CONFLICTING_EXTERNAL_IDENTITY: StaticFragmentIdentity =
-    static_identity("external_c", 62, "trait", 3);
+const FIRST_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_a", 60, "trait", 1);
+const SECOND_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_b", 61, "trait", 2);
+const CONFLICTING_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_c", 62, "trait", 3);
 
 /// Returns the shared runtime external-trait identity.
 fn external_runtime_identity() -> RuntimeIdentity {
@@ -322,27 +290,24 @@ fn independent_descriptor() -> &'static TypeDescriptor {
     &INDEPENDENT_DESCRIPTOR
 }
 
-static IMPL_DEFINITION: LazyLock<ImplDefinitionDescriptor> =
-    LazyLock::new(|| {
-        ImplDefinitionDescriptor::new(
-            FragmentIdentity::new("registry-fixture", "impl", 70, 1, "impl", 1),
-            TypeExpression::Parameter("Self".into()),
-            ImplKind::Inherent,
-            None,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-        .expect("the inherent impl fixture definition must be valid")
-    });
+static IMPL_DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+    ImplDefinitionDescriptor::new(
+        FragmentIdentity::new("registry-fixture", "impl", 70, 1, "impl", 1),
+        TypeExpression::Parameter("Self".into()),
+        ImplKind::Inherent,
+        None,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+    .expect("the inherent impl fixture definition must be valid")
+});
 static IMPL_DESCRIPTOR: LazyLock<ImplDescriptor> = LazyLock::new(|| {
     ImplDescriptor::builder(&IMPL_DEFINITION, independent_descriptor)
         .build()
         .expect("the inherent impl fixture must be valid")
 });
 
-const IMPL_IDENTITY: StaticFragmentIdentity =
-    static_identity("impl", 70, "impl", 1);
-const MISMATCHED_IMPL_IDENTITY: StaticFragmentIdentity =
-    static_identity("impl_duplicate", 71, "impl", 2);
+const IMPL_IDENTITY: StaticFragmentIdentity = static_identity("impl", 70, "impl", 1);
+const MISMATCHED_IMPL_IDENTITY: StaticFragmentIdentity = static_identity("impl_duplicate", 71, "impl", 2);
 
 /// Returns the concrete target identity of the impl fixture.
 fn impl_runtime_identity() -> RuntimeIdentity {
@@ -354,59 +319,44 @@ fn impl_payload() -> FragmentPayload {
     FragmentPayload::Impl(&IMPL_DESCRIPTOR)
 }
 
-static IMPL_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
+static IMPL_FRAGMENT: RegistrationFragment =
+    RegistrationFragment::new(FragmentKind::Impl, IMPL_IDENTITY, impl_runtime_identity, impl_payload);
+static MISMATCHED_IMPL_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Impl,
-    IMPL_IDENTITY,
+    MISMATCHED_IMPL_IDENTITY,
     impl_runtime_identity,
     impl_payload,
 );
-static MISMATCHED_IMPL_FRAGMENT: RegistrationFragment =
-    RegistrationFragment::new(
-        FragmentKind::Impl,
-        MISMATCHED_IMPL_IDENTITY,
-        impl_runtime_identity,
-        impl_payload,
-    );
 
-static SAME_TRAIT_A: LazyLock<TraitDefinitionDescriptor> =
-    LazyLock::new(|| {
-        TraitDefinitionDescriptor::new(
-            TraitId::Reflected(TypeId::of::<SameTraitMarkerA>()),
-            "SameTrait",
-            "fixture::a::SameTrait",
-            "SameTrait",
-            TraitCompleteness::Complete,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-    });
-static SAME_TRAIT_B: LazyLock<TraitDefinitionDescriptor> =
-    LazyLock::new(|| {
-        TraitDefinitionDescriptor::new(
-            TraitId::Reflected(TypeId::of::<SameTraitMarkerB>()),
-            "SameTrait",
-            "fixture::b::SameTrait",
-            "SameTrait",
-            TraitCompleteness::Complete,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-    });
-static AMBIGUOUS_IMPL_DEFINITION: LazyLock<ImplDefinitionDescriptor> =
-    LazyLock::new(|| {
-        ImplDefinitionDescriptor::new_unresolved_trait(
-            FragmentIdentity::new(
-                "registry-fixture",
-                "ambiguous_impl",
-                79,
-                1,
-                "impl-definition",
-                79,
-            ),
-            TypeExpression::Parameter("T".into()),
-            "SameTrait",
-            None,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-    });
+static SAME_TRAIT_A: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<SameTraitMarkerA>()),
+        "SameTrait",
+        "fixture::a::SameTrait",
+        "SameTrait",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static SAME_TRAIT_B: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<SameTraitMarkerB>()),
+        "SameTrait",
+        "fixture::b::SameTrait",
+        "SameTrait",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
+static AMBIGUOUS_IMPL_DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+    ImplDefinitionDescriptor::new_unresolved_trait(
+        FragmentIdentity::new("registry-fixture", "ambiguous_impl", 79, 1, "impl-definition", 79),
+        TypeExpression::Parameter("T".into()),
+        "SameTrait",
+        None,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
 
 fn same_trait_a_identity() -> RuntimeIdentity {
     RuntimeIdentity::Trait(SAME_TRAIT_A.trait_id().clone())
@@ -425,9 +375,7 @@ fn same_trait_b_payload() -> FragmentPayload {
 }
 
 fn ambiguous_impl_definition_identity() -> RuntimeIdentity {
-    RuntimeIdentity::ImplDefinition(
-        AMBIGUOUS_IMPL_DEFINITION.fragment_identity().clone(),
-    )
+    RuntimeIdentity::ImplDefinition(AMBIGUOUS_IMPL_DEFINITION.fragment_identity().clone())
 }
 
 fn ambiguous_impl_definition_payload() -> FragmentPayload {
@@ -446,60 +394,42 @@ static SAME_TRAIT_FRAGMENT_B: RegistrationFragment = RegistrationFragment::new(
     same_trait_b_identity,
     same_trait_b_payload,
 );
-static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment =
-    RegistrationFragment::new(
-        FragmentKind::ImplDefinition,
-        static_identity("ambiguous_impl", 79, "impl-definition", 79),
-        ambiguous_impl_definition_identity,
-        ambiguous_impl_definition_payload,
-    );
+static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::ImplDefinition,
+    static_identity("ambiguous_impl", 79, "impl-definition", 79),
+    ambiguous_impl_definition_identity,
+    ambiguous_impl_definition_payload,
+);
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     IMPL_FRAGMENT
 }
 
-static APPLIED_EXTERNAL_TRAIT: LazyLock<TraitDescriptor> =
-    LazyLock::new(|| {
-        TraitDescriptor::builder(&EXTERNAL_DEFINITION_LEFT)
-            .build()
-            .expect("the applied external trait fixture must be valid")
-    });
-static TRAIT_IMPL_DEFINITION_LEFT: LazyLock<ImplDefinitionDescriptor> =
-    LazyLock::new(|| {
-        ImplDefinitionDescriptor::new(
-            FragmentIdentity::new(
-                "registry-fixture",
-                "trait_impl_a",
-                80,
-                1,
-                "impl",
-                1,
-            ),
-            TypeExpression::Parameter("Self".into()),
-            ImplKind::Trait,
-            Some(&EXTERNAL_DEFINITION_LEFT),
-            &EMPTY_GENERIC_DEFINITION,
-        )
-        .expect("the first trait impl definition must be valid")
-    });
-static TRAIT_IMPL_DEFINITION_RIGHT: LazyLock<ImplDefinitionDescriptor> =
-    LazyLock::new(|| {
-        ImplDefinitionDescriptor::new(
-            FragmentIdentity::new(
-                "registry-fixture",
-                "trait_impl_b",
-                81,
-                1,
-                "impl",
-                2,
-            ),
-            TypeExpression::Parameter("Self".into()),
-            ImplKind::Trait,
-            Some(&EXTERNAL_DEFINITION_RIGHT),
-            &EMPTY_GENERIC_DEFINITION,
-        )
-        .expect("the second trait impl definition must be valid")
-    });
+static APPLIED_EXTERNAL_TRAIT: LazyLock<TraitDescriptor> = LazyLock::new(|| {
+    TraitDescriptor::builder(&EXTERNAL_DEFINITION_LEFT)
+        .build()
+        .expect("the applied external trait fixture must be valid")
+});
+static TRAIT_IMPL_DEFINITION_LEFT: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+    ImplDefinitionDescriptor::new(
+        FragmentIdentity::new("registry-fixture", "trait_impl_a", 80, 1, "impl", 1),
+        TypeExpression::Parameter("Self".into()),
+        ImplKind::Trait,
+        Some(&EXTERNAL_DEFINITION_LEFT),
+        &EMPTY_GENERIC_DEFINITION,
+    )
+    .expect("the first trait impl definition must be valid")
+});
+static TRAIT_IMPL_DEFINITION_RIGHT: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+    ImplDefinitionDescriptor::new(
+        FragmentIdentity::new("registry-fixture", "trait_impl_b", 81, 1, "impl", 2),
+        TypeExpression::Parameter("Self".into()),
+        ImplKind::Trait,
+        Some(&EXTERNAL_DEFINITION_RIGHT),
+        &EMPTY_GENERIC_DEFINITION,
+    )
+    .expect("the second trait impl definition must be valid")
+});
 static TRAIT_IMPL_LEFT: LazyLock<ImplDescriptor> = LazyLock::new(|| {
     ImplDescriptor::builder(&TRAIT_IMPL_DEFINITION_LEFT, independent_descriptor)
         .implemented_trait(&APPLIED_EXTERNAL_TRAIT)
@@ -507,19 +437,14 @@ static TRAIT_IMPL_LEFT: LazyLock<ImplDescriptor> = LazyLock::new(|| {
         .expect("the first trait impl fixture must be valid")
 });
 static TRAIT_IMPL_RIGHT: LazyLock<ImplDescriptor> = LazyLock::new(|| {
-    ImplDescriptor::builder(
-        &TRAIT_IMPL_DEFINITION_RIGHT,
-        independent_descriptor,
-    )
-    .implemented_trait(&APPLIED_EXTERNAL_TRAIT)
-    .build()
-    .expect("the second trait impl fixture must be valid")
+    ImplDescriptor::builder(&TRAIT_IMPL_DEFINITION_RIGHT, independent_descriptor)
+        .implemented_trait(&APPLIED_EXTERNAL_TRAIT)
+        .build()
+        .expect("the second trait impl fixture must be valid")
 });
 
-const TRAIT_IMPL_IDENTITY_LEFT: StaticFragmentIdentity =
-    static_identity("trait_impl_a", 80, "impl", 1);
-const TRAIT_IMPL_IDENTITY_RIGHT: StaticFragmentIdentity =
-    static_identity("trait_impl_b", 81, "impl", 2);
+const TRAIT_IMPL_IDENTITY_LEFT: StaticFragmentIdentity = static_identity("trait_impl_a", 80, "impl", 1);
+const TRAIT_IMPL_IDENTITY_RIGHT: StaticFragmentIdentity = static_identity("trait_impl_b", 81, "impl", 2);
 
 /// Builds the first impl of the shared external trait and target.
 fn trait_impl_payload_left() -> FragmentPayload {
@@ -531,27 +456,24 @@ fn trait_impl_payload_right() -> FragmentPayload {
     FragmentPayload::Impl(&TRAIT_IMPL_RIGHT)
 }
 
-static TRAIT_IMPL_FRAGMENT_LEFT: RegistrationFragment =
-    RegistrationFragment::new(
-        FragmentKind::Impl,
-        TRAIT_IMPL_IDENTITY_LEFT,
-        impl_runtime_identity,
-        trait_impl_payload_left,
-    );
-static TRAIT_IMPL_FRAGMENT_RIGHT: RegistrationFragment =
-    RegistrationFragment::new(
-        FragmentKind::Impl,
-        TRAIT_IMPL_IDENTITY_RIGHT,
-        impl_runtime_identity,
-        trait_impl_payload_right,
-    );
+static TRAIT_IMPL_FRAGMENT_LEFT: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::Impl,
+    TRAIT_IMPL_IDENTITY_LEFT,
+    impl_runtime_identity,
+    trait_impl_payload_left,
+);
+static TRAIT_IMPL_FRAGMENT_RIGHT: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::Impl,
+    TRAIT_IMPL_IDENTITY_RIGHT,
+    impl_runtime_identity,
+    trait_impl_payload_right,
+);
 
 /// Verifies inventory discovery, stable fragment ordering, and all public type
 /// indexes.
 #[test]
 fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
-    let registry = ReflectRegistry::initialize()
-        .expect("valid linked fragments must initialize");
+    let registry = ReflectRegistry::initialize().expect("valid linked fragments must initialize");
     assert!(std::ptr::eq(
         registry
             .get(TypeId::of::<EarlyType>())
@@ -568,9 +490,7 @@ fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
     let early_position = registry
         .types()
         .iter()
-        .position(|descriptor| {
-            descriptor.type_id() == TypeId::of::<EarlyType>()
-        })
+        .position(|descriptor| descriptor.type_id() == TypeId::of::<EarlyType>())
         .expect("the early descriptor must be enumerated");
     let late_position = registry
         .types()
@@ -579,13 +499,9 @@ fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
         .expect("the late descriptor must be enumerated");
     assert!(early_position < late_position);
 
-    let type_candidates =
-        registry.find_by_type_name(std::any::type_name::<EarlyType>());
+    let type_candidates = registry.find_by_type_name(std::any::type_name::<EarlyType>());
     assert_eq!(type_candidates.len(), 1);
-    let type_name_matches: Vec<_> = type_candidates
-        .into_iter()
-        .map(TypeDescriptor::type_id)
-        .collect();
+    let type_name_matches: Vec<_> = type_candidates.into_iter().map(TypeDescriptor::type_id).collect();
     assert_eq!(type_name_matches, [TypeId::of::<EarlyType>()]);
 
     let query_matches: Vec<_> = registry
@@ -593,10 +509,7 @@ fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
         .iter()
         .map(TypeDescriptor::type_id)
         .collect();
-    assert_eq!(
-        query_matches,
-        [TypeId::of::<EarlyType>(), TypeId::of::<LateType>()]
-    );
+    assert_eq!(query_matches, [TypeId::of::<EarlyType>(), TypeId::of::<LateType>()]);
     assert!(registry.find_by_query_name("missing").is_empty());
 }
 
@@ -606,19 +519,14 @@ fn test_registry_runtime_initializes_once_across_threads() {
     let handles: Vec<_> = (0..32)
         .map(|_| {
             std::thread::spawn(|| {
-                ReflectRegistry::initialize()
-                    .expect("valid linked fragments must initialize")
-                    as *const ReflectRegistry as usize
+                ReflectRegistry::initialize().expect("valid linked fragments must initialize") as *const ReflectRegistry
+                    as usize
             })
         })
         .collect();
     let addresses: Vec<_> = handles
         .into_iter()
-        .map(|handle| {
-            handle
-                .join()
-                .expect("registry initialization thread must finish")
-        })
+        .map(|handle| handle.join().expect("registry initialization thread must finish"))
         .collect();
     assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
 }
@@ -639,9 +547,8 @@ fn test_registry_runtime_rejects_duplicate_fragment_identity() {
 /// Verifies one source identity cannot silently change its normalized content.
 #[test]
 fn test_registry_runtime_rejects_content_fingerprint_conflict() {
-    let error = build_registry(&[&CONTENT_RIGHT, &CONTENT_LEFT]).expect_err(
-        "one source identity with different fingerprints must fail",
-    );
+    let error = build_registry(&[&CONTENT_RIGHT, &CONTENT_LEFT])
+        .expect_err("one source identity with different fingerprints must fail");
     assert_eq!(error.kind(), RegistryErrorKind::IdentityConflict);
     let (left, right) = error
         .conflicting_fragments()
@@ -677,8 +584,8 @@ fn test_registry_runtime_rejects_external_trait_id_conflict() {
 /// Verifies an impl payload cannot claim a different registration identity.
 #[test]
 fn test_registry_runtime_rejects_impl_registration_identity_mismatch() {
-    let error = build_registry(&[&MISMATCHED_IMPL_FRAGMENT])
-        .expect_err("the outer and descriptor impl identities must match");
+    let error =
+        build_registry(&[&MISMATCHED_IMPL_FRAGMENT]).expect_err("the outer and descriptor impl identities must match");
     assert_eq!(error.kind(), RegistryErrorKind::IdentityConflict);
     let (definition, registration) = error
         .conflicting_fragments()
@@ -686,8 +593,7 @@ fn test_registry_runtime_rejects_impl_registration_identity_mismatch() {
     assert_eq!(definition.module_path(), "impl");
     assert_eq!(registration.module_path(), "impl_duplicate");
 
-    build_registry(&[&IMPL_FRAGMENT])
-        .expect("a matching impl identity must register");
+    build_registry(&[&IMPL_FRAGMENT]).expect("a matching impl identity must register");
 }
 
 /// Verifies diagnostic trait names never silently choose between two distinct
@@ -714,11 +620,8 @@ fn test_registry_runtime_rejects_ambiguous_generic_trait_impl_definition() {
 /// Verifies one target cannot register the same applied trait impl twice.
 #[test]
 fn test_registry_runtime_rejects_duplicate_target_trait_impl() {
-    let error = build_registry(&[
-        &TRAIT_IMPL_FRAGMENT_RIGHT,
-        &TRAIT_IMPL_FRAGMENT_LEFT,
-    ])
-    .expect_err("duplicate target trait impls must fail deterministically");
+    let error = build_registry(&[&TRAIT_IMPL_FRAGMENT_RIGHT, &TRAIT_IMPL_FRAGMENT_LEFT])
+        .expect_err("duplicate target trait impls must fail deterministically");
     assert_eq!(error.kind(), RegistryErrorKind::IdentityConflict);
     let (left, right) = error
         .conflicting_fragments()
@@ -727,34 +630,27 @@ fn test_registry_runtime_rejects_duplicate_target_trait_impl() {
     assert_eq!(right.module_path(), "trait_impl_b");
 }
 
-static CONFLICTING_FRAGMENTS: [&RegistrationFragment; 2] =
-    [&CONTENT_RIGHT, &CONTENT_LEFT];
+static CONFLICTING_FRAGMENTS: [&RegistrationFragment; 2] = [&CONTENT_RIGHT, &CONTENT_LEFT];
 static VALID_FRAGMENTS: [&RegistrationFragment; 1] = [&EARLY_FRAGMENT];
-static ERROR_CACHE: OnceLock<
-    Result<ReflectRegistry, reflect::error::RegistryError>,
-> = OnceLock::new();
+static ERROR_CACHE: OnceLock<Result<ReflectRegistry, reflect::error::RegistryError>> = OnceLock::new();
 
 /// Verifies failed initialization is cached and returned by cheap error clones.
 #[test]
 fn test_registry_runtime_caches_initialization_error() {
-    let first = initialize_registry(&ERROR_CACHE, &CONFLICTING_FRAGMENTS)
-        .expect_err("the conflicting registry must fail");
-    let second = initialize_registry(&ERROR_CACHE, &VALID_FRAGMENTS)
-        .expect_err("the cached error must win over later input");
+    let first =
+        initialize_registry(&ERROR_CACHE, &CONFLICTING_FRAGMENTS).expect_err("the conflicting registry must fail");
+    let second =
+        initialize_registry(&ERROR_CACHE, &VALID_FRAGMENTS).expect_err("the cached error must win over later input");
     assert_eq!(first.kind(), RegistryErrorKind::IdentityConflict);
     assert_eq!(second.kind(), first.kind());
-    assert_eq!(
-        second.conflicting_fragments(),
-        first.conflicting_fragments()
-    );
+    assert_eq!(second.conflicting_fragments(), first.conflicting_fragments());
 }
 
 /// Verifies registry aggregation failure cannot poison pure descriptor
 /// structure queries.
 #[test]
 fn test_registry_runtime_keeps_descriptor_queries_independent() {
-    let _ = build_registry(&[&CONTENT_LEFT, &CONTENT_RIGHT])
-        .expect_err("the synthetic registry must fail");
+    let _ = build_registry(&[&CONTENT_LEFT, &CONTENT_RIGHT]).expect_err("the synthetic registry must fail");
     let descriptor = TypeDescriptor::of::<IndependentType>();
     assert_eq!(descriptor.type_id(), TypeId::of::<IndependentType>());
     assert_eq!(descriptor.query_name(), "independent");
@@ -764,14 +660,11 @@ fn test_registry_runtime_keeps_descriptor_queries_independent() {
 /// stable empty view instead of allocating on each query.
 #[test]
 fn test_registry_runtime_reuses_frozen_effective_views() {
-    let registry = ReflectRegistry::initialize()
-        .expect("the linked registry must initialize");
+    let registry = ReflectRegistry::initialize().expect("the linked registry must initialize");
     let first = registry.effective_view(TypeId::of::<IndependentType>());
     let second = registry.effective_view(TypeId::of::<IndependentType>());
-    let missing_first =
-        registry.effective_view(TypeId::of::<CapabilityTarget>());
-    let missing_second =
-        registry.effective_view(TypeId::of::<CapabilityTarget>());
+    let missing_first = registry.effective_view(TypeId::of::<CapabilityTarget>());
+    let missing_second = registry.effective_view(TypeId::of::<CapabilityTarget>());
 
     assert!(std::ptr::eq(first, second));
     assert!(std::ptr::eq(missing_first, missing_second));
