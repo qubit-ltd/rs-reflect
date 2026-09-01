@@ -6,7 +6,11 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Token emission from an already validated invocation plan.
+//! Shared token-emission primitives driven by validated invocation plans.
+//!
+//! Concrete impl adapters and trait-default hooks have different ownership,
+//! receiver, and registration shells. Their owners retain those shells while
+//! this module emits the semantic fragments that must remain identical.
 
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -25,8 +29,8 @@ use crate::ir::ReturnTypeIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
-/// Emits the canonical runtime availability slice for one adapter plan.
-pub(crate) fn emit_adapter(plan: &InvocationPlan, context: &ExpansionContext) -> TokenStream {
+/// Emits the canonical runtime unavailability slice for one adapter plan.
+pub(crate) fn emit_unavailable_reasons(plan: &InvocationPlan, context: &ExpansionContext) -> TokenStream {
     debug_assert!(!plan.is_executable() || !matches!(plan.output, OutputPlan::Opaque | OutputPlan::Unsupported));
     let facade = context.facade();
     let reasons = match &plan.availability {

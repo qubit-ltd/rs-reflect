@@ -2309,5 +2309,5 @@ pub(super) fn invocation_unavailable_reason_entry(
         super::invocation::analysis::MethodContext::implementation(target),
     )
     .expect("validated method analysis is infallible");
-    super::invocation::emit::emit_adapter(&plan, context)
+    super::invocation::emit::emit_unavailable_reasons(&plan, context)
 }

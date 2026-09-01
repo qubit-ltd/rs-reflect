@@ -123,9 +123,12 @@ parse ──> validate ──> domain IR
 - `expand/context.rs` 唯一负责 facade 路径和 fragment fingerprint。
 - `expand/dispatcher.rs` 分派 struct、enum、trait、impl。
 - `expand/invocation/analysis.rs` 判定 receiver、参数、输出、线程安全、catching、async 与不可用原因。
-- `expand/invocation/emit.rs` 只根据 `InvocationPlan` 生成 adapter token。
+- `expand/invocation/emit.rs` 只根据 `InvocationPlan` 生成不可用原因、参数绑定与
+  thread-safe/catching 断言等共享语义片段。
 
-trait 默认方法与 concrete impl 共用同一 invocation 分析和 emitter。宿主宏代码不向 `quote!` 内生成路径的
+trait 默认方法与 concrete impl 共用同一 invocation 分析和语义 emitter。两者的执行壳保持在各自所有者中：
+前者必须生成 `Self` 约束下的默认方法 hook，后者必须生成具体 target 的 adapter 与 registration。把这两种
+所有权壳强塞进一个带大量模式开关的 emitter 只会转移复杂度，不建立新抽象。宿主宏代码不向 `quote!` 内生成路径的
 风格规则妥协；style checker 明确区分宿主 Rust 与 generated-token scope。
 
 ## 5. 版本化生成协议与 facade
