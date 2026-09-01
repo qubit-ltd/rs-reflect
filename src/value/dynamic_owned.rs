@@ -12,6 +12,7 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
+use crate::value::DynamicRef;
 use crate::value::Local;
 use crate::value::ThreadSafe;
 use crate::value::mode::Mode;
@@ -55,6 +56,13 @@ impl DynamicOwned<Local> {
         }
     }
 
+    /// Borrows the owned erased value without exposing its concrete type.
+    #[must_use]
+    pub fn as_reflected_ref(&self) -> DynamicRef<'_, Local> {
+        let LocalOwnedStorage::Any(value) = &self.storage;
+        DynamicRef::from_any(value.as_ref())
+    }
+
     /// Returns whether the stored value has the exact type `T`.
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
@@ -71,8 +79,7 @@ impl DynamicOwned<Local> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its local `Any` boundary.
@@ -148,8 +155,7 @@ impl DynamicOwned<ThreadSafe> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its thread-safe `Any` boundary.
