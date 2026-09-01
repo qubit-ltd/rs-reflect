@@ -33,3 +33,10 @@ path = "fuzz_targets/registry_model.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "dynamic_operations"
+path = "fuzz_targets/dynamic_operations.rs"
+test = false
+doc = false
+bench = false

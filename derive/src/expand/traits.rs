@@ -590,10 +590,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     .iter()
                     .map(|lifetime| lifetime_expression(lifetime, item.span, &facade));
                 let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe) };
-                Some(quote!(#facade::expression::PredicateDescriptor::TypeBound {
-                    subject: #facade::expression::TypeExpression::Parameter(#name.into()),
-                    bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]), bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default(),
-                }))
+                Some(quote!(#facade::__private::codegen_v1::expression::type_bound(
+                    #facade::expression::TypeExpression::Parameter(#name.into()),
+                    Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]),
+                    Box::new([#modifier]),
+                    Box::new([#(#lifetimes),*]),
+                )))
             }
             GenericBoundIr::Lifetime(lifetime) => {
                 let lifetime = lifetime_expression(lifetime, item.span, &facade);
@@ -659,12 +661,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                             crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None),
                             crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe),
                         };
-                        Some(quote!(#facade::expression::PredicateDescriptor::TypeBound {
-                            subject: #facade::expression::TypeExpression::Parameter(#subject.into()),
-                            bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]),
-                            bound_modifiers: Box::new([#modifier]),
-                            higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default(),
-                        }))
+                        Some(quote!(#facade::__private::codegen_v1::expression::type_bound(
+                            #facade::expression::TypeExpression::Parameter(#subject.into()),
+                            Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]),
+                            Box::new([#modifier]),
+                            Box::new([#(#lifetimes),*]),
+                        )))
                     }
                     GenericBoundIr::Lifetime(lifetime) => {
                         let lifetime = lifetime_expression(lifetime, declaration.span, &facade);
@@ -725,10 +727,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let bounds: Vec<_> = bounds.iter().map(|bound| {
                 lifetime_expression(bound, declaration.span, &facade)
             }).collect();
-            vec![quote!(#facade::expression::PredicateDescriptor::LifetimeOutlives {
-                lifetime: #lifetime,
-                bounds: Box::new([#(#bounds),*]), diagnostic: #facade::expression::DiagnosticText::default(),
-            })]
+            vec![quote!(#facade::__private::codegen_v1::expression::lifetime_outlives(
+                #lifetime,
+                Box::new([#(#bounds),*]),
+            ))]
         }
         crate::ir::WherePredicateIr::Type {
             bounded_type,
@@ -758,13 +760,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 }),
                 _ => None,
             }).collect();
-            let type_bound = (!trait_bounds.is_empty()).then(|| quote!(#facade::expression::PredicateDescriptor::TypeBound {
-                subject: #subject,
-                bounds: Box::new([#(#trait_bounds),*]),
-                bound_modifiers: Box::new([#(#bound_modifiers),*]),
-                higher_ranked_lifetimes: Box::new([#(#higher_ranked_lifetimes),*]),
-                diagnostic: #facade::expression::DiagnosticText::default(),
-            }));
+            let type_bound = (!trait_bounds.is_empty()).then(|| {
+                quote!(#facade::__private::codegen_v1::expression::type_bound(
+                    #subject,
+                    Box::new([#(#trait_bounds),*]),
+                    Box::new([#(#bound_modifiers),*]),
+                    Box::new([#(#higher_ranked_lifetimes),*]),
+                ))
+            });
             let lifetime_bounds = bounds.iter().filter_map(|bound| match bound {
                 GenericBoundIr::Lifetime(lifetime) => {
                     let lifetime = lifetime_expression(lifetime, declaration.span, &facade);
@@ -2228,10 +2231,10 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
         WherePredicateIr::Lifetime { lifetime, bounds, .. } => {
             let lifetime = lifetime_expression(lifetime, span, facade);
             let bounds = bounds.iter().map(|bound| lifetime_expression(bound, span, facade));
-            vec![quote!(#facade::expression::PredicateDescriptor::LifetimeOutlives {
-                lifetime: #lifetime, bounds: Box::new([#(#bounds),*]),
-                diagnostic: #facade::expression::DiagnosticText::default(),
-            })]
+            vec![quote!(#facade::__private::codegen_v1::expression::lifetime_outlives(
+                #lifetime,
+                Box::new([#(#bounds),*]),
+            ))]
         }
         WherePredicateIr::Type { bounded_type, lifetimes, bounds, .. } => {
             let subject = type_expression(bounded_type, facade);
@@ -2250,9 +2253,14 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                 }),
                 _ => None,
             }).collect();
-            let type_bound = (!trait_bounds.is_empty()).then(|| quote!(#facade::expression::PredicateDescriptor::TypeBound {
-                subject: #subject, bounds: Box::new([#(#trait_bounds),*]), bound_modifiers: Box::new([#(#modifiers),*]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default(),
-            }));
+            let type_bound = (!trait_bounds.is_empty()).then(|| {
+                quote!(#facade::__private::codegen_v1::expression::type_bound(
+                    #subject,
+                    Box::new([#(#trait_bounds),*]),
+                    Box::new([#(#modifiers),*]),
+                    Box::new([#(#lifetimes),*]),
+                ))
+            });
             let outlives = bounds.iter().filter_map(|bound| match bound {
                 GenericBoundIr::Lifetime(lifetime) => {
                     let lifetime = lifetime_expression(lifetime, span, facade);
@@ -2281,11 +2289,12 @@ fn generic_bounds(bounds: &[GenericBoundIr], subject: &LitStr, span: Span, facad
                 crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None),
                 crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe),
             };
-            Some(quote!(#facade::expression::PredicateDescriptor::TypeBound {
-                subject: #facade::expression::TypeExpression::Parameter(#subject.into()),
-                bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]),
-                bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default(),
-            }))
+            Some(quote!(#facade::__private::codegen_v1::expression::type_bound(
+                #facade::expression::TypeExpression::Parameter(#subject.into()),
+                Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))]),
+                Box::new([#modifier]),
+                Box::new([#(#lifetimes),*]),
+            )))
         }
         GenericBoundIr::Lifetime(lifetime) => {
             let lifetime = lifetime_expression(lifetime, span, facade);
@@ -2581,7 +2590,52 @@ fn external_supertrait_arguments(
 
 /// Converts trait-object or opaque-type bounds into runtime predicates.
 fn bound_predicates(bounds: &[GenericBoundIr], facade: &TokenStream, span: Span) -> Vec<TokenStream> {
-    bounds.iter().filter_map(|bound| match bound { GenericBoundIr::Trait { path, modifier, lifetimes } => { let source = LitStr::new(&path.source, span); let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe) }; let lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, span, facade)); Some(quote!(#facade::expression::PredicateDescriptor::TypeBound { subject: #facade::expression::TypeExpression::SelfType, bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#source.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#source)))]), bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default() })) }, GenericBoundIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::expression::PredicateDescriptor::TypeOutlives { ty: #facade::expression::TypeExpression::SelfType, lifetime: #value, diagnostic: #facade::expression::DiagnosticText::default() })) }, _ => None }).collect()
+    bounds
+        .iter()
+        .filter_map(|bound| match bound {
+            GenericBoundIr::Trait {
+                path,
+                modifier,
+                lifetimes,
+            } => {
+                let source = LitStr::new(&path.source, span);
+                let modifier = match modifier {
+                    crate::ir::TraitBoundModifierIr::None => {
+                        quote!(#facade::expression::TraitBoundModifier::None)
+                    }
+                    crate::ir::TraitBoundModifierIr::Maybe => {
+                        quote!(#facade::expression::TraitBoundModifier::Maybe)
+                    }
+                };
+                let lifetimes = lifetimes
+                    .iter()
+                    .map(|value| lifetime_expression(value, span, facade));
+                Some(quote!(#facade::__private::codegen_v1::expression::type_bound(
+                    #facade::expression::TypeExpression::SelfType,
+                    Box::new([#facade::expression::TypeExpression::Concrete(
+                        #facade::__private::codegen_v1::expression::concrete(
+                            vec![#source.into()].into_boxed_slice(),
+                            vec![].into_boxed_slice(),
+                            #facade::expression::DiagnosticText::from(#source),
+                        ),
+                    )]),
+                    Box::new([#modifier]),
+                    Box::new([#(#lifetimes),*]),
+                )))
+            }
+            GenericBoundIr::Lifetime(value) => {
+                let value = lifetime_expression(value, span, facade);
+                Some(
+                    quote!(#facade::expression::PredicateDescriptor::TypeOutlives {
+                        ty: #facade::expression::TypeExpression::SelfType,
+                        lifetime: #value,
+                        diagnostic: #facade::expression::DiagnosticText::default(),
+                    }),
+                )
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Converts a parsed const expression into structural runtime metadata.
