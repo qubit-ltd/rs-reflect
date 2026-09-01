@@ -65,3 +65,32 @@ reflected_opaque!(
     concat!(stringify!(qubit_datatype), "::", stringify!(DataType))
 );
 reflected_opaque!(Uuid, UUID_DESCRIPTOR, concat!(stringify!(uuid), "::", stringify!(Uuid)));
+
+#[cfg(test)]
+mod tests {
+    use super::BigDecimal;
+    use super::DataType;
+    use super::DateTime;
+    use super::Id;
+    use super::NaiveDate;
+    use super::NaiveTime;
+    use super::TypeDescriptor;
+    use super::Utc;
+    use super::Uuid;
+    use crate::descriptor::TypeKind;
+
+    #[test]
+    fn external_values_expose_opaque_reflection_roots() {
+        for descriptor in [
+            TypeDescriptor::of::<Id>(),
+            TypeDescriptor::of::<BigDecimal>(),
+            TypeDescriptor::of::<DateTime<Utc>>(),
+            TypeDescriptor::of::<NaiveDate>(),
+            TypeDescriptor::of::<NaiveTime>(),
+            TypeDescriptor::of::<DataType>(),
+            TypeDescriptor::of::<Uuid>(),
+        ] {
+            assert_eq!(descriptor.kind(), TypeKind::Opaque);
+        }
+    }
+}
