@@ -670,6 +670,45 @@ impl<'a> SupertraitClosure<'a> {
 }
 
 /// An applied trait descriptor with concrete generic arguments.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+/// #[cfg(feature = "derive")]
+/// use qubit_reflect::{reflect, reflect_impl};
+///
+/// #[cfg(feature = "derive")]
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct Service;
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect(crate = qubit_reflect)]
+/// trait Named {
+///     fn name(&self) -> &'static str;
+/// }
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect_impl(crate = qubit_reflect)]
+/// impl Named for Service {
+///     fn name(&self) -> &'static str { "service" }
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let applied = TypeDescriptor::of::<Service>()
+///     .impls()?
+///     .iter()
+///     .find_map(|implementation| implementation.implemented_trait())
+///     .expect("reflected trait implementation");
+/// assert_eq!(applied.definition().rust_name(), "Named");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 pub struct TraitDescriptor {
     definition: &'static TraitDefinitionDescriptor,
     trait_id: AppliedTraitId,

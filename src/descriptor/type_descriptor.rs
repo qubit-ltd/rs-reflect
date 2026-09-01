@@ -71,17 +71,10 @@ use crate::value::ReflectedOwned;
 /// # Examples
 ///
 /// ```
-/// #![allow(proc_macro_derive_resolution_fallback)]
 /// use qubit_reflect::{Reflect, TypeDescriptor};
 ///
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct User {
-///     id: u64,
-/// }
-///
-/// let descriptor = <User as Reflect>::type_descriptor();
-/// assert!(std::ptr::eq(descriptor, TypeDescriptor::of::<User>()));
+/// let descriptor = <u32 as Reflect>::type_descriptor();
+/// assert!(std::ptr::eq(descriptor, TypeDescriptor::of::<u32>()));
 /// ```
 pub trait Reflect: 'static {
     /// Returns the unique root descriptor for `Self`.

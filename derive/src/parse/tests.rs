@@ -609,3 +609,40 @@ fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
         quote! { trait Child: Parent + std::fmt::Debug {} },
     );
 }
+
+#[test]
+fn test_trait_and_impl_accept_explicit_runtime_facade() {
+    let reflected_trait = parse_valid(
+        MacroKind::Trait,
+        quote!(crate = framework::reflect),
+        quote!(trait Service {}),
+    );
+    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
+        panic!("expected a trait declaration");
+    };
+    assert_eq!(
+        reflected_trait
+            .attributes
+            .iter()
+            .filter(|attribute| attribute.name == HelperName::RuntimeCrate)
+            .count(),
+        1,
+    );
+
+    let reflected_impl = parse_valid(
+        MacroKind::Impl,
+        quote!(crate = framework::reflect),
+        quote!(impl Service {}),
+    );
+    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
+        panic!("expected an impl declaration");
+    };
+    assert_eq!(
+        reflected_impl
+            .attributes
+            .iter()
+            .filter(|attribute| attribute.name == HelperName::RuntimeCrate)
+            .count(),
+        1,
+    );
+}

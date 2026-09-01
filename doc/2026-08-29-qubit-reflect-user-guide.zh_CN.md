@@ -38,6 +38,21 @@ qubit-reflect = "0.1"
 
 默认 `derive` feature 会重导出 `Reflect`、`reflect`、`reflect_impl` 三个宏。设置 `default-features = false` 后，运行时和手写注册 API 仍然存在，但这些宏不再被重导出。
 
+请按集成边界选择最窄的依赖配置：
+
+```toml
+# 只使用运行时描述符、动态值和手写注册。
+qubit-reflect = { version = "0.1", default-features = false }
+
+# 使用宏，并为 BigDecimal、chrono、UUID 类型提供反射实现。
+qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+
+# 使用宏，并为 Qubit DataType、Id 类型提供反射实现。
+qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+```
+
+`ecosystem-types` 与 `qubit-types` 相互独立，而且都不属于默认 feature。只使用运行时的下游不会编译这些依赖，也不会在未声明的情况下获得相应 trait 实现。
+
 ## 核心工作流
 
 ### 1. 为类型派生结构描述符
@@ -135,6 +150,22 @@ assert_eq!(value.name, "Ada");
 
 ## 进阶用法
 
+### 通过下游 facade 或宏集成
+
+如果 facade 直接承载 `qubit-reflect` 的派生宏，应当逐项重导出它承诺的公共符号，并在派生宏约定的路径下暴露带版本的生成协议：
+
+```rust,ignore
+pub use qubit_reflect::Reflect;
+pub use qubit_reflect::TypeDescriptor;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use qubit_reflect::__private::codegen_v1;
+}
+```
+
+业务声明随后可使用 `#[reflect(crate = my_facade)]`。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v1`，并让生成代码只通过该别名引用协议。`codegen_v1` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
+
 ### 描述 trait 与可调用实现
 
 - `#[reflect]` 描述 trait 声明，包括 supertrait、默认方法、关联类型和关联常量。
@@ -171,6 +202,8 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 | 方法可见但不能调用 | 查看不可用原因：泛型方法需要受支持的 specialization；unsafe、variadic、不支持的 ABI、opaque 输出及部分借用/unsized 形式不能穿过动态边界。 |
 | 注册表初始化失败 | 检查 `RegistryError`；初始化错误会缓存，修复冲突后需要启动新进程。 |
 | 跨线程调用不可用 | 方法必须显式标记 `thread_safe`，并且只在 Rust bound 满足时构造 `SendReflected*` 值。 |
+| 外部类型没有 `Reflect` 实现 | 在拥有反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`；这些实现默认不会启用。 |
+| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，并确认它精确暴露 `__private::codegen_v1`，不要意外绕过 facade 指向底层 crate。 |
 
 ## 限制与最佳实践
 

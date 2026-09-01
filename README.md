@@ -24,6 +24,18 @@ The default `derive` feature exports `#[derive(Reflect)]`, `#[reflect]`, and
 `#[reflect_impl]`. Disabling default features keeps the runtime and handwritten
 registration APIs, but does not re-export those macros.
 
+External type implementations are opt-in:
+
+| Feature | Adds `Reflect` implementations for |
+| --- | --- |
+| `derive` (default) | The three reflection macros; no external type dependency |
+| `ecosystem-types` | `bigdecimal`, `chrono`, and `uuid` types |
+| `qubit-types` | `qubit-datatype` and `qubit-id` types |
+
+For a runtime-only dependency, use
+`qubit-reflect = { version = "0.1", default-features = false }`. Enable only
+the external type families that cross your reflection boundary.
+
 ## Quick Start
 
 A schema-driven editor needs to display and replace a field selected by name,

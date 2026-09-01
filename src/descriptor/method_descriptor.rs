@@ -641,6 +641,39 @@ impl InvocationAdapter {
 fn unavailable_entry_point() {}
 
 /// An immutable reflected method declaration.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// use qubit_reflect::{Reflect, TypeDescriptor};
+/// #[cfg(feature = "derive")]
+/// use qubit_reflect::reflect_impl;
+///
+/// #[cfg(feature = "derive")]
+/// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
+/// struct Service;
+///
+/// #[cfg(feature = "derive")]
+/// #[reflect_impl(crate = qubit_reflect)]
+/// impl Service {
+///     fn ping(&self) {}
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let method = TypeDescriptor::of::<Service>()
+///     .impls()?
+///     .first()
+///     .and_then(|implementation| implementation.method("ping"))
+///     .expect("reflected method");
+/// assert_eq!(method.rust_name(), "ping");
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 #[derive(Clone, Debug)]
 pub struct MethodDescriptor {
     identity: MemberId,

@@ -220,7 +220,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::RuntimeCrate,
         source_name: "crate",
-        targets: TargetSet::new(TYPE),
+        targets: TargetSet::new(TYPE | TRAIT | IMPL),
     },
 ];
 

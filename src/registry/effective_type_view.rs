@@ -16,6 +16,18 @@ use crate::descriptor::MethodQualifier;
 
 /// A frozen effective view of the implementations and methods targeting one
 /// concrete reflected type.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::registry::ReflectRegistry;
+///
+/// let registry = ReflectRegistry::initialize()?;
+/// let view = registry.effective_view(TypeId::of::<u32>());
+/// assert!(view.methods().is_empty());
+/// # Ok::<(), qubit_reflect::error::RegistryError>(())
+/// ```
 #[derive(Debug)]
 pub struct EffectiveTypeView {
     implementations: Box<[&'static ImplDescriptor]>,

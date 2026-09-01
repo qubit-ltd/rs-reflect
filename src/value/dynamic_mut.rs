@@ -29,6 +29,18 @@ use crate::value::storage::ThreadSafeMutStorage;
 /// Sized values enter through [`Self::new`]. Mutable `str` uses the dedicated
 /// [`Self::new_str_mut`] variant; it is accessed through [`Self::as_str`] or
 /// [`Self::as_str_mut`] and never masquerades as `Any`.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::DynamicMut;
+/// use qubit_reflect::value::Local;
+///
+/// let mut value = 7_u32;
+/// let mut reflected = DynamicMut::<Local>::new(&mut value);
+/// *reflected.downcast_mut::<u32>().expect("exact type") = 9;
+/// assert_eq!(value, 9);
+/// ```
 pub struct DynamicMut<'a, M: Mode> {
     storage: M::MutStorage<'a>,
     marker: PhantomData<M::Marker>,

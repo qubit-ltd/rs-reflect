@@ -8,6 +8,8 @@
 
 //! Shared implementation details for built-in descriptors.
 
+#[cfg(any(feature = "ecosystem-types", feature = "qubit-types"))]
 mod reflected_opaque;
 
+#[cfg(any(feature = "ecosystem-types", feature = "qubit-types"))]
 pub(crate) use reflected_opaque::reflected_opaque;
