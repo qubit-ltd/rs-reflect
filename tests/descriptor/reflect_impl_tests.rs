@@ -19,16 +19,16 @@ use std::task::Context;
 use std::task::Poll;
 
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::descriptor::MethodQualifier;
-use reflect::descriptor::StructKind;
-use reflect::invoke::Invocation;
-use reflect::invoke::InvocationArg;
-use reflect::invoke::InvocationOutput;
-use reflect::reflect;
-use reflect::reflect_impl;
-use reflect::registry::ReflectRegistry;
-use reflect::value::DynamicOwned;
+use qubit_reflect::Reflect;
+use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::invoke::Invocation;
+use qubit_reflect::invoke::InvocationArg;
+use qubit_reflect::invoke::InvocationOutput;
+use qubit_reflect::reflect;
+use qubit_reflect::reflect_impl;
+use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::DynamicOwned;
 
 struct Sample;
 

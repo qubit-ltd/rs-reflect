@@ -1,0 +1,5 @@
+error: duplicate `rename` reflection helper
+  --> tests/ui/fail/duplicate_rename_tests.rs:12:29
+   |
+12 | #[reflect(rename = "first", rename = "second")]
+   |                             ^^^^^^

@@ -11,15 +11,15 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
-use reflect::descriptor::FieldDescriptor;
-use reflect::descriptor::MethodLookup;
-use reflect::descriptor::OpaqueTypeDescriptor;
-use reflect::descriptor::StructKind;
-use reflect::descriptor::TypeKind;
-use reflect::descriptor::TypeRef;
-use reflect::identity::Visibility;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::FieldDescriptor;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::descriptor::OpaqueTypeDescriptor;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::TypeRef;
+use qubit_reflect::identity::Visibility;
 
 struct NamedRecord {
     number: u8,

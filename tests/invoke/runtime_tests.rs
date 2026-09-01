@@ -25,27 +25,27 @@ mod invocation_runtime {
     use std::task::Waker;
 
     use qubit_reflect as reflect;
-    use reflect::identity::FragmentIdentity;
-    use reflect::identity::MemberId;
-    use reflect::invoke::ArgumentExpectation;
-    use reflect::invoke::BorrowOrigin;
-    use reflect::invoke::Invocation;
-    use reflect::invoke::InvocationArg;
-    use reflect::invoke::InvocationBinding;
-    use reflect::invoke::InvocationErrorKind;
-    use reflect::invoke::InvocationFailure;
-    use reflect::invoke::InvocationInputMode;
-    use reflect::invoke::InvocationMode;
-    use reflect::invoke::InvocationOutput;
-    use reflect::invoke::InvocationPanic;
-    use reflect::invoke::InvocationReceiver;
-    use reflect::invoke::ReceiverExpectation;
-    use reflect::invoke::ReflectedFuture;
-    use reflect::value::DynamicMut;
-    use reflect::value::DynamicOwned;
-    use reflect::value::DynamicRef;
-    use reflect::value::Local;
-    use reflect::value::ThreadSafe;
+    use qubit_reflect::identity::FragmentIdentity;
+    use qubit_reflect::identity::MemberId;
+    use qubit_reflect::invoke::ArgumentExpectation;
+    use qubit_reflect::invoke::BorrowOrigin;
+    use qubit_reflect::invoke::Invocation;
+    use qubit_reflect::invoke::InvocationArg;
+    use qubit_reflect::invoke::InvocationBinding;
+    use qubit_reflect::invoke::InvocationErrorKind;
+    use qubit_reflect::invoke::InvocationFailure;
+    use qubit_reflect::invoke::InvocationInputMode;
+    use qubit_reflect::invoke::InvocationMode;
+    use qubit_reflect::invoke::InvocationOutput;
+    use qubit_reflect::invoke::InvocationPanic;
+    use qubit_reflect::invoke::InvocationReceiver;
+    use qubit_reflect::invoke::ReceiverExpectation;
+    use qubit_reflect::invoke::ReflectedFuture;
+    use qubit_reflect::value::DynamicMut;
+    use qubit_reflect::value::DynamicOwned;
+    use qubit_reflect::value::DynamicRef;
+    use qubit_reflect::value::Local;
+    use qubit_reflect::value::ThreadSafe;
 
     /// A small receiver used by the hand-written invocation adapters.
     #[derive(Debug, Eq, PartialEq)]

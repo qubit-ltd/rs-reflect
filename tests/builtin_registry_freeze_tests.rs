@@ -12,14 +12,14 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use reflect::__private::registration::FragmentKind;
-use reflect::__private::registration::FragmentPayload;
-use reflect::__private::registration::RegistrationFragment;
-use reflect::__private::registration::RuntimeIdentity;
-use reflect::__private::registration::StaticFragmentIdentity;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
-use reflect::registry::ReflectRegistry;
+use qubit_reflect::__private::registration::FragmentKind;
+use qubit_reflect::__private::registration::FragmentPayload;
+use qubit_reflect::__private::registration::RegistrationFragment;
+use qubit_reflect::__private::registration::RuntimeIdentity;
+use qubit_reflect::__private::registration::StaticFragmentIdentity;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::registry::ReflectRegistry;
 
 struct ExplicitRegistration;
 

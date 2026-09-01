@@ -8,9 +8,8 @@
 
 // qubit-style: allow explicit-imports
 //! Integration tests for owned dynamic values.
-use qubit_reflect as reflect;
-use reflect::value::ReflectedOwned;
-use reflect::value::SendReflectedOwned;
+use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::SendReflectedOwned;
 
 /// Confirms an owned downcast failure returns a usable original wrapper.
 #[test]

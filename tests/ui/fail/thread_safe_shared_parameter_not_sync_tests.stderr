@@ -1,0 +1,13 @@
+error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
+  --> tests/ui/fail/thread_safe_shared_parameter_not_sync_tests.rs:20:20
+   |
+20 |     fn run(value: &Rc<u8>) -> u8 {
+   |                    ^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
+   |
+   = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
+note: required by a bound in `__qubit_reflect_assert_sync`
+  --> tests/ui/fail/thread_safe_shared_parameter_not_sync_tests.rs:17:1
+   |
+17 | #[reflect_impl]
+   | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_sync`
+   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)

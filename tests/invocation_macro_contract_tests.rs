@@ -23,20 +23,20 @@ use std::task::Poll;
 use std::task::Waker;
 
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::descriptor::CatchingAvailability;
-use reflect::descriptor::MethodInstanceDescriptor;
-use reflect::descriptor::MethodLookup;
-use reflect::descriptor::MethodQualifier;
-use reflect::invoke::Invocation;
-use reflect::invoke::InvocationArg;
-use reflect::invoke::InvocationOutput;
-use reflect::reflect_impl;
-use reflect::registry::ReflectRegistry;
-use reflect::value::DynamicOwned;
-use reflect::value::DynamicRef;
-use reflect::value::Local;
-use reflect::value::ThreadSafe;
+use qubit_reflect::Reflect;
+use qubit_reflect::descriptor::CatchingAvailability;
+use qubit_reflect::descriptor::MethodInstanceDescriptor;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::invoke::Invocation;
+use qubit_reflect::invoke::InvocationArg;
+use qubit_reflect::invoke::InvocationOutput;
+use qubit_reflect::reflect_impl;
+use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
+use qubit_reflect::value::ThreadSafe;
 
 #[derive(Reflect)]
 struct Worker {

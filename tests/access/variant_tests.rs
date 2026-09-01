@@ -10,21 +10,20 @@
 //! Integration tests for reflected enum variant access.
 use std::any::TypeId;
 
-use qubit_reflect as reflect;
-use reflect::__private::descriptor;
-use reflect::access::FieldAccessError;
-use reflect::access::FieldAccessPolicy;
-use reflect::access::FieldIdentity;
-use reflect::access::FieldVisibility;
-use reflect::descriptor::FieldDescriptor;
-use reflect::descriptor::OpaqueTypeDescriptor;
-use reflect::descriptor::TypeDescriptor;
-use reflect::descriptor::TypeRef;
-use reflect::descriptor::VariantDescriptor;
-use reflect::descriptor::VariantKind;
-use reflect::error::TypeMismatch;
-use reflect::identity::Visibility;
-use reflect::value::ReflectedRef;
+use qubit_reflect::__private::descriptor;
+use qubit_reflect::access::FieldAccessError;
+use qubit_reflect::access::FieldAccessPolicy;
+use qubit_reflect::access::FieldIdentity;
+use qubit_reflect::access::FieldVisibility;
+use qubit_reflect::descriptor::FieldDescriptor;
+use qubit_reflect::descriptor::OpaqueTypeDescriptor;
+use qubit_reflect::descriptor::TypeDescriptor;
+use qubit_reflect::descriptor::TypeRef;
+use qubit_reflect::descriptor::VariantDescriptor;
+use qubit_reflect::descriptor::VariantKind;
+use qubit_reflect::error::TypeMismatch;
+use qubit_reflect::identity::Visibility;
+use qubit_reflect::value::ReflectedRef;
 
 enum Event {
     Progress(u32),

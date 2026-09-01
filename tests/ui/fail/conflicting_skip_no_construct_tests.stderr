@@ -1,0 +1,5 @@
+error: `skip` cannot be combined with `no_construct`
+  --> tests/ui/fail/conflicting_skip_no_construct_tests.rs:13:21
+   |
+13 |     #[reflect(skip, no_construct)]
+   |                     ^^^^^^^^^^^^

@@ -11,16 +11,15 @@
 use std::any::TypeId;
 use std::str::FromStr;
 
-use qubit_reflect as reflect;
-use reflect::error::RegistryError;
-use reflect::error::RegistryErrorKind;
-use reflect::error::TypeMismatch;
-use reflect::identity::CapabilityId;
-use reflect::identity::ExternalTraitId;
-use reflect::identity::FragmentIdentity;
-use reflect::identity::MemberId;
-use reflect::identity::Visibility;
-use reflect::identity::VisibilityKind;
+use qubit_reflect::error::RegistryError;
+use qubit_reflect::error::RegistryErrorKind;
+use qubit_reflect::error::TypeMismatch;
+use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::identity::ExternalTraitId;
+use qubit_reflect::identity::FragmentIdentity;
+use qubit_reflect::identity::MemberId;
+use qubit_reflect::identity::Visibility;
+use qubit_reflect::identity::VisibilityKind;
 
 /// Verifies namespaced identifiers accept valid external names.
 #[test]

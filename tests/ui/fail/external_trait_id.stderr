@@ -1,5 +1,0 @@
-error: `invalid..identifier` is not a dot-separated stable identifier
-  --> tests/ui/fail/external_trait_id.rs:14:36
-   |
-14 | #[reflect_impl(external_trait_id = "invalid..identifier")]
-   |                                    ^^^^^^^^^^^^^^^^^^^^^

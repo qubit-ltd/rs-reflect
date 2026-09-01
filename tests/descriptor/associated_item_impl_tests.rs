@@ -10,19 +10,18 @@
 
 use std::marker::PhantomData;
 
-use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::Reflect as FrameworkReflect;
-use reflect::TypeDescriptor;
-use reflect::descriptor::AssociatedConstImplementationSource;
-use reflect::descriptor::AssociatedConstReadUnavailableReason;
-use reflect::descriptor::ImplDescriptor;
-use reflect::expression::LifetimeExpression;
-use reflect::expression::PredicateDescriptor;
-use reflect::expression::TypeExpression;
-use reflect::reflect;
-use reflect::reflect_impl;
-use reflect::registry::ReflectRegistry;
+use qubit_reflect::Reflect;
+use qubit_reflect::Reflect as FrameworkReflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::AssociatedConstImplementationSource;
+use qubit_reflect::descriptor::AssociatedConstReadUnavailableReason;
+use qubit_reflect::descriptor::ImplDescriptor;
+use qubit_reflect::expression::LifetimeExpression;
+use qubit_reflect::expression::PredicateDescriptor;
+use qubit_reflect::expression::TypeExpression;
+use qubit_reflect::reflect;
+use qubit_reflect::reflect_impl;
+use qubit_reflect::registry::ReflectRegistry;
 
 #[derive(Reflect)]
 struct AssociatedItemTarget;

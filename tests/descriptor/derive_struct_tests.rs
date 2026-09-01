@@ -17,14 +17,14 @@ use std::time::Duration;
 use std::time::Instant;
 
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
-use reflect::descriptor::StructKind;
-use reflect::descriptor::TypeKind;
-use reflect::registry::ReflectRegistry;
-use reflect::value::ReflectedMut;
-use reflect::value::ReflectedOwned;
-use reflect::value::ReflectedRef;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::ReflectedRef;
 
 #[derive(Reflect)]
 struct DerivedNamed {
