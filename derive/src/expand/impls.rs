@@ -8,14 +8,11 @@
 
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
-mod lifetime;
-
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::format_ident;
 use quote::quote;
-use quote::quote_spanned;
 
 use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
@@ -23,7 +20,6 @@ use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
-use crate::ir::ParameterIr;
 use crate::ir::ParameterPatternKindIr;
 use crate::ir::PathArgumentIr;
 use crate::ir::PathArgumentsIr;
@@ -485,50 +481,21 @@ fn expand_concrete_impl(
     let module = format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
     let target_source = declaration.target_type.source;
     let invocation_adapter_definitions = declaration.methods.iter().enumerate().filter_map(|(index, method)| {
-        let typed_owned_receiver = method
-            .receiver
-            .as_ref()
-            .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
-        let typed_pinned_receiver = method.receiver.as_ref().and_then(typed_pinned_receiver_mutable);
         let typed_extension_receiver = method
             .receiver
             .as_ref()
             .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
-        let supported_receiver = matches!(
-            method.receiver.as_ref().map(|receiver| receiver.kind),
-            None | Some(ReceiverKindIr::Value)
-                | Some(ReceiverKindIr::SharedReference)
-                | Some(ReceiverKindIr::MutableReference)
-        ) || typed_owned_receiver.is_some()
-            || typed_pinned_receiver.is_some()
-            || typed_extension_receiver.is_some();
-        let supported_parameters = method
-            .parameters
-            .iter()
-            .all(|parameter| supports_invocation_parameter(&parameter.ty));
-        let is_safe_invocation = supported_receiver
-            && supported_parameters
-            && method.generics.params.is_empty()
-            && !method.qualifiers.is_unsafe
-            && method.qualifiers.abi.is_none()
-            && !method.qualifiers.is_variadic
-            && (!return_contains_non_static_lifetime(&method.return_type)
-                || is_supported_shared_borrow_return(&method.return_type)
-                || is_supported_mutable_borrow_return(method))
-            && (!method.qualifiers.is_async || !is_borrow_return(&method.return_type))
-            && !invocation_disabled_by_policy(method)
-            && supports_invocation_return(&method.return_type);
-        let pinned_receiver_mutable = method.receiver.as_ref().and_then(typed_pinned_receiver_mutable);
+        let mut method_context = super::invocation::analysis::MethodContext::implementation(&target);
+        method_context.extension_receiver = typed_extension_receiver.clone();
+        let invocation_plan = super::invocation::analysis::analyze_method(method, method_context)
+            .expect("validated method analysis is infallible");
+        debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
+        let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
+        let typed_extension_receiver = invocation_plan.extension_receiver_type().cloned();
+        let is_safe_invocation = invocation_plan.is_executable();
+        let pinned_receiver_mutable = invocation_plan.pinned_receiver_mutability();
         if let Some(pinned_mutable) = pinned_receiver_mutable {
-            let is_safe_pinned_invocation = supported_parameters
-                && method.generics.params.is_empty()
-                && !method.qualifiers.is_async
-                && !method.qualifiers.is_unsafe
-                && method.qualifiers.abi.is_none()
-                && !method.qualifiers.is_variadic
-                && !is_borrow_return(&method.return_type)
-                && !invocation_disabled_by_policy(method)
-                && supports_invocation_return(&method.return_type);
+            let is_safe_pinned_invocation = invocation_plan.is_executable();
             if is_safe_pinned_invocation {
                 let method_name = &method.name;
                 let adapter_name = format_ident!("__qubit_reflect_invoke_pinned_{index}");
@@ -537,13 +504,13 @@ fn expand_concrete_impl(
                 let parameter_expectations: Vec<_> = method
                     .parameters
                     .iter()
-                    .map(|parameter| invocation_argument_expectation(parameter, &facade))
+                    .map(|parameter| super::invocation::emit::argument_expectation(parameter, &facade))
                     .collect();
                 let mode = quote!(#facade::value::Local);
                 let argument_bindings: Vec<_> = method
                     .parameters
                     .iter()
-                    .map(|parameter| invocation_argument_binding(parameter, &facade, &mode))
+                    .map(|parameter| super::invocation::emit::argument_binding(parameter, &facade, &mode))
                     .collect();
                 let call_arguments: Vec<_> = method
                     .parameters
@@ -637,22 +604,15 @@ fn expand_concrete_impl(
         let adapter_name = format_ident!("__qubit_reflect_invoke_{index}");
         let catching_adapter_name = format_ident!("__qubit_reflect_invoke_catching_{index}");
         let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-        let thread_safe = method
-            .attributes
-            .iter()
-            .any(|attribute| attribute.name == HelperName::ThreadSafe);
-        let catching_requested = method
-            .attributes
-            .iter()
-            .any(|attribute| attribute.name == HelperName::CatchUnwind)
-            && !method.qualifiers.is_async;
+        let thread_safe = invocation_plan.modes.thread_safe;
+        let catching_requested = invocation_plan.modes.catching;
         let mode = if thread_safe {
             quote!(#facade::value::ThreadSafe)
         } else {
             quote!(#facade::value::Local)
         };
         let thread_safe_assertions = thread_safe.then(|| {
-            thread_safe_invocation_assertions(
+            super::invocation::emit::thread_safe_assertions(
                 method,
                 &target,
                 typed_owned_receiver.as_ref(),
@@ -660,7 +620,7 @@ fn expand_concrete_impl(
             )
         });
         let catching_assertions = catching_requested.then(|| {
-            catching_invocation_assertions(
+            super::invocation::emit::catching_assertions(
                 method,
                 &target,
                 typed_owned_receiver.as_ref(),
@@ -787,7 +747,7 @@ fn expand_concrete_impl(
         let parameter_expectations: Vec<_> = method
             .parameters
             .iter()
-            .map(|parameter| invocation_argument_expectation(parameter, &facade))
+            .map(|parameter| super::invocation::emit::argument_expectation(parameter, &facade))
             .collect();
         let invocation_validation = if typed_extension_receiver.is_some() {
             quote!(invocation.validate_arguments(&identity, &[#(#parameter_expectations),*])?)
@@ -801,7 +761,7 @@ fn expand_concrete_impl(
         let argument_bindings: Vec<_> = method
             .parameters
             .iter()
-            .map(|parameter| invocation_argument_binding(parameter, &facade, &mode))
+            .map(|parameter| super::invocation::emit::argument_binding(parameter, &facade, &mode))
             .collect();
         let call_arguments: Vec<_> = method
             .parameters
@@ -859,7 +819,7 @@ fn expand_concrete_impl(
                     ..
                 }),
             ) => {
-                let value = if is_str_type(element) {
+                let value = if super::invocation::analysis::is_str_type(element) {
                     quote!(#facade::value::DynamicRef::<#mode>::new_str(#call))
                 } else {
                     quote!(#facade::value::DynamicRef::<#mode>::new(#call))
@@ -884,7 +844,7 @@ fn expand_concrete_impl(
                     ..
                 }),
             ) => {
-                let value = if is_str_type(element) {
+                let value = if super::invocation::analysis::is_str_type(element) {
                     quote!(#facade::value::DynamicMut::<#mode>::new_str_mut(#call))
                 } else {
                     quote!(#facade::value::DynamicMut::<#mode>::new(#call))
@@ -974,7 +934,7 @@ fn expand_concrete_impl(
                         },
                     ..
                 }) => {
-                    let value = if is_str_type(element) {
+                    let value = if super::invocation::analysis::is_str_type(element) {
                         quote!(#facade::value::DynamicRef::<#mode>::new_str(#call))
                     } else {
                         quote!(#facade::value::DynamicRef::<#mode>::new(#call))
@@ -993,7 +953,7 @@ fn expand_concrete_impl(
                         },
                     ..
                 }) => {
-                    let value = if is_str_type(element) {
+                    let value = if super::invocation::analysis::is_str_type(element) {
                         quote!(#facade::value::DynamicMut::<#mode>::new_str_mut(#call))
                     } else {
                         quote!(#facade::value::DynamicMut::<#mode>::new(#call))
@@ -1080,54 +1040,25 @@ fn expand_concrete_impl(
         })
     });
     let invocation_adapter_entries = declaration.methods.iter().enumerate().map(|(index, method)| {
-        let supported_parameters = method
-            .parameters
-            .iter()
-            .all(|parameter| supports_invocation_parameter(&parameter.ty));
-        let typed_owned_receiver = method
-            .receiver
-            .as_ref()
-            .and_then(|receiver| typed_owned_receiver_type(receiver, &target));
-        let typed_pinned_receiver = method.receiver.as_ref().and_then(typed_pinned_receiver_mutable);
         let typed_extension_receiver = method
             .receiver
             .as_ref()
             .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
-        if typed_pinned_receiver.is_some() {
-            let is_safe_pinned_invocation = supported_parameters
-                && method.generics.params.is_empty()
-                && !method.qualifiers.is_async
-                && !method.qualifiers.is_unsafe
-                && method.qualifiers.abi.is_none()
-                && !method.qualifiers.is_variadic
-                && !is_borrow_return(&method.return_type)
-                && !invocation_disabled_by_policy(method)
-                && supports_invocation_return(&method.return_type);
+        let mut method_context = super::invocation::analysis::MethodContext::implementation(&target);
+        method_context.extension_receiver = typed_extension_receiver.clone();
+        let invocation_plan = super::invocation::analysis::analyze_method(method, method_context)
+            .expect("validated method analysis is infallible");
+        debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
+        let typed_extension_receiver = invocation_plan.extension_receiver_type().cloned();
+        if invocation_plan.pinned_receiver_mutability().is_some() {
+            let is_safe_pinned_invocation = invocation_plan.is_executable();
             if is_safe_pinned_invocation {
                 let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
                 return quote!(Some(&#descriptor_name));
             }
             return quote!(None);
         }
-        let supported_receiver = matches!(
-            method.receiver.as_ref().map(|receiver| receiver.kind),
-            None | Some(ReceiverKindIr::Value)
-                | Some(ReceiverKindIr::SharedReference)
-                | Some(ReceiverKindIr::MutableReference)
-        ) || typed_owned_receiver.is_some();
-        let supported_receiver = supported_receiver || typed_extension_receiver.is_some();
-        let is_safe_invocation = supported_receiver
-            && supported_parameters
-            && method.generics.params.is_empty()
-            && !method.qualifiers.is_unsafe
-            && method.qualifiers.abi.is_none()
-            && !method.qualifiers.is_variadic
-            && (!return_contains_non_static_lifetime(&method.return_type)
-                || is_supported_shared_borrow_return(&method.return_type)
-                || is_supported_mutable_borrow_return(method))
-            && (!method.qualifiers.is_async || !is_borrow_return(&method.return_type))
-            && !invocation_disabled_by_policy(method)
-            && supports_invocation_return(&method.return_type);
+        let is_safe_invocation = invocation_plan.is_executable();
         if is_safe_invocation {
             let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
             if let Some(receiver_type) = typed_extension_receiver {
@@ -1160,7 +1091,7 @@ fn expand_concrete_impl(
     let invocation_unavailable_reason_entries: Vec<_> = declaration
         .methods
         .iter()
-        .map(|method| invocation_unavailable_reason_entry(method, &target, &facade))
+        .map(|method| invocation_unavailable_reason_entry(method, &target, context))
         .collect();
     let generic_specialization_adapter_definitions =
         declaration
@@ -2129,194 +2060,12 @@ fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, 
     }
 }
 
-/// Returns whether a parameter can cross the safe dynamic invocation boundary.
-pub(super) fn supports_invocation_parameter(ty: &TypeIr) -> bool {
-    match &ty.kind {
-        TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
-        _ => supports_owned_dynamic_type(ty),
-    }
-}
-
-/// Emits explicit method-local bounds for an opt-in thread-safe adapter.
-pub(super) fn thread_safe_invocation_assertions(
-    method: &MethodIr,
-    target: &TokenStream,
-    typed_owned_receiver: Option<&TokenStream>,
-    typed_extension_receiver: Option<&TokenStream>,
-) -> TokenStream {
-    let receiver = method.receiver.as_ref().map(|receiver| {
-        let span = receiver.span;
-        if let Some(ty) = typed_extension_receiver.or(typed_owned_receiver) {
-            quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#ty>();)
-        } else {
-            match receiver.kind {
-                ReceiverKindIr::SharedReference => {
-                    quote_spanned!(span=> __qubit_reflect_assert_sync::<#target>();)
-                }
-                ReceiverKindIr::Value | ReceiverKindIr::MutableReference => {
-                    quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#target>();)
-                }
-                ReceiverKindIr::Typed => TokenStream::new(),
-            }
-        }
-    });
-    let parameters = method.parameters.iter().map(|parameter| {
-        let span = parameter.span;
-        match &parameter.ty.kind {
-            TypeKindIr::Reference {
-                mutable: true, element, ..
-            } => {
-                let ty = &element.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#ty>();)
-            }
-            TypeKindIr::Reference { element, .. } => {
-                let ty = &element.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_sync::<#ty>();)
-            }
-            _ => {
-                let ty = &parameter.ty.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#ty>();)
-            }
-        }
-    });
-    let output = match &method.return_type {
-        ReturnTypeIr::Type(ty) if !matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) => {
-            let tokens = &ty.tokens;
-            let span = ty.span;
-            quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#tokens>();)
-        }
-        _ => TokenStream::new(),
-    };
-    quote! {
-        fn __qubit_reflect_assert_sync<T: ?Sized + ::core::marker::Sync>() {}
-        fn __qubit_reflect_assert_send_sync<
-            T: ?Sized + ::core::marker::Send + ::core::marker::Sync,
-        >() {}
-        #receiver
-        #(#parameters)*
-        #output
-    }
-}
-
-/// Emits explicit method-local unwind-safety bounds for a catching adapter.
-pub(super) fn catching_invocation_assertions(
-    method: &MethodIr,
-    target: &TokenStream,
-    typed_owned_receiver: Option<&TokenStream>,
-    typed_extension_receiver: Option<&TokenStream>,
-) -> TokenStream {
-    let receiver = method.receiver.as_ref().map(|receiver| {
-        let span = receiver.span;
-        if let Some(ty) = typed_extension_receiver.or(typed_owned_receiver) {
-            quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<#ty>();)
-        } else {
-            match receiver.kind {
-                ReceiverKindIr::SharedReference => {
-                    quote_spanned!(span=> __qubit_reflect_assert_ref_unwind_safe::<#target>();)
-                }
-                ReceiverKindIr::MutableReference => {
-                    quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<&mut #target>();)
-                }
-                ReceiverKindIr::Value => {
-                    quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<#target>();)
-                }
-                ReceiverKindIr::Typed => TokenStream::new(),
-            }
-        }
-    });
-    let parameters = method.parameters.iter().map(|parameter| {
-        let span = parameter.span;
-        match &parameter.ty.kind {
-            TypeKindIr::Reference {
-                mutable: true, element, ..
-            } => {
-                let ty = &element.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<&mut #ty>();)
-            }
-            TypeKindIr::Reference { element, .. } => {
-                let ty = &element.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_ref_unwind_safe::<#ty>();)
-            }
-            _ => {
-                let ty = &parameter.ty.tokens;
-                quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<#ty>();)
-            }
-        }
-    });
-    let output = match &method.return_type {
-        ReturnTypeIr::Type(TypeIr {
-            kind:
-                TypeKindIr::Reference {
-                    mutable: false,
-                    element,
-                    ..
-                },
-            ..
-        }) => {
-            let ty = &element.tokens;
-            let span = element.span;
-            quote_spanned!(span=> __qubit_reflect_assert_ref_unwind_safe::<#ty>();)
-        }
-        ReturnTypeIr::Type(TypeIr {
-            kind: TypeKindIr::Reference {
-                mutable: true, element, ..
-            },
-            ..
-        }) => {
-            let ty = &element.tokens;
-            let span = element.span;
-            quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<&mut #ty>();)
-        }
-        ReturnTypeIr::Type(ty) if !matches!(ty.kind, TypeKindIr::Never) => {
-            let tokens = &ty.tokens;
-            let span = ty.span;
-            quote_spanned!(span=> __qubit_reflect_assert_unwind_safe::<#tokens>();)
-        }
-        _ => TokenStream::new(),
-    };
-    quote! {
-        fn __qubit_reflect_assert_unwind_safe<
-            T: ?Sized + ::std::panic::UnwindSafe,
-        >() {}
-        fn __qubit_reflect_assert_ref_unwind_safe<
-            T: ?Sized + ::std::panic::RefUnwindSafe,
-        >() {}
-        #receiver
-        #(#parameters)*
-        #output
-    }
-}
-
-/// Returns the exact owned container type for the standard explicit receivers
-/// that can cross the `Any` boundary without losing ownership or pinning.
-pub(super) fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStream) -> Option<TokenStream> {
-    if receiver.kind != ReceiverKindIr::Typed {
-        return None;
-    }
-    let TypeKindIr::Path(path) = &receiver.ty.kind else {
-        return None;
-    };
-    let segment = path.segments.last()?;
-    let PathArgumentsIr::AngleBracketed(arguments) = &segment.arguments else {
-        return None;
-    };
-    match (segment.name.as_str(), arguments.as_slice()) {
-        ("Box", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::boxed::Box<#target>)),
-        ("Rc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::rc::Rc<#target>)),
-        ("Arc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::sync::Arc<#target>)),
-        ("Pin", [PathArgumentIr::Type(argument)]) if is_box_self_type(argument) => {
-            Some(quote!(::std::pin::Pin<::std::boxed::Box<#target>>))
-        }
-        _ => None,
-    }
-}
-
 /// Returns a non-core explicit receiver type that requires a registered
 /// `ReceiverAdapter` capability for dynamic invocation.
 fn typed_extension_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStream) -> Option<TokenStream> {
     if receiver.kind != ReceiverKindIr::Typed
-        || typed_pinned_receiver_mutable(receiver).is_some()
-        || typed_owned_receiver_type(receiver, &quote!(Self)).is_some()
+        || super::invocation::analysis::typed_pinned_receiver_mutable(receiver).is_some()
+        || super::invocation::analysis::typed_owned_receiver_type(receiver, &quote!(Self)).is_some()
     {
         return None;
     }
@@ -2325,48 +2074,6 @@ fn typed_extension_receiver_type(receiver: &crate::ir::ReceiverIr, target: &Toke
         &receiver.ty.tokens,
         &[(self_identifier, target.clone())],
     ))
-}
-
-/// Returns whether a typed receiver is `Pin<&mut Self>` (`true`) or
-/// `Pin<&Self>` (`false`).
-pub(super) fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) -> Option<bool> {
-    if receiver.kind != ReceiverKindIr::Typed {
-        return None;
-    }
-    let TypeKindIr::Path(path) = &receiver.ty.kind else {
-        return None;
-    };
-    let segment = path.segments.last()?;
-    let PathArgumentsIr::AngleBracketed(arguments) = &segment.arguments else {
-        return None;
-    };
-    let [PathArgumentIr::Type(argument)] = arguments.as_slice() else {
-        return None;
-    };
-    let TypeKindIr::Reference { mutable, element, .. } = &argument.kind else {
-        return None;
-    };
-    (segment.name == "Pin" && is_self_type(element)).then_some(*mutable)
-}
-
-/// Returns whether `ty` is the receiver's unqualified `Self` type.
-fn is_self_type(ty: &TypeIr) -> bool {
-    matches!(&ty.kind, TypeKindIr::Path(path) if path.segments.len() == 1 && path.segments[0].name == "Self")
-}
-
-/// Returns whether `ty` is the standard `Box<Self>` receiver container.
-fn is_box_self_type(ty: &TypeIr) -> bool {
-    let TypeKindIr::Path(path) = &ty.kind else {
-        return false;
-    };
-    let Some(segment) = path.segments.last() else {
-        return false;
-    };
-    matches!(
-        (&*segment.name, &segment.arguments),
-        ("Box", PathArgumentsIr::AngleBracketed(arguments))
-            if matches!(arguments.as_slice(), [PathArgumentIr::Type(argument)] if is_self_type(argument))
-    )
 }
 
 /// Emits concrete arguments for one validated method specialization.
@@ -2582,28 +2289,6 @@ fn specialize_type_tokens(
     Some(substitute_tokens(&ty.tokens, &replacements))
 }
 
-/// Returns whether an owned dynamic value can safely represent `ty`.
-fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
-    matches!(
-        ty.kind,
-        TypeKindIr::Path(_)
-            | TypeKindIr::Tuple(_)
-            | TypeKindIr::Array { .. }
-            | TypeKindIr::Pointer { .. }
-            | TypeKindIr::BareFunction { .. }
-    )
-}
-
-/// Returns whether an invocation adapter can represent this return shape.
-pub(super) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
-    match return_type {
-        ReturnTypeIr::Unit => true,
-        ReturnTypeIr::Type(ty) => {
-            matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) || supports_owned_dynamic_type(ty)
-        }
-    }
-}
-
 /// Returns whether reflection policy explicitly suppresses invocation.
 fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
     method
@@ -2617,259 +2302,12 @@ fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
 pub(super) fn invocation_unavailable_reason_entry(
     method: &MethodIr,
     target: &TokenStream,
-    facade: &TokenStream,
+    context: &ExpansionContext,
 ) -> TokenStream {
-    let mut reasons = Vec::new();
-    let unsupported_receiver = method.receiver.as_ref().is_some_and(|receiver| {
-        receiver.kind == ReceiverKindIr::Typed
-            && typed_owned_receiver_type(receiver, target).is_none()
-            && typed_pinned_receiver_mutable(receiver).is_none()
-    });
-    if unsupported_receiver {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnsupportedReceiver
-        ));
-    }
-    if !method.generics.params.is_empty() {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnspecializedGeneric
-        ));
-    }
-    if method.qualifiers.is_unsafe {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnsafeMethod
-        ));
-    }
-    if method.qualifiers.abi.is_some() {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnsupportedAbi
-        ));
-    }
-    if method.qualifiers.is_variadic {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::Variadic
-        ));
-    }
-    let unsupported_borrow = (return_contains_non_static_lifetime(&method.return_type)
-        && !is_supported_shared_borrow_return(&method.return_type)
-        && !is_supported_mutable_borrow_return(method))
-        || (method.qualifiers.is_async && is_borrow_return(&method.return_type));
-    if unsupported_borrow {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn
-        ));
-    }
-    if matches!(
-        method.return_type,
-        ReturnTypeIr::Type(TypeIr {
-            kind: TypeKindIr::ImplTrait { .. },
-            ..
-        })
-    ) {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::OpaqueReturn
-        ));
-    }
-    if method
-        .parameters
-        .iter()
-        .any(|parameter| has_unsupported_unsized_parameter(&parameter.ty))
-    {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::UnsupportedUnsizedValue
-        ));
-    }
-    if invocation_disabled_by_policy(method) {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy
-        ));
-    }
-    if reasons.is_empty() {
-        reasons.push(quote!(
-            #facade::descriptor::InvocationUnavailableReason::DisabledByPolicy
-        ));
-    }
-    quote!(&[#(#reasons),*])
-}
-
-/// Returns whether a borrowed parameter uses an unsized shape without a
-/// dedicated adapter.
-fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
-    matches!(
-        &ty.kind,
-        TypeKindIr::Reference { element, .. }
-            if matches!(element.kind, TypeKindIr::Slice(_) | TypeKindIr::TraitObject { .. })
+    let plan = super::invocation::analysis::analyze_method(
+        method,
+        super::invocation::analysis::MethodContext::implementation(target),
     )
-}
-
-/// Returns whether `ty` names Rust's built-in unsized `str` type.
-pub(super) fn is_str_type(ty: &TypeIr) -> bool {
-    matches!(
-        &ty.kind,
-        TypeKindIr::Path(path)
-            if path.segments.last().is_some_and(|segment| {
-                segment.name == "str" && matches!(segment.arguments, PathArgumentsIr::None)
-            })
-    )
-}
-
-/// Expands the exact runtime expectation for one positional parameter.
-pub(super) fn invocation_argument_expectation(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
-    match &parameter.ty.kind {
-        TypeKindIr::Reference {
-            mutable: true, element, ..
-        } => {
-            let element = &element.tokens;
-            quote!(#facade::invoke::ArgumentExpectation::borrowed_mut::<#element>())
-        }
-        TypeKindIr::Reference { element, .. } => {
-            let element = &element.tokens;
-            quote!(#facade::invoke::ArgumentExpectation::borrowed::<#element>())
-        }
-        _ => {
-            let ty = &parameter.ty.tokens;
-            quote!(#facade::invoke::ArgumentExpectation::owned::<#ty>())
-        }
-    }
-}
-
-/// Expands one post-validation extraction while preserving borrowed lifetimes.
-pub(super) fn invocation_argument_binding(
-    parameter: &ParameterIr,
-    facade: &TokenStream,
-    mode: &TokenStream,
-) -> TokenStream {
-    let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
-    match &parameter.ty.kind {
-        TypeKindIr::Reference {
-            mutable: true, element, ..
-        } => {
-            if is_str_type(element) {
-                quote! {
-                    let #argument = match arguments
-                        .next()
-                        .expect("validation checked argument count")
-                    {
-                        #facade::invoke::InvocationArg::Mut(value) =>
-                            #facade::value::DynamicMut::<#mode>::into_str_mut(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        _ => unreachable!("validation checked argument mode"),
-                    };
-                }
-            } else {
-                let element = &element.tokens;
-                quote! {
-                    let #argument = match arguments
-                        .next()
-                        .expect("validation checked argument count")
-                    {
-                        #facade::invoke::InvocationArg::Mut(value) =>
-                            #facade::value::DynamicMut::<#mode>::downcast::<#element>(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        _ => unreachable!("validation checked argument mode"),
-                    };
-                }
-            }
-        }
-        TypeKindIr::Reference { element, .. } => {
-            if is_str_type(element) {
-                quote! {
-                    let #argument = match arguments
-                        .next()
-                        .expect("validation checked argument count")
-                    {
-                        #facade::invoke::InvocationArg::Ref(value) =>
-                            #facade::value::DynamicRef::<#mode>::into_str(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        #facade::invoke::InvocationArg::Mut(value) => {
-                            let value = #facade::value::DynamicMut::<#mode>::into_str_mut(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type"));
-                            &*value
-                        }
-                        _ => unreachable!("validation checked argument mode"),
-                    };
-                }
-            } else {
-                let element = &element.tokens;
-                quote! {
-                    let #argument = match arguments
-                        .next()
-                        .expect("validation checked argument count")
-                    {
-                        #facade::invoke::InvocationArg::Ref(value) =>
-                            #facade::value::DynamicRef::<#mode>::downcast::<#element>(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        #facade::invoke::InvocationArg::Mut(value) => {
-                            let value = #facade::value::DynamicMut::<#mode>::downcast::<#element>(value)
-                                .unwrap_or_else(|_| unreachable!("validation checked argument type"));
-                            &*value
-                        }
-                        _ => unreachable!("validation checked argument mode"),
-                    };
-                }
-            }
-        }
-        _ => {
-            let ty = &parameter.ty.tokens;
-            quote! {
-                let #argument: #ty = match arguments
-                    .next()
-                    .expect("validation checked argument count")
-                {
-                    #facade::invoke::InvocationArg::Owned(value) =>
-                        #facade::value::DynamicOwned::<#mode>::downcast::<#ty>(value)
-                            .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                    _ => unreachable!("validation checked argument mode"),
-                };
-            }
-        }
-    }
-}
-
-/// Returns whether a return declaration carries a borrow that cannot cross the
-/// owned dynamic-value boundary.
-pub(super) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
-    lifetime::return_contains_non_static_lifetime(return_type)
-}
-
-/// Returns whether a borrowed output can retain the invocation call lifetime.
-pub(super) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> bool {
-    matches!(
-        return_type,
-        ReturnTypeIr::Type(TypeIr {
-            kind: TypeKindIr::Reference { mutable: false, .. },
-            ..
-        })
-    )
-}
-
-/// Returns whether this declaration can safely identify a unique mutable-borrow
-/// origin.
-pub(super) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
-    matches!(
-        method.receiver.as_ref().map(|receiver| receiver.kind),
-        Some(ReceiverKindIr::MutableReference)
-    ) && !method
-        .parameters
-        .iter()
-        .any(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { mutable: true, .. }))
-        && matches!(
-            method.return_type,
-            ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference { mutable: true, .. },
-                ..
-            })
-        )
-}
-
-/// Returns whether the declaration returns any borrow rather than an owned
-/// value.
-pub(super) fn is_borrow_return(return_type: &ReturnTypeIr) -> bool {
-    matches!(
-        return_type,
-        ReturnTypeIr::Type(TypeIr {
-            kind: TypeKindIr::Reference { .. },
-            ..
-        })
-    )
+    .expect("validated method analysis is infallible");
+    super::invocation::emit::emit_adapter(&plan, context)
 }

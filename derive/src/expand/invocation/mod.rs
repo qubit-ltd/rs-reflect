@@ -8,4 +8,7 @@
 
 //! Shared dynamic-invocation planning and emission.
 
+pub(crate) mod analysis;
+pub(crate) mod emit;
+pub(crate) mod lifetime;
 pub(crate) mod plan;
