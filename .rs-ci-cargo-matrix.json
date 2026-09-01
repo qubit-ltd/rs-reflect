@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "name": "runtime-only",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"],
+      "defaultFeatures": false,
+      "features": []
+    },
+    {
+      "name": "default",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"]
+    },
+    {
+      "name": "root-all-features",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"],
+      "allFeatures": true
+    }
+  ]
+}
