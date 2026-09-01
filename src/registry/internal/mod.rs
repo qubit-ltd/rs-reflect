@@ -11,6 +11,7 @@
 
 #[cfg(feature = "bench-internals")]
 pub(crate) mod benchmark_registry_facts;
+#[cfg(feature = "bench-internals")]
 mod benchmark_target;
 mod built_fragment;
 mod materialized_fragment;
