@@ -399,7 +399,7 @@ fn test_applied_gat_substitutes_outer_arguments_without_rewriting_local_paramete
     let payload = <AppliedGatTarget as AppliedGatContract<u8>>::__qubit_reflect_trait_payload();
     let generic = payload.applied().associated_types()[0].generic_definition();
     assert!(matches!(
-        generic.predicates().as_ref(),
+        generic.predicates(),
         [
             PredicateDescriptor::TypeOutlives {
                 ty: TypeExpression::Concrete(concrete),

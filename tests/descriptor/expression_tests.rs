@@ -234,7 +234,7 @@ fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
     assert_eq!(function.abi(), &FunctionAbi::Rust);
     assert_eq!(function.safety(), &FunctionSafety::Safe);
     assert_eq!(
-        function.higher_ranked_lifetimes().as_ref(),
+        function.higher_ranked_lifetimes(),
         &[LifetimeExpression::Named("a".into())]
     );
     let TypeExpression::Reference(parameter) = &function.parameters()[0] else {
@@ -390,16 +390,16 @@ fn test_type_expression_navigates_qualified_associated_type() {
         panic!("expected a concrete trait path");
     };
     assert_eq!(
-        trait_path.path().as_ref(),
+        trait_path.path(),
         &["core".into(), "iter".into(), "Iterator".into()]
     );
     assert_eq!(
-        trait_path.arguments().as_ref(),
+        trait_path.arguments(),
         &[GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))]
     );
     assert_eq!(associated.item(), "Item");
     assert_eq!(
-        associated.arguments().as_ref(),
+        associated.arguments(),
         &[GenericArgument::Type(TypeExpression::Parameter("U".into()))]
     );
 }
