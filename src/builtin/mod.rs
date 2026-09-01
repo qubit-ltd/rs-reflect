@@ -9,6 +9,7 @@
 //! Built-in reflected type descriptors.
 
 mod array;
+mod external;
 mod function;
 #[path = "../registry/interner.rs"]
 pub(crate) mod interner;
