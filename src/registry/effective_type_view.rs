@@ -215,13 +215,10 @@ mod tests {
 
     /// Builds one concrete type argument with stable structural identity.
     fn type_argument(name: &str) -> GenericArgument {
-        GenericArgument::Type(TypeExpression::Concrete(
-            ConcreteTypeExpression {
-                path: Box::new([name.into()]),
-                arguments: Box::new([]),
-                diagnostic: DiagnosticText::from(name),
-            },
-        ))
+        let expression = ConcreteTypeExpression::new([name], [])
+            .expect("the fixture path contains one segment")
+            .with_diagnostic(name);
+        GenericArgument::Type(TypeExpression::Concrete(expression))
     }
 
     /// Builds one stable fixture member identity.
