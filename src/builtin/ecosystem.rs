@@ -44,8 +44,4 @@ reflected_opaque!(
     NAIVE_TIME_DESCRIPTOR,
     concat!(stringify!(chrono), "::", stringify!(NaiveTime))
 );
-reflected_opaque!(
-    Uuid,
-    UUID_DESCRIPTOR,
-    concat!(stringify!(uuid), "::", stringify!(Uuid))
-);
+reflected_opaque!(Uuid, UUID_DESCRIPTOR, concat!(stringify!(uuid), "::", stringify!(Uuid)));

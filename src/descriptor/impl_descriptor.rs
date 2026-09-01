@@ -95,10 +95,7 @@ pub struct ImplAssociatedConstDescriptor {
 impl ImplAssociatedConstDescriptor {
     /// Creates declaration-level associated constant binding facts.
     #[doc(hidden)]
-    pub const fn new(
-        rust_name: &'static str,
-        declared_type: TypeExpression,
-    ) -> Self {
+    pub const fn new(rust_name: &'static str, declared_type: TypeExpression) -> Self {
         Self {
             rust_name,
             declared_type,
@@ -122,31 +119,19 @@ impl ImplAssociatedConstDescriptor {
 
 impl ImplDefinitionDescriptor {
     /// Returns whether complete declaration facts identify the same trait.
-    pub(crate) fn matches_trait_definition(
-        &self,
-        candidate: &TraitDefinitionDescriptor,
-    ) -> bool {
-        if candidate.completeness()
-            != crate::descriptor::TraitCompleteness::Complete
-        {
+    pub(crate) fn matches_trait_definition(&self, candidate: &TraitDefinitionDescriptor) -> bool {
+        if candidate.completeness() != crate::descriptor::TraitCompleteness::Complete {
             return false;
         }
-        let has_facts = !self.methods().is_empty()
-            || !self.associated_types().is_empty()
-            || !self.associated_consts().is_empty();
+        let has_facts =
+            !self.methods().is_empty() || !self.associated_types().is_empty() || !self.associated_consts().is_empty();
         has_facts
-            && MethodDescriptor::signatures_match(
-                self.methods(),
-                candidate.methods(),
-            )
+            && MethodDescriptor::signatures_match(self.methods(), candidate.methods())
             && self
                 .associated_types()
                 .iter()
                 .map(|item| item.rust_name())
-                .eq(candidate
-                    .associated_types()
-                    .iter()
-                    .map(|item| item.rust_name()))
+                .eq(candidate.associated_types().iter().map(|item| item.rust_name()))
             && self
                 .associated_consts()
                 .iter()
@@ -181,10 +166,8 @@ impl ImplDefinitionDescriptor {
             target_type,
             kind,
             implemented_trait: implemented_trait_cell,
-            implemented_trait_id: implemented_trait
-                .map(|descriptor| descriptor.trait_id().clone()),
-            implemented_trait_path: implemented_trait
-                .map(|descriptor| descriptor.rust_path().into()),
+            implemented_trait_id: implemented_trait.map(|descriptor| descriptor.trait_id().clone()),
+            implemented_trait_path: implemented_trait.map(|descriptor| descriptor.rust_path().into()),
             generic_definition,
             methods: OnceLock::new(),
             associated_types: OnceLock::new(),
@@ -242,9 +225,7 @@ impl ImplDefinitionDescriptor {
     /// `None` identifies an inherent impl definition.
     #[must_use]
     #[inline(always)]
-    pub fn implemented_trait(
-        &self,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
         self.implemented_trait.get().copied()
     }
 
@@ -265,10 +246,7 @@ impl ImplDefinitionDescriptor {
 
     /// Resolves a symbolic trait link exactly once while freezing the global
     /// registry.
-    pub(crate) fn resolve_implemented_trait(
-        &'static self,
-        descriptor: &'static TraitDefinitionDescriptor,
-    ) -> bool {
+    pub(crate) fn resolve_implemented_trait(&'static self, descriptor: &'static TraitDefinitionDescriptor) -> bool {
         match self.implemented_trait.get() {
             Some(existing) => std::ptr::eq(*existing, descriptor),
             None => self.implemented_trait.set(descriptor).is_ok(),
@@ -278,9 +256,7 @@ impl ImplDefinitionDescriptor {
     /// Returns generic parameters and predicates in source order.
     #[must_use]
     #[inline(always)]
-    pub const fn generic_definition(
-        &self,
-    ) -> &'static GenericDefinitionDescriptor {
+    pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
     }
 
@@ -307,10 +283,7 @@ impl ImplDefinitionDescriptor {
 
     /// Initializes declaration-level methods exactly once.
     #[doc(hidden)]
-    pub fn initialize_methods(
-        &'static self,
-        initialize: impl FnOnce(&'static Self) -> Box<[MethodDescriptor]>,
-    ) {
+    pub fn initialize_methods(&'static self, initialize: impl FnOnce(&'static Self) -> Box<[MethodDescriptor]>) {
         self.methods.get_or_init(|| initialize(self));
     }
 
@@ -462,9 +435,7 @@ impl AssociatedConstBindingDescriptor {
     ) -> Self {
         let read_unavailable_reason = match reader {
             Some(_) => None,
-            None => {
-                Some(AssociatedConstReadUnavailableReason::UnprovenOwnedValue)
-            }
+            None => Some(AssociatedConstReadUnavailableReason::UnprovenOwnedValue),
         };
         Self {
             declaration,
@@ -484,9 +455,7 @@ impl AssociatedConstBindingDescriptor {
     /// Returns whether the value is defaulted or explicitly overridden.
     #[must_use]
     #[inline(always)]
-    pub const fn implementation_source(
-        &self,
-    ) -> AssociatedConstImplementationSource {
+    pub const fn implementation_source(&self) -> AssociatedConstImplementationSource {
         self.implementation_source
     }
 
@@ -502,9 +471,7 @@ impl AssociatedConstBindingDescriptor {
     /// `None` means [`Self::read`] can produce a fresh owned value.
     #[must_use]
     #[inline(always)]
-    pub const fn read_unavailable_reason(
-        &self,
-    ) -> Option<AssociatedConstReadUnavailableReason> {
+    pub const fn read_unavailable_reason(&self) -> Option<AssociatedConstReadUnavailableReason> {
         self.read_unavailable_reason
     }
 
@@ -537,20 +504,15 @@ impl fmt::Display for ImplDescriptorBuildError {
     /// Formats a stable diagnostic message.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InherentImplHasTrait => {
-                formatter.write_str("an inherent impl cannot name a trait")
+            Self::InherentImplHasTrait => formatter.write_str("an inherent impl cannot name a trait"),
+            Self::TraitImplMissingTrait => formatter.write_str("a trait impl must name a trait"),
+            Self::GenericArgumentsDoNotMatchDefinition => {
+                formatter.write_str("concrete impl arguments do not match the definition")
             }
-            Self::TraitImplMissingTrait => {
-                formatter.write_str("a trait impl must name a trait")
+            Self::ImplementedTraitDefinitionMismatch => {
+                formatter.write_str("applied trait does not match the impl definition")
             }
-            Self::GenericArgumentsDoNotMatchDefinition => formatter.write_str(
-                "concrete impl arguments do not match the definition",
-            ),
-            Self::ImplementedTraitDefinitionMismatch => formatter
-                .write_str("applied trait does not match the impl definition"),
-            Self::ForeignMember => {
-                formatter.write_str("impl descriptor contains a foreign member")
-            }
+            Self::ForeignMember => formatter.write_str("impl descriptor contains a foreign member"),
         }
     }
 }
@@ -628,8 +590,7 @@ impl ImplDescriptor {
     /// application.
     pub(crate) fn same_application(&self, other: &Self) -> bool {
         self.kind() == other.kind()
-            && self.definition().fragment_identity()
-                == other.definition().fragment_identity()
+            && self.definition().fragment_identity() == other.definition().fragment_identity()
             && self.arguments() == other.arguments()
             && self.target_type().type_id() == other.target_type().type_id()
     }
@@ -653,29 +614,17 @@ impl ImplDescriptor {
             (None, None) => Ordering::Equal,
             (None, Some(_)) => Ordering::Less,
             (Some(_), None) => Ordering::Greater,
-            (Some(left), Some(right)) => match (
-                left.definition().trait_id(),
-                right.definition().trait_id(),
-            ) {
-                (TraitId::Reflected(_), TraitId::Reflected(_)) => {
-                    left.rust_path().cmp(right.rust_path())
-                }
-                (TraitId::External(left), TraitId::External(right)) => {
-                    left.cmp(right)
-                }
+            (Some(left), Some(right)) => match (left.definition().trait_id(), right.definition().trait_id()) {
+                (TraitId::Reflected(_), TraitId::Reflected(_)) => left.rust_path().cmp(right.rust_path()),
+                (TraitId::External(left), TraitId::External(right)) => left.cmp(right),
                 (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
-                (TraitId::External(_), TraitId::Reflected(_)) => {
-                    Ordering::Greater
-                }
+                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
             },
         }
     }
 
     /// Returns whether this implementation belongs to a lookup namespace.
-    pub(crate) fn matches_qualifier(
-        &self,
-        qualifier: MethodQualifier<'_>,
-    ) -> bool {
+    pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
         match qualifier {
             MethodQualifier::Any => true,
             MethodQualifier::Inherent => self.kind() == ImplKind::Inherent,
@@ -736,9 +685,7 @@ impl ImplDescriptor {
 
     /// Finds a trait declaration by query name.
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
-        self.methods
-            .iter()
-            .find(|method| method.query_name() == name)
+        self.methods.iter().find(|method| method.query_name() == name)
     }
 
     /// Returns concrete effective instances, including defaulted methods.
@@ -758,9 +705,7 @@ impl ImplDescriptor {
     /// Returns associated constant bindings in declaration order.
     #[must_use]
     #[inline(always)]
-    pub const fn associated_consts(
-        &self,
-    ) -> &[AssociatedConstBindingDescriptor] {
+    pub const fn associated_consts(&self) -> &[AssociatedConstBindingDescriptor] {
         &self.associated_consts
     }
 
@@ -825,10 +770,7 @@ pub struct ImplDescriptorBuilder {
 
 impl ImplDescriptorBuilder {
     /// Creates an empty concrete instance builder.
-    fn new(
-        definition: &'static ImplDefinitionDescriptor,
-        target_type: TypeDescriptorResolver,
-    ) -> Self {
+    fn new(definition: &'static ImplDefinitionDescriptor, target_type: TypeDescriptorResolver) -> Self {
         Self {
             definition,
             target_type,
@@ -842,10 +784,7 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets the applied trait implemented by this instance.
-    pub fn implemented_trait(
-        mut self,
-        implemented_trait: &'static TraitDescriptor,
-    ) -> Self {
+    pub fn implemented_trait(mut self, implemented_trait: &'static TraitDescriptor) -> Self {
         self.implemented_trait = Some(implemented_trait);
         self
     }
@@ -857,28 +796,19 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets concrete effective method instances.
-    pub fn method_instances(
-        mut self,
-        instances: Vec<MethodInstanceDescriptor>,
-    ) -> Self {
+    pub fn method_instances(mut self, instances: Vec<MethodInstanceDescriptor>) -> Self {
         self.method_instances = instances;
         self
     }
 
     /// Sets associated type bindings in declaration order.
-    pub fn associated_types(
-        mut self,
-        bindings: Vec<AssociatedTypeBindingDescriptor>,
-    ) -> Self {
+    pub fn associated_types(mut self, bindings: Vec<AssociatedTypeBindingDescriptor>) -> Self {
         self.associated_types = bindings;
         self
     }
 
     /// Sets associated constant bindings in declaration order.
-    pub fn associated_consts(
-        mut self,
-        bindings: Vec<AssociatedConstBindingDescriptor>,
-    ) -> Self {
+    pub fn associated_consts(mut self, bindings: Vec<AssociatedConstBindingDescriptor>) -> Self {
         self.associated_consts = bindings;
         self
     }
@@ -894,21 +824,13 @@ impl ImplDescriptorBuilder {
     /// Returns [`ImplDescriptorBuildError`] for inconsistent trait, generic,
     /// method, or associated-item relationships.
     pub fn build(self) -> Result<ImplDescriptor, ImplDescriptorBuildError> {
-        validate_kind(
-            self.definition.kind(),
-            self.implemented_trait.is_some(),
-        )?;
+        validate_kind(self.definition.kind(), self.implemented_trait.is_some())?;
         let expected_arguments = self
             .definition
             .generic_definition()
             .parameters
             .iter()
-            .filter(|parameter| {
-                !matches!(
-                    parameter,
-                    GenericParameterDescriptor::Lifetime { .. }
-                )
-            })
+            .filter(|parameter| !matches!(parameter, GenericParameterDescriptor::Lifetime { .. }))
             .count();
         if expected_arguments != self.arguments.len()
             || self
@@ -916,46 +838,29 @@ impl ImplDescriptorBuilder {
                 .iter()
                 .any(|argument| !generic_argument_is_concrete(argument))
         {
-            return Err(
-                ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition,
-            );
+            return Err(ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition);
         }
         let kinds_match = self
             .definition
             .generic_definition()
             .parameters
             .iter()
-            .filter(|parameter| {
-                !matches!(
-                    parameter,
-                    GenericParameterDescriptor::Lifetime { .. }
-                )
-            })
+            .filter(|parameter| !matches!(parameter, GenericParameterDescriptor::Lifetime { .. }))
             .zip(&self.arguments)
             .all(|(parameter, argument)| {
                 matches!(
                     (parameter, argument),
-                    (
-                        GenericParameterDescriptor::Type { .. },
-                        GenericArgument::Type(_)
-                    ) | (
-                        GenericParameterDescriptor::Const { .. },
-                        GenericArgument::Const(_)
-                    )
+                    (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
+                        | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
                 )
             });
         if !kinds_match {
-            return Err(
-                ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition,
-            );
+            return Err(ImplDescriptorBuildError::GenericArgumentsDoNotMatchDefinition);
         }
-        if let (Some(expected), Some(actual)) =
-            (self.definition.implemented_trait(), self.implemented_trait)
+        if let (Some(expected), Some(actual)) = (self.definition.implemented_trait(), self.implemented_trait)
             && actual.definition().trait_id() != expected.trait_id()
         {
-            return Err(
-                ImplDescriptorBuildError::ImplementedTraitDefinitionMismatch,
-            );
+            return Err(ImplDescriptorBuildError::ImplementedTraitDefinitionMismatch);
         }
         if self.methods.iter().any(|method| {
             !method
@@ -970,12 +875,9 @@ impl ImplDescriptorBuilder {
                     .methods()
                     .iter()
                     .any(|method| std::ptr::eq(method, instance.declaration()))
-                    || instance.implementation_method().is_some_and(|method| {
-                        !self
-                            .methods
-                            .iter()
-                            .any(|candidate| std::ptr::eq(candidate, method))
-                    })
+                    || instance
+                        .implementation_method()
+                        .is_some_and(|method| !self.methods.iter().any(|candidate| std::ptr::eq(candidate, method)))
             });
             let foreign_type = self.associated_types.iter().any(|binding| {
                 !applied_trait
@@ -993,8 +895,7 @@ impl ImplDescriptorBuilder {
                 return Err(ImplDescriptorBuildError::ForeignMember);
             }
         } else if self.method_instances.iter().any(|instance| {
-            instance.implementation_source()
-                != crate::descriptor::MethodImplementationSource::Declared
+            instance.implementation_source() != crate::descriptor::MethodImplementationSource::Declared
                 || !self
                     .methods
                     .iter()
@@ -1017,17 +918,10 @@ impl ImplDescriptorBuilder {
 }
 
 /// Validates the invariant shared by impl definitions and instances.
-fn validate_kind(
-    kind: ImplKind,
-    has_trait: bool,
-) -> Result<(), ImplDescriptorBuildError> {
+fn validate_kind(kind: ImplKind, has_trait: bool) -> Result<(), ImplDescriptorBuildError> {
     match (kind, has_trait) {
-        (ImplKind::Inherent, true) => {
-            Err(ImplDescriptorBuildError::InherentImplHasTrait)
-        }
-        (ImplKind::Trait, false) => {
-            Err(ImplDescriptorBuildError::TraitImplMissingTrait)
-        }
+        (ImplKind::Inherent, true) => Err(ImplDescriptorBuildError::InherentImplHasTrait),
+        (ImplKind::Trait, false) => Err(ImplDescriptorBuildError::TraitImplMissingTrait),
         _ => Ok(()),
     }
 }

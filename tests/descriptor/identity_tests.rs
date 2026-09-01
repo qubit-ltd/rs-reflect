@@ -24,17 +24,14 @@ use qubit_reflect::identity::VisibilityKind;
 /// Verifies namespaced identifiers accept valid external names.
 #[test]
 fn test_namespaced_ids_accept_ascii_identifier_segments() {
-    let capability = CapabilityId::new("example.fixture.clone")
-        .expect("valid capability ID");
-    let external = ExternalTraitId::from_str("example.fixture.display")
-        .expect("valid trait ID");
+    let capability = CapabilityId::new("example.fixture.clone").expect("valid capability ID");
+    let external = ExternalTraitId::from_str("example.fixture.display").expect("valid trait ID");
 
     assert_eq!(capability.as_str(), "example.fixture.clone");
     assert_eq!(capability.as_ref(), "example.fixture.clone");
     assert_eq!(capability.to_string(), "example.fixture.clone");
     assert_eq!(
-        CapabilityId::from_str("example.fixture.clone")
-            .expect("capability parses"),
+        CapabilityId::from_str("example.fixture.clone").expect("capability parses"),
         capability,
     );
     assert!(CapabilityId::new("Example.fixture_2.Clone3").is_ok());
@@ -67,16 +64,8 @@ fn test_capability_id_rejects_reserved_namespace() {
 /// index, and fragment.
 #[test]
 fn test_member_id_is_a_composite_identity() {
-    let fragment = FragmentIdentity::new(
-        "example_crate",
-        "example::model",
-        12,
-        5,
-        "field",
-        42,
-    );
-    let member =
-        MemberId::new("example::model::User", "field", 0, fragment.clone());
+    let fragment = FragmentIdentity::new("example_crate", "example::model", 12, 5, "field", 42);
+    let member = MemberId::new("example::model::User", "field", 0, fragment.clone());
 
     assert_eq!(member.declaring_identity(), "example::model::User");
     assert_eq!(member.kind(), "field");
@@ -87,22 +76,10 @@ fn test_member_id_is_a_composite_identity() {
 /// Verifies source visibilities normalize to their stable categories.
 #[test]
 fn test_visibility_normalizes_source_forms() {
-    assert_eq!(
-        Visibility::from_source("pub").kind(),
-        VisibilityKind::Public
-    );
-    assert_eq!(
-        Visibility::from_source("pub(crate)").kind(),
-        VisibilityKind::Crate
-    );
-    assert_eq!(
-        Visibility::from_source("pub(super)").kind(),
-        VisibilityKind::Super
-    );
-    assert_eq!(
-        Visibility::from_source("pub(self)").kind(),
-        VisibilityKind::Private
-    );
+    assert_eq!(Visibility::from_source("pub").kind(), VisibilityKind::Public);
+    assert_eq!(Visibility::from_source("pub(crate)").kind(), VisibilityKind::Crate);
+    assert_eq!(Visibility::from_source("pub(super)").kind(), VisibilityKind::Super);
+    assert_eq!(Visibility::from_source("pub(self)").kind(), VisibilityKind::Private);
 }
 
 /// Verifies restricted visibilities retain their source path for diagnostics.
@@ -127,10 +104,8 @@ fn test_visibility_rejects_empty_restricted_path() {
 /// inexpensive cloning.
 #[test]
 fn test_registry_error_clone_preserves_kind() {
-    let left =
-        FragmentIdentity::new("example", "example::one", 1, 1, "impl", 1);
-    let right =
-        FragmentIdentity::new("example", "example::two", 2, 1, "impl", 2);
+    let left = FragmentIdentity::new("example", "example::one", 1, 1, "impl", 1);
+    let right = FragmentIdentity::new("example", "example::two", 2, 1, "impl", 2);
     let error = RegistryError::duplicate_fragment(left.clone(), right.clone());
     let cloned = error.clone();
 
@@ -141,30 +116,22 @@ fn test_registry_error_clone_preserves_kind() {
     assert_eq!(actual_left, &left);
     assert_eq!(actual_right, &right);
     assert!(error.fragment_identity().is_none());
-    assert_eq!(
-        error.to_string(),
-        "reflection registry error: DuplicateFragment"
-    );
+    assert_eq!(error.to_string(), "reflection registry error: DuplicateFragment");
 }
 
 /// Verifies every registry error constructor retains its category and
 /// applicable fragment context.
 #[test]
 fn test_registry_error_constructors_preserve_context() {
-    let left =
-        FragmentIdentity::new("example", "example::left", 1, 1, "impl", 1);
-    let right =
-        FragmentIdentity::new("example", "example::right", 2, 1, "impl", 2);
+    let left = FragmentIdentity::new("example", "example::left", 1, 1, "impl", 1);
+    let right = FragmentIdentity::new("example", "example::right", 2, 1, "impl", 2);
     let conflicts = [
         (
             RegistryError::identity_conflict(left.clone(), right.clone()),
             RegistryErrorKind::IdentityConflict,
         ),
         (
-            RegistryError::external_trait_id_conflict(
-                left.clone(),
-                right.clone(),
-            ),
+            RegistryError::external_trait_id_conflict(left.clone(), right.clone()),
             RegistryErrorKind::ExternalTraitIdConflict,
         ),
         (

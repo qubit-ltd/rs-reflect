@@ -135,22 +135,10 @@ impl PredicateDescriptor {
     pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
         let diagnostic = DiagnosticText::from(value.into());
         match &mut self {
-            Self::TypeBound {
-                diagnostic: target,
-                ..
-            }
-            | Self::LifetimeOutlives {
-                diagnostic: target,
-                ..
-            }
-            | Self::TypeOutlives {
-                diagnostic: target,
-                ..
-            }
-            | Self::TypeEquality {
-                diagnostic: target,
-                ..
-            } => *target = diagnostic,
+            Self::TypeBound { diagnostic: target, .. }
+            | Self::LifetimeOutlives { diagnostic: target, .. }
+            | Self::TypeOutlives { diagnostic: target, .. }
+            | Self::TypeEquality { diagnostic: target, .. } => *target = diagnostic,
         }
         self
     }

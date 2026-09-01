@@ -50,11 +50,7 @@ pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpre
 
 /// Creates a reference type expression from generated structural inputs.
 #[doc(hidden)]
-pub fn reference(
-    lifetime: LifetimeExpression,
-    mutable: bool,
-    target: TypeExpression,
-) -> ReferenceTypeExpression {
+pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> ReferenceTypeExpression {
     ReferenceTypeExpression::new(lifetime, mutable, target)
 }
 
@@ -74,10 +70,7 @@ pub fn type_bound(
 /// Creates a non-empty lifetime-outlives predicate from generator-validated
 /// inputs.
 #[doc(hidden)]
-pub fn lifetime_outlives(
-    lifetime: LifetimeExpression,
-    bounds: Box<[LifetimeExpression]>,
-) -> PredicateDescriptor {
+pub fn lifetime_outlives(lifetime: LifetimeExpression, bounds: Box<[LifetimeExpression]>) -> PredicateDescriptor {
     PredicateDescriptor::lifetime_outlives(lifetime, bounds)
         .expect("generated lifetime-outlives predicates have at least one bound")
 }

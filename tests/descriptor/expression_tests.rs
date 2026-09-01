@@ -152,10 +152,7 @@ where
     assert_eq!(plain, annotated);
     assert_eq!(identity_hash(plain), identity_hash(annotated));
     assert_ne!(plain, structurally_different);
-    assert_ne!(
-        identity_hash(plain),
-        identity_hash(structurally_different),
-    );
+    assert_ne!(identity_hash(plain), identity_hash(structurally_different),);
 }
 
 /// Verifies that nested references, slices, and generic parameters remain
@@ -389,10 +386,7 @@ fn test_type_expression_navigates_qualified_associated_type() {
     let Some(TypeExpression::Concrete(trait_path)) = associated.trait_path() else {
         panic!("expected a concrete trait path");
     };
-    assert_eq!(
-        trait_path.path(),
-        &["core".into(), "iter".into(), "Iterator".into()]
-    );
+    assert_eq!(trait_path.path(), &["core".into(), "iter".into(), "Iterator".into()]);
     assert_eq!(
         trait_path.arguments(),
         &[GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))]
@@ -531,16 +525,10 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
 /// hashing on structure alone.
 #[test]
 fn test_all_diagnostic_type_nodes_use_structural_identity() {
-    let concrete_plain =
-        ConcreteTypeExpression::new(["u8"], Vec::new()).expect("non-empty path");
+    let concrete_plain = ConcreteTypeExpression::new(["u8"], Vec::new()).expect("non-empty path");
     let concrete_annotated = concrete_plain.clone().with_diagnostic("u8");
-    let concrete_different =
-        ConcreteTypeExpression::new(["u16"], Vec::new()).expect("non-empty path");
-    assert_identity_contract(
-        &concrete_plain,
-        &concrete_annotated,
-        &concrete_different,
-    );
+    let concrete_different = ConcreteTypeExpression::new(["u16"], Vec::new()).expect("non-empty path");
+    assert_identity_contract(&concrete_plain, &concrete_annotated, &concrete_different);
 
     let associated_plain = AssociatedTypeExpression::new(
         TypeExpression::Parameter("T".into()),
@@ -555,11 +543,7 @@ fn test_all_diagnostic_type_nodes_use_structural_identity() {
         "Output",
         Box::<[GenericArgument]>::default(),
     );
-    assert_identity_contract(
-        &associated_plain,
-        &associated_annotated,
-        &associated_different,
-    );
+    assert_identity_contract(&associated_plain, &associated_annotated, &associated_different);
 
     let reference_plain = ReferenceTypeExpression::new(
         LifetimeExpression::Named("a".into()),
@@ -572,17 +556,11 @@ fn test_all_diagnostic_type_nodes_use_structural_identity() {
         true,
         TypeExpression::Parameter("T".into()),
     );
-    assert_identity_contract(
-        &reference_plain,
-        &reference_annotated,
-        &reference_different,
-    );
+    assert_identity_contract(&reference_plain, &reference_annotated, &reference_different);
 
-    let pointer_plain =
-        RawPointerTypeExpression::new(false, TypeExpression::Parameter("T".into()));
+    let pointer_plain = RawPointerTypeExpression::new(false, TypeExpression::Parameter("T".into()));
     let pointer_annotated = pointer_plain.clone().with_diagnostic("*const T");
-    let pointer_different =
-        RawPointerTypeExpression::new(true, TypeExpression::Parameter("T".into()));
+    let pointer_different = RawPointerTypeExpression::new(true, TypeExpression::Parameter("T".into()));
     assert_identity_contract(&pointer_plain, &pointer_annotated, &pointer_different);
 
     let array_plain = ArrayTypeExpression::new(
@@ -613,11 +591,7 @@ fn test_all_diagnostic_type_nodes_use_structural_identity() {
         vec![TypeExpression::Parameter("U".into())].into_boxed_slice(),
         TypeExpression::Parameter("T".into()),
     );
-    assert_identity_contract(
-        &function_plain,
-        &function_annotated,
-        &function_different,
-    );
+    assert_identity_contract(&function_plain, &function_annotated, &function_different);
 
     let display = type_bound(
         TypeExpression::SelfType,
@@ -659,11 +633,7 @@ fn test_all_generic_diagnostics_use_structural_identity() {
         vec![TraitBoundModifier::None],
         Vec::new(),
     );
-    assert_identity_contract(
-        &predicate_plain,
-        &predicate_annotated,
-        &predicate_different,
-    );
+    assert_identity_contract(&predicate_plain, &predicate_annotated, &predicate_different);
 
     let parameter_plain = GenericParameterDescriptor::Type {
         name: "T".into(),
@@ -683,11 +653,7 @@ fn test_all_generic_diagnostics_use_structural_identity() {
         default: None,
         diagnostic: DiagnosticText::default(),
     };
-    assert_identity_contract(
-        &parameter_plain,
-        &parameter_annotated,
-        &parameter_different,
-    );
+    assert_identity_contract(&parameter_plain, &parameter_annotated, &parameter_different);
 
     let const_plain = ConstGenericArgument::new(
         concrete(&["usize"], Vec::new()),

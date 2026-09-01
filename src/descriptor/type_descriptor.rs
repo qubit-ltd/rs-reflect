@@ -140,9 +140,7 @@ impl TypeDescriptor {
     /// reflected struct root, if that root exposes them.
     #[must_use]
     #[inline(always)]
-    pub const fn struct_construction(
-        &self,
-    ) -> Option<&StructConstructionDescriptor> {
+    pub const fn struct_construction(&self) -> Option<&StructConstructionDescriptor> {
         self.construction.as_ref()
     }
 
@@ -150,9 +148,7 @@ impl TypeDescriptor {
     /// root instance, if this root was derived from generic source.
     #[must_use]
     #[inline(always)]
-    pub const fn concrete_generic(
-        &self,
-    ) -> Option<&'static ConcreteGenericDescriptor> {
+    pub const fn concrete_generic(&self) -> Option<&'static ConcreteGenericDescriptor> {
         self.generic
     }
 
@@ -162,12 +158,8 @@ impl TypeDescriptor {
         input: NamedConstructionInput<crate::value::Local>,
     ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.struct_construction() {
-            Some(construction) => {
-                construction.local_constructor().construct_named(input)
-            }
-            None => {
-                Err(input.into_recovery(ConstructionError::TargetUnavailable))
-            }
+            Some(construction) => construction.local_constructor().construct_named(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         }
     }
 
@@ -178,23 +170,15 @@ impl TypeDescriptor {
         input: TupleConstructionInput<crate::value::Local>,
     ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.struct_construction() {
-            Some(construction) => {
-                construction.local_constructor().construct_tuple(input)
-            }
-            None => {
-                Err(input.into_recovery(ConstructionError::TargetUnavailable))
-            }
+            Some(construction) => construction.local_constructor().construct_tuple(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         }
     }
 
     /// Constructs a unit struct through its generated local adapter.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.struct_construction() {
-            Some(construction) => {
-                construction.local_constructor().construct_unit()
-            }
+            Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
                 ConstructionError::TargetUnavailable,
                 Vec::new(),
@@ -204,10 +188,7 @@ impl TypeDescriptor {
 
     /// Creates a primitive root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_primitive<T: ?Sized + 'static>(
-        query_name: &'static str,
-        kind: PrimitiveKind,
-    ) -> Self {
+    pub(crate) const fn new_primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Primitive(PrimitiveTypeDescriptor::new(kind)),
@@ -218,10 +199,7 @@ impl TypeDescriptor {
 
     /// Creates a text root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_text<T: ?Sized + 'static>(
-        query_name: &'static str,
-        kind: TextKind,
-    ) -> Self {
+    pub(crate) const fn new_text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Text(TextTypeDescriptor::new(kind)),
@@ -247,20 +225,14 @@ impl TypeDescriptor {
 
     /// Attaches generated struct construction entry points to this root.
     #[doc(hidden)]
-    pub const fn with_struct_construction(
-        mut self,
-        construction: StructConstructionDescriptor,
-    ) -> Self {
+    pub const fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
     }
 
     /// Attaches generic declaration and concrete-instance facts to this root.
     #[doc(hidden)]
-    pub const fn with_concrete_generic(
-        mut self,
-        generic: &'static ConcreteGenericDescriptor,
-    ) -> Self {
+    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
         self.generic = Some(generic);
         self
     }
@@ -292,10 +264,7 @@ impl TypeDescriptor {
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
     /// data.
     #[doc(hidden)]
-    pub(crate) const fn new_tuple<T: ?Sized + 'static>(
-        query_name: &'static str,
-        elements: &'static [TypeRef],
-    ) -> Self {
+    pub(crate) const fn new_tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Tuple(TupleTypeDescriptor::new(elements)),
@@ -328,9 +297,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Array(ArrayTypeDescriptor::new(
-                element, length,
-            )),
+            TypeDescriptorData::Array(ArrayTypeDescriptor::new(element, length)),
             &[],
             &[],
         )
@@ -346,9 +313,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Array(ArrayTypeDescriptor::new_lazy(
-                element, length,
-            )),
+            TypeDescriptorData::Array(ArrayTypeDescriptor::new_lazy(element, length)),
             &[],
             &[],
         )
@@ -356,10 +321,7 @@ impl TypeDescriptor {
 
     /// Creates an optional root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_optional<T: ?Sized + 'static>(
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Optional(OptionalTypeDescriptor::new(element)),
@@ -377,9 +339,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(
-                element,
-            )),
+            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(element)),
             &[],
             &[],
         )
@@ -394,9 +354,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Sequence(SequenceTypeDescriptor::new(
-                kind, element,
-            )),
+            TypeDescriptorData::Sequence(SequenceTypeDescriptor::new(kind, element)),
             &[],
             &[],
         )
@@ -412,9 +370,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Sequence(SequenceTypeDescriptor::new_lazy(
-                kind, element,
-            )),
+            TypeDescriptorData::Sequence(SequenceTypeDescriptor::new_lazy(kind, element)),
             &[],
             &[],
         )
@@ -478,9 +434,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Map(MapTypeDescriptor::new_lazy(
-                kind, key, value,
-            )),
+            TypeDescriptorData::Map(MapTypeDescriptor::new_lazy(kind, key, value)),
             &[],
             &[],
         )
@@ -495,9 +449,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new(
-                kind, pointee,
-            )),
+            TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new(kind, pointee)),
             &[],
             &[],
         )
@@ -513,9 +465,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::SmartPointer(
-                SmartPointerTypeDescriptor::new_lazy(kind, pointee),
-            ),
+            TypeDescriptorData::SmartPointer(SmartPointerTypeDescriptor::new_lazy(kind, pointee)),
             &[],
             &[],
         )
@@ -530,9 +480,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Reference(ReferenceTypeDescriptor::new(
-                kind, target,
-            )),
+            TypeDescriptorData::Reference(ReferenceTypeDescriptor::new(kind, target)),
             &[],
             &[],
         )
@@ -548,9 +496,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::Reference(ReferenceTypeDescriptor::new_lazy(
-                kind, target,
-            )),
+            TypeDescriptorData::Reference(ReferenceTypeDescriptor::new_lazy(kind, target)),
             &[],
             &[],
         )
@@ -558,10 +504,7 @@ impl TypeDescriptor {
 
     /// Creates a slice root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_slice<T: ?Sized + 'static>(
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Slice(SliceTypeDescriptor::new(element)),
@@ -594,9 +537,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new(
-                mutability, pointee,
-            )),
+            TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new(mutability, pointee)),
             &[],
             &[],
         )
@@ -612,9 +553,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new_lazy(
-                mutability, pointee,
-            )),
+            TypeDescriptorData::RawPointer(RawPointerTypeDescriptor::new_lazy(mutability, pointee)),
             &[],
             &[],
         )
@@ -677,9 +616,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<T>(
             query_name,
-            TypeDescriptorData::TraitObject(TraitObjectTypeDescriptor::new(
-                trait_descriptor,
-            )),
+            TypeDescriptorData::TraitObject(TraitObjectTypeDescriptor::new(trait_descriptor)),
             &[],
             &[],
         )
@@ -687,15 +624,8 @@ impl TypeDescriptor {
 
     /// Creates an intentionally opaque root for generated descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_opaque<T: ?Sized + 'static>(
-        query_name: &'static str,
-    ) -> Self {
-        Self::new::<T>(
-            query_name,
-            TypeDescriptorData::Opaque(OpaqueTypeView),
-            &[],
-            &[],
-        )
+    pub(crate) const fn new_opaque<T: ?Sized + 'static>(query_name: &'static str) -> Self {
+        Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
     }
 
     /// Creates an opaque root with an explicit static capability resolver.
@@ -789,10 +719,7 @@ impl TypeDescriptor {
     /// Generated descriptor roots call this before the root is interned, so
     /// every query observes one stable capability set for the concrete type.
     #[doc(hidden)]
-    pub const fn with_capabilities(
-        mut self,
-        capabilities: fn() -> &'static TypeCapabilities,
-    ) -> Self {
+    pub const fn with_capabilities(mut self, capabilities: fn() -> &'static TypeCapabilities) -> Self {
         self.capabilities = capabilities;
         self
     }
@@ -830,10 +757,7 @@ impl TypeDescriptor {
     ///
     /// `None` means this descriptor did not register the key, registered a
     /// different contract, or records a fact without an operation adapter.
-    pub fn get_capability<A: 'static>(
-        &self,
-        key: CapabilityKey<A>,
-    ) -> Option<&A> {
+    pub fn get_capability<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
         self.capabilities().get(key)
     }
 
@@ -842,9 +766,7 @@ impl TypeDescriptor {
     #[inline(always)]
     pub const fn kind(&self) -> TypeKind {
         match &self.data {
-            TypeDescriptorData::Primitive(view) => {
-                TypeKind::Primitive(view.kind())
-            }
+            TypeDescriptorData::Primitive(view) => TypeKind::Primitive(view.kind()),
             TypeDescriptorData::Text(view) => TypeKind::Text(view.kind()),
             TypeDescriptorData::Struct(view) => TypeKind::Struct(view.kind()),
             TypeDescriptorData::Enum(_) => TypeKind::Enum,
@@ -854,19 +776,11 @@ impl TypeDescriptor {
             TypeDescriptorData::Sequence(_) => TypeKind::Sequence,
             TypeDescriptorData::Set(_) => TypeKind::Set,
             TypeDescriptorData::Map(_) => TypeKind::Map,
-            TypeDescriptorData::SmartPointer(view) => {
-                TypeKind::SmartPointer(view.kind())
-            }
-            TypeDescriptorData::Reference(view) => {
-                TypeKind::Reference(view.kind())
-            }
+            TypeDescriptorData::SmartPointer(view) => TypeKind::SmartPointer(view.kind()),
+            TypeDescriptorData::Reference(view) => TypeKind::Reference(view.kind()),
             TypeDescriptorData::Slice(_) => TypeKind::Slice,
-            TypeDescriptorData::RawPointer(view) => {
-                TypeKind::RawPointer(view.mutability())
-            }
-            TypeDescriptorData::Function(view) => {
-                TypeKind::FunctionPointer(view.kind())
-            }
+            TypeDescriptorData::RawPointer(view) => TypeKind::RawPointer(view.mutability()),
+            TypeDescriptorData::Function(view) => TypeKind::FunctionPointer(view.kind()),
             TypeDescriptorData::TraitObject(_) => TypeKind::TraitObject,
             TypeDescriptorData::Opaque(_) => TypeKind::Opaque,
         }
@@ -975,9 +889,7 @@ impl TypeDescriptor {
     /// Returns the smart-pointer view, or `None` for every other kind.
     #[must_use]
     #[inline(always)]
-    pub const fn as_smart_pointer(
-        &self,
-    ) -> Option<&SmartPointerTypeDescriptor> {
+    pub const fn as_smart_pointer(&self) -> Option<&SmartPointerTypeDescriptor> {
         match &self.data {
             TypeDescriptorData::SmartPointer(view) => Some(view),
             _ => None,
@@ -1057,9 +969,7 @@ impl TypeDescriptor {
     ///
     /// `None` means the root has no direct field with that lookup name.
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields
-            .iter()
-            .find(|field| field.query_name() == Some(name))
+        self.fields.iter().find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a direct field by source index.
@@ -1082,9 +992,7 @@ impl TypeDescriptor {
     ///
     /// `None` means the root has no variant with that lookup name.
     pub fn variant(&self, name: &str) -> Option<&VariantDescriptor> {
-        self.variants
-            .iter()
-            .find(|variant| variant.query_name() == name)
+        self.variants.iter().find(|variant| variant.query_name() == name)
     }
 
     /// Returns a variant by source index.
@@ -1099,9 +1007,9 @@ impl TypeDescriptor {
         &self,
         discriminant: crate::descriptor::NumericDiscriminant,
     ) -> Option<&VariantDescriptor> {
-        self.variants.iter().find(|variant| {
-            variant.numeric_discriminant() == Some(discriminant)
-        })
+        self.variants
+            .iter()
+            .find(|variant| variant.numeric_discriminant() == Some(discriminant))
     }
 
     /// Returns every linked reflected implementation targeting this exact
@@ -1110,9 +1018,7 @@ impl TypeDescriptor {
     /// Both the returned slice and its descriptors belong to the immutable
     /// process-wide registry. A cached [`RegistryError`] is returned when
     /// distributed registration could not be aggregated.
-    pub fn impls(
-        &self,
-    ) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
+    pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(registry.implementations(self.type_id()))
     }
@@ -1123,10 +1029,7 @@ impl TypeDescriptor {
     /// defaulted trait methods replaced by their effective override where
     /// applicable. The slice is empty when no reflected impl targets this
     /// root. A cached [`RegistryError`] is returned when aggregation failed.
-    pub fn methods(
-        &self,
-    ) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError>
-    {
+    pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(registry.effective_view(self.type_id()).methods())
     }
@@ -1138,10 +1041,7 @@ impl TypeDescriptor {
     /// use the name. Callers that need a qualified namespace can use
     /// [`crate::registry::EffectiveTypeView::lookup_method`] on a registry
     /// view. A cached [`RegistryError`] is returned when aggregation failed.
-    pub fn methods_named(
-        &self,
-        name: &str,
-    ) -> Result<MethodLookup<'static>, RegistryError> {
+    pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(registry
             .effective_view(self.type_id())

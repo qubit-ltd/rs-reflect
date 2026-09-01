@@ -70,11 +70,7 @@ pub(super) static FIXTURE_FIELDS: [FieldDescriptor; 4] = [
     .with_variant(2, "Data"),
 ];
 static FIXTURE_DESCRIPTOR: TypeDescriptor =
-    descriptor::struct_type::<ConstructionErrorFixture>(
-        "ConstructionErrorFixture",
-        StructKind::Named,
-        &FIXTURE_FIELDS,
-    );
+    descriptor::struct_type::<ConstructionErrorFixture>("ConstructionErrorFixture", StructKind::Named, &FIXTURE_FIELDS);
 
 /// Verifies construction field IDs retain every source-form component and
 /// format direct and variant fields distinctly.
@@ -85,10 +81,7 @@ fn test_construction_field_id_preserves_source_identity_forms() {
         .map(ConstructionFieldId::from_descriptor)
         .collect();
 
-    assert_eq!(
-        ids[0].declaring_type(),
-        TypeId::of::<ConstructionErrorFixture>()
-    );
+    assert_eq!(ids[0].declaring_type(), TypeId::of::<ConstructionErrorFixture>());
     assert_eq!(
         ids[0].declaring_type_name(),
         std::any::type_name::<ConstructionErrorFixture>()
@@ -110,8 +103,7 @@ fn test_construction_field_id_preserves_source_identity_forms() {
 /// context when formatted.
 #[test]
 fn test_construction_error_variants_format_complete_context() {
-    let field =
-        Box::new(ConstructionFieldId::from_descriptor(&FIXTURE_FIELDS[0]));
+    let field = Box::new(ConstructionFieldId::from_descriptor(&FIXTURE_FIELDS[0]));
     let mismatch = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>());
     let errors = [
         ConstructionError::TargetUnavailable,
@@ -119,15 +111,11 @@ fn test_construction_error_variants_format_complete_context() {
             expected: ConstructionShape::Named,
             actual: ConstructionShape::Tuple,
         },
-        ConstructionError::UnknownField {
-            name: "unknown".into(),
-        },
+        ConstructionError::UnknownField { name: "unknown".into() },
         ConstructionError::DuplicateField {
             name: "duplicate".into(),
         },
-        ConstructionError::MissingField {
-            field: field.clone(),
-        },
+        ConstructionError::MissingField { field: field.clone() },
         ConstructionError::UnknownPosition { index: 4 },
         ConstructionError::ValueTypeMismatch {
             field: field.clone(),

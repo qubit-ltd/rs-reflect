@@ -85,8 +85,7 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Consumes this wrapper and returns the original mutable borrow when its
@@ -99,9 +98,9 @@ impl<'a> DynamicMut<'a, Local> {
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            LocalMutStorage::Any(value) if value.is::<T>() => Ok(value
-                .downcast_mut::<T>()
-                .expect("the exact type ID was checked")),
+            LocalMutStorage::Any(value) if value.is::<T>() => {
+                Ok(value.downcast_mut::<T>().expect("the exact type ID was checked"))
+            }
             LocalMutStorage::Any(value) => Err(Self {
                 storage: LocalMutStorage::Any(value),
                 marker,
@@ -215,8 +214,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Consumes this wrapper and returns the original thread-safe mutable
@@ -228,9 +226,9 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            ThreadSafeMutStorage::Any(value) if value.is::<T>() => Ok(value
-                .downcast_mut::<T>()
-                .expect("the exact type ID was checked")),
+            ThreadSafeMutStorage::Any(value) if value.is::<T>() => {
+                Ok(value.downcast_mut::<T>().expect("the exact type ID was checked"))
+            }
             ThreadSafeMutStorage::Any(value) => Err(Self {
                 storage: ThreadSafeMutStorage::Any(value),
                 marker,

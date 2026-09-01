@@ -36,9 +36,7 @@ impl<A: 'static> CapabilityKey<A> {
 
     /// Creates a built-in typed key using this crate's reserved ID authority.
     pub(crate) fn new_core(id: &str) -> Self {
-        let id = CapabilityId::new_core(id).expect(
-            "built-in capability IDs must use valid qubit.reflect names",
-        );
+        let id = CapabilityId::new_core(id).expect("built-in capability IDs must use valid qubit.reflect names");
         Self::new(id)
     }
 
