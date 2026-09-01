@@ -56,6 +56,23 @@ The default `derive` feature re-exports `Reflect`, `reflect`, and
 `reflect_impl` macros. `default-features = false` keeps the runtime and
 handwritten registration APIs, but no longer re-exports those macros.
 
+Choose the narrowest dependency profile that matches the integration:
+
+```toml
+# Runtime descriptors, dynamic values, and handwritten registration only.
+qubit-reflect = { version = "0.1", default-features = false }
+
+# Macros plus BigDecimal, chrono, and UUID reflection implementations.
+qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+
+# Macros plus Qubit DataType and Id reflection implementations.
+qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+```
+
+`ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
+the default feature set, so a runtime-only consumer does not compile those
+dependency families or silently acquire their trait implementations.
+
 ## Core Workflow
 
 ### 1. Derive the structural descriptor
@@ -168,6 +185,30 @@ that implement `Drop`.
 
 ## Advanced Usage
 
+### Integrate through a downstream facade or macro
+
+A facade that directly hosts `qubit-reflect` derives must explicitly re-export
+the public symbols it promises and expose the versioned generated-code entry
+under the path expected by the derive:
+
+```rust,ignore
+pub use qubit_reflect::Reflect;
+pub use qubit_reflect::TypeDescriptor;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use qubit_reflect::__private::codegen_v1;
+}
+```
+
+Declarations can then use `#[reflect(crate = my_facade)]`. Do not glob-re-export
+`qubit_reflect` or its `__private` module: that turns unrelated implementation
+details into the facade's API. A downstream procedural macro may instead expose
+the same module under an exact private alias such as `reflect_codegen_v1` and
+emit only paths through that alias. `codegen_v1` is a compiler-to-runtime
+protocol for generated code, not a supported handwritten construction API; a
+future incompatible protocol receives a new versioned module.
+
 ### Declare traits and callable implementations
 
 - `#[reflect]` reflects a trait declaration, including supertraits, default
@@ -238,6 +279,8 @@ do not choose an executor or poll it, and async methods cannot use
 | A method is visible but not callable | Inspect its unavailable reason; generic methods need a supported specialization, and unsafe, variadic, unsupported ABI, opaque output, and some borrowed/unsized forms cannot cross the boundary. |
 | Registry initialization fails | Inspect `RegistryError`; initialization errors are cached, so start a new process after fixing conflicting registrations. |
 | Cross-thread invocation is unavailable | Use a method explicitly marked `thread_safe` and construct `SendReflected*` values only where Rust's bounds are satisfied. |
+| An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
+| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]` and expose exactly `__private::codegen_v1`; do not point the derive at the underlying crate by accident. |
 
 ## Limitations and Best Practices
 

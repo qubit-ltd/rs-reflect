@@ -75,23 +75,19 @@ struct PayloadCacheMarker;
 struct TraitObjectCacheMarker;
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::new([]),
-        predicates: Box::new([]),
-        diagnostic: DiagnosticText::default(),
-    });
+    LazyLock::new(|| GenericDefinitionDescriptor::new(Vec::new(), Vec::new()));
 
-static GENERIC_TRAIT_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::new([GenericParameterDescriptor::Type {
+static GENERIC_TRAIT_DEFINITION: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| {
+    GenericDefinitionDescriptor::new(
+        vec![GenericParameterDescriptor::Type {
             name: "T".into(),
             bounds: Box::new([]),
             default: None,
             diagnostic: DiagnosticText::default(),
-        }]),
-        predicates: Box::new([]),
-        diagnostic: DiagnosticText::default(),
-    });
+        }],
+        Vec::new(),
+    )
+});
 
 static ROOT_DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
     TraitDefinitionDescriptor::new(
@@ -155,16 +151,17 @@ static MIDDLE_TRAIT: LazyLock<&'static TraitDescriptor> = LazyLock::new(|| {
 });
 
 fn target_type() -> &'static TypeDescriptor {
-    static TARGET: TypeDescriptor = reflect::__private::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
+    static TARGET: TypeDescriptor =
+        reflect::__private::codegen_v1::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
     &TARGET
 }
 
 fn concrete_u32_expression() -> TypeExpression {
-    TypeExpression::Concrete(reflect::expression::ConcreteTypeExpression {
-        path: vec!["u32".into()].into_boxed_slice(),
-        arguments: Box::new([]),
-        diagnostic: DiagnosticText::from("u32"),
-    })
+    TypeExpression::Concrete(
+        reflect::expression::ConcreteTypeExpression::new(["u32"], Vec::new())
+            .expect("test path is non-empty")
+            .with_diagnostic("u32"),
+    )
 }
 
 fn member_id(kind: &str, index: usize) -> MemberId {
@@ -231,7 +228,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                reflect::__private::external_supertrait::<RootMarker>(
+                reflect::__private::codegen_v1::descriptor::external_supertrait::<RootMarker>(
                     "test.external.concurrent.root",
                     "fixture::ConcurrentRoot",
                     Vec::new(),
@@ -245,7 +242,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
         .collect();
     assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
 
-    let distinct = reflect::__private::external_supertrait::<RootMarker>(
+    let distinct = reflect::__private::codegen_v1::descriptor::external_supertrait::<RootMarker>(
         "test.external.concurrent.other",
         "fixture::ConcurrentOther",
         Vec::new(),
@@ -280,14 +277,16 @@ fn test_trait_payload_and_object_caches_reuse_initialized_values() {
     );
     assert!(std::ptr::eq(first.applied(), second.applied()));
 
-    let first = reflect::__private::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
-        TraitDescriptor::builder(&ROOT_DEFINITION)
-            .build()
-            .expect("the cached trait object fixture must build")
-    });
-    let second = reflect::__private::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
-        panic!("a hot trait-object lookup must not rebuild its descriptor")
-    });
+    let first =
+        reflect::__private::codegen_v1::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+            TraitDescriptor::builder(&ROOT_DEFINITION)
+                .build()
+                .expect("the cached trait object fixture must build")
+        });
+    let second =
+        reflect::__private::codegen_v1::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+            panic!("a hot trait-object lookup must not rebuild its descriptor")
+        });
     assert!(std::ptr::eq(first, second));
 }
 
@@ -344,7 +343,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     assert_eq!(associated_type.rust_name(), "Item");
     assert_eq!(associated_type.query_name(), "item");
     assert!(associated_type.bounds().is_empty());
-    assert!(associated_type.generic_definition().parameters.is_empty());
+    assert!(associated_type.generic_definition().parameters().is_empty());
     assert_eq!(associated_type.default(), Some(&TypeExpression::Never));
     let gat = AssociatedTypeDescriptor::new_with_generic_definition(
         5,
@@ -352,14 +351,10 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
         "gat",
         Box::new([]),
         None,
-        GenericDefinitionDescriptor {
-            parameters: Box::new([]),
-            predicates: Box::new([]),
-            diagnostic: DiagnosticText::default(),
-        },
+        GenericDefinitionDescriptor::new(Vec::new(), Vec::new()),
     );
     assert_eq!(gat.index(), 5);
-    assert!(gat.generic_definition().parameters.is_empty());
+    assert!(gat.generic_definition().parameters().is_empty());
 
     let associated_const = AssociatedConstDescriptor::new(4, "LIMIT", "limit", TypeExpression::Never, true);
     assert_eq!(associated_const.index(), 4);
@@ -488,13 +483,7 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
         Some(concrete_u32_expression()),
         Some(target_type as TypeDescriptorResolver),
     ))
-    .qualifiers(MethodQualifiers {
-        is_async: true,
-        is_unsafe: false,
-        is_const: false,
-        abi: None,
-        is_variadic: false,
-    })
+    .qualifiers(MethodQualifiers::new(true, false, false, None, false))
     .generic_definition(&GENERIC_TRAIT_DEFINITION)
     .build();
 
@@ -522,8 +511,8 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
         method.return_value().concrete_type().map(TypeDescriptor::type_id),
         Some(target_type().type_id()),
     );
-    assert!(method.qualifiers().is_async);
-    assert_eq!(method.generic_definition().parameters.len(), 1);
+    assert!(method.qualifiers().is_async());
+    assert_eq!(method.generic_definition().parameters().len(), 1);
     assert_eq!(
         method.declaring_trait().map(TraitDefinitionDescriptor::rust_path),
         Some("fixture::Generic")
@@ -546,11 +535,11 @@ fn test_trait_descriptor_rejects_non_concrete_or_incomplete_applications() {
         Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index: 0 })
     ));
 
-    let concrete_with_lifetime = TypeExpression::Concrete(ConcreteTypeExpression {
-        path: vec!["Cow".into()].into_boxed_slice(),
-        arguments: vec![GenericArgument::Lifetime(LifetimeExpression::Static)].into_boxed_slice(),
-        diagnostic: DiagnosticText::from("Cow<'static, str>"),
-    });
+    let concrete_with_lifetime = TypeExpression::Concrete(
+        ConcreteTypeExpression::new(["Cow"], vec![GenericArgument::Lifetime(LifetimeExpression::Static)])
+            .expect("test path is non-empty")
+            .with_diagnostic("Cow<'static, str>"),
+    );
     assert!(
         TraitDescriptor::builder(&GENERIC_DEFINITION)
             .arguments(vec![GenericArgument::Type(concrete_with_lifetime)])
@@ -656,11 +645,14 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
             .build()
             .expect("trait impl must name its implemented trait"),
     ));
-    let nested_symbolic = TypeExpression::Concrete(ConcreteTypeExpression {
-        path: vec!["Vec".into()].into_boxed_slice(),
-        arguments: vec![GenericArgument::Type(TypeExpression::Parameter("T".into()))].into_boxed_slice(),
-        diagnostic: DiagnosticText::from("Vec<T>"),
-    });
+    let nested_symbolic = TypeExpression::Concrete(
+        ConcreteTypeExpression::new(
+            ["Vec"],
+            vec![GenericArgument::Type(TypeExpression::Parameter("T".into()))],
+        )
+        .expect("test path is non-empty")
+        .with_diagnostic("Vec<T>"),
+    );
     assert!(
         ImplDescriptor::builder(generic_impl_definition, target_type)
             .implemented_trait(applied)
@@ -756,7 +748,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
         panic!("the reader must preserve the declared type");
     };
     assert_eq!(value, 32);
-    assert_eq!(generic_impl.definition().generic_definition().parameters.len(), 1);
+    assert_eq!(generic_impl.definition().generic_definition().parameters().len(), 1);
     assert_eq!(generic_impl.arguments(), arguments);
     assert_eq!(generic_impl.implementation_methods().len(), 1);
     assert_eq!(

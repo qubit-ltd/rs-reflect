@@ -314,7 +314,7 @@ fn test_reflect_trait_registers_complete_marker_backed_definition() {
 
     assert_eq!(definition.rust_name(), "ReflectedService");
     assert!(matches!(definition.trait_id(), TraitId::Reflected(_)));
-    assert_eq!(definition.generic_definition().parameters.len(), 0);
+    assert_eq!(definition.generic_definition().parameters().len(), 0);
     let candidates =
         registry.find_trait_definitions_by_path("integration_tests::descriptor::reflect_trait_tests::ReflectedService");
     assert_eq!(candidates.len(), 1);
@@ -432,7 +432,7 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
     assert!(matches!(
         applied.methods()[0].parameters()[0].signature_type(),
         reflect::expression::TypeExpression::Concrete(value)
-            if value.path[0].as_ref() == std::any::type_name::<u8>()
+            if value.path()[0].as_ref() == std::any::type_name::<u8>()
     ));
     let output = applied.methods()[0]
         .return_value()
@@ -441,7 +441,7 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
     assert!(matches!(
         output,
         reflect::expression::TypeExpression::Concrete(value)
-            if value.path[0].as_ref() == std::any::type_name::<u8>()
+            if value.path()[0].as_ref() == std::any::type_name::<u8>()
     ));
     assert!(matches!(
         applied.methods()[1]
@@ -449,7 +449,7 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
             .signature_type()
             .expect("const-generic output signature must be retained"),
         reflect::expression::TypeExpression::Array(value)
-            if matches!(value.length, reflect::expression::ConstExpression::UnsignedInteger(2))
+            if matches!(value.length(), reflect::expression::ConstExpression::UnsignedInteger(2))
     ));
 
     let lifetime = TypeDescriptor::of::<dyn LifetimeDynService<'static>>();
@@ -474,7 +474,7 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
             .signature_type()
             .expect("associated return must be concrete"),
         reflect::expression::TypeExpression::Concrete(value)
-            if value.path[0].as_ref() == std::any::type_name::<u8>()
+            if value.path()[0].as_ref() == std::any::type_name::<u8>()
     ));
 
     assert_eq!(
@@ -575,31 +575,31 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::GenericService")
         .expect("generic trait must be registered");
 
-    assert_eq!(definition.generic_definition().parameters.len(), 1);
+    assert_eq!(definition.generic_definition().parameters().len(), 1);
     let payload = <ServiceMarkerProbe as GenericService<usize>>::__qubit_reflect_trait_payload();
     assert_eq!(payload.applied().arguments().len(), 1);
     let generic_method = &payload.applied().methods()[1];
     assert_eq!(generic_method.rust_name(), "generic");
-    assert_eq!(generic_method.generic_definition().parameters.len(), 4);
-    assert_eq!(generic_method.generic_definition().predicates.len(), 2);
+    assert_eq!(generic_method.generic_definition().parameters().len(), 4);
+    assert_eq!(generic_method.generic_definition().predicates().len(), 2);
     let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } =
-        &generic_method.generic_definition().parameters[1]
+        &generic_method.generic_definition().parameters()[1]
     else {
         panic!("generic method must retain its lifetime parameter")
     };
     assert_eq!(bounds.len(), 1);
     let reflect::expression::GenericParameterDescriptor::Const { ty, .. } =
-        &generic_method.generic_definition().parameters[3]
+        &generic_method.generic_definition().parameters()[3]
     else {
         panic!("generic method must retain its const parameter")
     };
     assert!(
-        matches!(ty.as_ref(), reflect::expression::TypeExpression::Concrete(value) if value.path[0].as_ref() == "usize")
+        matches!(ty.as_ref(), reflect::expression::TypeExpression::Concrete(value) if value.path()[0].as_ref() == "usize")
     );
     assert!(matches!(
         generic_method.parameters()[0].signature_type(),
         reflect::expression::TypeExpression::Reference(value)
-            if matches!(value.target.as_ref(), reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "U")
+            if matches!(value.target(), reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "U")
     ));
     let service = <ServiceMarkerProbe as ReflectedService>::__qubit_reflect_trait_payload();
     assert_eq!(service.applied().methods().len(), 2);
@@ -621,7 +621,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
             "integration_tests::descriptor::reflect_trait_tests::LifetimeAndLiteralDefaultService",
         )
         .expect("literal-default trait must register");
-    let parameters = literal_defaults.generic_definition().parameters.as_ref();
+    let parameters = literal_defaults.generic_definition().parameters();
     let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } = &parameters[1] else {
         panic!("expected a lifetime parameter")
     };
@@ -648,7 +648,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert_eq!(maybe.applied().arguments().len(), 1);
     let definition = maybe.definition();
     let reflect::expression::GenericParameterDescriptor::Type { bounds, .. } =
-        &definition.generic_definition().parameters[0]
+        &definition.generic_definition().parameters()[0]
     else {
         panic!("expected type parameter")
     };
@@ -663,11 +663,11 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     let hrtb = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::HrtbService")
         .expect("HRTB trait must register");
-    assert_eq!(hrtb.generic_definition().predicates.len(), 1);
+    assert_eq!(hrtb.generic_definition().predicates().len(), 1);
     let where_bound = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereBoundService")
         .expect("where-bound trait must register");
-    let predicates = where_bound.generic_definition().predicates.as_ref();
+    let predicates = where_bound.generic_definition().predicates();
     assert_eq!(predicates.len(), 1);
     let reflect::expression::PredicateDescriptor::TypeBound {
         bounds,
@@ -691,7 +691,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereLifetimeService")
         .expect("lifetime-bound trait must register");
     assert!(matches!(
-        lifetime_bound.generic_definition().predicates.as_ref(),
+        lifetime_bound.generic_definition().predicates(),
         [
             reflect::expression::PredicateDescriptor::TypeBound { .. },
             reflect::expression::PredicateDescriptor::TypeOutlives {
@@ -714,14 +714,14 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     let reflect::expression::TypeExpression::Concrete(vector) = parameter.signature_type() else {
         panic!("Vec parameter must remain a structured concrete path")
     };
-    assert_eq!(vector.path[0].as_ref(), "Vec");
+    assert_eq!(vector.path()[0].as_ref(), "Vec");
     let reflect::expression::GenericArgument::Type(reflect::expression::TypeExpression::Array(array)) =
-        &vector.arguments[0]
+        &vector.arguments()[0]
     else {
         panic!("Vec element must preserve its array argument")
     };
     assert!(matches!(
-        array.length,
+        array.length(),
         reflect::expression::ConstExpression::UnsignedInteger(4)
     ));
     let return_value = structural.applied().methods()[0]

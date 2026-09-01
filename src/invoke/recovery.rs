@@ -95,9 +95,28 @@ impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
 /// A validation error paired with the complete recoverable invocation input.
 pub struct InvocationFailure<'call, M: InvocationMode> {
     /// Structured reason the invocation could not enter user code.
-    pub error: InvocationError,
+    pub(crate) error: InvocationError,
     /// Untouched receiver and arguments retained by the runtime.
-    pub recovery: InvocationRecovery<'call, M>,
+    pub(crate) recovery: InvocationRecovery<'call, M>,
+}
+
+impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable invocation input.
+    pub const fn recovery(&self) -> &InvocationRecovery<'call, M> {
+        &self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, InvocationRecovery<'call, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> InvocationRecovery<'call, M> {
+        self.recovery
+    }
 }
 
 impl<M: InvocationMode> fmt::Debug for InvocationFailure<'_, M> {

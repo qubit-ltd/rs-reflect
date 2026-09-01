@@ -66,6 +66,15 @@ impl CapabilityConflict {
 }
 
 /// An immutable capability set sorted by stable capability ID.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let capabilities = TypeDescriptor::of::<u32>().capabilities();
+/// assert!(capabilities.descriptors().windows(2).all(|pair| pair[0].id() < pair[1].id()));
+/// ```
 #[derive(Clone, Debug)]
 pub struct TypeCapabilities {
     descriptors: Box<[CapabilityDescriptor]>,

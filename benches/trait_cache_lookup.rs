@@ -10,7 +10,7 @@
 
 use std::hint::black_box;
 
-use qubit_reflect::__private::external_supertrait;
+use qubit_reflect::__private::codegen_v1::descriptor::external_supertrait;
 
 /// Measures repeated lookup after the exact external application is cached.
 fn main() {

@@ -13,11 +13,11 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::registration::FragmentKind;
-use qubit_reflect::__private::registration::FragmentPayload;
-use qubit_reflect::__private::registration::RegistrationFragment;
-use qubit_reflect::__private::registration::RuntimeIdentity;
-use qubit_reflect::__private::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::FieldDescriptor;
@@ -36,9 +36,9 @@ fn registry_independent_shape_descriptor() -> &'static TypeDescriptor {
     &REGISTRY_INDEPENDENT_SHAPE
 }
 
-static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::descriptor::opaque_member::<u8>();
+static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v1::descriptor::opaque_member::<u8>();
 static VALUE_TYPE: TypeRef = TypeRef::Opaque(&VALUE_TYPE_DESCRIPTOR);
-static FIELDS: [FieldDescriptor; 1] = [reflect::__private::descriptor::field(
+static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::descriptor::field(
     registry_independent_shape_descriptor,
     0,
     Some("value"),
@@ -46,7 +46,7 @@ static FIELDS: [FieldDescriptor; 1] = [reflect::__private::descriptor::field(
     &VALUE_TYPE,
     Visibility::Private,
 )];
-static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::descriptor::struct_type::<
+static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
     RegistryIndependentShape,
 >("RegistryIndependentShape", StructKind::Named, &FIELDS);
 
@@ -81,7 +81,7 @@ fn second_payload() -> FragmentPayload {
     FragmentPayload::Type(TypeDescriptor::of::<u8>())
 }
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     RegistrationFragment::new(
         FragmentKind::Type,
         CONFLICTING_IDENTITY,
@@ -90,7 +90,7 @@ reflect::__private::inventory::submit! {
     )
 }
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     RegistrationFragment::new(
         FragmentKind::Type,
         CONFLICTING_IDENTITY,

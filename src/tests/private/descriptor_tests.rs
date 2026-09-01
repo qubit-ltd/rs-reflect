@@ -8,6 +8,7 @@
 
 //! Tests hidden descriptor factories used by generated code.
 
+use crate::__private::codegen_v1::expression as codegen_expression;
 use crate::__private::descriptor;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::EnumRepr;
@@ -28,6 +29,9 @@ use crate::descriptor::VariantKind;
 use crate::error::TypeMismatch;
 use crate::expression::ConstExpression;
 use crate::expression::FunctionAbi;
+use crate::expression::GenericArgument;
+use crate::expression::LifetimeExpression;
+use crate::expression::TraitBoundModifier;
 use crate::expression::TypeExpression;
 use crate::identity::Visibility;
 use crate::value::ReflectedRef;
@@ -102,6 +106,67 @@ fn test_const_argument_factories_cover_supported_primitives() {
     let reader = descriptor::associated_const_reader(constant_value);
     assert_eq!(reader.read().downcast_ref::<u8>(), Some(&41));
     assert_eq!(format!("{reader:?}"), "AssociatedConstReader(..)");
+}
+
+/// Verifies the versioned code-generation facade preserves checked expression
+/// invariants and every structural input passed by generated code.
+#[test]
+fn test_codegen_v1_expression_factories_preserve_structural_inputs() {
+    let concrete = codegen_expression::concrete(
+        vec![
+            Box::<str>::from("std"),
+            Box::<str>::from("vec"),
+            Box::<str>::from("Vec"),
+        ]
+        .into_boxed_slice(),
+        vec![GenericArgument::Type(TypeExpression::SelfType)].into_boxed_slice(),
+        "std::vec::Vec<Self>".into(),
+    );
+    assert_eq!(
+        concrete.path().iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+        ["std", "vec", "Vec"]
+    );
+    assert_eq!(concrete.arguments(), &[GenericArgument::Type(TypeExpression::SelfType)]);
+    assert_eq!(concrete.diagnostic(), Some("std::vec::Vec<Self>"));
+
+    let const_argument = codegen_expression::const_argument(
+        TypeExpression::Concrete(concrete),
+        ConstExpression::UnsignedInteger(4),
+        "4",
+    );
+    assert!(matches!(const_argument.declared_type(), TypeExpression::Concrete(_)));
+    assert_eq!(const_argument.value(), &ConstExpression::UnsignedInteger(4));
+    assert_eq!(const_argument.normalized_diagnostic(), "4");
+
+    let array = codegen_expression::array(TypeExpression::SelfType, ConstExpression::Parameter("N".into()));
+    assert_eq!(array.element(), &TypeExpression::SelfType);
+    assert_eq!(array.length(), &ConstExpression::Parameter("N".into()));
+
+    let reference =
+        codegen_expression::reference(LifetimeExpression::Named("a".into()), true, TypeExpression::SelfType);
+    assert_eq!(reference.lifetime(), &LifetimeExpression::Named("a".into()));
+    assert!(reference.is_mutable());
+    assert_eq!(reference.target(), &TypeExpression::SelfType);
+
+    let type_bound = codegen_expression::type_bound(
+        TypeExpression::Parameter("T".into()),
+        vec![TypeExpression::Parameter("Display".into())].into_boxed_slice(),
+        vec![TraitBoundModifier::None].into_boxed_slice(),
+        vec![LifetimeExpression::Named("a".into())].into_boxed_slice(),
+    );
+    assert!(matches!(
+        type_bound,
+        crate::expression::PredicateDescriptor::TypeBound { .. }
+    ));
+
+    let outlives = codegen_expression::lifetime_outlives(
+        LifetimeExpression::Named("a".into()),
+        vec![LifetimeExpression::Static].into_boxed_slice(),
+    );
+    assert!(matches!(
+        outlives,
+        crate::expression::PredicateDescriptor::LifetimeOutlives { .. }
+    ));
 }
 
 /// Verifies hidden eager factories retain all typed categories used by macro

@@ -187,9 +187,28 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, 
 /// A pinned shared invocation validation error and its complete recovery input.
 pub struct PinnedRefInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
     /// Structured reason user code was not called.
-    pub error: InvocationError,
+    error: InvocationError,
     /// Original pinned receiver and arguments.
-    pub recovery: PinnedRefInvocationRecovery<'call, T, M>,
+    recovery: PinnedRefInvocationRecovery<'call, T, M>,
+}
+
+impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationFailure<'call, T, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable pinned invocation input.
+    pub const fn recovery(&self) -> &PinnedRefInvocationRecovery<'call, T, M> {
+        &self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, PinnedRefInvocationRecovery<'call, T, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> PinnedRefInvocationRecovery<'call, T, M> {
+        self.recovery
+    }
 }
 
 impl<T: ?Sized, M: InvocationMode> fmt::Debug for PinnedRefInvocationFailure<'_, T, M> {
@@ -356,9 +375,32 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, 
 /// input.
 pub struct PinnedMutInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
     /// Structured reason user code was not called.
-    pub error: InvocationError,
+    error: InvocationError,
     /// Original pinned receiver and arguments.
-    pub recovery: PinnedMutInvocationRecovery<'call, T, M>,
+    recovery: PinnedMutInvocationRecovery<'call, T, M>,
+}
+
+impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable pinned invocation input.
+    pub const fn recovery(&self) -> &PinnedMutInvocationRecovery<'call, T, M> {
+        &self.recovery
+    }
+    /// Returns mutable access to the recoverable pinned invocation input.
+    pub fn recovery_mut(&mut self) -> &mut PinnedMutInvocationRecovery<'call, T, M> {
+        &mut self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, PinnedMutInvocationRecovery<'call, T, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> PinnedMutInvocationRecovery<'call, T, M> {
+        self.recovery
+    }
 }
 
 impl<T: ?Sized, M: InvocationMode> fmt::Debug for PinnedMutInvocationFailure<'_, T, M> {

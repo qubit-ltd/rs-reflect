@@ -13,14 +13,14 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::registration::CapabilityRegistration;
-use qubit_reflect::__private::registration::FragmentKind;
-use qubit_reflect::__private::registration::FragmentPayload;
-use qubit_reflect::__private::registration::RegistrationFragment;
-use qubit_reflect::__private::registration::RuntimeIdentity;
-use qubit_reflect::__private::registration::StaticFragmentIdentity;
-use qubit_reflect::__private::registration::build_registry;
-use qubit_reflect::__private::registration::initialize_registry;
+use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::testing::CapabilityRegistration;
+use qubit_reflect::__private::testing::build_registry;
+use qubit_reflect::__private::testing::initialize_registry;
 use qubit_reflect::Reflect;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
@@ -49,10 +49,12 @@ struct CapabilityTarget;
 struct SameTraitMarkerA;
 struct SameTraitMarkerB;
 
-static EARLY_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<EarlyType>("shared-query");
-static LATE_DESCRIPTOR: TypeDescriptor = reflect::__private::descriptor::opaque_root::<LateType>("shared-query");
+static EARLY_DESCRIPTOR: TypeDescriptor =
+    reflect::__private::codegen_v1::descriptor::opaque_root::<EarlyType>("shared-query");
+static LATE_DESCRIPTOR: TypeDescriptor =
+    reflect::__private::codegen_v1::descriptor::opaque_root::<LateType>("shared-query");
 static INDEPENDENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::opaque_root::<IndependentType>("independent");
+    reflect::__private::codegen_v1::descriptor::opaque_root::<IndependentType>("independent");
 
 impl Reflect for IndependentType {
     /// Returns a descriptor whose structural query is independent of the
@@ -104,10 +106,10 @@ static EARLY_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
 static LATE_FRAGMENT: RegistrationFragment =
     RegistrationFragment::new(FragmentKind::Type, LATE_IDENTITY, late_runtime_identity, late_payload);
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     LATE_FRAGMENT
 }
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     EARLY_FRAGMENT
 }
 
@@ -191,21 +193,18 @@ static CAPABILITY_RIGHT: RegistrationFragment = RegistrationFragment::new(
 );
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::default(),
-        predicates: Box::default(),
-        diagnostic: DiagnosticText::default(),
-    });
-static ONE_TYPE_PARAMETER: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
-    parameters: vec![GenericParameterDescriptor::Type {
-        name: "T".into(),
-        bounds: Box::default(),
-        default: None,
-        diagnostic: DiagnosticText::default(),
-    }]
-    .into_boxed_slice(),
-    predicates: Box::default(),
-    diagnostic: DiagnosticText::default(),
+    LazyLock::new(|| GenericDefinitionDescriptor::new(Box::default(), Box::default()));
+static ONE_TYPE_PARAMETER: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| {
+    GenericDefinitionDescriptor::new(
+        vec![GenericParameterDescriptor::Type {
+            name: "T".into(),
+            bounds: Box::default(),
+            default: None,
+            diagnostic: DiagnosticText::default(),
+        }]
+        .into_boxed_slice(),
+        Box::default(),
+    )
 });
 
 static EXTERNAL_DEFINITION_LEFT: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
@@ -402,7 +401,7 @@ static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment = RegistrationFr
     ambiguous_impl_definition_payload,
 );
 
-reflect::__private::inventory::submit! {
+reflect::__private::codegen_v1::inventory::submit! {
     IMPL_FRAGMENT
 }
 

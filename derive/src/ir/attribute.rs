@@ -8,6 +8,8 @@
 
 //! Helper-attribute IR and the shared helper target matrix.
 
+// qubit-style: allow multiple-public-types
+
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 
@@ -218,7 +220,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::RuntimeCrate,
         source_name: "crate",
-        targets: TargetSet::new(TYPE),
+        targets: TargetSet::new(TYPE | TRAIT | IMPL),
     },
 ];
 

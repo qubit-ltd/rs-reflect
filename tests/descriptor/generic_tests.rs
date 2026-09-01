@@ -237,7 +237,7 @@ fn test_generic_struct_instances_are_unique_and_interned() {
     let generic = left
         .concrete_generic()
         .expect("derived generic roots expose substitutions");
-    assert_eq!(generic.definition().parameters.len(), 2);
+    assert_eq!(generic.definition().parameters().len(), 2);
     assert_eq!(generic.arguments().len(), 2);
     assert_eq!(generic.definition_index(0), Some(0));
     assert_eq!(generic.definition_index(2), None);
@@ -381,7 +381,7 @@ fn test_const_argument_exposes_typed_reflected_owned_value() {
         .const_argument_value(1)
         .expect("primitive const arguments expose reflected-owned values");
 
-    assert_eq!(argument.normalized_diagnostic.as_ref(), "2");
+    assert_eq!(argument.normalized_diagnostic(), "2");
     let value = value
         .downcast::<usize>()
         .unwrap_or_else(|_| panic!("const value retains usize type"));
@@ -539,7 +539,7 @@ fn test_runtime_argument_indices_map_to_definition_parameters() {
         .concrete_generic()
         .expect("the mixed generic root exposes substitutions");
 
-    assert_eq!(generic.definition().parameters.len(), 3);
+    assert_eq!(generic.definition().parameters().len(), 3);
     assert_eq!(generic.arguments().len(), 2);
     assert_eq!(generic.definition_index(0), Some(1));
     assert_eq!(generic.definition_index(1), Some(2));
@@ -569,11 +569,11 @@ fn test_runtime_argument_indices_map_to_definition_parameters() {
     let reflect::expression::GenericArgument::Const(argument) = &generic.arguments()[1] else {
         panic!("the second runtime argument must be const");
     };
-    let reflect::expression::TypeExpression::Concrete(declared_type) = argument.declared_type.as_ref() else {
+    let reflect::expression::TypeExpression::Concrete(declared_type) = argument.declared_type() else {
         panic!("the qualified primitive declaration type must stay concrete");
     };
     assert_eq!(
-        declared_type.path.iter().map(Box::as_ref).collect::<Vec<_>>(),
+        declared_type.path().iter().map(Box::as_ref).collect::<Vec<_>>(),
         ["core", "primitive", "usize"],
     );
     assert_eq!(
@@ -625,7 +625,7 @@ fn test_const_expression_uses_normalized_value_diagnostic() {
         panic!("the expression substitution must be const");
     };
 
-    assert_eq!(argument.normalized_diagnostic.as_ref(), "3");
+    assert_eq!(argument.normalized_diagnostic(), "3");
     assert_const_value(generic, 0, 3_usize);
 }
 
@@ -637,7 +637,7 @@ fn test_const_primitive_aliases_preserve_arguments_and_values() {
         .concrete_generic()
         .expect("aliased const parameters retain runtime substitutions");
 
-    assert_eq!(generic.definition().parameters.len(), 2);
+    assert_eq!(generic.definition().parameters().len(), 2);
     assert_eq!(generic.arguments().len(), 2);
     assert_eq!(generic.definition_index(0), Some(0));
     assert_eq!(generic.definition_index(1), Some(1));
@@ -680,7 +680,7 @@ fn test_type_argument_lazy_resolution_is_concurrently_cached() {
 fn test_static_lifetime_generic_root_preserves_definition_without_runtime_lifetime_argument() {
     let descriptor = TypeDescriptor::of::<Borrowed<'static>>();
     let generic = descriptor.concrete_generic().expect("generic definitions are retained");
-    assert_eq!(generic.definition().parameters.len(), 1);
+    assert_eq!(generic.definition().parameters().len(), 1);
     assert!(generic.arguments().is_empty());
     assert_eq!(Borrowed { value: "static" }.value, "static");
 }

@@ -8,10 +8,12 @@
 
 //! Expansion of reflected struct declarations.
 
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
@@ -20,25 +22,20 @@ use crate::ir::VisibilityIr;
 
 /// Expands a concrete struct into a static root descriptor and safe field
 /// adapters.
-pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
-    let Some(facade) = super::facade_path_for(&declaration.attributes) else {
-        return TokenStream::new();
-    };
+    let facade = context.facade().clone();
     let name = declaration.name.clone();
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
-    let registration_module =
-        format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
+    let registration_module = format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
     let opaque_root = declaration
         .attributes
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque);
-    let reflected_field_types =
-        super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let reflected_field_types = super::generics::reflected_field_types(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
         .generics
         .params
@@ -46,15 +43,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics =
-        match syn::parse2(declaration.generics.declaration.clone()) {
-            Ok(generics) => generics,
-            Err(_) => return TokenStream::new(),
-        };
+    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
+        Ok(generics) => generics,
+        Err(_) => return TokenStream::new(),
+    };
     if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) =
-            syn::parse2(declaration.generics.where_clause.clone())
-        else {
+        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
             return TokenStream::new();
         };
         generics.where_clause = Some(where_clause);
@@ -67,18 +61,11 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
-            let lifetime = syn::Lifetime::new(
-                &format!("'{}", parameter.name),
-                parameter.span,
-            );
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameter_names {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -92,8 +79,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
                 .push(syn::parse_quote!(#parameter: #facade::Reflect));
         }
     }
-    let (impl_generics, type_generics, where_clause) =
-        generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let self_type = quote!(#name #type_generics);
     let query_name = declaration
         .attributes
@@ -101,11 +87,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
-    let capability_function =
-        format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition =
-        capabilities(&declaration, &facade, &self_type, &capability_function);
+    let capability_definition = capabilities(&declaration, &facade, &self_type, &capability_function);
     let adapter_definitions: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -157,8 +141,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     } else {
         super::construction::struct_adapters(&declaration, &facade)
     };
-    let construction_descriptor =
-        super::construction::struct_descriptor(&facade);
+    let construction_descriptor = super::construction::struct_descriptor(&facade);
     let fields: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -185,12 +168,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         let visibility = visibility(&field.visibility, &facade, field.span);
         let descriptor = if opaque_field {
             quote! {
-                #facade::__private::descriptor::field(
+                #facade::__private::codegen_v1::descriptor::field(
                     <#self_type as #facade::Reflect>::type_descriptor,
                     #index, #rust_name, #query_name,
                     ::std::boxed::Box::leak(::std::boxed::Box::new(
                         #facade::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
-                            ::std::boxed::Box::new(#facade::__private::descriptor::opaque_member::<#ty>()),
+                            ::std::boxed::Box::new(#facade::__private::codegen_v1::descriptor::opaque_member::<#ty>()),
                         )),
                     )),
                     #visibility,
@@ -198,10 +181,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
             }
         } else {
             quote! {
-                #facade::__private::descriptor::lazy_field(
+                #facade::__private::codegen_v1::descriptor::lazy_field(
                     <#self_type as #facade::Reflect>::type_descriptor,
                     #index, #rust_name, #query_name,
-                    #facade::__private::descriptor::lazy_type_ref::<#ty>(),
+                    #facade::__private::codegen_v1::descriptor::lazy_type_ref::<#ty>(),
                     #visibility,
                 )
             }
@@ -216,25 +199,21 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         1 if declaration.fields[0].name.is_none() => {
             quote!(#facade::descriptor::StructKind::Newtype)
         }
-        _ if declaration
-            .fields
-            .first()
-            .is_some_and(|field| field.name.is_none()) =>
-        {
+        _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => {
             quote!(#facade::descriptor::StructKind::Tuple)
         }
         _ => quote!(#facade::descriptor::StructKind::Named),
     };
     let root_descriptor = if opaque_root {
-        quote!(#facade::__private::descriptor::with_capabilities(
-            #facade::__private::descriptor::opaque_root::<Self>(#query_name),
+        quote!(#facade::__private::codegen_v1::descriptor::with_capabilities(
+            #facade::__private::codegen_v1::descriptor::opaque_root::<Self>(#query_name),
             #capability_resolver,
         ))
     } else {
         quote! {
             let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-            #facade::__private::descriptor::with_capabilities(
-                #facade::__private::descriptor::struct_type_with_construction::<Self>(
+            #facade::__private::codegen_v1::descriptor::with_capabilities(
+                #facade::__private::codegen_v1::descriptor::struct_type_with_construction::<Self>(
                     #query_name, #struct_kind, fields, #construction_descriptor,
                 ),
                 #capability_resolver,
@@ -244,9 +223,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
     let descriptor = if declaration.generics.params.is_empty() {
         root_descriptor
     } else {
-        let generic =
-            super::generics::concrete_descriptor(&declaration, &facade);
-        quote!(#facade::__private::descriptor::with_concrete_generic({ #root_descriptor },
+        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        quote!(#facade::__private::codegen_v1::descriptor::with_concrete_generic({ #root_descriptor },
             ::std::boxed::Box::leak(::std::boxed::Box::new(#generic))))
     };
     let registration = registration(
@@ -256,8 +234,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
         fingerprint,
         !declaration.generics.params.is_empty(),
     );
-    let generic_definition_provider =
-        super::generics::definition_provider(&declaration, &facade);
+    let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -267,7 +244,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
 
         impl #impl_generics #facade::Reflect for #name #type_generics #where_clause {
             fn type_descriptor() -> &'static #facade::TypeDescriptor {
-                #facade::__private::intern_type::<Self>(|| { #descriptor })
+                #facade::__private::codegen_v1::descriptor::intern_type::<Self>(|| { #descriptor })
             }
         }
 
@@ -344,20 +321,20 @@ fn registration(
             use super::*;
             use #facade as __qubit_reflect;
 
-            fn runtime_identity() -> __qubit_reflect::__private::RuntimeIdentity {
-                __qubit_reflect::__private::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
+            fn runtime_identity() -> __qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity {
+                __qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
             }
 
-            fn payload() -> __qubit_reflect::__private::FragmentPayload {
-                __qubit_reflect::__private::FragmentPayload::Type(
+            fn payload() -> __qubit_reflect::__private::codegen_v1::registration::FragmentPayload {
+                __qubit_reflect::__private::codegen_v1::registration::FragmentPayload::Type(
                     <#name as __qubit_reflect::Reflect>::type_descriptor(),
                 )
             }
 
-            __qubit_reflect::__private::inventory::submit! {
-                __qubit_reflect::__private::RegistrationFragment::new(
-                    __qubit_reflect::__private::FragmentKind::Type,
-                    __qubit_reflect::__private::StaticFragmentIdentity::new(
+            __qubit_reflect::__private::codegen_v1::inventory::submit! {
+                __qubit_reflect::__private::codegen_v1::registration::RegistrationFragment::new(
+                    __qubit_reflect::__private::codegen_v1::registration::FragmentKind::Type,
+                    __qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", #fingerprint,
                     ),
                     runtime_identity,
@@ -368,19 +345,8 @@ fn registration(
     }
 }
 
-/// Computes a stable FNV-1a content fingerprint for one declaration.
-fn fingerprint(input: &str) -> u64 {
-    input.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-    })
-}
-
 /// Expands a normalized source visibility into its public runtime form.
-fn visibility(
-    visibility: &VisibilityIr,
-    facade: &TokenStream,
-    span: proc_macro2::Span,
-) -> TokenStream {
+fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => quote!(#facade::identity::Visibility::Public),
         VisibilityIr::Crate => quote!(#facade::identity::Visibility::Crate),

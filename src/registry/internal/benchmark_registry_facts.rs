@@ -3,8 +3,7 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
 //! Benchmark-only prepared registry facts.
@@ -26,7 +25,7 @@ use crate::registry::registry::ReflectRegistry;
 
 /// Prepared adapter-free capability facts used by registry aggregation.
 pub(crate) struct BenchmarkRegistryFacts {
-    fragments: Box<[BenchmarkRegistryFact]>,
+    fragments: Box<[FactRow]>,
 }
 
 impl BenchmarkRegistryFacts {
@@ -37,7 +36,7 @@ impl BenchmarkRegistryFacts {
 }
 
 /// One prepared benchmark fact kept outside the measured aggregation loop.
-struct BenchmarkRegistryFact {
+struct FactRow {
     identity: FragmentIdentity,
     target_type_id: TypeId,
     descriptor: CapabilityDescriptor,
@@ -50,7 +49,7 @@ pub(crate) fn prepare_benchmark_registry_facts(fragment_count: usize) -> Benchma
         .map(|index| {
             let capability_id = CapabilityId::new(&format!("benchmark.registry.fragment{index}"))
                 .expect("generated benchmark capability ID must be valid");
-            BenchmarkRegistryFact {
+            FactRow {
                 identity: FragmentIdentity::new(
                     "qubit-reflect-benchmark",
                     "synthetic",
@@ -92,5 +91,5 @@ fn aggregate_prepared_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectReg
             )),
         })
         .collect();
-    super::super::builder::validate_and_freeze_materialized(fragments)
+    super::super::registry_builder::validate_and_freeze_materialized(fragments)
 }

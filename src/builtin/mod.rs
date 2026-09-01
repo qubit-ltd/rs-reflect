@@ -9,13 +9,17 @@
 //! Built-in reflected type descriptors.
 
 mod array;
-mod external;
+#[cfg(feature = "ecosystem-types")]
+mod ecosystem;
 mod function;
+mod internal;
 #[path = "../registry/interner.rs"]
 pub(crate) mod interner;
 mod map;
 mod option;
 mod pointer;
+#[cfg(feature = "qubit-types")]
+mod qubit;
 mod raw_pointer;
 mod reference;
 mod scalar;

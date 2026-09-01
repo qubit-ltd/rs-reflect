@@ -195,7 +195,7 @@ fn test_reflect_impl_records_associated_type_bindings_in_declaration_order() {
     assert_eq!(bindings[1].declaration().rust_name(), "Unproven");
     assert!(matches!(
         bindings[0].value(),
-        TypeExpression::Concrete(value) if value.path.last().is_some_and(|segment| segment.as_ref() == "u16")
+        TypeExpression::Concrete(value) if value.path().last().is_some_and(|segment| segment.as_ref() == "u16")
     ));
     assert!(std::ptr::eq(
         bindings[0]
@@ -205,7 +205,7 @@ fn test_reflect_impl_records_associated_type_bindings_in_declaration_order() {
     ));
     assert!(matches!(
         bindings[1].value(),
-        TypeExpression::Concrete(value) if value.path.last().is_some_and(|segment| segment.as_ref() == "u8")
+        TypeExpression::Concrete(value) if value.path().last().is_some_and(|segment| segment.as_ref() == "u8")
     ));
     assert!(bindings[1].concrete_type().is_none());
 }
@@ -282,11 +282,11 @@ fn test_reflect_impl_preserves_unresolved_generic_associated_type_expression() {
     };
     assert!(
         matches!(
-            expression.self_type.as_ref(),
-            TypeExpression::Concrete(value) if value.path.last().is_some_and(|segment| segment.as_ref() == "u8")
+            expression.self_type(),
+            TypeExpression::Concrete(value) if value.path().last().is_some_and(|segment| segment.as_ref() == "u8")
         ),
         "unexpected projection self type: {:?}",
-        expression.self_type
+        expression.self_type()
     );
     assert!(binding.concrete_type().is_none());
 }
@@ -399,7 +399,7 @@ fn test_applied_gat_substitutes_outer_arguments_without_rewriting_local_paramete
     let payload = <AppliedGatTarget as AppliedGatContract<u8>>::__qubit_reflect_trait_payload();
     let generic = payload.applied().associated_types()[0].generic_definition();
     assert!(matches!(
-        generic.predicates.as_ref(),
+        generic.predicates(),
         [
             PredicateDescriptor::TypeOutlives {
                 ty: TypeExpression::Concrete(concrete),
@@ -411,7 +411,7 @@ fn test_applied_gat_substitutes_outer_arguments_without_rewriting_local_paramete
                 lifetime: LifetimeExpression::Named(local_lifetime),
                 ..
             },
-        ] if concrete.path.last().is_some_and(|segment| segment.as_ref() == "u8")
+        ] if concrete.path().last().is_some_and(|segment| segment.as_ref() == "u8")
             && outer_lifetime.as_ref() == "a"
             && parameter.as_ref() == "U"
             && local_lifetime.as_ref() == "a"

@@ -47,16 +47,16 @@ fn test_invocation_recovery_inspection_preserves_bindings() {
         )
         .expect_err("mismatched argument type should fail validation");
 
-    assert!(failure.recovery.receiver().is_none());
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    assert_eq!(failure.recovery.argument_name(1), None);
-    assert!(format!("{:?}", failure.recovery).contains("InvocationRecovery"));
+    assert!(failure.recovery().receiver().is_none());
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    assert_eq!(failure.recovery().argument_name(1), None);
+    assert!(format!("{:?}", failure.recovery()).contains("InvocationRecovery"));
     assert!(format!("{failure:?}").contains("InvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
 
-    let recovered = failure.recovery.into_invocation();
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
 

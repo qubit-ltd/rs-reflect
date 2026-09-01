@@ -41,8 +41,9 @@ fn reflected_increment(value: u8) -> u8 {
 impl Reflect for Sample {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
-        DESCRIPTOR
-            .get_or_init(|| reflect::__private::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[]))
+        DESCRIPTOR.get_or_init(|| {
+            reflect::__private::codegen_v1::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
+        })
     }
 }
 
@@ -254,8 +255,9 @@ struct Counter(u8);
 impl Reflect for Counter {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
-        DESCRIPTOR
-            .get_or_init(|| reflect::__private::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[]))
+        DESCRIPTOR.get_or_init(|| {
+            reflect::__private::codegen_v1::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
+        })
     }
 }
 
@@ -398,7 +400,11 @@ impl Reflect for SmartReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::descriptor::struct_type::<SmartReceiver>("SmartReceiver", StructKind::Named, &[])
+            reflect::__private::codegen_v1::descriptor::struct_type::<SmartReceiver>(
+                "SmartReceiver",
+                StructKind::Named,
+                &[],
+            )
         })
     }
 }
@@ -407,7 +413,7 @@ impl Reflect for PinnedOnlyReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::descriptor::struct_type::<PinnedOnlyReceiver>(
+            reflect::__private::codegen_v1::descriptor::struct_type::<PinnedOnlyReceiver>(
                 "PinnedOnlyReceiver",
                 StructKind::Named,
                 &[],
@@ -898,7 +904,7 @@ fn test_reflect_impl_records_and_invokes_const_function_at_runtime() {
     ) else {
         panic!("const function must be discoverable");
     };
-    assert!(instance.effective_method().qualifiers().is_const);
+    assert!(instance.effective_method().qualifiers().is_const());
     let output = instance
         .adapter()
         .expect("const function needs an ordinary runtime adapter")
@@ -1130,12 +1136,12 @@ fn test_explicit_receiver_rejection_recovers_named_arguments_in_caller_order() {
         panic!("the explicit receiver adapter must reject an incompatible container")
     };
     assert!(matches!(
-        failure.error.kind(),
+        failure.error().kind(),
         reflect::invoke::InvocationErrorKind::ReceiverAdapterRejected { .. }
     ));
-    assert_eq!(failure.recovery.argument_name(0), Some("second"));
-    assert_eq!(failure.recovery.argument_name(1), None);
-    let (receiver, arguments) = failure.recovery.into_parts();
+    assert_eq!(failure.recovery().argument_name(0), Some("second"));
+    assert_eq!(failure.recovery().argument_name(1), None);
+    let (receiver, arguments) = failure.into_recovery().into_parts();
     let Some(reflect::invoke::InvocationReceiver::Owned(receiver)) = receiver else {
         panic!("recovery must retain the incompatible owned receiver")
     };
@@ -1201,7 +1207,7 @@ fn test_reflect_impl_registers_explicit_generic_impl_specialization() {
         .find(|definition| std::ptr::eq(*definition, implementation.definition()))
         .expect("the concrete specialization must share its registered definition");
     assert!(std::ptr::eq(registered_definition, implementation.definition()));
-    assert_eq!(implementation.definition().generic_definition().parameters.len(), 1);
+    assert_eq!(implementation.definition().generic_definition().parameters().len(), 1);
     assert_eq!(implementation.arguments().len(), 1);
     let adapter = instance
         .adapter()
@@ -1259,7 +1265,7 @@ fn test_reflect_impl_registers_explicit_const_generic_impl_specialization() {
                 .any(|candidate| std::ptr::eq(candidate, instance))
         })
         .expect("method instance must belong to one registered const generic impl");
-    assert_eq!(implementation.definition().generic_definition().parameters.len(), 1);
+    assert_eq!(implementation.definition().generic_definition().parameters().len(), 1);
     assert_eq!(implementation.arguments().len(), 1);
     let adapter = instance
         .adapter()
@@ -1320,17 +1326,17 @@ fn test_reflect_impl_registers_generic_definition_without_concrete_instance() {
             matches!(
                 definition.target_type(),
                 reflect::expression::TypeExpression::Concrete(target)
-                    if target.path.last().is_some_and(|segment| segment.as_ref() == "GenericImplDefinitionOnly")
+                    if target.path().last().is_some_and(|segment| segment.as_ref() == "GenericImplDefinitionOnly")
             )
         })
         .collect();
 
     assert_eq!(definitions.len(), 1);
     let definition = definitions[0];
-    assert_eq!(definition.generic_definition().parameters.len(), 3);
-    assert!(!definition.generic_definition().predicates.is_empty());
+    assert_eq!(definition.generic_definition().parameters().len(), 3);
+    assert!(!definition.generic_definition().predicates().is_empty());
     assert_eq!(definition.methods().len(), 3);
-    assert_eq!(definition.methods()[1].generic_definition().parameters.len(), 1);
+    assert_eq!(definition.methods()[1].generic_definition().parameters().len(), 1);
     assert_eq!(definition.methods()[2].rust_name(), "skipped_definition_method");
     let candidates = registry.find_impl_definitions_by_target(definition.target_type());
     assert_eq!(candidates.len(), 1);
@@ -1364,12 +1370,12 @@ fn test_reflect_impl_registers_trait_and_blanket_definitions_without_instances()
             matches!(
                 definition.target_type(),
                 reflect::expression::TypeExpression::Concrete(target)
-                    if target.path.last().is_some_and(|segment| segment.as_ref() == "GenericTraitImplDefinitionOnly")
+                    if target.path().last().is_some_and(|segment| segment.as_ref() == "GenericTraitImplDefinitionOnly")
             )
         })
         .expect("generic trait impl definition must be registered");
     assert_eq!(generic_trait.kind(), reflect::descriptor::ImplKind::Trait);
-    assert_eq!(generic_trait.generic_definition().parameters.len(), 1);
+    assert_eq!(generic_trait.generic_definition().parameters().len(), 1);
     assert_eq!(
         generic_trait
             .implemented_trait()
@@ -1386,8 +1392,8 @@ fn test_reflect_impl_registers_trait_and_blanket_definitions_without_instances()
             matches!(definition.target_type(), reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "T")
         })
         .expect("external blanket impl definition must be registered");
-    assert_eq!(blanket.generic_definition().parameters.len(), 1);
-    assert!(!blanket.generic_definition().predicates.is_empty());
+    assert_eq!(blanket.generic_definition().parameters().len(), 1);
+    assert!(!blanket.generic_definition().predicates().is_empty());
     assert_eq!(
         blanket
             .implemented_trait()
@@ -1904,10 +1910,10 @@ fn test_reflect_impl_preserves_all_owned_arguments_after_validation_failure() {
         panic!("the second argument must fail exact type validation");
     };
     assert!(matches!(
-        failure.error.kind(),
+        failure.error().kind(),
         reflect::invoke::InvocationErrorKind::ArgumentTypeMismatch { index: 1, .. }
     ));
-    let (_, arguments) = failure.recovery.into_parts();
+    let (_, arguments) = failure.into_recovery().into_parts();
     let mut arguments = arguments.into_vec().into_iter();
     let (Some(InvocationArg::Owned(first)), Some(InvocationArg::Owned(second)), None) =
         (arguments.next(), arguments.next(), arguments.next())
