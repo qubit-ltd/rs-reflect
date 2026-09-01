@@ -66,10 +66,7 @@ fn main() {
         Some(&1),
     );
     field
-        .set(
-            ReflectedMut::new(&mut field_probe),
-            ReflectedOwned::new(2_u64),
-        )
+        .set(ReflectedMut::new(&mut field_probe), ReflectedOwned::new(2_u64))
         .expect("dynamic field set setup must succeed");
     assert_eq!(field_probe.id, 2);
 
@@ -81,22 +78,16 @@ fn main() {
         ))
         .expect("dynamic method setup must have an adapter")
         .expect("dynamic method setup must validate");
-    let InvocationOutput::Owned(method_probe_value) = method_probe_output
-    else {
+    let InvocationOutput::Owned(method_probe_value) = method_probe_output else {
         panic!("dynamic method setup must return an owned value");
     };
     assert_eq!(
         DynamicOwned::<Local>::downcast::<u64>(method_probe_value)
-            .unwrap_or_else(|_| panic!(
-                "dynamic method setup output must retain its type"
-            )),
+            .unwrap_or_else(|_| panic!("dynamic method setup output must retain its type")),
         3,
     );
     descriptor
-        .construct_struct(NamedConstructionInput::new([(
-            "id",
-            ReflectedOwned::new(3_u64),
-        )]))
+        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(3_u64))]))
         .expect("dynamic construction setup must succeed");
 
     let mut direct = BenchmarkRecord { id: 0 };
@@ -120,10 +111,7 @@ fn main() {
     });
     measure("dynamic field set", || {
         for value in 0..ITERATIONS {
-            let _ = black_box(field.set(
-                ReflectedMut::new(&mut reflected),
-                ReflectedOwned::new(black_box(value)),
-            ));
+            let _ = black_box(field.set(ReflectedMut::new(&mut reflected), ReflectedOwned::new(black_box(value))));
         }
     });
     assert_eq!(reflected.id, ITERATIONS - 1);
@@ -155,12 +143,9 @@ fn main() {
 
     measure("dynamic construct", || {
         for value in 0..ITERATIONS {
-            let _ = black_box(descriptor.construct_struct(
-                NamedConstructionInput::new([(
-                    "id",
-                    ReflectedOwned::new(value),
-                )]),
-            ));
+            let _ = black_box(
+                descriptor.construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(value))])),
+            );
         }
     });
 }

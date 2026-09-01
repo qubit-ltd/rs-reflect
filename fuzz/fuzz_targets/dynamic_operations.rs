@@ -60,18 +60,15 @@ fn assert_one_recovered_drop(operation: impl FnOnce(ReflectedOwned)) {
 
 fuzz_target!(|unbounded: &[u8]| {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
-    let registry = ReflectRegistry::initialize()
-        .expect("the fuzz target's linked fragments must form a valid snapshot");
+    let registry =
+        ReflectRegistry::initialize().expect("the fuzz target's linked fragments must form a valid snapshot");
     let descriptor = TypeDescriptor::of::<DynamicRecord>();
     let registry_type_count = registry.types().len();
     let registered_descriptor = registry
         .get(descriptor.type_id())
         .expect("the derived fuzz target must be registered");
     let field = descriptor.field("value").expect("derived field");
-    let MethodLookup::Unique(method) = descriptor
-        .methods_named("add")
-        .expect("registry lookup")
-    else {
+    let MethodLookup::Unique(method) = descriptor.methods_named("add").expect("registry lookup") else {
         panic!("derived method must resolve uniquely");
     };
 
@@ -79,17 +76,12 @@ fuzz_target!(|unbounded: &[u8]| {
     for command in data {
         match command % 5 {
             0 => {
-                let value = field
-                    .get(ReflectedRef::new(&record))
-                    .expect("exact shared target");
+                let value = field.get(ReflectedRef::new(&record)).expect("exact shared target");
                 assert_eq!(value.downcast_ref::<u64>(), Some(&record.value));
             }
             1 => {
                 field
-                    .set(
-                        ReflectedMut::new(&mut record),
-                        ReflectedOwned::new(u64::from(*command)),
-                    )
+                    .set(ReflectedMut::new(&mut record), ReflectedOwned::new(u64::from(*command)))
                     .expect("exact replacement");
             }
             2 => assert_one_recovered_drop(|replacement| {
@@ -118,8 +110,7 @@ fuzz_target!(|unbounded: &[u8]| {
                 drop(failure.into_recovery());
             }),
             _ => assert_one_recovered_drop(|value| {
-                let result =
-                    descriptor.construct_struct(NamedConstructionInput::new([("value", value)]));
+                let result = descriptor.construct_struct(NamedConstructionInput::new([("value", value)]));
                 let Err(recovery) = result else {
                     panic!("wrong construction field type");
                 };

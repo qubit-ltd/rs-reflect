@@ -15,7 +15,7 @@ use crate::__private::registration::prepare_benchmark_registry_facts;
 #[test]
 fn test_benchmark_registry_facts_use_production_aggregation() {
     let facts = prepare_benchmark_registry_facts(4);
-    let registry = aggregate_benchmark_registry_facts(&facts)
-        .expect("distinct prepared facts must aggregate successfully");
+    let registry =
+        aggregate_benchmark_registry_facts(&facts).expect("distinct prepared facts must aggregate successfully");
     assert!(registry.types().is_empty());
 }

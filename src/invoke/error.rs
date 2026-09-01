@@ -19,9 +19,7 @@ use crate::invoke::InvocationInputMode;
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum InvocationErrorKind {
     /// The supplied receiver shape differs from the method signature.
-    #[error(
-        "invocation receiver mode mismatch: expected {expected:?}, got {actual:?}"
-    )]
+    #[error("invocation receiver mode mismatch: expected {expected:?}, got {actual:?}")]
     ReceiverModeMismatch {
         /// Required receiver mode, or `None` for an associated function.
         expected: Option<InvocationInputMode>,
@@ -40,26 +38,20 @@ pub enum InvocationErrorKind {
     },
     /// A method requires an explicitly registered receiver conversion
     /// capability, but its target descriptor has none for the receiver type.
-    #[error(
-        "invocation receiver adapter is not registered for `{expected_name}`"
-    )]
+    #[error("invocation receiver adapter is not registered for `{expected_name}`")]
     ReceiverAdapterUnavailable {
         /// The explicit receiver type required by the method signature.
         expected_name: &'static str,
     },
     /// A registered receiver conversion rejected the supplied receiver while
     /// returning it untouched for recovery.
-    #[error(
-        "invocation receiver adapter rejected the supplied receiver for `{expected_name}`"
-    )]
+    #[error("invocation receiver adapter rejected the supplied receiver for `{expected_name}`")]
     ReceiverAdapterRejected {
         /// The explicit receiver type required by the method signature.
         expected_name: &'static str,
     },
     /// The number of supplied positional arguments differs from the signature.
-    #[error(
-        "invocation argument count mismatch: expected {expected}, got {actual}"
-    )]
+    #[error("invocation argument count mismatch: expected {expected}, got {actual}")]
     ArgumentCountMismatch {
         /// Required positional argument count.
         expected: usize,
@@ -85,9 +77,7 @@ pub enum InvocationErrorKind {
         parameter_indices: Box<[usize]>,
     },
     /// A name refers to a wildcard or destructuring parameter.
-    #[error(
-        "invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`"
-    )]
+    #[error("invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`")]
     NamedArgumentUnavailable {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,
@@ -97,9 +87,7 @@ pub enum InvocationErrorKind {
         name: Box<str>,
     },
     /// More than one input attempts to bind the same parameter.
-    #[error(
-        "invocation argument {input_index} duplicates parameter {parameter_index}"
-    )]
+    #[error("invocation argument {input_index} duplicates parameter {parameter_index}")]
     DuplicateArgumentBinding {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,
@@ -107,9 +95,7 @@ pub enum InvocationErrorKind {
         parameter_index: usize,
     },
     /// A positional input remains after every parameter is occupied.
-    #[error(
-        "invocation positional argument {input_index} has no unoccupied parameter"
-    )]
+    #[error("invocation positional argument {input_index} has no unoccupied parameter")]
     PositionalArgumentOverflow {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,
@@ -123,9 +109,7 @@ pub enum InvocationErrorKind {
         name: Option<&'static str>,
     },
     /// A raw adapter received a named binding without method descriptors.
-    #[error(
-        "invocation argument {input_index} named `{name}` requires descriptor-aware binding"
-    )]
+    #[error("invocation argument {input_index} named `{name}` requires descriptor-aware binding")]
     NamedBindingRequiresDescriptor {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,
@@ -133,9 +117,7 @@ pub enum InvocationErrorKind {
         name: Box<str>,
     },
     /// One argument has an incompatible ownership or borrowing mode.
-    #[error(
-        "invocation argument {index} mode mismatch: expected {expected:?}, got {actual:?}"
-    )]
+    #[error("invocation argument {index} mode mismatch: expected {expected:?}, got {actual:?}")]
     ArgumentModeMismatch {
         /// Zero-based positional argument index, excluding the receiver.
         index: usize,
@@ -225,10 +207,7 @@ pub struct InvocationPanic {
 
 impl InvocationPanic {
     /// Creates a caught-panic value retaining method identity and payload.
-    pub fn new(
-        method_identity: MemberId,
-        payload: Box<dyn Any + Send>,
-    ) -> Self {
+    pub fn new(method_identity: MemberId, payload: Box<dyn Any + Send>) -> Self {
         Self {
             method_identity: Box::new(method_identity),
             payload,
