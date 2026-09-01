@@ -621,7 +621,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
             "integration_tests::descriptor::reflect_trait_tests::LifetimeAndLiteralDefaultService",
         )
         .expect("literal-default trait must register");
-    let parameters = literal_defaults.generic_definition().parameters().as_ref();
+    let parameters = literal_defaults.generic_definition().parameters();
     let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } = &parameters[1] else {
         panic!("expected a lifetime parameter")
     };
@@ -667,7 +667,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     let where_bound = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereBoundService")
         .expect("where-bound trait must register");
-    let predicates = where_bound.generic_definition().predicates().as_ref();
+    let predicates = where_bound.generic_definition().predicates();
     assert_eq!(predicates.len(), 1);
     let reflect::expression::PredicateDescriptor::TypeBound {
         bounds,
@@ -691,7 +691,7 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::WhereLifetimeService")
         .expect("lifetime-bound trait must register");
     assert!(matches!(
-        lifetime_bound.generic_definition().predicates().as_ref(),
+        lifetime_bound.generic_definition().predicates(),
         [
             reflect::expression::PredicateDescriptor::TypeBound { .. },
             reflect::expression::PredicateDescriptor::TypeOutlives {
