@@ -44,8 +44,13 @@ bench-internals = []
 derive = ["dep:qubit-reflect-derive"]
 
 [dependencies]
+bigdecimal = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 inventory = "0.3"
+qubit-datatype = { version = "0.12.0", path = "../../rust-common/rs-datatype" }
+qubit-id = { version = "0.5.0", path = "../../rust-common/rs-id" }
 thiserror = "2"
+uuid = "1"
 qubit-reflect-derive = { version = "=0.1.0", path = "derive", optional = true }
 
 [dev-dependencies]
