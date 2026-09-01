@@ -3,3 +3,11 @@ error: Reflect cannot be derived for unions
    |
 14 | union Unsupported {
    |       ^^^^^^^^^^^
+
+warning: unused import: `qubit_reflect as reflect`
+  --> tests/ui/fail/derive_union_tests.rs:10:5
+   |
+10 | use qubit_reflect as reflect;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
