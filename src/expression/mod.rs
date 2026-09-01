@@ -8,12 +8,14 @@
 
 //! Structural, parser-independent representations of Rust types and generics.
 
+mod error;
 mod generic_argument;
 mod generic_definition;
 mod lifetime_expression;
 mod predicate;
 mod type_expression;
 
+pub use error::ExpressionError;
 pub use generic_argument::ConstExpression;
 pub use generic_argument::ConstGenericArgument;
 pub use generic_argument::GenericArgument;

@@ -21,20 +21,16 @@ use crate::invoke::InvocationMode;
 use crate::invoke::InvocationOutput;
 
 /// A generated entry point for a method whose receiver is `Pin<&T>`.
-pub type PinnedRefAdapter<T, M> = for<'call> fn(
-    PinnedRefInvocation<'call, T, M>,
-) -> Result<
-    InvocationOutput<'call, M>,
-    PinnedRefInvocationFailure<'call, T, M>,
->;
+pub type PinnedRefAdapter<T, M> =
+    for<'call> fn(
+        PinnedRefInvocation<'call, T, M>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedRefInvocationFailure<'call, T, M>>;
 
 /// A generated entry point for a method whose receiver is `Pin<&mut T>`.
-pub type PinnedMutAdapter<T, M> = for<'call> fn(
-    PinnedMutInvocation<'call, T, M>,
-) -> Result<
-    InvocationOutput<'call, M>,
-    PinnedMutInvocationFailure<'call, T, M>,
->;
+pub type PinnedMutAdapter<T, M> =
+    for<'call> fn(
+        PinnedMutInvocation<'call, T, M>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedMutInvocationFailure<'call, T, M>>;
 
 /// Invocation input for a `Pin<&T>` receiver.
 ///
@@ -69,9 +65,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated_bindings(
-                bindings,
-            ),
+            invocation: crate::invoke::Invocation::associated_bindings(bindings),
         }
     }
 
@@ -103,15 +97,9 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
         method_identity: &MemberId,
         parameters: &[crate::descriptor::ParameterDescriptor],
     ) -> Result<Self, PinnedRefInvocationFailure<'call, T, M>> {
-        let Self {
-            receiver,
-            invocation,
-        } = self;
+        let Self { receiver, invocation } = self;
         match invocation.bind_arguments(method_identity, parameters) {
-            Ok(invocation) => Ok(Self {
-                receiver,
-                invocation,
-            }),
+            Ok(invocation) => Ok(Self { receiver, invocation }),
             Err(failure) => Err(PinnedRefInvocationFailure {
                 error: failure.error,
                 recovery: PinnedRefInvocationRecovery {
@@ -130,21 +118,12 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
         self,
         method_identity: &MemberId,
         arguments: &[ArgumentExpectation],
-    ) -> Result<
-        PinnedValidatedRefInvocation<'call, T, M>,
-        PinnedRefInvocationFailure<'call, T, M>,
-    > {
-        let Self {
-            receiver,
-            invocation,
-        } = self;
+    ) -> Result<PinnedValidatedRefInvocation<'call, T, M>, PinnedRefInvocationFailure<'call, T, M>> {
+        let Self { receiver, invocation } = self;
         match invocation.validate_arguments(method_identity, arguments) {
             Ok(validated) => {
                 let (_, arguments) = validated.into_parts();
-                Ok(PinnedValidatedRefInvocation {
-                    receiver,
-                    arguments,
-                })
+                Ok(PinnedValidatedRefInvocation { receiver, arguments })
             }
             Err(failure) => Err(PinnedRefInvocationFailure {
                 error: failure.error,
@@ -163,9 +142,7 @@ pub struct PinnedValidatedRefInvocation<'call, T: ?Sized, M: InvocationMode> {
     arguments: Box<[InvocationArg<'call, M>]>,
 }
 
-impl<'call, T: ?Sized, M: InvocationMode>
-    PinnedValidatedRefInvocation<'call, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedValidatedRefInvocation<'call, T, M> {
     /// Consumes validation state and returns the pin proof with its arguments.
     pub fn into_parts(self) -> (Pin<&'call T>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
@@ -178,9 +155,7 @@ pub struct PinnedRefInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
     invocation: crate::invoke::Invocation<'call, M>,
 }
 
-impl<'call, T: ?Sized, M: InvocationMode>
-    PinnedRefInvocationRecovery<'call, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, M> {
     /// Returns the recovered pinned receiver.
     #[must_use]
     #[inline(always)]
@@ -212,14 +187,31 @@ impl<'call, T: ?Sized, M: InvocationMode>
 /// A pinned shared invocation validation error and its complete recovery input.
 pub struct PinnedRefInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
     /// Structured reason user code was not called.
-    pub error: InvocationError,
+    error: InvocationError,
     /// Original pinned receiver and arguments.
-    pub recovery: PinnedRefInvocationRecovery<'call, T, M>,
+    recovery: PinnedRefInvocationRecovery<'call, T, M>,
 }
 
-impl<T: ?Sized, M: InvocationMode> fmt::Debug
-    for PinnedRefInvocationFailure<'_, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationFailure<'call, T, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable pinned invocation input.
+    pub const fn recovery(&self) -> &PinnedRefInvocationRecovery<'call, T, M> {
+        &self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, PinnedRefInvocationRecovery<'call, T, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> PinnedRefInvocationRecovery<'call, T, M> {
+        self.recovery
+    }
+}
+
+impl<T: ?Sized, M: InvocationMode> fmt::Debug for PinnedRefInvocationFailure<'_, T, M> {
     /// Formats validation metadata without requiring erased arguments to
     /// implement `Debug`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -230,18 +222,14 @@ impl<T: ?Sized, M: InvocationMode> fmt::Debug
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> fmt::Display
-    for PinnedRefInvocationFailure<'_, T, M>
-{
+impl<T: ?Sized, M: InvocationMode> fmt::Display for PinnedRefInvocationFailure<'_, T, M> {
     /// Formats the underlying structured validation error.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.error.fmt(formatter)
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> std::error::Error
-    for PinnedRefInvocationFailure<'_, T, M>
-{
+impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedRefInvocationFailure<'_, T, M> {
     /// Returns the structured invocation error as the underlying cause.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.error)
@@ -278,9 +266,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated_bindings(
-                bindings,
-            ),
+            invocation: crate::invoke::Invocation::associated_bindings(bindings),
         }
     }
 
@@ -302,15 +288,9 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
         method_identity: &MemberId,
         parameters: &[crate::descriptor::ParameterDescriptor],
     ) -> Result<Self, PinnedMutInvocationFailure<'call, T, M>> {
-        let Self {
-            receiver,
-            invocation,
-        } = self;
+        let Self { receiver, invocation } = self;
         match invocation.bind_arguments(method_identity, parameters) {
-            Ok(invocation) => Ok(Self {
-                receiver,
-                invocation,
-            }),
+            Ok(invocation) => Ok(Self { receiver, invocation }),
             Err(failure) => Err(PinnedMutInvocationFailure {
                 error: failure.error,
                 recovery: PinnedMutInvocationRecovery {
@@ -327,21 +307,12 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
         self,
         method_identity: &MemberId,
         arguments: &[ArgumentExpectation],
-    ) -> Result<
-        PinnedValidatedMutInvocation<'call, T, M>,
-        PinnedMutInvocationFailure<'call, T, M>,
-    > {
-        let Self {
-            receiver,
-            invocation,
-        } = self;
+    ) -> Result<PinnedValidatedMutInvocation<'call, T, M>, PinnedMutInvocationFailure<'call, T, M>> {
+        let Self { receiver, invocation } = self;
         match invocation.validate_arguments(method_identity, arguments) {
             Ok(validated) => {
                 let (_, arguments) = validated.into_parts();
-                Ok(PinnedValidatedMutInvocation {
-                    receiver,
-                    arguments,
-                })
+                Ok(PinnedValidatedMutInvocation { receiver, arguments })
             }
             Err(failure) => Err(PinnedMutInvocationFailure {
                 error: failure.error,
@@ -360,13 +331,9 @@ pub struct PinnedValidatedMutInvocation<'call, T: ?Sized, M: InvocationMode> {
     arguments: Box<[InvocationArg<'call, M>]>,
 }
 
-impl<'call, T: ?Sized, M: InvocationMode>
-    PinnedValidatedMutInvocation<'call, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedValidatedMutInvocation<'call, T, M> {
     /// Consumes validation state and returns the pin proof with its arguments.
-    pub fn into_parts(
-        self,
-    ) -> (Pin<&'call mut T>, Box<[InvocationArg<'call, M>]>) {
+    pub fn into_parts(self) -> (Pin<&'call mut T>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 }
@@ -377,9 +344,7 @@ pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
     invocation: crate::invoke::Invocation<'call, M>,
 }
 
-impl<'call, T: ?Sized, M: InvocationMode>
-    PinnedMutInvocationRecovery<'call, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, M> {
     /// Returns a reborrowed pinned mutable receiver.
     pub fn receiver(&mut self) -> Pin<&mut T> {
         self.receiver.as_mut()
@@ -410,14 +375,35 @@ impl<'call, T: ?Sized, M: InvocationMode>
 /// input.
 pub struct PinnedMutInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
     /// Structured reason user code was not called.
-    pub error: InvocationError,
+    error: InvocationError,
     /// Original pinned receiver and arguments.
-    pub recovery: PinnedMutInvocationRecovery<'call, T, M>,
+    recovery: PinnedMutInvocationRecovery<'call, T, M>,
 }
 
-impl<T: ?Sized, M: InvocationMode> fmt::Debug
-    for PinnedMutInvocationFailure<'_, T, M>
-{
+impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable pinned invocation input.
+    pub const fn recovery(&self) -> &PinnedMutInvocationRecovery<'call, T, M> {
+        &self.recovery
+    }
+    /// Returns mutable access to the recoverable pinned invocation input.
+    pub fn recovery_mut(&mut self) -> &mut PinnedMutInvocationRecovery<'call, T, M> {
+        &mut self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, PinnedMutInvocationRecovery<'call, T, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> PinnedMutInvocationRecovery<'call, T, M> {
+        self.recovery
+    }
+}
+
+impl<T: ?Sized, M: InvocationMode> fmt::Debug for PinnedMutInvocationFailure<'_, T, M> {
     /// Formats validation metadata without requiring erased arguments to
     /// implement `Debug`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -428,18 +414,14 @@ impl<T: ?Sized, M: InvocationMode> fmt::Debug
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> fmt::Display
-    for PinnedMutInvocationFailure<'_, T, M>
-{
+impl<T: ?Sized, M: InvocationMode> fmt::Display for PinnedMutInvocationFailure<'_, T, M> {
     /// Formats the underlying structured validation error.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.error.fmt(formatter)
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> std::error::Error
-    for PinnedMutInvocationFailure<'_, T, M>
-{
+impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedMutInvocationFailure<'_, T, M> {
     /// Returns the structured invocation error as the underlying cause.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.error)

@@ -57,29 +57,18 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the recovered input range.
     pub fn argument_name(&self, index: usize) -> Option<&str> {
-        self.argument_names
-            .get(index)
-            .and_then(|name| name.as_deref())
+        self.argument_names.get(index).and_then(|name| name.as_deref())
     }
 
     /// Consumes the recovery and returns the receiver and caller-ordered
     /// arguments.
-    pub fn into_parts(
-        self,
-    ) -> (
-        Option<InvocationReceiver<'call, M>>,
-        Box<[InvocationArg<'call, M>]>,
-    ) {
+    pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 
     /// Reconstitutes the exact invocation so a caller can inspect or retry it.
     pub fn into_invocation(self) -> Invocation<'call, M> {
-        Invocation::from_parts(
-            self.receiver,
-            self.arguments,
-            self.argument_names,
-        )
+        Invocation::from_parts(self.receiver, self.arguments, self.argument_names)
     }
 }
 
@@ -89,10 +78,7 @@ impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("InvocationRecovery")
-            .field(
-                "receiver_mode",
-                &self.receiver.as_ref().map(InvocationReceiver::mode),
-            )
+            .field("receiver_mode", &self.receiver.as_ref().map(InvocationReceiver::mode))
             .field("argument_count", &self.arguments.len())
             .field(
                 "argument_names",
@@ -109,9 +95,28 @@ impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
 /// A validation error paired with the complete recoverable invocation input.
 pub struct InvocationFailure<'call, M: InvocationMode> {
     /// Structured reason the invocation could not enter user code.
-    pub error: InvocationError,
+    pub(crate) error: InvocationError,
     /// Untouched receiver and arguments retained by the runtime.
-    pub recovery: InvocationRecovery<'call, M>,
+    pub(crate) recovery: InvocationRecovery<'call, M>,
+}
+
+impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
+    /// Returns the structured validation error.
+    pub const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    /// Returns the recoverable invocation input.
+    pub const fn recovery(&self) -> &InvocationRecovery<'call, M> {
+        &self.recovery
+    }
+    /// Consumes this failure into its error and recovery input.
+    pub fn into_parts(self) -> (InvocationError, InvocationRecovery<'call, M>) {
+        (self.error, self.recovery)
+    }
+    /// Consumes this failure and returns its recoverable invocation input.
+    pub fn into_recovery(self) -> InvocationRecovery<'call, M> {
+        self.recovery
+    }
 }
 
 impl<M: InvocationMode> fmt::Debug for InvocationFailure<'_, M> {

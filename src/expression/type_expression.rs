@@ -13,6 +13,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use crate::expression::ConstExpression;
+use crate::expression::ExpressionError;
 use crate::expression::GenericArgument;
 use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
@@ -42,7 +43,20 @@ macro_rules! impl_identity_without_diagnostic {
 /// implementations deliberately exclude diagnostic fields from their structural
 /// identity.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct DiagnosticText(pub Option<Box<str>>);
+pub struct DiagnosticText(pub(crate) Option<Box<str>>);
+
+impl DiagnosticText {
+    /// Returns the diagnostic text when present.
+    pub fn as_deref(&self) -> Option<&str> {
+        self.0.as_deref()
+    }
+}
+
+impl From<Box<str>> for DiagnosticText {
+    fn from(value: Box<str>) -> Self {
+        Self(Some(value))
+    }
+}
 
 impl From<&str> for DiagnosticText {
     fn from(value: &str) -> Self {
@@ -93,11 +107,52 @@ pub enum TypeExpression {
 pub struct ConcreteTypeExpression {
     /// Path segments in declaration order, for example `std`, `vec`, and
     /// `Vec`.
-    pub path: Box<[Box<str>]>,
+    pub(crate) path: Box<[Box<str>]>,
     /// Generic arguments of the final path segment in declaration order.
-    pub arguments: Box<[GenericArgument]>,
+    pub(crate) arguments: Box<[GenericArgument]>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl ConcreteTypeExpression {
+    /// Creates a concrete type expression from a non-empty path.
+    pub fn new<P, S>(path: P, arguments: impl IntoIterator<Item = GenericArgument>) -> Result<Self, ExpressionError>
+    where
+        P: IntoIterator<Item = S>,
+        S: Into<Box<str>>,
+    {
+        let path = path.into_iter().map(Into::into).collect::<Box<[_]>>();
+        if path.is_empty() {
+            return Err(ExpressionError::EmptyConcretePath);
+        }
+        Ok(Self {
+            path,
+            arguments: arguments.into_iter().collect(),
+            diagnostic: DiagnosticText::default(),
+        })
+    }
+
+    /// Returns the path segments in declaration order.
+    pub fn path(&self) -> &[Box<str>] {
+        &self.path
+    }
+
+    /// Returns final-segment generic arguments in declaration order.
+    pub fn arguments(&self) -> &[GenericArgument] {
+        &self.arguments
+    }
+
+    /// Returns source-oriented diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+
+    /// Attaches source-oriented diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, diagnostic: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(diagnostic.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(ConcreteTypeExpression { path, arguments });
@@ -106,15 +161,60 @@ impl_identity_without_diagnostic!(ConcreteTypeExpression { path, arguments });
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeExpression {
     /// The self type whose associated item is projected.
-    pub self_type: Box<TypeExpression>,
+    pub(crate) self_type: Box<TypeExpression>,
     /// The optional qualifying trait path from an `as Trait` clause.
-    pub trait_path: Option<Box<TypeExpression>>,
+    pub(crate) trait_path: Option<Box<TypeExpression>>,
     /// The associated item name.
-    pub item: Box<str>,
+    pub(crate) item: Box<str>,
     /// Generic arguments applied to the associated type.
-    pub arguments: Box<[GenericArgument]>,
+    pub(crate) arguments: Box<[GenericArgument]>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl AssociatedTypeExpression {
+    /// Creates an associated type projection.
+    pub fn new(
+        self_type: TypeExpression,
+        trait_path: Option<TypeExpression>,
+        item: impl Into<Box<str>>,
+        arguments: impl Into<Box<[GenericArgument]>>,
+    ) -> Self {
+        Self {
+            self_type: Box::new(self_type),
+            trait_path: trait_path.map(Box::new),
+            item: item.into(),
+            arguments: arguments.into(),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+
+    /// Returns the projected self type.
+    pub fn self_type(&self) -> &TypeExpression {
+        &self.self_type
+    }
+    /// Returns the optional qualifying trait path.
+    pub fn trait_path(&self) -> Option<&TypeExpression> {
+        self.trait_path.as_deref()
+    }
+    /// Returns the associated item name.
+    pub fn item(&self) -> &str {
+        &self.item
+    }
+    /// Returns associated type arguments.
+    pub fn arguments(&self) -> &[GenericArgument] {
+        &self.arguments
+    }
+    /// Returns source-oriented diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches source-oriented diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(AssociatedTypeExpression {
@@ -129,13 +229,47 @@ impl_identity_without_diagnostic!(AssociatedTypeExpression {
 pub struct ReferenceTypeExpression {
     /// The reference lifetime, including [`LifetimeExpression::Elided`] when
     /// omitted.
-    pub lifetime: LifetimeExpression,
+    pub(crate) lifetime: LifetimeExpression,
     /// Whether this is a mutable reference.
-    pub mutable: bool,
+    pub(crate) mutable: bool,
     /// The referenced type.
-    pub target: Box<TypeExpression>,
+    pub(crate) target: Box<TypeExpression>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl ReferenceTypeExpression {
+    /// Creates a reference expression.
+    pub fn new(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> Self {
+        Self {
+            lifetime,
+            mutable,
+            target: Box::new(target),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns the reference lifetime.
+    pub fn lifetime(&self) -> &LifetimeExpression {
+        &self.lifetime
+    }
+    /// Returns whether the reference is mutable.
+    pub fn is_mutable(&self) -> bool {
+        self.mutable
+    }
+    /// Returns the referenced type.
+    pub fn target(&self) -> &TypeExpression {
+        &self.target
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(ReferenceTypeExpression {
@@ -148,11 +282,40 @@ impl_identity_without_diagnostic!(ReferenceTypeExpression {
 #[derive(Clone, Debug)]
 pub struct RawPointerTypeExpression {
     /// Whether this is a mutable raw pointer.
-    pub mutable: bool,
+    pub(crate) mutable: bool,
     /// The pointee type.
-    pub target: Box<TypeExpression>,
+    pub(crate) target: Box<TypeExpression>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl RawPointerTypeExpression {
+    /// Creates a raw pointer expression.
+    pub fn new(mutable: bool, target: TypeExpression) -> Self {
+        Self {
+            mutable,
+            target: Box::new(target),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns whether the pointer is mutable.
+    pub fn is_mutable(&self) -> bool {
+        self.mutable
+    }
+    /// Returns the pointee type.
+    pub fn target(&self) -> &TypeExpression {
+        &self.target
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(RawPointerTypeExpression { mutable, target });
@@ -161,11 +324,40 @@ impl_identity_without_diagnostic!(RawPointerTypeExpression { mutable, target });
 #[derive(Clone, Debug)]
 pub struct ArrayTypeExpression {
     /// The repeated element type.
-    pub element: Box<TypeExpression>,
+    pub(crate) element: Box<TypeExpression>,
     /// The array length expression.
-    pub length: ConstExpression,
+    pub(crate) length: ConstExpression,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl ArrayTypeExpression {
+    /// Creates an array expression.
+    pub fn new(element: TypeExpression, length: ConstExpression) -> Self {
+        Self {
+            element: Box::new(element),
+            length,
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns the element type.
+    pub fn element(&self) -> &TypeExpression {
+        &self.element
+    }
+    /// Returns the structural length expression.
+    pub fn length(&self) -> &ConstExpression {
+        &self.length
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(ArrayTypeExpression { element, length });
@@ -196,19 +388,75 @@ pub enum FunctionSafety {
 #[derive(Clone, Debug)]
 pub struct FunctionPointerExpression {
     /// The function's ABI.
-    pub abi: FunctionAbi,
+    pub(crate) abi: FunctionAbi,
     /// The function's safety qualifier.
-    pub safety: FunctionSafety,
+    pub(crate) safety: FunctionSafety,
     /// Whether the final argument is variadic.
-    pub variadic: bool,
+    pub(crate) variadic: bool,
     /// Lifetimes introduced by a higher-ranked function pointer.
-    pub higher_ranked_lifetimes: Box<[LifetimeExpression]>,
+    pub(crate) higher_ranked_lifetimes: Box<[LifetimeExpression]>,
     /// Parameter types in declaration order.
-    pub parameters: Box<[TypeExpression]>,
+    pub(crate) parameters: Box<[TypeExpression]>,
     /// The function return type.
-    pub return_type: Box<TypeExpression>,
+    pub(crate) return_type: Box<TypeExpression>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl FunctionPointerExpression {
+    /// Creates a function pointer expression.
+    pub fn new(
+        abi: FunctionAbi,
+        safety: FunctionSafety,
+        variadic: bool,
+        higher_ranked_lifetimes: impl Into<Box<[LifetimeExpression]>>,
+        parameters: impl Into<Box<[TypeExpression]>>,
+        return_type: TypeExpression,
+    ) -> Self {
+        Self {
+            abi,
+            safety,
+            variadic,
+            higher_ranked_lifetimes: higher_ranked_lifetimes.into(),
+            parameters: parameters.into(),
+            return_type: Box::new(return_type),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns the calling convention.
+    pub fn abi(&self) -> &FunctionAbi {
+        &self.abi
+    }
+    /// Returns the safety qualifier.
+    pub fn safety(&self) -> &FunctionSafety {
+        &self.safety
+    }
+    /// Returns whether the signature is variadic.
+    pub fn is_variadic(&self) -> bool {
+        self.variadic
+    }
+    /// Returns higher-ranked lifetimes.
+    pub fn higher_ranked_lifetimes(&self) -> &[LifetimeExpression] {
+        &self.higher_ranked_lifetimes
+    }
+    /// Returns parameter types.
+    pub fn parameters(&self) -> &[TypeExpression] {
+        &self.parameters
+    }
+    /// Returns the return type.
+    pub fn return_type(&self) -> &TypeExpression {
+        &self.return_type
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(FunctionPointerExpression {
@@ -224,9 +472,33 @@ impl_identity_without_diagnostic!(FunctionPointerExpression {
 #[derive(Clone, Debug)]
 pub struct TraitObjectExpression {
     /// Trait and lifetime predicates in declaration order.
-    pub bounds: Box<[PredicateDescriptor]>,
+    pub(crate) bounds: Box<[PredicateDescriptor]>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl TraitObjectExpression {
+    /// Creates a trait object expression.
+    pub fn new(bounds: impl Into<Box<[PredicateDescriptor]>>) -> Self {
+        Self {
+            bounds: bounds.into(),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns object bounds.
+    pub fn bounds(&self) -> &[PredicateDescriptor] {
+        &self.bounds
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(TraitObjectExpression { bounds });
@@ -235,9 +507,33 @@ impl_identity_without_diagnostic!(TraitObjectExpression { bounds });
 #[derive(Clone, Debug)]
 pub struct OpaqueTypeExpression {
     /// Trait and lifetime predicates in declaration order.
-    pub bounds: Box<[PredicateDescriptor]>,
+    pub(crate) bounds: Box<[PredicateDescriptor]>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl OpaqueTypeExpression {
+    /// Creates an opaque type expression.
+    pub fn new(bounds: impl Into<Box<[PredicateDescriptor]>>) -> Self {
+        Self {
+            bounds: bounds.into(),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+    /// Returns opaque bounds.
+    pub fn bounds(&self) -> &[PredicateDescriptor] {
+        &self.bounds
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl_identity_without_diagnostic!(OpaqueTypeExpression { bounds });

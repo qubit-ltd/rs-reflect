@@ -27,17 +27,49 @@ use crate::expression::TypeExpression;
 #[derive(Clone, Debug)]
 pub struct GenericDefinitionDescriptor {
     /// Lifetime, type, and const parameters in declaration order.
-    pub parameters: Box<[GenericParameterDescriptor]>,
+    pub(crate) parameters: Box<[GenericParameterDescriptor]>,
     /// Where-clause predicates in declaration order.
-    pub predicates: Box<[PredicateDescriptor]>,
+    pub(crate) predicates: Box<[PredicateDescriptor]>,
     /// Optional source-oriented diagnostic text excluded from identity.
-    pub diagnostic: DiagnosticText,
+    pub(crate) diagnostic: DiagnosticText,
+}
+
+impl GenericDefinitionDescriptor {
+    /// Creates a generic declaration descriptor.
+    pub fn new(
+        parameters: impl Into<Box<[GenericParameterDescriptor]>>,
+        predicates: impl Into<Box<[PredicateDescriptor]>>,
+    ) -> Self {
+        Self {
+            parameters: parameters.into(),
+            predicates: predicates.into(),
+            diagnostic: DiagnosticText::default(),
+        }
+    }
+
+    /// Returns generic parameters in declaration order.
+    pub fn parameters(&self) -> &[GenericParameterDescriptor] {
+        &self.parameters
+    }
+    /// Returns where-clause predicates in declaration order.
+    pub fn predicates(&self) -> &[PredicateDescriptor] {
+        &self.predicates
+    }
+    /// Returns diagnostic text when present.
+    pub fn diagnostic(&self) -> Option<&str> {
+        self.diagnostic.as_deref()
+    }
+    /// Attaches diagnostic text.
+    #[must_use]
+    pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
+        self.diagnostic = DiagnosticText::from(value.into());
+        self
+    }
 }
 
 impl PartialEq for GenericDefinitionDescriptor {
     fn eq(&self, other: &Self) -> bool {
-        self.parameters == other.parameters
-            && self.predicates == other.predicates
+        self.parameters == other.parameters && self.predicates == other.predicates
     }
 }
 
@@ -114,11 +146,7 @@ impl PartialEq for GenericParameterDescriptor {
                     default: other_default,
                     diagnostic: _,
                 },
-            ) => {
-                name == other_name
-                    && bounds == other_bounds
-                    && default == other_default
-            }
+            ) => name == other_name && bounds == other_bounds && default == other_default,
             (
                 Self::Const {
                     name,
@@ -132,9 +160,7 @@ impl PartialEq for GenericParameterDescriptor {
                     default: other_default,
                     diagnostic: _,
                 },
-            ) => {
-                name == other_name && ty == other_ty && default == other_default
-            }
+            ) => name == other_name && ty == other_ty && default == other_default,
             _ => false,
         }
     }

@@ -45,9 +45,7 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(invocation.argument_name(0), None);
     let validated = invocation
         .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
-        .unwrap_or_else(|_| {
-            panic!("matching pinned shared invocation should validate")
-        });
+        .unwrap_or_else(|_| panic!("matching pinned shared invocation should validate"));
     let (validated_receiver, arguments) = validated.into_parts();
     assert_eq!(*validated_receiver, 7);
     assert_eq!(arguments.len(), 1);
@@ -60,19 +58,16 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
         )],
     );
     assert_eq!(invocation.argument_name(0), Some("value"));
-    let Err(failure) = invocation.validate(
-        &method_identity(),
-        &[ArgumentExpectation::owned::<String>()],
-    ) else {
+    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<String>()]) else {
         panic!("mismatched pinned shared argument should fail");
     };
     assert!(format!("{failure:?}").contains("PinnedRefInvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
-    assert_eq!(*failure.recovery.receiver(), 7);
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    let recovered = failure.recovery.into_invocation();
+    assert_eq!(*failure.recovery().receiver(), 7);
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
 
@@ -89,13 +84,8 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(invocation.argument_name(0), None);
     {
         let validated = invocation
-            .validate(
-                &method_identity(),
-                &[ArgumentExpectation::owned::<u16>()],
-            )
-            .unwrap_or_else(|_| {
-                panic!("matching pinned mutable invocation should validate")
-            });
+            .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
+            .unwrap_or_else(|_| panic!("matching pinned mutable invocation should validate"));
         let (mut validated_receiver, arguments) = validated.into_parts();
         *validated_receiver.as_mut().get_mut() = 23;
         assert_eq!(arguments.len(), 1);
@@ -110,18 +100,15 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
         )],
     );
     assert_eq!(invocation.argument_name(0), Some("value"));
-    let Err(mut failure) = invocation.validate(
-        &method_identity(),
-        &[ArgumentExpectation::owned::<String>()],
-    ) else {
+    let Err(mut failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<String>()]) else {
         panic!("mismatched pinned mutable argument should fail");
     };
     assert!(format!("{failure:?}").contains("PinnedMutInvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
-    assert_eq!(*failure.recovery.receiver(), 23);
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    let recovered = failure.recovery.into_invocation();
+    assert_eq!(*failure.recovery_mut().receiver(), 23);
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }

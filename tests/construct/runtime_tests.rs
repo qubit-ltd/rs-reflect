@@ -14,7 +14,7 @@ mod construction_runtime {
     use std::rc::Rc;
 
     use qubit_reflect as reflect;
-    use qubit_reflect::__private::descriptor;
+    use qubit_reflect::__private::codegen_v1::descriptor;
     use qubit_reflect::access::VariantActiveAdapter;
     use qubit_reflect::construct::ConstructionError;
     use qubit_reflect::construct::ConstructionField;
@@ -100,30 +100,24 @@ mod construction_runtime {
     }
 
     /// Tests whether the unit variant is active after descriptor validation.
-    fn started_is_active(
-        value: ReflectedRef<'_>,
-    ) -> Result<bool, reflect::error::TypeMismatch> {
-        let event = value.downcast_ref::<Event>().unwrap_or_else(|| {
-            unreachable!("the descriptor validates the enum root type")
-        });
+    fn started_is_active(value: ReflectedRef<'_>) -> Result<bool, reflect::error::TypeMismatch> {
+        let event = value
+            .downcast_ref::<Event>()
+            .unwrap_or_else(|| unreachable!("the descriptor validates the enum root type"));
         Ok(matches!(event, Event::Started))
     }
 
     /// Tests whether the named variant is active after descriptor validation.
-    fn failed_is_active(
-        value: ReflectedRef<'_>,
-    ) -> Result<bool, reflect::error::TypeMismatch> {
-        let event = value.downcast_ref::<Event>().unwrap_or_else(|| {
-            unreachable!("the descriptor validates the enum root type")
-        });
+    fn failed_is_active(value: ReflectedRef<'_>) -> Result<bool, reflect::error::TypeMismatch> {
+        let event = value
+            .downcast_ref::<Event>()
+            .unwrap_or_else(|| unreachable!("the descriptor validates the enum root type"));
         Ok(matches!(event, Event::Failed { .. }))
     }
 
     static U32_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<u32>();
-    static STRING_TYPE: OpaqueTypeDescriptor =
-        descriptor::opaque_member::<String>();
-    static OPTION_STRING_TYPE: OpaqueTypeDescriptor =
-        descriptor::opaque_member::<Option<String>>();
+    static STRING_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<String>();
+    static OPTION_STRING_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<Option<String>>();
     static U32_REF: TypeRef = TypeRef::Opaque(&U32_TYPE);
     static STRING_REF: TypeRef = TypeRef::Opaque(&STRING_TYPE);
     static OPTION_STRING_REF: TypeRef = TypeRef::Opaque(&OPTION_STRING_TYPE);
@@ -155,11 +149,7 @@ mod construction_runtime {
         ),
     ];
     static PROFILE_DESCRIPTOR: TypeDescriptor =
-        descriptor::struct_type::<Profile>(
-            "construct::Profile",
-            StructKind::Named,
-            &PROFILE_FIELDS,
-        );
+        descriptor::struct_type::<Profile>("construct::Profile", StructKind::Named, &PROFILE_FIELDS);
     static PROFILE_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 3] = [
         ConstructionField::required(&PROFILE_FIELDS[0]),
         ConstructionField::required(&PROFILE_FIELDS[1]),
@@ -190,11 +180,7 @@ mod construction_runtime {
         ),
     ];
     static DEFAULTED_DESCRIPTOR: TypeDescriptor =
-        descriptor::struct_type::<Defaulted>(
-            "construct::Defaulted",
-            StructKind::Named,
-            &DEFAULTED_FIELDS,
-        );
+        descriptor::struct_type::<Defaulted>("construct::Defaulted", StructKind::Named, &DEFAULTED_FIELDS);
 
     /// Supplies the explicit per-field default used by reflected construction.
     fn default_label() -> DynamicOwned<Local> {
@@ -222,10 +208,7 @@ mod construction_runtime {
     ];
     static RESTRICTED_DEFAULTED_UPDATE_FIELDS: [UpdateField; 2] = [
         UpdateField::allowed(&DEFAULTED_FIELDS[0]),
-        UpdateField::unavailable(
-            &DEFAULTED_FIELDS[1],
-            ConstructionUnavailableReason::UpdateForbidden,
-        ),
+        UpdateField::unavailable(&DEFAULTED_FIELDS[1], ConstructionUnavailableReason::UpdateForbidden),
     ];
 
     /// Panics if an invalid field set evaluates a provider before structural
@@ -235,36 +218,16 @@ mod construction_runtime {
     }
 
     static DEFAULT_BEFORE_REQUIRED_NAMED: [ConstructionField<Local>; 2] = [
-        ConstructionField::defaulted(
-            &DEFAULTED_FIELDS[0],
-            provider_must_not_run,
-        ),
+        ConstructionField::defaulted(&DEFAULTED_FIELDS[0], provider_must_not_run),
         ConstructionField::required(&DEFAULTED_FIELDS[1]),
     ];
 
     static PAIR_FIELDS: [FieldDescriptor; 2] = [
-        descriptor::field(
-            pair_descriptor,
-            0,
-            None,
-            None,
-            &U32_REF,
-            Visibility::Private,
-        ),
-        descriptor::field(
-            pair_descriptor,
-            1,
-            None,
-            None,
-            &STRING_REF,
-            Visibility::Private,
-        ),
+        descriptor::field(pair_descriptor, 0, None, None, &U32_REF, Visibility::Private),
+        descriptor::field(pair_descriptor, 1, None, None, &STRING_REF, Visibility::Private),
     ];
-    static PAIR_DESCRIPTOR: TypeDescriptor = descriptor::struct_type::<Pair>(
-        "construct::Pair",
-        StructKind::Tuple,
-        &PAIR_FIELDS,
-    );
+    static PAIR_DESCRIPTOR: TypeDescriptor =
+        descriptor::struct_type::<Pair>("construct::Pair", StructKind::Tuple, &PAIR_FIELDS);
     static PAIR_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 2] = [
         ConstructionField::required(&PAIR_FIELDS[0]),
         ConstructionField::required(&PAIR_FIELDS[1]),
@@ -280,30 +243,13 @@ mod construction_runtime {
     }
 
     static LEADING_PROVIDER_ONLY_PAIR_FIELDS: [ConstructionField<Local>; 2] = [
-        ConstructionField::provider_only(
-            &PAIR_FIELDS[0],
-            default_first_pair_value,
-        ),
+        ConstructionField::provider_only(&PAIR_FIELDS[0], default_first_pair_value),
         ConstructionField::required(&PAIR_FIELDS[1]),
     ];
 
     static TRIPLE_FIELDS: [FieldDescriptor; 3] = [
-        descriptor::field(
-            triple_descriptor,
-            0,
-            None,
-            None,
-            &U32_REF,
-            Visibility::Private,
-        ),
-        descriptor::field(
-            triple_descriptor,
-            1,
-            None,
-            None,
-            &STRING_REF,
-            Visibility::Private,
-        ),
+        descriptor::field(triple_descriptor, 0, None, None, &U32_REF, Visibility::Private),
+        descriptor::field(triple_descriptor, 1, None, None, &STRING_REF, Visibility::Private),
         descriptor::field(
             triple_descriptor,
             2,
@@ -313,22 +259,16 @@ mod construction_runtime {
             Visibility::Private,
         ),
     ];
-    static TRIPLE_DESCRIPTOR: TypeDescriptor = descriptor::struct_type::<Triple>(
-        "construct::Triple",
-        StructKind::Tuple,
-        &TRIPLE_FIELDS,
-    );
+    static TRIPLE_DESCRIPTOR: TypeDescriptor =
+        descriptor::struct_type::<Triple>("construct::Triple", StructKind::Tuple, &TRIPLE_FIELDS);
     static MIDDLE_PROVIDER_ONLY_TRIPLE_FIELDS: [ConstructionField<Local>; 3] = [
         ConstructionField::required(&TRIPLE_FIELDS[0]),
         ConstructionField::provider_only(&TRIPLE_FIELDS[1], default_label),
         ConstructionField::required(&TRIPLE_FIELDS[2]),
     ];
 
-    static MARKER_DESCRIPTOR: TypeDescriptor = descriptor::struct_type::<Marker>(
-        "construct::Marker",
-        StructKind::Unit,
-        &[],
-    );
+    static MARKER_DESCRIPTOR: TypeDescriptor =
+        descriptor::struct_type::<Marker>("construct::Marker", StructKind::Unit, &[]);
     static MARKER_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 0] = [];
 
     static FAILED_FIELDS: [FieldDescriptor; 2] = [
@@ -371,8 +311,7 @@ mod construction_runtime {
             failed_is_active as VariantActiveAdapter,
         ),
     ];
-    static EVENT_DESCRIPTOR: TypeDescriptor =
-        descriptor::enum_type::<Event>("construct::Event", &EVENT_VARIANTS);
+    static EVENT_DESCRIPTOR: TypeDescriptor = descriptor::enum_type::<Event>("construct::Event", &EVENT_VARIANTS);
     static FAILED_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 2] = [
         ConstructionField::required(&FAILED_FIELDS[0]),
         ConstructionField::required(&FAILED_FIELDS[1]),
@@ -381,178 +320,143 @@ mod construction_runtime {
     static STARTED_THREAD_SAFE_FIELDS: [ConstructionField<ThreadSafe>; 0] = [];
 
     /// Builds a profile from descriptor-ordered, already validated values.
-    fn construct_profile(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_profile(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         let [id, label, optional_note] = input
             .into_values()
             .into_vec()
             .try_into()
-            .unwrap_or_else(|_| {
-                unreachable!("validation guarantees three fields")
-            });
+            .unwrap_or_else(|_| unreachable!("validation guarantees three fields"));
         DynamicOwned::<Local>::new(Profile {
             id: id
                 .downcast::<u32>()
                 .unwrap_or_else(|_| unreachable!("validation guarantees u32")),
-            label: label.downcast::<String>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees String")
-            }),
+            label: label
+                .downcast::<String>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees String")),
             optional_note: optional_note
                 .downcast::<Option<String>>()
-                .unwrap_or_else(|_| {
-                    unreachable!("validation guarantees Option<String>")
-                }),
+                .unwrap_or_else(|_| unreachable!("validation guarantees Option<String>")),
         })
     }
 
     /// Panics if a failed profile validation incorrectly crosses the adapter
     /// boundary.
-    fn unreachable_profile_adapter(
-        _: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn unreachable_profile_adapter(_: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         panic!("a validation failure must not execute the construction adapter")
     }
 
     /// Builds the explicit-default fixture from validated values.
-    fn construct_defaulted(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_defaulted(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         let [id, label] = input
             .into_values()
             .into_vec()
             .try_into()
-            .unwrap_or_else(|_| {
-                unreachable!("validation guarantees two fields")
-            });
+            .unwrap_or_else(|_| unreachable!("validation guarantees two fields"));
         DynamicOwned::<Local>::new(Defaulted {
             id: id
                 .downcast::<u32>()
                 .unwrap_or_else(|_| unreachable!("validation guarantees u32")),
-            label: label.downcast::<String>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees String")
-            }),
+            label: label
+                .downcast::<String>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees String")),
         })
     }
 
     /// Builds a tuple struct from validated positional values.
-    fn construct_pair(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_pair(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         let [first, second] = input
             .into_values()
             .into_vec()
             .try_into()
-            .unwrap_or_else(|_| {
-                unreachable!("validation guarantees two fields")
-            });
+            .unwrap_or_else(|_| unreachable!("validation guarantees two fields"));
         DynamicOwned::<Local>::new(Pair(
             first
                 .downcast::<u32>()
                 .unwrap_or_else(|_| unreachable!("validation guarantees u32")),
-            second.downcast::<String>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees String")
-            }),
+            second
+                .downcast::<String>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees String")),
         ))
     }
 
     /// Builds a three-field tuple from descriptor-ordered validated values.
-    fn construct_triple(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_triple(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         let [first, second, third] = input
             .into_values()
             .into_vec()
             .try_into()
-            .unwrap_or_else(|_| {
-                unreachable!("validation guarantees three fields")
-            });
+            .unwrap_or_else(|_| unreachable!("validation guarantees three fields"));
         DynamicOwned::<Local>::new(Triple(
             first
                 .downcast::<u32>()
                 .unwrap_or_else(|_| unreachable!("validation guarantees u32")),
-            second.downcast::<String>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees String")
-            }),
-            third.downcast::<Option<String>>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees Option<String>")
-            }),
+            second
+                .downcast::<String>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees String")),
+            third
+                .downcast::<Option<String>>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees Option<String>")),
         ))
     }
 
     /// Builds a fieldless struct after unit-shape validation.
-    fn construct_marker(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_marker(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         assert!(input.values().is_empty());
         DynamicOwned::<Local>::new(Marker)
     }
 
     /// Builds the unit enum variant after unit-shape validation.
-    fn construct_started(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_started(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         assert!(input.values().is_empty());
         DynamicOwned::<Local>::new(Event::Started)
     }
 
     /// Builds the unit enum variant through the thread-safe erased boundary.
-    fn construct_started_thread_safe(
-        input: ValidatedConstructionInput<ThreadSafe>,
-    ) -> DynamicOwned<ThreadSafe> {
+    fn construct_started_thread_safe(input: ValidatedConstructionInput<ThreadSafe>) -> DynamicOwned<ThreadSafe> {
         assert!(input.values().is_empty());
         DynamicOwned::<ThreadSafe>::new(Event::Started)
     }
 
     /// Builds the named enum variant from descriptor-ordered values.
-    fn construct_failed(
-        input: ValidatedConstructionInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn construct_failed(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         let [code, message] = input
             .into_values()
             .into_vec()
             .try_into()
-            .unwrap_or_else(|_| {
-                unreachable!("validation guarantees two fields")
-            });
+            .unwrap_or_else(|_| unreachable!("validation guarantees two fields"));
         DynamicOwned::<Local>::new(Event::Failed {
             code: code
                 .downcast::<u32>()
                 .unwrap_or_else(|_| unreachable!("validation guarantees u32")),
-            message: message.downcast::<String>().unwrap_or_else(|_| {
-                unreachable!("validation guarantees String")
-            }),
+            message: message
+                .downcast::<String>()
+                .unwrap_or_else(|_| unreachable!("validation guarantees String")),
         })
     }
 
     /// Applies validated named overrides to an owned profile base value.
-    fn update_profile(
-        input: ValidatedUpdateInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn update_profile(input: ValidatedUpdateInput<Local>) -> DynamicOwned<Local> {
         let (base, overrides) = input.into_parts();
-        let mut profile = base.downcast::<Profile>().unwrap_or_else(|_| {
-            unreachable!("validation guarantees the base type")
-        });
+        let mut profile = base
+            .downcast::<Profile>()
+            .unwrap_or_else(|_| unreachable!("validation guarantees the base type"));
         for value in overrides.into_vec() {
             let (index, value) = value.into_parts();
             match index {
                 0 => {
-                    profile.id = value.downcast::<u32>().unwrap_or_else(|_| {
-                        unreachable!("validation guarantees u32")
-                    });
+                    profile.id = value
+                        .downcast::<u32>()
+                        .unwrap_or_else(|_| unreachable!("validation guarantees u32"));
                 }
                 1 => {
-                    profile.label =
-                        value.downcast::<String>().unwrap_or_else(|_| {
-                            unreachable!("validation guarantees String")
-                        });
+                    profile.label = value
+                        .downcast::<String>()
+                        .unwrap_or_else(|_| unreachable!("validation guarantees String"));
                 }
                 2 => {
                     profile.optional_note = value
                         .downcast::<Option<String>>()
-                        .unwrap_or_else(|_| {
-                            unreachable!("validation guarantees Option<String>")
-                        });
+                        .unwrap_or_else(|_| unreachable!("validation guarantees Option<String>"));
                 }
                 _ => unreachable!("validation only accepts declared fields"),
             }
@@ -561,27 +465,23 @@ mod construction_runtime {
     }
 
     /// Applies validated named overrides to the explicit-default fixture.
-    fn update_defaulted(
-        input: ValidatedUpdateInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn update_defaulted(input: ValidatedUpdateInput<Local>) -> DynamicOwned<Local> {
         let (base, overrides) = input.into_parts();
-        let mut value = base.downcast::<Defaulted>().unwrap_or_else(|_| {
-            unreachable!("validation guarantees the base type")
-        });
+        let mut value = base
+            .downcast::<Defaulted>()
+            .unwrap_or_else(|_| unreachable!("validation guarantees the base type"));
         for field in overrides.into_vec() {
             let (index, replacement) = field.into_parts();
             match index {
                 0 => {
-                    value.id =
-                        replacement.downcast::<u32>().unwrap_or_else(|_| {
-                            unreachable!("validation guarantees u32")
-                        });
+                    value.id = replacement
+                        .downcast::<u32>()
+                        .unwrap_or_else(|_| unreachable!("validation guarantees u32"));
                 }
                 1 => {
-                    value.label =
-                        replacement.downcast::<String>().unwrap_or_else(|_| {
-                            unreachable!("validation guarantees String")
-                        });
+                    value.label = replacement
+                        .downcast::<String>()
+                        .unwrap_or_else(|_| unreachable!("validation guarantees String"));
                 }
                 _ => unreachable!("validation only accepts declared fields"),
             }
@@ -591,17 +491,15 @@ mod construction_runtime {
 
     /// Panics if a failed update validation incorrectly crosses the adapter
     /// boundary.
-    fn unreachable_update_adapter(
-        _: ValidatedUpdateInput<Local>,
-    ) -> DynamicOwned<Local> {
+    fn unreachable_update_adapter(_: ValidatedUpdateInput<Local>) -> DynamicOwned<Local> {
         panic!("a validation failure must not execute the update adapter")
     }
 
     /// Downcasts a successful local result and returns the concrete value.
     fn downcast_result<T: 'static>(value: DynamicOwned<Local>) -> T {
-        value.downcast::<T>().unwrap_or_else(|_| {
-            panic!("construction should return the declared root type")
-        })
+        value
+            .downcast::<T>()
+            .unwrap_or_else(|_| panic!("construction should return the declared root type"))
     }
 
     /// Extracts a required construction validation failure without requiring a
@@ -617,18 +515,10 @@ mod construction_runtime {
     }
 
     #[test]
-    fn test_named_construction_validates_then_orders_values_by_descriptor_index()
-     {
-        let constructor = StructConstructor::new(
-            &PROFILE_DESCRIPTOR,
-            &PROFILE_CONSTRUCTION_FIELDS,
-            construct_profile,
-        );
+    fn test_named_construction_validates_then_orders_values_by_descriptor_index() {
+        let constructor = StructConstructor::new(&PROFILE_DESCRIPTOR, &PROFILE_CONSTRUCTION_FIELDS, construct_profile);
         let input = NamedConstructionInput::new([
-            (
-                "optional_note",
-                ReflectedOwned::new(Some(String::from("note"))),
-            ),
+            ("optional_note", ReflectedOwned::new(Some(String::from("note")))),
             ("label", ReflectedOwned::new(String::from("alpha"))),
             ("id", ReflectedOwned::new(7_u32)),
         ]);
@@ -680,10 +570,7 @@ mod construction_runtime {
         );
 
         let value = constructor
-            .construct_named(NamedConstructionInput::new([(
-                "id",
-                ReflectedOwned::new(9_u32),
-            )]))
+            .construct_named(NamedConstructionInput::new([("id", ReflectedOwned::new(9_u32))]))
             .expect("an explicit provider may fill its field");
 
         assert_eq!(
@@ -699,13 +586,8 @@ mod construction_runtime {
                 ("id", ReflectedOwned::new(10_u32)),
                 ("label", ReflectedOwned::new(String::from("caller value"))),
             ]))
-            .expect(
-                "an ordinary default field may still be supplied by the caller",
-            );
-        assert_eq!(
-            downcast_result::<Defaulted>(supplied).label,
-            "caller value"
-        );
+            .expect("an ordinary default field may still be supplied by the caller");
+        assert_eq!(downcast_result::<Defaulted>(supplied).label, "caller value");
     }
 
     #[test]
@@ -716,10 +598,7 @@ mod construction_runtime {
             construct_defaulted,
         );
         let provided = constructor
-            .construct_named(NamedConstructionInput::new([(
-                "id",
-                ReflectedOwned::new(12_u32),
-            )]))
+            .construct_named(NamedConstructionInput::new([("id", ReflectedOwned::new(12_u32))]))
             .expect("a provider-only field should be filled by its provider");
         assert_eq!(
             downcast_result::<Defaulted>(provided),
@@ -754,10 +633,7 @@ mod construction_runtime {
             construct_defaulted,
         );
         let construction_failure = expect_construction_failure(
-            constructor.construct_named(NamedConstructionInput::new([(
-                "id",
-                ReflectedOwned::new(1_u32),
-            )])),
+            constructor.construct_named(NamedConstructionInput::new([("id", ReflectedOwned::new(1_u32))])),
             "from-zero construction should remain unavailable",
         );
         assert!(matches!(
@@ -765,21 +641,14 @@ mod construction_runtime {
             ConstructionError::Unavailable { .. }
         ));
 
-        let updater = StructUpdater::new(
-            &DEFAULTED_DESCRIPTOR,
-            &DEFAULTED_UPDATE_FIELDS,
-            update_defaulted,
-        );
+        let updater = StructUpdater::new(&DEFAULTED_DESCRIPTOR, &DEFAULTED_UPDATE_FIELDS, update_defaulted);
         let updated = updater
             .update(StructUpdateInput::new(
                 ReflectedOwned::new(Defaulted {
                     id: 1,
                     label: String::from("before"),
                 }),
-                NamedConstructionInput::new([(
-                    "label",
-                    ReflectedOwned::new(String::from("after")),
-                )]),
+                NamedConstructionInput::new([("label", ReflectedOwned::new(String::from("after")))]),
             ))
             .expect("independent update policy may allow an override");
         assert_eq!(downcast_result::<Defaulted>(updated).label, "after");
@@ -798,10 +667,7 @@ mod construction_runtime {
                     id: 1,
                     label: String::from("before"),
                 }),
-                NamedConstructionInput::new([(
-                    "label",
-                    ReflectedOwned::new(String::from("forbidden")),
-                )]),
+                NamedConstructionInput::new([("label", ReflectedOwned::new(String::from("forbidden")))]),
             )),
             "an unavailable update field must fail before its adapter",
         );
@@ -817,8 +683,7 @@ mod construction_runtime {
     }
 
     #[test]
-    fn test_named_input_validates_every_missing_field_before_running_a_provider()
-     {
+    fn test_named_input_validates_every_missing_field_before_running_a_provider() {
         let constructor = StructConstructor::new(
             &DEFAULTED_DESCRIPTOR,
             &DEFAULT_BEFORE_REQUIRED_NAMED,
@@ -826,9 +691,7 @@ mod construction_runtime {
         );
 
         let failure = expect_construction_failure(
-            constructor.construct_named(NamedConstructionInput::new(
-                std::iter::empty::<(&str, ReflectedOwned)>(),
-            )),
+            constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>())),
             "the later required field must fail before the earlier provider runs",
         );
 
@@ -841,18 +704,11 @@ mod construction_runtime {
     }
 
     #[test]
-    fn test_tuple_input_validates_every_missing_field_before_running_a_provider()
-     {
-        let constructor = StructConstructor::new(
-            &PAIR_DESCRIPTOR,
-            &DEFAULT_BEFORE_REQUIRED_TUPLE,
-            construct_pair,
-        );
+    fn test_tuple_input_validates_every_missing_field_before_running_a_provider() {
+        let constructor = StructConstructor::new(&PAIR_DESCRIPTOR, &DEFAULT_BEFORE_REQUIRED_TUPLE, construct_pair);
 
         let failure = expect_construction_failure(
-            constructor.construct_tuple(TupleConstructionInput::new(
-                std::iter::empty::<ReflectedOwned>(),
-            )),
+            constructor.construct_tuple(TupleConstructionInput::new(std::iter::empty::<ReflectedOwned>())),
             "the later required position must fail before the earlier provider runs",
         );
 
@@ -871,10 +727,7 @@ mod construction_runtime {
             construct_defaulted,
         );
         let failure = expect_construction_failure(
-            constructor.construct_named(NamedConstructionInput::new([(
-                "id",
-                ReflectedOwned::new(9_u32),
-            )])),
+            constructor.construct_named(NamedConstructionInput::new([("id", ReflectedOwned::new(9_u32))])),
             "a skipped or no-construct field needs an explicit provider",
         );
 
@@ -912,8 +765,7 @@ mod construction_runtime {
         ));
         let recovered = recovered.into_vec();
         assert_eq!(recovered.len(), 4);
-        let RecoveredConstructionValue::Named { name, value } = &recovered[1]
-        else {
+        let RecoveredConstructionValue::Named { name, value } = &recovered[1] else {
             panic!("named recovery should preserve the original binding")
         };
         assert_eq!(name.as_ref(), "id");
@@ -928,10 +780,7 @@ mod construction_runtime {
             unreachable_profile_adapter,
         );
         let failure = expect_construction_failure(
-            constructor.construct_named(NamedConstructionInput::new([(
-                "unknown",
-                ReflectedOwned::new(7_u32),
-            )])),
+            constructor.construct_named(NamedConstructionInput::new([("unknown", ReflectedOwned::new(7_u32))])),
             "unknown query names must be rejected",
         );
 
@@ -958,9 +807,7 @@ mod construction_runtime {
             "numeric values are not coerced across exact Rust types",
         );
 
-        let ConstructionError::ValueTypeMismatch { field, mismatch } =
-            failure.error()
-        else {
+        let ConstructionError::ValueTypeMismatch { field, mismatch } = failure.error() else {
             panic!("the failure should identify the exact field type mismatch")
         };
         assert_eq!(field.query_name(), Some("id"));
@@ -971,16 +818,9 @@ mod construction_runtime {
 
     #[test]
     fn test_wrong_shape_returns_named_values_untouched() {
-        let constructor = StructConstructor::new(
-            &PAIR_DESCRIPTOR,
-            &PAIR_CONSTRUCTION_FIELDS,
-            construct_pair,
-        );
+        let constructor = StructConstructor::new(&PAIR_DESCRIPTOR, &PAIR_CONSTRUCTION_FIELDS, construct_pair);
         let failure = expect_construction_failure(
-            constructor.construct_named(NamedConstructionInput::new([(
-                "first",
-                ReflectedOwned::new(1_u32),
-            )])),
+            constructor.construct_named(NamedConstructionInput::new([("first", ReflectedOwned::new(1_u32))])),
             "a tuple constructor must reject named input",
         );
 
@@ -996,21 +836,11 @@ mod construction_runtime {
 
     #[test]
     fn test_tuple_and_unit_struct_construction_use_matching_shapes() {
-        let pair_constructor = StructConstructor::new(
-            &PAIR_DESCRIPTOR,
-            &PAIR_CONSTRUCTION_FIELDS,
-            construct_pair,
-        );
-        let marker_constructor = StructConstructor::new(
-            &MARKER_DESCRIPTOR,
-            &MARKER_CONSTRUCTION_FIELDS,
-            construct_marker,
-        );
+        let pair_constructor = StructConstructor::new(&PAIR_DESCRIPTOR, &PAIR_CONSTRUCTION_FIELDS, construct_pair);
+        let marker_constructor =
+            StructConstructor::new(&MARKER_DESCRIPTOR, &MARKER_CONSTRUCTION_FIELDS, construct_marker);
 
-        assert!(std::ptr::eq(
-            pair_constructor.descriptor(),
-            &PAIR_DESCRIPTOR
-        ));
+        assert!(std::ptr::eq(pair_constructor.descriptor(), &PAIR_DESCRIPTOR));
         assert_eq!(pair_constructor.fields().len(), 2);
         assert_eq!(pair_constructor.shape(), ConstructionShape::Tuple);
         assert!(format!("{pair_constructor:?}").contains("StructConstructor"));
@@ -1025,10 +855,7 @@ mod construction_runtime {
             .construct_unit()
             .expect("a unit constructor takes no values");
 
-        assert_eq!(
-            downcast_result::<Pair>(pair),
-            Pair(3, String::from("three"))
-        );
+        assert_eq!(downcast_result::<Pair>(pair), Pair(3, String::from("three")));
         assert_eq!(downcast_result::<Marker>(marker), Marker);
         assert!(
             expect_construction_failure(
@@ -1042,29 +869,19 @@ mod construction_runtime {
 
     #[test]
     fn test_tuple_input_skips_leading_provider_only_field() {
-        let constructor = StructConstructor::new(
-            &PAIR_DESCRIPTOR,
-            &LEADING_PROVIDER_ONLY_PAIR_FIELDS,
-            construct_pair,
-        );
+        let constructor = StructConstructor::new(&PAIR_DESCRIPTOR, &LEADING_PROVIDER_ONLY_PAIR_FIELDS, construct_pair);
 
         let pair = constructor
-            .construct_tuple(TupleConstructionInput::new([
-                ReflectedOwned::new(String::from("caller field")),
-            ]))
-            .expect(
-                "caller positions should skip a leading provider-only field",
-            );
+            .construct_tuple(TupleConstructionInput::new([ReflectedOwned::new(String::from(
+                "caller field",
+            ))]))
+            .expect("caller positions should skip a leading provider-only field");
 
-        assert_eq!(
-            downcast_result::<Pair>(pair),
-            Pair(99, String::from("caller field"))
-        );
+        assert_eq!(downcast_result::<Pair>(pair), Pair(99, String::from("caller field")));
     }
 
     #[test]
-    fn test_tuple_input_skips_middle_provider_only_field_and_recovers_caller_order()
-     {
+    fn test_tuple_input_skips_middle_provider_only_field_and_recovers_caller_order() {
         let constructor = StructConstructor::new(
             &TRIPLE_DESCRIPTOR,
             &MIDDLE_PROVIDER_ONLY_TRIPLE_FIELDS,
@@ -1075,16 +892,10 @@ mod construction_runtime {
                 ReflectedOwned::new(7_u32),
                 ReflectedOwned::new(Some(String::from("tail"))),
             ]))
-            .expect(
-                "caller positions should skip a middle provider-only field",
-            );
+            .expect("caller positions should skip a middle provider-only field");
         assert_eq!(
             downcast_result::<Triple>(triple),
-            Triple(
-                7,
-                String::from("explicit default"),
-                Some(String::from("tail")),
-            )
+            Triple(7, String::from("explicit default"), Some(String::from("tail")),)
         );
 
         let failure = expect_construction_failure(
@@ -1094,18 +905,14 @@ mod construction_runtime {
             ])),
             "the second caller value should validate against the third descriptor field",
         );
-        let ConstructionError::ValueTypeMismatch { field, mismatch } =
-            failure.error()
-        else {
+        let ConstructionError::ValueTypeMismatch { field, mismatch } = failure.error() else {
             panic!("the failure should retain the mapped descriptor field")
         };
         assert_eq!(field.index(), 2);
         assert_eq!(mismatch.actual(), TypeId::of::<i32>());
         let recovered = failure.into_values().into_vec();
         assert_eq!(recovered.len(), 2);
-        let RecoveredConstructionValue::Positional { index, value } =
-            &recovered[1]
-        else {
+        let RecoveredConstructionValue::Positional { index, value } = &recovered[1] else {
             panic!("tuple recovery must preserve the caller's positional order")
         };
         assert_eq!(*index, 1);
@@ -1114,26 +921,15 @@ mod construction_runtime {
 
     #[test]
     fn test_unit_and_named_variant_construction_return_enum_root_values() {
-        let started_constructor = VariantConstructor::new(
-            &EVENT_VARIANTS[0],
-            &STARTED_CONSTRUCTION_FIELDS,
-            construct_started,
-        );
-        let failed_constructor = VariantConstructor::new(
-            &EVENT_VARIANTS[1],
-            &FAILED_CONSTRUCTION_FIELDS,
-            construct_failed,
-        );
+        let started_constructor =
+            VariantConstructor::new(&EVENT_VARIANTS[0], &STARTED_CONSTRUCTION_FIELDS, construct_started);
+        let failed_constructor =
+            VariantConstructor::new(&EVENT_VARIANTS[1], &FAILED_CONSTRUCTION_FIELDS, construct_failed);
 
-        assert!(std::ptr::eq(
-            started_constructor.variant(),
-            &EVENT_VARIANTS[0]
-        ));
+        assert!(std::ptr::eq(started_constructor.variant(), &EVENT_VARIANTS[0]));
         assert!(started_constructor.fields().is_empty());
         assert_eq!(started_constructor.shape(), ConstructionShape::Unit);
-        assert!(
-            format!("{started_constructor:?}").contains("VariantConstructor")
-        );
+        assert!(format!("{started_constructor:?}").contains("VariantConstructor"));
 
         let started = started_constructor
             .construct_unit()
@@ -1155,11 +951,7 @@ mod construction_runtime {
         );
         assert!(
             expect_construction_failure(
-                started_constructor.construct_tuple(
-                    TupleConstructionInput::new(std::iter::empty::<
-                        ReflectedOwned,
-                    >())
-                ),
+                started_constructor.construct_tuple(TupleConstructionInput::new(std::iter::empty::<ReflectedOwned>())),
                 "a unit variant must reject tuple input",
             )
             .values()
@@ -1177,11 +969,7 @@ mod construction_runtime {
 
     #[test]
     fn test_update_validates_all_overrides_before_mutating_owned_base() {
-        let updater = StructUpdater::new(
-            &PROFILE_DESCRIPTOR,
-            &PROFILE_UPDATE_FIELDS,
-            update_profile,
-        );
+        let updater = StructUpdater::new(&PROFILE_DESCRIPTOR, &PROFILE_UPDATE_FIELDS, update_profile);
         let base = Profile {
             id: 1,
             label: String::from("before"),
@@ -1195,9 +983,7 @@ mod construction_runtime {
             ]),
         );
 
-        let updated = updater
-            .update(input)
-            .expect("valid overrides should update");
+        let updated = updater.update(input).expect("valid overrides should update");
 
         assert_eq!(
             downcast_result::<Profile>(updated),
@@ -1210,13 +996,8 @@ mod construction_runtime {
     }
 
     #[test]
-    fn test_update_failure_recovers_base_and_every_override_in_original_order()
-    {
-        let updater = StructUpdater::new(
-            &PROFILE_DESCRIPTOR,
-            &PROFILE_UPDATE_FIELDS,
-            unreachable_update_adapter,
-        );
+    fn test_update_failure_recovers_base_and_every_override_in_original_order() {
+        let updater = StructUpdater::new(&PROFILE_DESCRIPTOR, &PROFILE_UPDATE_FIELDS, unreachable_update_adapter);
         let input = StructUpdateInput::new(
             ReflectedOwned::new(Profile {
                 id: 1,
@@ -1245,12 +1026,10 @@ mod construction_runtime {
             panic!("update recovery must return the base first")
         };
         assert_eq!(
-            base.downcast_ref::<Profile>()
-                .map(|profile| profile.label.as_str()),
+            base.downcast_ref::<Profile>().map(|profile| profile.label.as_str()),
             Some("before")
         );
-        let RecoveredConstructionValue::Named { name, .. } = &recovered[1]
-        else {
+        let RecoveredConstructionValue::Named { name, .. } = &recovered[1] else {
             panic!("the first override should remain named")
         };
         assert_eq!(name.as_ref(), "label");
@@ -1258,27 +1037,19 @@ mod construction_runtime {
 
     #[test]
     fn test_update_rejects_wrong_base_type_without_losing_overrides() {
-        let updater = StructUpdater::new(
-            &PROFILE_DESCRIPTOR,
-            &PROFILE_UPDATE_FIELDS,
-            unreachable_update_adapter,
-        );
+        let updater = StructUpdater::new(&PROFILE_DESCRIPTOR, &PROFILE_UPDATE_FIELDS, unreachable_update_adapter);
         let failure = expect_construction_failure(
             updater.update(StructUpdateInput::new(
                 ReflectedOwned::new(Defaulted {
                     id: 1,
                     label: String::from("wrong root"),
                 }),
-                NamedConstructionInput::new([(
-                    "id",
-                    ReflectedOwned::new(2_u32),
-                )]),
+                NamedConstructionInput::new([("id", ReflectedOwned::new(2_u32))]),
             )),
             "update requires the exact reflected root type",
         );
 
-        let ConstructionError::BaseTypeMismatch { mismatch } = failure.error()
-        else {
+        let ConstructionError::BaseTypeMismatch { mismatch } = failure.error() else {
             panic!("the failure should classify the base mismatch")
         };
         assert_eq!(mismatch.expected(), TypeId::of::<Profile>());
@@ -1299,18 +1070,11 @@ mod construction_runtime {
     #[test]
     fn test_validation_failure_neither_drops_nor_duplicates_owned_inputs() {
         let drops = Rc::new(Cell::new(0));
-        let constructor = StructConstructor::new(
-            &PROFILE_DESCRIPTOR,
-            &PROFILE_CONSTRUCTION_FIELDS,
-            construct_profile,
-        );
+        let constructor = StructConstructor::new(&PROFILE_DESCRIPTOR, &PROFILE_CONSTRUCTION_FIELDS, construct_profile);
         let failure = expect_construction_failure(
             constructor.construct_named(NamedConstructionInput::new([
                 ("unknown", ReflectedOwned::new(DropProbe(Rc::clone(&drops)))),
-                (
-                    "also_unknown",
-                    ReflectedOwned::new(DropProbe(Rc::clone(&drops))),
-                ),
+                ("also_unknown", ReflectedOwned::new(DropProbe(Rc::clone(&drops)))),
             ])),
             "unknown fields must fail before consuming values",
         );
@@ -1323,17 +1087,12 @@ mod construction_runtime {
 
     /// Constructs a thread-safe scalar root from one validated positional
     /// value.
-    fn construct_thread_scalar(
-        input: ValidatedConstructionInput<ThreadSafe>,
-    ) -> DynamicOwned<ThreadSafe> {
-        let [value] =
-            input
-                .into_values()
-                .into_vec()
-                .try_into()
-                .unwrap_or_else(|_| {
-                    unreachable!("validation guarantees one value")
-                });
+    fn construct_thread_scalar(input: ValidatedConstructionInput<ThreadSafe>) -> DynamicOwned<ThreadSafe> {
+        let [value] = input
+            .into_values()
+            .into_vec()
+            .try_into()
+            .unwrap_or_else(|_| unreachable!("validation guarantees one value"));
         let value = value
             .downcast::<u32>()
             .unwrap_or_else(|_| unreachable!("validation guarantees u32"));
@@ -1357,24 +1116,17 @@ mod construction_runtime {
         Visibility::Private,
     )];
     static THREAD_SCALAR_DESCRIPTOR: TypeDescriptor =
-        descriptor::struct_type::<ThreadScalar>(
-            "construct::ThreadScalar",
-            StructKind::Newtype,
-            &THREAD_SCALAR_FIELDS,
-        );
-    static THREAD_SCALAR_CONSTRUCTION_FIELDS: [ConstructionField<ThreadSafe>;
-        1] = [ConstructionField::required(&THREAD_SCALAR_FIELDS[0])];
-    static THREAD_SCALAR_UPDATE_FIELDS: [UpdateField; 1] =
-        [UpdateField::allowed(&THREAD_SCALAR_FIELDS[0])];
+        descriptor::struct_type::<ThreadScalar>("construct::ThreadScalar", StructKind::Newtype, &THREAD_SCALAR_FIELDS);
+    static THREAD_SCALAR_CONSTRUCTION_FIELDS: [ConstructionField<ThreadSafe>; 1] =
+        [ConstructionField::required(&THREAD_SCALAR_FIELDS[0])];
+    static THREAD_SCALAR_UPDATE_FIELDS: [UpdateField; 1] = [UpdateField::allowed(&THREAD_SCALAR_FIELDS[0])];
 
     /// Applies one validated thread-safe scalar replacement.
-    fn update_thread_scalar(
-        input: ValidatedUpdateInput<ThreadSafe>,
-    ) -> DynamicOwned<ThreadSafe> {
+    fn update_thread_scalar(input: ValidatedUpdateInput<ThreadSafe>) -> DynamicOwned<ThreadSafe> {
         let (base, overrides) = input.into_parts();
-        let mut value = base.downcast::<ThreadScalar>().unwrap_or_else(|_| {
-            unreachable!("validation guarantees ThreadScalar")
-        });
+        let mut value = base
+            .downcast::<ThreadScalar>()
+            .unwrap_or_else(|_| unreachable!("validation guarantees ThreadScalar"));
         for replacement in overrides.into_vec() {
             let (index, replacement) = replacement.into_parts();
             assert_eq!(index, 0);
@@ -1393,27 +1145,19 @@ mod construction_runtime {
             construct_thread_scalar,
         );
         let value = constructor
-            .construct_tuple(TupleConstructionInput::new([DynamicOwned::<
-                ThreadSafe,
-            >::new(
-                11_u32
-            )]))
-            .expect(
-                "thread-safe input should validate without mode conversion",
-            );
+            .construct_tuple(TupleConstructionInput::new([DynamicOwned::<ThreadSafe>::new(11_u32)]))
+            .expect("thread-safe input should validate without mode conversion");
 
-        assert!(std::ptr::eq(
-            constructor.descriptor(),
-            &THREAD_SCALAR_DESCRIPTOR
-        ));
+        assert!(std::ptr::eq(constructor.descriptor(), &THREAD_SCALAR_DESCRIPTOR));
         assert_eq!(constructor.fields().len(), 1);
         assert_eq!(constructor.shape(), ConstructionShape::Tuple);
         assert!(format!("{constructor:?}").contains("StructConstructor"));
         assert!(
             expect_construction_failure(
-                constructor.construct_named(NamedConstructionInput::new(
-                    std::iter::empty::<(&str, DynamicOwned<ThreadSafe>,)>()
-                )),
+                constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(
+                    &str,
+                    DynamicOwned<ThreadSafe>,
+                )>())),
                 "a thread-safe tuple constructor must reject named input",
             )
             .values()
@@ -1428,9 +1172,9 @@ mod construction_runtime {
             .is_empty()
         );
 
-        let scalar = value.downcast::<ThreadScalar>().unwrap_or_else(|_| {
-            panic!("the adapter result should retain thread-safe storage")
-        });
+        let scalar = value
+            .downcast::<ThreadScalar>()
+            .unwrap_or_else(|_| panic!("the adapter result should retain thread-safe storage"));
         assert_eq!(scalar, ThreadScalar(11));
 
         let updater = StructUpdater::new(
@@ -1438,27 +1182,19 @@ mod construction_runtime {
             &THREAD_SCALAR_UPDATE_FIELDS,
             update_thread_scalar,
         );
-        assert!(std::ptr::eq(
-            updater.descriptor(),
-            &THREAD_SCALAR_DESCRIPTOR
-        ));
+        assert!(std::ptr::eq(updater.descriptor(), &THREAD_SCALAR_DESCRIPTOR));
         assert_eq!(updater.fields().len(), 1);
         assert!(format!("{updater:?}").contains("StructUpdater"));
         let updated = updater
             .update(StructUpdateInput::new(
                 DynamicOwned::<ThreadSafe>::new(ThreadScalar(11)),
-                NamedConstructionInput::new(std::iter::empty::<(
-                    &str,
-                    DynamicOwned<ThreadSafe>,
-                )>()),
+                NamedConstructionInput::new(std::iter::empty::<(&str, DynamicOwned<ThreadSafe>)>()),
             ))
             .expect("an exact thread-safe update must succeed");
         assert_eq!(
             updated
                 .downcast::<ThreadScalar>()
-                .unwrap_or_else(|_| panic!(
-                    "the update must retain ThreadScalar"
-                )),
+                .unwrap_or_else(|_| panic!("the update must retain ThreadScalar")),
             ThreadScalar(11),
         );
 
@@ -1474,9 +1210,10 @@ mod construction_runtime {
         assert!(variant.construct_unit().is_ok());
         assert!(
             expect_construction_failure(
-                variant.construct_named(NamedConstructionInput::new(
-                    std::iter::empty::<(&str, DynamicOwned<ThreadSafe>,)>()
-                )),
+                variant.construct_named(NamedConstructionInput::new(std::iter::empty::<(
+                    &str,
+                    DynamicOwned<ThreadSafe>,
+                )>())),
                 "a thread-safe unit variant must reject named input",
             )
             .values()

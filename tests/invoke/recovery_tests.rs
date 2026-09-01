@@ -27,14 +27,7 @@ fn method_identity() -> MemberId {
         "example::Recovery",
         "method",
         1,
-        FragmentIdentity::new(
-            "example",
-            "example::Recovery",
-            1,
-            1,
-            "method",
-            1,
-        ),
+        FragmentIdentity::new("example", "example::Recovery", 1, 1, "method", 1),
     )
 }
 
@@ -42,11 +35,10 @@ fn method_identity() -> MemberId {
 /// all caller-ordered bindings.
 #[test]
 fn test_invocation_recovery_inspection_preserves_bindings() {
-    let invocation =
-        Invocation::associated_bindings([InvocationBinding::named(
-            "value",
-            InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8)),
-        )]);
+    let invocation = Invocation::associated_bindings([InvocationBinding::named(
+        "value",
+        InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8)),
+    )]);
     let failure = invocation
         .validate(
             &method_identity(),
@@ -55,16 +47,16 @@ fn test_invocation_recovery_inspection_preserves_bindings() {
         )
         .expect_err("mismatched argument type should fail validation");
 
-    assert!(failure.recovery.receiver().is_none());
-    assert_eq!(failure.recovery.arguments().len(), 1);
-    assert_eq!(failure.recovery.argument_name(0), Some("value"));
-    assert_eq!(failure.recovery.argument_name(1), None);
-    assert!(format!("{:?}", failure.recovery).contains("InvocationRecovery"));
+    assert!(failure.recovery().receiver().is_none());
+    assert_eq!(failure.recovery().arguments().len(), 1);
+    assert_eq!(failure.recovery().argument_name(0), Some("value"));
+    assert_eq!(failure.recovery().argument_name(1), None);
+    assert!(format!("{:?}", failure.recovery()).contains("InvocationRecovery"));
     assert!(format!("{failure:?}").contains("InvocationFailure"));
     assert!(failure.to_string().contains("failed to invoke"));
     assert!(failure.source().is_some());
 
-    let recovered = failure.recovery.into_invocation();
+    let recovered = failure.into_recovery().into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
 
@@ -73,10 +65,7 @@ fn test_invocation_recovery_inspection_preserves_bindings() {
 #[test]
 fn test_validated_invocation_inspection_supports_both_modes() {
     let mutable_expectation = ArgumentExpectation::borrowed_mut::<u32>();
-    assert_eq!(
-        mutable_expectation.type_name(),
-        std::any::type_name::<u32>()
-    );
+    assert_eq!(mutable_expectation.type_name(), std::any::type_name::<u32>());
 
     let local = Invocation::<Local>::associated([])
         .validate(&method_identity(), ReceiverExpectation::none(), &[])

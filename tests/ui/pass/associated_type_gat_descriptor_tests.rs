@@ -33,14 +33,14 @@ fn main() {
     let payload = <Target as GatContract>::__qubit_reflect_trait_payload();
     let generic = payload.applied().associated_types()[0].generic_definition();
     assert!(matches!(
-        generic.parameters.as_ref(),
+        generic.parameters().as_ref(),
         [
             GenericParameterDescriptor::Lifetime { name, .. },
             GenericParameterDescriptor::Type { name: type_name, .. },
         ] if name.as_ref() == "a" && type_name.as_ref() == "T"
     ));
     assert!(matches!(
-        generic.predicates.as_ref(),
+        generic.predicates().as_ref(),
         [
             PredicateDescriptor::TypeOutlives {
                 ty: TypeExpression::SelfType,
