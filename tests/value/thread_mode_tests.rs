@@ -8,10 +8,9 @@
 
 // qubit-style: allow explicit-imports
 //! Integration tests for thread-safe dynamic value mode.
-use qubit_reflect as reflect;
-use reflect::value::SendReflectedMut;
-use reflect::value::SendReflectedOwned;
-use reflect::value::SendReflectedRef;
+use qubit_reflect::value::SendReflectedMut;
+use qubit_reflect::value::SendReflectedOwned;
+use qubit_reflect::value::SendReflectedRef;
 
 /// Verifies that a wrapper retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: T) {}

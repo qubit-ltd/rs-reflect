@@ -9,8 +9,8 @@
 // qubit-style: allow explicit-imports
 //! Integration tests for concrete generic reflection instances.
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 struct User {
@@ -45,7 +45,9 @@ struct ExplicitAliasedVectorPage<T: ImportedRuntimeReflect> {
 }
 
 mod custom_container_name {
-    #[derive(::qubit_reflect::Reflect)]
+    use super::reflect::Reflect;
+
+    #[derive(Reflect)]
     #[reflect(opaque)]
     pub(super) struct Vec<T> {
         pub(super) value: T,
@@ -71,7 +73,7 @@ struct OpaqueGenericRecord<T, const N: usize> {
 struct Unreflected;
 
 #[derive(Reflect)]
-struct DirectReflectBound<T: qubit_reflect::Reflect> {
+struct DirectReflectBound<T: reflect::Reflect> {
     #[reflect(opaque)]
     value: T,
 }
@@ -79,7 +81,7 @@ struct DirectReflectBound<T: qubit_reflect::Reflect> {
 #[derive(Reflect)]
 struct WhereReflectBound<T>
 where
-    T: qubit_reflect::Reflect,
+    T: reflect::Reflect,
 {
     #[reflect(opaque)]
     value: T,
@@ -143,7 +145,7 @@ impl Family for UserFamily {
 #[derive(Reflect)]
 struct AssociatedItem<T: Family>
 where
-    T::Item: qubit_reflect::Reflect,
+    T::Item: reflect::Reflect,
 {
     item: T::Item,
 }
@@ -195,11 +197,14 @@ mod shadowed_runtime_path {
         pub trait Reflect {}
     }
 
-    impl qubit_reflect::Reflect for super::Unreflected {}
+    use self::qubit_reflect::Reflect as ShadowedReflect;
+    use super::reflect::Reflect as ExternalReflect;
 
-    #[derive(::qubit_reflect::Reflect)]
+    impl ShadowedReflect for super::Unreflected {}
+
+    #[derive(ExternalReflect)]
     #[reflect(opaque)]
-    pub(super) struct ShadowedBound<T: qubit_reflect::Reflect> {
+    pub(super) struct ShadowedBound<T: ShadowedReflect> {
         pub(super) value: T,
     }
 }

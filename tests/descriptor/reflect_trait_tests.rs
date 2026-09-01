@@ -11,10 +11,10 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use reflect::descriptor::TraitId;
-use reflect::descriptor::TypeDescriptor;
-use reflect::reflect;
-use reflect::registry::ReflectRegistry;
+use qubit_reflect::descriptor::TraitId;
+use qubit_reflect::descriptor::TypeDescriptor;
+use qubit_reflect::reflect;
+use qubit_reflect::registry::ReflectRegistry;
 
 #[reflect]
 trait ReflectedService {

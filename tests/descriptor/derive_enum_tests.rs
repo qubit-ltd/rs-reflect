@@ -11,19 +11,18 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
-use reflect::access::FieldAccessError;
-use reflect::descriptor::DiscriminantOrigin;
-use reflect::descriptor::EnumRepr;
-use reflect::descriptor::NumericDiscriminant;
-use reflect::descriptor::TypeKind;
-use reflect::descriptor::VariantKind;
-use reflect::registry::ReflectRegistry;
-use reflect::value::ReflectedMut;
-use reflect::value::ReflectedOwned;
-use reflect::value::ReflectedRef;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::access::FieldAccessError;
+use qubit_reflect::descriptor::DiscriminantOrigin;
+use qubit_reflect::descriptor::EnumRepr;
+use qubit_reflect::descriptor::NumericDiscriminant;
+use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::VariantKind;
+use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::ReflectedRef;
 
 /// Counts destruction of a replacement submitted to an inactive variant.
 struct VariantDropProbe(Rc<Cell<usize>>);

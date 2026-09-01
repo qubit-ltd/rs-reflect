@@ -11,12 +11,12 @@
 #![cfg(panic = "abort")]
 
 use qubit_reflect as reflect;
-use reflect::Reflect;
-use reflect::descriptor::CatchingAvailability;
-use reflect::descriptor::MethodLookup;
-use reflect::descriptor::MethodQualifier;
-use reflect::reflect_impl;
-use reflect::registry::ReflectRegistry;
+use qubit_reflect::Reflect;
+use qubit_reflect::descriptor::CatchingAvailability;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::reflect_impl;
+use qubit_reflect::registry::ReflectRegistry;
 
 #[derive(Reflect)]
 struct Worker;

@@ -16,22 +16,22 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
-use reflect::__private::registration::CapabilityRegistration;
-use reflect::__private::registration::FragmentKind;
-use reflect::__private::registration::FragmentPayload;
-use reflect::__private::registration::RegistrationFragment;
-use reflect::__private::registration::RuntimeIdentity;
-use reflect::__private::registration::StaticFragmentIdentity;
-use reflect::__private::registration::build_registry;
-use reflect::Reflect;
-use reflect::TypeDescriptor;
-use reflect::capability::CapabilityDescriptor;
-use reflect::capability::CapabilityKey;
-use reflect::error::RegistryErrorKind;
-use reflect::identity::CapabilityId;
-use reflect::registry::ReflectRegistry;
-use reflect::value::ReflectedMut;
-use reflect::value::ReflectedOwned;
+use qubit_reflect::__private::registration::CapabilityRegistration;
+use qubit_reflect::__private::registration::FragmentKind;
+use qubit_reflect::__private::registration::FragmentPayload;
+use qubit_reflect::__private::registration::RegistrationFragment;
+use qubit_reflect::__private::registration::RuntimeIdentity;
+use qubit_reflect::__private::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::registration::build_registry;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::capability::CapabilityDescriptor;
+use qubit_reflect::capability::CapabilityKey;
+use qubit_reflect::error::RegistryErrorKind;
+use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::ReflectedMut;
+use qubit_reflect::value::ReflectedOwned;
 
 #[derive(Reflect)]
 struct StressRecord<T> {
