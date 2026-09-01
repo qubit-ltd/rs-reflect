@@ -8,6 +8,7 @@
 
 //! Integration tests for dynamic value APIs.
 
+mod dynamic_borrow_tests;
 mod dynamic_owned_tests;
 mod dynamic_ref_tests;
 mod str_tests;
