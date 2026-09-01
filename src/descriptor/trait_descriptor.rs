@@ -32,7 +32,8 @@ use crate::expression::TypeExpression;
 use crate::identity::ExternalTraitId;
 use crate::identity::Visibility;
 
-type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImplPayload>>>;
+type AppliedTraitCache =
+    HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImplPayload>>>;
 type DynTraitCache = HashMap<TypeId, &'static OnceLock<TraitDescriptor>>;
 
 /// The process-local identity source of a reflected or external trait.
@@ -118,15 +119,20 @@ pub struct TraitImplPayload {
     definition: &'static TraitDefinitionDescriptor,
     applied: &'static TraitDescriptor,
     default_method_adapters: &'static [Option<&'static InvocationAdapter>],
-    default_method_unavailable_reasons: &'static [&'static [InvocationUnavailableReason]],
+    default_method_unavailable_reasons:
+        &'static [&'static [InvocationUnavailableReason]],
     associated_type_resolvers: &'static [Option<TypeDescriptorResolver>],
-    associated_const_readers: &'static [Option<&'static AssociatedConstReader>],
+    associated_const_readers:
+        &'static [Option<&'static AssociatedConstReader>],
 }
 
 impl TraitImplPayload {
     /// Creates a payload for one reflected trait declaration.
     #[doc(hidden)]
-    pub const fn new(definition: &'static TraitDefinitionDescriptor, applied: &'static TraitDescriptor) -> Self {
+    pub const fn new(
+        definition: &'static TraitDefinitionDescriptor,
+        applied: &'static TraitDescriptor,
+    ) -> Self {
         Self {
             definition,
             applied,
@@ -151,26 +157,34 @@ impl TraitImplPayload {
 
     /// Returns concrete adapters for default methods in declaration order.
     #[doc(hidden)]
-    pub const fn default_method_adapters(self) -> &'static [Option<&'static InvocationAdapter>] {
+    pub const fn default_method_adapters(
+        self,
+    ) -> &'static [Option<&'static InvocationAdapter>] {
         self.default_method_adapters
     }
 
     /// Returns unavailable-reason sets for default methods in declaration
     /// order.
     #[doc(hidden)]
-    pub const fn default_method_unavailable_reasons(self) -> &'static [&'static [InvocationUnavailableReason]] {
+    pub const fn default_method_unavailable_reasons(
+        self,
+    ) -> &'static [&'static [InvocationUnavailableReason]] {
         self.default_method_unavailable_reasons
     }
 
     /// Returns proven concrete associated-type resolvers in declaration order.
     #[doc(hidden)]
-    pub const fn associated_type_resolvers(self) -> &'static [Option<TypeDescriptorResolver>] {
+    pub const fn associated_type_resolvers(
+        self,
+    ) -> &'static [Option<TypeDescriptorResolver>] {
         self.associated_type_resolvers
     }
 
     /// Returns safe associated-constant readers in declaration order.
     #[doc(hidden)]
-    pub const fn associated_const_readers(self) -> &'static [Option<&'static AssociatedConstReader>] {
+    pub const fn associated_const_readers(
+        self,
+    ) -> &'static [Option<&'static AssociatedConstReader>] {
         self.associated_const_readers
     }
 
@@ -180,31 +194,52 @@ impl TraitImplPayload {
     pub fn cached_with_arguments<T: ?Sized + 'static>(
         definition: &'static TraitDefinitionDescriptor,
         arguments: Vec<GenericArgument>,
-        build: impl FnOnce(Vec<GenericArgument>) -> Result<TraitDescriptor, TraitDescriptorBuildError>,
-        build_default_method_adapters: impl FnOnce() -> Vec<Option<&'static InvocationAdapter>>,
-        build_default_method_unavailable_reasons: impl FnOnce() -> Vec<&'static [InvocationUnavailableReason]>,
-        build_associated_type_resolvers: impl FnOnce() -> Vec<Option<TypeDescriptorResolver>>,
-        build_associated_const_readers: impl FnOnce() -> Vec<Option<&'static AssociatedConstReader>>,
+        build: impl FnOnce(
+            Vec<GenericArgument>,
+        )
+            -> Result<TraitDescriptor, TraitDescriptorBuildError>,
+        build_default_method_adapters: impl FnOnce() -> Vec<
+            Option<&'static InvocationAdapter>,
+        >,
+        build_default_method_unavailable_reasons: impl FnOnce() -> Vec<
+            &'static [InvocationUnavailableReason],
+        >,
+        build_associated_type_resolvers: impl FnOnce() -> Vec<
+            Option<TypeDescriptorResolver>,
+        >,
+        build_associated_const_readers: impl FnOnce() -> Vec<
+            Option<&'static AssociatedConstReader>,
+        >,
     ) -> Self {
-        static CACHE: LazyLock<Mutex<AppliedTraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+        static CACHE: LazyLock<Mutex<AppliedTraitCache>> =
+            LazyLock::new(|| Mutex::new(HashMap::new()));
         let identity = AppliedTraitId {
             definition: definition.trait_id().clone(),
             arguments: arguments.clone().into_boxed_slice(),
             associated_type_arguments: Box::new([]),
         };
         let key = (TypeId::of::<T>(), identity);
-        let mut cache = CACHE.lock().expect("trait payload cache mutex must not be poisoned");
-        let cell = cache.entry(key).or_insert_with(|| Arc::new(OnceLock::new())).clone();
+        let mut cache = CACHE
+            .lock()
+            .expect("trait payload cache mutex must not be poisoned");
+        let cell = cache
+            .entry(key)
+            .or_insert_with(|| Arc::new(OnceLock::new()))
+            .clone();
         drop(cache);
         *cell.get_or_init(|| {
-            let applied = Box::leak(Box::new(
-                build(arguments).expect("a reflected trait must build a valid applied descriptor"),
-            ));
-            let default_method_adapters = Box::leak(build_default_method_adapters().into_boxed_slice());
-            let default_method_unavailable_reasons =
-                Box::leak(build_default_method_unavailable_reasons().into_boxed_slice());
-            let associated_type_resolvers = Box::leak(build_associated_type_resolvers().into_boxed_slice());
-            let associated_const_readers = Box::leak(build_associated_const_readers().into_boxed_slice());
+            let applied = Box::leak(Box::new(build(arguments).expect(
+                "a reflected trait must build a valid applied descriptor",
+            )));
+            let default_method_adapters =
+                Box::leak(build_default_method_adapters().into_boxed_slice());
+            let default_method_unavailable_reasons = Box::leak(
+                build_default_method_unavailable_reasons().into_boxed_slice(),
+            );
+            let associated_type_resolvers =
+                Box::leak(build_associated_type_resolvers().into_boxed_slice());
+            let associated_const_readers =
+                Box::leak(build_associated_const_readers().into_boxed_slice());
             Self {
                 definition,
                 applied,
@@ -225,14 +260,16 @@ pub fn external_supertrait<T: ?Sized + 'static>(
     rust_path: &'static str,
     arguments: Vec<GenericArgument>,
 ) -> &'static TraitDescriptor {
-    let external_id =
-        ExternalTraitId::new(id).expect("the macro validator must only emit valid external trait identifiers");
+    let external_id = ExternalTraitId::new(id).expect(
+        "the macro validator must only emit valid external trait identifiers",
+    );
     let key = (
         TypeId::of::<T>(),
         external_id.clone(),
         arguments.clone().into_boxed_slice(),
     );
-    let cell = crate::descriptor::internal::trait_cache::external_supertrait_cell(key);
+    let cell =
+        crate::descriptor::internal::trait_cache::external_supertrait_cell(key);
     cell.get_or_init(|| {
         let definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
             TraitId::External(external_id),
@@ -261,8 +298,11 @@ pub fn external_supertrait<T: ?Sized + 'static>(
 pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
     build: impl FnOnce() -> TraitDescriptor,
 ) -> &'static TraitDescriptor {
-    static CACHE: LazyLock<Mutex<DynTraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-    let mut cache = CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    static CACHE: LazyLock<Mutex<DynTraitCache>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    let mut cache = CACHE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let cell = *cache
         .entry(TypeId::of::<T>())
         .or_insert_with(|| Box::leak(Box::new(OnceLock::new())));
@@ -274,7 +314,8 @@ impl TraitDefinitionDescriptor {
     /// Returns whether two declarations can be merged for one external trait
     /// ID.
     pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
-        self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
+        self.completeness() == other.completeness()
+            && self.generic_definition() == other.generic_definition()
     }
 
     /// Creates immutable trait definition facts.
@@ -367,14 +408,18 @@ impl TraitDefinitionDescriptor {
     /// Returns generic parameters and predicates in source order.
     #[must_use]
     #[inline(always)]
-    pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
+    pub const fn generic_definition(
+        &self,
+    ) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
     }
 
     /// Returns methods declared by this trait in source order.
     #[must_use]
     pub fn methods(&self) -> &[MethodDescriptor] {
-        self.members.get().map_or(&[], |members| members.methods.as_ref())
+        self.members
+            .get()
+            .map_or(&[], |members| members.methods.as_ref())
     }
 
     /// Returns associated types declared by this trait in source order.
@@ -408,7 +453,8 @@ impl TraitDefinitionDescriptor {
         ),
     ) {
         self.members.get_or_init(|| {
-            let (methods, associated_types, associated_consts) = initialize(self);
+            let (methods, associated_types, associated_consts) =
+                initialize(self);
             TraitDefinitionMembers {
                 methods,
                 associated_types,
@@ -501,11 +547,12 @@ impl AssociatedTypeDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn generic_definition(&self) -> &GenericDefinitionDescriptor {
-        static EMPTY: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
-            parameters: Box::new([]),
-            predicates: Box::new([]),
-            diagnostic: crate::expression::DiagnosticText::default(),
-        });
+        static EMPTY: LazyLock<GenericDefinitionDescriptor> =
+            LazyLock::new(|| GenericDefinitionDescriptor {
+                parameters: Box::new([]),
+                predicates: Box::new([]),
+                diagnostic: crate::expression::DiagnosticText::default(),
+            });
         self.generic_definition.as_deref().unwrap_or(&EMPTY)
     }
 
@@ -519,7 +566,10 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
-    fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
+    fn substituted(
+        self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> Self {
         Self {
             bounds: self
                 .bounds
@@ -530,10 +580,11 @@ impl AssociatedTypeDescriptor {
                 .default
                 .as_ref()
                 .map(|expression| substitutions.type_expression(expression)),
-            generic_definition: self
-                .generic_definition
-                .as_ref()
-                .map(|definition| Box::new(substitutions.generic_definition(definition))),
+            generic_definition: self.generic_definition.as_ref().map(
+                |definition| {
+                    Box::new(substitutions.generic_definition(definition))
+                },
+            ),
             ..self
         }
     }
@@ -604,7 +655,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
-    fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
+    fn substituted(
+        self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> Self {
         Self {
             declared_type: substitutions.type_expression(&self.declared_type),
             ..self
@@ -649,7 +703,9 @@ pub struct SupertraitClosure<'a> {
 impl<'a> SupertraitClosure<'a> {
     /// Returns applied supertraits in deterministic path order.
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
-        self.descriptors.iter().map(|descriptor| descriptor.descriptor())
+        self.descriptors
+            .iter()
+            .map(|descriptor| descriptor.descriptor())
     }
 
     /// Returns the number of distinct transitive supertraits.
@@ -678,7 +734,9 @@ pub struct TraitDescriptor {
 
 impl TraitDescriptor {
     /// Starts an applied trait builder for `definition`.
-    pub fn builder(definition: &'static TraitDefinitionDescriptor) -> TraitDescriptorBuilder {
+    pub fn builder(
+        definition: &'static TraitDefinitionDescriptor,
+    ) -> TraitDescriptorBuilder {
         TraitDescriptorBuilder::new(definition)
     }
 
@@ -765,7 +823,9 @@ impl TraitDescriptor {
     ///
     /// `None` means this applied trait has no method with the requested name.
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
-        self.methods.iter().find(|method| method.query_name() == name)
+        self.methods
+            .iter()
+            .find(|method| method.query_name() == name)
     }
 
     /// Returns associated type declarations in source order.
@@ -778,8 +838,13 @@ impl TraitDescriptor {
     /// Finds an associated type by query name.
     ///
     /// `None` means no associated type has the requested name.
-    pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
-        self.associated_types.iter().find(|item| item.query_name() == name)
+    pub fn associated_type(
+        &self,
+        name: &str,
+    ) -> Option<&AssociatedTypeDescriptor> {
+        self.associated_types
+            .iter()
+            .find(|item| item.query_name() == name)
     }
 
     /// Returns associated constant declarations in source order.
@@ -792,8 +857,13 @@ impl TraitDescriptor {
     /// Finds an associated constant by query name.
     ///
     /// `None` means no associated constant has the requested name.
-    pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
-        self.associated_consts.iter().find(|item| item.query_name() == name)
+    pub fn associated_const(
+        &self,
+        name: &str,
+    ) -> Option<&AssociatedConstDescriptor> {
+        self.associated_consts
+            .iter()
+            .find(|item| item.query_name() == name)
     }
 
     /// Returns whether two descriptors are the same concrete trait application.
@@ -915,14 +985,23 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets concrete associated-type equalities in declaration order.
-    pub fn associated_type_arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
+    pub fn associated_type_arguments(
+        mut self,
+        arguments: Vec<GenericArgument>,
+    ) -> Self {
         self.associated_type_arguments = arguments;
         self
     }
 
     /// Sets direct supertraits in source declaration order.
-    pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
-        self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
+    pub fn direct_supertraits<const N: usize>(
+        mut self,
+        direct_supertraits: [&'static TraitDescriptor; N],
+    ) -> Self {
+        self.direct_supertraits = direct_supertraits
+            .into_iter()
+            .map(TraitDescriptorRef::new)
+            .collect();
         self
     }
 
@@ -933,13 +1012,19 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets applied associated types in source order.
-    pub fn associated_types(mut self, associated_types: Vec<AssociatedTypeDescriptor>) -> Self {
+    pub fn associated_types(
+        mut self,
+        associated_types: Vec<AssociatedTypeDescriptor>,
+    ) -> Self {
         self.associated_types = associated_types;
         self
     }
 
     /// Sets applied associated constants in source order.
-    pub fn associated_consts(mut self, associated_consts: Vec<AssociatedConstDescriptor>) -> Self {
+    pub fn associated_consts(
+        mut self,
+        associated_consts: Vec<AssociatedConstDescriptor>,
+    ) -> Self {
         self.associated_consts = associated_consts;
         self
     }
@@ -958,12 +1043,15 @@ impl TraitDescriptorBuilder {
         }) {
             return Err(TraitDescriptorBuildError::ForeignMethod);
         }
-        if self.definition.completeness() == TraitCompleteness::ExternalIncomplete
+        if self.definition.completeness()
+            == TraitCompleteness::ExternalIncomplete
             && (!self.direct_supertraits.is_empty()
                 || !self.associated_types.is_empty()
                 || !self.associated_consts.is_empty())
         {
-            return Err(TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts);
+            return Err(
+                TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts,
+            );
         }
 
         let mut all_supertraits = Vec::new();
@@ -979,22 +1067,28 @@ impl TraitDescriptorBuilder {
         let trait_id = AppliedTraitId {
             definition: self.definition.trait_id().clone(),
             arguments: self.arguments.clone().into_boxed_slice(),
-            associated_type_arguments: self.associated_type_arguments.clone().into_boxed_slice(),
+            associated_type_arguments: self
+                .associated_type_arguments
+                .clone()
+                .into_boxed_slice(),
         };
-        let substitutions =
-            TraitApplicationSubstitutions::new(self.definition, &self.arguments, &self.associated_type_arguments);
+        let substitutions = TraitApplicationSubstitutions::new(
+            self.definition,
+            &self.arguments,
+            &self.associated_type_arguments,
+        );
         let methods = if substitutions.is_empty()
-            || !self
-                .methods
-                .iter()
-                .any(|method| method.needs_trait_application_substitution(&substitutions))
-        {
+            || !self.methods.iter().any(|method| {
+                method.needs_trait_application_substitution(&substitutions)
+            }) {
             self.methods
         } else {
             Box::leak(
                 self.methods
                     .iter()
-                    .map(|method| method.substituted_for_trait_application(&substitutions))
+                    .map(|method| {
+                        method.substituted_for_trait_application(&substitutions)
+                    })
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             )
@@ -1013,7 +1107,9 @@ impl TraitDescriptorBuilder {
             definition: self.definition,
             trait_id,
             arguments: self.arguments.into_boxed_slice(),
-            associated_type_arguments: self.associated_type_arguments.into_boxed_slice(),
+            associated_type_arguments: self
+                .associated_type_arguments
+                .into_boxed_slice(),
             direct_supertraits: self.direct_supertraits.into_boxed_slice(),
             all_supertraits: all_supertraits.into_boxed_slice(),
             methods,
@@ -1036,7 +1132,10 @@ impl TraitDescriptorBuilder {
                 rust_path: self.definition.rust_path(),
             });
         }
-        if closure.iter().any(|existing| existing.same_application(candidate)) {
+        if closure
+            .iter()
+            .any(|existing| existing.same_application(candidate))
+        {
             return Ok(());
         }
         closure.push(TraitDescriptorRef::new(candidate));
@@ -1049,10 +1148,16 @@ impl TraitDescriptorBuilder {
     /// Verifies every runtime identity parameter has one concrete argument of
     /// the matching generic kind.
     fn validate_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
-        if self.definition.completeness() == TraitCompleteness::ExternalIncomplete {
+        if self.definition.completeness()
+            == TraitCompleteness::ExternalIncomplete
+        {
             for (index, argument) in self.arguments.iter().enumerate() {
                 if !generic_argument_is_concrete(argument) {
-                    return Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index });
+                    return Err(
+                        TraitDescriptorBuildError::NonConcreteGenericArgument {
+                            index,
+                        },
+                    );
                 }
             }
             return Ok(());
@@ -1062,7 +1167,12 @@ impl TraitDescriptorBuilder {
             .generic_definition()
             .parameters
             .iter()
-            .filter(|parameter| !matches!(parameter, GenericParameterDescriptor::Lifetime { .. }))
+            .filter(|parameter| {
+                !matches!(
+                    parameter,
+                    GenericParameterDescriptor::Lifetime { .. }
+                )
+            })
             .collect();
         if parameters.len() != self.arguments.len() {
             return Err(TraitDescriptorBuildError::GenericArgumentCount {
@@ -1070,17 +1180,30 @@ impl TraitDescriptorBuilder {
                 actual: self.arguments.len(),
             });
         }
-        for (index, (parameter, argument)) in parameters.into_iter().zip(&self.arguments).enumerate() {
+        for (index, (parameter, argument)) in
+            parameters.into_iter().zip(&self.arguments).enumerate()
+        {
             let kind_matches = matches!(
                 (parameter, argument),
-                (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
-                    | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
+                (
+                    GenericParameterDescriptor::Type { .. },
+                    GenericArgument::Type(_)
+                ) | (
+                    GenericParameterDescriptor::Const { .. },
+                    GenericArgument::Const(_)
+                )
             );
             if !kind_matches {
-                return Err(TraitDescriptorBuildError::GenericArgumentKind { index });
+                return Err(TraitDescriptorBuildError::GenericArgumentKind {
+                    index,
+                });
             }
             if !generic_argument_is_concrete(argument) {
-                return Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index });
+                return Err(
+                    TraitDescriptorBuildError::NonConcreteGenericArgument {
+                        index,
+                    },
+                );
             }
         }
         Ok(())
@@ -1088,11 +1211,16 @@ impl TraitDescriptorBuilder {
 
     /// Verifies associated-type equalities are concrete, unique, and declared
     /// by this trait or one of its direct supertraits.
-    fn validate_associated_type_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
+    fn validate_associated_type_arguments(
+        &self,
+    ) -> Result<(), TraitDescriptorBuildError> {
         let mut names = std::collections::HashSet::new();
         for argument in &self.associated_type_arguments {
-            let GenericArgument::AssociatedType { name, value } = argument else {
-                return Err(TraitDescriptorBuildError::InvalidAssociatedTypeArgument);
+            let GenericArgument::AssociatedType { name, value } = argument
+            else {
+                return Err(
+                    TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+                );
             };
             if !names.insert(name.as_ref())
                 || !(self
@@ -1100,15 +1228,17 @@ impl TraitDescriptorBuilder {
                     .iter()
                     .any(|descriptor| descriptor.rust_name() == name.as_ref())
                     || self.direct_supertraits.iter().any(|supertrait| {
-                        supertrait
-                            .descriptor()
-                            .associated_types()
-                            .iter()
-                            .any(|descriptor| descriptor.rust_name() == name.as_ref())
+                        supertrait.descriptor().associated_types().iter().any(
+                            |descriptor| {
+                                descriptor.rust_name() == name.as_ref()
+                            },
+                        )
                     }))
                 || !type_expression_is_concrete(value)
             {
-                return Err(TraitDescriptorBuildError::InvalidAssociatedTypeArgument);
+                return Err(
+                    TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+                );
             }
         }
         Ok(())
@@ -1141,12 +1271,15 @@ impl TraitApplicationSubstitutions {
                     lifetimes.insert(name.clone());
                 }
                 GenericParameterDescriptor::Type { name, .. } => {
-                    if let Some(GenericArgument::Type(value)) = arguments.next() {
+                    if let Some(GenericArgument::Type(value)) = arguments.next()
+                    {
                         types.insert(name.clone(), value.clone());
                     }
                 }
                 GenericParameterDescriptor::Const { name, .. } => {
-                    if let Some(GenericArgument::Const(value)) = arguments.next() {
+                    if let Some(GenericArgument::Const(value)) =
+                        arguments.next()
+                    {
                         consts.insert(name.clone(), value.value.clone());
                     }
                 }
@@ -1155,7 +1288,9 @@ impl TraitApplicationSubstitutions {
         let associated_types = associated_type_arguments
             .iter()
             .filter_map(|argument| match argument {
-                GenericArgument::AssociatedType { name, value } => Some((name.clone(), value.as_ref().clone())),
+                GenericArgument::AssociatedType { name, value } => {
+                    Some((name.clone(), value.as_ref().clone()))
+                }
                 _ => None,
             })
             .collect();
@@ -1169,12 +1304,18 @@ impl TraitApplicationSubstitutions {
 
     /// Returns whether this application carries no substitutions.
     fn is_empty(&self) -> bool {
-        self.types.is_empty() && self.consts.is_empty() && self.lifetimes.is_empty() && self.associated_types.is_empty()
+        self.types.is_empty()
+            && self.consts.is_empty()
+            && self.lifetimes.is_empty()
+            && self.associated_types.is_empty()
     }
 
     /// Applies outer trait arguments inside a nested item generic definition
     /// while preserving names shadowed by the item's own parameters.
-    fn generic_definition(&self, definition: &GenericDefinitionDescriptor) -> GenericDefinitionDescriptor {
+    fn generic_definition(
+        &self,
+        definition: &GenericDefinitionDescriptor,
+    ) -> GenericDefinitionDescriptor {
         let mut scoped = self.clone();
         for parameter in &definition.parameters {
             match parameter {
@@ -1199,7 +1340,10 @@ impl TraitApplicationSubstitutions {
                     diagnostic,
                 } => GenericParameterDescriptor::Lifetime {
                     name: name.clone(),
-                    bounds: bounds.iter().map(|bound| scoped.lifetime(bound)).collect(),
+                    bounds: bounds
+                        .iter()
+                        .map(|bound| scoped.lifetime(bound))
+                        .collect(),
                     diagnostic: diagnostic.clone(),
                 },
                 GenericParameterDescriptor::Type {
@@ -1209,8 +1353,13 @@ impl TraitApplicationSubstitutions {
                     diagnostic,
                 } => GenericParameterDescriptor::Type {
                     name: name.clone(),
-                    bounds: bounds.iter().map(|bound| scoped.predicate(bound)).collect(),
-                    default: default.as_ref().map(|value| scoped.type_expression(value)),
+                    bounds: bounds
+                        .iter()
+                        .map(|bound| scoped.predicate(bound))
+                        .collect(),
+                    default: default
+                        .as_ref()
+                        .map(|value| scoped.type_expression(value)),
                     diagnostic: diagnostic.clone(),
                 },
                 GenericParameterDescriptor::Const {
@@ -1221,7 +1370,9 @@ impl TraitApplicationSubstitutions {
                 } => GenericParameterDescriptor::Const {
                     name: name.clone(),
                     ty: Box::new(scoped.type_expression(ty)),
-                    default: default.as_ref().map(|value| scoped.const_expression(value)),
+                    default: default
+                        .as_ref()
+                        .map(|value| scoped.const_expression(value)),
                     diagnostic: diagnostic.clone(),
                 },
             })
@@ -1239,24 +1390,38 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes one structural type expression recursively.
-    pub(crate) fn type_expression(&self, expression: &TypeExpression) -> TypeExpression {
+    pub(crate) fn type_expression(
+        &self,
+        expression: &TypeExpression,
+    ) -> TypeExpression {
         match expression {
-            TypeExpression::Parameter(name) => self.types.get(name).cloned().unwrap_or_else(|| expression.clone()),
+            TypeExpression::Parameter(name) => self
+                .types
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| expression.clone()),
             TypeExpression::Concrete(concrete)
-                if concrete.path.len() == 1 && self.types.contains_key(&concrete.path[0]) =>
+                if concrete.path.len() == 1
+                    && self.types.contains_key(&concrete.path[0]) =>
             {
                 self.types[&concrete.path[0]].clone()
             }
             TypeExpression::Concrete(concrete)
                 if concrete.path.len() == 2
                     && concrete.path[0].as_ref() == "Self"
-                    && self.associated_types.contains_key(&concrete.path[1]) =>
+                    && self
+                        .associated_types
+                        .contains_key(&concrete.path[1]) =>
             {
                 self.associated_types[&concrete.path[1]].clone()
             }
             TypeExpression::Associated(associated)
-                if matches!(associated.self_type.as_ref(), TypeExpression::SelfType)
-                    && self.associated_types.contains_key(&associated.item) =>
+                if matches!(
+                    associated.self_type.as_ref(),
+                    TypeExpression::SelfType
+                ) && self
+                    .associated_types
+                    .contains_key(&associated.item) =>
             {
                 self.associated_types[&associated.item].clone()
             }
@@ -1271,7 +1436,8 @@ impl TraitApplicationSubstitutions {
                             .collect();
                     }
                     TypeExpression::Associated(associated) => {
-                        *associated.self_type = self.type_expression(&associated.self_type);
+                        *associated.self_type =
+                            self.type_expression(&associated.self_type);
                         associated.trait_path = associated
                             .trait_path
                             .as_ref()
@@ -1284,7 +1450,8 @@ impl TraitApplicationSubstitutions {
                     }
                     TypeExpression::Reference(reference) => {
                         reference.lifetime = self.lifetime(&reference.lifetime);
-                        *reference.target = self.type_expression(&reference.target);
+                        *reference.target =
+                            self.type_expression(&reference.target);
                     }
                     TypeExpression::RawPointer(pointer) => {
                         *pointer.target = self.type_expression(&pointer.target);
@@ -1297,7 +1464,10 @@ impl TraitApplicationSubstitutions {
                         array.length = self.const_expression(&array.length);
                     }
                     TypeExpression::Tuple(elements) => {
-                        *elements = elements.iter().map(|element| self.type_expression(element)).collect();
+                        *elements = elements
+                            .iter()
+                            .map(|element| self.type_expression(element))
+                            .collect();
                     }
                     TypeExpression::FunctionPointer(function) => {
                         function.parameters = function
@@ -1305,7 +1475,8 @@ impl TraitApplicationSubstitutions {
                             .iter()
                             .map(|parameter| self.type_expression(parameter))
                             .collect();
-                        *function.return_type = self.type_expression(&function.return_type);
+                        *function.return_type =
+                            self.type_expression(&function.return_type);
                     }
                     TypeExpression::TraitObject(object) => {
                         object.bounds = object
@@ -1321,7 +1492,9 @@ impl TraitApplicationSubstitutions {
                             .map(|predicate| self.predicate(predicate))
                             .collect();
                     }
-                    TypeExpression::Parameter(_) | TypeExpression::SelfType | TypeExpression::Never => {}
+                    TypeExpression::Parameter(_)
+                    | TypeExpression::SelfType
+                    | TypeExpression::Never => {}
                 }
                 result
             }
@@ -1331,38 +1504,62 @@ impl TraitApplicationSubstitutions {
     /// Substitutes one generic argument recursively.
     fn generic_argument(&self, argument: &GenericArgument) -> GenericArgument {
         match argument {
-            GenericArgument::Type(value) => GenericArgument::Type(self.type_expression(value)),
-            GenericArgument::Lifetime(value) => GenericArgument::Lifetime(self.lifetime(value)),
+            GenericArgument::Type(value) => {
+                GenericArgument::Type(self.type_expression(value))
+            }
+            GenericArgument::Lifetime(value) => {
+                GenericArgument::Lifetime(self.lifetime(value))
+            }
             GenericArgument::Const(value) => {
                 let mut value = value.clone();
-                value.declared_type = Box::new(self.type_expression(&value.declared_type));
+                value.declared_type =
+                    Box::new(self.type_expression(&value.declared_type));
                 value.value = self.const_expression(&value.value);
                 GenericArgument::Const(value)
             }
-            GenericArgument::AssociatedType { name, value } => GenericArgument::AssociatedType {
-                name: name.clone(),
-                value: Box::new(self.type_expression(value)),
-            },
-            GenericArgument::AssociatedTypeBound { name, bounds } => GenericArgument::AssociatedTypeBound {
-                name: name.clone(),
-                bounds: bounds.iter().map(|predicate| self.predicate(predicate)).collect(),
-            },
+            GenericArgument::AssociatedType { name, value } => {
+                GenericArgument::AssociatedType {
+                    name: name.clone(),
+                    value: Box::new(self.type_expression(value)),
+                }
+            }
+            GenericArgument::AssociatedTypeBound { name, bounds } => {
+                GenericArgument::AssociatedTypeBound {
+                    name: name.clone(),
+                    bounds: bounds
+                        .iter()
+                        .map(|predicate| self.predicate(predicate))
+                        .collect(),
+                }
+            }
         }
     }
 
     /// Substitutes one const parameter reference.
-    fn const_expression(&self, expression: &ConstExpression) -> ConstExpression {
+    fn const_expression(
+        &self,
+        expression: &ConstExpression,
+    ) -> ConstExpression {
         match expression {
-            ConstExpression::Parameter(name) => self.consts.get(name).cloned().unwrap_or_else(|| expression.clone()),
+            ConstExpression::Parameter(name) => self
+                .consts
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| expression.clone()),
             _ => expression.clone(),
         }
     }
 
     /// Maps declaration lifetimes to the only lifetime supported by a
     /// `'static` trait-object root.
-    fn lifetime(&self, lifetime: &crate::expression::LifetimeExpression) -> crate::expression::LifetimeExpression {
+    fn lifetime(
+        &self,
+        lifetime: &crate::expression::LifetimeExpression,
+    ) -> crate::expression::LifetimeExpression {
         match lifetime {
-            crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name) => {
+            crate::expression::LifetimeExpression::Named(name)
+                if self.lifetimes.contains(name) =>
+            {
                 crate::expression::LifetimeExpression::Static
             }
             _ => lifetime.clone(),
@@ -1370,16 +1567,27 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes types nested in one predicate.
-    pub(crate) fn predicate(&self, predicate: &PredicateDescriptor) -> PredicateDescriptor {
+    pub(crate) fn predicate(
+        &self,
+        predicate: &PredicateDescriptor,
+    ) -> PredicateDescriptor {
         let mut result = predicate.clone();
         match &mut result {
-            PredicateDescriptor::TypeBound { subject, bounds, .. } => {
+            PredicateDescriptor::TypeBound {
+                subject, bounds, ..
+            } => {
                 *subject = self.type_expression(subject);
-                *bounds = bounds.iter().map(|bound| self.type_expression(bound)).collect();
+                *bounds = bounds
+                    .iter()
+                    .map(|bound| self.type_expression(bound))
+                    .collect();
             }
-            PredicateDescriptor::LifetimeOutlives { lifetime, bounds, .. } => {
+            PredicateDescriptor::LifetimeOutlives {
+                lifetime, bounds, ..
+            } => {
                 *lifetime = self.lifetime(lifetime);
-                *bounds = bounds.iter().map(|bound| self.lifetime(bound)).collect();
+                *bounds =
+                    bounds.iter().map(|bound| self.lifetime(bound)).collect();
             }
             PredicateDescriptor::TypeOutlives { ty, lifetime, .. } => {
                 *ty = self.type_expression(ty);
@@ -1397,10 +1605,16 @@ impl TraitApplicationSubstitutions {
 /// Returns whether an argument contains only concrete runtime identity facts.
 pub(super) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
     match argument {
-        GenericArgument::Type(expression) => type_expression_is_concrete(expression),
-        GenericArgument::Const(argument) => !matches!(argument.value, ConstExpression::Parameter(_)),
+        GenericArgument::Type(expression) => {
+            type_expression_is_concrete(expression)
+        }
+        GenericArgument::Const(argument) => {
+            !matches!(argument.value, ConstExpression::Parameter(_))
+        }
         GenericArgument::Lifetime(_) => true,
-        GenericArgument::AssociatedType { value, .. } => type_expression_is_concrete(value),
+        GenericArgument::AssociatedType { value, .. } => {
+            type_expression_is_concrete(value)
+        }
         GenericArgument::AssociatedTypeBound { .. } => false,
     }
 }
@@ -1408,14 +1622,23 @@ pub(super) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
 /// Returns whether a substituted type expression contains no symbolic type.
 fn type_expression_is_concrete(expression: &TypeExpression) -> bool {
     match expression {
-        TypeExpression::Concrete(concrete) => concrete.arguments.iter().all(generic_argument_is_concrete),
-        TypeExpression::Reference(reference) => type_expression_is_concrete(&reference.target),
-        TypeExpression::RawPointer(pointer) => type_expression_is_concrete(&pointer.target),
+        TypeExpression::Concrete(concrete) => {
+            concrete.arguments.iter().all(generic_argument_is_concrete)
+        }
+        TypeExpression::Reference(reference) => {
+            type_expression_is_concrete(&reference.target)
+        }
+        TypeExpression::RawPointer(pointer) => {
+            type_expression_is_concrete(&pointer.target)
+        }
         TypeExpression::Slice(element) => type_expression_is_concrete(element),
         TypeExpression::Array(array) => {
-            type_expression_is_concrete(&array.element) && !matches!(array.length, ConstExpression::Parameter(_))
+            type_expression_is_concrete(&array.element)
+                && !matches!(array.length, ConstExpression::Parameter(_))
         }
-        TypeExpression::Tuple(elements) => elements.iter().all(type_expression_is_concrete),
+        TypeExpression::Tuple(elements) => {
+            elements.iter().all(type_expression_is_concrete)
+        }
         TypeExpression::FunctionPointer(function) => {
             function.parameters.iter().all(type_expression_is_concrete)
                 && type_expression_is_concrete(&function.return_type)

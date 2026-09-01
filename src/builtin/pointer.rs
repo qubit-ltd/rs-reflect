@@ -19,7 +19,8 @@ use crate::descriptor::TypeDescriptor;
 macro_rules! impl_smart_pointer {
     ($type:ident, $kind:expr) => {
         impl<T: Reflect + ?Sized> Reflect for $type<T> {
-            /// Returns the interned descriptor for this smart-pointer specialization.
+            /// Returns the interned descriptor for this smart-pointer
+            /// specialization.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
                     TypeDescriptor::new_smart_pointer_lazy::<Self>(

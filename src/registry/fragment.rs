@@ -118,7 +118,10 @@ pub struct CapabilityRegistration {
 impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
     #[doc(hidden)]
-    pub const fn new(target_type_id: TypeId, descriptor: CapabilityDescriptor) -> Self {
+    pub const fn new(
+        target_type_id: TypeId,
+        descriptor: CapabilityDescriptor,
+    ) -> Self {
         Self {
             target_type_id,
             descriptor,
@@ -175,10 +178,20 @@ impl FragmentPayload {
     #[inline(always)]
     pub(crate) fn runtime_identity(&self) -> RuntimeIdentity {
         match self {
-            Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
-            Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
-            Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
-            Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
+            Self::Type(descriptor) => {
+                RuntimeIdentity::Type(descriptor.type_id())
+            }
+            Self::Trait(descriptor) => {
+                RuntimeIdentity::Trait(descriptor.trait_id().clone())
+            }
+            Self::ImplDefinition(descriptor) => {
+                RuntimeIdentity::ImplDefinition(
+                    descriptor.fragment_identity().clone(),
+                )
+            }
+            Self::Impl(descriptor) => {
+                RuntimeIdentity::Impl(descriptor.target_type().type_id())
+            }
             Self::Capability(registration) => RuntimeIdentity::Capability {
                 target_type_id: registration.target_type_id(),
                 capability_id: registration.descriptor().id().clone(),
@@ -308,4 +321,8 @@ register_builtin_type!(f64_registration, f64, 16);
 register_builtin_type!(string_registration, String, 17);
 register_builtin_type!(str_registration, str, 18);
 register_builtin_type!(unit_tuple_registration, (), 19);
-register_builtin_type!(debug_trait_object_registration, dyn std::fmt::Debug, 20);
+register_builtin_type!(
+    debug_trait_object_registration,
+    dyn std::fmt::Debug,
+    20
+);

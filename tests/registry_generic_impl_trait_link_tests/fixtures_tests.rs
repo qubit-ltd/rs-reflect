@@ -107,7 +107,10 @@ mod nested_impl {
 }
 
 /// Finds the unique generic impl definition whose source trait path is `path`.
-fn definition_by_trait_path(registry: &ReflectRegistry, path: &str) -> &'static ImplDefinitionDescriptor {
+fn definition_by_trait_path(
+    registry: &ReflectRegistry,
+    path: &str,
+) -> &'static ImplDefinitionDescriptor {
     let mut matches = registry
         .impl_definitions()
         .iter()
@@ -126,16 +129,23 @@ fn definition_by_trait_path(registry: &ReflectRegistry, path: &str) -> &'static 
 /// Verifies legal Rust trait paths resolve to the reflected declaration marker.
 #[test]
 fn test_generic_impl_definition_resolves_qualified_and_aliased_trait_paths() {
-    let registry =
-        ReflectRegistry::initialize().expect("qualified generic trait impl definitions must resolve uniquely");
+    let registry = ReflectRegistry::initialize().expect(
+        "qualified generic trait impl definitions must resolve uniquely",
+    );
     let cases = [
         (
             "crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait",
             "CrateQualifiedTrait",
         ),
-        ("path_traits::RelativeQualifiedTrait", "RelativeQualifiedTrait"),
+        (
+            "path_traits::RelativeQualifiedTrait",
+            "RelativeQualifiedTrait",
+        ),
         ("self::SelfQualifiedTrait", "SelfQualifiedTrait"),
-        ("super::path_traits::SuperQualifiedTrait", "SuperQualifiedTrait"),
+        (
+            "super::path_traits::SuperQualifiedTrait",
+            "SuperQualifiedTrait",
+        ),
         ("ReflectedAlias", "ImportedAliasTrait"),
     ];
 

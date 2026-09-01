@@ -76,7 +76,9 @@ impl TypeCapabilities {
     ///
     /// Returns [`CapabilityConflict`] when an ID occurs more than once. A
     /// different adapter type is reported separately from an exact duplicate.
-    pub fn try_new(mut descriptors: Vec<CapabilityDescriptor>) -> Result<Self, CapabilityConflict> {
+    pub fn try_new(
+        mut descriptors: Vec<CapabilityDescriptor>,
+    ) -> Result<Self, CapabilityConflict> {
         descriptors.sort_by(|left, right| {
             left.id()
                 .cmp(right.id())
@@ -116,8 +118,9 @@ impl TypeCapabilities {
     /// Returns whether the set contains the key's exact ID and adapter
     /// contract.
     pub fn contains<A: 'static>(&self, key: CapabilityKey<A>) -> bool {
-        self.find(key.id())
-            .is_some_and(|descriptor| descriptor.adapter_type() == key.adapter_type())
+        self.find(key.id()).is_some_and(|descriptor| {
+            descriptor.adapter_type() == key.adapter_type()
+        })
     }
 
     /// Retrieves a capability adapter through its typed key.

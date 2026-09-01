@@ -30,12 +30,17 @@ fn parse_valid(
     args: TokenStream,
     input: TokenStream,
 ) -> crate::ir::ValidatedDeclaration {
-    let parsed = parse_declaration(kind, args, input).expect("the declaration should parse");
+    let parsed = parse_declaration(kind, args, input)
+        .expect("the declaration should parse");
     validate_declaration(parsed).expect("the declaration should validate")
 }
 
 /// Renders all combined diagnostics emitted for a declaration.
-fn parse_invalid(kind: MacroKind, args: TokenStream, input: TokenStream) -> String {
+fn parse_invalid(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> String {
     let result = parse_and_validate_declaration(kind, args, input);
     result
         .expect_err("the declaration should be rejected")
@@ -111,7 +116,8 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
             }
         },
     );
-    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
+    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration
+    else {
         panic!("expected a trait declaration");
     };
     assert_eq!(reflected_trait.external_traits.len(), 1);
@@ -138,7 +144,8 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
             }
         },
     );
-    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
+    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration
+    else {
         panic!("expected an impl declaration");
     };
     assert_eq!(reflected_impl.methods.len(), 1);
@@ -183,7 +190,9 @@ fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
     );
     assert!(diagnostics.contains("duplicate `rename`"));
     assert!(diagnostics.contains("`skip` cannot be combined with `no_invoke`"));
-    assert!(diagnostics.contains("`skip` cannot be combined with `catch_unwind`"));
+    assert!(
+        diagnostics.contains("`skip` cannot be combined with `catch_unwind`")
+    );
 
     let no_invoke = parse_invalid(
         MacroKind::Impl,
@@ -195,8 +204,13 @@ fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
             }
         },
     );
-    assert!(no_invoke.contains("`no_invoke` cannot be combined with `catch_unwind`"));
-    assert!(no_invoke.contains("`no_invoke` cannot be combined with `thread_safe`"));
+    assert!(
+        no_invoke
+            .contains("`no_invoke` cannot be combined with `catch_unwind`")
+    );
+    assert!(
+        no_invoke.contains("`no_invoke` cannot be combined with `thread_safe`")
+    );
 }
 
 #[test]
@@ -211,7 +225,10 @@ fn test_validate_rejects_catch_unwind_on_async_method() {
             }
         },
     );
-    assert!(diagnostics.contains("`catch_unwind` cannot be used on an async method"));
+    assert!(
+        diagnostics
+            .contains("`catch_unwind` cannot be used on an async method")
+    );
 }
 
 #[test]
@@ -234,7 +251,9 @@ fn test_parse_rejects_unknown_helpers() {
             struct Invalid;
         },
     );
-    assert!(qualified.contains("unknown reflection helper `policy :: unknown`"));
+    assert!(
+        qualified.contains("unknown reflection helper `policy :: unknown`")
+    );
 }
 
 #[test]
@@ -253,7 +272,10 @@ fn test_parse_rejects_bare_helpers_and_aggregates_validation_errors() {
     );
     assert!(diagnostics.contains("unknown reflection helper `unknown_policy`"));
     assert!(diagnostics.contains("`skip` is not valid on a type"));
-    assert!(diagnostics.contains("bare `#[reflect]` is not a valid helper attribute"));
+    assert!(
+        diagnostics
+            .contains("bare `#[reflect]` is not a valid helper attribute")
+    );
     assert_eq!(
         diagnostics.matches("`skip` is not valid on a type").count(),
         1,
@@ -310,9 +332,14 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
             trait Invalid: Send + Sync {}
         ),
     );
-    assert!(mapping_diagnostics.contains("external trait path `Send` is mapped more than once"));
     assert!(
-        mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once")
+        mapping_diagnostics
+            .contains("external trait path `Send` is mapped more than once")
+    );
+    assert!(
+        mapping_diagnostics.contains(
+            "external trait ID `example.Send` is mapped more than once"
+        )
     );
 
     let unused_mapping = parse_invalid(
@@ -322,10 +349,9 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
             trait Invalid: Send {}
         },
     );
-    assert!(
-        unused_mapping
-            .contains("external trait mapping `NotABound` does not match a direct supertrait")
-    );
+    assert!(unused_mapping.contains(
+        "external trait mapping `NotABound` does not match a direct supertrait"
+    ));
 }
 
 #[test]
@@ -347,12 +373,12 @@ fn test_external_mappings_reject_non_supertrait_bounds() {
             }
         },
     );
-    assert!(
-        diagnostics.contains("external trait mapping `Send` does not match a direct supertrait")
-    );
-    assert!(
-        diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait")
-    );
+    assert!(diagnostics.contains(
+        "external trait mapping `Send` does not match a direct supertrait"
+    ));
+    assert!(diagnostics.contains(
+        "external trait mapping `Sync` does not match a direct supertrait"
+    ));
     assert!(diagnostics.contains(
         "external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"
     ));
@@ -391,13 +417,12 @@ fn test_validate_specialization_parameter_completeness() {
             impl<T, const N: usize> Container<T, N> {}
         },
     );
-    assert!(
-        wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind")
-    );
-    assert!(
-        wrong_kinds
-            .contains("specialization value for `N` does not match its Const parameter kind")
-    );
+    assert!(wrong_kinds.contains(
+        "specialization value for `T` does not match its Type parameter kind"
+    ));
+    assert!(wrong_kinds.contains(
+        "specialization value for `N` does not match its Const parameter kind"
+    ));
 }
 
 #[test]
@@ -451,7 +476,8 @@ fn test_validate_accepts_repeatable_external_mappings_and_specializations() {
             trait Service: Send + Sync {}
         },
     );
-    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
+    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration
+    else {
         panic!("expected a trait declaration");
     };
     assert_eq!(reflected_trait.external_traits.len(), 2);
@@ -463,7 +489,8 @@ fn test_validate_accepts_repeatable_external_mappings_and_specializations() {
             impl<T> Container<T> {}
         },
     );
-    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
+    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration
+    else {
         panic!("expected an impl declaration");
     };
     assert_eq!(reflected_impl.specializations.len(), 2);
@@ -478,7 +505,10 @@ fn test_parse_rejects_attribute_macros_on_wrong_item_kinds() {
             struct NotATrait;
         ),
     );
-    assert!(trait_diagnostic.contains("`#[reflect]` can only be applied to a trait"));
+    assert!(
+        trait_diagnostic
+            .contains("`#[reflect]` can only be applied to a trait")
+    );
 
     let impl_diagnostic = parse_invalid(
         MacroKind::Impl,
@@ -487,11 +517,15 @@ fn test_parse_rejects_attribute_macros_on_wrong_item_kinds() {
             fn not_an_impl() {}
         ),
     );
-    assert!(impl_diagnostic.contains("`#[reflect_impl]` can only be applied to an impl block"));
+    assert!(
+        impl_diagnostic
+            .contains("`#[reflect_impl]` can only be applied to an impl block")
+    );
 }
 
 #[test]
-fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds() {
+fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
+{
     let declaration = parse_valid(
         MacroKind::Derive,
         TokenStream::new(),
@@ -547,7 +581,8 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
             }
         },
     );
-    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
+    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration
+    else {
         panic!("expected an impl declaration");
     };
     let method = &reflected_impl.methods[0];
@@ -586,7 +621,9 @@ fn test_parse_preserves_parenthesized_path_and_bare_function_binders() {
     let DeclarationIr::Type(declaration) = &declaration.declaration else {
         panic!("expected a type declaration");
     };
-    let TypeKindIr::BareFunction { lifetimes, .. } = &declaration.fields[0].ty.kind else {
+    let TypeKindIr::BareFunction { lifetimes, .. } =
+        &declaration.fields[0].ty.kind
+    else {
         panic!("expected a bare function type");
     };
     assert_eq!(lifetimes, &["'a"]);
@@ -594,7 +631,9 @@ fn test_parse_preserves_parenthesized_path_and_bare_function_binders() {
     let TypeKindIr::Path(box_path) = &declaration.fields[1].ty.kind else {
         panic!("expected Box path");
     };
-    let PathArgumentsIr::AngleBracketed(arguments) = &box_path.segments[0].arguments else {
+    let PathArgumentsIr::AngleBracketed(arguments) =
+        &box_path.segments[0].arguments
+    else {
         panic!("expected Box angle-bracketed arguments");
     };
     let crate::ir::PathArgumentIr::Type(callable) = &arguments[0] else {
@@ -606,7 +645,9 @@ fn test_parse_preserves_parenthesized_path_and_bare_function_binders() {
     let crate::ir::GenericBoundIr::Trait { path, .. } = &bounds[0] else {
         panic!("expected Fn trait bound");
     };
-    let PathArgumentsIr::Parenthesized { inputs, output } = &path.segments[0].arguments else {
+    let PathArgumentsIr::Parenthesized { inputs, output } =
+        &path.segments[0].arguments
+    else {
         panic!("expected parenthesized Fn arguments");
     };
     assert_eq!(inputs.len(), 1);
@@ -651,7 +692,9 @@ fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
         TokenStream::new(),
         quote! { trait Broken: std::fmt::Debug {} },
     );
-    assert!(diagnostic.contains("direct supertrait `std :: fmt :: Debug` needs"));
+    assert!(
+        diagnostic.contains("direct supertrait `std :: fmt :: Debug` needs")
+    );
 
     parse_valid(
         MacroKind::Trait,

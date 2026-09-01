@@ -28,7 +28,10 @@ trait ReflectedService {
     }
 }
 
-#[reflect(supertrait(ReflectedService), external_trait(Send, id = "core.marker.Send"))]
+#[reflect(
+    supertrait(ReflectedService),
+    external_trait(Send, id = "core.marker.Send")
+)]
 trait Worker: ReflectedService + Send {
     fn work(&self);
 }
@@ -285,7 +288,8 @@ impl GenericService<usize> for ServiceMarkerProbe {
 
 impl<const N: usize> ConstService<N> for ServiceMarkerProbe {}
 impl<'b, 'a: 'b, const SIGNED: i16, const UNSIGNED: u8, const ESCAPED: char>
-    LifetimeAndLiteralDefaultService<'b, 'a, SIGNED, UNSIGNED, ESCAPED> for ServiceMarkerProbe
+    LifetimeAndLiteralDefaultService<'b, 'a, SIGNED, UNSIGNED, ESCAPED>
+    for ServiceMarkerProbe
 {
     fn borrowed(&'a self) -> &'b str {
         ""
@@ -307,7 +311,8 @@ impl AssocHrtb for ServiceMarkerProbe {
 
 #[test]
 fn test_reflect_trait_registers_complete_marker_backed_definition() {
-    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    let registry =
+        ReflectRegistry::initialize().expect("trait fragments must initialize");
     let definition = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::ReflectedService")
         .expect("reflected trait must be registered");
@@ -315,13 +320,16 @@ fn test_reflect_trait_registers_complete_marker_backed_definition() {
     assert_eq!(definition.rust_name(), "ReflectedService");
     assert!(matches!(definition.trait_id(), TraitId::Reflected(_)));
     assert_eq!(definition.generic_definition().parameters.len(), 0);
-    let candidates =
-        registry.find_trait_definitions_by_path("integration_tests::descriptor::reflect_trait_tests::ReflectedService");
+    let candidates = registry.find_trait_definitions_by_path(
+        "integration_tests::descriptor::reflect_trait_tests::ReflectedService",
+    );
     assert_eq!(candidates.len(), 1);
     assert_eq!(candidates.iter().count(), 1);
     assert_eq!(candidates.into_iter().count(), 1);
     assert!(std::ptr::eq(
-        candidates.only().expect("a unique path must have one candidate"),
+        candidates
+            .only()
+            .expect("a unique path must have one candidate"),
         definition
     ));
     assert!(std::ptr::eq(
@@ -348,8 +356,14 @@ fn test_reflect_trait_preserves_dyn_compatibility_and_default_semantics() {
     assert_eq!(debug.debug_value(), 21);
     assert_eq!(NonDynService::generic(&ServiceMarkerProbe, 34), 34);
     assert_eq!(<ServiceMarkerProbe as NonDynService>::VALUE, 34);
-    assert_eq!(GenericDynService::<u8, 2>::transform(&ServiceMarkerProbe, 5), 5);
-    assert_eq!(GenericDynService::<u8, 2>::repeat(&ServiceMarkerProbe, 5), [5; 2]);
+    assert_eq!(
+        GenericDynService::<u8, 2>::transform(&ServiceMarkerProbe, 5),
+        5
+    );
+    assert_eq!(
+        GenericDynService::<u8, 2>::repeat(&ServiceMarkerProbe, 5),
+        [5; 2]
+    );
     assert_eq!(GenericDynService::<u8, 2>::limit(&ServiceMarkerProbe), 2);
     assert_eq!(
         LifetimeDynService::borrowed(&ServiceMarkerProbe, "borrowed"),
@@ -377,13 +391,16 @@ fn test_reflect_trait_preserves_dyn_compatibility_and_default_semantics() {
 fn test_dyn_compatible_trait_object_navigates_to_applied_trait_descriptor() {
     let descriptor = TypeDescriptor::of::<dyn DynService>();
     let repeated = TypeDescriptor::of::<dyn DynService>();
-    let trait_object = descriptor
-        .as_trait_object()
-        .expect("a reflected dyn-compatible trait must expose a trait-object view");
+    let trait_object = descriptor.as_trait_object().expect(
+        "a reflected dyn-compatible trait must expose a trait-object view",
+    );
     let applied = trait_object.trait_descriptor();
-    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    let registry =
+        ReflectRegistry::initialize().expect("trait fragments must initialize");
     let definition = registry
-        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::DynService")
+        .trait_definition_by_path(
+            "integration_tests::descriptor::reflect_trait_tests::DynService",
+        )
         .expect("the reflected trait definition must be registered");
 
     assert!(std::ptr::eq(descriptor, repeated));
@@ -396,7 +413,10 @@ fn test_dyn_compatible_trait_object_navigates_to_applied_trait_descriptor() {
     let non_dyn_definition = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::NonDynService")
         .expect("a non-dyn-compatible reflected trait still has a definition descriptor");
-    assert!(matches!(non_dyn_definition.trait_id(), TraitId::Reflected(_)));
+    assert!(matches!(
+        non_dyn_definition.trait_id(),
+        TraitId::Reflected(_)
+    ));
 }
 
 #[test]
@@ -422,7 +442,8 @@ fn test_dyn_trait_object_preserves_rename_and_provable_supertrait_navigation() {
 }
 
 #[test]
-fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures() {
+fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
+{
     let generic = TypeDescriptor::of::<dyn GenericDynService<u8, 2>>();
     let applied = generic
         .as_trait_object()
@@ -462,7 +483,8 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
         "LifetimeDynService"
     );
 
-    let associated = TypeDescriptor::of::<dyn AssociatedDynService<Item = u8>>();
+    let associated =
+        TypeDescriptor::of::<dyn AssociatedDynService<Item = u8>>();
     let applied = associated
         .as_trait_object()
         .expect("associated-type dyn application must be reflected")
@@ -478,21 +500,24 @@ fn test_generic_and_associated_dyn_applications_substitute_concrete_signatures()
     ));
 
     assert_eq!(
-        TypeDescriptor::of::<dyn GenericDynService<UnreflectedDynArgument, 2>>()
-            .as_trait_object()
-            .expect("dyn generic arguments need not implement Reflect")
-            .trait_descriptor()
-            .arguments()
-            .len(),
+        TypeDescriptor::of::<dyn GenericDynService<UnreflectedDynArgument, 2>>(
+        )
+        .as_trait_object()
+        .expect("dyn generic arguments need not implement Reflect")
+        .trait_descriptor()
+        .arguments()
+        .len(),
         2
     );
     assert_eq!(
-        TypeDescriptor::of::<dyn AssociatedDynService<Item = UnreflectedDynArgument>>()
-            .as_trait_object()
-            .expect("dyn associated bindings need not implement Reflect")
-            .trait_descriptor()
-            .associated_type_arguments()
-            .len(),
+        TypeDescriptor::of::<
+            dyn AssociatedDynService<Item = UnreflectedDynArgument>,
+        >()
+        .as_trait_object()
+        .expect("dyn associated bindings need not implement Reflect")
+        .trait_descriptor()
+        .associated_type_arguments()
+        .len(),
         1
     );
 }
@@ -525,7 +550,10 @@ fn test_dyn_receivers_and_reflected_supertraits_preserve_navigation() {
         .expect("three-level reflected child must expose a descriptor")
         .trait_descriptor();
     assert_eq!(grandchild.direct_supertraits().len(), 1);
-    assert_eq!(grandchild.direct_supertraits()[0].rust_name(), "LocalDynChild");
+    assert_eq!(
+        grandchild.direct_supertraits()[0].rust_name(),
+        "LocalDynChild"
+    );
     assert_eq!(grandchild.all_supertraits().len(), 2);
     assert_eq!(
         grandchild
@@ -539,15 +567,20 @@ fn test_dyn_receivers_and_reflected_supertraits_preserve_navigation() {
 
 #[test]
 fn test_reflect_trait_accepts_explicit_external_supertrait_mapping() {
-    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    let registry =
+        ReflectRegistry::initialize().expect("trait fragments must initialize");
     let definition = registry
-        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::Worker")
+        .trait_definition_by_path(
+            "integration_tests::descriptor::reflect_trait_tests::Worker",
+        )
         .expect("mapped trait must be registered");
 
     assert_eq!(definition.rust_name(), "Worker");
     assert!(matches!(definition.trait_id(), TraitId::Reflected(_)));
-    let payload = <ServiceMarkerProbe as Worker>::__qubit_reflect_trait_payload();
-    let repeated = <ServiceMarkerProbe as Worker>::__qubit_reflect_trait_payload();
+    let payload =
+        <ServiceMarkerProbe as Worker>::__qubit_reflect_trait_payload();
+    let repeated =
+        <ServiceMarkerProbe as Worker>::__qubit_reflect_trait_payload();
     assert!(std::ptr::eq(payload.applied(), repeated.applied()));
     assert_eq!(payload.applied().methods().len(), 1);
     assert_eq!(payload.applied().methods()[0].rust_name(), "work");
@@ -569,8 +602,12 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     fn assert_hrtb<T: HrtbService<for<'a> fn(&'a str)>>() {}
     fn assert_where_bound<T: WhereBoundService<for<'a> fn(&'a str)>>() {}
     fn assert_lifetime_bound<T: WhereLifetimeService<usize>>() {}
-    fn assert_lifetime_parameter_bound<T: LifetimeAndLiteralDefaultService<'static, 'static>>() {}
-    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    fn assert_lifetime_parameter_bound<
+        T: LifetimeAndLiteralDefaultService<'static, 'static>,
+    >() {
+    }
+    let registry =
+        ReflectRegistry::initialize().expect("trait fragments must initialize");
     let definition = registry
         .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::GenericService")
         .expect("generic trait must be registered");
@@ -582,8 +619,10 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     assert_eq!(generic_method.rust_name(), "generic");
     assert_eq!(generic_method.generic_definition().parameters.len(), 4);
     assert_eq!(generic_method.generic_definition().predicates.len(), 2);
-    let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } =
-        &generic_method.generic_definition().parameters[1]
+    let reflect::expression::GenericParameterDescriptor::Lifetime {
+        bounds,
+        ..
+    } = &generic_method.generic_definition().parameters[1]
     else {
         panic!("generic method must retain its lifetime parameter")
     };
@@ -601,7 +640,9 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         reflect::expression::TypeExpression::Reference(value)
             if matches!(value.target.as_ref(), reflect::expression::TypeExpression::Parameter(name) if name.as_ref() == "U")
     ));
-    let service = <ServiceMarkerProbe as ReflectedService>::__qubit_reflect_trait_payload();
+    let service =
+        <ServiceMarkerProbe as ReflectedService>::__qubit_reflect_trait_payload(
+        );
     assert_eq!(service.applied().methods().len(), 2);
     assert_eq!(
         service.applied().methods()[0].receiver(),
@@ -609,11 +650,19 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     );
     assert!(!service.applied().methods()[0].has_default());
     assert!(service.applied().methods()[1].has_default());
-    assert_eq!(service.applied().associated_types()[0].rust_name(), "Output");
+    assert_eq!(
+        service.applied().associated_types()[0].rust_name(),
+        "Output"
+    );
     assert_eq!(service.applied().associated_types()[0].bounds().len(), 1);
-    assert_eq!(service.applied().associated_consts()[0].rust_name(), "LIMIT");
+    assert_eq!(
+        service.applied().associated_consts()[0].rust_name(),
+        "LIMIT"
+    );
     assert!(service.applied().associated_consts()[0].has_default());
-    let const_payload = <ServiceMarkerProbe as ConstService<8>>::__qubit_reflect_trait_payload();
+    let const_payload =
+        <ServiceMarkerProbe as ConstService<8>>::__qubit_reflect_trait_payload(
+        );
     assert_eq!(const_payload.applied().arguments().len(), 1);
     assert_eq!(ConstService::<8>::limit(&ServiceMarkerProbe), 8);
     let literal_defaults = registry
@@ -622,46 +671,73 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         )
         .expect("literal-default trait must register");
     let parameters = literal_defaults.generic_definition().parameters.as_ref();
-    let reflect::expression::GenericParameterDescriptor::Lifetime { bounds, .. } = &parameters[1] else {
+    let reflect::expression::GenericParameterDescriptor::Lifetime {
+        bounds,
+        ..
+    } = &parameters[1]
+    else {
         panic!("expected a lifetime parameter")
     };
     assert_eq!(
         bounds.as_ref(),
         [reflect::expression::LifetimeExpression::Named("b".into())]
     );
-    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[2] else {
+    let reflect::expression::GenericParameterDescriptor::Const {
+        default, ..
+    } = &parameters[2]
+    else {
         panic!("expected the signed const parameter")
     };
-    assert_eq!(default, &Some(reflect::expression::ConstExpression::SignedInteger(-7)));
-    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[3] else {
+    assert_eq!(
+        default,
+        &Some(reflect::expression::ConstExpression::SignedInteger(-7))
+    );
+    let reflect::expression::GenericParameterDescriptor::Const {
+        default, ..
+    } = &parameters[3]
+    else {
         panic!("expected the unsigned const parameter")
     };
     assert_eq!(
         default,
         &Some(reflect::expression::ConstExpression::UnsignedInteger(42))
     );
-    let reflect::expression::GenericParameterDescriptor::Const { default, .. } = &parameters[4] else {
+    let reflect::expression::GenericParameterDescriptor::Const {
+        default, ..
+    } = &parameters[4]
+    else {
         panic!("expected the character const parameter")
     };
-    assert_eq!(default, &Some(reflect::expression::ConstExpression::Character('\n')));
+    assert_eq!(
+        default,
+        &Some(reflect::expression::ConstExpression::Character('\n'))
+    );
     let maybe = <ServiceMarkerProbe as MaybeService<str>>::__qubit_reflect_trait_payload();
     assert_eq!(maybe.applied().arguments().len(), 1);
     let definition = maybe.definition();
-    let reflect::expression::GenericParameterDescriptor::Type { bounds, .. } =
-        &definition.generic_definition().parameters[0]
+    let reflect::expression::GenericParameterDescriptor::Type {
+        bounds, ..
+    } = &definition.generic_definition().parameters[0]
     else {
         panic!("expected type parameter")
     };
-    let reflect::expression::PredicateDescriptor::TypeBound { bound_modifiers, .. } = &bounds[0] else {
+    let reflect::expression::PredicateDescriptor::TypeBound {
+        bound_modifiers,
+        ..
+    } = &bounds[0]
+    else {
         panic!("expected type bound")
     };
     assert_eq!(
         bound_modifiers.as_ref(),
         [reflect::expression::TraitBoundModifier::Maybe]
     );
-    let registry = ReflectRegistry::initialize().expect("registry must initialize");
+    let registry =
+        ReflectRegistry::initialize().expect("registry must initialize");
     let hrtb = registry
-        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::HrtbService")
+        .trait_definition_by_path(
+            "integration_tests::descriptor::reflect_trait_tests::HrtbService",
+        )
         .expect("HRTB trait must register");
     assert_eq!(hrtb.generic_definition().predicates.len(), 1);
     let where_bound = registry
@@ -708,15 +784,19 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
         structural.definition().visibility(),
         &reflect::identity::Visibility::Crate
     );
-    let structural_call = StructuralService::structural(&ServiceMarkerProbe, Vec::new());
+    let structural_call =
+        StructuralService::structural(&ServiceMarkerProbe, Vec::new());
     assert_eq!(structural_call(std::ptr::null()), 0);
     let parameter = &structural.applied().methods()[0].parameters()[0];
-    let reflect::expression::TypeExpression::Concrete(vector) = parameter.signature_type() else {
+    let reflect::expression::TypeExpression::Concrete(vector) =
+        parameter.signature_type()
+    else {
         panic!("Vec parameter must remain a structured concrete path")
     };
     assert_eq!(vector.path[0].as_ref(), "Vec");
-    let reflect::expression::GenericArgument::Type(reflect::expression::TypeExpression::Array(array)) =
-        &vector.arguments[0]
+    let reflect::expression::GenericArgument::Type(
+        reflect::expression::TypeExpression::Array(array),
+    ) = &vector.arguments[0]
     else {
         panic!("Vec element must preserve its array argument")
     };
@@ -734,12 +814,17 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     ));
     assert_lifetime_parameter_bound::<ServiceMarkerProbe>();
     assert_eq!(
-        <ServiceMarkerProbe as LifetimeAndLiteralDefaultService<'_, '_, -7i16, 42u8, '\n'>>::borrowed(
-            &ServiceMarkerProbe,
-        ),
+        <ServiceMarkerProbe as LifetimeAndLiteralDefaultService<
+            '_,
+            '_,
+            -7i16,
+            42u8,
+            '\n',
+        >>::borrowed(&ServiceMarkerProbe,),
         ""
     );
-    let assoc = <ServiceMarkerProbe as AssocHrtb>::__qubit_reflect_trait_payload();
+    let assoc =
+        <ServiceMarkerProbe as AssocHrtb>::__qubit_reflect_trait_payload();
     assert_eq!(assoc.applied().associated_types()[0].bounds().len(), 1);
     let reflect::expression::PredicateDescriptor::TypeBound {
         bound_modifiers,

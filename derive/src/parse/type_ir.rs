@@ -54,11 +54,12 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
     let kind = match ty {
         Type::Path(path) => {
             let mut converted = convert_path(&path.path);
-            converted.qualified_self = path.qself.as_ref().map(|qualified| QualifiedSelfIr {
-                ty: Box::new(convert_type(&qualified.ty)),
-                position: qualified.position,
-                has_as: qualified.as_token.is_some(),
-            });
+            converted.qualified_self =
+                path.qself.as_ref().map(|qualified| QualifiedSelfIr {
+                    ty: Box::new(convert_type(&qualified.ty)),
+                    position: qualified.position,
+                    has_as: qualified.as_token.is_some(),
+                });
             TypeKindIr::Path(converted)
         }
         Type::Reference(reference) => TypeKindIr::Reference {
@@ -70,8 +71,12 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
             mutable: reference.mutability.is_some(),
             element: Box::new(convert_type(&reference.elem)),
         },
-        Type::Tuple(tuple) => TypeKindIr::Tuple(tuple.elems.iter().map(convert_type).collect()),
-        Type::Slice(slice) => TypeKindIr::Slice(Box::new(convert_type(&slice.elem))),
+        Type::Tuple(tuple) => {
+            TypeKindIr::Tuple(tuple.elems.iter().map(convert_type).collect())
+        }
+        Type::Slice(slice) => {
+            TypeKindIr::Slice(Box::new(convert_type(&slice.elem)))
+        }
         Type::Array(array) => TypeKindIr::Array {
             element: Box::new(convert_type(&array.elem)),
             length: array.len.to_token_stream(),
@@ -135,41 +140,61 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
 fn convert_path_arguments(arguments: &PathArguments) -> PathArgumentsIr {
     match arguments {
         PathArguments::None => PathArgumentsIr::None,
-        PathArguments::AngleBracketed(arguments) => PathArgumentsIr::AngleBracketed(
-            arguments
-                .args
-                .iter()
-                .map(|argument| match argument {
-                    syn::GenericArgument::Lifetime(lifetime) => {
-                        PathArgumentIr::Lifetime(lifetime.to_token_stream().to_string())
+        PathArguments::AngleBracketed(arguments) => {
+            PathArgumentsIr::AngleBracketed(
+                arguments
+                    .args
+                    .iter()
+                    .map(|argument| match argument {
+                        syn::GenericArgument::Lifetime(lifetime) => {
+                            PathArgumentIr::Lifetime(
+                                lifetime.to_token_stream().to_string(),
+                            )
+                        }
+                        syn::GenericArgument::Type(ty) => {
+                            PathArgumentIr::Type(convert_type(ty))
+                        }
+                        syn::GenericArgument::Const(value) => {
+                            PathArgumentIr::Const(value.to_token_stream())
+                        }
+                        syn::GenericArgument::AssocType(binding) => {
+                            PathArgumentIr::AssociatedType {
+                                name: binding.ident.to_string(),
+                                ty: convert_type(&binding.ty),
+                            }
+                        }
+                        syn::GenericArgument::AssocConst(binding) => {
+                            PathArgumentIr::AssociatedConst {
+                                name: binding.ident.to_string(),
+                                value: binding.value.to_token_stream(),
+                            }
+                        }
+                        syn::GenericArgument::Constraint(constraint) => {
+                            PathArgumentIr::Constraint {
+                                name: constraint.ident.to_string(),
+                                bounds: constraint
+                                    .bounds
+                                    .iter()
+                                    .map(convert_bound)
+                                    .collect(),
+                            }
+                        }
+                        _ => PathArgumentIr::Other(argument.to_token_stream()),
+                    })
+                    .collect(),
+            )
+        }
+        PathArguments::Parenthesized(arguments) => {
+            PathArgumentsIr::Parenthesized {
+                inputs: arguments.inputs.iter().map(convert_type).collect(),
+                output: match &arguments.output {
+                    ReturnType::Default => None,
+                    ReturnType::Type(_, output) => {
+                        Some(Box::new(convert_type(output)))
                     }
-                    syn::GenericArgument::Type(ty) => PathArgumentIr::Type(convert_type(ty)),
-                    syn::GenericArgument::Const(value) => {
-                        PathArgumentIr::Const(value.to_token_stream())
-                    }
-                    syn::GenericArgument::AssocType(binding) => PathArgumentIr::AssociatedType {
-                        name: binding.ident.to_string(),
-                        ty: convert_type(&binding.ty),
-                    },
-                    syn::GenericArgument::AssocConst(binding) => PathArgumentIr::AssociatedConst {
-                        name: binding.ident.to_string(),
-                        value: binding.value.to_token_stream(),
-                    },
-                    syn::GenericArgument::Constraint(constraint) => PathArgumentIr::Constraint {
-                        name: constraint.ident.to_string(),
-                        bounds: constraint.bounds.iter().map(convert_bound).collect(),
-                    },
-                    _ => PathArgumentIr::Other(argument.to_token_stream()),
-                })
-                .collect(),
-        ),
-        PathArguments::Parenthesized(arguments) => PathArgumentsIr::Parenthesized {
-            inputs: arguments.inputs.iter().map(convert_type).collect(),
-            output: match &arguments.output {
-                ReturnType::Default => None,
-                ReturnType::Type(_, output) => Some(Box::new(convert_type(output))),
-            },
-        },
+                },
+            }
+        }
     }
 }
 

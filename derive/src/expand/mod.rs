@@ -26,8 +26,12 @@ use crate::ir::HelperValueIr;
 pub(crate) fn expand(declaration: DeclarationIr) -> TokenStream {
     match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
-            crate::ir::TypeDeclarationKindIr::Struct => structs::expand(declaration),
-            crate::ir::TypeDeclarationKindIr::Enum => enums::expand(declaration),
+            crate::ir::TypeDeclarationKindIr::Struct => {
+                structs::expand(declaration)
+            }
+            crate::ir::TypeDeclarationKindIr::Enum => {
+                enums::expand(declaration)
+            }
             crate::ir::TypeDeclarationKindIr::Union => TokenStream::new(),
         },
         DeclarationIr::Trait(declaration) => traits::expand(declaration),
@@ -40,7 +44,8 @@ fn facade_path() -> Option<TokenStream> {
     match proc_macro_crate::crate_name("qubit-reflect") {
         Ok(proc_macro_crate::FoundCrate::Itself) => Some(quote::quote!(crate)),
         Ok(proc_macro_crate::FoundCrate::Name(name)) => {
-            let ident = proc_macro2::Ident::new(&name, proc_macro2::Span::call_site());
+            let ident =
+                proc_macro2::Ident::new(&name, proc_macro2::Span::call_site());
             Some(quote::quote!(::#ident))
         }
         Err(_) => None,

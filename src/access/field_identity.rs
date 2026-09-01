@@ -120,7 +120,11 @@ impl fmt::Display for FieldIdentity {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.variant_rust_name, self.rust_name) {
             (Some(variant), Some(rust_name)) => {
-                write!(formatter, "{}::{variant}.{rust_name}", self.declaring_type_name)
+                write!(
+                    formatter,
+                    "{}::{variant}.{rust_name}",
+                    self.declaring_type_name
+                )
             }
             (Some(variant), None) => write!(
                 formatter,
@@ -130,7 +134,11 @@ impl fmt::Display for FieldIdentity {
             (None, Some(rust_name)) => {
                 write!(formatter, "{}::{rust_name}", self.declaring_type_name)
             }
-            (None, None) => write!(formatter, "{} field #{}", self.declaring_type_name, self.index),
+            (None, None) => write!(
+                formatter,
+                "{} field #{}",
+                self.declaring_type_name, self.index
+            ),
         }
     }
 }

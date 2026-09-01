@@ -14,8 +14,11 @@ use qubit_reflect::__private::external_supertrait;
 
 /// Measures repeated lookup after the exact external application is cached.
 fn main() {
-    let first =
-        external_supertrait::<dyn std::fmt::Display>("benchmark.external.display", "std::fmt::Display", Vec::new());
+    let first = external_supertrait::<dyn std::fmt::Display>(
+        "benchmark.external.display",
+        "std::fmt::Display",
+        Vec::new(),
+    );
     black_box(first);
 
     for _ in 0..100_000 {

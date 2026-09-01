@@ -24,7 +24,11 @@ pub struct FieldSetRecovery {
 
 impl FieldSetRecovery {
     /// Creates recovery for one field replacement value.
-    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: ReflectedOwned) -> Self {
+    pub(crate) const fn new(
+        field: FieldIdentity,
+        query_name: Option<&'static str>,
+        value: ReflectedOwned,
+    ) -> Self {
         Self {
             field,
             query_name,
@@ -77,7 +81,10 @@ impl FieldSetRecovery {
     ///
     /// Returns the intact recovery when `name` does not match or the field is
     /// positional.
-    pub fn into_value_by_name(self, name: &str) -> Result<ReflectedOwned, Self> {
+    pub fn into_value_by_name(
+        self,
+        name: &str,
+    ) -> Result<ReflectedOwned, Self> {
         if self.query_name == Some(name) {
             Ok(self.value)
         } else {
@@ -131,7 +138,9 @@ impl FieldSetFailure {
     ) -> Self {
         Self {
             error: Box::new(error),
-            recovery: Some(Box::new(FieldSetRecovery::new(field, query_name, value))),
+            recovery: Some(Box::new(FieldSetRecovery::new(
+                field, query_name, value,
+            ))),
         }
     }
 

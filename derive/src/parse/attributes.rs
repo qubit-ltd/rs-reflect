@@ -75,7 +75,11 @@ pub(super) fn parse_attributes(
                 "bare `#[reflect]` is not a valid helper attribute",
             )),
             Meta::List(list) => {
-                helpers.extend(parse_helper_tokens(list.tokens.clone(), target, errors));
+                helpers.extend(parse_helper_tokens(
+                    list.tokens.clone(),
+                    target,
+                    errors,
+                ));
             }
             Meta::NameValue(_) => errors.push(syn::Error::new(
                 attribute.span(),
@@ -117,7 +121,8 @@ fn convert_meta(
 ) -> Option<HelperAttributeIr> {
     let span = meta.span();
     let path_text = meta.path().to_token_stream().to_string();
-    let Some(source_name) = meta.path().get_ident().map(ToString::to_string) else {
+    let Some(source_name) = meta.path().get_ident().map(ToString::to_string)
+    else {
         errors.push(syn::Error::new(
             span,
             format!("unknown reflection helper `{path_text}`"),
@@ -132,38 +137,37 @@ fn convert_meta(
         return None;
     };
     let value = match name {
-        HelperName::Rename => {
-            parse_string_value(&meta, "rename").map(crate::ir::HelperValueIr::Rename)
-        }
+        HelperName::Rename => parse_string_value(&meta, "rename")
+            .map(crate::ir::HelperValueIr::Rename),
         HelperName::Opaque
         | HelperName::Skip
         | HelperName::ReadOnly
         | HelperName::NoConstruct
         | HelperName::NoInvoke
         | HelperName::CatchUnwind
-        | HelperName::ThreadSafe => {
-            parse_flag(&meta, name.as_str()).map(|()| crate::ir::HelperValueIr::Flag)
+        | HelperName::ThreadSafe => parse_flag(&meta, name.as_str())
+            .map(|()| crate::ir::HelperValueIr::Flag),
+        HelperName::Capabilities => parse_path_list(&meta, "capabilities")
+            .map(crate::ir::HelperValueIr::Paths),
+        HelperName::Supertrait => parse_path_list(&meta, "supertrait")
+            .map(crate::ir::HelperValueIr::Paths),
+        HelperName::DynCompatible => {
+            parse_optional_path_list(&meta, "dyn_compatible")
+                .map(crate::ir::HelperValueIr::DynCompatible)
         }
-        HelperName::Capabilities => {
-            parse_path_list(&meta, "capabilities").map(crate::ir::HelperValueIr::Paths)
+        HelperName::Default => {
+            parse_default(&meta).map(crate::ir::HelperValueIr::DefaultPath)
         }
-        HelperName::Supertrait => {
-            parse_path_list(&meta, "supertrait").map(crate::ir::HelperValueIr::Paths)
+        HelperName::Specialize => parse_specialization(&meta)
+            .map(crate::ir::HelperValueIr::Specialization),
+        HelperName::ExternalTraitId => {
+            parse_string_value(&meta, "external_trait_id")
+                .map(crate::ir::HelperValueIr::ExternalTraitId)
         }
-        HelperName::DynCompatible => parse_optional_path_list(&meta, "dyn_compatible")
-            .map(crate::ir::HelperValueIr::DynCompatible),
-        HelperName::Default => parse_default(&meta).map(crate::ir::HelperValueIr::DefaultPath),
-        HelperName::Specialize => {
-            parse_specialization(&meta).map(crate::ir::HelperValueIr::Specialization)
-        }
-        HelperName::ExternalTraitId => parse_string_value(&meta, "external_trait_id")
-            .map(crate::ir::HelperValueIr::ExternalTraitId),
-        HelperName::ExternalTrait => {
-            parse_external_trait(&meta).map(crate::ir::HelperValueIr::ExternalTrait)
-        }
-        HelperName::RuntimeCrate => {
-            parse_runtime_crate(&meta).map(crate::ir::HelperValueIr::RuntimeCrate)
-        }
+        HelperName::ExternalTrait => parse_external_trait(&meta)
+            .map(crate::ir::HelperValueIr::ExternalTrait),
+        HelperName::RuntimeCrate => parse_runtime_crate(&meta)
+            .map(crate::ir::HelperValueIr::RuntimeCrate),
     };
     match value {
         Ok(value) => {
@@ -188,7 +192,10 @@ fn convert_meta(
 }
 
 /// Parses a flag or a parenthesized list of inherited associated item paths.
-fn parse_optional_path_list(meta: &Meta, name: &str) -> syn::Result<Vec<PathIr>> {
+fn parse_optional_path_list(
+    meta: &Meta,
+    name: &str,
+) -> syn::Result<Vec<PathIr>> {
     if matches!(meta, Meta::Path(_)) {
         return Ok(Vec::new());
     }
@@ -253,7 +260,8 @@ fn parse_path_list(meta: &Meta, name: &str) -> syn::Result<Vec<PathIr>> {
             format!("`{name}` requires a parenthesized path list"),
         ));
     };
-    let paths = list.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)?;
+    let paths =
+        list.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)?;
     if paths.is_empty() {
         return Err(syn::Error::new(
             list.span(),
@@ -291,7 +299,8 @@ fn parse_specialization(meta: &Meta) -> syn::Result<SpecializationIr> {
             "`specialize` requires named arguments",
         ));
     };
-    let SpecializationBindings(bindings) = syn::parse2::<SpecializationBindings>(list.tokens.clone())?;
+    let SpecializationBindings(bindings) =
+        syn::parse2::<SpecializationBindings>(list.tokens.clone())?;
     if bindings.is_empty() {
         return Err(syn::Error::new(
             list.span(),
@@ -393,7 +402,9 @@ impl Parse for ExternalTraitSyntax {
         input.parse::<Token![=]>()?;
         let id = input.parse()?;
         if !input.is_empty() {
-            return Err(input.error("unexpected tokens after external trait ID"));
+            return Err(
+                input.error("unexpected tokens after external trait ID")
+            );
         }
         Ok(Self { path, id })
     }

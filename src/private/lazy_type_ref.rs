@@ -54,8 +54,14 @@ impl fmt::Debug for LazyTypeRef {
     /// Formats cached state without forcing relation resolution.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.resolved.get() {
-            Some(reference) => formatter.debug_tuple("LazyTypeRef").field(reference).finish(),
-            None => formatter.debug_tuple("LazyTypeRef").field(&"<unresolved>").finish(),
+            Some(reference) => formatter
+                .debug_tuple("LazyTypeRef")
+                .field(reference)
+                .finish(),
+            None => formatter
+                .debug_tuple("LazyTypeRef")
+                .field(&"<unresolved>")
+                .finish(),
         }
     }
 }
@@ -84,7 +90,9 @@ mod tests {
         fn type_descriptor() -> &'static TypeDescriptor {
             static DESCRIPTOR: OnceLock<TypeDescriptor> = OnceLock::new();
             RESOLUTIONS.fetch_add(1, Ordering::SeqCst);
-            DESCRIPTOR.get_or_init(|| TypeDescriptor::new_opaque::<Self>("CountedTarget"))
+            DESCRIPTOR.get_or_init(|| {
+                TypeDescriptor::new_opaque::<Self>("CountedTarget")
+            })
         }
     }
 

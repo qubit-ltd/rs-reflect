@@ -164,7 +164,10 @@ impl FieldDescriptor {
     /// Generated enum fields use this hook to validate the active variant
     /// while the replacement remains recoverable by the descriptor.
     #[doc(hidden)]
-    pub const fn with_set_preflight(mut self, set_preflight: Option<FieldSetPreflightAdapter>) -> Self {
+    pub const fn with_set_preflight(
+        mut self,
+        set_preflight: Option<FieldSetPreflightAdapter>,
+    ) -> Self {
         self.set_preflight = set_preflight;
         self
     }
@@ -175,7 +178,11 @@ impl FieldDescriptor {
     /// runtime identity, so fields at equal positions in different variants
     /// remain distinct.
     #[doc(hidden)]
-    pub const fn with_variant(mut self, variant_index: usize, variant_rust_name: &'static str) -> Self {
+    pub const fn with_variant(
+        mut self,
+        variant_index: usize,
+        variant_rust_name: &'static str,
+    ) -> Self {
         self.variant_index = Some(variant_index);
         self.variant_rust_name = Some(variant_rust_name);
         self
@@ -258,10 +265,15 @@ impl FieldDescriptor {
     /// invoking generated code. An enum-field adapter may additionally report
     /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot
     /// outlive `target`.
-    pub fn get<'a>(&self, target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
+    pub fn get<'a>(
+        &self,
+        target: ReflectedRef<'a>,
+    ) -> Result<ReflectedRef<'a>, FieldAccessError> {
         self.validate_shared_target(&target)?;
         self.validate_policy(FieldAccessOperation::Get)?;
-        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        let adapter = self
+            .get
+            .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
         adapter(target)
     }
 
@@ -270,7 +282,10 @@ impl FieldDescriptor {
     /// Returns a target mismatch, read-only/skipped policy, or unavailable-
     /// adapter error before invoking generated code. The returned exclusive
     /// borrow cannot outlive `target`.
-    pub fn get_mut<'a>(&self, target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, FieldAccessError> {
+    pub fn get_mut<'a>(
+        &self,
+        target: ReflectedMut<'a>,
+    ) -> Result<ReflectedMut<'a>, FieldAccessError> {
         self.validate_mutable_target(&target)?;
         self.validate_policy(FieldAccessOperation::GetMut)?;
         let adapter = self
@@ -288,7 +303,11 @@ impl FieldDescriptor {
     /// [`FieldSetFailure::recovery`]. A symbolic definition-level field has no
     /// exact runtime identity and therefore reports
     /// [`FieldAccessError::Unavailable`].
-    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldSetFailure> {
+    pub fn set(
+        &self,
+        target: ReflectedMut<'_>,
+        value: ReflectedOwned,
+    ) -> Result<(), FieldSetFailure> {
         if let Err(error) = self.validate_mutable_target(&target) {
             return Err(self.set_failure(error, value));
         }
@@ -298,7 +317,10 @@ impl FieldDescriptor {
         let (expected, _) = match self.concrete_field_identity() {
             Some(identity) => identity,
             None => {
-                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
+                return Err(self.set_failure(
+                    self.unavailable(FieldAccessOperation::Set),
+                    value,
+                ));
             }
         };
         let actual = dynamic_owned_type_id(&value);
@@ -312,7 +334,10 @@ impl FieldDescriptor {
         let adapter = match self.set {
             Some(adapter) => adapter,
             None => {
-                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
+                return Err(self.set_failure(
+                    self.unavailable(FieldAccessOperation::Set),
+                    value,
+                ));
             }
         };
         if let Some(preflight) = self.set_preflight
@@ -324,14 +349,20 @@ impl FieldDescriptor {
     }
 
     /// Validates a shared target without consuming or changing it.
-    fn validate_shared_target(&self, target: &ReflectedRef<'_>) -> Result<(), FieldAccessError> {
+    fn validate_shared_target(
+        &self,
+        target: &ReflectedRef<'_>,
+    ) -> Result<(), FieldAccessError> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(target);
         self.validate_target_identity(expected, actual)
     }
 
     /// Validates a mutable target without consuming or changing it.
-    fn validate_mutable_target(&self, target: &ReflectedMut<'_>) -> Result<(), FieldAccessError> {
+    fn validate_mutable_target(
+        &self,
+        target: &ReflectedMut<'_>,
+    ) -> Result<(), FieldAccessError> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_mut_type_id(target);
         self.validate_target_identity(expected, actual)
@@ -355,28 +386,40 @@ impl FieldDescriptor {
     }
 
     /// Enforces skip and read-only policy before dispatching an adapter.
-    fn validate_policy(&self, operation: FieldAccessOperation) -> Result<(), FieldAccessError> {
+    fn validate_policy(
+        &self,
+        operation: FieldAccessOperation,
+    ) -> Result<(), FieldAccessError> {
         match (self.access_policy, operation) {
             (FieldAccessPolicy::Skipped, _) => Err(FieldAccessError::Skipped {
                 field: self.identity(),
                 operation,
             }),
-            (FieldAccessPolicy::ReadOnly, FieldAccessOperation::GetMut | FieldAccessOperation::Set) => {
-                Err(FieldAccessError::ReadOnly {
-                    field: self.identity(),
-                    operation,
-                })
+            (
+                FieldAccessPolicy::ReadOnly,
+                FieldAccessOperation::GetMut | FieldAccessOperation::Set,
+            ) => Err(FieldAccessError::ReadOnly {
+                field: self.identity(),
+                operation,
+            }),
+            (FieldAccessPolicy::ReadWrite | FieldAccessPolicy::ReadOnly, _) => {
+                Ok(())
             }
-            (FieldAccessPolicy::ReadWrite | FieldAccessPolicy::ReadOnly, _) => Ok(()),
         }
     }
 
     /// Returns the exact runtime identity and diagnostic name for a concrete
     /// resolved or explicitly opaque field.
-    fn concrete_field_identity(&self) -> Option<(std::any::TypeId, &'static str)> {
+    fn concrete_field_identity(
+        &self,
+    ) -> Option<(std::any::TypeId, &'static str)> {
         match self.field_type() {
-            TypeRef::Resolved(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
-            TypeRef::Opaque(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
+            TypeRef::Resolved(descriptor) => {
+                Some((descriptor.type_id(), descriptor.type_name()))
+            }
+            TypeRef::Opaque(descriptor) => {
+                Some((descriptor.type_id(), descriptor.type_name()))
+            }
             TypeRef::Symbolic(_) => None,
         }
     }
@@ -385,14 +428,16 @@ impl FieldDescriptor {
     fn identity(&self) -> FieldIdentity {
         let declaring_type = self.declaring_type();
         match (self.variant_index, self.variant_rust_name) {
-            (Some(variant_index), Some(variant_rust_name)) => FieldIdentity::new_variant(
-                declaring_type.type_id(),
-                declaring_type.type_name(),
-                self.index,
-                self.rust_name,
-                variant_index,
-                variant_rust_name,
-            ),
+            (Some(variant_index), Some(variant_rust_name)) => {
+                FieldIdentity::new_variant(
+                    declaring_type.type_id(),
+                    declaring_type.type_name(),
+                    self.index,
+                    self.rust_name,
+                    variant_index,
+                    variant_rust_name,
+                )
+            }
             (None, None) => FieldIdentity::new(
                 declaring_type.type_id(),
                 declaring_type.type_name(),
@@ -412,8 +457,17 @@ impl FieldDescriptor {
     }
 
     /// Pairs a pre-execution set error with the untouched replacement value.
-    fn set_failure(&self, error: FieldAccessError, value: ReflectedOwned) -> FieldSetFailure {
-        FieldSetFailure::before_execution(error, self.identity(), self.query_name, value)
+    fn set_failure(
+        &self,
+        error: FieldAccessError,
+        value: ReflectedOwned,
+    ) -> FieldSetFailure {
+        FieldSetFailure::before_execution(
+            error,
+            self.identity(),
+            self.query_name,
+            value,
+        )
     }
 }
 

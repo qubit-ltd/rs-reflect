@@ -38,7 +38,11 @@ struct LazyOptionalElement;
 
 static LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
 static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::struct_type::<LazyOptionalElement>("lazy_optional_element", StructKind::Unit, &[]);
+    reflect::__private::descriptor::struct_type::<LazyOptionalElement>(
+        "lazy_optional_element",
+        StructKind::Unit,
+        &[],
+    );
 
 impl Reflect for LazyOptionalElement {
     /// Counts and returns the stable descriptor used to observe lazy relation
@@ -53,7 +57,11 @@ struct LazyBoxPointee;
 
 static LAZY_BOX_POINTEE_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
 static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::descriptor::struct_type::<LazyBoxPointee>("lazy_box_pointee", StructKind::Unit, &[]);
+    reflect::__private::descriptor::struct_type::<LazyBoxPointee>(
+        "lazy_box_pointee",
+        StructKind::Unit,
+        &[],
+    );
 
 impl Reflect for LazyBoxPointee {
     /// Counts and returns the stable descriptor used to observe lazy relation
@@ -70,7 +78,11 @@ macro_rules! define_lazy_probe {
 
         static $counter: AtomicUsize = AtomicUsize::new(0);
         static $descriptor: TypeDescriptor =
-            reflect::__private::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
+            reflect::__private::descriptor::struct_type::<$type_name>(
+                $query_name,
+                StructKind::Unit,
+                &[],
+            );
 
         impl Reflect for $type_name {
             /// Counts and returns one stable descriptor used to observe lazy
@@ -89,8 +101,18 @@ define_lazy_probe!(
     LAZY_SEQUENCE_DESCRIPTOR,
     "lazy_sequence_element"
 );
-define_lazy_probe!(LazySetElement, LAZY_SET_CALLS, LAZY_SET_DESCRIPTOR, "lazy_set_element");
-define_lazy_probe!(LazyMapKey, LAZY_MAP_KEY_CALLS, LAZY_MAP_KEY_DESCRIPTOR, "lazy_map_key");
+define_lazy_probe!(
+    LazySetElement,
+    LAZY_SET_CALLS,
+    LAZY_SET_DESCRIPTOR,
+    "lazy_set_element"
+);
+define_lazy_probe!(
+    LazyMapKey,
+    LAZY_MAP_KEY_CALLS,
+    LAZY_MAP_KEY_DESCRIPTOR,
+    "lazy_map_key"
+);
 define_lazy_probe!(
     LazyMapValue,
     LAZY_MAP_VALUE_CALLS,
@@ -121,7 +143,12 @@ define_lazy_probe!(
     LAZY_REFERENCE_DESCRIPTOR,
     "lazy_reference_target"
 );
-define_lazy_probe!(LazyRawPointee, LAZY_RAW_CALLS, LAZY_RAW_DESCRIPTOR, "lazy_raw_pointee");
+define_lazy_probe!(
+    LazyRawPointee,
+    LAZY_RAW_CALLS,
+    LAZY_RAW_DESCRIPTOR,
+    "lazy_raw_pointee"
+);
 define_lazy_probe!(
     LazySliceElement,
     LAZY_SLICE_CALLS,
@@ -234,11 +261,15 @@ fn test_builtin_container_descriptors_preserve_family_and_arguments() {
         TypeDescriptor::of::<String>(),
     ));
     assert_eq!(
-        set.as_set().expect("HashSet should expose the set typed view").kind(),
+        set.as_set()
+            .expect("HashSet should expose the set typed view")
+            .kind(),
         SetKind::HashSet
     );
     assert_eq!(
-        map.as_map().expect("BTreeMap should expose the map typed view").kind(),
+        map.as_map()
+            .expect("BTreeMap should expose the map typed view")
+            .kind(),
         MapKind::BTreeMap
     );
     assert!(std::ptr::eq(
@@ -263,17 +294,29 @@ fn test_builtin_container_descriptors_preserve_family_and_arguments() {
 /// child relationships are resolved.
 #[test]
 fn test_builtin_optional_and_box_relations_resolve_lazily() {
-    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst),
+        0
+    );
     let optional = TypeDescriptor::of::<Option<LazyOptionalElement>>();
-    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst),
+        0
+    );
     let optional_element = optional
         .as_optional()
         .expect("Option should expose the optional typed view")
         .element_type()
         .as_resolved()
         .expect("Option element should resolve when navigated");
-    assert!(std::ptr::eq(optional_element, &LAZY_OPTIONAL_ELEMENT_DESCRIPTOR));
-    assert_eq!(LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst), 1);
+    assert!(std::ptr::eq(
+        optional_element,
+        &LAZY_OPTIONAL_ELEMENT_DESCRIPTOR
+    ));
+    assert_eq!(
+        LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS.load(Ordering::SeqCst),
+        1
+    );
 
     assert_eq!(LAZY_BOX_POINTEE_INITIALIZATIONS.load(Ordering::SeqCst), 0);
     let boxed = TypeDescriptor::of::<Box<LazyBoxPointee>>();
@@ -344,14 +387,21 @@ fn test_builtin_array_and_tuple_relations_resolve_lazily() {
         .element_type()
         .as_resolved()
         .expect("array element should resolve when navigated");
-    let elements = tuple.as_tuple().expect("tuple should expose its typed view").elements();
+    let elements = tuple
+        .as_tuple()
+        .expect("tuple should expose its typed view")
+        .elements();
     assert!(std::ptr::eq(array_element, &LAZY_ARRAY_DESCRIPTOR));
     assert!(std::ptr::eq(
-        elements[0].as_resolved().expect("first tuple element should resolve"),
+        elements[0]
+            .as_resolved()
+            .expect("first tuple element should resolve"),
         &LAZY_TUPLE_FIRST_DESCRIPTOR,
     ));
     assert!(std::ptr::eq(
-        elements[1].as_resolved().expect("second tuple element should resolve"),
+        elements[1]
+            .as_resolved()
+            .expect("second tuple element should resolve"),
         &LAZY_TUPLE_SECOND_DESCRIPTOR,
     ));
 }
@@ -401,7 +451,9 @@ fn test_builtin_function_relations_resolve_lazily() {
     assert_eq!(LAZY_FUNCTION_PARAMETER_CALLS.load(Ordering::SeqCst), 0);
     assert_eq!(LAZY_FUNCTION_RETURN_CALLS.load(Ordering::SeqCst), 0);
 
-    let view = function.as_function().expect("function should expose its typed view");
+    let view = function
+        .as_function()
+        .expect("function should expose its typed view");
     let parameter = view.parameters()[0]
         .as_resolved()
         .expect("function parameter should resolve when navigated");
@@ -469,10 +521,25 @@ fn test_builtin_tuple_array_and_function_descriptors_expose_typed_views() {
     let array = TypeDescriptor::of::<[bool; 3]>();
     let function = TypeDescriptor::of::<fn(u8) -> String>();
 
-    assert_eq!(tuple.as_tuple().expect("tuple typed view should exist").arity(), 2);
-    assert_eq!(array.as_array().expect("array typed view should exist").length(), 3);
     assert_eq!(
-        function.as_function().expect("function typed view should exist").kind(),
+        tuple
+            .as_tuple()
+            .expect("tuple typed view should exist")
+            .arity(),
+        2
+    );
+    assert_eq!(
+        array
+            .as_array()
+            .expect("array typed view should exist")
+            .length(),
+        3
+    );
+    assert_eq!(
+        function
+            .as_function()
+            .expect("function typed view should exist")
+            .kind(),
         FunctionPointerKind::Safe
     );
     assert_eq!(
@@ -495,7 +562,9 @@ fn test_builtin_interner_is_concurrent_and_distinguishes_generic_arguments() {
     let first = TypeDescriptor::of::<Vec<u32>>();
 
     for thread in threads {
-        let descriptor = thread.join().expect("descriptor lookup thread should not panic");
+        let descriptor = thread
+            .join()
+            .expect("descriptor lookup thread should not panic");
         assert!(std::ptr::eq(first, descriptor));
     }
 
@@ -538,7 +607,9 @@ fn test_builtin_interner_concurrently_initializes_multiple_composite_types() {
     let mut roots = [None; 4];
     let mut identities = [None; 4];
     for worker in workers {
-        let (group, address, identity) = worker.join().expect("composite lookup worker should complete");
+        let (group, address, identity) = worker
+            .join()
+            .expect("composite lookup worker should complete");
         assert_eq!(*roots[group].get_or_insert(address), address);
         assert_eq!(*identities[group].get_or_insert(identity), identity);
     }
@@ -572,7 +643,10 @@ fn test_builtin_set_descriptors_preserve_collection_family() {
     let hash_set = TypeDescriptor::of::<HashSet<u8>>();
     let btree_set = TypeDescriptor::of::<BTreeSet<u8>>();
 
-    assert_eq!(hash_set.as_set().expect("HashSet typed view").kind(), SetKind::HashSet,);
+    assert_eq!(
+        hash_set.as_set().expect("HashSet typed view").kind(),
+        SetKind::HashSet,
+    );
     assert_eq!(
         btree_set.as_set().expect("BTreeSet typed view").kind(),
         SetKind::BTreeSet,
@@ -605,7 +679,11 @@ fn test_builtin_function_descriptors_cover_supported_calling_conventions() {
             FunctionPointerKind::Unsafe,
             FunctionAbi::Rust,
         ),
-        (TypeDescriptor::of::<SafeC>(), FunctionPointerKind::Safe, FunctionAbi::C),
+        (
+            TypeDescriptor::of::<SafeC>(),
+            FunctionPointerKind::Safe,
+            FunctionAbi::C,
+        ),
         (
             TypeDescriptor::of::<UnsafeC>(),
             FunctionPointerKind::Unsafe,
@@ -660,9 +738,17 @@ fn test_builtin_function_descriptor_supports_c_variadic_signatures() {
     let safe_variadic = TypeDescriptor::of::<SafeCVariadic>();
     let unsafe_variadic = TypeDescriptor::of::<UnsafeCVariadic>();
 
-    assert!(safe_variadic.as_function().expect("safe variadic view").is_variadic());
+    assert!(
+        safe_variadic
+            .as_function()
+            .expect("safe variadic view")
+            .is_variadic()
+    );
     assert_eq!(
-        safe_variadic.as_function().expect("safe variadic view").kind(),
+        safe_variadic
+            .as_function()
+            .expect("safe variadic view")
+            .kind(),
         FunctionPointerKind::Safe,
     );
     assert!(
@@ -672,7 +758,10 @@ fn test_builtin_function_descriptor_supports_c_variadic_signatures() {
             .is_variadic()
     );
     assert_eq!(
-        unsafe_variadic.as_function().expect("unsafe variadic view").kind(),
+        unsafe_variadic
+            .as_function()
+            .expect("unsafe variadic view")
+            .kind(),
         FunctionPointerKind::Unsafe,
     );
 }

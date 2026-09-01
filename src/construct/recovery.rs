@@ -62,7 +62,10 @@ pub struct ConstructionRecovery<M: Mode> {
 
 impl<M: Mode> ConstructionRecovery<M> {
     /// Creates recovery from one structured error and ordered owned values.
-    pub(crate) fn new(error: ConstructionError, values: Vec<RecoveredConstructionValue<M>>) -> Self {
+    pub(crate) fn new(
+        error: ConstructionError,
+        values: Vec<RecoveredConstructionValue<M>>,
+    ) -> Self {
         Self {
             error: Box::new(error),
             values,
@@ -87,7 +90,9 @@ impl<M: Mode> ConstructionRecovery<M> {
     }
 
     /// Consumes recovery and returns the structured error and ordered values.
-    pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
+    pub fn into_parts(
+        self,
+    ) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }
 

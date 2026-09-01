@@ -26,7 +26,10 @@ pub struct TypeCapabilityRegistration {
 impl TypeCapabilityRegistration {
     /// Creates a macro-generated concrete capability registration fragment.
     #[doc(hidden)]
-    pub const fn new(target_type_id: fn() -> TypeId, descriptors: fn() -> Vec<CapabilityDescriptor>) -> Self {
+    pub const fn new(
+        target_type_id: fn() -> TypeId,
+        descriptors: fn() -> Vec<CapabilityDescriptor>,
+    ) -> Self {
         Self {
             target_type_id,
             descriptors,
@@ -46,7 +49,10 @@ pub struct ReflectedTypeRegistration {
 impl ReflectedTypeRegistration {
     /// Creates a macro-generated reflected concrete type registration fragment.
     #[doc(hidden)]
-    pub const fn new(target_type_id: fn() -> TypeId, descriptor: fn() -> &'static TypeDescriptor) -> Self {
+    pub const fn new(
+        target_type_id: fn() -> TypeId,
+        descriptor: fn() -> &'static TypeDescriptor,
+    ) -> Self {
         Self {
             target_type_id,
             descriptor,
@@ -62,7 +68,8 @@ inventory::collect!(ReflectedTypeRegistration);
 /// An unregistered type produces an empty set rather than inferred
 /// capabilities.
 #[doc(hidden)]
-pub fn registered_type_capabilities<T: 'static>() -> Result<TypeCapabilities, CapabilityConflict> {
+pub fn registered_type_capabilities<T: 'static>()
+-> Result<TypeCapabilities, CapabilityConflict> {
     let target = TypeId::of::<T>();
     let mut descriptors = Vec::new();
     for registration in inventory::iter::<TypeCapabilityRegistration> {
@@ -79,7 +86,8 @@ pub fn registered_type_capabilities<T: 'static>() -> Result<TypeCapabilities, Ca
 /// returns the existing [`TypeDescriptor`](crate::descriptor::TypeDescriptor)
 /// root and never creates a second root.
 #[doc(hidden)]
-pub fn registered_reflected_type<T: 'static>() -> Option<&'static TypeDescriptor> {
+pub fn registered_reflected_type<T: 'static>() -> Option<&'static TypeDescriptor>
+{
     let target = TypeId::of::<T>();
     inventory::iter::<ReflectedTypeRegistration>
         .into_iter()
@@ -212,7 +220,8 @@ macro_rules! register_reflected_type {
                 ::std::any::TypeId::of::<$target>()
             }
 
-            fn __qubit_reflect_descriptor() -> &'static $crate::descriptor::TypeDescriptor {
+            fn __qubit_reflect_descriptor()
+            -> &'static $crate::descriptor::TypeDescriptor {
                 $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 

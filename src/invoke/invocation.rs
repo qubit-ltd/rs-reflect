@@ -107,12 +107,17 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Creates an invocation from an optional explicit receiver and arguments.
-    pub fn new<I>(receiver: Option<InvocationReceiver<'call, M>>, arguments: I) -> Self
+    pub fn new<I>(
+        receiver: Option<InvocationReceiver<'call, M>>,
+        arguments: I,
+    ) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
     {
         let arguments = arguments.into_iter().collect::<Box<[_]>>();
-        let argument_names = std::iter::repeat_with(|| None).take(arguments.len()).collect();
+        let argument_names = std::iter::repeat_with(|| None)
+            .take(arguments.len())
+            .collect();
         Self {
             receiver,
             arguments,
@@ -126,12 +131,17 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     ///
     /// This constructor only collects inputs. Method-aware binding, mode
     /// checks, and exact type checks happen later without extracting values.
-    pub fn from_bindings<I>(receiver: Option<InvocationReceiver<'call, M>>, bindings: I) -> Self
+    pub fn from_bindings<I>(
+        receiver: Option<InvocationReceiver<'call, M>>,
+        bindings: I,
+    ) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
     {
-        let (argument_names, arguments): (Vec<_>, Vec<_>) =
-            bindings.into_iter().map(InvocationBinding::into_parts).unzip();
+        let (argument_names, arguments): (Vec<_>, Vec<_>) = bindings
+            .into_iter()
+            .map(InvocationBinding::into_parts)
+            .unzip();
         Self {
             receiver,
             arguments: arguments.into_boxed_slice(),
@@ -162,7 +172,9 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the supplied input range.
     pub fn argument_name(&self, index: usize) -> Option<&str> {
-        self.argument_names.get(index).and_then(|name| name.as_deref())
+        self.argument_names
+            .get(index)
+            .and_then(|name| name.as_deref())
     }
 
     /// Resolves named and positional bindings against parameter descriptors.
@@ -191,17 +203,25 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
                     let matches = parameters
                         .iter()
                         .enumerate()
-                        .filter(|(_, parameter)| parameter.name() == Some(name.as_ref()))
+                        .filter(|(_, parameter)| {
+                            parameter.name() == Some(name.as_ref())
+                        })
                         .collect::<Vec<_>>();
                     match matches.as_slice() {
                         [] => {
                             return Err(self.into_failure(
                                 method_identity,
-                                InvocationErrorKind::UnknownArgumentName { input_index, name },
+                                InvocationErrorKind::UnknownArgumentName {
+                                    input_index,
+                                    name,
+                                },
                             ));
                         }
                         [(parameter_index, parameter)]
-                            if matches!(parameter.pattern(), ParameterPatternDescriptor::Identifier) =>
+                            if matches!(
+                                parameter.pattern(),
+                                ParameterPatternDescriptor::Identifier
+                            ) =>
                         {
                             *parameter_index
                         }
@@ -223,22 +243,26 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
                                     name,
                                     parameter_indices: matches
                                         .into_iter()
-                                        .map(|(parameter_index, _)| parameter_index)
+                                        .map(|(parameter_index, _)| {
+                                            parameter_index
+                                        })
                                         .collect(),
                                 },
                             ));
                         }
                     }
                 }
-                None => match occupied_by.iter().position(Option::is_none) {
-                    Some(parameter_index) => parameter_index,
-                    None => {
-                        return Err(self.into_failure(
+                None => {
+                    match occupied_by.iter().position(Option::is_none) {
+                        Some(parameter_index) => parameter_index,
+                        None => {
+                            return Err(self.into_failure(
                             method_identity,
                             InvocationErrorKind::PositionalArgumentOverflow { input_index },
                         ));
+                        }
                     }
-                },
+                }
             };
             if occupied_by[parameter_index].replace(input_index).is_some() {
                 return Err(self.into_failure(
@@ -252,7 +276,9 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
             parameter_for_input.push(parameter_index);
         }
 
-        if let Some(parameter_index) = occupied_by.iter().position(Option::is_none) {
+        if let Some(parameter_index) =
+            occupied_by.iter().position(Option::is_none)
+        {
             return Err(self.into_failure(
                 method_identity,
                 InvocationErrorKind::MissingArgumentBinding {
@@ -268,25 +294,42 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
             argument_names,
             binding_recovery: _,
         } = self;
-        let mut caller_arguments = arguments.into_vec().into_iter().map(Some).collect::<Vec<_>>();
+        let mut caller_arguments = arguments
+            .into_vec()
+            .into_iter()
+            .map(Some)
+            .collect::<Vec<_>>();
         let mut ordered_arguments = std::iter::repeat_with(|| None)
             .take(parameters.len())
             .collect::<Vec<_>>();
-        for (input_index, parameter_index) in parameter_for_input.into_iter().enumerate() {
-            ordered_arguments[parameter_index] = caller_arguments[input_index].take();
+        for (input_index, parameter_index) in
+            parameter_for_input.into_iter().enumerate()
+        {
+            ordered_arguments[parameter_index] =
+                caller_arguments[input_index].take();
         }
         Ok(Self {
             receiver,
             arguments: ordered_arguments
                 .into_iter()
-                .map(|argument| argument.unwrap_or_else(|| unreachable!("every parameter is bound exactly once")))
+                .map(|argument| {
+                    argument.unwrap_or_else(|| {
+                        unreachable!("every parameter is bound exactly once")
+                    })
+                })
                 .collect(),
-            argument_names: std::iter::repeat_with(|| None).take(parameters.len()).collect(),
+            argument_names: std::iter::repeat_with(|| None)
+                .take(parameters.len())
+                .collect(),
             binding_recovery: Some(Box::new(BindingRecovery {
                 caller_index_for_argument: occupied_by
                     .into_iter()
                     .map(|input_index| {
-                        input_index.unwrap_or_else(|| unreachable!("every parameter is bound exactly once"))
+                        input_index.unwrap_or_else(|| {
+                            unreachable!(
+                                "every parameter is bound exactly once"
+                            )
+                        })
                     })
                     .collect(),
                 caller_names: argument_names,
@@ -305,11 +348,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         method_identity: &MemberId,
         receiver: ReceiverExpectation,
         arguments: &[ArgumentExpectation],
-    ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>> {
+    ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>>
+    {
         if let Some((input_index, name)) = self.first_named_binding() {
             return Err(self.into_failure(
                 method_identity,
-                InvocationErrorKind::NamedBindingRequiresDescriptor { input_index, name },
+                InvocationErrorKind::NamedBindingRequiresDescriptor {
+                    input_index,
+                    name,
+                },
             ));
         }
         if let Err(kind) = self.validate_receiver(receiver) {
@@ -322,7 +369,9 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
             };
             return Err(self.into_failure(method_identity, kind));
         }
-        for (index, (actual, expected)) in self.arguments.iter().zip(arguments).enumerate() {
+        for (index, (actual, expected)) in
+            self.arguments.iter().zip(arguments).enumerate()
+        {
             if !mode_matches(expected.mode(), actual.mode()) {
                 let kind = InvocationErrorKind::ArgumentModeMismatch {
                     index,
@@ -358,11 +407,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         self,
         method_identity: &MemberId,
         arguments: &[ArgumentExpectation],
-    ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>> {
+    ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>>
+    {
         if let Some((input_index, name)) = self.first_named_binding() {
             return Err(self.into_failure(
                 method_identity,
-                InvocationErrorKind::NamedBindingRequiresDescriptor { input_index, name },
+                InvocationErrorKind::NamedBindingRequiresDescriptor {
+                    input_index,
+                    name,
+                },
             ));
         }
         if self.arguments.len() != arguments.len() {
@@ -372,7 +425,9 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
             };
             return Err(self.into_failure(method_identity, kind));
         }
-        for (index, (actual, expected)) in self.arguments.iter().zip(arguments).enumerate() {
+        for (index, (actual, expected)) in
+            self.arguments.iter().zip(arguments).enumerate()
+        {
             if !mode_matches(expected.mode(), actual.mode()) {
                 let kind = InvocationErrorKind::ArgumentModeMismatch {
                     index,
@@ -401,7 +456,11 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
 
     /// Rejects an invocation before user code runs while retaining every
     /// untouched input for recovery.
-    pub fn reject(self, method_identity: &MemberId, kind: InvocationErrorKind) -> InvocationFailure<'call, M> {
+    pub fn reject(
+        self,
+        method_identity: &MemberId,
+        kind: InvocationErrorKind,
+    ) -> InvocationFailure<'call, M> {
         self.into_failure(method_identity, kind)
     }
 
@@ -421,7 +480,10 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Validates receiver presence, mode, and exact type without consuming it.
-    fn validate_receiver(&self, expected: ReceiverExpectation) -> Result<(), InvocationErrorKind> {
+    fn validate_receiver(
+        &self,
+        expected: ReceiverExpectation,
+    ) -> Result<(), InvocationErrorKind> {
         let actual_mode = self.receiver.as_ref().map(InvocationReceiver::mode);
         if !receiver_mode_matches(expected.mode(), actual_mode) {
             return Err(InvocationErrorKind::ReceiverModeMismatch {
@@ -429,9 +491,11 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
                 actual: actual_mode,
             });
         }
-        if let (Some(expected_type), Some(expected_name), Some(actual)) =
-            (expected.type_id(), expected.type_name(), self.receiver.as_ref())
-            && expected_type != actual.type_id()
+        if let (Some(expected_type), Some(expected_name), Some(actual)) = (
+            expected.type_id(),
+            expected.type_name(),
+            self.receiver.as_ref(),
+        ) && expected_type != actual.type_id()
         {
             return Err(InvocationErrorKind::ReceiverTypeMismatch {
                 expected: expected_type,
@@ -444,14 +508,17 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
 
     /// Returns the first still-unbound caller name for raw-adapter rejection.
     fn first_named_binding(&self) -> Option<(usize, Box<str>)> {
-        self.argument_names
-            .iter()
-            .enumerate()
-            .find_map(|(input_index, name)| name.clone().map(|name| (input_index, name)))
+        self.argument_names.iter().enumerate().find_map(
+            |(input_index, name)| name.clone().map(|name| (input_index, name)),
+        )
     }
 
     /// Pairs one validation error with every untouched input.
-    fn into_failure(self, method_identity: &MemberId, kind: InvocationErrorKind) -> InvocationFailure<'call, M> {
+    fn into_failure(
+        self,
+        method_identity: &MemberId,
+        kind: InvocationErrorKind,
+    ) -> InvocationFailure<'call, M> {
         let Self {
             receiver,
             arguments,
@@ -484,7 +551,11 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         };
         InvocationFailure {
             error: InvocationError::new(method_identity.clone(), kind),
-            recovery: crate::invoke::InvocationRecovery::new(receiver, arguments, argument_names),
+            recovery: crate::invoke::InvocationRecovery::new(
+                receiver,
+                arguments,
+                argument_names,
+            ),
         }
     }
 }
@@ -555,7 +626,9 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
             }
             .reject(
                 method_identity,
-                InvocationErrorKind::ReceiverAdapterUnavailable { expected_name },
+                InvocationErrorKind::ReceiverAdapterUnavailable {
+                    expected_name,
+                },
             ));
         };
         match adapter(receiver) {
@@ -574,7 +647,12 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     }
 
     /// Consumes the validation state so an adapter may extract owned values.
-    pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
+    pub fn into_parts(
+        self,
+    ) -> (
+        Option<InvocationReceiver<'call, M>>,
+        Box<[InvocationArg<'call, M>]>,
+    ) {
         (self.receiver, self.arguments)
     }
 }
@@ -585,19 +663,30 @@ impl<M: InvocationMode> fmt::Debug for ValidatedInvocation<'_, M> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ValidatedInvocation")
-            .field("receiver_mode", &self.receiver.as_ref().map(InvocationReceiver::mode))
+            .field(
+                "receiver_mode",
+                &self.receiver.as_ref().map(InvocationReceiver::mode),
+            )
             .field("argument_count", &self.arguments.len())
             .finish()
     }
 }
 
 /// Returns whether `actual` can safely satisfy `expected`.
-fn mode_matches(expected: InvocationInputMode, actual: InvocationInputMode) -> bool {
-    expected == actual || (expected == InvocationInputMode::Ref && actual == InvocationInputMode::Mut)
+fn mode_matches(
+    expected: InvocationInputMode,
+    actual: InvocationInputMode,
+) -> bool {
+    expected == actual
+        || (expected == InvocationInputMode::Ref
+            && actual == InvocationInputMode::Mut)
 }
 
 /// Applies argument mode compatibility to optional receiver modes.
-fn receiver_mode_matches(expected: Option<InvocationInputMode>, actual: Option<InvocationInputMode>) -> bool {
+fn receiver_mode_matches(
+    expected: Option<InvocationInputMode>,
+    actual: Option<InvocationInputMode>,
+) -> bool {
     match (expected, actual) {
         (None, None) => true,
         (Some(expected), Some(actual)) => mode_matches(expected, actual),
@@ -627,12 +716,23 @@ mod tests {
             "invoke::binding_tests",
             "method",
             0,
-            FragmentIdentity::new("qubit-reflect", "invoke::binding_tests", 1, 1, "method", 1),
+            FragmentIdentity::new(
+                "qubit-reflect",
+                "invoke::binding_tests",
+                1,
+                1,
+                "method",
+                1,
+            ),
         )
     }
 
     /// Creates one owned parameter with test-selected name and pattern.
-    fn parameter(index: usize, name: Option<&'static str>, pattern: ParameterPatternDescriptor) -> ParameterDescriptor {
+    fn parameter(
+        index: usize,
+        name: Option<&'static str>,
+        pattern: ParameterPatternDescriptor,
+    ) -> ParameterDescriptor {
         ParameterDescriptor::new(
             index,
             name,
@@ -652,16 +752,26 @@ mod tests {
 
     /// Creates and validates named bindings whose declaration order differs
     /// from their original caller order.
-    fn validated_named_receiver_invocation() -> super::ValidatedInvocation<'static, Local> {
+    fn validated_named_receiver_invocation()
+    -> super::ValidatedInvocation<'static, Local> {
         let parameters = [
             parameter(0, Some("first"), ParameterPatternDescriptor::Identifier),
-            parameter(1, Some("second"), ParameterPatternDescriptor::Identifier),
+            parameter(
+                1,
+                Some("second"),
+                ParameterPatternDescriptor::Identifier,
+            ),
         ];
         Invocation::from_bindings(
             Some(InvocationReceiver::Owned(DynamicOwned::<Local>::new(7_u32))),
             [
-                InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(22_u16))),
-                InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(11_u8))),
+                InvocationBinding::named(
+                    "second",
+                    InvocationArg::Owned(DynamicOwned::<Local>::new(22_u16)),
+                ),
+                InvocationBinding::positional(InvocationArg::Owned(
+                    DynamicOwned::<Local>::new(11_u8),
+                )),
             ],
         )
         .bind_arguments(&method_identity(), &parameters)
@@ -679,8 +789,10 @@ mod tests {
     /// Verifies a missing explicit-receiver capability restores exact caller
     /// binding metadata after argument validation has succeeded.
     #[test]
-    fn test_validated_invocation_recovers_named_bindings_when_receiver_adapter_is_unavailable() {
-        let result = validated_named_receiver_invocation().adapt_receiver::<String>(&method_identity(), None);
+    fn test_validated_invocation_recovers_named_bindings_when_receiver_adapter_is_unavailable()
+     {
+        let result = validated_named_receiver_invocation()
+            .adapt_receiver::<String>(&method_identity(), None);
         let Err(failure) = result else {
             panic!("a missing receiver adapter must fail before extraction")
         };
@@ -713,10 +825,14 @@ mod tests {
     /// Verifies an explicit-receiver adapter rejection restores exact caller
     /// binding metadata after argument validation has succeeded.
     #[test]
-    fn test_validated_invocation_recovers_named_bindings_when_receiver_adapter_rejects() {
+    fn test_validated_invocation_recovers_named_bindings_when_receiver_adapter_rejects()
+     {
         let result = validated_named_receiver_invocation().adapt_receiver(
             &method_identity(),
-            Some(&(reject_receiver as crate::invoke::ReceiverAdapter<String, Local>)),
+            Some(
+                &(reject_receiver
+                    as crate::invoke::ReceiverAdapter<String, Local>),
+            ),
         );
         let Err(failure) = result else {
             panic!("a rejected receiver must fail before user code runs")
@@ -751,12 +867,25 @@ mod tests {
     #[test]
     fn test_bind_arguments_rejects_ambiguous_identifier_name() {
         let parameters = [
-            parameter(0, Some("duplicate"), ParameterPatternDescriptor::Identifier),
-            parameter(1, Some("duplicate"), ParameterPatternDescriptor::Identifier),
+            parameter(
+                0,
+                Some("duplicate"),
+                ParameterPatternDescriptor::Identifier,
+            ),
+            parameter(
+                1,
+                Some("duplicate"),
+                ParameterPatternDescriptor::Identifier,
+            ),
         ];
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named("duplicate", InvocationArg::Owned(DynamicOwned::<Local>::new(1_u8))),
-            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(2_u8))),
+            InvocationBinding::named(
+                "duplicate",
+                InvocationArg::Owned(DynamicOwned::<Local>::new(1_u8)),
+            ),
+            InvocationBinding::positional(InvocationArg::Owned(
+                DynamicOwned::<Local>::new(2_u8),
+            )),
         ]);
 
         let result = invocation.bind_arguments(&method_identity(), &parameters);
@@ -784,10 +913,11 @@ mod tests {
             Some("not_identifier"),
             ParameterPatternDescriptor::Wildcard,
         )];
-        let invocation = Invocation::associated_bindings([InvocationBinding::named(
-            "not_identifier",
-            InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)),
-        )]);
+        let invocation =
+            Invocation::associated_bindings([InvocationBinding::named(
+                "not_identifier",
+                InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)),
+            )]);
 
         let result = invocation.bind_arguments(&method_identity(), &parameters);
         let Err(failure) = result else {

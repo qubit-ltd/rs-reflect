@@ -17,7 +17,9 @@ use crate::descriptor::SetKind;
 use crate::descriptor::TypeDescriptor;
 
 /// Builds the descriptor shared by every set family specialization.
-fn descriptor<Set: ?Sized + 'static, Element: Reflect>(kind: SetKind) -> TypeDescriptor {
+fn descriptor<Set: ?Sized + 'static, Element: Reflect>(
+    kind: SetKind,
+) -> TypeDescriptor {
     TypeDescriptor::new_set_lazy::<Set>(
         std::any::type_name::<Set>(),
         kind,

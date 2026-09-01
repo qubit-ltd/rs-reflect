@@ -48,17 +48,17 @@ mod tests {
         assert_eq!(user.label_a(), 13);
         assert_eq!(user.label_b(), 23);
 
-        let registry =
-            ReflectRegistry::initialize().expect("dependency fragments must form one registry");
-        let implementations = registry.implementations(RegistryUser::type_descriptor().type_id());
+        let registry = ReflectRegistry::initialize()
+            .expect("dependency fragments must form one registry");
+        let implementations =
+            registry.implementations(RegistryUser::type_descriptor().type_id());
         assert_eq!(implementations.len(), 2);
-        assert!(
-            implementations
-                .iter()
-                .all(|implementation| implementation.implemented_trait().is_some())
-        );
+        assert!(implementations.iter().all(|implementation| {
+            implementation.implemented_trait().is_some()
+        }));
 
-        let effective = registry.effective_view(RegistryUser::type_descriptor().type_id());
+        let effective =
+            registry.effective_view(RegistryUser::type_descriptor().type_id());
         assert_eq!(effective.implementations().len(), 2);
         assert_eq!(effective.methods().len(), 2);
         let names: Vec<_> = effective
@@ -76,7 +76,8 @@ mod tests {
             1
         );
         assert_eq!(RenamedDependencyChild::child(&RenamedDependencyProbe), 2);
-        let descriptor = TypeDescriptor::of::<dyn RenamedDependencyChild<Item = u8>>();
+        let descriptor =
+            TypeDescriptor::of::<dyn RenamedDependencyChild<Item = u8>>();
         assert_eq!(
             descriptor
                 .as_trait_object()

@@ -89,7 +89,9 @@ impl<T: ?Sized> ResolveReflectTypeDescriptor for &&ReflectArgumentProbe<T> {
     }
 }
 
-impl<T: Reflect + ?Sized> ResolveReflectTypeDescriptor for &ReflectArgumentProbe<T> {
+impl<T: Reflect + ?Sized> ResolveReflectTypeDescriptor
+    for &ReflectArgumentProbe<T>
+{
     fn resolve_reflect_type_descriptor(self) -> Option<TypeDescriptorResolver> {
         Some(T::type_descriptor)
     }
@@ -98,7 +100,9 @@ impl<T: Reflect + ?Sized> ResolveReflectTypeDescriptor for &ReflectArgumentProbe
 /// Creates an associated-constant reader only after rustc proves the exact
 /// declared value type satisfies the sized `'static` owned boundary.
 #[doc(hidden)]
-pub fn associated_const_reader<T: 'static>(getter: fn() -> T) -> &'static AssociatedConstReader {
+pub fn associated_const_reader<T: 'static>(
+    getter: fn() -> T,
+) -> &'static AssociatedConstReader {
     Box::leak(Box::new(AssociatedConstReader::from_getter(getter)))
 }
 
@@ -141,11 +145,17 @@ impl<P: AssociatedConstProvider> Default for AssociatedConstProbe<P> {
 #[doc(hidden)]
 pub trait ResolveAssociatedConstReader {
     /// Returns the proven reader, or `None` without evaluating the constant.
-    fn resolve_associated_const_reader(self) -> Option<&'static AssociatedConstReader>;
+    fn resolve_associated_const_reader(
+        self,
+    ) -> Option<&'static AssociatedConstReader>;
 }
 
-impl<P: AssociatedConstProvider> ResolveAssociatedConstReader for &&AssociatedConstProbe<P> {
-    fn resolve_associated_const_reader(self) -> Option<&'static AssociatedConstReader> {
+impl<P: AssociatedConstProvider> ResolveAssociatedConstReader
+    for &&AssociatedConstProbe<P>
+{
+    fn resolve_associated_const_reader(
+        self,
+    ) -> Option<&'static AssociatedConstReader> {
         None
     }
 }
@@ -155,7 +165,9 @@ where
     P: AssociatedConstProvider,
     P::Value: Sized + 'static,
 {
-    fn resolve_associated_const_reader(self) -> Option<&'static AssociatedConstReader> {
+    fn resolve_associated_const_reader(
+        self,
+    ) -> Option<&'static AssociatedConstReader> {
         Some(associated_const_reader::<P::Value>(P::get))
     }
 }
@@ -212,7 +224,9 @@ impl ConstArgumentValue for char {
 
 /// Converts one primitive const argument into its structural expression.
 #[doc(hidden)]
-pub fn const_argument_expression<T: ConstArgumentValue>(value: T) -> ConstExpression {
+pub fn const_argument_expression<T: ConstArgumentValue>(
+    value: T,
+) -> ConstExpression {
     value.expression()
 }
 
@@ -234,14 +248,19 @@ pub fn const_argument_owned<T: 'static>(value: T) -> ReflectedOwned {
 /// cannot be stored in a single local static without conflating distinct
 /// substitutions.
 #[doc(hidden)]
-pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'static TypeDescriptor {
+pub fn intern_type<T: ?Sized + 'static>(
+    build: fn() -> TypeDescriptor,
+) -> &'static TypeDescriptor {
     crate::builtin::interner::intern::<T>(build)
 }
 
 /// Creates a primitive root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
-pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> TypeDescriptor {
+pub const fn primitive<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: PrimitiveKind,
+) -> TypeDescriptor {
     TypeDescriptor::new_primitive::<T>(query_name, kind)
 }
 
@@ -253,13 +272,20 @@ pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
     kind: PrimitiveKind,
     capabilities: fn() -> &'static TypeCapabilities,
 ) -> TypeDescriptor {
-    TypeDescriptor::new_primitive_with_capabilities::<T>(query_name, kind, capabilities)
+    TypeDescriptor::new_primitive_with_capabilities::<T>(
+        query_name,
+        kind,
+        capabilities,
+    )
 }
 
 /// Creates a text root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
-pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> TypeDescriptor {
+pub const fn text<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: TextKind,
+) -> TypeDescriptor {
     TypeDescriptor::new_text::<T>(query_name, kind)
 }
 
@@ -270,7 +296,11 @@ pub const fn text_with_capabilities<T: ?Sized + 'static>(
     kind: TextKind,
     capabilities: fn() -> &'static TypeCapabilities,
 ) -> TypeDescriptor {
-    TypeDescriptor::new_text_with_capabilities::<T>(query_name, kind, capabilities)
+    TypeDescriptor::new_text_with_capabilities::<T>(
+        query_name,
+        kind,
+        capabilities,
+    )
 }
 
 /// Creates a struct root descriptor for `T` with a generated diagnostic type
@@ -292,7 +322,8 @@ pub const fn struct_type_with_construction<T: ?Sized + 'static>(
     fields: &'static [FieldDescriptor],
     construction: StructConstructionDescriptor,
 ) -> TypeDescriptor {
-    TypeDescriptor::new_struct::<T>(query_name, kind, fields).with_struct_construction(construction)
+    TypeDescriptor::new_struct::<T>(query_name, kind, fields)
+        .with_struct_construction(construction)
 }
 
 /// Attaches generic declaration and concrete-instance facts to a root.
@@ -331,13 +362,20 @@ pub const fn enum_type_with_repr<T: ?Sized + 'static>(
     variants: &'static [VariantDescriptor],
     representations: &'static [EnumRepr],
 ) -> TypeDescriptor {
-    TypeDescriptor::new_enum_with_repr::<T>(query_name, variants, representations)
+    TypeDescriptor::new_enum_with_repr::<T>(
+        query_name,
+        variants,
+        representations,
+    )
 }
 
 /// Creates a tuple root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
-pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> TypeDescriptor {
+pub const fn tuple<T: ?Sized + 'static>(
+    query_name: &'static str,
+    elements: &'static [TypeRef],
+) -> TypeDescriptor {
     TypeDescriptor::new_tuple::<T>(query_name, elements)
 }
 
@@ -355,7 +393,10 @@ pub const fn array<T: ?Sized + 'static>(
 /// Creates an optional root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
-pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
+pub const fn optional<T: ?Sized + 'static>(
+    query_name: &'static str,
+    element: &'static TypeRef,
+) -> TypeDescriptor {
     TypeDescriptor::new_optional::<T>(query_name, element)
 }
 
@@ -416,7 +457,10 @@ pub const fn reference<T: ?Sized + 'static>(
 /// Creates a slice root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
-pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
+pub const fn slice<T: ?Sized + 'static>(
+    query_name: &'static str,
+    element: &'static TypeRef,
+) -> TypeDescriptor {
     TypeDescriptor::new_slice::<T>(query_name, element)
 }
 
@@ -442,7 +486,14 @@ pub const fn function<T: ?Sized + 'static>(
     parameters: &'static [TypeRef],
     return_type: &'static TypeRef,
 ) -> TypeDescriptor {
-    TypeDescriptor::new_function::<T>(query_name, kind, abi, variadic, parameters, return_type)
+    TypeDescriptor::new_function::<T>(
+        query_name,
+        kind,
+        abi,
+        variadic,
+        parameters,
+        return_type,
+    )
 }
 
 /// Creates a trait-object root descriptor for `T` with a generated diagnostic
@@ -458,7 +509,9 @@ pub const fn trait_object<T: ?Sized + 'static>(
 /// Creates an intentionally opaque root descriptor for `T` with a generated
 /// diagnostic type name.
 #[doc(hidden)]
-pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeDescriptor {
+pub const fn opaque_root<T: ?Sized + 'static>(
+    query_name: &'static str,
+) -> TypeDescriptor {
     TypeDescriptor::new_opaque::<T>(query_name)
 }
 
@@ -489,7 +542,9 @@ pub fn lazy_type_ref<T: Reflect + ?Sized>() -> &'static LazyTypeRef {
 /// Allocates a process-lifetime list of relationships that resolve only when
 /// the list is navigated.
 #[doc(hidden)]
-pub(crate) fn lazy_type_ref_list(references: Vec<LazyTypeRef>) -> &'static LazyTypeRefList {
+pub(crate) fn lazy_type_ref_list(
+    references: Vec<LazyTypeRef>,
+) -> &'static LazyTypeRefList {
     let references = Box::leak(references.into_boxed_slice());
     Box::leak(Box::new(LazyTypeRefList::new(references)))
 }
@@ -504,7 +559,14 @@ pub const fn field(
     field_type: &'static TypeRef,
     visibility: Visibility,
 ) -> FieldDescriptor {
-    FieldDescriptor::new(declaring_type, index, rust_name, query_name, field_type, visibility)
+    FieldDescriptor::new(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        field_type,
+        visibility,
+    )
 }
 
 /// Creates an immutable field whose concrete type relationship is resolved on
@@ -518,7 +580,14 @@ pub const fn lazy_field(
     field_type: &'static LazyTypeRef,
     visibility: Visibility,
 ) -> FieldDescriptor {
-    FieldDescriptor::new_lazy(declaring_type, index, rust_name, query_name, field_type, visibility)
+    FieldDescriptor::new_lazy(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        field_type,
+        visibility,
+    )
 }
 
 /// Creates an immutable enum variant descriptor for generated descriptor data.
@@ -532,7 +601,15 @@ pub const fn variant(
     fields: &'static [FieldDescriptor],
     active_test: VariantActiveAdapter,
 ) -> VariantDescriptor {
-    VariantDescriptor::new(declaring_type, index, rust_name, query_name, kind, fields, active_test)
+    VariantDescriptor::new(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        kind,
+        fields,
+        active_test,
+    )
 }
 
 /// Attaches generated construction entry points to one enum variant.
@@ -562,7 +639,8 @@ mod tests {
     }
 
     #[test]
-    fn semantic_probes_use_generic_environment_bounds_without_concrete_inspection() {
+    fn semantic_probes_use_generic_environment_bounds_without_concrete_inspection()
+     {
         assert!(unresolved_descriptor::<u8>().is_none());
         assert!(proven_descriptor::<u8>().is_some());
     }

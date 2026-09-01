@@ -93,10 +93,11 @@ pub(crate) fn struct_adapters(
     });
     let literal = match fields.first().and_then(|field| field.name.as_ref()) {
         Some(_) => {
-            let assignments = declaration.fields.iter().zip(values).map(|(field, value)| {
-                let name = field.name.as_ref().expect("named struct field");
-                quote!(#name: #value)
-            });
+            let assignments =
+                declaration.fields.iter().zip(values).map(|(field, value)| {
+                    let name = field.name.as_ref().expect("named struct field");
+                    quote!(#name: #value)
+                });
             quote!(Self { #(#assignments),* })
         }
         None if fields.is_empty() => quote!(Self),
@@ -167,7 +168,8 @@ pub(crate) fn struct_adapters(
     }
 }
 
-/// Returns the descriptor expression linking a struct to its generated entry points.
+/// Returns the descriptor expression linking a struct to its generated entry
+/// points.
 pub(crate) fn struct_descriptor(facade: &TokenStream) -> TokenStream {
     quote!(#facade::construct::StructConstructionDescriptor::new(
         Self::__qubit_reflect_struct_constructor,
@@ -175,18 +177,22 @@ pub(crate) fn struct_descriptor(facade: &TokenStream) -> TokenStream {
     ))
 }
 
-/// Emits a local constructor and its descriptor attachment for one enum variant.
-pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> TokenStream {
-    if variant
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
-    {
+/// Emits a local constructor and its descriptor attachment for one enum
+/// variant.
+pub(crate) fn variant_adapters(
+    variant: &VariantIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    if variant.attributes.iter().any(|attribute| {
+        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
+    }) {
         return TokenStream::new();
     }
     let variant_index = variant.index;
-    let constructor = format_ident!("__qubit_reflect_variant_constructor_{variant_index}");
-    let adapter = format_ident!("__qubit_reflect_construct_variant_{variant_index}");
+    let constructor =
+        format_ident!("__qubit_reflect_variant_constructor_{variant_index}");
+    let adapter =
+        format_ident!("__qubit_reflect_construct_variant_{variant_index}");
     let default_providers = variant.fields.iter().filter_map(|field| {
         let default = field
             .attributes
@@ -249,10 +255,12 @@ pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> Tok
         VariantKindIr::Unit => quote!(Self::#variant_name),
         VariantKindIr::Tuple => quote!(Self::#variant_name(#(#values),*)),
         VariantKindIr::Struct => {
-            let assignments = variant.fields.iter().zip(values).map(|(field, value)| {
-                let name = field.name.as_ref().expect("named variant field");
-                quote!(#name: #value)
-            });
+            let assignments =
+                variant.fields.iter().zip(values).map(|(field, value)| {
+                    let name =
+                        field.name.as_ref().expect("named variant field");
+                    quote!(#name: #value)
+                });
             quote!(Self::#variant_name { #(#assignments),* })
         }
     };
@@ -278,14 +286,16 @@ pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream) -> Tok
 }
 
 /// Returns an optional descriptor attachment for one variant.
-pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream) -> TokenStream {
-    if variant
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
-    {
+pub(crate) fn variant_descriptor(
+    variant: &VariantIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    if variant.attributes.iter().any(|attribute| {
+        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
+    }) {
         return TokenStream::new();
     }
-    let constructor = format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
+    let constructor =
+        format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
     quote!(.with_construction(#facade::construct::VariantConstructionDescriptor::new(Self::#constructor)))
 }

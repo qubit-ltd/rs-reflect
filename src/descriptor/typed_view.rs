@@ -206,7 +206,10 @@ impl ArrayTypeDescriptor {
     }
 
     /// Creates an array view whose element resolves on first navigation.
-    pub(crate) const fn new_lazy(element: &'static LazyTypeRef, length: usize) -> Self {
+    pub(crate) const fn new_lazy(
+        element: &'static LazyTypeRef,
+        length: usize,
+    ) -> Self {
         Self {
             element: TypeRefSource::Lazy(element),
             length,
@@ -274,7 +277,10 @@ pub struct SequenceTypeDescriptor {
 
 impl SequenceTypeDescriptor {
     /// Creates a sequence view for internal descriptor construction.
-    pub(crate) const fn new(kind: SequenceKind, element: &'static TypeRef) -> Self {
+    pub(crate) const fn new(
+        kind: SequenceKind,
+        element: &'static TypeRef,
+    ) -> Self {
         Self {
             kind,
             element: TypeRefSource::Eager(element),
@@ -282,7 +288,10 @@ impl SequenceTypeDescriptor {
     }
 
     /// Creates a sequence view whose element resolves on first navigation.
-    pub(crate) const fn new_lazy(kind: SequenceKind, element: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        kind: SequenceKind,
+        element: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             kind,
             element: TypeRefSource::Lazy(element),
@@ -330,7 +339,10 @@ impl SetTypeDescriptor {
     }
 
     /// Creates a set view whose element resolves on first navigation.
-    pub(crate) const fn new_lazy(kind: SetKind, element: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        kind: SetKind,
+        element: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             kind,
             element: TypeRefSource::Lazy(element),
@@ -371,7 +383,11 @@ pub struct MapTypeDescriptor {
 
 impl MapTypeDescriptor {
     /// Creates a map view for internal descriptor construction.
-    pub(crate) const fn new(kind: MapKind, key: &'static TypeRef, value: &'static TypeRef) -> Self {
+    pub(crate) const fn new(
+        kind: MapKind,
+        key: &'static TypeRef,
+        value: &'static TypeRef,
+    ) -> Self {
         Self {
             kind,
             key: TypeRefSource::Eager(key),
@@ -381,7 +397,11 @@ impl MapTypeDescriptor {
 
     /// Creates a map view whose key and value resolve independently on first
     /// navigation.
-    pub(crate) const fn new_lazy(kind: MapKind, key: &'static LazyTypeRef, value: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        kind: MapKind,
+        key: &'static LazyTypeRef,
+        value: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             kind,
             key: TypeRefSource::Lazy(key),
@@ -420,7 +440,10 @@ pub struct SmartPointerTypeDescriptor {
 
 impl SmartPointerTypeDescriptor {
     /// Creates a smart-pointer view for internal descriptor construction.
-    pub(crate) const fn new(kind: SmartPointerKind, pointee: &'static TypeRef) -> Self {
+    pub(crate) const fn new(
+        kind: SmartPointerKind,
+        pointee: &'static TypeRef,
+    ) -> Self {
         Self {
             kind,
             pointee: TypeRefSource::Eager(pointee),
@@ -429,7 +452,10 @@ impl SmartPointerTypeDescriptor {
 
     /// Creates a smart-pointer view whose pointee is resolved on first
     /// navigation.
-    pub(crate) const fn new_lazy(kind: SmartPointerKind, pointee: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        kind: SmartPointerKind,
+        pointee: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             kind,
             pointee: TypeRefSource::Lazy(pointee),
@@ -460,7 +486,10 @@ pub struct ReferenceTypeDescriptor {
 
 impl ReferenceTypeDescriptor {
     /// Creates a reference view for internal descriptor construction.
-    pub(crate) const fn new(kind: ReferenceKind, target: &'static TypeRef) -> Self {
+    pub(crate) const fn new(
+        kind: ReferenceKind,
+        target: &'static TypeRef,
+    ) -> Self {
         Self {
             kind,
             target: TypeRefSource::Eager(target),
@@ -468,7 +497,10 @@ impl ReferenceTypeDescriptor {
     }
 
     /// Creates a reference view whose target resolves on first navigation.
-    pub(crate) const fn new_lazy(kind: ReferenceKind, target: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        kind: ReferenceKind,
+        target: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             kind,
             target: TypeRefSource::Lazy(target),
@@ -528,7 +560,10 @@ pub struct RawPointerTypeDescriptor {
 
 impl RawPointerTypeDescriptor {
     /// Creates a raw-pointer view for internal descriptor construction.
-    pub(crate) const fn new(mutability: Mutability, pointee: &'static TypeRef) -> Self {
+    pub(crate) const fn new(
+        mutability: Mutability,
+        pointee: &'static TypeRef,
+    ) -> Self {
         Self {
             mutability,
             pointee: TypeRefSource::Eager(pointee),
@@ -536,7 +571,10 @@ impl RawPointerTypeDescriptor {
     }
 
     /// Creates a raw-pointer view whose pointee resolves on first navigation.
-    pub(crate) const fn new_lazy(mutability: Mutability, pointee: &'static LazyTypeRef) -> Self {
+    pub(crate) const fn new_lazy(
+        mutability: Mutability,
+        pointee: &'static LazyTypeRef,
+    ) -> Self {
         Self {
             mutability,
             pointee: TypeRefSource::Lazy(pointee),
@@ -648,7 +686,9 @@ pub struct TraitObjectTypeDescriptor {
 
 impl TraitObjectTypeDescriptor {
     /// Creates a trait-object view backed by a lazy applied-trait resolver.
-    pub(crate) const fn new(trait_descriptor: fn() -> &'static TraitDescriptor) -> Self {
+    pub(crate) const fn new(
+        trait_descriptor: fn() -> &'static TraitDescriptor,
+    ) -> Self {
         Self { trait_descriptor }
     }
 
