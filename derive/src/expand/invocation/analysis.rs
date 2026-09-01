@@ -130,7 +130,6 @@ pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> s
             method,
             receiver.as_ref(),
             &parameters,
-            default_blocked || mode_blocked,
         ))
     };
     debug_assert!(!matches!(receiver, Some(ReceiverPlan::Unsupported)) || !executable);
@@ -148,7 +147,6 @@ fn unavailable_reasons(
     method: &MethodIr,
     receiver: Option<&ReceiverPlan>,
     parameters: &[ParameterPlan],
-    owner_blocked: bool,
 ) -> Vec<UnavailableReasonPlan> {
     let mut reasons = Vec::new();
     if matches!(receiver, Some(ReceiverPlan::Unsupported)) {
@@ -179,7 +177,7 @@ fn unavailable_reasons(
     if parameters.iter().any(|plan| plan.unsupported_unsized) {
         reasons.push(UnavailableReasonPlan::UnsupportedUnsizedValue);
     }
-    if invocation_disabled_by_policy(method) || owner_blocked {
+    if invocation_disabled_by_policy(method) {
         reasons.push(UnavailableReasonPlan::DisabledByPolicy);
     }
     if reasons.is_empty() {
