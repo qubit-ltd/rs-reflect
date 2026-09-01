@@ -76,23 +76,28 @@ pub enum NumericDiscriminant {
 
 /// The immutable structural description of one reflected enum variant.
 ///
-/// # Examples
-///
-/// ```
-/// #![allow(proc_macro_derive_resolution_fallback)]
-/// use qubit_reflect::{Reflect, TypeDescriptor};
-///
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// enum State {
-///     Ready,
-/// }
-///
-/// let variant = TypeDescriptor::of::<State>()
-///     .variant("Ready")
-///     .expect("the derived variant exists");
-/// assert_eq!(variant.rust_name(), "Ready");
-/// ```
+#[cfg_attr(
+    feature = "derive",
+    doc = r#"
+# Examples
+
+```
+#![allow(proc_macro_derive_resolution_fallback)]
+use qubit_reflect::{Reflect, TypeDescriptor};
+
+#[derive(Reflect)]
+#[reflect(crate = qubit_reflect)]
+enum State {
+    Ready,
+}
+
+let variant = TypeDescriptor::of::<State>()
+    .variant("Ready")
+    .expect("the derived variant exists");
+assert_eq!(variant.rust_name(), "Ready");
+```
+"#
+)]
 pub struct VariantDescriptor {
     declaring_type: TypeDescriptorResolver,
     index: usize,

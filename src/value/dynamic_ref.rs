@@ -29,6 +29,17 @@ use crate::value::storage::ThreadSafeRefStorage;
 /// Sized values enter through [`Self::new`]. `str` is unsized and therefore
 /// uses the dedicated [`Self::new_str`] variant; it is accessed through
 /// [`Self::as_str`] and never masquerades as `Any`.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::DynamicRef;
+/// use qubit_reflect::value::Local;
+///
+/// let value = 7_u32;
+/// let reflected = DynamicRef::<Local>::new(&value);
+/// assert_eq!(reflected.downcast_ref::<u32>(), Some(&7));
+/// ```
 pub struct DynamicRef<'a, M: Mode> {
     storage: M::RefStorage<'a>,
     marker: PhantomData<M::Marker>,
