@@ -191,11 +191,11 @@ fn test_expression_constructors_preserve_navigable_structural_facts() {
 
     let trait_object = TraitObjectExpression::new([predicate.clone()])
         .with_diagnostic("dyn Display");
-    assert_eq!(trait_object.bounds(), &[predicate.clone()]);
+    assert_eq!(trait_object.bounds(), std::slice::from_ref(&predicate));
     assert_eq!(trait_object.diagnostic(), Some("dyn Display"));
     let opaque = OpaqueTypeExpression::new([predicate.clone()])
         .with_diagnostic("impl Display");
-    assert_eq!(opaque.bounds(), &[predicate.clone()]);
+    assert_eq!(opaque.bounds(), std::slice::from_ref(&predicate));
     assert_eq!(opaque.diagnostic(), Some("impl Display"));
 
     let definition = GenericDefinitionDescriptor::new(
