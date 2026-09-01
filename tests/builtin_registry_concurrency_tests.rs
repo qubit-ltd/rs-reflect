@@ -25,24 +25,15 @@ fn test_builtin_registry_concurrently_freezes_once() {
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                let registry = ReflectRegistry::initialize()
-                    .expect("concurrent initialization must succeed");
-                let identities: Vec<_> = registry
-                    .types()
-                    .iter()
-                    .map(|descriptor| descriptor.type_id())
-                    .collect();
+                let registry = ReflectRegistry::initialize().expect("concurrent initialization must succeed");
+                let identities: Vec<_> = registry.types().iter().map(|descriptor| descriptor.type_id()).collect();
                 (registry as *const ReflectRegistry as usize, identities)
             })
         })
         .collect();
     let snapshots: Vec<_> = handles
         .into_iter()
-        .map(|handle| {
-            handle
-                .join()
-                .expect("registry initialization thread must finish")
-        })
+        .map(|handle| handle.join().expect("registry initialization thread must finish"))
         .collect();
 
     assert!(snapshots.windows(2).all(|pair| pair[0] == pair[1]));

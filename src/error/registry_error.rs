@@ -45,35 +45,23 @@ struct RegistryErrorData {
 impl RegistryError {
     /// Creates an error for two fragments that claim the same registration
     /// identity.
-    pub fn duplicate_fragment(
-        left: FragmentIdentity,
-        right: FragmentIdentity,
-    ) -> Self {
+    pub fn duplicate_fragment(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::DuplicateFragment, left, right)
     }
 
     /// Creates an error for fragments that disagree about one identity's
     /// content.
-    pub fn identity_conflict(
-        left: FragmentIdentity,
-        right: FragmentIdentity,
-    ) -> Self {
+    pub fn identity_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::IdentityConflict, left, right)
     }
 
     /// Creates an error for incompatible external-trait registrations.
-    pub fn external_trait_id_conflict(
-        left: FragmentIdentity,
-        right: FragmentIdentity,
-    ) -> Self {
+    pub fn external_trait_id_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::ExternalTraitIdConflict, left, right)
     }
 
     /// Creates an error for incompatible capability registrations.
-    pub fn capability_conflict(
-        left: FragmentIdentity,
-        right: FragmentIdentity,
-    ) -> Self {
+    pub fn capability_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
 
@@ -109,9 +97,7 @@ impl RegistryError {
     /// conflict.
     #[must_use]
     #[inline(always)]
-    pub fn conflicting_fragments(
-        &self,
-    ) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
+    pub fn conflicting_fragments(&self) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
         let Self(data) = self;
         match (&data.left, &data.right) {
             (Some(left), Some(right)) => Some((left, right)),
@@ -133,11 +119,7 @@ impl RegistryError {
 
     /// Creates a conflict error retaining both conflicting registration
     /// fragments.
-    fn conflict(
-        kind: RegistryErrorKind,
-        left: FragmentIdentity,
-        right: FragmentIdentity,
-    ) -> Self {
+    fn conflict(kind: RegistryErrorKind, left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind,
             left: Some(left),

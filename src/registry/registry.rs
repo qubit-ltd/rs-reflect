@@ -32,17 +32,12 @@ pub struct TypeCandidates<'registry> {
 
 impl<'registry> TypeCandidates<'registry> {
     /// Creates a borrowed candidate view over a registry-owned slice.
-    pub(crate) const fn new(
-        descriptors: &'registry [&'static TypeDescriptor],
-    ) -> Self {
+    pub(crate) const fn new(descriptors: &'registry [&'static TypeDescriptor]) -> Self {
         Self { descriptors }
     }
 
     /// Returns candidates in stable fragment order.
-    pub fn iter(
-        self,
-    ) -> impl ExactSizeIterator<Item = &'static TypeDescriptor> + 'registry
-    {
+    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
@@ -59,8 +54,7 @@ impl<'registry> TypeCandidates<'registry> {
 
 impl<'registry> IntoIterator for TypeCandidates<'registry> {
     type Item = &'static TypeDescriptor;
-    type IntoIter =
-        std::iter::Copied<std::slice::Iter<'registry, &'static TypeDescriptor>>;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -77,17 +71,12 @@ pub struct TraitCandidates<'registry> {
 
 impl<'registry> TraitCandidates<'registry> {
     /// Creates a borrowed candidate view over a registry-owned slice.
-    pub(crate) const fn new(
-        descriptors: &'registry [&'static TraitDefinitionDescriptor],
-    ) -> Self {
+    pub(crate) const fn new(descriptors: &'registry [&'static TraitDefinitionDescriptor]) -> Self {
         Self { descriptors }
     }
 
     /// Returns candidates in stable fragment order.
-    pub fn iter(
-        self,
-    ) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry
-    {
+    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
@@ -109,9 +98,7 @@ impl<'registry> TraitCandidates<'registry> {
 
 impl<'registry> IntoIterator for TraitCandidates<'registry> {
     type Item = &'static TraitDefinitionDescriptor;
-    type IntoIter = std::iter::Copied<
-        std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>,
-    >;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -130,10 +117,7 @@ impl ImplDefinitionCandidates {
     /// Iterates over matching definitions in stable fragment order.
     #[must_use]
     #[inline(always)]
-    pub fn iter(
-        &self,
-    ) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_
-    {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_ {
         self.descriptors.iter().copied()
     }
 
@@ -189,8 +173,7 @@ impl ReflectRegistry {
     /// snapshot is published. Both success and [`RegistryError`] are cached;
     /// concurrent callers therefore observe the same immutable result.
     pub fn initialize() -> Result<&'static Self, RegistryError> {
-        static REGISTRY: OnceLock<Result<ReflectRegistry, RegistryError>> =
-            OnceLock::new();
+        static REGISTRY: OnceLock<Result<ReflectRegistry, RegistryError>> = OnceLock::new();
         initialize_cached(&REGISTRY, build_inventory_registry)
     }
 
@@ -206,12 +189,7 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_type_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(
-            self.indexes
-                .types_by_type_name
-                .get(name)
-                .map_or(&[], Box::as_ref),
-        )
+        TypeCandidates::new(self.indexes.types_by_type_name.get(name).map_or(&[], Box::as_ref))
     }
 
     /// Finds every descriptor with the reflection query name `name`.
@@ -219,12 +197,7 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_query_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(
-            self.indexes
-                .types_by_query_name
-                .get(name)
-                .map_or(&[], Box::as_ref),
-        )
+        TypeCandidates::new(self.indexes.types_by_query_name.get(name).map_or(&[], Box::as_ref))
     }
 
     /// Enumerates all statically registered roots in stable fragment order.
@@ -239,14 +212,8 @@ impl ReflectRegistry {
     /// The slice is empty when no linked implementation fragment targets the
     /// exact root. Its order is the registry's stable fragment order, so a
     /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
-    pub fn implementations(
-        &self,
-        type_id: TypeId,
-    ) -> &[&'static ImplDescriptor] {
-        self.indexes
-            .impls_by_target
-            .get(&type_id)
-            .map_or(&[], Box::as_ref)
+    pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
+        self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
     }
 
     /// Enumerates statically registered generic, blanket, and constrained impl
@@ -264,10 +231,7 @@ impl ReflectRegistry {
     ///
     /// Diagnostic-only text does not participate because
     /// [`TypeExpression`] equality is structural.
-    pub fn find_impl_definitions_by_target(
-        &self,
-        target: &TypeExpression,
-    ) -> ImplDefinitionCandidates {
+    pub fn find_impl_definitions_by_target(&self, target: &TypeExpression) -> ImplDefinitionCandidates {
         ImplDefinitionCandidates {
             descriptors: self
                 .impl_definitions
@@ -294,10 +258,7 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked registration fragment declared the requested
     /// trait.
-    pub fn trait_definition(
-        &self,
-        trait_id: &TraitId,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
         self.indexes.traits_by_id.get(trait_id).copied()
     }
 
@@ -305,24 +266,13 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked reflected trait declaration has the exact path,
     /// or the path is ambiguous across linked fragments.
-    pub fn trait_definition_by_path(
-        &self,
-        rust_path: &str,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn trait_definition_by_path(&self, rust_path: &str) -> Option<&'static TraitDefinitionDescriptor> {
         self.find_trait_definitions_by_path(rust_path).only()
     }
 
     /// Finds every trait declaration with a diagnostic Rust path in stable
     /// order.
-    pub fn find_trait_definitions_by_path(
-        &self,
-        rust_path: &str,
-    ) -> TraitCandidates<'_> {
-        TraitCandidates::new(
-            self.indexes
-                .traits_by_rust_path
-                .get(rust_path)
-                .map_or(&[], Box::as_ref),
-        )
+    pub fn find_trait_definitions_by_path(&self, rust_path: &str) -> TraitCandidates<'_> {
+        TraitCandidates::new(self.indexes.traits_by_rust_path.get(rust_path).map_or(&[], Box::as_ref))
     }
 }

@@ -39,10 +39,7 @@ struct RegistryBuilder {
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
-    external_traits: HashMap<
-        ExternalTraitId,
-        (&'static TraitDefinitionDescriptor, FragmentIdentity),
-    >,
+    external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
@@ -54,12 +51,8 @@ impl RegistryBuilder {
     /// Validates one materialized fragment and records its payload privately.
     fn push(&mut self, built: BuiltFragment) -> Result<(), RegistryError> {
         match built.payload {
-            FragmentPayload::Type(descriptor) => {
-                self.push_type(descriptor, &built.identity)?
-            }
-            FragmentPayload::Trait(descriptor) => {
-                self.push_trait(descriptor, &built.identity)?
-            }
+            FragmentPayload::Type(descriptor) => self.push_type(descriptor, &built.identity)?,
+            FragmentPayload::Trait(descriptor) => self.push_trait(descriptor, &built.identity)?,
             FragmentPayload::ImplDefinition(descriptor) => {
                 if descriptor.fragment_identity() != &built.identity {
                     return Err(RegistryError::identity_conflict(
@@ -69,27 +62,14 @@ impl RegistryBuilder {
                 }
                 self.impl_definitions.push(descriptor);
             }
-            FragmentPayload::Impl(descriptor) => {
-                self.push_impl(descriptor, &built.identity)?
-            }
+            FragmentPayload::Impl(descriptor) => self.push_impl(descriptor, &built.identity)?,
             FragmentPayload::Capability(registration) => {
-                let key = (
-                    registration.target_type_id(),
-                    registration.descriptor().id().clone(),
-                );
+                let key = (registration.target_type_id(), registration.descriptor().id().clone());
                 if let Some((_, first)) = self.capabilities.get(&key) {
-                    return Err(RegistryError::capability_conflict(
-                        first.clone(),
-                        built.identity,
-                    ));
+                    return Err(RegistryError::capability_conflict(first.clone(), built.identity));
                 }
-                self.capabilities.insert(
-                    key,
-                    (
-                        registration.descriptor().adapter_type(),
-                        built.identity.clone(),
-                    ),
-                );
+                self.capabilities
+                    .insert(key, (registration.descriptor().adapter_type(), built.identity.clone()));
             }
         }
         self.fragment_identities.push(built.identity);
@@ -103,10 +83,7 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         if let Some((_, first)) = self.types_by_id.get(&descriptor.type_id()) {
-            return Err(RegistryError::identity_conflict(
-                first.clone(),
-                identity.clone(),
-            ));
+            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
         }
         self.types.push(descriptor);
         self.types_by_id
@@ -122,9 +99,7 @@ impl RegistryBuilder {
     ) -> Result<(), RegistryError> {
         let definition_id = descriptor.trait_id().clone();
         if let TraitId::External(external_id) = &definition_id {
-            if let Some((first_descriptor, first_identity)) =
-                self.external_traits.get(external_id)
-            {
+            if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id) {
                 if !descriptor.is_compatible_with(first_descriptor) {
                     return Err(RegistryError::external_trait_id_conflict(
                         first_identity.clone(),
@@ -132,19 +107,13 @@ impl RegistryBuilder {
                     ));
                 }
             } else {
-                self.external_traits.insert(
-                    external_id.clone(),
-                    (descriptor, identity.clone()),
-                );
+                self.external_traits
+                    .insert(external_id.clone(), (descriptor, identity.clone()));
             }
         } else if let Some(first) = self.trait_fragments.get(&definition_id) {
-            return Err(RegistryError::identity_conflict(
-                first.clone(),
-                identity.clone(),
-            ));
+            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
         }
-        self.trait_fragments
-            .insert(definition_id.clone(), identity.clone());
+        self.trait_fragments.insert(definition_id.clone(), identity.clone());
         self.traits_by_id.entry(definition_id).or_insert(descriptor);
         Ok(())
     }
@@ -157,8 +126,7 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         let definition_identity = descriptor.definition().fragment_identity();
-        if definition_identity != identity && descriptor.arguments().is_empty()
-        {
+        if definition_identity != identity && descriptor.arguments().is_empty() {
             return Err(RegistryError::identity_conflict(
                 definition_identity.clone(),
                 identity.clone(),
@@ -169,17 +137,11 @@ impl RegistryBuilder {
         if let Some(implemented_trait) = descriptor.implemented_trait() {
             let key = (target_type_id, implemented_trait.trait_id().clone());
             if let Some(first) = self.trait_impls.get(&key) {
-                return Err(RegistryError::identity_conflict(
-                    first.clone(),
-                    identity.clone(),
-                ));
+                return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
             }
             self.trait_impls.insert(key, identity.clone());
         }
-        self.impls_by_target
-            .entry(target_type_id)
-            .or_default()
-            .push(descriptor);
+        self.impls_by_target.entry(target_type_id).or_default().push(descriptor);
         Ok(())
     }
 
@@ -187,14 +149,11 @@ impl RegistryBuilder {
     /// declaration has been validated.
     fn resolve_impl_definition_traits(&self) -> Result<(), RegistryError> {
         for definition in &self.impl_definitions {
-            if definition.kind() != ImplKind::Trait
-                || definition.implemented_trait().is_some()
-            {
+            if definition.kind() != ImplKind::Trait || definition.implemented_trait().is_some() {
                 continue;
             }
             if let Some(trait_id) = definition.implemented_trait_id() {
-                let Some(candidate) = self.traits_by_id.get(trait_id).copied()
-                else {
+                let Some(candidate) = self.traits_by_id.get(trait_id).copied() else {
                     return Err(RegistryError::impl_trait_resolution(
                         definition.fragment_identity().clone(),
                     ));
@@ -217,10 +176,7 @@ impl RegistryBuilder {
                 .copied()
                 .filter(|descriptor| {
                     matches!(descriptor.trait_id(), TraitId::Reflected(_))
-                        && reflected_trait_path_matches(
-                            path,
-                            descriptor.rust_path(),
-                        )
+                        && reflected_trait_path_matches(path, descriptor.rust_path())
                 })
                 .collect();
             let candidate = match candidates.as_slice() {
@@ -231,10 +187,8 @@ impl RegistryBuilder {
                         .values()
                         .copied()
                         .filter(|descriptor| {
-                            matches!(
-                                descriptor.trait_id(),
-                                TraitId::Reflected(_)
-                            ) && definition.matches_trait_definition(descriptor)
+                            matches!(descriptor.trait_id(), TraitId::Reflected(_))
+                                && definition.matches_trait_definition(descriptor)
                         })
                         .collect();
                     let [candidate] = compatible.as_slice() else {
@@ -266,12 +220,9 @@ impl RegistryBuilder {
             implementations.sort_by(|left, right| left.registry_cmp(right));
         }
 
-        let types_by_type_name =
-            group_types(&self.types, TypeDescriptor::type_name);
-        let types_by_query_name =
-            group_types(&self.types, TypeDescriptor::query_name);
-        let mut trait_definitions: Vec<_> =
-            self.traits_by_id.into_iter().collect();
+        let types_by_type_name = group_types(&self.types, TypeDescriptor::type_name);
+        let types_by_query_name = group_types(&self.types, TypeDescriptor::query_name);
+        let mut trait_definitions: Vec<_> = self.traits_by_id.into_iter().collect();
         trait_definitions.sort_by(|(left_id, _), (right_id, _)| {
             self.trait_fragments
                 .get(left_id)
@@ -286,15 +237,11 @@ impl RegistryBuilder {
         let impls_by_target = self
             .impls_by_target
             .into_iter()
-            .map(|(type_id, implementations)| {
-                (type_id, implementations.into_boxed_slice())
-            })
+            .map(|(type_id, implementations)| (type_id, implementations.into_boxed_slice()))
             .collect::<HashMap<_, _>>();
         let effective_views_by_target = impls_by_target
             .iter()
-            .map(|(type_id, implementations)| {
-                (*type_id, EffectiveTypeView::new(implementations))
-            })
+            .map(|(type_id, implementations)| (*type_id, EffectiveTypeView::new(implementations)))
             .collect();
         let capability_fragments = self
             .capabilities
@@ -323,10 +270,7 @@ impl RegistryBuilder {
 
 /// Returns whether a source trait path uniquely denotes a registered reflected
 /// declaration after removing Rust-relative path anchors.
-fn reflected_trait_path_matches(
-    source_path: &str,
-    registered_path: &str,
-) -> bool {
+fn reflected_trait_path_matches(source_path: &str, registered_path: &str) -> bool {
     let mut relative_path = source_path;
     while let Some(stripped) = relative_path
         .strip_prefix("crate::")
@@ -342,17 +286,12 @@ fn reflected_trait_path_matches(
 }
 
 /// Builds a registry from all linker-discovered fragments.
-pub(crate) fn build_inventory_registry()
--> Result<ReflectRegistry, RegistryError> {
-    build_registry_from_iter(
-        inventory::iter::<RegistrationFragment>.into_iter(),
-    )
+pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryError> {
+    build_registry_from_iter(inventory::iter::<RegistrationFragment>.into_iter())
 }
 
 /// Builds a registry from an explicit static fragment slice.
-pub(crate) fn build_registry(
-    fragments: &[&'static RegistrationFragment],
-) -> Result<ReflectRegistry, RegistryError> {
+pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(fragments.iter().copied())
 }
 
@@ -430,9 +369,7 @@ pub(crate) fn validate_and_freeze_materialized(
 }
 
 /// Detects exact duplicates and content changes before any payload is built.
-fn validate_fragment_identities(
-    fragments: &[PendingFragment],
-) -> Result<(), RegistryError> {
+fn validate_fragment_identities(fragments: &[PendingFragment]) -> Result<(), RegistryError> {
     validate_identities(fragments.iter().map(|fragment| &fragment.identity))
 }
 
@@ -446,16 +383,10 @@ fn validate_identities<'identity>(
     };
     for right in identities {
         if left == right {
-            return Err(RegistryError::duplicate_fragment(
-                left.clone(),
-                right.clone(),
-            ));
+            return Err(RegistryError::duplicate_fragment(left.clone(), right.clone()));
         }
         if left.same_source_identity(right) {
-            return Err(RegistryError::identity_conflict(
-                left.clone(),
-                right.clone(),
-            ));
+            return Err(RegistryError::identity_conflict(left.clone(), right.clone()));
         }
         left = right;
     }
@@ -469,10 +400,7 @@ fn group_types(
 ) -> HashMap<&'static str, Box<[&'static TypeDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for descriptor in types {
-        groups
-            .entry(name(descriptor))
-            .or_default()
-            .push(*descriptor);
+        groups.entry(name(descriptor)).or_default().push(*descriptor);
     }
     groups
         .into_iter()
@@ -487,10 +415,7 @@ fn group_traits(
 ) -> HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for (_, descriptor) in traits {
-        groups
-            .entry(descriptor.rust_path())
-            .or_default()
-            .push(*descriptor);
+        groups.entry(descriptor.rust_path()).or_default().push(*descriptor);
     }
     groups
         .into_iter()

@@ -51,9 +51,7 @@ fn test_local_str_consuming_downcast_returns_original_wrapper() {
     let mut text = String::from("hello");
     let value = ReflectedMut::new_str_mut(text.as_mut_str());
     let mut value = match value.downcast::<String>() {
-        Ok(_) => panic!(
-            "a dedicated mutable str variant must not downcast through Any"
-        ),
+        Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
         Err(value) => value,
     };
     value

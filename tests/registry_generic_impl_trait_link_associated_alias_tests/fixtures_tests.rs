@@ -59,14 +59,11 @@ impl<T> AssociatedAlias for AssociatedTarget<T> {
 /// Verifies associated item facts participate in unique alias resolution.
 #[test]
 fn test_generic_impl_definition_resolves_associated_item_alias() {
-    let registry = ReflectRegistry::initialize()
-        .expect("associated item facts must support unique alias resolution");
+    let registry = ReflectRegistry::initialize().expect("associated item facts must support unique alias resolution");
     let definition = registry
         .impl_definitions()
         .iter()
-        .find(|definition| {
-            definition.implemented_trait_path() == Some("AssociatedAlias")
-        })
+        .find(|definition| definition.implemented_trait_path() == Some("AssociatedAlias"))
         .expect("the generic impl definition must be registered");
     assert_eq!(
         definition

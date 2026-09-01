@@ -19,8 +19,5 @@ fn test_fragment_payload_reports_matching_kind_and_identity() {
     let descriptor = TypeDescriptor::of::<u8>();
     let payload = FragmentPayload::Type(descriptor);
     assert_eq!(payload.kind(), FragmentKind::Type);
-    assert_eq!(
-        payload.runtime_identity(),
-        RuntimeIdentity::Type(descriptor.type_id())
-    );
+    assert_eq!(payload.runtime_identity(), RuntimeIdentity::Type(descriptor.type_id()));
 }
