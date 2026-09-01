@@ -225,7 +225,7 @@ impl TypeDescriptor {
 
     /// Attaches generated struct construction entry points to this root.
     #[doc(hidden)]
-    pub const fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
+    pub fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
     }
