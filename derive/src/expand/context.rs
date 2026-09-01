@@ -8,9 +8,16 @@
 
 //! Shared facts required by every expansion backend.
 
+// qubit-style: allow type-file-name
+
+use proc_macro_crate::FoundCrate;
+use proc_macro_crate::crate_name;
+use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Error;
+use syn::Result as SynResult;
 
 use crate::ir::HelperAttributeIr;
 use crate::ir::HelperValueIr;
@@ -23,7 +30,7 @@ pub(crate) struct ExpansionContext {
 
 impl ExpansionContext {
     /// Resolves an explicit runtime facade or the Cargo dependency name.
-    pub(crate) fn from_attributes(attributes: &[HelperAttributeIr]) -> syn::Result<Self> {
+    pub(crate) fn from_attributes(attributes: &[HelperAttributeIr]) -> SynResult<Self> {
         if let Some(facade) = attributes.iter().find_map(|attribute| {
             if let HelperValueIr::RuntimeCrate(path) = &attribute.value {
                 Some(path.tokens.clone())
@@ -33,7 +40,7 @@ impl ExpansionContext {
         }) {
             return Ok(Self { facade });
         }
-        Self::from_found_crate(proc_macro_crate::crate_name("qubit-reflect").ok())
+        Self::from_found_crate(crate_name("qubit-reflect").ok())
     }
 
     /// Returns the caller-visible runtime facade path.
@@ -46,15 +53,15 @@ impl ExpansionContext {
         fingerprint(source)
     }
 
-    fn from_found_crate(found: Option<proc_macro_crate::FoundCrate>) -> syn::Result<Self> {
+    fn from_found_crate(found: Option<FoundCrate>) -> SynResult<Self> {
         let facade = match found {
-            Some(proc_macro_crate::FoundCrate::Itself) => quote!(crate),
-            Some(proc_macro_crate::FoundCrate::Name(name)) => {
-                let identifier = proc_macro2::Ident::new(&name, Span::call_site());
+            Some(FoundCrate::Itself) => quote!(crate),
+            Some(FoundCrate::Name(name)) => {
+                let identifier = Ident::new(&name, Span::call_site());
                 quote!(::#identifier)
             }
             None => {
-                return Err(syn::Error::new(
+                return Err(Error::new(
                     Span::call_site(),
                     "cannot resolve `qubit-reflect`; use `#[reflect(crate = path)]`",
                 ));
@@ -73,6 +80,7 @@ pub(crate) fn fingerprint(source: &str) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro_crate::FoundCrate;
     use proc_macro2::Span;
     use quote::quote;
 
@@ -105,9 +113,8 @@ mod tests {
 
     #[test]
     fn renamed_dependency_becomes_an_absolute_path() {
-        let context =
-            ExpansionContext::from_found_crate(Some(proc_macro_crate::FoundCrate::Name("reflect_runtime".to_owned())))
-                .expect("renamed dependency must resolve");
+        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Name("reflect_runtime".to_owned())))
+            .expect("renamed dependency must resolve");
         assert_eq!(context.facade().to_string(), ":: reflect_runtime");
     }
 

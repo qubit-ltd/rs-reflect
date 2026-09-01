@@ -8,6 +8,7 @@
 
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
+use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
@@ -1799,8 +1800,7 @@ fn substitute_tokens(tokens: &TokenStream, replacements: &[(Ident, TokenStream)]
                 .map(|(_, tokens)| tokens.clone())
                 .unwrap_or_else(|| TokenStream::from(TokenTree::Ident(ident))),
             TokenTree::Group(group) => {
-                let mut replacement =
-                    proc_macro2::Group::new(group.delimiter(), substitute_tokens(&group.stream(), replacements));
+                let mut replacement = Group::new(group.delimiter(), substitute_tokens(&group.stream(), replacements));
                 replacement.set_span(group.span());
                 TokenStream::from(TokenTree::Group(replacement))
             }
@@ -1976,7 +1976,7 @@ fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> 
         }
         match &trees[index] {
             TokenTree::Group(group) => {
-                let mut replacement = proc_macro2::Group::new(
+                let mut replacement = Group::new(
                     group.delimiter(),
                     substitute_lifetime_tokens(&group.stream(), lifetime_names),
                 );
