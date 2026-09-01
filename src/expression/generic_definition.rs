@@ -36,8 +36,7 @@ pub struct GenericDefinitionDescriptor {
 
 impl PartialEq for GenericDefinitionDescriptor {
     fn eq(&self, other: &Self) -> bool {
-        self.parameters == other.parameters
-            && self.predicates == other.predicates
+        self.parameters == other.parameters && self.predicates == other.predicates
     }
 }
 
@@ -114,11 +113,7 @@ impl PartialEq for GenericParameterDescriptor {
                     default: other_default,
                     diagnostic: _,
                 },
-            ) => {
-                name == other_name
-                    && bounds == other_bounds
-                    && default == other_default
-            }
+            ) => name == other_name && bounds == other_bounds && default == other_default,
             (
                 Self::Const {
                     name,
@@ -132,9 +127,7 @@ impl PartialEq for GenericParameterDescriptor {
                     default: other_default,
                     diagnostic: _,
                 },
-            ) => {
-                name == other_name && ty == other_ty && default == other_default
-            }
+            ) => name == other_name && ty == other_ty && default == other_default,
             _ => false,
         }
     }

@@ -143,73 +143,55 @@ pub(crate) fn validate_named<M: Mode>(
         return Err(input.into_recovery(error));
     }
 
-    let positions = match validate_construction_bindings(
-        input.fields(),
-        fields,
-        value_type_id,
-    ) {
+    let positions = match validate_construction_bindings(input.fields(), fields, value_type_id) {
         Ok(positions) => positions,
         Err(error) => return Err(input.into_recovery(error)),
     };
 
     for (index, field) in fields.iter().enumerate() {
-        if positions[index].is_none()
-            && matches!(field.policy(), ConstructionFieldPolicy::Required)
-        {
+        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required) {
             return Err(input.into_recovery(ConstructionError::MissingField {
-                field: Box::new(ConstructionFieldId::from_descriptor(
-                    field.descriptor(),
-                )),
+                field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
             }));
         }
     }
 
-    let mut defaults: Vec<Option<DynamicOwned<M>>> =
-        std::iter::repeat_with(|| None).take(fields.len()).collect();
+    let mut defaults: Vec<Option<DynamicOwned<M>>> = std::iter::repeat_with(|| None).take(fields.len()).collect();
     for (index, field) in fields.iter().enumerate() {
         if positions[index].is_some() {
             continue;
         }
         match field.policy() {
-            ConstructionFieldPolicy::Default(provider)
-            | ConstructionFieldPolicy::ProviderOnly(provider) => {
+            ConstructionFieldPolicy::Default(provider) | ConstructionFieldPolicy::ProviderOnly(provider) => {
                 let value = provider();
-                if let Err(error) =
-                    validate_value(field.descriptor(), &value, value_type_id)
-                {
+                if let Err(error) = validate_value(field.descriptor(), &value, value_type_id) {
                     return Err(input.into_recovery(error));
                 }
                 defaults[index] = Some(value);
             }
             ConstructionFieldPolicy::Unavailable(_) => {
-                unreachable!(
-                    "constructor availability is validated before providers"
-                )
+                unreachable!("constructor availability is validated before providers")
             }
             ConstructionFieldPolicy::Required => {
-                unreachable!(
-                    "every missing required field is rejected before providers"
-                )
+                unreachable!("every missing required field is rejected before providers")
             }
         }
     }
 
-    let mut raw = input
-        .into_fields()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = input.into_fields().into_iter().map(Some).collect::<Vec<_>>();
     let mut values = Vec::with_capacity(fields.len());
     for index in 0..fields.len() {
         if let Some(input_index) = positions[index] {
-            let (_, value) = raw[input_index].take().unwrap_or_else(|| {
-                unreachable!("each input position is selected once")
-            });
+            let (_, value) = raw[input_index]
+                .take()
+                .unwrap_or_else(|| unreachable!("each input position is selected once"));
             values.push(value);
         } else {
-            values.push(defaults[index].take().unwrap_or_else(|| {
-                unreachable!("every omitted field has a validated provider")
-            }));
+            values.push(
+                defaults[index]
+                    .take()
+                    .unwrap_or_else(|| unreachable!("every omitted field has a validated provider")),
+            );
         }
     }
     Ok(ValidatedConstructionInput {
@@ -231,11 +213,7 @@ pub(crate) fn validate_tuple<M: Mode>(
         .iter()
         .enumerate()
         .filter_map(|(index, field)| {
-            (!matches!(
-                field.policy(),
-                ConstructionFieldPolicy::ProviderOnly(_)
-            ))
-            .then_some(index)
+            (!matches!(field.policy(), ConstructionFieldPolicy::ProviderOnly(_))).then_some(index)
         })
         .collect::<Vec<_>>();
     if input.values().len() > caller_field_indices.len() {
@@ -244,75 +222,59 @@ pub(crate) fn validate_tuple<M: Mode>(
         }));
     }
     let mut positions = vec![None; fields.len()];
-    for (input_index, (&field_index, value)) in
-        caller_field_indices.iter().zip(input.values()).enumerate()
-    {
+    for (input_index, (&field_index, value)) in caller_field_indices.iter().zip(input.values()).enumerate() {
         let field = &fields[field_index];
-        if let Err(error) =
-            validate_value(field.descriptor(), value, value_type_id)
-        {
+        if let Err(error) = validate_value(field.descriptor(), value, value_type_id) {
             return Err(input.into_recovery(error));
         }
         positions[field_index] = Some(input_index);
     }
 
     for (index, field) in fields.iter().enumerate() {
-        if positions[index].is_none()
-            && matches!(field.policy(), ConstructionFieldPolicy::Required)
-        {
+        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required) {
             return Err(input.into_recovery(ConstructionError::MissingField {
-                field: Box::new(ConstructionFieldId::from_descriptor(
-                    field.descriptor(),
-                )),
+                field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
             }));
         }
     }
 
-    let mut defaults: Vec<Option<DynamicOwned<M>>> =
-        std::iter::repeat_with(|| None).take(fields.len()).collect();
+    let mut defaults: Vec<Option<DynamicOwned<M>>> = std::iter::repeat_with(|| None).take(fields.len()).collect();
     for (index, field) in fields.iter().enumerate() {
         if positions[index].is_some() {
             continue;
         }
         match field.policy() {
-            ConstructionFieldPolicy::Default(provider)
-            | ConstructionFieldPolicy::ProviderOnly(provider) => {
+            ConstructionFieldPolicy::Default(provider) | ConstructionFieldPolicy::ProviderOnly(provider) => {
                 let value = provider();
-                if let Err(error) =
-                    validate_value(field.descriptor(), &value, value_type_id)
-                {
+                if let Err(error) = validate_value(field.descriptor(), &value, value_type_id) {
                     return Err(input.into_recovery(error));
                 }
                 defaults[index] = Some(value);
             }
             ConstructionFieldPolicy::Unavailable(_) => {
-                unreachable!(
-                    "constructor availability is validated before providers"
-                )
+                unreachable!("constructor availability is validated before providers")
             }
             ConstructionFieldPolicy::Required => {
-                unreachable!(
-                    "every missing required field is rejected before providers"
-                )
+                unreachable!("every missing required field is rejected before providers")
             }
         }
     }
 
-    let mut raw = input
-        .into_values()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = input.into_values().into_iter().map(Some).collect::<Vec<_>>();
     let mut values = Vec::with_capacity(fields.len());
     for index in 0..fields.len() {
         if let Some(input_index) = positions[index] {
-            values.push(raw[input_index].take().unwrap_or_else(|| {
-                unreachable!("each tuple position is selected once")
-            }));
+            values.push(
+                raw[input_index]
+                    .take()
+                    .unwrap_or_else(|| unreachable!("each tuple position is selected once")),
+            );
         } else {
-            values.push(defaults[index].take().unwrap_or_else(|| {
-                unreachable!("every omitted field has a validated provider")
-            }));
+            values.push(
+                defaults[index]
+                    .take()
+                    .unwrap_or_else(|| unreachable!("every omitted field has a validated provider")),
+            );
         }
     }
     Ok(ValidatedConstructionInput {
@@ -330,14 +292,10 @@ pub(crate) fn validate_unit<M: Mode>(
     }
     if let Some(field) = fields.first() {
         return Err(ConstructionError::MissingField {
-            field: Box::new(ConstructionFieldId::from_descriptor(
-                field.descriptor(),
-            )),
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
         });
     }
-    Ok(ValidatedConstructionInput {
-        values: Box::new([]),
-    })
+    Ok(ValidatedConstructionInput { values: Box::new([]) })
 }
 
 /// Validates an exact update base and every supplied override atomically.
@@ -355,27 +313,19 @@ pub(crate) fn validate_update<M: Mode>(
         }));
     }
 
-    let positions = match validate_update_bindings(
-        input.overrides().fields(),
-        fields,
-        value_type_id,
-    ) {
+    let positions = match validate_update_bindings(input.overrides().fields(), fields, value_type_id) {
         Ok(positions) => positions,
         Err(error) => return Err(input.into_recovery(error)),
     };
 
     let (base, overrides) = input.into_parts();
-    let mut raw = overrides
-        .into_fields()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = overrides.into_fields().into_iter().map(Some).collect::<Vec<_>>();
     let mut validated = Vec::with_capacity(raw.len());
     for (index, position) in positions.into_iter().enumerate() {
         if let Some(position) = position {
-            let (_, value) = raw[position].take().unwrap_or_else(|| {
-                unreachable!("each override position is selected once")
-            });
+            let (_, value) = raw[position]
+                .take()
+                .unwrap_or_else(|| unreachable!("each override position is selected once"));
             validated.push(ValidatedOverride { index, value });
         }
     }
@@ -420,36 +370,30 @@ fn validate_construction_bindings<M: Mode>(
 ) -> Result<Vec<Option<usize>>, ConstructionError> {
     let mut positions = vec![None; fields.len()];
     for (input_index, (name, value)) in input.iter().enumerate() {
-        let Some(field_index) = fields.iter().position(|field| {
-            field.descriptor().query_name() == Some(name.as_ref())
-        }) else {
+        let Some(field_index) = fields
+            .iter()
+            .position(|field| field.descriptor().query_name() == Some(name.as_ref()))
+        else {
             return Err(ConstructionError::UnknownField { name: name.clone() });
         };
         if positions[field_index].replace(input_index).is_some() {
-            return Err(ConstructionError::DuplicateField {
-                name: name.clone(),
-            });
+            return Err(ConstructionError::DuplicateField { name: name.clone() });
         }
         let field = &fields[field_index];
         match field.policy() {
             ConstructionFieldPolicy::ProviderOnly(_) => {
                 return Err(ConstructionError::Unavailable {
-                    field: Box::new(ConstructionFieldId::from_descriptor(
-                        field.descriptor(),
-                    )),
+                    field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
                     reason: ConstructionUnavailableReason::CallerValueForbidden,
                 });
             }
             ConstructionFieldPolicy::Unavailable(reason) => {
                 return Err(ConstructionError::Unavailable {
-                    field: Box::new(ConstructionFieldId::from_descriptor(
-                        field.descriptor(),
-                    )),
+                    field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
                     reason,
                 });
             }
-            ConstructionFieldPolicy::Required
-            | ConstructionFieldPolicy::Default(_) => {}
+            ConstructionFieldPolicy::Required | ConstructionFieldPolicy::Default(_) => {}
         }
         validate_value(field.descriptor(), value, value_type_id)?;
     }
@@ -458,18 +402,12 @@ fn validate_construction_bindings<M: Mode>(
 
 /// Returns the first field whose policy makes from-zero construction
 /// unavailable.
-fn unavailable_constructor_field<M: Mode>(
-    fields: &[ConstructionField<M>],
-) -> Option<ConstructionError> {
+fn unavailable_constructor_field<M: Mode>(fields: &[ConstructionField<M>]) -> Option<ConstructionError> {
     fields.iter().find_map(|field| match field.policy() {
-        ConstructionFieldPolicy::Unavailable(reason) => {
-            Some(ConstructionError::Unavailable {
-                field: Box::new(ConstructionFieldId::from_descriptor(
-                    field.descriptor(),
-                )),
-                reason,
-            })
-        }
+        ConstructionFieldPolicy::Unavailable(reason) => Some(ConstructionError::Unavailable {
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
+            reason,
+        }),
         ConstructionFieldPolicy::Required
         | ConstructionFieldPolicy::Default(_)
         | ConstructionFieldPolicy::ProviderOnly(_) => None,
@@ -484,22 +422,19 @@ fn validate_update_bindings<M: Mode>(
 ) -> Result<Vec<Option<usize>>, ConstructionError> {
     let mut positions = vec![None; fields.len()];
     for (input_index, (name, value)) in input.iter().enumerate() {
-        let Some(field_index) = fields.iter().position(|field| {
-            field.descriptor().query_name() == Some(name.as_ref())
-        }) else {
+        let Some(field_index) = fields
+            .iter()
+            .position(|field| field.descriptor().query_name() == Some(name.as_ref()))
+        else {
             return Err(ConstructionError::UnknownField { name: name.clone() });
         };
         if positions[field_index].replace(input_index).is_some() {
-            return Err(ConstructionError::DuplicateField {
-                name: name.clone(),
-            });
+            return Err(ConstructionError::DuplicateField { name: name.clone() });
         }
         let field = &fields[field_index];
         if let UpdateFieldPolicy::Unavailable(reason) = field.policy() {
             return Err(ConstructionError::Unavailable {
-                field: Box::new(ConstructionFieldId::from_descriptor(
-                    field.descriptor(),
-                )),
+                field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
                 reason,
             });
         }

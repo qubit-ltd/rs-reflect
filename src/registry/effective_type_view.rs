@@ -39,20 +39,11 @@ impl EffectiveTypeView {
         let mut methods: Vec<&'static MethodInstanceDescriptor> = Vec::new();
         for implementation in implementations {
             for candidate in implementation.method_instances() {
-                let duplicate =
-                    methods.iter().enumerate().position(|(index, current)| {
-                        same_method_application(
-                            method_implementations[index],
-                            current,
-                            implementation,
-                            candidate,
-                        )
-                    });
+                let duplicate = methods.iter().enumerate().position(|(index, current)| {
+                    same_method_application(method_implementations[index], current, implementation, candidate)
+                });
                 match duplicate {
-                    Some(index)
-                        if candidate.implementation_source()
-                            == MethodImplementationSource::Overridden =>
-                    {
+                    Some(index) if candidate.implementation_source() == MethodImplementationSource::Overridden => {
                         method_implementations[index] = *implementation;
                         methods[index] = candidate;
                     }
@@ -88,18 +79,10 @@ impl EffectiveTypeView {
 
     /// Looks up one of the same frozen effective entries returned by
     /// [`Self::methods`].
-    pub fn lookup_method<'a>(
-        &'a self,
-        qualifier: MethodQualifier<'_>,
-        name: &str,
-    ) -> MethodLookup<'a> {
+    pub fn lookup_method<'a>(&'a self, qualifier: MethodQualifier<'_>, name: &str) -> MethodLookup<'a> {
         let mut found = None;
-        for (implementation, instance) in
-            self.method_implementations.iter().zip(&self.methods)
-        {
-            if !implementation.matches_qualifier(qualifier)
-                || instance.declaration().query_name() != name
-            {
+        for (implementation, instance) in self.method_implementations.iter().zip(&self.methods) {
+            if !implementation.matches_qualifier(qualifier) || instance.declaration().query_name() != name {
                 continue;
             }
             if found.is_some() {
@@ -130,9 +113,7 @@ fn same_method_application(
         candidate_implementation.implemented_trait(),
     ) {
         (None, None) => true,
-        (Some(current_trait), Some(candidate_trait)) => {
-            current_trait.same_application(candidate_trait)
-        }
+        (Some(current_trait), Some(candidate_trait)) => current_trait.same_application(candidate_trait),
         _ => false,
     }
 }
@@ -172,9 +153,7 @@ mod tests {
 
     /// Returns the exact reflected target shared by view fixtures.
     fn target_type() -> &'static TypeDescriptor {
-        static TARGET: TypeDescriptor = crate::__private::descriptor::primitive::<
-            Target,
-        >("Target", PrimitiveKind::U8);
+        static TARGET: TypeDescriptor = crate::__private::descriptor::primitive::<Target>("Target", PrimitiveKind::U8);
         &TARGET
     }
 
@@ -203,13 +182,11 @@ mod tests {
 
     /// Builds one concrete type argument with stable structural identity.
     fn type_argument(name: &str) -> GenericArgument {
-        GenericArgument::Type(TypeExpression::Concrete(
-            ConcreteTypeExpression {
-                path: Box::new([name.into()]),
-                arguments: Box::new([]),
-                diagnostic: DiagnosticText::from(name),
-            },
-        ))
+        GenericArgument::Type(TypeExpression::Concrete(ConcreteTypeExpression {
+            path: Box::new([name.into()]),
+            arguments: Box::new([]),
+            diagnostic: DiagnosticText::from(name),
+        }))
     }
 
     /// Builds one stable fixture member identity.
@@ -218,14 +195,7 @@ mod tests {
             declaring_identity,
             "method",
             0,
-            FragmentIdentity::new(
-                "fixture",
-                declaring_identity,
-                1,
-                1,
-                "method",
-                1,
-            ),
+            FragmentIdentity::new("fixture", declaring_identity, 1, 1, "method", 1),
         )
     }
 
@@ -252,14 +222,7 @@ mod tests {
     fn test_effective_view_preserves_method_specialization_arguments() {
         let definition = Box::leak(Box::new(
             ImplDefinitionDescriptor::new(
-                FragmentIdentity::new(
-                    "fixture",
-                    "method_specialization",
-                    1,
-                    1,
-                    "impl",
-                    1,
-                ),
+                FragmentIdentity::new("fixture", "method_specialization", 1, 1, "impl", 1),
                 TypeExpression::Parameter("Self".into()),
                 ImplKind::Inherent,
                 None,
@@ -310,14 +273,7 @@ mod tests {
     fn test_effective_view_preserves_impl_application_arguments() {
         let definition = Box::leak(Box::new(
             ImplDefinitionDescriptor::new(
-                FragmentIdentity::new(
-                    "fixture",
-                    "impl_application",
-                    1,
-                    1,
-                    "impl",
-                    2,
-                ),
+                FragmentIdentity::new("fixture", "impl_application", 1, 1, "impl", 2),
                 TypeExpression::Parameter("Self".into()),
                 ImplKind::Inherent,
                 None,
@@ -364,15 +320,14 @@ mod tests {
     /// qualified lookup uses the complete applied trait identity.
     #[test]
     fn test_effective_view_preserves_applied_trait_arguments() {
-        let trait_definition =
-            Box::leak(Box::new(TraitDefinitionDescriptor::new(
-                TraitId::Reflected(TypeId::of::<GenericTraitMarker>()),
-                "GenericTrait",
-                "fixture::GenericTrait",
-                "generic_trait",
-                TraitCompleteness::Complete,
-                one_type_parameter(),
-            )));
+        let trait_definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
+            TraitId::Reflected(TypeId::of::<GenericTraitMarker>()),
+            "GenericTrait",
+            "fixture::GenericTrait",
+            "generic_trait",
+            TraitCompleteness::Complete,
+            one_type_parameter(),
+        )));
         let declaration = Box::leak(Box::new(
             MethodDescriptor::builder(
                 method_id("generic_trait"),
@@ -395,14 +350,7 @@ mod tests {
         let second_trait = build_trait(type_argument("u16"));
         let impl_definition = Box::leak(Box::new(
             ImplDefinitionDescriptor::new(
-                FragmentIdentity::new(
-                    "fixture",
-                    "generic_trait_impl",
-                    3,
-                    1,
-                    "impl",
-                    3,
-                ),
+                FragmentIdentity::new("fixture", "generic_trait_impl", 3, 1, "impl", 3),
                 TypeExpression::Parameter("Self".into()),
                 ImplKind::Trait,
                 Some(trait_definition),

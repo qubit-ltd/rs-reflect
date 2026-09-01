@@ -42,18 +42,12 @@ fn test_invocation_adapter_local_descriptor_invokes_its_typed_entry_point() {
 /// Returns one owned thread-safe output through the generated boundary.
 fn return_eight<'call>(
     _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<
-    InvocationOutput<'call, ThreadSafe>,
-    InvocationFailure<'call, ThreadSafe>,
-> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(
-        8_u8,
-    )))
+) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
+    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
 }
 
 #[test]
-fn test_invocation_adapter_thread_safe_descriptor_invokes_its_typed_entry_point()
- {
+fn test_invocation_adapter_thread_safe_descriptor_invokes_its_typed_entry_point() {
     let adapter = InvocationAdapter::thread_safe(return_eight);
     let output = adapter
         .invoke_thread_safe(Invocation::associated([]))

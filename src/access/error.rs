@@ -58,9 +58,7 @@ pub enum FieldAccessError {
         operation: FieldAccessOperation,
     },
     /// The field belongs to a different currently inactive enum variant.
-    #[error(
-        "field {field} belongs to inactive variant {variant_rust_name} at index {variant_index}"
-    )]
+    #[error("field {field} belongs to inactive variant {variant_rust_name} at index {variant_index}")]
     InactiveVariant {
         /// The field whose operation was requested.
         field: FieldIdentity,
@@ -77,11 +75,7 @@ impl FieldAccessError {
     /// The adapter calls this only after the descriptor has validated the root
     /// enum type. The returned error does not modify the target.
     #[doc(hidden)]
-    pub const fn inactive_variant(
-        field: FieldIdentity,
-        variant_index: usize,
-        variant_rust_name: &'static str,
-    ) -> Self {
+    pub const fn inactive_variant(field: FieldIdentity, variant_index: usize, variant_rust_name: &'static str) -> Self {
         Self::InactiveVariant {
             field,
             variant_index,

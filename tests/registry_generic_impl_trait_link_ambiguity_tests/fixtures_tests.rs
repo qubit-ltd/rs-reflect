@@ -44,7 +44,6 @@ impl<T> AmbiguousAlias for AmbiguousTarget<T> {
 /// Verifies compatible declaration facts never select an arbitrary marker.
 #[test]
 fn test_generic_impl_definition_rejects_ambiguous_alias_facts() {
-    let error = ReflectRegistry::initialize()
-        .expect_err("identical trait declaration facts must remain ambiguous");
+    let error = ReflectRegistry::initialize().expect_err("identical trait declaration facts must remain ambiguous");
     assert_eq!(error.kind(), RegistryErrorKind::ImplTraitResolution);
 }

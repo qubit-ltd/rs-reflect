@@ -57,9 +57,7 @@ fn test_type_expression_navigates_mutable_reference_to_slice_parameter() {
     let expression = TypeExpression::Reference(ReferenceTypeExpression {
         lifetime: LifetimeExpression::Named("a".into()),
         mutable: true,
-        target: Box::new(TypeExpression::Slice(Box::new(
-            TypeExpression::Parameter("T".into()),
-        ))),
+        target: Box::new(TypeExpression::Slice(Box::new(TypeExpression::Parameter("T".into())))),
         diagnostic: DiagnosticText::default(),
     });
 
@@ -94,8 +92,7 @@ fn test_type_expression_navigates_elided_reference_lifetime() {
 /// Verifies that function pointers retain ABI, safety, HRTB, and opaque return
 /// bounds.
 #[test]
-fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
-{
+fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return() {
     let iterator = concrete(
         &["core", "iter", "Iterator"],
         vec![GenericArgument::AssociatedType {
@@ -103,38 +100,29 @@ fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
             value: Box::new(TypeExpression::Parameter("T".into())),
         }],
     );
-    let expression =
-        TypeExpression::FunctionPointer(FunctionPointerExpression {
-            abi: FunctionAbi::Rust,
-            safety: FunctionSafety::Safe,
-            variadic: false,
-            higher_ranked_lifetimes: Box::new([LifetimeExpression::Named(
-                "a".into(),
-            )]),
-            parameters: Box::new([TypeExpression::Reference(
-                ReferenceTypeExpression {
-                    lifetime: LifetimeExpression::Named("a".into()),
-                    mutable: false,
-                    target: Box::new(TypeExpression::Parameter("T".into())),
-                    diagnostic: DiagnosticText::default(),
-                },
-            )]),
-            return_type: Box::new(TypeExpression::Opaque(
-                OpaqueTypeExpression {
-                    bounds: Box::new([PredicateDescriptor::TypeBound {
-                        subject: TypeExpression::SelfType,
-                        bounds: Box::new([iterator]),
-                        bound_modifiers: Box::new([
-                            reflect::expression::TraitBoundModifier::None,
-                        ]),
-                        higher_ranked_lifetimes: Box::default(),
-                        diagnostic: DiagnosticText::default(),
-                    }]),
-                    diagnostic: DiagnosticText::default(),
-                },
-            )),
+    let expression = TypeExpression::FunctionPointer(FunctionPointerExpression {
+        abi: FunctionAbi::Rust,
+        safety: FunctionSafety::Safe,
+        variadic: false,
+        higher_ranked_lifetimes: Box::new([LifetimeExpression::Named("a".into())]),
+        parameters: Box::new([TypeExpression::Reference(ReferenceTypeExpression {
+            lifetime: LifetimeExpression::Named("a".into()),
+            mutable: false,
+            target: Box::new(TypeExpression::Parameter("T".into())),
             diagnostic: DiagnosticText::default(),
-        });
+        })]),
+        return_type: Box::new(TypeExpression::Opaque(OpaqueTypeExpression {
+            bounds: Box::new([PredicateDescriptor::TypeBound {
+                subject: TypeExpression::SelfType,
+                bounds: Box::new([iterator]),
+                bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
+                higher_ranked_lifetimes: Box::default(),
+                diagnostic: DiagnosticText::default(),
+            }]),
+            diagnostic: DiagnosticText::default(),
+        })),
+        diagnostic: DiagnosticText::default(),
+    });
 
     let TypeExpression::FunctionPointer(function) = expression else {
         panic!("expected a function pointer expression");
@@ -173,12 +161,8 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
     let predicate = PredicateDescriptor::TypeBound {
         subject: TypeExpression::Parameter("F".into()),
         bounds: Box::new([bound]),
-        bound_modifiers: Box::new([
-            reflect::expression::TraitBoundModifier::None,
-        ]),
-        higher_ranked_lifetimes: Box::new([LifetimeExpression::Named(
-            "a".into(),
-        )]),
+        bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
+        higher_ranked_lifetimes: Box::new([LifetimeExpression::Named("a".into())]),
         diagnostic: DiagnosticText::default(),
     };
 
@@ -193,9 +177,7 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
     let TypeExpression::Concrete(callable) = &bounds[0] else {
         panic!("expected a trait path");
     };
-    let GenericArgument::Type(TypeExpression::Tuple(parameters)) =
-        &callable.arguments[0]
-    else {
+    let GenericArgument::Type(TypeExpression::Tuple(parameters)) = &callable.arguments[0] else {
         panic!("expected trait parameter types");
     };
     let TypeExpression::Reference(parameter) = &parameters[0] else {
@@ -231,9 +213,7 @@ fn test_generic_definition_navigates_const_generic_and_predicates() {
         predicates: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::Parameter("T".into()),
             bounds: Box::new([concrete(&["Clone"], Vec::new())]),
-            bound_modifiers: Box::new([
-                reflect::expression::TraitBoundModifier::None,
-            ]),
+            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),
@@ -241,9 +221,7 @@ fn test_generic_definition_navigates_const_generic_and_predicates() {
     };
 
     assert_eq!(definition.parameters.len(), 3);
-    let GenericParameterDescriptor::Const { default, .. } =
-        &definition.parameters[2]
-    else {
+    let GenericParameterDescriptor::Const { default, .. } = &definition.parameters[2] else {
         panic!("expected a const generic parameter");
     };
     assert_eq!(default, &Some(ConstExpression::UnsignedInteger(4)));
@@ -269,18 +247,12 @@ fn test_generic_argument_navigates_typed_const_value() {
     });
 
     assert_eq!(argument, alternate_diagnostic);
-    assert_eq!(
-        identity_hash(&argument),
-        identity_hash(&alternate_diagnostic)
-    );
+    assert_eq!(identity_hash(&argument), identity_hash(&alternate_diagnostic));
 
     let GenericArgument::Const(argument) = argument else {
         panic!("expected a const generic argument");
     };
-    assert_eq!(
-        argument.declared_type.as_ref(),
-        &concrete(&["usize"], Vec::new())
-    );
+    assert_eq!(argument.declared_type.as_ref(), &concrete(&["usize"], Vec::new()));
     assert_eq!(argument.value, ConstExpression::UnsignedInteger(4));
     assert_eq!(argument.normalized_diagnostic.as_ref(), "4usize");
 
@@ -302,27 +274,18 @@ fn test_type_expression_navigates_qualified_associated_type() {
         self_type: Box::new(TypeExpression::Parameter("T".into())),
         trait_path: Some(Box::new(concrete(
             &["core", "iter", "Iterator"],
-            vec![GenericArgument::Lifetime(LifetimeExpression::Named(
-                "a".into(),
-            ))],
+            vec![GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))],
         ))),
         item: "Item".into(),
-        arguments: Box::new([GenericArgument::Type(
-            TypeExpression::Parameter("U".into()),
-        )]),
+        arguments: Box::new([GenericArgument::Type(TypeExpression::Parameter("U".into()))]),
         diagnostic: DiagnosticText::default(),
     });
 
     let TypeExpression::Associated(associated) = expression else {
         panic!("expected an associated type projection");
     };
-    assert_eq!(
-        associated.self_type.as_ref(),
-        &TypeExpression::Parameter("T".into())
-    );
-    let Some(TypeExpression::Concrete(trait_path)) =
-        associated.trait_path.as_deref()
-    else {
+    assert_eq!(associated.self_type.as_ref(), &TypeExpression::Parameter("T".into()));
+    let Some(TypeExpression::Concrete(trait_path)) = associated.trait_path.as_deref() else {
         panic!("expected a concrete trait path");
     };
     assert_eq!(
@@ -331,9 +294,7 @@ fn test_type_expression_navigates_qualified_associated_type() {
     );
     assert_eq!(
         trait_path.arguments.as_ref(),
-        &[GenericArgument::Lifetime(LifetimeExpression::Named(
-            "a".into()
-        ))]
+        &[GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))]
     );
     assert_eq!(associated.item.as_ref(), "Item");
     assert_eq!(
@@ -372,19 +333,13 @@ fn test_type_expression_navigates_raw_pointer() {
         panic!("expected a raw pointer expression");
     };
     assert!(pointer.mutable);
-    assert_eq!(
-        pointer.target.as_ref(),
-        &TypeExpression::Parameter("T".into())
-    );
+    assert_eq!(pointer.target.as_ref(), &TypeExpression::Parameter("T".into()));
 }
 
 /// Verifies that tuple element order and nested forms remain navigable.
 #[test]
 fn test_type_expression_navigates_tuple() {
-    let expression = TypeExpression::Tuple(Box::new([
-        TypeExpression::Parameter("T".into()),
-        TypeExpression::Never,
-    ]));
+    let expression = TypeExpression::Tuple(Box::new([TypeExpression::Parameter("T".into()), TypeExpression::Never]));
 
     let TypeExpression::Tuple(elements) = expression else {
         panic!("expected a tuple expression");
@@ -408,9 +363,7 @@ fn test_type_expression_navigates_array_trait_object_and_never() {
         bounds: Box::new([PredicateDescriptor::TypeBound {
             subject: TypeExpression::SelfType,
             bounds: Box::new([concrete(&["Display"], Vec::new())]),
-            bound_modifiers: Box::new([
-                reflect::expression::TraitBoundModifier::None,
-            ]),
+            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
             higher_ranked_lifetimes: Box::default(),
             diagnostic: DiagnosticText::default(),
         }]),
@@ -452,10 +405,7 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
         diagnostic: "T: 'a".into(),
     };
     assert_eq!(plain_predicate, annotated_predicate);
-    assert_eq!(
-        identity_hash(&plain_predicate),
-        identity_hash(&annotated_predicate)
-    );
+    assert_eq!(identity_hash(&plain_predicate), identity_hash(&annotated_predicate));
 
     let plain_definition = GenericDefinitionDescriptor {
         parameters: Box::new([GenericParameterDescriptor::Lifetime {
@@ -476,8 +426,5 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
         diagnostic: "<'a>".into(),
     };
     assert_eq!(plain_definition, annotated_definition);
-    assert_eq!(
-        identity_hash(&plain_definition),
-        identity_hash(&annotated_definition)
-    );
+    assert_eq!(identity_hash(&plain_definition), identity_hash(&annotated_definition));
 }

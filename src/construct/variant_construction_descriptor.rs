@@ -20,9 +20,7 @@ pub struct VariantConstructionDescriptor {
 impl VariantConstructionDescriptor {
     /// Creates a generated local owned variant-construction entry point.
     #[doc(hidden)]
-    pub const fn new(
-        local_constructor: fn() -> &'static VariantConstructor<Local>,
-    ) -> Self {
+    pub const fn new(local_constructor: fn() -> &'static VariantConstructor<Local>) -> Self {
         Self { local_constructor }
     }
 
