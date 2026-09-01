@@ -295,7 +295,15 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         .iter()
         .enumerate()
         .map(|(index, method)| {
-            default_method_invocation_adapter(method, index, &suffix, &trait_name_literal, &hook_type_bounds, &facade)
+            default_method_invocation_adapter(
+                method,
+                index,
+                &suffix,
+                &trait_name_literal,
+                &hook_type_bounds,
+                &facade,
+                context,
+            )
         })
         .collect();
     let default_method_adapter_items = default_method_adapters
@@ -305,10 +313,19 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         Some((_, entry)) => entry.clone(),
         None => quote!(None),
     });
-    let default_method_unavailable_reason_entries = declaration
-        .methods
-        .iter()
-        .map(|method| super::impls::invocation_unavailable_reason_entry(method, &quote!(Self), &facade));
+    let default_method_unavailable_reason_entries = declaration.methods.iter().map(|method| {
+        let has_unproven_associated_type = method
+            .parameters
+            .iter()
+            .any(|parameter| type_contains_associated_type(&parameter.ty))
+            || matches!(&method.return_type, ReturnTypeIr::Type(ty) if type_contains_associated_type(ty));
+        let plan = super::invocation::analysis::analyze_method(
+            method,
+            super::invocation::analysis::MethodContext::trait_default(&quote!(Self), has_unproven_associated_type),
+        )
+        .expect("validated method analysis is infallible");
+        super::invocation::emit::emit_adapter(&plan, context)
+    });
     let associated_type_resolver_entries = declaration.associated_types.iter().map(|item| {
         if item.generics.params.is_empty() {
             let name = &item.name;
@@ -1522,27 +1539,9 @@ fn default_method_invocation_adapter(
     trait_name: &syn::LitStr,
     hook_type_bounds: &[TokenStream],
     facade: &TokenStream,
+    _context: &ExpansionContext,
 ) -> Option<(TokenStream, TokenStream)> {
     let target = quote!(Self);
-    let typed_owned_receiver = method
-        .receiver
-        .as_ref()
-        .and_then(|receiver| super::impls::typed_owned_receiver_type(receiver, &target));
-    let typed_pinned_receiver = method
-        .receiver
-        .as_ref()
-        .and_then(super::impls::typed_pinned_receiver_mutable);
-    let supported_receiver = matches!(
-        method.receiver.as_ref().map(|receiver| receiver.kind),
-        None | Some(ReceiverKindIr::Value)
-            | Some(ReceiverKindIr::SharedReference)
-            | Some(ReceiverKindIr::MutableReference)
-    ) || typed_owned_receiver.is_some()
-        || typed_pinned_receiver.is_some();
-    let supported_parameters = method
-        .parameters
-        .iter()
-        .all(|parameter| super::impls::supports_invocation_parameter(&parameter.ty));
     let has_unproven_associated_type = method
         .parameters
         .iter()
@@ -1551,25 +1550,14 @@ fn default_method_invocation_adapter(
             &method.return_type,
             ReturnTypeIr::Type(ty) if type_contains_associated_type(ty)
         );
-    if let Some(pinned_mutable) = typed_pinned_receiver {
-        let supported = method.has_default
-            && supported_parameters
-            && method.generics.params.is_empty()
-            && method.generics.where_predicates.is_empty()
-            && !has_unproven_associated_type
-            && !method.qualifiers.is_async
-            && !method.qualifiers.is_unsafe
-            && method.qualifiers.abi.is_none()
-            && !method.qualifiers.is_variadic
-            && !super::impls::is_borrow_return(&method.return_type)
-            && !method.attributes.iter().any(|attribute| {
-                matches!(
-                    attribute.name,
-                    HelperName::Skip | HelperName::NoInvoke | HelperName::ThreadSafe | HelperName::CatchUnwind
-                )
-            })
-            && super::impls::supports_invocation_return(&method.return_type);
-        return supported.then(|| {
+    let invocation_plan = super::invocation::analysis::analyze_method(
+        method,
+        super::invocation::analysis::MethodContext::trait_default(&target, has_unproven_associated_type),
+    )
+    .expect("validated method analysis is infallible");
+    let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
+    if let Some(pinned_mutable) = invocation_plan.pinned_receiver_mutability() {
+        return invocation_plan.is_executable().then(|| {
             default_pinned_method_invocation_adapter(
                 method,
                 index,
@@ -1581,48 +1569,24 @@ fn default_method_invocation_adapter(
             )
         });
     }
-    let supported = method.has_default
-        && supported_receiver
-        && supported_parameters
-        && method.generics.params.is_empty()
-        && method.generics.where_predicates.is_empty()
-        && !has_unproven_associated_type
-        && !method.qualifiers.is_unsafe
-        && method.qualifiers.abi.is_none()
-        && !method.qualifiers.is_variadic
-        && (!super::impls::return_contains_non_static_lifetime(&method.return_type)
-            || super::impls::is_supported_shared_borrow_return(&method.return_type)
-            || super::impls::is_supported_mutable_borrow_return(method))
-        && (!method.qualifiers.is_async || !super::impls::is_borrow_return(&method.return_type))
-        && !method
-            .attributes
-            .iter()
-            .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoInvoke))
-        && super::impls::supports_invocation_return(&method.return_type);
-    if !supported {
+    if !invocation_plan.is_executable() {
         return None;
     }
 
     let adapter_name = format_ident!("__qubit_reflect_invoke_default_{suffix}_{index}");
     let method_name = &method.name;
-    let thread_safe = method
-        .attributes
-        .iter()
-        .any(|attribute| attribute.name == HelperName::ThreadSafe);
-    let catching_requested = method
-        .attributes
-        .iter()
-        .any(|attribute| attribute.name == HelperName::CatchUnwind)
-        && !method.qualifiers.is_async;
+    debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
+    let thread_safe = invocation_plan.modes.thread_safe;
+    let catching_requested = invocation_plan.modes.catching;
     let mode = if thread_safe {
         quote!(#facade::value::ThreadSafe)
     } else {
         quote!(#facade::value::Local)
     };
     let thread_safe_assertions = thread_safe
-        .then(|| super::impls::thread_safe_invocation_assertions(method, &target, typed_owned_receiver.as_ref(), None));
+        .then(|| super::invocation::emit::thread_safe_assertions(method, &target, typed_owned_receiver.as_ref(), None));
     let catching_assertions = catching_requested
-        .then(|| super::impls::catching_invocation_assertions(method, &target, typed_owned_receiver.as_ref(), None));
+        .then(|| super::invocation::emit::catching_assertions(method, &target, typed_owned_receiver.as_ref(), None));
     let receiver_expectation = if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
         Some(ReceiverKindIr::Value)
@@ -1698,12 +1662,12 @@ fn default_method_invocation_adapter(
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_expectation(parameter, facade))
+        .map(|parameter| super::invocation::emit::argument_expectation(parameter, facade))
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_binding(parameter, facade, &mode))
+        .map(|parameter| super::invocation::emit::argument_binding(parameter, facade, &mode))
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -1753,7 +1717,7 @@ fn default_method_invocation_adapter(
                 ..
             }),
         ) => {
-            let value = if super::impls::is_str_type(element) {
+            let value = if super::invocation::analysis::is_str_type(element) {
                 quote!(#facade::value::DynamicRef::<#mode>::new_str(#call))
             } else {
                 quote!(#facade::value::DynamicRef::<#mode>::new(#call))
@@ -1777,7 +1741,7 @@ fn default_method_invocation_adapter(
                 ..
             }),
         ) => {
-            let value = if super::impls::is_str_type(element) {
+            let value = if super::invocation::analysis::is_str_type(element) {
                 quote!(#facade::value::DynamicMut::<#mode>::new_str_mut(#call))
             } else {
                 quote!(#facade::value::DynamicMut::<#mode>::new(#call))
@@ -1867,7 +1831,7 @@ fn default_method_invocation_adapter(
                     },
                 ..
             }) => {
-                let value = if super::impls::is_str_type(element) {
+                let value = if super::invocation::analysis::is_str_type(element) {
                     quote!(#facade::value::DynamicRef::<#mode>::new_str(#call))
                 } else {
                     quote!(#facade::value::DynamicRef::<#mode>::new(#call))
@@ -1885,7 +1849,7 @@ fn default_method_invocation_adapter(
                 },
                 ..
             }) => {
-                let value = if super::impls::is_str_type(element) {
+                let value = if super::invocation::analysis::is_str_type(element) {
                     quote!(#facade::value::DynamicMut::<#mode>::new_str_mut(#call))
                 } else {
                     quote!(#facade::value::DynamicMut::<#mode>::new(#call))
@@ -2046,12 +2010,12 @@ fn default_pinned_method_invocation_adapter(
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_expectation(parameter, facade))
+        .map(|parameter| super::invocation::emit::argument_expectation(parameter, facade))
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| super::impls::invocation_argument_binding(parameter, facade, &mode))
+        .map(|parameter| super::invocation::emit::argument_binding(parameter, facade, &mode))
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
