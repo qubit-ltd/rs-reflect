@@ -128,9 +128,13 @@ parse ──> validate ──> domain IR
 - `expand/context.rs` is the single owner of facade resolution and fragment fingerprints.
 - `expand/dispatcher.rs` routes structs, enums, traits, and impls.
 - `expand/invocation/analysis.rs` decides receiver, parameter, output, thread-safe, catching, async, and unavailable semantics.
-- `expand/invocation/emit.rs` emits adapters from an `InvocationPlan` without re-deciding semantics.
+- `expand/invocation/emit.rs` emits shared semantic fragments from an `InvocationPlan`: unavailable reasons,
+  argument bindings, and thread-safe/catching assertions.
 
-Trait default methods and concrete impls share the same invocation analysis and emitter. Style checking distinguishes
+Trait default methods and concrete impls share the same invocation analysis and semantic emitters. Their execution
+shells stay with their natural owners: the former emits a `Self`-bounded default-method hook, while the latter emits a
+concrete-target adapter and registration. Combining those ownership shells behind mode flags would move complexity
+without creating a useful abstraction. Style checking distinguishes
 host Rust from generated-token scopes, so paths intentionally emitted inside `quote!` do not distort host-source
 rules.
 

@@ -351,7 +351,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             super::invocation::analysis::MethodContext::trait_default(&quote!(Self), has_unproven_associated_type),
         )
         .expect("validated method analysis is infallible");
-        super::invocation::emit::emit_adapter(&plan, context)
+        super::invocation::emit::emit_unavailable_reasons(&plan, context)
     });
     let associated_type_resolver_entries = declaration.associated_types.iter().map(|item| {
         if item.generics.params.is_empty() {
