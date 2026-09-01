@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
@@ -20,15 +21,13 @@ use crate::ir::VisibilityIr;
 
 /// Expands a concrete struct into a static root descriptor and safe field
 /// adapters.
-pub(crate) fn expand(declaration: TypeDeclarationIr) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
-    let Some(facade) = super::facade_path_for(&declaration.attributes) else {
-        return TokenStream::new();
-    };
+    let facade = context.facade().clone();
     let name = declaration.name.clone();
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let registration_module = format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
     let opaque_root = declaration
         .attributes
@@ -343,13 +342,6 @@ fn registration(
             }
         }
     }
-}
-
-/// Computes a stable FNV-1a content fingerprint for one declaration.
-fn fingerprint(input: &str) -> u64 {
-    input.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-    })
 }
 
 /// Expands a normalized source visibility into its public runtime form.

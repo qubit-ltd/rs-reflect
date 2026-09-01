@@ -11,13 +11,13 @@
 mod lifetime;
 
 use proc_macro2::Ident;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::format_ident;
 use quote::quote;
 use quote::quote_spanned;
 
+use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
@@ -41,11 +41,19 @@ use crate::ir::VisibilityIr;
 /// The descriptor graph is deliberately constructed during registry
 /// initialization, not from an inventory constructor. This keeps user code out
 /// of linker startup and uses the T12 registration protocol exclusively.
-pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
+pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if !declaration.generics.params.is_empty() {
-        return expand_generic_impl_specializations(declaration);
+        return expand_generic_impl_specializations(declaration, context);
     }
-    expand_concrete_impl(declaration, quote!(::std::vec![]), None, None, Vec::new())
+    expand_concrete_impl(
+        declaration,
+        quote!(::std::vec![]),
+        None,
+        None,
+        Vec::new(),
+        context.facade(),
+        context,
+    )
 }
 
 /// Retains a generic impl and emits one concrete registration fragment for
@@ -53,12 +61,10 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr) -> TokenStream {
 ///
 /// Blanket and constrained impls have no finite runtime `TypeId` set, so an
 /// impl without `specialize(...)` deliberately remains descriptor-only.
-fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenStream {
+fn expand_generic_impl_specializations(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let retained = declaration.retained_tokens.clone();
-    let Some(facade) = facade_path() else {
-        return retained;
-    };
-    let definition = expand_generic_impl_definition(&declaration, &facade);
+    let facade = context.facade().clone();
+    let definition = expand_generic_impl_definition(&declaration, &facade, context);
     if declaration.specializations.is_empty() {
         return quote!(#retained #definition);
     }
@@ -96,6 +102,8 @@ fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenS
             Some(definition),
             Some(applicability_witness),
             associated_type_resolver_arms,
+            &facade,
+            context,
         )
     });
     quote!(#retained #definition #(#fragments)*)
@@ -105,8 +113,12 @@ fn expand_generic_impl_specializations(declaration: ImplDeclarationIr) -> TokenS
 ///
 /// This payload deliberately has no `TypeId`: it describes the symbolic impl
 /// declaration and cannot enter a concrete type's effective view.
-fn expand_generic_impl_definition(declaration: &ImplDeclarationIr, facade: &TokenStream) -> TokenStream {
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
+fn expand_generic_impl_definition(
+    declaration: &ImplDeclarationIr,
+    facade: &TokenStream,
+    context: &ExpansionContext,
+) -> TokenStream {
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let location = declaration.span.start();
     let line = location.line as u32;
     let column = location.column as u32;
@@ -276,7 +288,7 @@ fn expand_generic_impl_definition(declaration: &ImplDeclarationIr, facade: &Toke
 /// Returns the stable generated module name owning one generic impl
 /// definition.
 fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
-    let fingerprint = fingerprint(&declaration.retained_tokens.to_string());
+    let fingerprint = super::context::fingerprint(&declaration.retained_tokens.to_string());
     let location = declaration.span.start();
     format_ident!(
         "__qubit_reflect_impl_definition_{fingerprint:x}_{}_{}",
@@ -449,13 +461,10 @@ fn expand_concrete_impl(
     shared_definition: Option<TokenStream>,
     applicability_witness: Option<TokenStream>,
     specialized_associated_type_resolver_arms: Vec<TokenStream>,
+    facade: &TokenStream,
+    context: &ExpansionContext,
 ) -> TokenStream {
-    let Some(facade) = facade_path() else {
-        // Parser-only consumers of the standalone derive crate intentionally
-        // have no runtime facade. Retaining the validated Rust impl preserves
-        // its business semantics without fabricating a registration dependency.
-        return declaration.retained_tokens;
-    };
+    let facade = facade.clone();
     let retained = declaration.retained_tokens;
     let target = declaration.target_type.tokens;
     let impl_generic_definition = super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
@@ -469,7 +478,7 @@ fn expand_concrete_impl(
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
         });
-    let fingerprint = fingerprint(&format!("{}{}", retained, target));
+    let fingerprint = context.fingerprint(&format!("{}{}", retained, target));
     let location = declaration.span.start();
     let line = location.line as u32;
     let column = location.column as u32;
@@ -2815,25 +2824,6 @@ pub(super) fn invocation_argument_binding(
             }
         }
     }
-}
-
-/// Resolves the facade path without coupling the proc-macro crate to runtime.
-fn facade_path() -> Option<TokenStream> {
-    match proc_macro_crate::crate_name("qubit-reflect") {
-        Ok(proc_macro_crate::FoundCrate::Itself) => Some(quote!(crate)),
-        Ok(proc_macro_crate::FoundCrate::Name(name)) => {
-            let ident = Ident::new(&name, Span::call_site());
-            Some(quote!(::#ident))
-        }
-        Err(_) => None,
-    }
-}
-
-/// Computes a deterministic content fingerprint for fragment identity.
-fn fingerprint(value: &str) -> u64 {
-    value.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-    })
 }
 
 /// Returns whether a return declaration carries a borrow that cannot cross the
