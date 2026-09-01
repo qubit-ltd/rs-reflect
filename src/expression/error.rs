@@ -17,6 +17,12 @@ pub enum ExpressionError {
     /// A concrete type path did not contain any segments.
     #[error("a concrete type path must contain at least one segment")]
     EmptyConcretePath,
+    /// A type-bound predicate did not contain any trait bounds.
+    #[error("a type-bound predicate must contain at least one bound")]
+    EmptyTypeBounds,
+    /// A lifetime-outlives predicate did not contain any bound lifetimes.
+    #[error("a lifetime-outlives predicate must contain at least one bound")]
+    EmptyLifetimeBounds,
     /// Trait bounds and their modifiers had different lengths.
     #[error("trait-bound modifiers must match bounds: {bounds} bounds, {modifiers} modifiers")]
     BoundModifierCount {

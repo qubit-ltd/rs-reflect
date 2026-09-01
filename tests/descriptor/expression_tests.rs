@@ -12,7 +12,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use qubit_reflect as reflect;
 use qubit_reflect::expression::ArrayTypeExpression;
 use qubit_reflect::expression::AssociatedTypeExpression;
 use qubit_reflect::expression::ConcreteTypeExpression;
@@ -59,6 +58,60 @@ fn type_bound_rejects_mismatched_modifiers() {
     );
 }
 
+#[test]
+fn type_bound_rejects_empty_bounds() {
+    assert_eq!(
+        PredicateDescriptor::type_bound(
+            TypeExpression::SelfType,
+            Box::<[TypeExpression]>::default(),
+            Box::<[TraitBoundModifier]>::default(),
+            Box::<[LifetimeExpression]>::default(),
+        ),
+        Err(ExpressionError::EmptyTypeBounds),
+    );
+}
+
+#[test]
+fn lifetime_outlives_rejects_empty_bounds() {
+    assert_eq!(
+        PredicateDescriptor::lifetime_outlives(
+            LifetimeExpression::Named("a".into()),
+            Box::<[LifetimeExpression]>::default(),
+        ),
+        Err(ExpressionError::EmptyLifetimeBounds),
+    );
+}
+
+#[test]
+fn type_bound_preserves_higher_ranked_lifetime_order() {
+    let predicate = PredicateDescriptor::type_bound(
+        TypeExpression::SelfType,
+        vec![concrete(&["Fn"], Vec::new())].into_boxed_slice(),
+        vec![TraitBoundModifier::None].into_boxed_slice(),
+        vec![
+            LifetimeExpression::Named("first".into()),
+            LifetimeExpression::Named("second".into()),
+        ]
+        .into_boxed_slice(),
+    )
+    .expect("one bound and one modifier form a valid predicate");
+
+    let PredicateDescriptor::TypeBound {
+        higher_ranked_lifetimes,
+        ..
+    } = predicate
+    else {
+        panic!("expected a type-bound predicate");
+    };
+    assert_eq!(
+        higher_ranked_lifetimes.as_ref(),
+        &[
+            LifetimeExpression::Named("first".into()),
+            LifetimeExpression::Named("second".into()),
+        ],
+    );
+}
+
 /// Builds a concrete path expression without relying on parser implementation
 /// types.
 fn concrete(path: &[&str], arguments: Vec<GenericArgument>) -> TypeExpression {
@@ -67,11 +120,42 @@ fn concrete(path: &[&str], arguments: Vec<GenericArgument>) -> TypeExpression {
     )
 }
 
+/// Builds a valid type-bound predicate through the checked public boundary.
+fn type_bound(
+    subject: TypeExpression,
+    bounds: Vec<TypeExpression>,
+    modifiers: Vec<TraitBoundModifier>,
+    higher_ranked_lifetimes: Vec<LifetimeExpression>,
+) -> PredicateDescriptor {
+    PredicateDescriptor::type_bound(
+        subject,
+        bounds.into_boxed_slice(),
+        modifiers.into_boxed_slice(),
+        higher_ranked_lifetimes.into_boxed_slice(),
+    )
+    .expect("test bounds and modifiers must form a valid non-empty predicate")
+}
+
 /// Computes the structural identity hash used by equality regression tests.
 fn identity_hash<T: Hash>(value: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Checks the identity contract shared by diagnostic-bearing expression
+/// values.
+fn assert_identity_contract<T>(plain: &T, annotated: &T, structurally_different: &T)
+where
+    T: std::fmt::Debug + Eq + Hash,
+{
+    assert_eq!(plain, annotated);
+    assert_eq!(identity_hash(plain), identity_hash(annotated));
+    assert_ne!(plain, structurally_different);
+    assert_ne!(
+        identity_hash(plain),
+        identity_hash(structurally_different),
+    );
 }
 
 /// Verifies that nested references, slices, and generic parameters remain
@@ -134,13 +218,12 @@ fn test_type_expression_navigates_function_pointer_with_opaque_iterator_return()
         ))]
         .into_boxed_slice(),
         TypeExpression::Opaque(OpaqueTypeExpression::new(
-            vec![PredicateDescriptor::TypeBound {
-                subject: TypeExpression::SelfType,
-                bounds: Box::new([iterator]),
-                bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
-                higher_ranked_lifetimes: Box::default(),
-                diagnostic: DiagnosticText::default(),
-            }]
+            vec![type_bound(
+                TypeExpression::SelfType,
+                vec![iterator],
+                vec![TraitBoundModifier::None],
+                Vec::new(),
+            )]
             .into_boxed_slice(),
         )),
     ));
@@ -178,13 +261,12 @@ fn test_predicate_navigates_higher_ranked_trait_bound_lifetime() {
             )),
         ])))],
     );
-    let predicate = PredicateDescriptor::TypeBound {
-        subject: TypeExpression::Parameter("F".into()),
-        bounds: Box::new([bound]),
-        bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
-        higher_ranked_lifetimes: Box::new([LifetimeExpression::Named("a".into())]),
-        diagnostic: DiagnosticText::default(),
-    };
+    let predicate = type_bound(
+        TypeExpression::Parameter("F".into()),
+        vec![bound],
+        vec![TraitBoundModifier::None],
+        vec![LifetimeExpression::Named("a".into())],
+    );
 
     let PredicateDescriptor::TypeBound {
         bounds,
@@ -231,13 +313,12 @@ fn test_generic_definition_navigates_const_generic_and_predicates() {
             },
         ]
         .into_boxed_slice(),
-        vec![PredicateDescriptor::TypeBound {
-            subject: TypeExpression::Parameter("T".into()),
-            bounds: Box::new([concrete(&["Clone"], Vec::new())]),
-            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
-            higher_ranked_lifetimes: Box::default(),
-            diagnostic: DiagnosticText::default(),
-        }]
+        vec![type_bound(
+            TypeExpression::Parameter("T".into()),
+            vec![concrete(&["Clone"], Vec::new())],
+            vec![TraitBoundModifier::None],
+            Vec::new(),
+        )]
         .into_boxed_slice(),
     );
 
@@ -377,13 +458,12 @@ fn test_type_expression_navigates_array_trait_object_and_never() {
         ConstExpression::Parameter("N".into()),
     ));
     let object = TypeExpression::TraitObject(TraitObjectExpression::new(
-        vec![PredicateDescriptor::TypeBound {
-            subject: TypeExpression::SelfType,
-            bounds: Box::new([concrete(&["Display"], Vec::new())]),
-            bound_modifiers: Box::new([reflect::expression::TraitBoundModifier::None]),
-            higher_ranked_lifetimes: Box::default(),
-            diagnostic: DiagnosticText::default(),
-        }]
+        vec![type_bound(
+            TypeExpression::SelfType,
+            vec![concrete(&["Display"], Vec::new())],
+            vec![TraitBoundModifier::None],
+            Vec::new(),
+        )]
         .into_boxed_slice(),
     ));
 
@@ -445,4 +525,184 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
     .with_diagnostic("<'a>");
     assert_eq!(plain_definition, annotated_definition);
     assert_eq!(identity_hash(&plain_definition), identity_hash(&annotated_definition));
+}
+
+/// Verifies every diagnostic-bearing type-expression node pairs equality and
+/// hashing on structure alone.
+#[test]
+fn test_all_diagnostic_type_nodes_use_structural_identity() {
+    let concrete_plain =
+        ConcreteTypeExpression::new(["u8"], Vec::new()).expect("non-empty path");
+    let concrete_annotated = concrete_plain.clone().with_diagnostic("u8");
+    let concrete_different =
+        ConcreteTypeExpression::new(["u16"], Vec::new()).expect("non-empty path");
+    assert_identity_contract(
+        &concrete_plain,
+        &concrete_annotated,
+        &concrete_different,
+    );
+
+    let associated_plain = AssociatedTypeExpression::new(
+        TypeExpression::Parameter("T".into()),
+        None,
+        "Item",
+        Box::<[GenericArgument]>::default(),
+    );
+    let associated_annotated = associated_plain.clone().with_diagnostic("T::Item");
+    let associated_different = AssociatedTypeExpression::new(
+        TypeExpression::Parameter("T".into()),
+        None,
+        "Output",
+        Box::<[GenericArgument]>::default(),
+    );
+    assert_identity_contract(
+        &associated_plain,
+        &associated_annotated,
+        &associated_different,
+    );
+
+    let reference_plain = ReferenceTypeExpression::new(
+        LifetimeExpression::Named("a".into()),
+        false,
+        TypeExpression::Parameter("T".into()),
+    );
+    let reference_annotated = reference_plain.clone().with_diagnostic("&'a T");
+    let reference_different = ReferenceTypeExpression::new(
+        LifetimeExpression::Named("a".into()),
+        true,
+        TypeExpression::Parameter("T".into()),
+    );
+    assert_identity_contract(
+        &reference_plain,
+        &reference_annotated,
+        &reference_different,
+    );
+
+    let pointer_plain =
+        RawPointerTypeExpression::new(false, TypeExpression::Parameter("T".into()));
+    let pointer_annotated = pointer_plain.clone().with_diagnostic("*const T");
+    let pointer_different =
+        RawPointerTypeExpression::new(true, TypeExpression::Parameter("T".into()));
+    assert_identity_contract(&pointer_plain, &pointer_annotated, &pointer_different);
+
+    let array_plain = ArrayTypeExpression::new(
+        TypeExpression::Parameter("T".into()),
+        ConstExpression::UnsignedInteger(4),
+    );
+    let array_annotated = array_plain.clone().with_diagnostic("[T; 4]");
+    let array_different = ArrayTypeExpression::new(
+        TypeExpression::Parameter("T".into()),
+        ConstExpression::UnsignedInteger(8),
+    );
+    assert_identity_contract(&array_plain, &array_annotated, &array_different);
+
+    let function_plain = FunctionPointerExpression::new(
+        FunctionAbi::Rust,
+        FunctionSafety::Safe,
+        false,
+        Box::<[LifetimeExpression]>::default(),
+        vec![TypeExpression::Parameter("T".into())].into_boxed_slice(),
+        TypeExpression::Parameter("T".into()),
+    );
+    let function_annotated = function_plain.clone().with_diagnostic("fn(T) -> T");
+    let function_different = FunctionPointerExpression::new(
+        FunctionAbi::Rust,
+        FunctionSafety::Safe,
+        false,
+        Box::<[LifetimeExpression]>::default(),
+        vec![TypeExpression::Parameter("U".into())].into_boxed_slice(),
+        TypeExpression::Parameter("T".into()),
+    );
+    assert_identity_contract(
+        &function_plain,
+        &function_annotated,
+        &function_different,
+    );
+
+    let display = type_bound(
+        TypeExpression::SelfType,
+        vec![concrete(&["Display"], Vec::new())],
+        vec![TraitBoundModifier::None],
+        Vec::new(),
+    );
+    let debug = type_bound(
+        TypeExpression::SelfType,
+        vec![concrete(&["Debug"], Vec::new())],
+        vec![TraitBoundModifier::None],
+        Vec::new(),
+    );
+    let object_plain = TraitObjectExpression::new(vec![display.clone()].into_boxed_slice());
+    let object_annotated = object_plain.clone().with_diagnostic("dyn Display");
+    let object_different = TraitObjectExpression::new(vec![debug.clone()].into_boxed_slice());
+    assert_identity_contract(&object_plain, &object_annotated, &object_different);
+
+    let opaque_plain = OpaqueTypeExpression::new(vec![display].into_boxed_slice());
+    let opaque_annotated = opaque_plain.clone().with_diagnostic("impl Display");
+    let opaque_different = OpaqueTypeExpression::new(vec![debug].into_boxed_slice());
+    assert_identity_contract(&opaque_plain, &opaque_annotated, &opaque_different);
+}
+
+/// Verifies predicate, generic-parameter, and const-argument diagnostics also
+/// remain outside structural identity.
+#[test]
+fn test_all_generic_diagnostics_use_structural_identity() {
+    let predicate_plain = type_bound(
+        TypeExpression::Parameter("T".into()),
+        vec![concrete(&["Clone"], Vec::new())],
+        vec![TraitBoundModifier::None],
+        Vec::new(),
+    );
+    let predicate_annotated = predicate_plain.clone().with_diagnostic("T: Clone");
+    let predicate_different = type_bound(
+        TypeExpression::Parameter("U".into()),
+        vec![concrete(&["Clone"], Vec::new())],
+        vec![TraitBoundModifier::None],
+        Vec::new(),
+    );
+    assert_identity_contract(
+        &predicate_plain,
+        &predicate_annotated,
+        &predicate_different,
+    );
+
+    let parameter_plain = GenericParameterDescriptor::Type {
+        name: "T".into(),
+        bounds: Box::new([predicate_plain]),
+        default: None,
+        diagnostic: DiagnosticText::default(),
+    };
+    let parameter_annotated = GenericParameterDescriptor::Type {
+        name: "T".into(),
+        bounds: Box::new([predicate_annotated]),
+        default: None,
+        diagnostic: "T: Clone".into(),
+    };
+    let parameter_different = GenericParameterDescriptor::Type {
+        name: "U".into(),
+        bounds: Box::new([predicate_different]),
+        default: None,
+        diagnostic: DiagnosticText::default(),
+    };
+    assert_identity_contract(
+        &parameter_plain,
+        &parameter_annotated,
+        &parameter_different,
+    );
+
+    let const_plain = ConstGenericArgument::new(
+        concrete(&["usize"], Vec::new()),
+        ConstExpression::UnsignedInteger(4),
+        "4",
+    );
+    let const_annotated = ConstGenericArgument::new(
+        concrete(&["usize"], Vec::new()),
+        ConstExpression::UnsignedInteger(4),
+        "4usize",
+    );
+    let const_different = ConstGenericArgument::new(
+        concrete(&["usize"], Vec::new()),
+        ConstExpression::UnsignedInteger(8),
+        "8",
+    );
+    assert_identity_contract(&const_plain, &const_annotated, &const_different);
 }
