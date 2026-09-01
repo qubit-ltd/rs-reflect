@@ -8,6 +8,8 @@
 
 //! Errors reported while constructing structural expressions.
 
+// qubit-style: allow type-file-name
+
 /// An invariant violation in a structural expression.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
