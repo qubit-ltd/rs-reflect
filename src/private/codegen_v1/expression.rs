@@ -8,9 +8,15 @@
 
 //! Checked expression factories consumed by generated code.
 
+use crate::expression::ArrayTypeExpression;
 use crate::expression::ConcreteTypeExpression;
+use crate::expression::ConstExpression;
+use crate::expression::ConstGenericArgument;
 use crate::expression::DiagnosticText;
 use crate::expression::GenericArgument;
+use crate::expression::LifetimeExpression;
+use crate::expression::ReferenceTypeExpression;
+use crate::expression::TypeExpression;
 
 /// Creates a concrete type expression from generator-validated path data.
 #[doc(hidden)]
@@ -22,4 +28,30 @@ pub fn concrete(
     let mut expression = ConcreteTypeExpression::new(path, arguments).expect("generated concrete paths are non-empty");
     expression.diagnostic = diagnostic;
     expression
+}
+
+/// Creates a typed const generic argument from generator-validated inputs.
+#[doc(hidden)]
+pub fn const_argument(
+    declared_type: TypeExpression,
+    value: ConstExpression,
+    normalized_diagnostic: impl Into<Box<str>>,
+) -> ConstGenericArgument {
+    ConstGenericArgument::new(declared_type, value, normalized_diagnostic)
+}
+
+/// Creates an array type expression from generated structural inputs.
+#[doc(hidden)]
+pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpression {
+    ArrayTypeExpression::new(element, length)
+}
+
+/// Creates a reference type expression from generated structural inputs.
+#[doc(hidden)]
+pub fn reference(
+    lifetime: LifetimeExpression,
+    mutable: bool,
+    target: TypeExpression,
+) -> ReferenceTypeExpression {
+    ReferenceTypeExpression::new(lifetime, mutable, target)
 }
