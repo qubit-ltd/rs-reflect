@@ -8,6 +8,7 @@
 
 //! Expansion of reflected struct declarations.
 
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -345,7 +346,7 @@ fn registration(
 }
 
 /// Expands a normalized source visibility into its public runtime form.
-fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: proc_macro2::Span) -> TokenStream {
+fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => quote!(#facade::identity::Visibility::Public),
         VisibilityIr::Crate => quote!(#facade::identity::Visibility::Crate),

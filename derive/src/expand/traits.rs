@@ -10,6 +10,7 @@
 
 mod token_rewrite;
 
+use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -17,6 +18,32 @@ use proc_macro2::TokenTree;
 use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
+use syn::Error;
+use syn::Expr;
+use syn::FnArg;
+use syn::GenericArgument;
+use syn::GenericParam;
+use syn::ItemFn;
+use syn::ItemTrait;
+use syn::Lifetime;
+use syn::Lit;
+use syn::LitInt;
+use syn::LitStr;
+use syn::Path;
+use syn::PathArguments as SynPathArguments;
+use syn::Receiver;
+use syn::TraitBoundModifier;
+use syn::TraitItem;
+use syn::TraitItemFn;
+use syn::TraitItemType;
+use syn::Type;
+use syn::TypeParamBound;
+use syn::UnOp;
+use syn::WhereClause;
+use syn::WherePredicate as SynWherePredicate;
+use syn::parse_quote;
+use syn::parse_quote_spanned;
+use syn::parse2;
 use token_rewrite::replace_self_with_owner;
 
 use crate::expand::ExpansionContext;
@@ -169,14 +196,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         declaration.span,
     );
     let trait_name = declaration.name.to_string();
-    let trait_name_literal = syn::LitStr::new(&trait_name, declaration.span);
+    let trait_name_literal = LitStr::new(&trait_name, declaration.span);
     let query_name = declaration
         .attributes
         .iter()
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&trait_name)
         .to_owned();
-    let query_name_literal = syn::LitStr::new(&query_name, declaration.span);
+    let query_name_literal = LitStr::new(&query_name, declaration.span);
     let visibility = match &declaration.visibility {
         crate::ir::VisibilityIr::Public => {
             quote!(#facade::identity::Visibility::Public)
@@ -191,7 +218,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             quote!(#facade::identity::Visibility::Private)
         }
         crate::ir::VisibilityIr::Restricted(path) => {
-            let path = syn::LitStr::new(&path.source, declaration.span);
+            let path = LitStr::new(&path.source, declaration.span);
             quote!(#facade::identity::Visibility::Restricted(#path.into()))
         }
     };
@@ -205,8 +232,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     .iter()
                     .find(|external| external.path.source == path.source)
                 {
-                    let id = syn::LitStr::new(&external.id, declaration.span);
-                    let diagnostic_path = syn::LitStr::new(&path.source, declaration.span);
+                    let id = LitStr::new(&external.id, declaration.span);
+                    let diagnostic_path = LitStr::new(&path.source, declaration.span);
                     let arguments = path
                         .segments
                         .last()
@@ -246,7 +273,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     }
                     _ => return None,
                 };
-                let type_source = syn::LitStr::new(type_source, declaration.span);
+                let type_source = LitStr::new(type_source, declaration.span);
                 return Some(quote!(#facade::expression::GenericArgument::Const(
                     #facade::expression::ConstGenericArgument::new(
                         #facade::expression::TypeExpression::Concrete(
@@ -346,12 +373,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let provider = format_ident!("__QubitReflectAssociatedConstProvider_{suffix}_{index}");
             let owner = format_ident!("__QubitReflectAssociatedConstOwner");
             let generic_declaration = replace_self_with_owner(declaration.generics.impl_declaration.clone(), &owner);
-            let dummy: syn::ItemFn = syn::parse2(quote!(fn __qubit_reflect_dummy #generic_declaration() {}))
+            let dummy: ItemFn = parse2(quote!(fn __qubit_reflect_dummy #generic_declaration() {}))
                 .expect("validated trait generics can be reused by an associated-const provider");
             let mut provider_generics = dummy.sig.generics;
             provider_generics
                 .params
-                .push(syn::parse_quote_spanned!(declaration.span=> #owner: ?Sized));
+                .push(parse_quote_spanned!(declaration.span=> #owner: ?Sized));
             let provider_declaration = quote!(#provider_generics);
             let (provider_impl_generics, provider_type_generics, _) = provider_generics.split_for_impl();
             let provider_impl_generics = quote!(#provider_impl_generics);
@@ -363,7 +390,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 .map(|parameter| {
                     let name = Ident::new(&parameter.name, declaration.span);
                     if parameter.kind == GenericKindIr::Lifetime {
-                        let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), declaration.span);
+                        let lifetime = Lifetime::new(&format!("'{}", parameter.name), declaration.span);
                         quote!(#lifetime)
                     } else {
                         quote!(#name)
@@ -378,7 +405,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     let name = Ident::new(&parameter.name, declaration.span);
                     match parameter.kind {
                         GenericKindIr::Lifetime => {
-                            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), declaration.span);
+                            let lifetime = Lifetime::new(&format!("'{}", parameter.name), declaration.span);
                             Some(quote!(&#lifetime ()))
                         }
                         GenericKindIr::Type => Some(quote!(*const #name)),
@@ -452,14 +479,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         .iter()
         .enumerate()
         .map(|(method_index, method)| {
-            let name = syn::LitStr::new(&method.name.to_string(), method.span);
+            let name = LitStr::new(&method.name.to_string(), method.span);
             let query = method
                 .attributes
                 .iter()
                 .find_map(|attribute| attribute.rename())
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| method.name.to_string());
-            let query = syn::LitStr::new(&query, method.span);
+            let query = LitStr::new(&query, method.span);
             let index = method_index;
             let receiver = match &method.receiver {
                 Some(receiver) => match receiver.kind {
@@ -467,17 +494,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     ReceiverKindIr::SharedReference => quote!(Some(#facade::descriptor::ReceiverDescriptor::Shared)),
                     ReceiverKindIr::MutableReference => quote!(Some(#facade::descriptor::ReceiverDescriptor::Mutable)),
                     ReceiverKindIr::Typed => {
-                        let declaration = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span);
+                        let declaration = LitStr::new(&receiver.declaration.to_string(), receiver.span);
                         quote!(Some(#facade::descriptor::ReceiverDescriptor::Explicit(#declaration)))
                     }
                 },
                 None => quote!(None),
             };
             let parameters = method.parameters.iter().map(|parameter| {
-                let name = parameter
-                    .name
-                    .as_deref()
-                    .map(|name| syn::LitStr::new(name, parameter.span));
+                let name = parameter.name.as_deref().map(|name| LitStr::new(name, parameter.span));
                 let name = match name {
                     Some(name) => quote!(Some(#name)),
                     None => quote!(None),
@@ -490,7 +514,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                         quote!(#facade::descriptor::ParameterPatternDescriptor::Wildcard)
                     }
                     ParameterPatternKindIr::Destructure => {
-                        let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
+                        let source = LitStr::new(&parameter.pattern.source, parameter.span);
                         quote!(#facade::descriptor::ParameterPatternDescriptor::Destructure(#source.into()))
                     }
                 };
@@ -525,7 +549,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let is_const = qualifiers.is_const;
             let is_variadic = qualifiers.is_variadic;
             let has_default = method.has_default;
-            let abi = qualifiers.abi.as_deref().map(|abi| syn::LitStr::new(abi, method.span));
+            let abi = qualifiers.abi.as_deref().map(|abi| LitStr::new(abi, method.span));
             let abi = match abi {
                 Some(abi) => quote!(Some(#facade::expression::FunctionAbi::Other(#abi.into()))),
                 None => quote!(None),
@@ -558,10 +582,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         })
         .collect();
     let associated_types: Vec<_> = declaration.associated_types.iter().enumerate().map(|(index, item)| {
-        let name = syn::LitStr::new(&item.name.to_string(), item.span);
+        let name = LitStr::new(&item.name.to_string(), item.span);
         let bounds = item.bounds.iter().filter_map(|bound| match bound {
             GenericBoundIr::Trait { path, lifetimes, modifier } => {
-                let path = syn::LitStr::new(&path.source, item.span);
+                let path = LitStr::new(&path.source, item.span);
                 let lifetimes = lifetimes
                     .iter()
                     .map(|lifetime| lifetime_expression(lifetime, item.span, &facade));
@@ -598,14 +622,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         .iter()
         .enumerate()
         .map(|(index, item)| {
-            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let name = LitStr::new(&item.name.to_string(), item.span);
             let ty = type_expression(&item.ty, &facade);
             let has_default = item.value.is_some();
             quote!(#facade::descriptor::AssociatedConstDescriptor::new(#index, #name, #name, #ty, #has_default))
         })
         .collect();
     let parameters = declaration.generics.params.iter().map(|parameter| {
-        let name = syn::LitStr::new(&parameter.name, declaration.span);
+        let name = LitStr::new(&parameter.name, declaration.span);
         match parameter.kind {
             GenericKindIr::Lifetime => {
                 let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
@@ -624,10 +648,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 }
             }}
             GenericKindIr::Type => {
-                let subject = syn::LitStr::new(&parameter.name, declaration.span);
+                let subject = LitStr::new(&parameter.name, declaration.span);
                 let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
                     GenericBoundIr::Trait { path, lifetimes, modifier } => {
-                        let path = syn::LitStr::new(&path.source, declaration.span);
+                        let path = LitStr::new(&path.source, declaration.span);
                         let lifetimes = lifetimes.iter().map(|lifetime| {
                             lifetime_expression(lifetime, declaration.span, &facade)
                         });
@@ -673,7 +697,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     .as_ref()
                     .map(|value| value.source.as_str())
                     .unwrap_or("_");
-                let const_type = syn::LitStr::new(const_type, declaration.span);
+                let const_type = LitStr::new(const_type, declaration.span);
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Const(value)) => const_expression(value, &facade),
                     _ => quote!(None),
@@ -718,7 +742,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             }).collect();
             let trait_bounds: Vec<_> = bounds.iter().filter_map(|bound| match bound {
                 GenericBoundIr::Trait { path, .. } => {
-                    let path = syn::LitStr::new(&path.source, declaration.span);
+                    let path = LitStr::new(&path.source, declaration.span);
                     Some(quote!(#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))))
                 }
                 _ => None,
@@ -757,7 +781,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         }
         _ => Vec::new(),
     });
-    let mut trait_item: syn::ItemTrait = match syn::parse2(declaration.retained_tokens.clone()) {
+    let mut trait_item: ItemTrait = match parse2(declaration.retained_tokens.clone()) {
         Ok(item) => item,
         Err(error) => return error.into_compile_error(),
     };
@@ -781,8 +805,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                     .iter()
                     .find(|external| external.path.source == path.source)
                 {
-                    let id = syn::LitStr::new(&external.id, declaration.span);
-                    let diagnostic_path = syn::LitStr::new(&path.source, declaration.span);
+                    let id = LitStr::new(&external.id, declaration.span);
+                    let diagnostic_path = LitStr::new(&path.source, declaration.span);
                     let arguments = path
                         .segments
                         .last()
@@ -853,15 +877,15 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     if trait_item
         .items
         .iter()
-        .any(|item| matches!(item, syn::TraitItem::Fn(function) if function.sig.ident == hook))
+        .any(|item| matches!(item, TraitItem::Fn(function) if function.sig.ident == hook))
     {
-        return syn::Error::new(
+        return Error::new(
             declaration.span,
             "`__qubit_reflect_trait_payload` is reserved by #[reflect]",
         )
         .into_compile_error();
     }
-    let hook_item = match syn::parse2(quote! {
+    let hook_item = match parse2(quote! {
         #[doc(hidden)]
         fn #hook() -> #facade::__private::codegen_v1::descriptor::TraitImplPayload
         where
@@ -893,7 +917,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         Err(error) => return error.into_compile_error(),
     };
     for item in default_method_adapter_items {
-        match syn::parse2(item.clone()) {
+        match parse2(item.clone()) {
             Ok(item) => trait_item.items.push(item),
             Err(error) => return error.into_compile_error(),
         }
@@ -992,19 +1016,15 @@ struct DynTraitGenerics {
 }
 
 /// Builds a `'static` concrete dyn application from the trait declaration.
-fn dyn_trait_generics(
-    item: &syn::ItemTrait,
-    declaration: &TraitDeclarationIr,
-    facade: &TokenStream,
-) -> DynTraitGenerics {
+fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade: &TokenStream) -> DynTraitGenerics {
     let mut impl_parameters = Vec::new();
     let mut impl_predicates = Vec::new();
     let mut application_arguments = Vec::new();
     let mut factory_arguments = Vec::new();
     for parameter in &item.generics.params {
         match parameter {
-            syn::GenericParam::Lifetime(_) => application_arguments.push(quote!('static)),
-            syn::GenericParam::Type(parameter) => {
+            GenericParam::Lifetime(_) => application_arguments.push(quote!('static)),
+            GenericParam::Type(parameter) => {
                 let name = &parameter.ident;
                 let bounds = &parameter.bounds;
                 impl_parameters.push(quote!(#name));
@@ -1016,7 +1036,7 @@ fn dyn_trait_generics(
                 application_arguments.push(quote!(#name));
                 factory_arguments.push(quote!(#name));
             }
-            syn::GenericParam::Const(parameter) => {
+            GenericParam::Const(parameter) => {
                 let name = &parameter.ident;
                 let ty = &parameter.ty;
                 impl_parameters.push(quote!(const #name: #ty));
@@ -1027,7 +1047,7 @@ fn dyn_trait_generics(
     }
     let mut associated_type_arguments = Vec::new();
     for associated in item.items.iter().filter_map(|item| match item {
-        syn::TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => Some(associated),
+        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => Some(associated),
         _ => None,
     }) {
         let name = &associated.ident;
@@ -1041,7 +1061,7 @@ fn dyn_trait_generics(
         }
         application_arguments.push(quote!(#name = #parameter));
         factory_arguments.push(quote!(#parameter));
-        let name_literal = syn::LitStr::new(&name.to_string(), name.span());
+        let name_literal = LitStr::new(&name.to_string(), name.span());
         associated_type_arguments.push(quote!(
             #facade::expression::GenericArgument::AssociatedType {
                 name: #name_literal.into(),
@@ -1059,7 +1079,7 @@ fn dyn_trait_generics(
         .items
         .iter()
         .filter_map(|item| match item {
-            syn::TraitItem::Type(associated) => Some(associated.ident.to_string()),
+            TraitItem::Type(associated) => Some(associated.ident.to_string()),
             _ => None,
         })
         .collect();
@@ -1076,7 +1096,7 @@ fn dyn_trait_generics(
         impl_predicates.push(quote!(#parameter: 'static));
         application_arguments.push(quote!(#name = #parameter));
         factory_arguments.push(quote!(#parameter));
-        let name_literal = syn::LitStr::new(&segment.name, declaration.span);
+        let name_literal = LitStr::new(&segment.name, declaration.span);
         associated_type_arguments.push(quote!(
             #facade::expression::GenericArgument::AssociatedType {
                 name: #name_literal.into(),
@@ -1149,7 +1169,7 @@ fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &Tra
         }
         output.extend([match token {
             TokenTree::Group(group) => {
-                let mut replaced = proc_macro2::Group::new(
+                let mut replaced = Group::new(
                     group.delimiter(),
                     replace_declared_lifetimes_with_static(group.stream(), declaration),
                 );
@@ -1165,14 +1185,14 @@ fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &Tra
 /// Rewrites `Self::Assoc` predicates to the generated dyn binding parameter.
 fn replace_self_associated_types(
     tokens: TokenStream,
-    item: &syn::ItemTrait,
+    item: &ItemTrait,
     declaration: &TraitDeclarationIr,
 ) -> TokenStream {
     let mut associated: std::collections::HashSet<_> = item
         .items
         .iter()
         .filter_map(|item| match item {
-            syn::TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
+            TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
                 Some(associated.ident.to_string())
             }
             _ => None,
@@ -1208,7 +1228,7 @@ fn replace_self_associated_types(
         }
         output.extend([match input[index].clone() {
             TokenTree::Group(group) => {
-                let mut replaced = proc_macro2::Group::new(
+                let mut replaced = Group::new(
                     group.delimiter(),
                     replace_self_associated_types(group.stream(), item, declaration),
                 );
@@ -1236,8 +1256,8 @@ fn dyn_inherited_associated_types(declaration: &TraitDeclarationIr) -> impl Iter
 
 /// Adds explicit inherited bindings to one reflected dyn supertrait path.
 fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDeclarationIr) -> TokenStream {
-    let mut syntax: syn::Path =
-        syn::parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
+    let mut syntax: Path =
+        parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
     for inherited in
         dyn_inherited_associated_types(declaration).filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
     {
@@ -1255,15 +1275,15 @@ fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDe
             .last_mut()
             .expect("validated supertrait path has a segment");
         match &mut segment.arguments {
-            syn::PathArguments::None => {
-                segment.arguments = syn::PathArguments::AngleBracketed(syn::parse_quote!(
+            SynPathArguments::None => {
+                segment.arguments = SynPathArguments::AngleBracketed(parse_quote!(
                     <#name = #parameter>
                 ));
             }
-            syn::PathArguments::AngleBracketed(arguments) => {
-                arguments.args.push(syn::parse_quote!(#name = #parameter));
+            SynPathArguments::AngleBracketed(arguments) => {
+                arguments.args.push(parse_quote!(#name = #parameter));
             }
-            syn::PathArguments::Parenthesized(_) => {}
+            SynPathArguments::Parenthesized(_) => {}
         }
     }
     let syntax = if syntax.leading_colon.is_some() {
@@ -1289,7 +1309,7 @@ fn dyn_inherited_arguments_for_supertrait(
                 .expect("validated inherited associated path has an item")
                 .name
                 .clone();
-            let name_literal = syn::LitStr::new(&name, declaration.span);
+            let name_literal = LitStr::new(&name, declaration.span);
             let parameter = format_ident!("__QubitReflectAssociated{name}");
             quote!(#facade::expression::GenericArgument::AssociatedType {
                 name: #name_literal.into(),
@@ -1322,7 +1342,7 @@ fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, supertrait: &c
 /// define which concrete application a declaration-level macro should choose.
 /// Supertraits are limited to standard traits whose dyn compatibility is known
 /// without inspecting another macro expansion.
-fn is_provably_dyn_compatible(item: &syn::ItemTrait, declaration: &TraitDeclarationIr) -> bool {
+fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
     if declaration
         .attributes
         .iter()
@@ -1341,24 +1361,23 @@ fn is_provably_dyn_compatible(item: &syn::ItemTrait, declaration: &TraitDeclarat
         return false;
     }
     item.items.iter().all(|trait_item| match trait_item {
-        syn::TraitItem::Fn(method) => method_is_dyn_dispatchable(method),
-        syn::TraitItem::Type(associated) => {
+        TraitItem::Fn(method) => method_is_dyn_dispatchable(method),
+        TraitItem::Type(associated) => {
             associated.generics.params.is_empty()
                 || where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
         }
-        syn::TraitItem::Const(_) => false,
+        TraitItem::Const(_) => false,
         _ => false,
     })
 }
 
 /// Returns whether one supertrait bound is known locally to preserve dyn
 /// compatibility.
-fn is_known_dyn_compatible_bound(bound: &syn::TypeParamBound) -> bool {
+fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
     match bound {
-        syn::TypeParamBound::Lifetime(_) => true,
-        syn::TypeParamBound::Trait(bound) => {
-            if !matches!(bound.modifier, syn::TraitBoundModifier::None) || tokens_contain_self(bound.to_token_stream())
-            {
+        TypeParamBound::Lifetime(_) => true,
+        TypeParamBound::Trait(bound) => {
+            if !matches!(bound.modifier, TraitBoundModifier::None) || tokens_contain_self(bound.to_token_stream()) {
                 return false;
             }
             let path = bound.path.to_token_stream().to_string().replace(' ', "");
@@ -1402,13 +1421,13 @@ fn is_known_dyn_compatible_bound(bound: &syn::TypeParamBound) -> bool {
 
 /// Returns whether a dyn application must name a concrete binding for this
 /// associated type.
-fn associated_type_requires_dyn_binding(associated: &syn::TraitItemType) -> bool {
+fn associated_type_requires_dyn_binding(associated: &TraitItemType) -> bool {
     !where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
 }
 
 /// Returns whether one method is dispatchable through a trait object or is
 /// explicitly excluded from the vtable by `Self: Sized`.
-fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
+fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
     if where_clause_requires_sized_self(method.sig.generics.where_clause.as_ref()) {
         return true;
     }
@@ -1418,7 +1437,7 @@ fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
             .generics
             .params
             .iter()
-            .any(|parameter| !matches!(parameter, syn::GenericParam::Lifetime(_)))
+            .any(|parameter| !matches!(parameter, GenericParam::Lifetime(_)))
     {
         return false;
     }
@@ -1431,7 +1450,7 @@ fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
     {
         return false;
     }
-    let Some(syn::FnArg::Receiver(receiver)) = method.sig.inputs.first() else {
+    let Some(FnArg::Receiver(receiver)) = method.sig.inputs.first() else {
         return false;
     };
     if !receiver_is_dyn_dispatchable(receiver) {
@@ -1447,7 +1466,7 @@ fn method_is_dyn_dispatchable(method: &syn::TraitItemFn) -> bool {
 }
 
 /// Returns whether a method receiver is one of Rust's dyn-dispatchable forms.
-fn receiver_is_dyn_dispatchable(receiver: &syn::Receiver) -> bool {
+fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
     if receiver.colon_token.is_none() {
         return true;
     }
@@ -1455,22 +1474,22 @@ fn receiver_is_dyn_dispatchable(receiver: &syn::Receiver) -> bool {
 }
 
 /// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
-fn receiver_type_is_dyn_dispatchable(ty: &syn::Type) -> bool {
+fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
     match ty {
-        syn::Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
-        syn::Type::Reference(reference) => receiver_type_is_dyn_dispatchable(&reference.elem),
-        syn::Type::Path(path) if path.qself.is_none() => {
+        Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
+        Type::Reference(reference) => receiver_type_is_dyn_dispatchable(&reference.elem),
+        Type::Path(path) if path.qself.is_none() => {
             let Some(segment) = path.path.segments.last() else {
                 return false;
             };
             if !matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc" | "Pin") {
                 return false;
             }
-            let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+            let SynPathArguments::AngleBracketed(arguments) = &segment.arguments else {
                 return false;
             };
             let mut types = arguments.args.iter().filter_map(|argument| match argument {
-                syn::GenericArgument::Type(ty) => Some(ty),
+                GenericArgument::Type(ty) => Some(ty),
                 _ => None,
             });
             let Some(inner) = types.next() else {
@@ -1500,16 +1519,16 @@ fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
 }
 
 /// Returns whether a where clause contains a direct `Self: Sized` predicate.
-fn where_clause_requires_sized_self(where_clause: Option<&syn::WhereClause>) -> bool {
+fn where_clause_requires_sized_self(where_clause: Option<&WhereClause>) -> bool {
     where_clause.is_some_and(|where_clause| {
         where_clause.predicates.iter().any(|predicate| {
-            let syn::WherePredicate::Type(predicate) = predicate else {
+            let SynWherePredicate::Type(predicate) = predicate else {
                 return false;
             };
-            matches!(predicate.bounded_ty, syn::Type::Path(ref path) if path.qself.is_none() && path.path.is_ident("Self"))
+            matches!(predicate.bounded_ty, Type::Path(ref path) if path.qself.is_none() && path.path.is_ident("Self"))
                 && predicate.bounds.iter().any(|bound| {
-                    matches!(bound, syn::TypeParamBound::Trait(bound)
-                        if matches!(bound.modifier, syn::TraitBoundModifier::None)
+                    matches!(bound, TypeParamBound::Trait(bound)
+                        if matches!(bound.modifier, TraitBoundModifier::None)
                             && bound.path.is_ident("Sized"))
                 })
         })
@@ -1536,7 +1555,7 @@ fn default_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
     suffix: &str,
-    trait_name: &syn::LitStr,
+    trait_name: &LitStr,
     hook_type_bounds: &[TokenStream],
     facade: &TokenStream,
     _context: &ExpansionContext,
@@ -1999,7 +2018,7 @@ fn default_pinned_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
     suffix: &str,
-    trait_name: &syn::LitStr,
+    trait_name: &LitStr,
     hook_type_bounds: &[TokenStream],
     facade: &TokenStream,
     pinned_mutable: bool,
@@ -2165,7 +2184,7 @@ fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
 /// model.
 pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let parameters = generics.params.iter().map(|parameter| {
-        let name = syn::LitStr::new(&parameter.name, parameter.span);
+        let name = LitStr::new(&parameter.name, parameter.span);
         match parameter.kind {
             GenericKindIr::Lifetime => {
                 let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
@@ -2178,7 +2197,7 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                 })
             }
             GenericKindIr::Type => {
-                let subject = syn::LitStr::new(&parameter.name, parameter.span);
+                let subject = LitStr::new(&parameter.name, parameter.span);
                 let bounds = generic_bounds(&parameter.bounds, &subject, parameter.span, facade);
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Type(value)) => {
@@ -2219,7 +2238,7 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
             let lifetimes = lifetimes.iter().map(|lifetime| lifetime_expression(lifetime, span, facade));
             let trait_bounds: Vec<_> = bounds.iter().filter_map(|bound| match bound {
                 GenericBoundIr::Trait { path, .. } => {
-                    let path = syn::LitStr::new(&path.source, span);
+                    let path = LitStr::new(&path.source, span);
                     Some(quote!(#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#path.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#path)))))
                 }
                 _ => None,
@@ -2253,15 +2272,10 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
 }
 
 /// Converts generic bounds into runtime predicate descriptors.
-fn generic_bounds(
-    bounds: &[GenericBoundIr],
-    subject: &syn::LitStr,
-    span: Span,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
+fn generic_bounds(bounds: &[GenericBoundIr], subject: &LitStr, span: Span, facade: &TokenStream) -> Vec<TokenStream> {
     bounds.iter().filter_map(move |bound| match bound {
         GenericBoundIr::Trait { path, lifetimes, modifier } => {
-            let path = syn::LitStr::new(&path.source, span);
+            let path = LitStr::new(&path.source, span);
             let lifetimes = lifetimes.iter().map(|lifetime| lifetime_expression(lifetime, span, facade));
             let modifier = match modifier {
                 crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None),
@@ -2289,7 +2303,7 @@ fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> Toke
     if lifetime == "'static" {
         return quote!(#facade::expression::LifetimeExpression::Static);
     }
-    let lifetime = syn::LitStr::new(lifetime.trim_start_matches('\''), span);
+    let lifetime = LitStr::new(lifetime.trim_start_matches('\''), span);
     quote!(#facade::expression::LifetimeExpression::Named(#lifetime.into()))
 }
 
@@ -2310,7 +2324,7 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
                     quote!(#facade::expression::LifetimeExpression::Static)
                 }
                 Some(value) => {
-                    let value = syn::LitStr::new(value.trim_start_matches('\''), ty.span);
+                    let value = LitStr::new(value.trim_start_matches('\''), ty.span);
                     quote!(#facade::expression::LifetimeExpression::Named(#value.into()))
                 }
                 None => quote!(#facade::expression::LifetimeExpression::Elided),
@@ -2367,7 +2381,7 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
                     quote!(#facade::expression::FunctionAbi::System)
                 }
                 Some(value) => {
-                    let value = syn::LitStr::new(value, ty.span);
+                    let value = LitStr::new(value, ty.span);
                     quote!(#facade::expression::FunctionAbi::Other(#value.into()))
                 }
                 None => quote!(#facade::expression::FunctionAbi::Rust),
@@ -2400,7 +2414,7 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
             ))
         }
         _ => {
-            let source = syn::LitStr::new(&ty.source, ty.span);
+            let source = LitStr::new(&ty.source, ty.span);
             quote!(#facade::expression::TypeExpression::Concrete(
                 #facade::__private::codegen_v1::expression::concrete(
                     vec![#source.into()].into_boxed_slice(),
@@ -2414,7 +2428,7 @@ pub(crate) fn type_expression(ty: &TypeIr, facade: &TokenStream) -> TokenStream 
 
 /// Converts one parsed path into a runtime type-expression token stream.
 fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) -> TokenStream {
-    let diagnostic = syn::LitStr::new(&ty.source, ty.span);
+    let diagnostic = LitStr::new(&ty.source, ty.span);
     if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self" {
         return quote!(#facade::expression::TypeExpression::SelfType);
     }
@@ -2423,7 +2437,7 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
         && matches!(path.segments[0].arguments, PathArgumentsIr::None)
         && path.segments[0].name.chars().all(|value| value.is_ascii_uppercase())
     {
-        let name = syn::LitStr::new(&path.segments[0].name, ty.span);
+        let name = LitStr::new(&path.segments[0].name, ty.span);
         return quote!(#facade::expression::TypeExpression::Parameter(#name.into()));
     }
     if let Some(qualified) = &path.qualified_self {
@@ -2431,7 +2445,7 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
         let item = path
             .segments
             .last()
-            .map(|segment| syn::LitStr::new(&segment.name, ty.span))
+            .map(|segment| LitStr::new(&segment.name, ty.span))
             .expect("qualified path has an item");
         let arguments = path
             .segments
@@ -2442,7 +2456,7 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
             .segments
             .iter()
             .take(qualified.position)
-            .map(|segment| syn::LitStr::new(&segment.name, ty.span));
+            .map(|segment| LitStr::new(&segment.name, ty.span));
         let trait_path = if qualified.has_as {
             quote!(Some(Box::new(#facade::expression::TypeExpression::Concrete(
                 #facade::__private::codegen_v1::expression::concrete(
@@ -2463,10 +2477,7 @@ fn path_expression(path: &crate::ir::PathIr, ty: &TypeIr, facade: &TokenStream) 
             ).with_diagnostic(#diagnostic)
         ));
     }
-    let segments = path
-        .segments
-        .iter()
-        .map(|segment| syn::LitStr::new(&segment.name, ty.span));
+    let segments = path.segments.iter().map(|segment| LitStr::new(&segment.name, ty.span));
     let arguments = path
         .segments
         .last()
@@ -2504,8 +2515,8 @@ fn path_arguments(arguments: &PathArgumentsIr, facade: &TokenStream, span: Span)
         PathArgumentsIr::AngleBracketed(values) => values.iter().filter_map(|value| match value {
             PathArgumentIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::expression::GenericArgument::Lifetime(#value))) }
             PathArgumentIr::Type(value) => { let value = type_expression(value, facade); Some(quote!(#facade::expression::GenericArgument::Type(#value))) }
-            PathArgumentIr::Const(value) => { let value = const_expression_value(value, facade); let source = syn::LitStr::new(&value.to_string(), span); Some(quote!(#facade::expression::GenericArgument::Const(#facade::expression::ConstGenericArgument::new(#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec!["_".into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::default())), #value, #source)))) }
-            PathArgumentIr::AssociatedType { name, ty } => { let name = syn::LitStr::new(name, span); let value = type_expression(ty, facade); Some(quote!(#facade::expression::GenericArgument::AssociatedType { name: #name.into(), value: Box::new(#value) })) }
+            PathArgumentIr::Const(value) => { let value = const_expression_value(value, facade); let source = LitStr::new(&value.to_string(), span); Some(quote!(#facade::expression::GenericArgument::Const(#facade::expression::ConstGenericArgument::new(#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec!["_".into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::default())), #value, #source)))) }
+            PathArgumentIr::AssociatedType { name, ty } => { let name = LitStr::new(name, span); let value = type_expression(ty, facade); Some(quote!(#facade::expression::GenericArgument::AssociatedType { name: #name.into(), value: Box::new(#value) })) }
             _ => None,
         }).collect(),
     }
@@ -2570,27 +2581,27 @@ fn external_supertrait_arguments(
 
 /// Converts trait-object or opaque-type bounds into runtime predicates.
 fn bound_predicates(bounds: &[GenericBoundIr], facade: &TokenStream, span: Span) -> Vec<TokenStream> {
-    bounds.iter().filter_map(|bound| match bound { GenericBoundIr::Trait { path, modifier, lifetimes } => { let source = syn::LitStr::new(&path.source, span); let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe) }; let lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, span, facade)); Some(quote!(#facade::expression::PredicateDescriptor::TypeBound { subject: #facade::expression::TypeExpression::SelfType, bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#source.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#source)))]), bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default() })) }, GenericBoundIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::expression::PredicateDescriptor::TypeOutlives { ty: #facade::expression::TypeExpression::SelfType, lifetime: #value, diagnostic: #facade::expression::DiagnosticText::default() })) }, _ => None }).collect()
+    bounds.iter().filter_map(|bound| match bound { GenericBoundIr::Trait { path, modifier, lifetimes } => { let source = LitStr::new(&path.source, span); let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::expression::TraitBoundModifier::Maybe) }; let lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, span, facade)); Some(quote!(#facade::expression::PredicateDescriptor::TypeBound { subject: #facade::expression::TypeExpression::SelfType, bounds: Box::new([#facade::expression::TypeExpression::Concrete(#facade::__private::codegen_v1::expression::concrete(vec![#source.into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::expression::DiagnosticText::from(#source)))]), bound_modifiers: Box::new([#modifier]), higher_ranked_lifetimes: Box::new([#(#lifetimes),*]), diagnostic: #facade::expression::DiagnosticText::default() })) }, GenericBoundIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::expression::PredicateDescriptor::TypeOutlives { ty: #facade::expression::TypeExpression::SelfType, lifetime: #value, diagnostic: #facade::expression::DiagnosticText::default() })) }, _ => None }).collect()
 }
 
 /// Converts a parsed const expression into structural runtime metadata.
 fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
-    if let Ok(identifier) = syn::parse2::<syn::Ident>(value.clone()) {
-        let name = syn::LitStr::new(&identifier.to_string(), identifier.span());
+    if let Ok(identifier) = parse2::<Ident>(value.clone()) {
+        let name = LitStr::new(&identifier.to_string(), identifier.span());
         return quote!(#facade::expression::ConstExpression::Parameter(#name.into()));
     }
-    if let Ok(value) = syn::parse2::<syn::Lit>(value.clone()) {
+    if let Ok(value) = parse2::<Lit>(value.clone()) {
         match value {
-            syn::Lit::Bool(value) => {
+            Lit::Bool(value) => {
                 let value = value.value;
                 return quote!(#facade::expression::ConstExpression::Boolean(#value));
             }
-            syn::Lit::Char(value) => {
+            Lit::Char(value) => {
                 let value = value.value();
                 return quote!(#facade::expression::ConstExpression::Character(#value));
             }
-            syn::Lit::Int(value) => {
+            Lit::Int(value) => {
                 if let Ok(value) = value.base10_parse::<u128>() {
                     return quote!(#facade::expression::ConstExpression::UnsignedInteger(#value));
                 }
@@ -2598,16 +2609,16 @@ fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStr
             _ => {}
         }
     }
-    if let Ok(syn::Expr::Unary(value)) = syn::parse2::<syn::Expr>(value.clone())
-        && matches!(value.op, syn::UnOp::Neg(_))
-        && let syn::Expr::Lit(literal) = *value.expr
-        && let syn::Lit::Int(value) = literal.lit
+    if let Ok(Expr::Unary(value)) = parse2::<Expr>(value.clone())
+        && matches!(value.op, UnOp::Neg(_))
+        && let Expr::Lit(literal) = *value.expr
+        && let Lit::Int(value) = literal.lit
         && let Ok(value) = value.base10_parse::<i128>()
     {
         let value = -value;
         return quote!(#facade::expression::ConstExpression::SignedInteger(#value));
     }
-    let source = syn::LitStr::new(&source, Span::call_site());
+    let source = LitStr::new(&source, Span::call_site());
     quote!(compile_error!(
         concat!("unsupported const expression in #[reflect] trait: ", #source)
     ))
@@ -2616,28 +2627,28 @@ fn const_expression_value(value: &TokenStream, facade: &TokenStream) -> TokenStr
 /// Converts the literal const-default subset that has a structural runtime
 /// representation.
 fn const_expression(value: &TokenStream, facade: &TokenStream) -> TokenStream {
-    let expression = syn::parse2::<syn::Expr>(value.clone());
+    let expression = parse2::<Expr>(value.clone());
     let expression = match expression {
         Ok(expression) => expression,
         Err(_) => return unsupported_const_default(value),
     };
     match expression {
-        syn::Expr::Lit(expression) => match expression.lit {
-            syn::Lit::Bool(value) => {
+        Expr::Lit(expression) => match expression.lit {
+            Lit::Bool(value) => {
                 let value = value.value;
                 quote!(Some(#facade::expression::ConstExpression::Boolean(#value)))
             }
-            syn::Lit::Char(value) => {
+            Lit::Char(value) => {
                 let value = value.value();
                 quote!(Some(#facade::expression::ConstExpression::Character(#value)))
             }
-            syn::Lit::Int(value) => integer_const_expression(&value, false, facade)
+            Lit::Int(value) => integer_const_expression(&value, false, facade)
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        syn::Expr::Unary(expression) if matches!(expression.op, syn::UnOp::Neg(_)) => match expression.expr.as_ref() {
-            syn::Expr::Lit(expression) => match &expression.lit {
-                syn::Lit::Int(value) => integer_const_expression(value, true, facade)
+        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => match expression.expr.as_ref() {
+            Expr::Lit(expression) => match &expression.lit {
+                Lit::Int(value) => integer_const_expression(value, true, facade)
                     .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
                 _ => unsupported_const_default(value),
             },
@@ -2649,7 +2660,7 @@ fn const_expression(value: &TokenStream, facade: &TokenStream) -> TokenStream {
 
 /// Converts an integer literal without relying on its whitespace-normalized
 /// token rendering.
-fn integer_const_expression(value: &syn::LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
+fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
@@ -2664,8 +2675,8 @@ fn integer_const_expression(value: &syn::LitInt, negative: bool, facade: &TokenS
 
 /// Emits a deterministic compile error for const defaults without a runtime
 /// structural value.
-fn unsupported_const_default(value: impl quote::ToTokens) -> TokenStream {
-    let source = syn::LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
+fn unsupported_const_default(value: impl ToTokens) -> TokenStream {
+    let source = LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
     quote!(compile_error!(
         concat!("unsupported non-literal const default in #[reflect] trait: ", #source)
     ))

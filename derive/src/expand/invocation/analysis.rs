@@ -8,6 +8,8 @@
 
 //! Pure invocation analysis shared by impl and trait expansion.
 
+// qubit-style: allow type-file-name
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -381,9 +383,16 @@ mod tests {
     use proc_macro2::TokenStream;
     use quote::quote;
 
-    use super::*;
+    use super::super::plan::AvailabilityPlan;
+    use super::super::plan::InvocationPlan;
+    use super::super::plan::OutputPlan;
+    use super::super::plan::ReceiverPlan;
+    use super::super::plan::UnavailableReasonPlan;
+    use super::MethodContext;
+    use super::analyze_method;
     use crate::ir::DeclarationIr;
     use crate::ir::MacroKind;
+    use crate::ir::MethodIr;
     use crate::parse::parse_and_validate_declaration;
 
     fn impl_method(input: TokenStream) -> MethodIr {

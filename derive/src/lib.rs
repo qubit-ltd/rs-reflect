@@ -14,6 +14,7 @@ use proc_macro::TokenStream;
 
 mod entry;
 mod expand;
+mod internal;
 mod ir;
 mod parse;
 mod validate;
