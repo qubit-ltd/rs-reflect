@@ -6,8 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Second independent implementation fragment for the cross-crate fixture.
+//! Model facade fixture declaration.
 
-mod label_b;
+use model_facade_derive::model_reflect;
 
-pub use label_b::LabelB;
+/// A model-facade fixture whose descriptor is generated through delegation.
+#[model_reflect]
+pub struct FacadeUser {
+    /// The reflected identifier used by facade integration assertions.
+    pub id: u64,
+}
