@@ -19,13 +19,13 @@ const MAX_INPUT_CHARS: usize = 4_096;
 // arbitrary text.
 fuzz_target!(|data: String| {
     let data = data.chars().take(MAX_INPUT_CHARS).collect::<String>();
-    let expression = TypeExpression::Concrete(
-        ConcreteTypeExpression::new(
-            [data.clone().into_boxed_str()],
-            [GenericArgument::Type(TypeExpression::Parameter(data.into_boxed_str()))],
-        )
-        .expect("the generated path contains exactly one segment"),
-    );
+    let Ok(parameter) = TypeExpression::parameter(data.clone()) else {
+        return;
+    };
+    let Ok(concrete) = ConcreteTypeExpression::new([data.into_boxed_str()], [GenericArgument::Type(parameter)]) else {
+        return;
+    };
+    let expression = TypeExpression::Concrete(concrete);
     assert_eq!(expression, expression.clone());
     let _ = format!("{expression:?}");
 });

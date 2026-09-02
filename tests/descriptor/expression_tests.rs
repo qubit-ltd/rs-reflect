@@ -19,6 +19,8 @@ use qubit_reflect::expression::ConstExpression;
 use qubit_reflect::expression::ConstGenericArgument;
 use qubit_reflect::expression::DiagnosticText;
 use qubit_reflect::expression::ExpressionError;
+use qubit_reflect::expression::ExpressionName;
+use qubit_reflect::expression::ExpressionPath;
 use qubit_reflect::expression::FunctionAbi;
 use qubit_reflect::expression::FunctionPointerExpression;
 use qubit_reflect::expression::FunctionSafety;
@@ -40,6 +42,58 @@ fn concrete_type_rejects_an_empty_path() {
         ConcreteTypeExpression::new(Vec::<Box<str>>::new(), Box::<[GenericArgument]>::default(),),
         Err(ExpressionError::EmptyConcretePath),
     );
+}
+
+#[test]
+fn concrete_type_rejects_an_empty_segment() {
+    assert_eq!(
+        ConcreteTypeExpression::new(["std", "", "Vec"], Vec::new()),
+        Err(ExpressionError::EmptyPathSegment { index: 1 }),
+    );
+}
+
+#[test]
+fn expression_name_rejects_empty_text() {
+    assert_eq!(ExpressionName::new(""), Err(ExpressionError::EmptyName));
+}
+
+#[test]
+fn expression_names_and_paths_preserve_validated_text() {
+    let borrowed = ExpressionName::from("borrowed");
+    let owned = ExpressionName::from(String::from("owned"));
+    let boxed = ExpressionName::from(Box::<str>::from("boxed"));
+    assert_eq!(borrowed.as_str(), "borrowed");
+    assert_eq!(owned.as_ref(), "owned");
+    assert_eq!(boxed.as_str(), "boxed");
+
+    let path = ExpressionPath::new(["std", "vec", "Vec"]).expect("a non-empty path with non-empty segments is valid");
+    assert_eq!(
+        path.segments().iter().map(ExpressionName::as_str).collect::<Vec<_>>(),
+        ["std", "vec", "Vec"],
+    );
+}
+
+#[test]
+fn expression_path_rejects_empty_paths_and_segments() {
+    assert_eq!(
+        ExpressionPath::new(Vec::<Box<str>>::new()),
+        Err(ExpressionError::EmptyPath),
+    );
+    assert_eq!(
+        ExpressionPath::new(["std", "", "Vec"]),
+        Err(ExpressionError::EmptyPathSegment { index: 1 }),
+    );
+}
+
+#[test]
+fn expression_leaf_constructors_reject_empty_names_and_paths() {
+    assert_eq!(TypeExpression::parameter(""), Err(ExpressionError::EmptyName));
+    assert_eq!(ConstExpression::parameter(""), Err(ExpressionError::EmptyName));
+    assert_eq!(
+        ConstExpression::path(Vec::<Box<str>>::new()),
+        Err(ExpressionError::EmptyPath)
+    );
+    assert_eq!(LifetimeExpression::named(""), Err(ExpressionError::EmptyName));
 }
 
 #[test]

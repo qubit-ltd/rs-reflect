@@ -14,6 +14,7 @@ use std::hash::Hasher;
 
 use crate::expression::ConstExpression;
 use crate::expression::ExpressionError;
+use crate::expression::ExpressionName;
 use crate::expression::GenericArgument;
 use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
@@ -77,7 +78,7 @@ pub enum TypeExpression {
     /// A concrete path such as `std::vec::Vec<T>`.
     Concrete(ConcreteTypeExpression),
     /// A type parameter such as `T`.
-    Parameter(Box<str>),
+    Parameter(ExpressionName),
     /// The `Self` type.
     SelfType,
     /// An associated type projection such as `<T as Trait>::Item`.
@@ -102,6 +103,17 @@ pub enum TypeExpression {
     Never,
 }
 
+impl TypeExpression {
+    /// Creates a named type-parameter expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
+    pub fn parameter(name: impl Into<Box<str>>) -> Result<Self, ExpressionError> {
+        ExpressionName::new(name).map(Self::Parameter)
+    }
+}
+
 /// A concrete type path and its final-segment generic arguments.
 #[derive(Clone, Debug)]
 pub struct ConcreteTypeExpression {
@@ -124,6 +136,9 @@ impl ConcreteTypeExpression {
         let path = path.into_iter().map(Into::into).collect::<Box<[_]>>();
         if path.is_empty() {
             return Err(ExpressionError::EmptyConcretePath);
+        }
+        if let Some(index) = path.iter().position(|segment| segment.is_empty()) {
+            return Err(ExpressionError::EmptyPathSegment { index });
         }
         Ok(Self {
             path,
@@ -165,7 +180,7 @@ pub struct AssociatedTypeExpression {
     /// The optional qualifying trait path from an `as Trait` clause.
     pub(crate) trait_path: Option<Box<TypeExpression>>,
     /// The associated item name.
-    pub(crate) item: Box<str>,
+    pub(crate) item: ExpressionName,
     /// Generic arguments applied to the associated type.
     pub(crate) arguments: Box<[GenericArgument]>,
     /// Optional source-oriented diagnostic text excluded from identity.
@@ -177,7 +192,7 @@ impl AssociatedTypeExpression {
     pub fn new(
         self_type: TypeExpression,
         trait_path: Option<TypeExpression>,
-        item: impl Into<Box<str>>,
+        item: impl Into<ExpressionName>,
         arguments: impl Into<Box<[GenericArgument]>>,
     ) -> Self {
         Self {
@@ -199,7 +214,7 @@ impl AssociatedTypeExpression {
     }
     /// Returns the associated item name.
     pub fn item(&self) -> &str {
-        &self.item
+        self.item.as_str()
     }
     /// Returns associated type arguments.
     pub fn arguments(&self) -> &[GenericArgument] {
@@ -372,7 +387,7 @@ pub enum FunctionAbi {
     /// The platform system ABI.
     System,
     /// Any explicitly named ABI not covered by a standard variant.
-    Other(Box<str>),
+    Other(ExpressionName),
 }
 
 /// A function pointer's safety qualifier.
