@@ -100,6 +100,8 @@ operations remain visible as descriptors with structured unavailable reasons.
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [API documentation](https://docs.rs/qubit-reflect)
+- [English design](doc/2026-09-01-qubit-reflect-design.md)
+- [中文详细设计](doc/2026-08-29-qubit-reflect-design.zh_CN.md)
 - [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [Requirements traceability matrix](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [简体中文 README](README.zh_CN.md)

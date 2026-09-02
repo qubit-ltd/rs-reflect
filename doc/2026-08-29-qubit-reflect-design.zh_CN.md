@@ -1,7 +1,9 @@
 # `qubit-reflect` 详细设计
 
 - 日期：2026-09-01
+- 最近审核：2026-09-02
 - 状态：破坏性边界重构已实现，并通过分阶段验证；完整发布矩阵由仓库 CI 持续执行
+- 英文版：[English design](2026-09-01-qubit-reflect-design.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - 适用仓库：`rs-reflect`
 - 对应协议：`qubit-reflect 0.1` / `__private::codegen_v1`
@@ -122,6 +124,8 @@ parse ──> validate ──> domain IR
 - `validate/` 检查声明形状与属性组合。
 - `expand/context.rs` 唯一负责 facade 路径和 fragment fingerprint。
 - `expand/dispatcher.rs` 分派 struct、enum、trait、impl。
+- `expand/expression_codegen.rs` 统一负责结构表达式 token 生成。
+- `expand/impls/specialization_codegen.rs` 隔离泛型 impl 特化与 token 替换。
 - `expand/invocation/analysis.rs` 判定 receiver、参数、输出、线程安全、catching、async 与不可用原因。
 - `expand/invocation/emit.rs` 只根据 `InvocationPlan` 生成不可用原因、参数绑定与
   thread-safe/catching 断言等共享语义片段。

@@ -76,6 +76,8 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
 - [API 文档](https://docs.rs/qubit-reflect)
+- [中文详细设计](doc/2026-08-29-qubit-reflect-design.zh_CN.md)
+- [English design](doc/2026-09-01-qubit-reflect-design.md)
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English README](README.md)

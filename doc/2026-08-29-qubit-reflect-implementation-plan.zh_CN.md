@@ -1,5 +1,7 @@
 # `qubit-reflect` 实施计划
 
+> **历史实施基线（已完成）：** 本文保留最初的任务分解、红—绿步骤和验收依据，不再作为当前待办清单，也不应重新执行其中的临时工作区或 Git 操作。当前架构以[中文详细设计](2026-08-29-qubit-reflect-design.zh_CN.md)与 [English design](2026-09-01-qubit-reflect-design.md) 为准；完成度证据以[需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)和仓库 CI 为准。
+
 > **面向智能体执行者：** 必须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，逐项实施本计划。各步骤使用复选框（`- [ ]`）语法跟踪进度。
 
 **目标：** 按最终需求规范实现完整、业务无关、安全且可跨 crate 汇聚的 `qubit-reflect` runtime 与三个过程宏，并为后续 `rs-model-*` 重构提供通用反射底座。
