@@ -1,7 +1,9 @@
 # `qubit-reflect` Design
 
 - Date: 2026-09-01
+- Last reviewed: 2026-09-02
 - Status: breaking boundary redesign implemented and verified in staged checks; the full release matrix remains continuously enforced by CI
+- Translation: [简体中文设计](2026-08-29-qubit-reflect-design.zh_CN.md)
 - Source requirements: [final requirements specification](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`
 - Protocol: `qubit-reflect 0.1` / `__private::codegen_v1`
@@ -127,6 +129,8 @@ parse ──> validate ──> domain IR
 - `validate/` checks declaration shapes and attribute combinations.
 - `expand/context.rs` is the single owner of facade resolution and fragment fingerprints.
 - `expand/dispatcher.rs` routes structs, enums, traits, and impls.
+- `expand/expression_codegen.rs` owns structural expression token generation.
+- `expand/impls/specialization_codegen.rs` isolates generic implementation specialization and token substitution.
 - `expand/invocation/analysis.rs` decides receiver, parameter, output, thread-safe, catching, async, and unavailable semantics.
 - `expand/invocation/emit.rs` emits shared semantic fragments from an `InvocationPlan`: unavailable reasons,
   argument bindings, and thread-safe/catching assertions.

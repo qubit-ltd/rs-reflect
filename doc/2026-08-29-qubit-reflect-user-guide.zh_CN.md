@@ -52,6 +52,7 @@ qubit-reflect = { version = "0.1", features = ["qubit-types"] }
 ```
 
 `ecosystem-types` 与 `qubit-types` 相互独立，而且都不属于默认 feature。只使用运行时的下游不会编译这些依赖，也不会在未声明的情况下获得相应 trait 实现。
+如果 facade 或元数据 crate 会为这些外部类型生成 descriptor，该 crate 必须在自己的 `qubit-reflect` 依赖上启用对应 feature；仅重导出宏不会自动启用类型族实现。
 
 ## 核心工作流
 
@@ -214,4 +215,5 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 - [README](../README.zh_CN.md) 与 [English README](../README.md)
 - [English user guide](2026-08-29-qubit-reflect-user-guide.md)
 - [API 文档](https://docs.rs/qubit-reflect)
+- [中文详细设计](2026-08-29-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-01-qubit-reflect-design.md)
 - [需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)

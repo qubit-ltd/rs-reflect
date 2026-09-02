@@ -72,6 +72,10 @@ qubit-reflect = { version = "0.1", features = ["qubit-types"] }
 `ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
 the default feature set, so a runtime-only consumer does not compile those
 dependency families or silently acquire their trait implementations.
+If a facade or metadata crate generates descriptors for one of these external
+types, that crate must enable the matching feature on its own
+`qubit-reflect` dependency; re-exporting the macros does not enable type-family
+implementations by itself.
 
 ## Core Workflow
 
@@ -297,4 +301,5 @@ described, but are not dynamically callable.
 - [README](../README.md) and [简体中文 README](../README.zh_CN.md)
 - [简体中文用户指南](2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [API documentation](https://docs.rs/qubit-reflect)
+- [English design](2026-09-01-qubit-reflect-design.md) and [简体中文设计](2026-08-29-qubit-reflect-design.zh_CN.md)
 - [Requirements traceability matrix](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
