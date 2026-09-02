@@ -8,14 +8,9 @@
 
 //! Terminal fixture: it depends only on the two downstream facade crates.
 
-use model_facade_derive::model_reflect;
+mod facade_user;
 
-#[model_reflect]
-/// A model-facade fixture whose descriptor is generated through delegation.
-pub struct FacadeUser {
-    /// The reflected identifier used by facade integration assertions.
-    pub id: u64,
-}
+pub use facade_user::FacadeUser;
 
 #[cfg(test)]
 mod tests {
@@ -29,8 +24,7 @@ mod tests {
         let descriptor = FacadeUser::type_descriptor();
         assert!(descriptor.type_name().ends_with("FacadeUser"));
 
-        let registry =
-            ReflectRegistry::initialize().expect("facade fragment registers");
+        let registry = ReflectRegistry::initialize().expect("facade fragment registers");
         assert!(registry.get(descriptor.type_id()).is_some());
     }
 }

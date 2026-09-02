@@ -18,6 +18,24 @@
       "commands": ["check", "test", "doc-test"],
       "packages": ["qubit-reflect"],
       "allFeatures": true
+    },
+    {
+      "name": "derive",
+      "commands": ["check", "test", "doc-test", "clippy"],
+      "packages": ["qubit-reflect-derive"]
+    },
+    {
+      "name": "cross-crate-fixtures",
+      "commands": ["check", "test", "doc-test", "clippy"],
+      "packages": [
+        "registry-types",
+        "registry-impl-a",
+        "registry-impl-b",
+        "registry-app",
+        "model-facade-runtime",
+        "model-facade-derive",
+        "model-facade-app"
+      ]
     }
   ]
 }

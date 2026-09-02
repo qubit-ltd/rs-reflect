@@ -6,8 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Second independent implementation fragment for the cross-crate fixture.
+//! Types shared by the cross-crate registry fixtures.
 
-mod label_b;
+use qubit_reflect::Reflect;
 
-pub use label_b::LabelB;
+/// A reflected type shared by the cross-crate registry fixtures.
+#[derive(Reflect)]
+pub struct RegistryUser {
+    /// The identifier used by registry aggregation assertions.
+    pub id: u8,
+}
