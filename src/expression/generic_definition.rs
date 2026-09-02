@@ -14,6 +14,7 @@ use std::hash::Hasher;
 
 use crate::expression::ConstExpression;
 use crate::expression::DiagnosticText;
+use crate::expression::ExpressionName;
 use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
@@ -88,7 +89,7 @@ pub enum GenericParameterDescriptor {
     /// A lifetime parameter such as `'a`.
     Lifetime {
         /// The lifetime parameter name without its leading apostrophe.
-        name: Box<str>,
+        name: ExpressionName,
         /// Lifetime bounds in declaration order.
         bounds: Box<[LifetimeExpression]>,
         /// Optional source-oriented diagnostic text excluded from identity.
@@ -97,7 +98,7 @@ pub enum GenericParameterDescriptor {
     /// A type parameter such as `T`.
     Type {
         /// The type parameter name.
-        name: Box<str>,
+        name: ExpressionName,
         /// Bounds in declaration order.
         bounds: Box<[PredicateDescriptor]>,
         /// The optional default type.
@@ -108,7 +109,7 @@ pub enum GenericParameterDescriptor {
     /// A const parameter such as `const N: usize`.
     Const {
         /// The const parameter name.
-        name: Box<str>,
+        name: ExpressionName,
         /// The declared const type.
         ty: Box<TypeExpression>,
         /// The optional default const expression.

@@ -12,6 +12,9 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use crate::expression::ExpressionError;
+use crate::expression::ExpressionName;
+use crate::expression::ExpressionPath;
 use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
@@ -28,14 +31,14 @@ pub enum GenericArgument {
     /// An associated type equality such as `Iterator<Item = T>`.
     AssociatedType {
         /// The associated type name.
-        name: Box<str>,
+        name: ExpressionName,
         /// The associated type value.
         value: Box<TypeExpression>,
     },
     /// An associated type bound such as `Iterator<Item: Display>`.
     AssociatedTypeBound {
         /// The associated type name.
-        name: Box<str>,
+        name: ExpressionName,
         /// Bounds that apply to the associated type.
         bounds: Box<[PredicateDescriptor]>,
     },
@@ -116,7 +119,32 @@ pub enum ConstExpression {
     /// A character literal.
     Character(char),
     /// A named const generic parameter.
-    Parameter(Box<str>),
+    Parameter(ExpressionName),
     /// A qualified path to a const item.
-    Path(Box<[Box<str>]>),
+    Path(ExpressionPath),
+}
+
+impl ConstExpression {
+    /// Creates a named const-parameter expression.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
+    pub fn parameter(name: impl Into<Box<str>>) -> Result<Self, ExpressionError> {
+        ExpressionName::new(name).map(Self::Parameter)
+    }
+
+    /// Creates a qualified const-item path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an expression error when the path is empty or contains an empty
+    /// segment.
+    pub fn path<P, S>(segments: P) -> Result<Self, ExpressionError>
+    where
+        P: IntoIterator<Item = S>,
+        S: Into<Box<str>>,
+    {
+        ExpressionPath::new(segments).map(Self::Path)
+    }
 }

@@ -1163,10 +1163,10 @@ impl TraitDescriptorBuilder {
 /// Concrete substitutions carried by one applied trait descriptor.
 #[derive(Clone)]
 pub(crate) struct TraitApplicationSubstitutions {
-    types: HashMap<Box<str>, TypeExpression>,
-    consts: HashMap<Box<str>, ConstExpression>,
-    lifetimes: std::collections::HashSet<Box<str>>,
-    associated_types: HashMap<Box<str>, TypeExpression>,
+    types: HashMap<crate::expression::ExpressionName, TypeExpression>,
+    consts: HashMap<crate::expression::ExpressionName, ConstExpression>,
+    lifetimes: std::collections::HashSet<crate::expression::ExpressionName>,
+    associated_types: HashMap<crate::expression::ExpressionName, TypeExpression>,
 }
 
 impl TraitApplicationSubstitutions {
@@ -1224,13 +1224,13 @@ impl TraitApplicationSubstitutions {
         for parameter in &definition.parameters {
             match parameter {
                 GenericParameterDescriptor::Lifetime { name, .. } => {
-                    scoped.lifetimes.remove(name);
+                    scoped.lifetimes.remove(name.as_str());
                 }
                 GenericParameterDescriptor::Type { name, .. } => {
-                    scoped.types.remove(name);
+                    scoped.types.remove(name.as_str());
                 }
                 GenericParameterDescriptor::Const { name, .. } => {
-                    scoped.consts.remove(name);
+                    scoped.consts.remove(name.as_str());
                 }
             }
         }
@@ -1286,24 +1286,34 @@ impl TraitApplicationSubstitutions {
     /// Substitutes one structural type expression recursively.
     pub(crate) fn type_expression(&self, expression: &TypeExpression) -> TypeExpression {
         match expression {
-            TypeExpression::Parameter(name) => self.types.get(name).cloned().unwrap_or_else(|| expression.clone()),
+            TypeExpression::Parameter(name) => self
+                .types
+                .get(name.as_str())
+                .cloned()
+                .unwrap_or_else(|| expression.clone()),
             TypeExpression::Concrete(concrete)
-                if concrete.path.len() == 1 && self.types.contains_key(&concrete.path[0]) =>
+                if concrete.path.len() == 1 && self.types.contains_key(concrete.path[0].as_ref()) =>
             {
-                self.types[&concrete.path[0]].clone()
+                self.types
+                    .get(concrete.path[0].as_ref())
+                    .expect("the guarded type substitution exists")
+                    .clone()
             }
             TypeExpression::Concrete(concrete)
                 if concrete.path.len() == 2
                     && concrete.path[0].as_ref() == "Self"
-                    && self.associated_types.contains_key(&concrete.path[1]) =>
+                    && self.associated_types.contains_key(concrete.path[1].as_ref()) =>
             {
-                self.associated_types[&concrete.path[1]].clone()
+                self.associated_types
+                    .get(concrete.path[1].as_ref())
+                    .expect("the guarded associated-type substitution exists")
+                    .clone()
             }
             TypeExpression::Associated(associated)
                 if matches!(associated.self_type.as_ref(), TypeExpression::SelfType)
-                    && self.associated_types.contains_key(&associated.item) =>
+                    && self.associated_types.contains_key(associated.item.as_str()) =>
             {
-                self.associated_types[&associated.item].clone()
+                self.associated_types[associated.item.as_str()].clone()
             }
             _ => {
                 let mut result = expression.clone();
@@ -1398,7 +1408,11 @@ impl TraitApplicationSubstitutions {
     /// Substitutes one const parameter reference.
     fn const_expression(&self, expression: &ConstExpression) -> ConstExpression {
         match expression {
-            ConstExpression::Parameter(name) => self.consts.get(name).cloned().unwrap_or_else(|| expression.clone()),
+            ConstExpression::Parameter(name) => self
+                .consts
+                .get(name.as_str())
+                .cloned()
+                .unwrap_or_else(|| expression.clone()),
             _ => expression.clone(),
         }
     }
@@ -1407,7 +1421,7 @@ impl TraitApplicationSubstitutions {
     /// `'static` trait-object root.
     fn lifetime(&self, lifetime: &crate::expression::LifetimeExpression) -> crate::expression::LifetimeExpression {
         match lifetime {
-            crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name) => {
+            crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name.as_str()) => {
                 crate::expression::LifetimeExpression::Static
             }
             _ => lifetime.clone(),

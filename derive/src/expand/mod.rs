@@ -12,6 +12,7 @@ mod construction;
 mod context;
 mod dispatcher;
 mod enums;
+mod expression_codegen;
 mod generics;
 mod impls;
 mod invocation;

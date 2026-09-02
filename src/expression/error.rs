@@ -14,6 +14,18 @@
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ExpressionError {
+    /// A structural name was empty.
+    #[error("an expression name must not be empty")]
+    EmptyName,
+    /// A structural path did not contain any segments.
+    #[error("an expression path must contain at least one segment")]
+    EmptyPath,
+    /// A structural path contained an empty segment.
+    #[error("expression path segment {index} must not be empty")]
+    EmptyPathSegment {
+        /// Zero-based index of the empty segment.
+        index: usize,
+    },
     /// A concrete type path did not contain any segments.
     #[error("a concrete type path must contain at least one segment")]
     EmptyConcretePath,
