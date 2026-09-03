@@ -21,6 +21,7 @@ use crate::registry::fragment::FragmentPayload;
 use crate::registry::fragment::RuntimeIdentity;
 use crate::registry::internal::MaterializedFragment;
 use crate::registry::internal::benchmark_target::BenchmarkTarget;
+use crate::registry::internal::fact_row::FactRow;
 use crate::registry::registry::ReflectRegistry;
 
 /// Prepared adapter-free capability facts used by registry aggregation.
@@ -33,13 +34,6 @@ impl BenchmarkRegistryFacts {
     pub(crate) fn aggregate(&self) -> Result<ReflectRegistry, RegistryError> {
         aggregate_prepared_facts(self)
     }
-}
-
-/// One prepared benchmark fact kept outside the measured aggregation loop.
-struct FactRow {
-    identity: FragmentIdentity,
-    target_type_id: TypeId,
-    descriptor: CapabilityDescriptor,
 }
 
 /// Prepares unique adapter-free capability facts outside benchmark timing.

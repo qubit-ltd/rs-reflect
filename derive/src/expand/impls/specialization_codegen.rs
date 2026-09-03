@@ -62,7 +62,7 @@ pub(super) fn specialization_associated_type_resolver_arms(
             Some(quote! {
                 #name => {
                     fn resolve #impl_declaration ()
-                        -> Option<#facade::descriptor::TypeDescriptorResolver>
+                        -> Option<#facade::__private::codegen_v1::descriptor::TypeDescriptorResolver>
                         #where_clause
                     {
                         use #facade::__private::codegen_v1::descriptor::ResolveReflectTypeDescriptor as _;
@@ -424,15 +424,15 @@ pub(super) fn specialization_arguments(
         match (parameter.kind, &binding.value) {
             (GenericKindIr::Type, SpecializationValueIr::Type(ty)) => {
                 let expression = crate::expand::traits::type_expression(ty, facade);
-                Some(quote!(#facade::expression::GenericArgument::Type(#expression)))
+                Some(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Type(#expression)))
             }
             (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(tokens)) => Some(quote!(
-                #facade::expression::GenericArgument::Type(
-                    #facade::expression::TypeExpression::Concrete(
+                #facade::__private::codegen_v1::expression::GenericArgument::Type(
+                    #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
                         #facade::__private::codegen_v1::expression::concrete(
                             vec![stringify!(#tokens).into()].into_boxed_slice(),
                             vec![].into_boxed_slice(),
-                            #facade::expression::DiagnosticText::from(stringify!(#tokens)),
+                            #facade::__private::codegen_v1::expression::DiagnosticText::from(stringify!(#tokens)),
                         ),
                     ),
                 )
@@ -445,13 +445,13 @@ pub(super) fn specialization_arguments(
                 let declared_type = parameter.const_type.as_ref()?.source.as_str();
                 let declared_type_literal = syn::LitStr::new(declared_type, parameter.span);
                 Some(quote!(
-                    #facade::expression::GenericArgument::Const(
-                        #facade::expression::ConstGenericArgument::new(
-                            #facade::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v1::expression::GenericArgument::Const(
+                        #facade::__private::codegen_v1::expression::ConstGenericArgument::new(
+                            #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
                                 #facade::__private::codegen_v1::expression::concrete(
                                     vec![#declared_type_literal.into()].into_boxed_slice(),
                                     vec![].into_boxed_slice(),
-                                    #facade::expression::DiagnosticText::from(#declared_type_literal),
+                                    #facade::__private::codegen_v1::expression::DiagnosticText::from(#declared_type_literal),
                                 ),
                             ),
                             #facade::__private::codegen_v1::expression::const_path([
@@ -519,13 +519,13 @@ pub(super) fn simple_generic_specialization_adapter(
     };
     let argument_expectations = parameter_types
         .iter()
-        .map(|ty| quote!(#facade::invoke::ArgumentExpectation::owned::<#ty>()));
+        .map(|ty| quote!(#facade::__private::codegen_v1::invoke::ArgumentExpectation::owned::<#ty>()));
     let argument_bindings = parameter_types.iter().enumerate().map(|(index, ty)| {
         let argument = format_ident!("__qubit_reflect_specialized_argument_{index}");
         quote! {
             let #argument: #ty = match arguments.next().expect("validation checked argument count") {
-                #facade::invoke::InvocationArg::Owned(value) =>
-                    #facade::value::DynamicOwned::<#facade::value::Local>::downcast::<#ty>(value)
+                #facade::__private::codegen_v1::invoke::InvocationArg::Owned(value) =>
+                    #facade::__private::codegen_v1::value::DynamicOwned::<#facade::__private::codegen_v1::value::Local>::downcast::<#ty>(value)
                         .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                 _ => unreachable!("validation checked argument mode"),
             };
@@ -543,11 +543,11 @@ pub(super) fn simple_generic_specialization_adapter(
     let output = match return_type {
         None => quote! {
             <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*);
-            #facade::invoke::InvocationOutput::Unit
+            #facade::__private::codegen_v1::invoke::InvocationOutput::Unit
         },
         Some(_) => quote! {
-            #facade::invoke::InvocationOutput::Owned(
-                #facade::value::DynamicOwned::<#facade::value::Local>::new(
+            #facade::__private::codegen_v1::invoke::InvocationOutput::Owned(
+                #facade::__private::codegen_v1::value::DynamicOwned::<#facade::__private::codegen_v1::value::Local>::new(
                     <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*),
                 ),
             )
@@ -555,12 +555,12 @@ pub(super) fn simple_generic_specialization_adapter(
     };
     Some(quote! {
         fn #adapter_name<'call>(
-            invocation: #facade::invoke::Invocation<'call, #facade::value::Local>,
+            invocation: #facade::__private::codegen_v1::invoke::Invocation<'call, #facade::__private::codegen_v1::value::Local>,
         ) -> ::core::result::Result<
-            #facade::invoke::InvocationOutput<'call, #facade::value::Local>,
-            #facade::invoke::InvocationFailure<'call, #facade::value::Local>,
+            #facade::__private::codegen_v1::invoke::InvocationOutput<'call, #facade::__private::codegen_v1::value::Local>,
+            #facade::__private::codegen_v1::invoke::InvocationFailure<'call, #facade::__private::codegen_v1::value::Local>,
         > {
-            let identity = #facade::identity::MemberId::new(
+            let identity = #facade::__private::codegen_v1::identity::MemberId::new(
                 #target_source,
                 "method-specialization",
                 #method_index,
@@ -568,7 +568,7 @@ pub(super) fn simple_generic_specialization_adapter(
             );
             let validated = invocation.validate(
                 &identity,
-                #facade::invoke::ReceiverExpectation::none(),
+                #facade::__private::codegen_v1::invoke::ReceiverExpectation::none(),
                 &[#(#argument_expectations),*],
             )?;
             let (_receiver, arguments) = validated.into_parts();
@@ -577,8 +577,8 @@ pub(super) fn simple_generic_specialization_adapter(
             Ok(#output)
         }
 
-        static #descriptor_name: #facade::descriptor::InvocationAdapter =
-            #facade::descriptor::InvocationAdapter::local(#adapter_name);
+        static #descriptor_name: #facade::__private::codegen_v1::descriptor::InvocationAdapter =
+            #facade::__private::codegen_v1::descriptor::InvocationAdapter::local(#adapter_name);
     })
 }
 

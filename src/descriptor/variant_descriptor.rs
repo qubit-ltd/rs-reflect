@@ -82,7 +82,8 @@ pub enum NumericDiscriminant {
 
 ```
 #![allow(proc_macro_derive_resolution_fallback)]
-use qubit_reflect::{Reflect, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 #[reflect(crate = qubit_reflect)]

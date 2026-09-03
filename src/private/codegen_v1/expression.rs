@@ -8,18 +8,46 @@
 
 //! Checked expression factories consumed by generated code.
 
-use crate::expression::ArrayTypeExpression;
-use crate::expression::ConcreteTypeExpression;
-use crate::expression::ConstExpression;
-use crate::expression::ConstGenericArgument;
-use crate::expression::DiagnosticText;
-use crate::expression::GenericArgument;
-use crate::expression::GenericParameterDescriptor;
-use crate::expression::LifetimeExpression;
-use crate::expression::PredicateDescriptor;
-use crate::expression::ReferenceTypeExpression;
-use crate::expression::TraitBoundModifier;
-use crate::expression::TypeExpression;
+#[doc(hidden)]
+pub use crate::expression::ArrayTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::AssociatedTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::ConcreteTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::ConstExpression;
+#[doc(hidden)]
+pub use crate::expression::ConstGenericArgument;
+#[doc(hidden)]
+pub use crate::expression::DiagnosticText;
+#[doc(hidden)]
+pub use crate::expression::FunctionAbi;
+#[doc(hidden)]
+pub use crate::expression::FunctionPointerExpression;
+#[doc(hidden)]
+pub use crate::expression::FunctionSafety;
+#[doc(hidden)]
+pub use crate::expression::GenericArgument;
+#[doc(hidden)]
+pub use crate::expression::GenericDefinitionDescriptor;
+#[doc(hidden)]
+pub use crate::expression::GenericParameterDescriptor;
+#[doc(hidden)]
+pub use crate::expression::LifetimeExpression;
+#[doc(hidden)]
+pub use crate::expression::OpaqueTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::PredicateDescriptor;
+#[doc(hidden)]
+pub use crate::expression::RawPointerTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::ReferenceTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::TraitBoundModifier;
+#[doc(hidden)]
+pub use crate::expression::TraitObjectExpression;
+#[doc(hidden)]
+pub use crate::expression::TypeExpression;
 
 /// Creates a named type-parameter expression from generator-validated text.
 #[doc(hidden)]
