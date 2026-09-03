@@ -43,19 +43,21 @@ struct User {
     name: String,
 }
 
-let descriptor = TypeDescriptor::of::<User>();
-let name = descriptor.field("name").expect("派生字段存在");
-let mut user = User { id: 7, name: String::from("Ada") };
+fn main() {
+    let descriptor = TypeDescriptor::of::<User>();
+    let name = descriptor.field("name").expect("派生字段存在");
+    let mut user = User { id: 7, name: String::from("Ada") };
 
-let current = name.get(ReflectedRef::new(&user)).expect("受检读取成功");
-assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    let current = name.get(ReflectedRef::new(&user)).expect("受检读取成功");
+    assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
-name.set(
-    ReflectedMut::new(&mut user),
-    ReflectedOwned::new(String::from("Grace")),
-)
-.expect("替换值类型精确匹配");
-assert_eq!(user.name, "Grace");
+    name.set(
+        ReflectedMut::new(&mut user),
+        ReflectedOwned::new(String::from("Grace")),
+    )
+    .expect("替换值类型精确匹配");
+    assert_eq!(user.name, "Grace");
+}
 ```
 
 ## 为什么需要它
@@ -65,7 +67,7 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 ## 核心能力与边界
 
 - 描述已反射的 struct、enum、trait、impl、泛型信息，以及支持的内置类型族。
-- 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；涉及所有权的失败会返回可恢复的输入。
+- 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；执行前校验失败时，恢复对象会保留调用方传入的 owned 值。
 - 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
 - 聚合链接产物中的 inventory fragment，生成确定性的注册表，并提供类型安全的 `Clone`、`Default` capability adapter。
 
