@@ -118,7 +118,10 @@ qubit-reflect-derive = {{ path = "{dependency_path}" }}
     .expect("the temporary manifest should be written");
     fs::write(
         source_dir.join("lib.rs"),
-        r#"use qubit_reflect_derive::Reflect;
+        concat!(
+            "use ",
+            "qubit_reflect_derive",
+            r#"::Reflect;
 
 #[derive(Reflect)]
 struct Duplicate {
@@ -127,7 +130,8 @@ first: u8,
 #[reflect(rename = "same")]
 second: u8,
 }
-"#,
+"#
+        ),
     )
     .expect("the temporary source should be written");
 
