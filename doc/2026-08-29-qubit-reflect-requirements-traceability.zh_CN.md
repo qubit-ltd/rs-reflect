@@ -2,7 +2,7 @@
 
 本矩阵逐项对应最终需求规范中的全部 284 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个真实实现文件和至少一个真实测试文件；所有路径均按 2026-09-01 完成破坏性边界重构后的仓库结构核验。
 
-表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v1`，registry 构建器位于 `src/registry/registry_builder.rs`。
+表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v2`，registry 构建器位于 `src/registry/registry_builder.rs`。
 
 ## 验证方法
 
@@ -59,7 +59,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-028 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `derive/src/parse/attributes.rs`、`derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs`、`tests/access/policy_tests.rs` |
 | REQ-ACCPT-029 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/registry/registry_builder.rs`、`src/private/registration.rs` | `tests/registry/cross_crate_tests.rs`、`tests/registry/runtime_tests.rs` |
 | REQ-ACCPT-030 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/construct/validated.rs`、`src/construct/update.rs`、`derive/src/expand/construction.rs` | `tests/construct/runtime_tests.rs`、`tests/construct/adapter_tests.rs` |
-| REQ-ACCPT-031 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/adapter.rs`、`derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`、`tests/panic_abort_invocation_tests.rs` |
+| REQ-ACCPT-031 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/adapter.rs`、`derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`、`tests/panic_abort_invocation_tests.rs`、`tests/fixtures/panic_abort_invocation.rs`、`project-ci-check.sh` |
 | REQ-ACCPT-032 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/future.rs`、`derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs` |
 | REQ-ACCPT-033 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/receiver.rs`、`derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-ACCPT-034 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/invocation.rs`、`src/invoke/recovery.rs` | `tests/invoke/runtime_tests.rs`、`tests/ui/fail/thread_safe_borrow_bound_tests.rs` |
@@ -75,7 +75,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-044 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `derive/src/expand/structs.rs`、`src/descriptor/type_ref.rs` | `tests/ui/pass/opaque_generic_tests.rs`、`tests/descriptor/generic_tests.rs` |
 | REQ-ACCPT-045 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/adapter.rs`、`derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`、`tests/ui/pass/catch_unwind_thread_safe_tests.rs` |
 | REQ-ACCPT-046 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `derive/src/expand/generics.rs`、`derive/src/expand/structs.rs` | `tests/ui/pass/lifetime_generic_tests.rs`、`tests/descriptor/generic_tests.rs` |
-| REQ-ACCPT-047 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/private/codegen_v1/mod.rs`、`derive/src/expand/`、`test-crates/model-facade-derive/src/lib.rs`、`test-crates/model-facade-runtime/src/lib.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs`、`tests/registry/model_facade_tests.rs` |
+| REQ-ACCPT-047 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/private/codegen_v2/mod.rs`、`derive/src/expand/`、`test-crates/model-facade-derive/src/lib.rs`、`test-crates/model-facade-runtime/src/lib.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs`、`tests/registry/model_facade_tests.rs` |
 | REQ-ACCPT-048 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/value/aliases.rs`、`src/value/mode.rs` | `tests/value/thread_mode_tests.rs` |
 | REQ-AGG-001 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-002 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
@@ -117,9 +117,9 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-DESC-009 | T02、T05、T11、T13 | `src/identity/visibility.rs`、`derive/src/parse/declaration.rs`、`derive/src/expand/traits.rs`、`derive/src/expand/impls.rs` | `tests/descriptor/identity_tests.rs`、`tests/descriptor/derive_struct_tests.rs`、`tests/descriptor/reflect_trait_tests.rs` |
 | REQ-DESC-010 | T03、T13 | `src/expression/type_expression.rs`、`src/expression/generic_argument.rs`、`src/expression/lifetime_expression.rs`、`derive/src/parse/type_ir.rs` | `tests/descriptor/expression_tests.rs`、`tests/descriptor/reflect_trait_tests.rs` |
 | REQ-DESC-011 | T02、T05、T11 | `src/descriptor/type_descriptor.rs`、`src/descriptor/trait_descriptor.rs`、`src/descriptor/field_descriptor.rs`、`src/descriptor/variant_descriptor.rs`、`src/descriptor/method_descriptor.rs` | `tests/descriptor/derive_struct_tests.rs`、`tests/descriptor/derive_enum_tests.rs`、`tests/descriptor/reflect_trait_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
-| REQ-ERR-001 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
-| REQ-ERR-002 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
-| REQ-ERR-003 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
+| REQ-ERR-001 | T02、T08、T09、T10、T12、T18、T19、T22 | `derive/src/parse/declaration.rs`、`derive/src/validate/declaration.rs` | `tests/ui_tests.rs`、`tests/ui/fail/derive_union_tests.rs` |
+| REQ-ERR-002 | T02、T08、T09、T10、T12、T18、T19、T22 | `derive/src/parse/attributes.rs`、`derive/src/validate/declaration.rs` | `tests/ui_tests.rs`、`tests/ui/fail/thread_safe_type_not_send_sync_tests.rs` |
+| REQ-ERR-003 | T02、T08、T09、T10、T12、T18、T19、T22 | `derive/src/lib.rs`、`derive/src/parse/declaration.rs` | `tests/ui_tests.rs`、`derive/tests/parser_tests.rs` |
 | REQ-ERR-004 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
 | REQ-ERR-005 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
 | REQ-ERR-006 | T02、T08、T09、T10、T12、T18、T19、T22 | `src/error/registry_error.rs`、`src/invoke/error.rs` | `tests/registry/runtime_tests.rs`、`tests/invoke/runtime_tests.rs` |
@@ -145,7 +145,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-GEN-003 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-004 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-005 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
-| REQ-GEN-006 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-006 | T03、T06、T14、T20、T22 | `src/builtin/array.rs`、`src/builtin/tuple.rs`、`src/builtin/function.rs`、`src/descriptor/typed_view.rs` | `tests/descriptor/builtin_tests.rs`、`tests/descriptor/generic_tests.rs` |
 | REQ-GEN-007 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-008 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-009 | T03、T06、T14、T20、T22 | `src/descriptor/generic_descriptor.rs`、`derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
@@ -196,7 +196,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-MAC-014 | T13、T14、T15、T16、T17、T22 | `derive/src/expand/impls.rs`、`derive/src/expand/traits.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-015 | T13、T14、T15、T16、T17、T22 | `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-016 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs` | `derive/tests/parser_tests.rs` |
-| REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs`、`derive/src/expand/mod.rs`、`src/private/codegen_v1/mod.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs` |
+| REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs`、`derive/src/expand/mod.rs`、`src/private/codegen_v2/mod.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs` |
 | REQ-MAC-018 | T13、T14、T15、T16、T17、T22 | `derive/src/parse/attributes.rs`、`derive/src/expand/impls.rs` | `tests/ui/fail/external_trait_id_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/parse/attributes.rs`、`derive/src/ir/attribute.rs` | `tests/descriptor/derive_struct_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-020 | T13、T14、T15、T16、T17、T20、T22 | `derive/src/expand/impls.rs`、`src/descriptor/impl_descriptor.rs` | `tests/ui/pass/generic_impl_specialization_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
@@ -231,7 +231,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-SYS-005 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-006 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-007 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-008 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-008 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs`、`scripts/check-markdown-examples.sh` | `tests/registry/runtime_tests.rs`、`project-ci-check.sh` |
 | REQ-SYS-009 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-010 | T01、T04、T05、T06、T12、T23、T26 | `src/lib.rs`、`src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-011 | T01、T26 | `Cargo.toml`、`src/lib.rs` | `.rs-ci-cargo-matrix.json`、`.rs-ci/cargo-feature-check.sh` |

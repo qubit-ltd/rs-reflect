@@ -1,8 +1,6 @@
 # qubit-reflect
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
-[![Crates.io](https://img.shields.io/crates/v/qubit-reflect.svg?color=blue)](https://crates.io/crates/qubit-reflect)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
@@ -13,8 +11,10 @@
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
+
+当前仅允许从 Qubit 内部 workspace 或经过批准的内部 Git revision 引用本 crate，尚未发布到 crates.io。运行时 crate 与 derive crate 必须来自同一个仓库 revision。
 
 默认启用的 `derive` feature 会导出 `#[derive(Reflect)]`、`#[reflect]` 和
 `#[reflect_impl]`。关闭默认 feature 后，运行时和手写注册 API 仍然可用，但这三个宏不会被重导出。
@@ -24,11 +24,11 @@ qubit-reflect = "0.1"
 | Feature | 提供的 `Reflect` 实现 |
 | --- | --- |
 | `derive`（默认） | 三个反射宏；不会引入外部类型依赖 |
-| `ecosystem-types` | `bigdecimal`、`chrono`、`uuid` 中的类型 |
-| `qubit-types` | `qubit-datatype`、`qubit-id` 中的类型 |
+| `ecosystem-types` | `BigDecimal`、`DateTime<Utc>`、`NaiveDate`、`NaiveTime`、`Uuid` |
+| `qubit-types` | `qubit_id::Id`、`qubit_datatype::DataType` |
 
 只使用运行时 API 时，可配置
-`qubit-reflect = { version = "0.1", default-features = false }`。只有确实会穿过反射边界的外部类型族才应启用对应 feature。
+`qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }`。只有确实会穿过反射边界的外部类型族才应启用对应 feature。
 
 ## 快速开始
 
@@ -69,19 +69,24 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 - 描述已反射的 struct、enum、trait、impl、泛型信息，以及支持的内置类型族。
 - 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；执行前校验失败时，恢复对象会保留调用方传入的 owned 值。
 - 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
-- 聚合链接产物中的 inventory fragment，生成确定性的注册表，并提供类型安全的 `Clone`、`Default` capability adapter。
+- 所有注册入口都汇入同一条经过校验的 inventory fragment 数据流，生成确定性的不可变注册表；调用方既可使用进程全局结果，也可持有显式 registry snapshot。注册表还提供类型安全的 `Clone`、`Default` capability adapter。
+- derive 与 facade 通过版本化的 `__private::codegen_v2` 协议集成，下游 model metadata 使用 ABI v3。
+- 动态值明确区分 `Local` 与选择性启用的 `ThreadSafe` 边界；只有生成代码证明类型满足所需 `Send + Sync` 约束时，才会提供线程安全字段访问和构造。
 
 反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、descriptor 地址和 trait marker 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
+tuple 和可移植函数指针 descriptor 支持 0 到 32 个元素或参数；33 及以上 arity 明确不支持，也不会获得 `Reflect` 实现。
 
 ## 延伸阅读
 
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
-- [API 文档](https://docs.rs/qubit-reflect)
-- [中文详细设计](doc/2026-08-29-qubit-reflect-design.zh_CN.md)
-- [English design](doc/2026-09-01-qubit-reflect-design.md)
+- 使用 `cargo doc --all-features` 在内部生成 API 文档
+- [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
+- [English design](doc/2026-09-03-qubit-reflect-design.md)
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)
+- [English traceability matrix](doc/2026-09-03-qubit-reflect-requirements-traceability.md)
 - [English README](README.md)
 
 ## 测试

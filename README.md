@@ -1,8 +1,6 @@
 # qubit-reflect
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
-[![Crates.io](https://img.shields.io/crates/v/qubit-reflect.svg?color=blue)](https://crates.io/crates/qubit-reflect)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
@@ -17,8 +15,12 @@ parsing, private-layout inspection, compiler-private APIs, or `unsafe`.
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
+
+The crate is currently consumed only from Qubit's internal workspace or an
+approved internal Git revision. It is not published to crates.io. Keep the
+runtime and derive crate on the same repository revision.
 
 The default `derive` feature exports `#[derive(Reflect)]`, `#[reflect]`, and
 `#[reflect_impl]`. Disabling default features keeps the runtime and handwritten
@@ -29,11 +31,11 @@ External type implementations are opt-in:
 | Feature | Adds `Reflect` implementations for |
 | --- | --- |
 | `derive` (default) | The three reflection macros; no external type dependency |
-| `ecosystem-types` | `bigdecimal`, `chrono`, and `uuid` types |
-| `qubit-types` | `qubit-datatype` and `qubit-id` types |
+| `ecosystem-types` | `BigDecimal`, `DateTime<Utc>`, `NaiveDate`, `NaiveTime`, and `Uuid` |
+| `qubit-types` | `qubit_id::Id` and `qubit_datatype::DataType` |
 
 For a runtime-only dependency, use
-`qubit-reflect = { version = "0.1", default-features = false }`. Enable only
+`qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }`. Enable only
 the external type families that cross your reflection boundary.
 
 ## Quick Start
@@ -90,23 +92,34 @@ facts even where an operation is unavailable.
 - Generated invocation adapters for supported methods, with local and
   explicitly requested thread-safe modes.
 - A deterministic registry assembled from linked inventory fragments, plus
-  typed `Clone` and `Default` capability adapters.
+  typed `Clone` and `Default` capability adapters. Every registration path
+  enters this one validated fragment stream; callers may hold an explicit,
+  immutable registry snapshot instead of consulting the process-global result.
+- A versioned `__private::codegen_v2` protocol for derive/facade integration,
+  including model metadata ABI v3 consumers.
+- Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
+  field access and construction exist only for types whose generated code
+  proves the required `Send + Sync` bounds.
 
 Reflection is deliberately bounded. It does not coerce numeric values, parse
 strings, infer `Into`, or upgrade a local dynamic value to thread-safe mode.
 `TypeId`, descriptor addresses, and trait markers are process-local identity,
 not serialization or cross-process model identifiers. Unsupported or disabled
 operations remain visible as descriptors with structured unavailable reasons.
+Tuple and portable function-pointer descriptors support arities 0 through 32;
+arity 33 and above are unsupported and intentionally have no `Reflect` impl.
 
 ## Learn More
 
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- [API documentation](https://docs.rs/qubit-reflect)
-- [English design](doc/2026-09-01-qubit-reflect-design.md)
-- [中文详细设计](doc/2026-08-29-qubit-reflect-design.zh_CN.md)
+- API documentation generated internally with `cargo doc --all-features`
+- [English design](doc/2026-09-03-qubit-reflect-design.md)
+- [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
 - [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
-- [Requirements traceability matrix](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)
+- [English traceability matrix](doc/2026-09-03-qubit-reflect-requirements-traceability.md)
+- [中文需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [简体中文 README](README.zh_CN.md)
 
 ## Testing

@@ -373,10 +373,15 @@ impl TypeDescriptor {
     pub fn variant(&self, name: &str) -> Option<&VariantDescriptor>;
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor>;
 
-    pub fn impls(&self) -> Result<&[ImplDescriptor], RegistryError>;
-    pub fn methods(&self) -> Result<&[MethodDescriptor], RegistryError>;
+    pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError>;
+    pub fn impls_in<'r>(&self, registry: &'r ReflectRegistry)
+        -> &'r [&'static ImplDescriptor];
+    pub fn methods(&self)
+        -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError>;
+    pub fn methods_in<'r>(&self, registry: &'r ReflectRegistry)
+        -> &'r [&'static MethodInstanceDescriptor];
     pub fn methods_named(&self, name: &str)
-        -> Result<MethodCandidates<'_>, RegistryError>;
+        -> Result<MethodLookup<'static>, RegistryError>;
 }
 ```
 
@@ -384,7 +389,7 @@ impl TypeDescriptor {
 let user = TypeDescriptor::of::<User>();
 assert_eq!(user.type_id(), TypeId::of::<User>());
 assert_eq!(user.type_name(), std::any::type_name::<User>());
-assert_eq!(user.query_name(), std::any::type_name::<User>());
+assert_eq!(user.query_name(), "User");
 assert_eq!(user.kind(), TypeKind::Struct(StructKind::Named));
 
 let username = user.field("username").unwrap();
@@ -502,13 +507,20 @@ impl FieldDescriptor {
     pub fn get_mut<'a>(&self, target: ReflectedMut<'a>)
         -> Result<ReflectedMut<'a>, FieldAccessError>;
     pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned)
-        -> Result<(), FieldAccessError>;
+        -> Result<(), FieldSetFailure>;
+    pub fn get_thread_safe<'a>(&self, target: SendReflectedRef<'a>)
+        -> Result<SendReflectedRef<'a>, FieldAccessError>;
+    pub fn get_mut_thread_safe<'a>(&self, target: SendReflectedMut<'a>)
+        -> Result<SendReflectedMut<'a>, FieldAccessError>;
+    pub fn set_thread_safe(&self, target: SendReflectedMut<'_>, value: SendReflectedOwned)
+        -> Result<(), FieldSetFailure<ThreadSafe>>;
 }
 ```
 
 `ReflectedRef`、`ReflectedMut` 和 `ReflectedOwned` 是字段、构造等同步就地操作的规范本地 mode。线程安全 mode 的
-`SendReflectedRef`、`SendReflectedMut` 和 `SendReflectedOwned` 用于跨线程传递，并可安全、不可逆地降级为相应本地
-包装后调用这些 API；只有显式登记的线程安全方法 adapter 才在调用链中保持 `ThreadSafe` mode。不要求用户再实现或
+`SendReflectedRef`、`SendReflectedMut` 和 `SendReflectedOwned` 用于跨线程传递；类型显式标记 `thread_safe` 且
+编译期 bound 成立时，字段、构造、更新与调用均直接提供 `ThreadSafe` adapter。线程安全包装也可安全、不可逆地
+降级为相应本地包装。不要求用户再实现或
 引用第二个公共 `ReflectValue` trait；这些包装类型必须通过受检泛型入口从 Rust 值构造。
 
 ```rust,ignore
@@ -613,7 +625,7 @@ impl User {
 impl MethodDescriptor {
     pub fn rust_name(&self) -> &'static str;
     pub fn query_name(&self) -> &'static str;
-    pub fn declaring_impl(&self) -> &'static ImplDescriptor;
+    pub fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor>;
     pub fn visibility(&self) -> MethodVisibility;
     pub fn receiver(&self) -> Option<&ReceiverDescriptor>;
     pub fn parameters(&self) -> &[ParameterDescriptor];
@@ -621,8 +633,15 @@ impl MethodDescriptor {
     pub fn parameter_at(&self, index: usize) -> Option<&ParameterDescriptor>;
     pub fn return_value(&self) -> &ReturnDescriptor;
     pub fn qualifiers(&self) -> MethodQualifiers;
-    pub fn invoke(&self, invocation: Invocation<'_>)
-        -> Result<InvocationOutput<'_>, InvocationError>;
+}
+
+impl MethodInstanceDescriptor {
+    pub fn declaration(&self) -> &'static MethodDescriptor;
+    pub fn unavailable_reasons(&self) -> &[InvocationUnavailableReason];
+    pub fn invoke_local<'call>(&self, invocation: Invocation<'call, Local>)
+        -> Option<InvocationResult<'call, Local>>;
+    pub fn invoke_thread_safe<'call>(&self, invocation: Invocation<'call, ThreadSafe>)
+        -> Option<InvocationResult<'call, ThreadSafe>>;
 }
 
 impl ParameterDescriptor {
@@ -911,15 +930,15 @@ fixture 生成、对象映射和框架绑定。
 ### 11.1 struct 构造
 
 ```rust,ignore
-let user = TypeDescriptor::of::<User>().construct_struct([
+let user = TypeDescriptor::of::<User>().construct_struct(NamedConstructionInput::new([
     ("id", ReflectedOwned::new(Id::from(7))),
     ("username", ReflectedOwned::new(String::from("alice"))),
-])?;
+]))?;
 
-let point = TypeDescriptor::of::<Point>().construct_tuple([
+let point = TypeDescriptor::of::<Point>().construct_tuple(TupleConstructionInput::new([
     ReflectedOwned::new(10_i32),
     ReflectedOwned::new(20_i32),
-])?;
+]))?;
 
 let marker = TypeDescriptor::of::<Marker>().construct_unit()?;
 ```
@@ -938,10 +957,10 @@ let marker = TypeDescriptor::of::<Marker>().construct_unit()?;
 ```rust,ignore
 let failed = TypeDescriptor::of::<Event>()
     .variant("Failed").unwrap()
-    .construct_struct([
+    .construct_struct(NamedConstructionInput::new([
         ("code", ReflectedOwned::new(500_u32)),
         ("message", ReflectedOwned::new(String::from("timeout"))),
-    ])?;
+    ]))?;
 
 let started = TypeDescriptor::of::<Event>()
     .variant("Started").unwrap()
@@ -1098,7 +1117,7 @@ assert_eq!(model.field("username").unwrap().descriptor().index(), 1);
 - **REQ-INT-011**：`qubit-model-derive` 和 `qubit-model-metadata` 必须依赖 `qubit-reflect` 的公共契约实现结构反射；
   模型角色 attribute macro 应在展开结果中委托给由模型 facade 重导出的 `Reflect` derive，不得复制一套字段、variant、
   泛型 bound、opaque 或注册代码生成逻辑。模型 facade 必须隐藏地重导出版本匹配的
-  `__private::codegen_v1` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
+  `__private::codegen_v2` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
   重导出 `descriptor`、`construct`、`value` 等完整 runtime 业务模块。同一声明重复叠加角色宏与显式 `Reflect`
   derive 必须给出编译期诊断。
 - **REQ-INT-012**：涉及反射结构、动态操作或两层依赖方向时，本文是 `rs-reflect`、`rs-model-derive` 与

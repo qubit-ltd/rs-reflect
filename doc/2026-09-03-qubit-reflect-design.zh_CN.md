@@ -1,12 +1,12 @@
 # `qubit-reflect` 详细设计
 
-- 日期：2026-09-01
-- 最近审核：2026-09-02
-- 状态：破坏性边界重构已实现，并通过分阶段验证；完整发布矩阵由仓库 CI 持续执行
-- 英文版：[English design](2026-09-01-qubit-reflect-design.md)
-- 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
+- 日期：2026-09-03
+- 最近审核：2026-09-03
+- 状态：破坏性边界重构已实现；当前只供内部仓库使用，发布流程明确暂缓
+- 英文版：[English design](2026-09-03-qubit-reflect-design.md)
+- 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
 - 适用仓库：`rs-reflect`
-- 对应协议：`qubit-reflect 0.1` / `__private::codegen_v1`
+- 对应协议：`qubit-reflect 0.1` / `__private::codegen_v2`
 
 ## 1. 目的与边界
 
@@ -81,7 +81,7 @@ src/
 ├── identity/                   # fragment、member、trait、visibility 身份
 ├── invoke/                     # 动态调用、future 与失败恢复
 ├── private/
-│   └── codegen_v1/             # 唯一生成协议入口
+│   └── codegen_v2/             # 唯一生成协议入口
 ├── registry/
 │   ├── registry_builder.rs     # 冲突检查与冻结前聚合
 │   ├── registry.rs             # 只读查询
@@ -96,6 +96,9 @@ descriptor 与 expression 的结构字段保持私有。公开构造器在边界
 registry 先收集全部 fragment，再检查重复 identity、类型/trait/impl/capability 冲突，最后一次性冻结索引。
 失败不会发布部分状态；候选和索引顺序由稳定 fragment 顺序决定。复杂有效方法视图在冻结阶段构造，
 查询路径不执行用户代码。
+聚合导航同时提供便捷入口与显式 snapshot 入口：`methods()` 会初始化进程全局 snapshot，
+`methods_in`、`impls_in`、`methods_named_in` 则只查询调用方传入的不可变 registry。
+因此，一个隔离 snapshot 的查询不会被无关的全局初始化缓存错误污染。
 
 ## 4. derive 流水线
 
@@ -140,7 +143,7 @@ trait 默认方法与 concrete impl 共用同一 invocation 分析和语义 emit
 生成代码只能通过以下版本化协议根访问 runtime 类型、工厂和注册钩子：
 
 ```text
-facade::__private::codegen_v1
+facade::__private::codegen_v2
 ```
 
 协议按领域精确暴露 `access`、`capability`、`construct`、`descriptor`、`error`、
@@ -148,12 +151,12 @@ facade::__private::codegen_v1
 这些是生成协议符号，不是供业务代码手写调用的 API；协议也不会重导出 runtime 的完整公开模块。
 根 `__private` 不平铺这些符号。协议发生不兼容变化时新增兄弟版本，而不是静默扩大 v1。
 
-下游 facade 为生成代码精确暴露 `__private::codegen_v1`，并独立逐项重导出它向业务代码承诺的公开符号。
+下游 facade 为生成代码精确暴露 `__private::codegen_v2`，并独立逐项重导出它向业务代码承诺的公开符号。
 不得使用 `pub use qubit_reflect::*`、`pub use qubit_reflect::__private::*`，也不应仅为满足宏展开而重导出
 runtime 的完整模块。
 
-`qubit-model-metadata` 另外维护自己的 `__private::v2` 模型元数据 ABI。它将 reflect 协议精确别名为
-`reflect_codegen_v1`，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
+`qubit-model-metadata` 另外维护自己的 `__private::v3` 模型元数据 ABI。它将 reflect 协议精确别名为
+`reflect_codegen_v2`，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
 
 ## 6. 动态安全边界
 
@@ -167,6 +170,8 @@ runtime 的完整模块。
 5. panic catching 只在显式声明且 unwind-safety bound 可证明时生成。
 
 库不做数值转换、字符串解析或 `Into` 推导。反射边界描述并执行准确 Rust 语义，不建立第二套隐式类型系统。
+类型级 ThreadSafe 生成覆盖字段 adapter、struct/variant 构造、struct update、owned-to-borrow bridge 与方法调用，
+共同形成一个 mode 契约。tuple 与可移植函数指针内建描述明确支持到 arity 32；arity 33 不提供 `Reflect` 实现。
 
 ## 7. 错误与诊断
 
@@ -185,7 +190,7 @@ runtime 的完整模块。
 | all-features | 生态/Qubit 类型、workspace tests、Clippy、Rustdoc |
 | derive | parser/analysis 单元测试、trybuild pass/fail、invocation 集成 |
 | registry | 跨 crate 聚合、冲突、冻结、稳定排序、并发初始化 |
-| ABI/facade | 重命名依赖、显式 facade、`codegen_v1` 与模型 `v2` |
+| ABI/facade | 重命名依赖、显式 facade、`codegen_v2` 与模型 `v3` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
 覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
