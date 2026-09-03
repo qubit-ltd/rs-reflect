@@ -1,0 +1,2 @@
+std::collections::HashMap<String, [u8; 32]>
+<T as Iterator>::Item

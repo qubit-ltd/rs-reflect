@@ -9,9 +9,11 @@
 //! Direct-versus-reflected baselines for field access, invocation, and
 //! construction.
 
-use std::hint::black_box;
-use std::time::Instant;
-
+use criterion::BatchSize;
+use criterion::Criterion;
+use criterion::black_box;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::construct::NamedConstructionInput;
@@ -39,15 +41,8 @@ impl BenchmarkRecord {
     }
 }
 
-/// Measures one operation and prints its elapsed wall-clock duration.
-fn measure(name: &str, operation: impl FnOnce()) {
-    let started = Instant::now();
-    operation();
-    println!("{name}: {:?}", started.elapsed());
-}
-
-fn main() {
-    const ITERATIONS: u64 = 100_000;
+/// Registers direct and reflected operation pairs.
+fn dynamic_operations(criterion: &mut Criterion) {
     let descriptor = TypeDescriptor::of::<BenchmarkRecord>();
     let field = descriptor.field("id").expect("benchmark field must exist");
     let MethodLookup::Unique(method) = descriptor
@@ -90,62 +85,57 @@ fn main() {
         .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(3_u64))]))
         .expect("dynamic construction setup must succeed");
 
-    let mut direct = BenchmarkRecord { id: 0 };
-    measure("direct field get", || {
-        for _ in 0..ITERATIONS {
-            black_box(direct.id);
-        }
+    criterion.bench_function("field/direct_get", |bench| {
+        let direct = BenchmarkRecord { id: 0 };
+        bench.iter(|| black_box(direct.id));
     });
-    measure("direct field set", || {
-        for value in 0..ITERATIONS {
-            black_box(&mut direct).id = black_box(value);
-        }
+    criterion.bench_function("field/direct_set", |bench| {
+        bench.iter_batched(
+            || BenchmarkRecord { id: 0 },
+            |mut value| black_box(&mut value).id = black_box(1),
+            BatchSize::SmallInput,
+        );
     });
-    black_box(direct.id);
-
-    let mut reflected = BenchmarkRecord { id: 0 };
-    measure("dynamic field get", || {
-        for _ in 0..ITERATIONS {
-            let _ = black_box(field.get(ReflectedRef::new(&reflected)));
-        }
+    criterion.bench_function("field/reflected_get", |bench| {
+        let reflected = BenchmarkRecord { id: 0 };
+        bench.iter(|| black_box(field.get(ReflectedRef::new(&reflected))));
     });
-    measure("dynamic field set", || {
-        for value in 0..ITERATIONS {
-            let _ = black_box(field.set(ReflectedMut::new(&mut reflected), ReflectedOwned::new(black_box(value))));
-        }
+    criterion.bench_function("field/reflected_set", |bench| {
+        bench.iter_batched(
+            || BenchmarkRecord { id: 0 },
+            |mut value| black_box(field.set(ReflectedMut::new(&mut value), ReflectedOwned::new(black_box(1_u64)))),
+            BatchSize::SmallInput,
+        );
     });
-    assert_eq!(reflected.id, ITERATIONS - 1);
-
-    let mut direct_method = BenchmarkRecord { id: 0 };
-    measure("direct method invoke", || {
-        for _ in 0..ITERATIONS {
-            black_box(direct_method.increment());
-        }
+    criterion.bench_function("method/direct", |bench| {
+        bench.iter_batched(
+            || BenchmarkRecord { id: 0 },
+            |mut value| black_box(value.increment()),
+            BatchSize::SmallInput,
+        );
     });
-    black_box(direct_method.id);
-
-    let mut reflected_method = BenchmarkRecord { id: 0 };
-    measure("dynamic method invoke", || {
-        for _ in 0..ITERATIONS {
-            let _ = black_box(method.invoke_local(Invocation::borrowed_mut(
-                DynamicMut::<Local>::new(&mut reflected_method),
-                [],
-            )));
-        }
+    criterion.bench_function("method/reflected", |bench| {
+        bench.iter_batched(
+            || BenchmarkRecord { id: 0 },
+            |mut value| {
+                let output = method.invoke_local(Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut value), []));
+                black_box(output.is_some());
+            },
+            BatchSize::SmallInput,
+        );
     });
-    assert_eq!(reflected_method.id, ITERATIONS);
-
-    measure("direct construct", || {
-        for value in 0..ITERATIONS {
-            black_box(BenchmarkRecord { id: value });
-        }
+    criterion.bench_function("construction/direct", |bench| {
+        bench.iter(|| black_box(BenchmarkRecord { id: black_box(1) }));
     });
-
-    measure("dynamic construct", || {
-        for value in 0..ITERATIONS {
-            let _ = black_box(
-                descriptor.construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(value))])),
-            );
-        }
+    criterion.bench_function("construction/reflected", |bench| {
+        bench.iter(|| {
+            black_box(descriptor.construct_struct(NamedConstructionInput::new([(
+                "id",
+                ReflectedOwned::new(black_box(1_u64)),
+            )])))
+        });
     });
 }
+
+criterion_group!(benches, dynamic_operations);
+criterion_main!(benches);
