@@ -9,16 +9,10 @@
 //! Minimal downstream runtime facade used to verify macro delegation.
 
 pub use qubit_reflect::Reflect;
+pub use qubit_reflect::ReflectRegistry;
 pub use qubit_reflect::TypeDescriptor;
-pub use qubit_reflect::access;
-pub use qubit_reflect::capability;
-pub use qubit_reflect::construct;
-pub use qubit_reflect::descriptor;
-pub use qubit_reflect::error;
-pub use qubit_reflect::expression;
-pub use qubit_reflect::identity;
-pub use qubit_reflect::registry;
-pub use qubit_reflect::value;
+pub use qubit_reflect::reflect;
+pub use qubit_reflect::reflect_impl;
 
 /// Re-exports the generated-code contract without exposing a model dependency.
 #[doc(hidden)]
