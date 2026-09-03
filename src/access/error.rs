@@ -75,6 +75,7 @@ impl FieldAccessError {
     /// The adapter calls this only after the descriptor has validated the root
     /// enum type. The returned error does not modify the target.
     #[doc(hidden)]
+    #[must_use]
     pub const fn inactive_variant(field: FieldIdentity, variant_index: usize, variant_rust_name: &'static str) -> Self {
         Self::InactiveVariant {
             field,

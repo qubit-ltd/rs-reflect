@@ -127,31 +127,40 @@ pub struct ArgumentExpectation {
 
 impl ArgumentExpectation {
     /// Creates an expectation for an owned `T` argument.
+    #[must_use]
     pub fn owned<T: ?Sized + 'static>() -> Self {
         Self::new::<T>(InvocationInputMode::Owned)
     }
 
     /// Creates an expectation for a shared `T` argument.
+    #[must_use]
     pub fn borrowed<T: ?Sized + 'static>() -> Self {
         Self::new::<T>(InvocationInputMode::Ref)
     }
 
     /// Creates an expectation for a mutable `T` argument.
+    #[must_use]
     pub fn borrowed_mut<T: ?Sized + 'static>() -> Self {
         Self::new::<T>(InvocationInputMode::Mut)
     }
 
     /// Returns the required argument mode.
+    #[must_use]
+    #[inline(always)]
     pub const fn mode(self) -> InvocationInputMode {
         self.mode
     }
 
     /// Returns the exact expected process-local Rust type identity.
+    #[must_use]
+    #[inline(always)]
     pub const fn type_id(self) -> TypeId {
         self.type_id
     }
 
     /// Returns the expected Rust type name for diagnostics.
+    #[must_use]
+    #[inline(always)]
     pub const fn type_name(self) -> &'static str {
         self.type_name
     }

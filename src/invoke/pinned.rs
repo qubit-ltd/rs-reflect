@@ -87,6 +87,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     ///
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the supplied input range.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.invocation.argument_name(index)
     }
@@ -171,6 +172,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, 
     }
 
     /// Returns the original name of one recovered caller binding.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.invocation.argument_name(index)
     }
@@ -194,10 +196,14 @@ pub struct PinnedRefInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
+    #[must_use]
+    #[inline(always)]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable pinned invocation input.
+    #[must_use]
+    #[inline(always)]
     pub const fn recovery(&self) -> &PinnedRefInvocationRecovery<'call, T, M> {
         &self.recovery
     }
@@ -278,6 +284,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     }
 
     /// Returns the original name of one caller-ordered binding.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.invocation.argument_name(index)
     }
@@ -346,6 +353,8 @@ pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, M> {
     /// Returns a reborrowed pinned mutable receiver.
+    #[must_use]
+    #[inline(always)]
     pub fn receiver(&mut self) -> Pin<&mut T> {
         self.receiver.as_mut()
     }
@@ -358,6 +367,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, 
     }
 
     /// Returns the original name of one recovered caller binding.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.invocation.argument_name(index)
     }
@@ -382,10 +392,14 @@ pub struct PinnedMutInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
+    #[must_use]
+    #[inline(always)]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable pinned invocation input.
+    #[must_use]
+    #[inline(always)]
     pub const fn recovery(&self) -> &PinnedMutInvocationRecovery<'call, T, M> {
         &self.recovery
     }

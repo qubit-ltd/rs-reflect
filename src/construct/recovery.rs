@@ -87,11 +87,13 @@ impl<M: Mode> ConstructionRecovery<M> {
     }
 
     /// Consumes recovery and returns the structured error and ordered values.
+    #[must_use]
     pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }
 
     /// Consumes recovery and returns all owned values in recovery order.
+    #[must_use]
     pub fn into_values(self) -> Box<[RecoveredConstructionValue<M>]> {
         self.values.into_boxed_slice()
     }

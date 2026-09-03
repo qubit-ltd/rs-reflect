@@ -45,6 +45,7 @@ impl Visibility {
     ///
     /// Unknown spellings are treated as private because they do not grant a
     /// recognized outward visibility.
+    #[must_use]
     pub fn from_source(source: &str) -> Self {
         match source.trim() {
             "pub" => Self::Public,

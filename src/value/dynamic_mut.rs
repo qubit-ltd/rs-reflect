@@ -69,6 +69,7 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
     }
@@ -76,6 +77,7 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
     }
@@ -198,6 +200,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
     }
@@ -205,6 +208,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
     }
@@ -304,6 +308,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
 
     /// Downgrades this thread-safe mutable borrow to the local mode without
     /// changing it.
+    #[must_use]
     pub fn into_local(self) -> DynamicMut<'a, Local> {
         let Self { storage, .. } = self;
         let storage = match storage {

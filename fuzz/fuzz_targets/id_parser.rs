@@ -12,11 +12,12 @@ use libfuzzer_sys::fuzz_target;
 use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::identity::ExternalTraitId;
 
-const MAX_INPUT_CHARS: usize = 4_096;
+const MAX_INPUT_BYTES: usize = 4_096;
 
-// Exercises bounded public identifier parsing with arbitrary UTF-8 input.
-fuzz_target!(|data: String| {
-    let data = data.chars().take(MAX_INPUT_CHARS).collect::<String>();
+// Exercises bounded public identifier parsing with arbitrary lossy UTF-8 input.
+fuzz_target!(|unbounded: &[u8]| {
+    let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
+    let data = String::from_utf8_lossy(data);
     let capability_id = CapabilityId::new(&data);
     let repeated_capability_id = CapabilityId::new(&data);
     assert_eq!(capability_id, repeated_capability_id);

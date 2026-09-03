@@ -48,6 +48,7 @@ pub struct ReflectArgumentProbe<T: ?Sized>(std::marker::PhantomData<fn() -> T>);
 impl<T: ?Sized> ReflectArgumentProbe<T> {
     /// Creates a probe without evaluating the target type's descriptor.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new() -> Self {
         Self(std::marker::PhantomData)
     }
@@ -122,6 +123,7 @@ pub struct AssociatedConstProbe<P: AssociatedConstProvider> {
 
 impl<P: AssociatedConstProvider> AssociatedConstProbe<P> {
     /// Creates a zero-sized semantic probe.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             marker: std::marker::PhantomData,
@@ -240,6 +242,7 @@ pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'stat
 /// Creates a primitive root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> TypeDescriptor {
     TypeDescriptor::new_primitive::<T>(query_name, kind)
 }
@@ -258,6 +261,7 @@ pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
 /// Creates a text root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> TypeDescriptor {
     TypeDescriptor::new_text::<T>(query_name, kind)
 }
@@ -275,6 +279,7 @@ pub const fn text_with_capabilities<T: ?Sized + 'static>(
 /// Creates a struct root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn struct_type<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: StructKind,
@@ -316,6 +321,7 @@ pub const fn with_capabilities(
 /// Creates an enum root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn enum_type<T: ?Sized + 'static>(
     query_name: &'static str,
     variants: &'static [VariantDescriptor],
@@ -325,6 +331,7 @@ pub const fn enum_type<T: ?Sized + 'static>(
 
 /// Creates an enum root with normalized explicit representation metadata.
 #[doc(hidden)]
+#[must_use]
 pub const fn enum_type_with_repr<T: ?Sized + 'static>(
     query_name: &'static str,
     variants: &'static [VariantDescriptor],
@@ -336,6 +343,7 @@ pub const fn enum_type_with_repr<T: ?Sized + 'static>(
 /// Creates a tuple root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> TypeDescriptor {
     TypeDescriptor::new_tuple::<T>(query_name, elements)
 }
@@ -343,6 +351,7 @@ pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'st
 /// Creates an array root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn array<T: ?Sized + 'static>(
     query_name: &'static str,
     element: &'static TypeRef,
@@ -354,6 +363,7 @@ pub const fn array<T: ?Sized + 'static>(
 /// Creates an optional root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
     TypeDescriptor::new_optional::<T>(query_name, element)
 }
@@ -361,6 +371,7 @@ pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'
 /// Creates a sequence root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn sequence<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: SequenceKind,
@@ -371,6 +382,7 @@ pub const fn sequence<T: ?Sized + 'static>(
 
 /// Creates a set root descriptor for `T` with a generated diagnostic type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn set<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: SetKind,
@@ -381,6 +393,7 @@ pub const fn set<T: ?Sized + 'static>(
 
 /// Creates a map root descriptor for `T` with a generated diagnostic type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn map<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: MapKind,
@@ -393,6 +406,7 @@ pub const fn map<T: ?Sized + 'static>(
 /// Creates a smart-pointer root descriptor for `T` with a generated diagnostic
 /// type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn smart_pointer<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: SmartPointerKind,
@@ -404,6 +418,7 @@ pub const fn smart_pointer<T: ?Sized + 'static>(
 /// Creates a reference root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn reference<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: ReferenceKind,
@@ -415,6 +430,7 @@ pub const fn reference<T: ?Sized + 'static>(
 /// Creates a slice root descriptor for `T` with a generated diagnostic type
 /// name.
 #[doc(hidden)]
+#[must_use]
 pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
     TypeDescriptor::new_slice::<T>(query_name, element)
 }
@@ -422,6 +438,7 @@ pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'sta
 /// Creates a raw-pointer root descriptor for `T` with a generated diagnostic
 /// type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn raw_pointer<T: ?Sized + 'static>(
     query_name: &'static str,
     mutability: Mutability,
@@ -433,6 +450,7 @@ pub const fn raw_pointer<T: ?Sized + 'static>(
 /// Creates a function-pointer root descriptor for `T` with a generated
 /// diagnostic type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn function<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: FunctionPointerKind,
@@ -457,6 +475,7 @@ pub const fn trait_object<T: ?Sized + 'static>(
 /// Creates an intentionally opaque root descriptor for `T` with a generated
 /// diagnostic type name.
 #[doc(hidden)]
+#[must_use]
 pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeDescriptor {
     TypeDescriptor::new_opaque::<T>(query_name)
 }
@@ -474,6 +493,7 @@ pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
 /// Creates an explicit opaque member descriptor whose diagnostic name is
 /// derived from `T`.
 #[doc(hidden)]
+#[must_use]
 pub const fn opaque_member<T: ?Sized + 'static>() -> OpaqueTypeDescriptor {
     OpaqueTypeDescriptor::new::<T>()
 }
@@ -481,6 +501,7 @@ pub const fn opaque_member<T: ?Sized + 'static>() -> OpaqueTypeDescriptor {
 /// Allocates a process-lifetime relationship that resolves `T` only when the
 /// relationship is navigated.
 #[doc(hidden)]
+#[must_use]
 pub fn lazy_type_ref<T: Reflect + ?Sized>() -> &'static LazyTypeRef {
     Box::leak(Box::new(LazyTypeRef::resolved::<T>()))
 }
@@ -495,6 +516,7 @@ pub(crate) fn lazy_type_ref_list(references: Vec<LazyTypeRef>) -> &'static LazyT
 
 /// Creates an immutable field descriptor for generated descriptor data.
 #[doc(hidden)]
+#[must_use]
 pub const fn field(
     declaring_type: TypeDescriptorResolver,
     index: usize,
@@ -522,6 +544,7 @@ pub const fn lazy_field(
 
 /// Creates an immutable enum variant descriptor for generated descriptor data.
 #[doc(hidden)]
+#[must_use]
 pub const fn variant(
     declaring_type: TypeDescriptorResolver,
     index: usize,

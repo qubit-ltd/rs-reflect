@@ -49,14 +49,17 @@ impl GenericDefinitionDescriptor {
     }
 
     /// Returns generic parameters in declaration order.
+    #[must_use]
     pub fn parameters(&self) -> &[GenericParameterDescriptor] {
         &self.parameters
     }
     /// Returns where-clause predicates in declaration order.
+    #[must_use]
     pub fn predicates(&self) -> &[PredicateDescriptor] {
         &self.predicates
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

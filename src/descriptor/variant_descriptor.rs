@@ -143,6 +143,7 @@ impl VariantDescriptor {
 
     /// Records source discriminant facts supplied by generated enum metadata.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_discriminant(mut self, origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
@@ -151,6 +152,7 @@ impl VariantDescriptor {
 
     /// Attaches a generated dynamic-construction entry point to this variant.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_construction(mut self, construction: VariantConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
@@ -256,6 +258,7 @@ impl VariantDescriptor {
     /// Finds a named field by query name.
     ///
     /// `None` means the variant has no field with that lookup name.
+    #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
         self.fields.iter().find(|field| field.query_name() == Some(name))
     }
@@ -263,6 +266,7 @@ impl VariantDescriptor {
     /// Returns a field by source index.
     ///
     /// `None` means the index is outside this variant's field range.
+    #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
         self.fields.get(index)
     }

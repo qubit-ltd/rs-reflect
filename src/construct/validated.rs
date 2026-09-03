@@ -43,6 +43,8 @@ impl<M: Mode> ValidatedConstructionInput<M> {
     }
 
     /// Consumes validation state so generated code may downcast every value.
+    #[must_use]
+    #[inline(always)]
     pub fn into_values(self) -> Box<[DynamicOwned<M>]> {
         self.values
     }

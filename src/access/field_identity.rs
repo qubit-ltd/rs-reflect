@@ -28,6 +28,7 @@ impl FieldIdentity {
     ///
     /// The type ID and diagnostic name must describe the same declaring root.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         declaring_type: TypeId,
         declaring_type_name: &'static str,
@@ -49,6 +50,7 @@ impl FieldIdentity {
     /// `variant_index` and `variant_rust_name` identify the same source variant
     /// and ensure equal field positions in different variants stay distinct.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new_variant(
         declaring_type: TypeId,
         declaring_type_name: &'static str,

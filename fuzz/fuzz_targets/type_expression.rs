@@ -13,13 +13,14 @@ use qubit_reflect::expression::ConcreteTypeExpression;
 use qubit_reflect::expression::GenericArgument;
 use qubit_reflect::expression::TypeExpression;
 
-const MAX_INPUT_CHARS: usize = 4_096;
+const MAX_INPUT_BYTES: usize = 4_096;
 
 // Exercises bounded public structural type-expression construction with
-// arbitrary text.
-fuzz_target!(|data: String| {
-    let data = data.chars().take(MAX_INPUT_CHARS).collect::<String>();
-    let Ok(parameter) = TypeExpression::parameter(data.clone()) else {
+// arbitrary lossy UTF-8 text.
+fuzz_target!(|unbounded: &[u8]| {
+    let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
+    let data = String::from_utf8_lossy(data).into_owned();
+    let Ok(parameter) = TypeExpression::parameter(data.to_string()) else {
         return;
     };
     let Ok(concrete) = ConcreteTypeExpression::new([data.into_boxed_str()], [GenericArgument::Type(parameter)]) else {

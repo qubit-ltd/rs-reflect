@@ -48,6 +48,7 @@ pub struct BenchmarkRegistryFacts(crate::registry::BenchmarkRegistryFacts);
 /// Prepares adapter-free capability facts outside the measured aggregation.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
+#[must_use]
 pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
     BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(fragment_count))
 }

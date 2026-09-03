@@ -73,6 +73,7 @@ pub type ReceiverAdapter<R, M> = for<'call> fn(InvocationReceiver<'call, M>) -> 
 /// Register this key against the reflected target type with
 /// [`crate::register_type_capabilities`] to opt an arbitrary self type into
 /// safe dynamic invocation.
+#[must_use]
 pub fn receiver_adapter_key<R: 'static, M: InvocationMode>() -> CapabilityKey<ReceiverAdapter<R, M>> {
     CapabilityKey::new_core("qubit.reflect.receiver_adapter")
 }
@@ -107,11 +108,13 @@ pub enum ReceiverExpectation {
 
 impl ReceiverExpectation {
     /// Creates an expectation for an associated function without a receiver.
+    #[must_use]
     pub const fn none() -> Self {
         Self::None
     }
 
     /// Creates an expectation for an owned receiver of exact type `T`.
+    #[must_use]
     pub fn owned<T: ?Sized + 'static>() -> Self {
         Self::Owned {
             type_id: TypeId::of::<T>(),
@@ -120,6 +123,7 @@ impl ReceiverExpectation {
     }
 
     /// Creates an expectation for a shared receiver of exact type `T`.
+    #[must_use]
     pub fn borrowed<T: ?Sized + 'static>() -> Self {
         Self::Ref {
             type_id: TypeId::of::<T>(),
@@ -128,6 +132,7 @@ impl ReceiverExpectation {
     }
 
     /// Creates an expectation for a mutable receiver of exact type `T`.
+    #[must_use]
     pub fn borrowed_mut<T: ?Sized + 'static>() -> Self {
         Self::Mut {
             type_id: TypeId::of::<T>(),
@@ -137,6 +142,8 @@ impl ReceiverExpectation {
 
     /// Returns the required receiver mode, or `None` for an associated
     /// function.
+    #[must_use]
+    #[inline(always)]
     pub const fn mode(self) -> Option<InvocationInputMode> {
         match self {
             Self::None => None,
@@ -147,6 +154,8 @@ impl ReceiverExpectation {
     }
 
     /// Returns the expected receiver type identity when a receiver is required.
+    #[must_use]
+    #[inline(always)]
     pub const fn type_id(self) -> Option<TypeId> {
         match self {
             Self::None => None,
@@ -155,6 +164,8 @@ impl ReceiverExpectation {
     }
 
     /// Returns the expected receiver type name when a receiver is required.
+    #[must_use]
+    #[inline(always)]
     pub const fn type_name(self) -> Option<&'static str> {
         match self {
             Self::None => None,

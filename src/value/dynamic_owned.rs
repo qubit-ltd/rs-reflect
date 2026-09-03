@@ -64,6 +64,7 @@ impl DynamicOwned<Local> {
     }
 
     /// Returns whether the stored value has the exact type `T`.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
     }
@@ -71,6 +72,7 @@ impl DynamicOwned<Local> {
     /// Returns the stored value as `T` when its exact type matches.
     ///
     /// Returns `None` when the requested type differs from the stored type.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
     }
@@ -140,6 +142,7 @@ impl DynamicOwned<ThreadSafe> {
     }
 
     /// Returns whether the stored value has the exact type `T`.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
     }
@@ -147,6 +150,7 @@ impl DynamicOwned<ThreadSafe> {
     /// Returns the stored value as `T` when its exact type matches.
     ///
     /// Returns `None` when the requested type differs from the stored type.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
     }
@@ -204,6 +208,7 @@ impl DynamicOwned<ThreadSafe> {
 
     /// Downgrades this thread-safe wrapper to the local mode without changing
     /// its value.
+    #[must_use]
     pub fn into_local(self) -> DynamicOwned<Local> {
         let Self { storage, .. } = self;
         let ThreadSafeOwnedStorage::Any(value) = storage;

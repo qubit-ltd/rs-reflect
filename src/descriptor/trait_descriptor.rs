@@ -139,18 +139,21 @@ impl TraitImplPayload {
 
     /// Returns the complete trait declaration shared by every implementation.
     #[doc(hidden)]
+    #[must_use]
     pub const fn definition(self) -> &'static TraitDefinitionDescriptor {
         self.definition
     }
 
     /// Returns the concrete applied trait descriptor for the hook receiver.
     #[doc(hidden)]
+    #[must_use]
     pub const fn applied(self) -> &'static TraitDescriptor {
         self.applied
     }
 
     /// Returns concrete adapters for default methods in declaration order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn default_method_adapters(self) -> &'static [Option<&'static InvocationAdapter>] {
         self.default_method_adapters
     }
@@ -158,18 +161,21 @@ impl TraitImplPayload {
     /// Returns unavailable-reason sets for default methods in declaration
     /// order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn default_method_unavailable_reasons(self) -> &'static [&'static [InvocationUnavailableReason]] {
         self.default_method_unavailable_reasons
     }
 
     /// Returns proven concrete associated-type resolvers in declaration order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn associated_type_resolvers(self) -> &'static [Option<TypeDescriptorResolver>] {
         self.associated_type_resolvers
     }
 
     /// Returns safe associated-constant readers in declaration order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn associated_const_readers(self) -> &'static [Option<&'static AssociatedConstReader>] {
         self.associated_const_readers
     }
@@ -220,6 +226,7 @@ impl TraitImplPayload {
 /// Returns a cached incomplete descriptor for an explicitly mapped external
 /// supertrait.
 #[doc(hidden)]
+#[must_use]
 pub fn external_supertrait<T: ?Sized + 'static>(
     id: &'static str,
     rust_path: &'static str,
@@ -279,6 +286,7 @@ impl TraitDefinitionDescriptor {
 
     /// Creates immutable trait definition facts.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         trait_id: TraitId,
         rust_name: &'static str,
@@ -301,6 +309,7 @@ impl TraitDefinitionDescriptor {
     /// Creates immutable trait definition facts with normalized source
     /// visibility.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new_with_visibility(
         trait_id: TraitId,
         rust_name: &'static str,
@@ -432,6 +441,7 @@ pub struct AssociatedTypeDescriptor {
 impl AssociatedTypeDescriptor {
     /// Creates associated type facts in declaration order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         index: usize,
         rust_name: &'static str,
@@ -451,6 +461,7 @@ impl AssociatedTypeDescriptor {
 
     /// Creates associated type facts with GAT parameters and predicates.
     #[doc(hidden)]
+    #[must_use]
     pub fn new_with_generic_definition(
         index: usize,
         rust_name: &'static str,
@@ -552,6 +563,7 @@ pub struct AssociatedConstDescriptor {
 impl AssociatedConstDescriptor {
     /// Creates associated constant facts in declaration order.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         index: usize,
         rust_name: &'static str,
@@ -619,11 +631,14 @@ pub struct TraitDescriptorRef(&'static TraitDescriptor);
 impl TraitDescriptorRef {
     /// Creates a supertrait reference.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(descriptor: &'static TraitDescriptor) -> Self {
         Self(descriptor)
     }
 
     /// Returns the referenced applied trait descriptor.
+    #[must_use]
+    #[inline(always)]
     pub const fn descriptor(self) -> &'static TraitDescriptor {
         let Self(descriptor) = self;
         descriptor
@@ -802,6 +817,7 @@ impl TraitDescriptor {
 
     /// Returns method declarations in source order.
     #[must_use]
+    #[inline(always)]
     pub const fn methods(&self) -> &[MethodDescriptor] {
         self.methods
     }
@@ -809,6 +825,7 @@ impl TraitDescriptor {
     /// Finds a method by query name.
     ///
     /// `None` means this applied trait has no method with the requested name.
+    #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)
     }
@@ -823,6 +840,7 @@ impl TraitDescriptor {
     /// Finds an associated type by query name.
     ///
     /// `None` means no associated type has the requested name.
+    #[must_use]
     pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
         self.associated_types.iter().find(|item| item.query_name() == name)
     }
@@ -837,11 +855,13 @@ impl TraitDescriptor {
     /// Finds an associated constant by query name.
     ///
     /// `None` means no associated constant has the requested name.
+    #[must_use]
     pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
         self.associated_consts.iter().find(|item| item.query_name() == name)
     }
 
     /// Returns whether two descriptors are the same concrete trait application.
+    #[must_use]
     pub fn same_application(&self, other: &Self) -> bool {
         self.trait_id == other.trait_id
     }
@@ -954,12 +974,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets concrete generic arguments in declaration order.
+    #[must_use]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;
         self
     }
 
     /// Sets concrete associated-type equalities in declaration order.
+    #[must_use]
     pub fn associated_type_arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.associated_type_arguments = arguments;
         self
@@ -972,18 +994,21 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets applied method declarations in source order.
+    #[must_use]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
         self
     }
 
     /// Sets applied associated types in source order.
+    #[must_use]
     pub fn associated_types(mut self, associated_types: Vec<AssociatedTypeDescriptor>) -> Self {
         self.associated_types = associated_types;
         self
     }
 
     /// Sets applied associated constants in source order.
+    #[must_use]
     pub fn associated_consts(mut self, associated_consts: Vec<AssociatedConstDescriptor>) -> Self {
         self.associated_consts = associated_consts;
         self

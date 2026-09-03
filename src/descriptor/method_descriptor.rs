@@ -64,6 +64,7 @@ impl ParameterDescriptor {
     /// destructuring patterns. `concrete_type` is present only when the
     /// declaration can navigate to an exact reflected root.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         index: usize,
         name: Option<&'static str>,
@@ -172,6 +173,7 @@ impl ReturnDescriptor {
     /// [`ReturnKind`] is sufficient. `concrete_type` is present only for an
     /// exact reflected root.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         kind: ReturnKind,
         signature_type: Option<TypeExpression>,
@@ -185,6 +187,7 @@ impl ReturnDescriptor {
     }
 
     /// Creates a unit return descriptor.
+    #[must_use]
     pub const fn unit() -> Self {
         Self::new(ReturnKind::Unit, None, None)
     }
@@ -242,6 +245,7 @@ pub struct MethodQualifiers {
 
 impl MethodQualifiers {
     /// Creates the complete set of method qualifiers.
+    #[must_use]
     pub const fn new(
         is_async: bool,
         is_unsafe: bool,
@@ -259,22 +263,27 @@ impl MethodQualifiers {
     }
 
     /// Returns whether the declaration is asynchronous.
+    #[must_use]
     pub const fn is_async(&self) -> bool {
         self.is_async
     }
     /// Returns whether the declaration is unsafe.
+    #[must_use]
     pub const fn is_unsafe(&self) -> bool {
         self.is_unsafe
     }
     /// Returns whether the declaration is const.
+    #[must_use]
     pub const fn is_const(&self) -> bool {
         self.is_const
     }
     /// Returns the explicitly declared ABI.
+    #[must_use]
     pub const fn abi(&self) -> Option<&FunctionAbi> {
         self.abi.as_ref()
     }
     /// Returns whether the declaration has a variadic tail.
+    #[must_use]
     pub const fn is_variadic(&self) -> bool {
         self.is_variadic
     }
@@ -533,6 +542,7 @@ impl InvocationAdapter {
     ///
     /// Returns `None` for legacy descriptor-only entries and for adapters that
     /// are available exclusively in another invocation mode.
+    #[must_use]
     pub fn invoke_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
@@ -553,6 +563,7 @@ impl InvocationAdapter {
     ///
     /// Returns `None` when this method was not explicitly generated with a
     /// thread-safe adapter.
+    #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
@@ -569,6 +580,7 @@ impl InvocationAdapter {
     ///
     /// This raw adapter entry point accepts positional inputs only. Use
     /// [`MethodInstanceDescriptor::invoke_catching_local`] for named bindings.
+    #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
@@ -578,6 +590,7 @@ impl InvocationAdapter {
 
     /// Invokes the explicit thread-safe catching entry point when one was
     /// generated.
+    #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
@@ -594,6 +607,7 @@ impl InvocationAdapter {
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
+    #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
         invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
@@ -619,6 +633,7 @@ impl InvocationAdapter {
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
+    #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
         invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
@@ -726,6 +741,7 @@ impl MethodDescriptor {
     ///
     /// The member identity remains independent of `query_name`, so renaming a
     /// method does not change its Rust identity.
+    #[must_use]
     pub fn builder(
         identity: MemberId,
         rust_name: &'static str,
@@ -780,6 +796,7 @@ impl MethodDescriptor {
     /// Finds a uniquely named identifier parameter.
     ///
     /// `None` means no parameter has the requested identifier.
+    #[must_use]
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
         self.parameters.iter().find(|parameter| parameter.name() == Some(name))
     }
@@ -787,6 +804,7 @@ impl MethodDescriptor {
     /// Returns a non-receiver parameter by declaration index.
     ///
     /// `None` means `index` is outside the parameter range.
+    #[must_use]
     pub fn parameter_at(&self, index: usize) -> Option<&ParameterDescriptor> {
         self.parameters.get(index)
     }
@@ -927,48 +945,56 @@ impl MethodDescriptorBuilder {
     }
 
     /// Sets normalized source visibility.
+    #[must_use]
     pub fn visibility(mut self, visibility: MethodVisibility) -> Self {
         self.visibility = visibility;
         self
     }
 
     /// Sets the receiver; `None` describes an associated function.
+    #[must_use]
     pub fn receiver(mut self, receiver: Option<ReceiverDescriptor>) -> Self {
         self.receiver = receiver;
         self
     }
 
     /// Sets non-receiver parameters in source order.
+    #[must_use]
     pub fn parameters(mut self, parameters: Vec<ParameterDescriptor>) -> Self {
         self.parameters = parameters;
         self
     }
 
     /// Sets the return declaration.
+    #[must_use]
     pub fn return_value(mut self, return_value: ReturnDescriptor) -> Self {
         self.return_value = return_value;
         self
     }
 
     /// Sets source qualifiers that affect invocation availability.
+    #[must_use]
     pub fn qualifiers(mut self, qualifiers: MethodQualifiers) -> Self {
         self.qualifiers = qualifiers;
         self
     }
 
     /// Copies the method's generic declaration and preserves source order.
+    #[must_use]
     pub fn generic_definition(mut self, generic_definition: &GenericDefinitionDescriptor) -> Self {
         self.generic_definition = generic_definition.clone();
         self
     }
 
     /// Records whether the declared trait method has a default body.
+    #[must_use]
     pub fn has_default(mut self, has_default: bool) -> Self {
         self.has_default = has_default;
         self
     }
 
     /// Builds the immutable declaration.
+    #[must_use]
     pub fn build(self) -> MethodDescriptor {
         MethodDescriptor {
             identity: self.identity,
@@ -1086,6 +1112,7 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no explicitly generated
     /// thread-safe catching adapter.
+    #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
@@ -1225,6 +1252,7 @@ impl MethodInstanceDescriptor {
     /// Returns `None` when this instance has no local adapter. Otherwise the
     /// result contains either the invocation output or a structured
     /// pre-execution failure.
+    #[must_use]
     pub fn invoke_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
@@ -1250,6 +1278,7 @@ impl MethodInstanceDescriptor {
     /// Returns `None` when this instance has no explicitly generated
     /// thread-safe adapter. Otherwise the result contains either the invocation
     /// output or a structured pre-execution failure.
+    #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
@@ -1278,6 +1307,7 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no explicitly generated local
     /// catching adapter.
+    #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
@@ -1301,6 +1331,7 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no pinned shared adapter for the
     /// exact receiver type `T`.
+    #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
         invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
@@ -1331,6 +1362,7 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no pinned mutable adapter for the
     /// exact receiver type `T`.
+    #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
         invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,

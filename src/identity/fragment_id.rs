@@ -22,6 +22,7 @@ pub struct FragmentIdentity {
 
 impl FragmentIdentity {
     /// Creates a fragment identity from its stable source and content facts.
+    #[must_use]
     pub fn new(
         declaring_crate: &str,
         module_path: &str,

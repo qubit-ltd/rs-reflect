@@ -31,6 +31,7 @@ pub struct CloneAdapter {
 
 impl CloneAdapter {
     /// Creates an adapter after statically proving that `T` implements `Clone`.
+    #[must_use]
     pub fn new<T: Clone + 'static>() -> Self {
         Self {
             clone_owned: clone_owned::<T>,
@@ -55,6 +56,7 @@ pub struct DefaultAdapter {
 impl DefaultAdapter {
     /// Creates an adapter after statically proving that `T` implements
     /// `Default`.
+    #[must_use]
     pub fn new<T: Default + 'static>() -> Self {
         Self {
             create: create_default::<T>,
@@ -70,41 +72,49 @@ impl DefaultAdapter {
 }
 
 /// Returns the built-in fact key for a statically verified `Send` declaration.
+#[must_use]
 pub fn send_key() -> CapabilityKey<()> {
     CapabilityKey::new_core(SEND_ID)
 }
 
 /// Returns the built-in fact key for a statically verified `Sync` declaration.
+#[must_use]
 pub fn sync_key() -> CapabilityKey<()> {
     CapabilityKey::new_core(SYNC_ID)
 }
 
 /// Returns the built-in typed key for dynamic clone operations.
+#[must_use]
 pub fn clone_key() -> CapabilityKey<CloneAdapter> {
     CapabilityKey::new_core(CLONE_ID)
 }
 
 /// Returns the built-in typed key for dynamic default construction.
+#[must_use]
 pub fn default_key() -> CapabilityKey<DefaultAdapter> {
     CapabilityKey::new_core(DEFAULT_ID)
 }
 
 /// Creates a `Send` fact after statically proving the concrete bound.
+#[must_use]
 pub fn send_descriptor<T: Send + 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::without_adapter(send_key())
 }
 
 /// Creates a `Sync` fact after statically proving the concrete bound.
+#[must_use]
 pub fn sync_descriptor<T: Sync + 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::without_adapter(sync_key())
 }
 
 /// Creates a clone descriptor and its exact-type dynamic adapter.
+#[must_use]
 pub fn clone_descriptor<T: Clone + 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(clone_key(), CloneAdapter::new::<T>())
 }
 
 /// Creates a default descriptor and its exact-type dynamic adapter.
+#[must_use]
 pub fn default_descriptor<T: Default + 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(default_key(), DefaultAdapter::new::<T>())
 }

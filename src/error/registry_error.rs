@@ -45,28 +45,33 @@ struct RegistryErrorData {
 impl RegistryError {
     /// Creates an error for two fragments that claim the same registration
     /// identity.
+    #[must_use]
     pub fn duplicate_fragment(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::DuplicateFragment, left, right)
     }
 
     /// Creates an error for fragments that disagree about one identity's
     /// content.
+    #[must_use]
     pub fn identity_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::IdentityConflict, left, right)
     }
 
     /// Creates an error for incompatible external-trait registrations.
+    #[must_use]
     pub fn external_trait_id_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::ExternalTraitIdConflict, left, right)
     }
 
     /// Creates an error for incompatible capability registrations.
+    #[must_use]
     pub fn capability_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
 
     /// Creates an error when a symbolic generic trait impl cannot resolve one
     /// unique linked trait declaration.
+    #[must_use]
     pub fn impl_trait_resolution(fragment: FragmentIdentity) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::ImplTraitResolution,
@@ -77,6 +82,7 @@ impl RegistryError {
 
     /// Creates an error when the current platform lacks
     /// distributed-registration support.
+    #[must_use]
     pub fn unsupported_platform() -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::UnsupportedPlatform,

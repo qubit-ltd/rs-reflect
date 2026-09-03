@@ -57,6 +57,7 @@ impl FieldSetRecovery {
     /// name.
     ///
     /// `None` means this recovery is positional or belongs to another name.
+    #[must_use]
     pub fn value_by_name(&self, name: &str) -> Option<&ReflectedOwned> {
         (self.query_name == Some(name)).then_some(&self.value)
     }
@@ -64,11 +65,14 @@ impl FieldSetRecovery {
     /// Returns the replacement when `index` is the field's source index.
     ///
     /// `None` means this recovery belongs to another field position.
+    #[must_use]
     pub fn value_at(&self, index: usize) -> Option<&ReflectedOwned> {
         (self.field.index() == index).then_some(&self.value)
     }
 
     /// Consumes recovery and returns the untouched replacement value.
+    #[must_use]
+    #[inline(always)]
     pub fn into_value(self) -> ReflectedOwned {
         self.value
     }
@@ -162,6 +166,7 @@ impl FieldSetFailure {
     }
 
     /// Consumes the failure and returns its error and optional recovery.
+    #[must_use]
     pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery>) {
         (*self.error, self.recovery.map(|recovery| *recovery))
     }
@@ -178,6 +183,8 @@ impl FieldSetFailure {
     }
 
     /// Consumes the failure and returns its machine-readable error.
+    #[must_use]
+    #[inline(always)]
     pub fn into_error(self) -> FieldAccessError {
         *self.error
     }
