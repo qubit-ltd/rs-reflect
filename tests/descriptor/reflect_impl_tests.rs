@@ -42,7 +42,7 @@ impl Reflect for Sample {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v1::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
+            reflect::__private::codegen_v2::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
         })
     }
 }
@@ -51,9 +51,28 @@ trait External {
     fn value(&self) -> u8;
 }
 
+#[allow(dead_code)]
+trait ExternalGeneric<T> {}
+
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
+struct ExternalGenericU8;
+
+#[derive(reflect::Reflect)]
+#[reflect(opaque)]
+struct ExternalGenericU16;
+
+#[reflect_impl(external_trait_id = "example.external.generic")]
+impl ExternalGeneric<u8> for ExternalGenericU8 {}
+
+#[reflect_impl(external_trait_id = "example.external.generic")]
+impl ExternalGeneric<u16> for ExternalGenericU16 {}
+
 #[reflect]
 trait Reflected {
     fn reflected_value(&self) -> u8;
+
+    fn specialized_value<T>(&self, value: T) -> T;
 
     fn default_value(&self) -> u8 {
         13
@@ -74,6 +93,11 @@ trait Reflected {
 impl Reflected for Sample {
     fn reflected_value(&self) -> u8 {
         11
+    }
+
+    #[reflect(specialize(T = u8))]
+    fn specialized_value<T>(&self, value: T) -> T {
+        value
     }
 }
 
@@ -217,6 +241,30 @@ impl Sample {
         value
     }
 
+    #[reflect(specialize(T = u8))]
+    #[allow(dead_code)]
+    fn reflected_borrowed_generic<T>(value: &T) -> u8 {
+        std::mem::size_of_val(value) as u8
+    }
+
+    #[reflect(specialize(T = u8))]
+    #[allow(dead_code)]
+    fn reflected_receiver_generic<T>(&self, value: T) -> T {
+        value
+    }
+
+    #[reflect(specialize(T = u8))]
+    #[allow(dead_code)]
+    async fn reflected_async_generic<T>(value: T) -> T {
+        value
+    }
+
+    #[reflect(specialize(T = u8))]
+    #[allow(dead_code)]
+    unsafe fn reflected_unsafe_generic<T>(value: T) -> T {
+        value
+    }
+
     #[reflect(specialize(N = 5))]
     #[allow(dead_code)]
     fn reflected_const_generic<const N: usize>(value: usize) -> usize {
@@ -256,7 +304,7 @@ impl Reflect for Counter {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v1::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
+            reflect::__private::codegen_v2::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
         })
     }
 }
@@ -400,7 +448,7 @@ impl Reflect for SmartReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v1::descriptor::struct_type::<SmartReceiver>(
+            reflect::__private::codegen_v2::descriptor::struct_type::<SmartReceiver>(
                 "SmartReceiver",
                 StructKind::Named,
                 &[],
@@ -413,7 +461,7 @@ impl Reflect for PinnedOnlyReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v1::descriptor::struct_type::<PinnedOnlyReceiver>(
+            reflect::__private::codegen_v2::descriptor::struct_type::<PinnedOnlyReceiver>(
                 "PinnedOnlyReceiver",
                 StructKind::Named,
                 &[],
@@ -861,6 +909,106 @@ fn test_reflect_impl_recursively_substitutes_nested_generic_method_specializatio
         panic!("nested generic output must use the concrete specialized type");
     };
     assert_eq!(value, vec![Some(31), None]);
+}
+
+/// Verifies generic specialization preserves shared-borrow parameter mode.
+#[test]
+fn test_reflect_impl_specialized_method_accepts_borrowed_parameter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_borrowed_generic",
+    ) else {
+        panic!("the borrowed specialization must be discoverable");
+    };
+    let input = 7_u8;
+    let output = instance
+        .adapter()
+        .expect("the borrowed specialization must have an adapter")
+        .invoke_local(Invocation::associated([InvocationArg::Ref(
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
+        )]))
+        .expect("the local adapter must exist")
+        .expect("the shared argument must validate");
+    let InvocationOutput::Owned(output) = output else {
+        panic!("the method must return an owned size");
+    };
+    assert_eq!(output.downcast_ref::<u8>(), Some(&1));
+}
+
+#[test]
+fn test_reflect_impl_specialized_method_uses_the_shared_receiver_emitter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_receiver_generic",
+    ) else {
+        panic!("the receiver specialization must be discoverable");
+    };
+    let sample = Sample;
+    let output = instance
+        .adapter()
+        .expect("the receiver specialization must have an adapter")
+        .invoke_local(Invocation::borrowed(
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
+            [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(47_u8))],
+        ))
+        .expect("the local adapter must exist")
+        .expect("the specialized receiver invocation must validate");
+    let InvocationOutput::Owned(output) = output else {
+        panic!("the specialized receiver method must return an owned value");
+    };
+    assert_eq!(output.downcast_ref::<u8>(), Some(&47));
+}
+
+#[test]
+fn test_reflect_impl_specialized_method_uses_the_shared_async_emitter() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_async_generic",
+    ) else {
+        panic!("the async specialization must be discoverable");
+    };
+    let output = instance
+        .adapter()
+        .expect("the async specialization must have an adapter")
+        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+            reflect::value::Local,
+        >::new(53_u8))]))
+        .expect("the local adapter must exist")
+        .expect("the specialized async invocation must validate");
+    let InvocationOutput::Future(mut future) = output else {
+        panic!("the async specialization must return a reflected future");
+    };
+    let Poll::Ready(InvocationOutput::Owned(output)) = poll_once(&mut future) else {
+        panic!("the async specialization must complete when polled");
+    };
+    assert_eq!(output.downcast_ref::<u8>(), Some(&53));
+}
+
+#[test]
+fn test_reflect_impl_specialization_reports_the_precise_unavailable_reason() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Inherent,
+        "reflected_unsafe_generic",
+    ) else {
+        panic!("the unsafe specialization must remain discoverable");
+    };
+    assert!(instance.adapter().is_none());
+    assert_eq!(
+        instance.unavailable_reasons(),
+        [reflect::descriptor::InvocationUnavailableReason::UnsafeMethod]
+    );
 }
 
 #[test]
@@ -1474,11 +1622,43 @@ fn test_reflect_impl_does_not_generate_adapter_for_non_rust_abi() {
         panic!("non-Rust ABI method instance must remain describable");
     };
     assert!(instance.adapter().is_none());
+    assert_eq!(
+        instance.effective_method().qualifiers().abi(),
+        Some(&reflect::expression::FunctionAbi::C)
+    );
     assert!(
         instance
             .unavailable_reasons()
             .contains(&reflect::descriptor::InvocationUnavailableReason::UnsupportedAbi)
     );
+}
+
+#[test]
+fn test_external_generic_trait_applications_preserve_concrete_arguments() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let applied_argument = |target: TypeId| {
+        let implementation = registry
+            .implementations(target)
+            .iter()
+            .find(|implementation| implementation.implemented_trait().is_some())
+            .expect("external generic trait implementation must be registered");
+        let applied = implementation
+            .implemented_trait()
+            .expect("external generic trait application must be present");
+        assert_eq!(applied.definition().rust_name(), "ExternalGeneric");
+        assert_eq!(applied.definition().rust_path(), "ExternalGeneric");
+        assert_eq!(applied.arguments().len(), 1);
+        applied.arguments()[0].clone()
+    };
+    let u8_argument = applied_argument(ExternalGenericU8::type_descriptor().type_id());
+    let u16_argument = applied_argument(ExternalGenericU16::type_descriptor().type_id());
+    assert_ne!(u8_argument, u16_argument);
+    let reflect::expression::GenericArgument::Type(reflect::expression::TypeExpression::Concrete(u8_type)) =
+        u8_argument
+    else {
+        panic!("external type argument must remain structural");
+    };
+    assert_eq!(u8_type.path().last().map(AsRef::as_ref), Some("u8"));
 }
 
 #[test]
@@ -1535,6 +1715,42 @@ fn test_reflect_impl_invokes_overridden_trait_method_through_descriptor_adapter(
         panic!("overridden trait method output must retain its concrete type");
     };
     assert_eq!(value, 11);
+}
+
+#[test]
+fn test_reflect_impl_registers_and_invokes_trait_method_specialization() {
+    let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let reflected_trait = implementations
+        .iter()
+        .find_map(|implementation| {
+            implementation
+                .implemented_trait()
+                .filter(|descriptor| descriptor.definition().rust_name() == "Reflected")
+        })
+        .expect("reflected trait implementation must be registered");
+    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+        implementations,
+        MethodQualifier::Trait(reflected_trait),
+        "specialized_value",
+    ) else {
+        panic!("the trait method specialization must be discoverable");
+    };
+    assert_eq!(instance.arguments().len(), 1);
+    let sample = Sample;
+    let output = instance
+        .adapter()
+        .expect("the trait method specialization must have an adapter")
+        .invoke_local(Invocation::borrowed(
+            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
+            [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(59_u8))],
+        ))
+        .expect("the local adapter must exist")
+        .expect("the trait method specialization must validate");
+    let InvocationOutput::Owned(output) = output else {
+        panic!("the trait method specialization must return an owned value");
+    };
+    assert_eq!(output.downcast_ref::<u8>(), Some(&59));
 }
 
 #[test]
@@ -1706,16 +1922,18 @@ fn test_reflect_impl_preserves_structured_reasons_for_unavailable_trait_methods(
 #[test]
 fn test_reflect_impl_only_describes_defaults_with_unproven_method_bounds_or_associated_types() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
-    for (target, trait_name, method_name) in [
+    for (target, trait_name, method_name, reason) in [
         (
             ConditionalDefaultSample::type_descriptor().type_id(),
             "ConditionalDefault",
             "clone_value",
+            reflect::descriptor::InvocationUnavailableReason::UnprovenDefaultConstraint,
         ),
         (
             AssociatedDefaultSample::type_descriptor().type_id(),
             "AssociatedDefault",
             "associated_value",
+            reflect::descriptor::InvocationUnavailableReason::UnprovenAssociatedType,
         ),
     ] {
         let implementations = registry.implementations(target);
@@ -1739,10 +1957,7 @@ fn test_reflect_impl_only_describes_defaults_with_unproven_method_bounds_or_asso
             reflect::descriptor::MethodImplementationSource::Defaulted
         );
         assert!(instance.adapter().is_none());
-        assert_eq!(
-            instance.unavailable_reasons(),
-            [reflect::descriptor::InvocationUnavailableReason::DisabledByPolicy]
-        );
+        assert_eq!(instance.unavailable_reasons(), [reason]);
     }
 }
 
@@ -1772,7 +1987,10 @@ fn test_reflect_impl_only_describes_nested_trait_object_associated_type_and_life
     assert!(instance.adapter().is_none());
     assert_eq!(
         instance.unavailable_reasons(),
-        [reflect::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn]
+        [
+            reflect::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn,
+            reflect::descriptor::InvocationUnavailableReason::UnprovenAssociatedType,
+        ]
     );
 }
 

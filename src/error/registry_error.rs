@@ -136,7 +136,33 @@ impl RegistryError {
 
 impl std::fmt::Display for RegistryError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "reflection registry error: {:?}", self.kind())
+        let Self(data) = self;
+        write!(formatter, "reflection registry error: {:?}", data.kind)?;
+        if let Some(left) = &data.left {
+            write!(
+                formatter,
+                " at {}::{}:{}:{} [{}; fingerprint={:#x}]",
+                left.declaring_crate(),
+                left.module_path(),
+                left.line(),
+                left.column(),
+                left.member_kind(),
+                left.content_fingerprint(),
+            )?;
+        }
+        if let Some(right) = &data.right {
+            write!(
+                formatter,
+                " conflicting with {}::{}:{}:{} [{}; fingerprint={:#x}]",
+                right.declaring_crate(),
+                right.module_path(),
+                right.line(),
+                right.column(),
+                right.member_kind(),
+                right.content_fingerprint(),
+            )?;
+        }
+        Ok(())
     }
 }
 

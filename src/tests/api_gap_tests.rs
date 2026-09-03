@@ -27,6 +27,7 @@ use crate::capability::send_descriptor;
 use crate::capability::send_key;
 use crate::capability::sync_descriptor;
 use crate::capability::sync_key;
+use crate::descriptor::AssociatedConstReader;
 use crate::descriptor::ConcreteGenericDescriptor;
 use crate::error::RegistryError;
 use crate::error::TypeMismatch;
@@ -50,8 +51,11 @@ use crate::expression::TraitObjectExpression;
 use crate::expression::TypeExpression;
 use crate::identity::FragmentIdentity;
 use crate::identity::MemberId;
+use crate::identity::Visibility;
+use crate::identity::VisibilityKind;
 use crate::invoke::InvocationArg;
 use crate::invoke::InvocationBinding;
+use crate::invoke::InvocationPanic;
 use crate::registry::ReflectRegistry;
 use crate::value::DynamicMut;
 use crate::value::DynamicOwned;
@@ -81,6 +85,10 @@ fn test_small_identity_and_error_accessors_preserve_input_facts() {
     assert!(identity.same_source_identity(&fragment(18)));
     let member = MemberId::new("Type", "field", 1, identity.clone());
     assert_eq!(member.fragment(), &identity);
+
+    let visibility = Visibility::from_source("pub(in crate::model)");
+    assert_eq!(visibility.kind(), VisibilityKind::Restricted);
+    assert_eq!(visibility.restricted_path(), Some("crate::model"));
 
     let direct = FieldIdentity::new(TypeId::of::<u8>(), "u8", 0, Some("value"));
     assert_eq!(direct.rust_name(), Some("value"));
@@ -212,6 +220,18 @@ fn test_small_generic_and_invocation_accessors_preserve_input_facts() {
     let binding = InvocationBinding::<Local>::named("value", InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)));
     assert_eq!(binding.name(), Some("value"));
     assert!(matches!(binding.argument(), InvocationArg::Owned(_)));
+
+    let reader = AssociatedConstReader::from_getter(|| 7_u8);
+    assert_eq!(reader.read().downcast_ref::<u8>(), Some(&7));
+
+    let panic = InvocationPanic::new(
+        MemberId::new("Type", "method", 0, fragment(19)),
+        Box::new(String::from("payload")),
+    );
+    let payload = panic
+        .downcast_payload::<String>()
+        .expect("the exact panic payload type must be recoverable");
+    assert_eq!(payload, "payload");
 }
 
 fn rejected_field_value(value: u8) -> FieldSetFailure {
@@ -247,7 +267,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
     let variant = FieldIdentity::new_variant(TypeId::of::<u16>(), "u16", 3, None, 2, "Ready");
     assert_eq!(variant.variant_index(), Some(2));
     assert_eq!(variant.to_string(), "u16::Ready field #3");
-    let inactive = FieldAccessError::inactive_variant(variant.clone(), 2, "Ready");
+    let inactive = FieldAccessError::inactive_variant(variant.clone());
     assert_eq!(inactive.field(), &variant);
 
     let failure = rejected_field_value(7);
@@ -310,14 +330,14 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
         field: direct,
         operation: FieldAccessOperation::Set,
     };
-    let failure = FieldSetFailure::after_execution(adapter_error.clone());
+    let failure: FieldSetFailure<crate::value::Local> = FieldSetFailure::after_execution(adapter_error.clone());
     assert!(failure.recovery().is_none());
     match failure.into_recovery() {
         Ok(_) => panic!("an adapter failure must not synthesize recovery"),
         Err(error) => assert_eq!(error, adapter_error),
     }
     assert_eq!(
-        FieldSetFailure::after_execution(adapter_error.clone()).into_error(),
+        FieldSetFailure::<crate::value::Local>::after_execution(adapter_error.clone()).into_error(),
         adapter_error
     );
 }

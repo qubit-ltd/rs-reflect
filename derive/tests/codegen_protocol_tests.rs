@@ -26,7 +26,7 @@ fn visit_rust_files(directory: &Path, visit: &mut impl FnMut(&Path)) {
 
 /// Ensures every generated facade path enters the versioned codegen protocol.
 #[test]
-fn test_generated_facade_paths_use_codegen_v1() {
+fn test_generated_facade_paths_use_codegen_v2() {
     let expand_directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/expand");
     let mut violations = Vec::new();
 
@@ -36,7 +36,7 @@ fn test_generated_facade_paths_use_codegen_v1() {
             let mut remainder = line;
             while let Some(position) = remainder.find("#facade") {
                 let candidate = &remainder[position..];
-                if !candidate.starts_with("#facade::__private::codegen_v1") {
+                if !candidate.starts_with("#facade::__private::codegen_v2") {
                     violations.push(format!("{}:{}: {}", path.display(), index + 1, line.trim()));
                 }
                 remainder = &candidate["#facade".len()..];
@@ -46,7 +46,7 @@ fn test_generated_facade_paths_use_codegen_v1() {
 
     assert!(
         violations.is_empty(),
-        "generated facade paths must use __private::codegen_v1:\n{}",
+        "generated facade paths must use __private::codegen_v2:\n{}",
         violations.join("\n"),
     );
 }

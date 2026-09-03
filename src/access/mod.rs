@@ -25,6 +25,11 @@ pub use field_adapter::FieldGetMutAdapter;
 pub use field_adapter::FieldSetAdapter;
 #[doc(hidden)]
 pub use field_adapter::FieldSetPreflightAdapter;
+pub use field_adapter::ThreadSafeFieldGetAdapter;
+pub use field_adapter::ThreadSafeFieldGetMutAdapter;
+pub use field_adapter::ThreadSafeFieldSetAdapter;
+#[doc(hidden)]
+pub use field_adapter::ThreadSafeFieldSetPreflightAdapter;
 pub use field_identity::FieldIdentity;
 pub use field_set_recovery::FieldSetFailure;
 pub use field_set_recovery::FieldSetRecovery;

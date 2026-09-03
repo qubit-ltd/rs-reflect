@@ -12,6 +12,7 @@
 use std::any::Any;
 use std::marker::PhantomData;
 
+use crate::value::DynamicMut;
 use crate::value::DynamicRef;
 use crate::value::Local;
 use crate::value::ThreadSafe;
@@ -60,7 +61,14 @@ impl DynamicOwned<Local> {
     #[must_use]
     pub fn as_reflected_ref(&self) -> DynamicRef<'_, Local> {
         let LocalOwnedStorage::Any(value) = &self.storage;
-        DynamicRef::from_any(value.as_ref())
+        DynamicRef::<Local>::from_any(value.as_ref())
+    }
+
+    /// Mutably borrows the owned erased value without exposing its concrete
+    /// type.
+    pub fn as_reflected_mut(&mut self) -> DynamicMut<'_, Local> {
+        let LocalOwnedStorage::Any(value) = &mut self.storage;
+        DynamicMut::<Local>::from_any(value.as_mut())
     }
 
     /// Returns whether the stored value has the exact type `T`.
@@ -139,6 +147,20 @@ impl DynamicOwned<ThreadSafe> {
             storage: ThreadSafeOwnedStorage::Any(Box::new(value)),
             marker: PhantomData,
         }
+    }
+
+    /// Borrows the owned value while preserving the thread-safe erased mode.
+    #[must_use]
+    pub fn as_reflected_ref(&self) -> DynamicRef<'_, ThreadSafe> {
+        let ThreadSafeOwnedStorage::Any(value) = &self.storage;
+        DynamicRef::<ThreadSafe>::from_any(value.as_ref())
+    }
+
+    /// Mutably borrows the owned value while preserving the thread-safe erased
+    /// mode.
+    pub fn as_reflected_mut(&mut self) -> DynamicMut<'_, ThreadSafe> {
+        let ThreadSafeOwnedStorage::Any(value) = &mut self.storage;
+        DynamicMut::<ThreadSafe>::from_any(value.as_mut())
     }
 
     /// Returns whether the stored value has the exact type `T`.

@@ -12,6 +12,8 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityDescriptor;
+use crate::capability::TypeCapabilities;
 use crate::descriptor::AppliedTraitId;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
@@ -43,7 +45,7 @@ struct RegistryBuilder {
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
-    capabilities: HashMap<(TypeId, CapabilityId), (TypeId, FragmentIdentity)>,
+    capabilities: HashMap<(TypeId, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
     fragment_identities: Vec<FragmentIdentity>,
 }
 
@@ -64,12 +66,9 @@ impl RegistryBuilder {
             }
             FragmentPayload::Impl(descriptor) => self.push_impl(descriptor, &built.identity)?,
             FragmentPayload::Capability(registration) => {
-                let key = (registration.target_type_id(), registration.descriptor().id().clone());
-                if let Some((_, first)) = self.capabilities.get(&key) {
-                    return Err(RegistryError::capability_conflict(first.clone(), built.identity));
+                for descriptor in registration.descriptors() {
+                    self.push_capability(registration.target_type_id(), descriptor.clone(), &built.identity)?;
                 }
-                self.capabilities
-                    .insert(key, (registration.descriptor().adapter_type(), built.identity.clone()));
             }
         }
         self.fragment_identities.push(built.identity);
@@ -88,6 +87,24 @@ impl RegistryBuilder {
         self.types.push(descriptor);
         self.types_by_id
             .insert(descriptor.type_id(), (descriptor, identity.clone()));
+        for capability in descriptor.declared_capabilities().descriptors() {
+            self.push_capability(descriptor.type_id(), capability.clone(), identity)?;
+        }
+        Ok(())
+    }
+
+    /// Adds one capability while retaining the source fragment that claimed it.
+    fn push_capability(
+        &mut self,
+        target_type_id: TypeId,
+        descriptor: CapabilityDescriptor,
+        identity: &FragmentIdentity,
+    ) -> Result<(), RegistryError> {
+        let key = (target_type_id, descriptor.id().clone());
+        if let Some((_, first)) = self.capabilities.get(&key) {
+            return Err(RegistryError::capability_conflict(first.clone(), identity.clone()));
+        }
+        self.capabilities.insert(key, (descriptor, identity.clone()));
         Ok(())
     }
 
@@ -229,6 +246,11 @@ impl RegistryBuilder {
                 .cmp(&self.trait_fragments.get(right_id))
         });
         let traits_by_rust_path = group_traits(&trait_definitions);
+        let type_fragments = self
+            .types_by_id
+            .iter()
+            .map(|(type_id, (_, identity))| (*type_id, identity.clone()))
+            .collect();
         let types_by_id = self
             .types_by_id
             .into_iter()
@@ -243,19 +265,30 @@ impl RegistryBuilder {
             .iter()
             .map(|(type_id, implementations)| (*type_id, EffectiveTypeView::new(implementations)))
             .collect();
-        let capability_fragments = self
-            .capabilities
+        let mut capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> = HashMap::new();
+        let mut capability_fragments = HashMap::new();
+        for ((type_id, capability_id), (descriptor, identity)) in self.capabilities {
+            capability_descriptors.entry(type_id).or_default().push(descriptor);
+            capability_fragments.insert((type_id, capability_id), identity);
+        }
+        let capabilities_by_target = capability_descriptors
             .into_iter()
-            .map(|(key, (_, identity))| (key, identity))
+            .map(|(type_id, descriptors)| {
+                let capabilities = TypeCapabilities::try_new(descriptors)
+                    .expect("registry capability conflicts were validated before freezing");
+                (type_id, capabilities)
+            })
             .collect();
         let indexes = RegistryIndexes {
             types_by_id,
+            type_fragments,
             types_by_type_name,
             types_by_query_name,
             traits_by_id: trait_definitions.into_iter().collect(),
             traits_by_rust_path,
             impls_by_target,
             effective_views_by_target,
+            capabilities_by_target,
             capability_fragments,
             fragment_identities: self.fragment_identities.into_boxed_slice(),
         };
@@ -264,6 +297,7 @@ impl RegistryBuilder {
             impl_definitions: self.impl_definitions.into_boxed_slice(),
             indexes,
             empty_effective_view: EffectiveTypeView::empty(),
+            empty_capabilities: TypeCapabilities::default(),
         }
     }
 }

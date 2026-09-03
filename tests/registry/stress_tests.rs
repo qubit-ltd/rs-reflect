@@ -16,11 +16,11 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
 use qubit_reflect::__private::testing::CapabilityRegistration;
 use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::Reflect;
@@ -61,9 +61,9 @@ struct NameCandidateRight;
 struct CapabilityTarget;
 
 static NAME_LEFT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<NameCandidateLeft>("stress-name");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<NameCandidateLeft>("stress-name");
 static NAME_RIGHT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<NameCandidateRight>("stress-name");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<NameCandidateRight>("stress-name");
 
 const fn identity(module: &'static str, line: u32, fingerprint: u64) -> StaticFragmentIdentity {
     StaticFragmentIdentity::new("stress-fixture", module, line, 1, "type", fingerprint)
@@ -102,23 +102,26 @@ fn stress_capability_id() -> CapabilityId {
 }
 
 fn capability_runtime_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Capability {
+    RuntimeIdentity::Capabilities {
         target_type_id: TypeId::of::<CapabilityTarget>(),
-        capability_id: stress_capability_id(),
     }
 }
 
 fn capability_u8_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::new(
         TypeId::of::<CapabilityTarget>(),
-        CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(stress_capability_id())),
+        vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(
+            stress_capability_id(),
+        ))],
     ))
 }
 
 fn capability_u16_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::new(
         TypeId::of::<CapabilityTarget>(),
-        CapabilityDescriptor::without_adapter(CapabilityKey::<u16>::new(stress_capability_id())),
+        vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u16>::new(
+            stress_capability_id(),
+        ))],
     ))
 }
 

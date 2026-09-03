@@ -22,8 +22,6 @@ use qubit_reflect::capability::clone_descriptor;
 use qubit_reflect::capability::clone_key;
 use qubit_reflect::capability::default_descriptor;
 use qubit_reflect::capability::default_key;
-use qubit_reflect::capability::registered_reflected_type;
-use qubit_reflect::capability::registered_type_capabilities;
 use qubit_reflect::capability::send_key;
 use qubit_reflect::capability::sync_key;
 use qubit_reflect::descriptor::Reflect;
@@ -31,6 +29,7 @@ use qubit_reflect::descriptor::TypeDescriptor;
 use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::register_reflected_type;
 use qubit_reflect::register_type_capabilities;
+use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::ReflectedOwned;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -51,9 +50,6 @@ struct LocalOnly {
 struct SendSync;
 
 struct ExtensionRegistration;
-
-#[derive(Clone)]
-struct DuplicateRegistration;
 
 struct ReflectedRoot;
 
@@ -77,7 +73,7 @@ fn reflected_root_capabilities() -> &'static TypeCapabilities {
 }
 
 static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
+    reflect::__private::codegen_v2::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
         "ReflectedRoot",
         reflected_root_capabilities,
     );
@@ -93,8 +89,6 @@ register_reflected_type!(ReflectedRoot);
 register_type_capabilities!(LocalOnly: Clone, Default);
 register_type_capabilities!(SendSync: Clone, Default, Send, Sync);
 register_type_capabilities!(ExtensionRegistration: [extension_key() => ExtensionAdapter("registered")]);
-register_type_capabilities!(DuplicateRegistration: Clone);
-register_type_capabilities!(DuplicateRegistration: Clone);
 register_type_capabilities!(DerivedExtensionRegistration: [extension_key() => ExtensionAdapter("derived")]);
 
 /// Creates a valid third-party capability ID for a test.
@@ -218,14 +212,15 @@ fn test_derive_capabilities_attach_to_the_generated_descriptor() {
     assert!(descriptor.get_capability(default_key()).is_some());
 }
 
-/// Confirms explicit typed capability registrations join the generated
-/// descriptor capability set without creating another descriptor root.
+/// Confirms explicit typed capability registrations join the registry's
+/// effective capability set without creating another descriptor root.
 #[test]
 fn test_derive_descriptor_includes_explicit_extension_registration() {
     let descriptor = DerivedExtensionRegistration::type_descriptor();
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
 
     assert_eq!(
-        descriptor.get_capability(extension_key()),
+        registry.capabilities(descriptor.type_id()).get(extension_key()),
         Some(&ExtensionAdapter("derived"))
     );
 }
@@ -254,8 +249,8 @@ fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
 /// Confirms explicit registration is exact and does not infer thread safety.
 #[test]
 fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
-    let capabilities = registered_type_capabilities::<LocalOnly>()
-        .expect("the concrete type has one compatible registration fragment");
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+    let capabilities = registry.capabilities(TypeId::of::<LocalOnly>());
 
     assert!(capabilities.get(clone_key()).is_some());
     assert!(capabilities.get(default_key()).is_some());
@@ -276,8 +271,8 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
 /// Confirms explicitly declared thread-safety facts have no operation adapter.
 #[test]
 fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotion() {
-    let capabilities =
-        registered_type_capabilities::<SendSync>().expect("the concrete thread-safe registration must be compatible");
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+    let capabilities = registry.capabilities(TypeId::of::<SendSync>());
 
     assert!(capabilities.contains(send_key()));
     assert!(capabilities.contains(sync_key()));
@@ -288,28 +283,19 @@ fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotio
 /// Confirms macro registration accepts a third-party typed key and adapter.
 #[test]
 fn test_concrete_registration_accepts_third_party_typed_adapter() {
-    let capabilities =
-        registered_type_capabilities::<ExtensionRegistration>().expect("the extension registration must be compatible");
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+    let capabilities = registry.capabilities(TypeId::of::<ExtensionRegistration>());
 
     assert_eq!(capabilities.get(extension_key()), Some(&ExtensionAdapter("registered")));
-}
-
-/// Confirms matching IDs emitted by independent fragments remain an explicit
-/// conflict.
-#[test]
-fn test_concrete_registration_rejects_cross_fragment_duplicate_capability() {
-    let error = registered_type_capabilities::<DuplicateRegistration>()
-        .expect_err("two linked fragments cannot silently claim one capability ID");
-
-    assert_eq!(error.kind(), CapabilityConflictKind::DuplicateId);
-    assert_eq!(error.id().as_str(), "qubit.reflect.clone");
 }
 
 /// Confirms reflected-type registration returns the existing descriptor root.
 #[test]
 fn test_reflected_type_registration_preserves_descriptor_root_identity() {
-    let registered =
-        registered_reflected_type::<ReflectedRoot>().expect("the exact concrete reflected type must be registered");
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+    let registered = registry
+        .get(TypeId::of::<ReflectedRoot>())
+        .expect("the exact concrete reflected type must be registered");
 
     assert!(std::ptr::eq(registered, TypeDescriptor::of::<ReflectedRoot>()));
 }

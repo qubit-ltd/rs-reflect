@@ -47,6 +47,14 @@ pub struct DynamicMut<'a, M: Mode> {
 }
 
 impl<'a> DynamicMut<'a, Local> {
+    /// Reuses an existing local erased mutable borrow.
+    pub(crate) fn from_any(value: &'a mut dyn Any) -> Self {
+        Self {
+            storage: LocalMutStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
     /// Wraps a sized `'static` value as a local mutable dynamic borrow.
     pub fn new<T: Sized + 'static>(value: &'a mut T) -> Self {
         Self {
@@ -177,6 +185,14 @@ impl<'a> DynamicMut<'a, Local> {
 }
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
+    /// Reuses an existing thread-safe erased mutable borrow.
+    pub(crate) fn from_any(value: &'a mut (dyn Any + Send + Sync)) -> Self {
+        Self {
+            storage: ThreadSafeMutStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
     /// Wraps a sized, `'static`, `Send`, and `Sync` value as a thread-safe
     /// mutable borrow.
     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {

@@ -55,25 +55,25 @@ impl EnumReprIr {
     /// Emits the public structured representation value for descriptor data.
     pub(super) fn descriptor_tokens(&self, facade: &TokenStream) -> TokenStream {
         match self {
-            Self::Rust => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Rust),
-            Self::C => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::C),
+            Self::Rust => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::Rust),
+            Self::C => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::C),
             Self::Transparent => {
-                quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Transparent)
+                quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::Transparent)
             }
-            Self::I8 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I8),
-            Self::I16 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I16),
-            Self::I32 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I32),
-            Self::I64 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I64),
-            Self::I128 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I128),
-            Self::Isize => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Isize),
-            Self::U8 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U8),
-            Self::U16 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U16),
-            Self::U32 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U32),
-            Self::U64 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U64),
-            Self::U128 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U128),
-            Self::Usize => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Usize),
+            Self::I8 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::I8),
+            Self::I16 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::I16),
+            Self::I32 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::I32),
+            Self::I64 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::I64),
+            Self::I128 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::I128),
+            Self::Isize => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::Isize),
+            Self::U8 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::U8),
+            Self::U16 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::U16),
+            Self::U32 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::U32),
+            Self::U64 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::U64),
+            Self::U128 => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::U128),
+            Self::Usize => quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::Usize),
             Self::Align(alignment) => {
-                quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Align(#alignment))
+                quote!(#facade::__private::codegen_v2::descriptor::EnumRepr::Align(#alignment))
             }
         }
     }

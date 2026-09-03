@@ -9,8 +9,10 @@
 // qubit-style: allow type-file-name
 //! Hidden distributed-registration protocol for generated macro output.
 
+use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityKey;
 use crate::error::RegistryError;
 use crate::registry::ReflectRegistry;
 #[doc(hidden)]
@@ -25,6 +27,28 @@ pub use crate::registry::fragment::RegistrationFragment;
 pub use crate::registry::fragment::RuntimeIdentity;
 #[doc(hidden)]
 pub use crate::registry::fragment::StaticFragmentIdentity;
+
+/// Returns whether the unified inventory declares one executable typed
+/// capability for an exact concrete type.
+///
+/// This declaration probe does not validate conflicts; registry construction
+/// remains the sole conflict authority.
+#[doc(hidden)]
+pub fn has_registered_capability<T: 'static, A: 'static>(key: CapabilityKey<A>) -> bool {
+    inventory::iter::<RegistrationFragment>
+        .into_iter()
+        .filter(|fragment| fragment.kind() == FragmentKind::Capability)
+        .any(|fragment| match fragment.build() {
+            FragmentPayload::Capability(registration) if registration.target_type_id() == TypeId::of::<T>() => {
+                registration.descriptors().iter().any(|descriptor| {
+                    descriptor.id() == key.id()
+                        && descriptor.adapter_type() == key.adapter_type()
+                        && descriptor.has_adapter()
+                })
+            }
+            _ => false,
+        })
+}
 
 /// Builds and validates an isolated registry snapshot from static fragments.
 ///

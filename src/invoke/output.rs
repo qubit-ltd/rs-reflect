@@ -37,6 +37,22 @@ pub enum InvocationOutput<'call, M: InvocationMode + 'call> {
         /// Receiver or parameter origins that may supply this borrow.
         origins: Box<[BorrowOrigin]>,
     },
+    /// The method returned an optional shared borrow with all conservative
+    /// origins. `None` remains distinct from an owned optional value.
+    OptionalRef {
+        /// Optional borrowed dynamic value tied to the common call lifetime.
+        value: Option<DynamicRef<'call, M>>,
+        /// Receiver or parameter origins that may supply this borrow.
+        origins: Box<[BorrowOrigin]>,
+    },
+    /// The method returned a sequence of shared borrows with common
+    /// conservative origins.
+    RefSlice {
+        /// Borrowed dynamic elements tied to the common call lifetime.
+        values: Box<[DynamicRef<'call, M>]>,
+        /// Receiver or parameter origins that may supply these borrows.
+        origins: Box<[BorrowOrigin]>,
+    },
     /// The method returned a mutable borrow with its unique origin.
     Mut {
         /// Mutably borrowed dynamic value tied to the common call lifetime.

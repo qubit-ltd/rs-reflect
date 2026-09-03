@@ -31,7 +31,7 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Converts a Rust path while retaining source tokens and structured segments.
-pub(super) fn convert_path(path: &Path) -> PathIr {
+pub(crate) fn convert_path(path: &Path) -> PathIr {
     let tokens = path.to_token_stream();
     PathIr {
         source: tokens.to_string(),
@@ -89,20 +89,27 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),
-            inputs: function.inputs.iter().map(|input| convert_type(&input.ty)).collect(),
+            inputs: function
+                .inputs
+                .iter()
+                .map(|input| convert_type(&input.ty))
+                .collect(),
             output: match &function.output {
                 ReturnType::Default => None,
                 ReturnType::Type(_, ty) => Some(Box::new(convert_type(ty))),
             },
             is_unsafe: function.unsafety.is_some(),
-            abi: function
-                .abi
-                .as_ref()
-                .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), LitStr::value)),
+            abi: function.abi.as_ref().map(|abi| {
+                abi.name
+                    .as_ref()
+                    .map_or_else(|| "C".to_owned(), LitStr::value)
+            }),
             is_variadic: function.variadic.is_some(),
         },
         Type::TraitObject(object) => TypeKindIr::TraitObject {
@@ -170,7 +177,9 @@ fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
 /// Converts a lifetime or trait bound into semantic IR.
 pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
     match bound {
-        TypeParamBound::Lifetime(lifetime) => GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string()),
+        TypeParamBound::Lifetime(lifetime) => {
+            GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string())
+        }
         TypeParamBound::Trait(trait_bound) => GenericBoundIr::Trait {
             path: convert_path(&trait_bound.path),
             modifier: match trait_bound.modifier {
@@ -182,7 +191,9 @@ pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),

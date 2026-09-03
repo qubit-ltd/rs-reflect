@@ -119,7 +119,10 @@ fn test_registry_error_clone_preserves_kind() {
     assert_eq!(actual_left, &left);
     assert_eq!(actual_right, &right);
     assert!(error.fragment_identity().is_none());
-    assert_eq!(error.to_string(), "reflection registry error: DuplicateFragment");
+    assert_eq!(
+        error.to_string(),
+        "reflection registry error: DuplicateFragment at example::example::one:1:1 [impl; fingerprint=0x1] conflicting with example::example::two:2:1 [impl; fingerprint=0x2]"
+    );
 }
 
 /// Verifies every registry error constructor retains its category and

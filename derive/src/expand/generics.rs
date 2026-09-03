@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::expand::generic_environment::GenericEnvironment;
 use crate::ir::GenericBoundIr;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
@@ -27,7 +28,8 @@ pub(crate) fn concrete_descriptor(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
 ) -> TokenStream {
-    let codegen = quote!(#facade::__private::codegen_v1);
+    let codegen = quote!(#facade::__private::codegen_v2);
+    let environment = GenericEnvironment::from_generics(&declaration.generics);
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
@@ -42,13 +44,15 @@ pub(crate) fn concrete_descriptor(
             GenericKindIr::Lifetime => {}
             GenericKindIr::Type => {
                 let name = syn::Ident::new(&parameter.name, parameter.span);
-                arguments.push(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v1::expression::parameter(stringify!(#name)),
-                )));
+                arguments.push(
+                    quote!(#facade::__private::codegen_v2::expression::GenericArgument::Type(
+                        #facade::__private::codegen_v2::expression::parameter(stringify!(#name)),
+                    )),
+                );
                 definition_indices.push(definition_index);
                 type_arguments.push(quote!({
                     use #codegen::descriptor::ResolveReflectArgument as _;
-                    let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<#name>::new();
+                    let probe = #facade::__private::codegen_v2::descriptor::ReflectArgumentProbe::<#name>::new();
                     (&probe).resolve_reflect_argument()
                 }));
                 const_argument_values.push(quote!(None));
@@ -60,28 +64,29 @@ pub(crate) fn concrete_descriptor(
                     .expect("const generic parameters retain their declared type");
                 let const_type_tokens = &const_type.tokens;
                 let name = syn::Ident::new(&parameter.name, parameter.span);
-                let declared_type = super::traits::type_expression(const_type, facade);
-                arguments.push(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Const(
-                    #facade::__private::codegen_v1::expression::ConstGenericArgument::new(
+                let declared_type =
+                    super::traits::type_expression(const_type, &environment, facade);
+                arguments.push(quote!(#facade::__private::codegen_v2::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v2::expression::ConstGenericArgument::new(
                         #declared_type,
-                        #facade::__private::codegen_v1::descriptor::const_argument_expression::<#const_type_tokens>(#name),
-                        #facade::__private::codegen_v1::descriptor::const_argument_diagnostic::<#const_type_tokens>(#name),
+                        #facade::__private::codegen_v2::descriptor::const_argument_expression::<#const_type_tokens>(#name),
+                        #facade::__private::codegen_v2::descriptor::const_argument_diagnostic::<#const_type_tokens>(#name),
                     ),
                 )));
                 definition_indices.push(definition_index);
                 type_arguments.push(quote!(None));
                 const_argument_values.push(quote!(Some(
-                    (|| #facade::__private::codegen_v1::descriptor::const_argument_owned::<#const_type_tokens>(#name))
-                        as fn() -> #facade::__private::codegen_v1::value::ReflectedOwned
+                    (|| #facade::__private::codegen_v2::descriptor::const_argument_owned::<#const_type_tokens>(#name))
+                        as fn() -> #facade::__private::codegen_v2::value::ReflectedOwned
                 )));
             }
         }
     }
     quote!({
         static DEFINITION: ::std::sync::OnceLock<
-            #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor,
+            #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor,
         > = ::std::sync::OnceLock::new();
-        #facade::__private::codegen_v1::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
+        #facade::__private::codegen_v2::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
             DEFINITION.get_or_init(|| #definition),
             ::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()),
             ::std::boxed::Box::leak(::std::vec![#(#definition_indices),*].into_boxed_slice()),
@@ -94,19 +99,13 @@ pub(crate) fn concrete_descriptor(
 /// Returns the stable hidden provider name shared with facade macros that
 /// augment one reflected generic declaration.
 pub(crate) fn definition_provider_name(name: &syn::Ident) -> syn::Ident {
-    let source = name.to_string();
-    let mut snake = String::new();
-    for (index, character) in source.chars().enumerate() {
-        if character.is_ascii_uppercase() {
-            if index != 0 {
-                snake.push('_');
-            }
-            snake.push(character.to_ascii_lowercase());
-        } else {
-            snake.push(character);
-        }
-    }
-    format_ident!("__qubit_reflect_generic_definition_{}", snake,)
+    format_ident!("__qubit_reflect_generic_definition_{}", name)
+}
+
+/// Returns the stable hidden provider name for the canonical symbolic type
+/// template shared with domain derive crates.
+pub(crate) fn template_provider_name(name: &syn::Ident) -> syn::Ident {
+    format_ident!("__qubit_reflect_generic_template_{}", name)
 }
 
 /// Emits a non-generic provider for the declaration-level generic metadata.
@@ -126,11 +125,174 @@ pub(crate) fn definition_provider(
         super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     quote! {
         #[doc(hidden)]
-        fn #function() -> &'static #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor {
+        #[allow(non_snake_case)]
+        fn #function() -> &'static #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor {
             static DEFINITION: ::std::sync::OnceLock<
-                #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor,
+                #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor,
             > = ::std::sync::OnceLock::new();
             DEFINITION.get_or_init(|| #definition)
+        }
+    }
+}
+
+/// Emits the canonical symbolic descriptor template for a generic root.
+///
+/// Domain derive crates consume this provider instead of rebuilding type and
+/// const expressions from a second syntax walker.
+pub(crate) fn template_provider(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    if declaration.generics.params.is_empty() {
+        return TokenStream::new();
+    }
+    let function = template_provider_name(&declaration.name);
+    let marker = format_ident!("__QubitReflectGenericTemplate{}", declaration.name);
+    let active = format_ident!("__qubit_reflect_generic_template_active_{}", declaration.name);
+    let environment = GenericEnvironment::from_generics(&declaration.generics);
+    let query_name = declaration
+        .attributes
+        .iter()
+        .find_map(|attribute| attribute.rename())
+        .unwrap_or(&declaration.name.to_string())
+        .to_owned();
+
+    let body = match declaration.kind {
+        TypeDeclarationKindIr::Struct => {
+            let fields = declaration.fields.iter().map(|field| {
+                let index = field.index;
+                let rust_name = field.name.as_ref().map(|name| name.to_string());
+                let rust_name = rust_name.as_ref().map_or_else(|| quote!(None), |name| quote!(Some(#name)));
+                let query_name = field.name.as_ref().map(|name| {
+                    field.attributes.iter().find_map(|attribute| attribute.rename()).unwrap_or(&name.to_string()).to_owned()
+                });
+                let query_name = query_name.as_ref().map_or_else(|| quote!(None), |name| quote!(Some(#name)));
+                let expression = super::traits::type_expression(&field.ty, &environment, facade);
+                let visibility = symbolic_visibility(&field.visibility, facade);
+                quote! {
+                    #facade::__private::codegen_v2::descriptor::field(
+                        #function,
+                        #index,
+                        #rust_name,
+                        #query_name,
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(
+                            #facade::__private::codegen_v2::descriptor::TypeRef::Symbolic(#expression),
+                        )),
+                        #visibility,
+                    )
+                }
+            });
+            let kind = match declaration.fields.len() {
+                0 => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Unit),
+                1 if declaration.fields[0].name.is_none() => {
+                    quote!(#facade::__private::codegen_v2::descriptor::StructKind::Newtype)
+                }
+                _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => {
+                    quote!(#facade::__private::codegen_v2::descriptor::StructKind::Tuple)
+                }
+                _ => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Named),
+            };
+            quote! {
+                let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
+                #facade::__private::codegen_v2::descriptor::struct_type::<#marker>(#query_name, #kind, fields)
+            }
+        }
+        TypeDeclarationKindIr::Enum => {
+            let variants = declaration.variants.iter().map(|variant| {
+                let variant_index = variant.index;
+                let rust_name = variant.name.to_string();
+                let variant_query_name = variant.attributes.iter().find_map(|attribute| attribute.rename()).unwrap_or(&rust_name).to_owned();
+                let fields = variant.fields.iter().map(|field| {
+                    let index = field.index;
+                    let rust_field_name = field.name.as_ref().map(|name| name.to_string());
+                    let rust_field_name = rust_field_name.as_ref().map_or_else(|| quote!(None), |name| quote!(Some(#name)));
+                    let field_query_name = field.name.as_ref().map(|name| {
+                        field.attributes.iter().find_map(|attribute| attribute.rename()).unwrap_or(&name.to_string()).to_owned()
+                    });
+                    let field_query_name = field_query_name.as_ref().map_or_else(|| quote!(None), |name| quote!(Some(#name)));
+                    let expression = super::traits::type_expression(&field.ty, &environment, facade);
+                    let visibility = symbolic_visibility(&field.visibility, facade);
+                    quote! {
+                        #facade::__private::codegen_v2::descriptor::field(
+                            #function,
+                            #index,
+                            #rust_field_name,
+                            #field_query_name,
+                            ::std::boxed::Box::leak(::std::boxed::Box::new(
+                                #facade::__private::codegen_v2::descriptor::TypeRef::Symbolic(#expression),
+                            )),
+                            #visibility,
+                        ).with_variant(#variant_index, #rust_name)
+                    }
+                });
+                let kind = match variant.fields.len() {
+                    0 => quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Unit),
+                    _ if variant.fields.first().is_some_and(|field| field.name.is_none()) => {
+                        quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Tuple)
+                    }
+                    _ => quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Struct),
+                };
+                quote! {
+                    {
+                        let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
+                        #facade::__private::codegen_v2::descriptor::variant(
+                            #function,
+                            #variant_index,
+                            #rust_name,
+                            #variant_query_name,
+                            #kind,
+                            fields,
+                            #active,
+                        )
+                    }
+                }
+            });
+            quote! {
+                let variants = ::std::boxed::Box::leak(::std::vec![#(#variants),*].into_boxed_slice());
+                #facade::__private::codegen_v2::descriptor::enum_type::<#marker>(#query_name, variants)
+            }
+        }
+        TypeDeclarationKindIr::Union => {
+            quote!(#facade::__private::codegen_v2::descriptor::opaque_root::<#marker>(#query_name))
+        }
+    };
+    let active_definition = (declaration.kind == TypeDeclarationKindIr::Enum).then(|| quote! {
+        #[doc(hidden)]
+        #[allow(non_snake_case)]
+        fn #active(
+            _value: #facade::__private::codegen_v2::value::DynamicRef<'_, #facade::__private::codegen_v2::value::Local>,
+        ) -> ::core::result::Result<bool, #facade::__private::codegen_v2::error::TypeMismatch> {
+            Ok(false)
+        }
+    });
+    quote! {
+        #[doc(hidden)]
+        #[allow(non_camel_case_types)]
+        struct #marker;
+
+        #active_definition
+
+        #[doc(hidden)]
+        #[allow(non_snake_case)]
+        fn #function() -> &'static #facade::__private::codegen_v2::TypeDescriptor {
+            static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v2::TypeDescriptor> =
+                ::std::sync::OnceLock::new();
+            DESCRIPTOR.get_or_init(|| { #body })
+        }
+    }
+}
+
+fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStream) -> TokenStream {
+    match visibility {
+        crate::ir::VisibilityIr::Public => quote!(#facade::__private::codegen_v2::identity::Visibility::Public),
+        crate::ir::VisibilityIr::Crate => quote!(#facade::__private::codegen_v2::identity::Visibility::Crate),
+        crate::ir::VisibilityIr::Super => quote!(#facade::__private::codegen_v2::identity::Visibility::Super),
+        crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Private)
+        }
+        crate::ir::VisibilityIr::Restricted(path) => {
+            let path = syn::LitStr::new(&path.source, proc_macro2::Span::call_site());
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Restricted(#path.into()))
         }
     }
 }

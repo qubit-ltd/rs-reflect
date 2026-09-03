@@ -69,6 +69,11 @@ impl<M: Mode + 'static> StructConstructor<M> {
     }
 
     /// Returns the shape required by this struct constructor.
+    ///
+    /// # Panics
+    ///
+    /// Panics if generated or manually assembled metadata associates this
+    /// constructor with a non-struct descriptor.
     #[must_use]
     #[inline(always)]
     pub fn shape(&self) -> ConstructionShape {

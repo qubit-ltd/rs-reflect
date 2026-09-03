@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact invocation surface consumed by generated code.
+//! Exact invocation surface consumed by codegen v2.
 
 #[doc(hidden)]
 pub use crate::invoke::ArgumentExpectation;
@@ -38,6 +38,8 @@ pub use crate::invoke::PinnedRefAdapter;
 pub use crate::invoke::PinnedRefInvocation;
 #[doc(hidden)]
 pub use crate::invoke::PinnedRefInvocationFailure;
+#[doc(hidden)]
+pub use crate::invoke::ReceiverAdapter;
 #[doc(hidden)]
 pub use crate::invoke::ReceiverExpectation;
 #[doc(hidden)]

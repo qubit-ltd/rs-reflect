@@ -25,7 +25,11 @@ use crate::parse::parse_declaration;
 use crate::validate::validate_declaration;
 
 /// Parses and validates a declaration, failing the test with its diagnostic.
-fn parse_valid(kind: MacroKind, args: TokenStream, input: TokenStream) -> crate::ir::ValidatedDeclaration {
+fn parse_valid(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> crate::ir::ValidatedDeclaration {
     let parsed = parse_declaration(kind, args, input).expect("the declaration should parse");
     validate_declaration(parsed).expect("the declaration should validate")
 }
@@ -114,7 +118,12 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     assert_eq!(reflected_trait.methods.len(), 2);
     assert_eq!(reflected_trait.associated_types.len(), 1);
     assert_eq!(reflected_trait.associated_consts.len(), 1);
-    assert!(!reflected_trait.retained_tokens.to_string().contains("reflect"));
+    assert!(
+        !reflected_trait
+            .retained_tokens
+            .to_string()
+            .contains("reflect")
+    );
 
     let reflected_impl = parse_valid(
         MacroKind::Impl,
@@ -135,7 +144,12 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     assert_eq!(reflected_impl.methods.len(), 1);
     assert_eq!(reflected_impl.target_type.source, "Packet < T >");
     assert!(reflected_impl.trait_path.is_some());
-    assert!(!reflected_impl.retained_tokens.to_string().contains("reflect"));
+    assert!(
+        !reflected_impl
+            .retained_tokens
+            .to_string()
+            .contains("reflect")
+    );
 }
 
 #[test]
@@ -271,7 +285,9 @@ fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
         },
     );
     assert!(names.contains("rename cannot be empty"));
-    assert!(names.contains("field query name `same` for Rust member `third` conflicts with Rust member `second`"));
+    assert!(names.contains(
+        "field query name `same` for Rust member `third` conflicts with Rust member `second`"
+    ));
 }
 
 #[test]
@@ -295,7 +311,9 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
         ),
     );
     assert!(mapping_diagnostics.contains("external trait path `Send` is mapped more than once"));
-    assert!(mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once"));
+    assert!(
+        mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once")
+    );
 
     let unused_mapping = parse_invalid(
         MacroKind::Trait,
@@ -304,7 +322,10 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
             trait Invalid: Send {}
         },
     );
-    assert!(unused_mapping.contains("external trait mapping `NotABound` does not match a direct supertrait"));
+    assert!(
+        unused_mapping
+            .contains("external trait mapping `NotABound` does not match a direct supertrait")
+    );
 }
 
 #[test]
@@ -326,9 +347,15 @@ fn test_external_mappings_reject_non_supertrait_bounds() {
             }
         },
     );
-    assert!(diagnostics.contains("external trait mapping `Send` does not match a direct supertrait"));
-    assert!(diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait"));
-    assert!(diagnostics.contains("external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"));
+    assert!(
+        diagnostics.contains("external trait mapping `Send` does not match a direct supertrait")
+    );
+    assert!(
+        diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait")
+    );
+    assert!(diagnostics.contains(
+        "external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"
+    ));
 }
 
 #[test]
@@ -364,8 +391,13 @@ fn test_validate_specialization_parameter_completeness() {
             impl<T, const N: usize> Container<T, N> {}
         },
     );
-    assert!(wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind"));
-    assert!(wrong_kinds.contains("specialization value for `N` does not match its Const parameter kind"));
+    assert!(
+        wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind")
+    );
+    assert!(
+        wrong_kinds
+            .contains("specialization value for `N` does not match its Const parameter kind")
+    );
 }
 
 #[test]
@@ -389,7 +421,7 @@ fn test_helper_target_matrix_matches_the_shared_contract() {
         (HelperName::Default, &[1][..]),
         (HelperName::NoInvoke, &[3][..]),
         (HelperName::CatchUnwind, &[3][..]),
-        (HelperName::ThreadSafe, &[3][..]),
+        (HelperName::ThreadSafe, &[0, 3][..]),
         (HelperName::Specialize, &[3, 4][..]),
         (HelperName::ExternalTraitId, &[4][..]),
         (HelperName::ExternalTrait, &[5][..]),
@@ -482,10 +514,19 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
         declaration.generics.params[2].default,
         Some(GenericDefaultIr::Const(_))
     ));
-    assert!(!declaration.generics.impl_declaration.to_string().contains('='));
+    assert!(
+        !declaration
+            .generics
+            .impl_declaration
+            .to_string()
+            .contains('=')
+    );
     assert_eq!(declaration.generics.arguments.to_string(), "< 'a , T , N >");
     assert!(declaration.generics.where_clause.is_empty());
-    let TypeKindIr::Reference { lifetime, element, .. } = &declaration.fields[0].ty.kind else {
+    let TypeKindIr::Reference {
+        lifetime, element, ..
+    } = &declaration.fields[0].ty.kind
+    else {
         panic!("expected a reference type");
     };
     assert_eq!(lifetime.as_deref(), Some("'a"));
@@ -517,8 +558,14 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
     assert!(method.qualifiers.is_async);
     assert!(method.qualifiers.is_unsafe);
     assert_eq!(method.qualifiers.abi.as_deref(), Some("C"));
-    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Wildcard);
-    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Destructure);
+    assert_eq!(
+        method.parameters[0].pattern.kind,
+        ParameterPatternKindIr::Wildcard
+    );
+    assert_eq!(
+        method.parameters[1].pattern.kind,
+        ParameterPatternKindIr::Destructure
+    );
     assert!(
         matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if matches!(ty.kind, TypeKindIr::Never))
     );
@@ -586,9 +633,15 @@ fn test_parse_treats_identifier_at_subpattern_as_destructure() {
     let method = &declaration.methods[0];
 
     assert_eq!(method.parameters[0].name, None);
-    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Destructure);
+    assert_eq!(
+        method.parameters[0].pattern.kind,
+        ParameterPatternKindIr::Destructure
+    );
     assert_eq!(method.parameters[1].name.as_deref(), Some("simple"));
-    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Identifier);
+    assert_eq!(
+        method.parameters[1].pattern.kind,
+        ParameterPatternKindIr::Identifier
+    );
 }
 
 #[test]
@@ -615,7 +668,9 @@ fn test_trait_and_impl_accept_explicit_runtime_facade() {
     let reflected_trait = parse_valid(
         MacroKind::Trait,
         quote!(crate = framework::reflect),
-        quote!(trait Service {}),
+        quote!(
+            trait Service {}
+        ),
     );
     let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
         panic!("expected a trait declaration");

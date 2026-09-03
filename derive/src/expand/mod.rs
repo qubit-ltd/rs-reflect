@@ -14,6 +14,7 @@ mod dispatcher;
 mod enum_repr_ir;
 mod enums;
 mod expression_codegen;
+mod generic_environment;
 mod generics;
 mod impls;
 mod invocation;

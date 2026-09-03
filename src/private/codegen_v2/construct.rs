@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact construction surface consumed by generated code.
+//! Exact construction surface consumed by codegen v2.
 
 #[doc(hidden)]
 pub use crate::construct::ConstructionField;

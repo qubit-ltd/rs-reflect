@@ -7,86 +7,7 @@
 // =============================================================================
 
 // qubit-style: allow public-type-layout
-//! Link-time records for explicit concrete reflection registrations.
-
-use std::any::TypeId;
-
-use crate::capability::CapabilityConflict;
-use crate::capability::CapabilityDescriptor;
-use crate::capability::TypeCapabilities;
-use crate::descriptor::TypeDescriptor;
-
-/// A link-time fragment declaring capabilities for one exact concrete type.
-#[doc(hidden)]
-pub struct TypeCapabilityRegistration {
-    target_type_id: fn() -> TypeId,
-    descriptors: fn() -> Vec<CapabilityDescriptor>,
-}
-
-impl TypeCapabilityRegistration {
-    /// Creates a macro-generated concrete capability registration fragment.
-    #[doc(hidden)]
-    pub const fn new(target_type_id: fn() -> TypeId, descriptors: fn() -> Vec<CapabilityDescriptor>) -> Self {
-        Self {
-            target_type_id,
-            descriptors,
-        }
-    }
-}
-
-inventory::collect!(TypeCapabilityRegistration);
-
-/// A link-time fragment declaring one reflected concrete descriptor root.
-#[doc(hidden)]
-pub struct ReflectedTypeRegistration {
-    target_type_id: fn() -> TypeId,
-    descriptor: fn() -> &'static TypeDescriptor,
-}
-
-impl ReflectedTypeRegistration {
-    /// Creates a macro-generated reflected concrete type registration fragment.
-    #[doc(hidden)]
-    pub const fn new(target_type_id: fn() -> TypeId, descriptor: fn() -> &'static TypeDescriptor) -> Self {
-        Self {
-            target_type_id,
-            descriptor,
-        }
-    }
-}
-
-inventory::collect!(ReflectedTypeRegistration);
-
-/// Collects all capability fragments registered for exact concrete type `T`.
-///
-/// Returns [`CapabilityConflict`] when matching fragments claim the same ID.
-/// An unregistered type produces an empty set rather than inferred
-/// capabilities.
-#[doc(hidden)]
-pub fn registered_type_capabilities<T: 'static>() -> Result<TypeCapabilities, CapabilityConflict> {
-    let target = TypeId::of::<T>();
-    let mut descriptors = Vec::new();
-    for registration in inventory::iter::<TypeCapabilityRegistration> {
-        if (registration.target_type_id)() == target {
-            descriptors.extend((registration.descriptors)());
-        }
-    }
-    TypeCapabilities::try_new(descriptors)
-}
-
-/// Returns the explicitly registered descriptor for exact concrete type `T`.
-///
-/// `None` means no linked registration fragment names `T`. Registration only
-/// returns the existing [`TypeDescriptor`](crate::descriptor::TypeDescriptor)
-/// root and never creates a second root.
-#[doc(hidden)]
-#[must_use]
-pub fn registered_reflected_type<T: 'static>() -> Option<&'static TypeDescriptor> {
-    let target = TypeId::of::<T>();
-    inventory::iter::<ReflectedTypeRegistration>
-        .into_iter()
-        .find(|registration| (registration.target_type_id)() == target)
-        .map(|registration| (registration.descriptor)())
-}
+//! Public macros for explicit concrete reflection registrations.
 
 /// Converts one supported trait token into a bound-checked descriptor.
 #[doc(hidden)]
@@ -164,10 +85,31 @@ macro_rules! register_type_capabilities {
                 ]
             }
 
-            $crate::capability::__inventory::submit! {
-                $crate::capability::TypeCapabilityRegistration::new(
-                    __qubit_reflect_target_type_id,
-                    __qubit_reflect_descriptors,
+            fn __qubit_reflect_runtime_identity(
+            ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
+                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities {
+                    target_type_id: __qubit_reflect_target_type_id(),
+                }
+            }
+
+            fn __qubit_reflect_payload(
+            ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
+                $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
+                    $crate::__private::codegen_v2::registration::CapabilityRegistration::new(
+                        __qubit_reflect_target_type_id(),
+                        __qubit_reflect_descriptors(),
+                    ),
+                )
+            }
+
+            $crate::__private::codegen_v2::inventory::submit! {
+                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v2::registration::FragmentKind::Capability,
+                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+                        env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "capability", 0,
+                    ),
+                    __qubit_reflect_runtime_identity,
+                    __qubit_reflect_payload,
                 )
             }
         };
@@ -190,10 +132,31 @@ macro_rules! register_type_capabilities {
                 ]
             }
 
-            $crate::capability::__inventory::submit! {
-                $crate::capability::TypeCapabilityRegistration::new(
-                    __qubit_reflect_target_type_id,
-                    __qubit_reflect_descriptors,
+            fn __qubit_reflect_runtime_identity(
+            ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
+                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities {
+                    target_type_id: __qubit_reflect_target_type_id(),
+                }
+            }
+
+            fn __qubit_reflect_payload(
+            ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
+                $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
+                    $crate::__private::codegen_v2::registration::CapabilityRegistration::new(
+                        __qubit_reflect_target_type_id(),
+                        __qubit_reflect_descriptors(),
+                    ),
+                )
+            }
+
+            $crate::__private::codegen_v2::inventory::submit! {
+                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v2::registration::FragmentKind::Capability,
+                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+                        env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "capability", 0,
+                    ),
+                    __qubit_reflect_runtime_identity,
+                    __qubit_reflect_payload,
                 )
             }
         };
@@ -217,10 +180,22 @@ macro_rules! register_reflected_type {
                 $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 
-            $crate::capability::__inventory::submit! {
-                $crate::capability::ReflectedTypeRegistration::new(
-                    __qubit_reflect_target_type_id,
-                    __qubit_reflect_descriptor,
+            fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
+                $crate::__private::codegen_v2::registration::RuntimeIdentity::Type(__qubit_reflect_target_type_id())
+            }
+
+            fn __qubit_reflect_payload() -> $crate::__private::codegen_v2::registration::FragmentPayload {
+                $crate::__private::codegen_v2::registration::FragmentPayload::Type(__qubit_reflect_descriptor())
+            }
+
+            $crate::__private::codegen_v2::inventory::submit! {
+                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v2::registration::FragmentKind::Type,
+                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+                        env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", 0,
+                    ),
+                    __qubit_reflect_runtime_identity,
+                    __qubit_reflect_payload,
                 )
             }
         };

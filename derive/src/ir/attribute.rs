@@ -190,7 +190,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::ThreadSafe,
         source_name: "thread_safe",
-        targets: TargetSet::new(METHOD),
+        targets: TargetSet::new(TYPE | METHOD),
     },
     HelperRule {
         name: HelperName::Specialize,

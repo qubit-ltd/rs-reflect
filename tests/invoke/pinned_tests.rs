@@ -17,7 +17,11 @@ use qubit_reflect::invoke::ArgumentExpectation;
 use qubit_reflect::invoke::InvocationArg;
 use qubit_reflect::invoke::InvocationBinding;
 use qubit_reflect::invoke::PinnedMutInvocation;
+use qubit_reflect::invoke::PinnedMutInvocationRecovery;
 use qubit_reflect::invoke::PinnedRefInvocation;
+use qubit_reflect::invoke::PinnedRefInvocationRecovery;
+use qubit_reflect::invoke::PinnedValidatedMutInvocation;
+use qubit_reflect::invoke::PinnedValidatedRefInvocation;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
@@ -43,7 +47,7 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(*invocation.receiver(), 7);
     assert_eq!(invocation.arguments().len(), 1);
     assert_eq!(invocation.argument_name(0), None);
-    let validated = invocation
+    let validated: PinnedValidatedRefInvocation<'_, u8, Local> = invocation
         .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
         .unwrap_or_else(|_| panic!("matching pinned shared invocation should validate"));
     let (validated_receiver, arguments) = validated.into_parts();
@@ -67,7 +71,8 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(*failure.recovery().receiver(), 7);
     assert_eq!(failure.recovery().arguments().len(), 1);
     assert_eq!(failure.recovery().argument_name(0), Some("value"));
-    let recovered = failure.into_recovery().into_invocation();
+    let recovery: PinnedRefInvocationRecovery<'_, u8, Local> = failure.into_recovery();
+    let recovered = recovery.into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
 
@@ -83,7 +88,7 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(invocation.arguments().len(), 1);
     assert_eq!(invocation.argument_name(0), None);
     {
-        let validated = invocation
+        let validated: PinnedValidatedMutInvocation<'_, u8, Local> = invocation
             .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
             .unwrap_or_else(|_| panic!("matching pinned mutable invocation should validate"));
         let (mut validated_receiver, arguments) = validated.into_parts();
@@ -109,6 +114,7 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(*failure.recovery_mut().receiver(), 23);
     assert_eq!(failure.recovery().arguments().len(), 1);
     assert_eq!(failure.recovery().argument_name(0), Some("value"));
-    let recovered = failure.into_recovery().into_invocation();
+    let recovery: PinnedMutInvocationRecovery<'_, u8, Local> = failure.into_recovery();
+    let recovered = recovery.into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }

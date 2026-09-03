@@ -10,7 +10,7 @@
 //! Integration tests for reflected enum variant access.
 use std::any::TypeId;
 
-use qubit_reflect::__private::codegen_v1::descriptor;
+use qubit_reflect::__private::codegen_v2::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessPolicy;
 use qubit_reflect::access::FieldIdentity;
@@ -60,11 +60,14 @@ fn get_progress_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, 
         .unwrap_or_else(|_| panic!("the descriptor must validate the field target type"));
     match event {
         Event::Progress(value) => Ok(ReflectedRef::new(value)),
-        Event::Done(_) => Err(FieldAccessError::inactive_variant(
-            FieldIdentity::new_variant(TypeId::of::<Event>(), "variant_tests::Event", 0, None, 0, "Progress"),
+        Event::Done(_) => Err(FieldAccessError::inactive_variant(FieldIdentity::new_variant(
+            TypeId::of::<Event>(),
+            "variant_tests::Event",
+            0,
+            None,
             0,
             "Progress",
-        )),
+        ))),
     }
 }
 
@@ -75,11 +78,14 @@ fn get_done_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, Fiel
         .unwrap_or_else(|_| panic!("the descriptor must validate the field target type"));
     match event {
         Event::Done(value) => Ok(ReflectedRef::new(value)),
-        Event::Progress(_) => Err(FieldAccessError::inactive_variant(
-            FieldIdentity::new_variant(TypeId::of::<Event>(), "variant_tests::Event", 0, None, 1, "Done"),
+        Event::Progress(_) => Err(FieldAccessError::inactive_variant(FieldIdentity::new_variant(
+            TypeId::of::<Event>(),
+            "variant_tests::Event",
+            0,
+            None,
             1,
             "Done",
-        )),
+        ))),
     }
 }
 
@@ -157,14 +163,9 @@ fn test_variant_field_rejects_inactive_variant_without_panicking() {
         Ok(_) => panic!("an inactive variant payload must not be read"),
         Err(error) => error,
     };
-    assert!(matches!(
-        error,
-        FieldAccessError::InactiveVariant {
-            variant_index: 0,
-            variant_rust_name: "Progress",
-            ..
-        }
-    ));
+    assert!(matches!(error, FieldAccessError::InactiveVariant { .. }));
+    assert_eq!(error.field().variant_index(), Some(0));
+    assert_eq!(error.field().variant_rust_name(), Some("Progress"));
 }
 
 /// Verifies fields at the same position in different variants retain distinct

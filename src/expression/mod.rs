@@ -30,6 +30,7 @@ pub use predicate::PredicateDescriptor;
 pub use predicate::TraitBoundModifier;
 pub use type_expression::ArrayTypeExpression;
 pub use type_expression::AssociatedTypeExpression;
+pub use type_expression::ConcretePathSegment;
 pub use type_expression::ConcreteTypeExpression;
 pub use type_expression::DiagnosticText;
 pub use type_expression::FunctionAbi;

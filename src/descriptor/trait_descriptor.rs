@@ -1170,11 +1170,17 @@ impl TraitDescriptorBuilder {
                     .iter()
                     .any(|descriptor| descriptor.rust_name() == name.as_ref())
                     || self.direct_supertraits.iter().any(|supertrait| {
-                        supertrait
-                            .descriptor()
+                        let descriptor = supertrait.descriptor();
+                        descriptor
                             .associated_types()
                             .iter()
-                            .any(|descriptor| descriptor.rust_name() == name.as_ref())
+                            .any(|item| item.rust_name() == name.as_ref())
+                            || descriptor.all_supertraits().iter().any(|ancestor| {
+                                ancestor
+                                    .associated_types()
+                                    .iter()
+                                    .any(|item| item.rust_name() == name.as_ref())
+                            })
                     }))
                 || !type_expression_is_concrete(value)
             {

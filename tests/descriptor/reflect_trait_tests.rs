@@ -28,6 +28,16 @@ trait ReflectedService {
     }
 }
 
+#[reflect]
+#[allow(dead_code)]
+trait AbiService {
+    extern "C" fn c_abi(&self);
+
+    extern "system" fn system_abi(&self);
+
+    extern "C-unwind" fn custom_abi(&self);
+}
+
 #[reflect(supertrait(ReflectedService), external_trait(Send, id = "core.marker.Send"))]
 trait Worker: ReflectedService + Send {
     fn work(&self);
@@ -303,6 +313,27 @@ impl StructuralService for ServiceMarkerProbe {
 }
 impl AssocHrtb for ServiceMarkerProbe {
     type Output = for<'a> fn(&'a str);
+}
+
+#[test]
+fn test_reflect_trait_uses_the_shared_abi_mapping() {
+    let registry = ReflectRegistry::initialize().expect("trait fragments must initialize");
+    let definition = registry
+        .trait_definition_by_path("integration_tests::descriptor::reflect_trait_tests::AbiService")
+        .expect("the ABI fixture trait must be registered");
+    assert_eq!(definition.methods().len(), 3);
+    assert_eq!(
+        definition.methods()[0].qualifiers().abi(),
+        Some(&reflect::expression::FunctionAbi::C)
+    );
+    assert_eq!(
+        definition.methods()[1].qualifiers().abi(),
+        Some(&reflect::expression::FunctionAbi::System)
+    );
+    assert_eq!(
+        definition.methods()[2].qualifiers().abi(),
+        Some(&reflect::expression::FunctionAbi::Other("C-unwind".into()))
+    );
 }
 
 #[test]

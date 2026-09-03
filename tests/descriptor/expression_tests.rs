@@ -14,6 +14,7 @@ use std::hash::Hasher;
 
 use qubit_reflect::expression::ArrayTypeExpression;
 use qubit_reflect::expression::AssociatedTypeExpression;
+use qubit_reflect::expression::ConcretePathSegment;
 use qubit_reflect::expression::ConcreteTypeExpression;
 use qubit_reflect::expression::ConstExpression;
 use qubit_reflect::expression::ConstGenericArgument;
@@ -50,6 +51,24 @@ fn concrete_type_rejects_an_empty_segment() {
         ConcreteTypeExpression::new(["std", "", "Vec"], Vec::new()),
         Err(ExpressionError::EmptyPathSegment { index: 1 }),
     );
+}
+
+/// Verifies each concrete path segment retains its own generic arguments.
+#[test]
+fn concrete_type_preserves_arguments_on_each_path_segment() {
+    let outer_argument = GenericArgument::Type(TypeExpression::Parameter("T".into()));
+    let inner_argument = GenericArgument::Type(TypeExpression::Parameter("U".into()));
+    let expression = ConcreteTypeExpression::from_segments([
+        ConcretePathSegment::new("Outer", vec![outer_argument.clone()].into_boxed_slice()),
+        ConcretePathSegment::new("Inner", vec![inner_argument.clone()].into_boxed_slice()),
+    ])
+    .expect("the structural path must be valid");
+
+    assert_eq!(expression.path(), &["Outer".into(), "Inner".into()]);
+    assert_eq!(expression.arguments(), &[inner_argument]);
+    assert_eq!(expression.segments()[0].name(), "Outer");
+    assert_eq!(expression.segments()[0].arguments(), &[outer_argument]);
+    assert_eq!(expression.segments()[1].name(), "Inner");
 }
 
 #[test]

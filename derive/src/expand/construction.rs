@@ -24,16 +24,36 @@ pub(crate) fn struct_adapters(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
 ) -> TokenStream {
+    let local = struct_mode_adapters(declaration, facade, false);
+    let thread_safe = declaration
+        .attributes
+        .iter()
+        .any(|attribute| attribute.name == HelperName::ThreadSafe)
+        .then(|| struct_mode_adapters(declaration, facade, true));
+    quote!(#local #thread_safe)
+}
+
+fn struct_mode_adapters(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
     let fields = &declaration.fields;
+    let mode = if thread_safe {
+        quote!(#facade::__private::codegen_v2::value::ThreadSafe)
+    } else {
+        quote!(#facade::__private::codegen_v2::value::Local)
+    };
+    let suffix = if thread_safe { "_thread_safe" } else { "" };
     let default_providers = fields.iter().filter_map(|field| {
         let default = field
             .attributes
             .iter()
             .find(|attribute| attribute.name == HelperName::Default)?;
-        let provider = format_ident!("__qubit_reflect_default_field_{}", field.index);
+        let provider = format_ident!("__qubit_reflect_default_field_{}{suffix}", field.index);
         let ty = &field.ty.tokens;
         let expression = match &default.value {
             HelperValueIr::DefaultPath(None) => {
@@ -46,9 +66,9 @@ pub(crate) fn struct_adapters(
             _ => unreachable!("validated default helper value"),
         };
         Some(quote! {
-            fn #provider() -> #facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local> {
+            fn #provider() -> #facade::__private::codegen_v2::value::DynamicOwned<#mode> {
                 let value: #ty = #expression;
-                <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::new(value)
+                <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::new(value)
             }
         })
     });
@@ -59,45 +79,44 @@ pub(crate) fn struct_adapters(
             matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
         });
         if default {
-            let provider = format_ident!("__qubit_reflect_default_field_{}", field.index);
+            let provider = format_ident!("__qubit_reflect_default_field_{}{suffix}", field.index);
             if restricted {
-                quote!(#facade::__private::codegen_v1::construct::ConstructionField::provider_only(&descriptor.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v2::construct::ConstructionField::provider_only(&descriptor.fields()[#index], Self::#provider))
             } else {
-                quote!(#facade::__private::codegen_v1::construct::ConstructionField::defaulted(&descriptor.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v2::construct::ConstructionField::defaulted(&descriptor.fields()[#index], Self::#provider))
             }
         } else if restricted {
-            quote!(#facade::__private::codegen_v1::construct::ConstructionField::unavailable(
-                &descriptor.fields()[#index], #facade::__private::codegen_v1::construct::ConstructionUnavailableReason::MissingDefaultProvider,
+            quote!(#facade::__private::codegen_v2::construct::ConstructionField::unavailable(
+                &descriptor.fields()[#index], #facade::__private::codegen_v2::construct::ConstructionUnavailableReason::MissingDefaultProvider,
             ))
         } else {
-            quote!(#facade::__private::codegen_v1::construct::ConstructionField::required(&descriptor.fields()[#index]))
+            quote!(#facade::__private::codegen_v2::construct::ConstructionField::required(&descriptor.fields()[#index]))
         }
     });
     let update_fields = fields.iter().map(|field| {
         let index = syn::Index::from(field.index);
         if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
-            quote!(#facade::__private::codegen_v1::construct::UpdateField::unavailable(
-                &descriptor.fields()[#index], #facade::__private::codegen_v1::construct::ConstructionUnavailableReason::UpdateForbidden,
+            quote!(#facade::__private::codegen_v2::construct::UpdateField::unavailable(
+                &descriptor.fields()[#index], #facade::__private::codegen_v2::construct::ConstructionUnavailableReason::UpdateForbidden,
             ))
         } else {
-            quote!(#facade::__private::codegen_v1::construct::UpdateField::allowed(&descriptor.fields()[#index]))
+            quote!(#facade::__private::codegen_v2::construct::UpdateField::allowed(&descriptor.fields()[#index]))
         }
     });
     let values = fields.iter().map(|field| {
         let ty = &field.ty.tokens;
         quote! {
-            <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::downcast::<#ty>(
+            <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::downcast::<#ty>(
                 values.next().unwrap_or_else(|| unreachable!("validated construction value count")),
             ).unwrap_or_else(|_| unreachable!("validated construction field type"))
         }
     });
     let literal = match fields.first().and_then(|field| field.name.as_ref()) {
         Some(_) => {
-            let assignments =
-                declaration.fields.iter().zip(values).map(|(field, value)| {
-                    let name = field.name.as_ref().expect("named struct field");
-                    quote!(#name: #value)
-                });
+            let assignments = declaration.fields.iter().zip(values).map(|(field, value)| {
+                let name = field.name.as_ref().expect("named struct field");
+                quote!(#name: #value)
+            });
             quote!(Self { #(#assignments),* })
         }
         None if fields.is_empty() => quote!(Self),
@@ -115,38 +134,38 @@ pub(crate) fn struct_adapters(
         };
         quote! {
             #index => {
-                value.#target = <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::downcast::<#ty>(replacement)
+                value.#target = <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::downcast::<#ty>(replacement)
                     .unwrap_or_else(|_| unreachable!("validated update field type"));
             }
         }
     });
-    let construct = format_ident!("__qubit_reflect_struct_constructor");
-    let construct_adapter = format_ident!("__qubit_reflect_construct_struct");
-    let update = format_ident!("__qubit_reflect_struct_updater");
-    let update_adapter = format_ident!("__qubit_reflect_update_struct");
+    let construct = format_ident!("__qubit_reflect_struct_constructor{suffix}");
+    let construct_adapter = format_ident!("__qubit_reflect_construct_struct{suffix}");
+    let update = format_ident!("__qubit_reflect_struct_updater{suffix}");
+    let update_adapter = format_ident!("__qubit_reflect_update_struct{suffix}");
     quote! {
         #(#default_providers)*
 
-        fn #construct_adapter(input: #facade::__private::codegen_v1::construct::ValidatedConstructionInput<#facade::__private::codegen_v1::value::Local>)
-            -> #facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>
+        fn #construct_adapter(input: #facade::__private::codegen_v2::construct::ValidatedConstructionInput<#mode>)
+            -> #facade::__private::codegen_v2::value::DynamicOwned<#mode>
         {
             let mut values = input.into_values().into_vec().into_iter();
-            <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::new(#literal)
+            <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::new(#literal)
         }
 
-        fn #construct() -> &'static #facade::__private::codegen_v1::construct::StructConstructor<#facade::__private::codegen_v1::value::Local> {
-            let descriptor = <Self as #facade::__private::codegen_v1::Reflect>::type_descriptor();
+        fn #construct() -> &'static #facade::__private::codegen_v2::construct::StructConstructor<#mode> {
+            let descriptor = <Self as #facade::__private::codegen_v2::Reflect>::type_descriptor();
             let fields = ::std::boxed::Box::leak(::std::vec![#(#construction_fields),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v1::construct::StructConstructor::new(
+            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v2::construct::StructConstructor::new(
                 descriptor, fields, Self::#construct_adapter,
             )))
         }
 
-        fn #update_adapter(input: #facade::__private::codegen_v1::construct::ValidatedUpdateInput<#facade::__private::codegen_v1::value::Local>)
-            -> #facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>
+        fn #update_adapter(input: #facade::__private::codegen_v2::construct::ValidatedUpdateInput<#mode>)
+            -> #facade::__private::codegen_v2::value::DynamicOwned<#mode>
         {
             let (base, overrides) = input.into_parts();
-            let mut value = <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::downcast::<Self>(base)
+            let mut value = <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::downcast::<Self>(base)
                 .unwrap_or_else(|_| unreachable!("validated update base type"));
             for override_value in overrides.into_vec() {
                 let (index, replacement) = override_value.into_parts();
@@ -155,13 +174,13 @@ pub(crate) fn struct_adapters(
                     _ => unreachable!("validated update field index"),
                 }
             }
-            <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::new(value)
+            <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::new(value)
         }
 
-        fn #update() -> &'static #facade::__private::codegen_v1::construct::StructUpdater<#facade::__private::codegen_v1::value::Local> {
-            let descriptor = <Self as #facade::__private::codegen_v1::Reflect>::type_descriptor();
+        fn #update() -> &'static #facade::__private::codegen_v2::construct::StructUpdater<#mode> {
+            let descriptor = <Self as #facade::__private::codegen_v2::Reflect>::type_descriptor();
             let fields = ::std::boxed::Box::leak(::std::vec![#(#update_fields),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v1::construct::StructUpdater::new(
+            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v2::construct::StructUpdater::new(
                 descriptor, fields, Self::#update_adapter,
             )))
         }
@@ -170,11 +189,24 @@ pub(crate) fn struct_adapters(
 
 /// Returns the descriptor expression linking a struct to its generated entry
 /// points.
-pub(crate) fn struct_descriptor(facade: &TokenStream) -> TokenStream {
-    quote!(#facade::__private::codegen_v1::construct::StructConstructionDescriptor::new(
+pub(crate) fn struct_descriptor(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
+    let thread_safe = declaration
+        .attributes
+        .iter()
+        .any(|attribute| attribute.name == HelperName::ThreadSafe)
+        .then(|| {
+            quote!(.with_thread_safe(
+                Self::__qubit_reflect_struct_constructor_thread_safe,
+                Some(Self::__qubit_reflect_struct_updater_thread_safe),
+            ))
+        });
+    quote!(#facade::__private::codegen_v2::construct::StructConstructionDescriptor::new(
         Self::__qubit_reflect_struct_constructor,
         Some(Self::__qubit_reflect_struct_updater),
-    ))
+    ) #thread_safe)
 }
 
 /// Emits a local constructor and its descriptor attachment for one enum
@@ -182,25 +214,43 @@ pub(crate) fn struct_descriptor(facade: &TokenStream) -> TokenStream {
 pub(crate) fn variant_adapters(
     variant: &VariantIr,
     facade: &TokenStream,
+    thread_safe: bool,
 ) -> TokenStream {
-    if variant.attributes.iter().any(|attribute| {
-        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-    }) {
+    let local = variant_adapters_for_mode(variant, facade, false);
+    let thread_safe_adapters =
+        thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
+    quote!(#local #thread_safe_adapters)
+}
+
+/// Emits one mode-specific enum variant constructor.
+fn variant_adapters_for_mode(
+    variant: &VariantIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
+    if variant
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
+    {
         return TokenStream::new();
     }
     let variant_index = variant.index;
-    let constructor =
-        format_ident!("__qubit_reflect_variant_constructor_{variant_index}");
-    let adapter =
-        format_ident!("__qubit_reflect_construct_variant_{variant_index}");
+    let suffix = if thread_safe { "_thread_safe" } else { "" };
+    let constructor = format_ident!("__qubit_reflect_variant_constructor_{variant_index}{suffix}");
+    let adapter = format_ident!("__qubit_reflect_construct_variant_{variant_index}{suffix}");
+    let mode = if thread_safe {
+        quote!(#facade::__private::codegen_v2::value::ThreadSafe)
+    } else {
+        quote!(#facade::__private::codegen_v2::value::Local)
+    };
     let default_providers = variant.fields.iter().filter_map(|field| {
         let default = field
             .attributes
             .iter()
             .find(|attribute| attribute.name == HelperName::Default)?;
         let provider = format_ident!(
-            "__qubit_reflect_default_variant_{variant_index}_field_{}",
-            field.index
+            "__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}", field.index
         );
         let ty = &field.ty.tokens;
         let expression = match &default.value {
@@ -214,9 +264,9 @@ pub(crate) fn variant_adapters(
             _ => unreachable!("validated default helper value"),
         };
         Some(quote! {
-            fn #provider() -> #facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local> {
+            fn #provider() -> #facade::__private::codegen_v2::value::DynamicOwned<#mode> {
                 let value: #ty = #expression;
-                <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::new(value)
+                <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::new(value)
             }
         })
     });
@@ -228,24 +278,24 @@ pub(crate) fn variant_adapters(
             matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
         });
         if default {
-            let provider = format_ident!("__qubit_reflect_default_variant_{variant_index}_field_{}", field.index);
+            let provider = format_ident!("__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}", field.index);
             if restricted {
-                quote!(#facade::__private::codegen_v1::construct::ConstructionField::provider_only(&variant.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v2::construct::ConstructionField::provider_only(&variant.fields()[#index], Self::#provider))
             } else {
-                quote!(#facade::__private::codegen_v1::construct::ConstructionField::defaulted(&variant.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v2::construct::ConstructionField::defaulted(&variant.fields()[#index], Self::#provider))
             }
         } else if restricted {
-            quote!(#facade::__private::codegen_v1::construct::ConstructionField::unavailable(
-                &variant.fields()[#index], #facade::__private::codegen_v1::construct::ConstructionUnavailableReason::MissingDefaultProvider,
+            quote!(#facade::__private::codegen_v2::construct::ConstructionField::unavailable(
+                &variant.fields()[#index], #facade::__private::codegen_v2::construct::ConstructionUnavailableReason::MissingDefaultProvider,
             ))
         } else {
-            quote!(#facade::__private::codegen_v1::construct::ConstructionField::required(&variant.fields()[#index]))
+            quote!(#facade::__private::codegen_v2::construct::ConstructionField::required(&variant.fields()[#index]))
         }
     });
     let values = fields.clone().map(|field| {
         let ty = &field.ty.tokens;
         quote!(
-            <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::downcast::<#ty>(
+            <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::downcast::<#ty>(
                 values.next().unwrap_or_else(|| unreachable!("validated variant value count")),
             ).unwrap_or_else(|_| unreachable!("validated variant field type"))
         )
@@ -255,30 +305,30 @@ pub(crate) fn variant_adapters(
         VariantKindIr::Unit => quote!(Self::#variant_name),
         VariantKindIr::Tuple => quote!(Self::#variant_name(#(#values),*)),
         VariantKindIr::Struct => {
-            let assignments =
-                variant.fields.iter().zip(values).map(|(field, value)| {
-                    let name =
-                        field.name.as_ref().expect("named variant field");
-                    quote!(#name: #value)
-                });
+            let assignments = variant.fields.iter().zip(values).map(|(field, value)| {
+                let name = field.name.as_ref().expect("named variant field");
+                quote!(#name: #value)
+            });
             quote!(Self::#variant_name { #(#assignments),* })
         }
     };
     quote! {
         #(#default_providers)*
 
-        fn #adapter(input: #facade::__private::codegen_v1::construct::ValidatedConstructionInput<#facade::__private::codegen_v1::value::Local>)
-            -> #facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>
+        fn #adapter(input: #facade::__private::codegen_v2::construct::ValidatedConstructionInput<#mode>)
+            -> #facade::__private::codegen_v2::value::DynamicOwned<#mode>
         {
             let mut values = input.into_values().into_vec().into_iter();
-            <#facade::__private::codegen_v1::value::DynamicOwned<#facade::__private::codegen_v1::value::Local>>::new(#literal)
+            <#facade::__private::codegen_v2::value::DynamicOwned<#mode>>::new(#literal)
         }
 
-        fn #constructor() -> &'static #facade::__private::codegen_v1::construct::VariantConstructor<#facade::__private::codegen_v1::value::Local> {
-            let descriptor = <Self as #facade::__private::codegen_v1::Reflect>::type_descriptor();
-            let variant = &descriptor.variants()[#variant_index];
+        fn #constructor() -> &'static #facade::__private::codegen_v2::construct::VariantConstructor<#mode> {
+            let descriptor = <Self as #facade::__private::codegen_v2::Reflect>::type_descriptor();
+            let variant = descriptor
+                .variant_at(#variant_index)
+                .unwrap_or_else(|| unreachable!("generated variant source index must exist"));
             let fields = ::std::boxed::Box::leak(::std::vec![#(#policies),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v1::construct::VariantConstructor::new(
+            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v2::construct::VariantConstructor::new(
                 variant, fields, Self::#adapter,
             )))
         }
@@ -289,13 +339,22 @@ pub(crate) fn variant_adapters(
 pub(crate) fn variant_descriptor(
     variant: &VariantIr,
     facade: &TokenStream,
+    thread_safe: bool,
 ) -> TokenStream {
-    if variant.attributes.iter().any(|attribute| {
-        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-    }) {
+    if variant
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
+    {
         return TokenStream::new();
     }
-    let constructor =
-        format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
-    quote!(.with_construction(#facade::__private::codegen_v1::construct::VariantConstructionDescriptor::new(Self::#constructor)))
+    let constructor = format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
+    let thread_safe = thread_safe.then(|| {
+        let constructor = format_ident!("__qubit_reflect_variant_constructor_{}_thread_safe", variant.index);
+        quote!(.with_thread_safe(Self::#constructor))
+    });
+    quote!(.with_construction(
+        #facade::__private::codegen_v2::construct::VariantConstructionDescriptor::new(Self::#constructor)
+            #thread_safe
+    ))
 }

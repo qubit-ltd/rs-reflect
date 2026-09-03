@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Versioned protocol used by reflection code generated for this release.
+//! Version-two protocol used by reflection code generated for this release.
 //!
 //! This module is not a hand-written application API. Generated code targets
 //! one protocol version; incompatible protocol changes must introduce a new

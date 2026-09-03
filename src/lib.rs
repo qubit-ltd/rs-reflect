@@ -38,8 +38,8 @@
 //!
 //! - [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.md)
 //! - [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-//! - [Architecture and design](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-01-qubit-reflect-design.md)
-//! - [架构与设计](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-design.zh_CN.md)
+//! - [Architecture and design](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-03-qubit-reflect-design.md)
+//! - [架构与设计](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-03-qubit-reflect-design.zh_CN.md)
 #![forbid(unsafe_code)]
 
 /// APIs for reflected field and variant access.
@@ -69,8 +69,8 @@ pub mod value;
 pub use access::FieldAccessError;
 /// A failed field replacement together with its recoverable inputs.
 pub use access::FieldSetFailure;
-/// The target borrow and replacement value retained after a failed field
-/// set.
+/// The untouched replacement value and field identity retained after a failed
+/// field set.
 pub use access::FieldSetRecovery;
 // Construction facade.
 /// A dynamic construction error.

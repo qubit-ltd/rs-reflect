@@ -15,8 +15,8 @@ mod default_invocation;
 mod default_method_expansion;
 mod dyn_trait_generics;
 mod metadata;
-mod trait_metadata;
 mod token_rewrite;
+mod trait_metadata;
 
 use proc_macro2::Group;
 use proc_macro2::Ident;
@@ -50,6 +50,8 @@ use syn::parse_quote_spanned;
 use syn::parse2;
 use token_rewrite::replace_self_with_owner;
 
+use self::default_method_expansion::DefaultMethodExpansion;
+use self::dyn_trait_generics::DynTraitGenerics;
 use super::expression_codegen::external_supertrait_arguments;
 pub(crate) use super::expression_codegen::generic_definition;
 pub(crate) use super::expression_codegen::type_expression;
@@ -65,8 +67,6 @@ use crate::ir::TraitDeclarationIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::WherePredicateIr;
-use self::dyn_trait_generics::DynTraitGenerics;
-use self::default_method_expansion::DefaultMethodExpansion;
 
 /// Conservatively rejects unresolved lifetime shapes before the semantic
 /// `Sized` probe. Rust method selection does not treat an unmet region
@@ -230,20 +230,20 @@ fn associated_const_type_has_proven_static_shape_in(
 fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
     match &declaration.visibility {
         crate::ir::VisibilityIr::Public => {
-            quote!(#facade::__private::codegen_v1::identity::Visibility::Public)
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Public)
         }
         crate::ir::VisibilityIr::Crate => {
-            quote!(#facade::__private::codegen_v1::identity::Visibility::Crate)
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Crate)
         }
         crate::ir::VisibilityIr::Super => {
-            quote!(#facade::__private::codegen_v1::identity::Visibility::Super)
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Super)
         }
         crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
-            quote!(#facade::__private::codegen_v1::identity::Visibility::Private)
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Private)
         }
         crate::ir::VisibilityIr::Restricted(path) => {
             let path = LitStr::new(&path.source, declaration.span);
-            quote!(#facade::__private::codegen_v1::identity::Visibility::Restricted(#path.into()))
+            quote!(#facade::__private::codegen_v2::identity::Visibility::Restricted(#path.into()))
         }
     }
 }
@@ -270,7 +270,7 @@ fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) ->
                         })
                         .unwrap_or_default();
                     Some(
-                        quote!(#facade::__private::codegen_v1::descriptor::external_supertrait::<Self>(
+                        quote!(#facade::__private::codegen_v2::descriptor::external_supertrait::<Self>(
                             #id,
                             #diagnostic_path,
                             vec![#(#arguments),*],
@@ -297,24 +297,24 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
                 let identifier = Ident::new(&parameter.name, declaration.span);
                 let type_source = parameter.const_type.as_ref()?.source.as_str();
                 let expression = match type_source {
-                    "bool" => quote!(#facade::__private::codegen_v1::expression::ConstExpression::Boolean(#identifier)),
-                    "char" => quote!(#facade::__private::codegen_v1::expression::ConstExpression::Character(#identifier)),
+                    "bool" => quote!(#facade::__private::codegen_v2::expression::ConstExpression::Boolean(#identifier)),
+                    "char" => quote!(#facade::__private::codegen_v2::expression::ConstExpression::Character(#identifier)),
                     "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => {
-                        quote!(#facade::__private::codegen_v1::expression::ConstExpression::SignedInteger(#identifier as i128))
+                        quote!(#facade::__private::codegen_v2::expression::ConstExpression::SignedInteger(#identifier as i128))
                     }
                     "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
-                        quote!(#facade::__private::codegen_v1::expression::ConstExpression::UnsignedInteger(#identifier as u128))
+                        quote!(#facade::__private::codegen_v2::expression::ConstExpression::UnsignedInteger(#identifier as u128))
                     }
                     _ => return None,
                 };
                 let type_source = LitStr::new(type_source, declaration.span);
-                return Some(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Const(
-                    #facade::__private::codegen_v1::expression::ConstGenericArgument::new(
-                        #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                            #facade::__private::codegen_v1::expression::concrete(
+                return Some(quote!(#facade::__private::codegen_v2::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v2::expression::ConstGenericArgument::new(
+                        #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                            #facade::__private::codegen_v2::expression::concrete(
                                 vec![#type_source.into()].into_boxed_slice(),
                                 vec![].into_boxed_slice(),
-                                #facade::__private::codegen_v1::expression::DiagnosticText::from(#type_source),
+                                #facade::__private::codegen_v2::expression::DiagnosticText::from(#type_source),
                             ),
                         ),
                         #expression,
@@ -327,12 +327,12 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
             }
             let identifier = Ident::new(&parameter.name, declaration.span);
             Some(quote! {
-                #facade::__private::codegen_v1::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v1::expression::concrete(
+                #facade::__private::codegen_v2::expression::GenericArgument::Type(
+                    #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                        #facade::__private::codegen_v2::expression::concrete(
                             vec![std::any::type_name::<#identifier>().into()].into_boxed_slice(),
                             vec![].into_boxed_slice(),
-                            #facade::__private::codegen_v1::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
+                            #facade::__private::codegen_v2::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
                         ),
                     ),
                 )
@@ -423,7 +423,7 @@ fn associated_type_resolver_entries(
     declaration: &TraitDeclarationIr,
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v1);
+    let codegen = quote!(#facade::__private::codegen_v2);
     declaration
         .associated_types
         .iter()
@@ -432,7 +432,7 @@ fn associated_type_resolver_entries(
                 let name = &item.name;
                 quote!({
                     use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                    let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<Self::#name>::new();
+                    let probe = #facade::__private::codegen_v2::descriptor::ReflectArgumentProbe::<Self::#name>::new();
                     (&probe).resolve_reflect_type_descriptor()
                 })
             } else {
@@ -446,7 +446,7 @@ fn associated_type_resolver_entries(
 /// semantics.
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
-    let codegen = quote!(#facade::__private::codegen_v1);
+    let codegen = quote!(#facade::__private::codegen_v2);
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let suffix = format!("{fingerprint:016x}");
     let marker = Ident::new(
@@ -454,6 +454,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         declaration.span,
     );
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
+    let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
     let generic_factory = Ident::new(
         &format!("__qubit_reflect_trait_generics_{suffix}"),
         declaration.span,
@@ -507,8 +508,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         &facade,
         context,
     );
-    let associated_type_resolver_entries =
-        associated_type_resolver_entries(&declaration, &facade);
+    let associated_type_resolver_entries = associated_type_resolver_entries(&declaration, &facade);
     let associated_const_providers: Vec<_> = declaration
         .associated_consts
         .iter()
@@ -599,7 +599,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let reader_entry = if has_proven_static_shape {
                 quote!({
                     use #codegen::descriptor::ResolveAssociatedConstReader as _;
-                    let probe = #facade::__private::codegen_v1::descriptor::AssociatedConstProbe::<
+                    let probe = #facade::__private::codegen_v2::descriptor::AssociatedConstProbe::<
                         #support::#provider<#(#generic_arguments,)* Self>
                     >::new();
                     (&probe).resolve_associated_const_reader()
@@ -664,7 +664,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                         })
                         .unwrap_or_default();
                     return Some(
-                        quote!(#facade::__private::codegen_v1::descriptor::external_supertrait::<#support_dyn_type>(
+                        quote!(#facade::__private::codegen_v2::descriptor::external_supertrait::<#support_dyn_type>(
                             #id,
                             #diagnostic_path,
                             vec![#(#arguments),*],
@@ -673,7 +673,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 }
                 let path = dyn_reflected_supertrait_path(path, &declaration);
                 Some(quote!(
-                    #facade::__private::codegen_v1::descriptor::TypeDescriptor::of::<dyn #path>()
+                    #facade::__private::codegen_v2::descriptor::TypeDescriptor::of::<dyn #path>()
                         .as_trait_object()
                         .expect("a reflected dyn-compatible supertrait has a trait-object descriptor")
                         .trait_descriptor()
@@ -706,12 +706,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     });
     let dyn_reflect_impl = generate_dyn_descriptor.then(|| {
         quote! {
-            impl #dyn_impl_declaration #facade::__private::codegen_v1::descriptor::Reflect for #dyn_type
+            impl #dyn_impl_declaration #facade::__private::codegen_v2::descriptor::Reflect for #dyn_type
                 #dyn_where_clause
             {
-                fn type_descriptor() -> &'static #facade::__private::codegen_v1::descriptor::TypeDescriptor {
-                    #facade::__private::codegen_v1::descriptor::intern_type::<Self>(|| {
-                        #facade::__private::codegen_v1::descriptor::trait_object::<Self>(
+                fn type_descriptor() -> &'static #facade::__private::codegen_v2::descriptor::TypeDescriptor {
+                    #facade::__private::codegen_v2::descriptor::intern_type::<Self>(|| {
+                        #facade::__private::codegen_v2::descriptor::trait_object::<Self>(
                             #query_name_literal,
                             #support::#dyn_descriptor_factory::<#(#dyn_factory_arguments),*>,
                         )
@@ -723,28 +723,28 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     if trait_item
         .items
         .iter()
-        .any(|item| matches!(item, TraitItem::Fn(function) if function.sig.ident == hook))
+        .any(|item| matches!(item, TraitItem::Fn(function) if function.sig.ident == hook || function.sig.ident == reflected_marker))
     {
         return Error::new(
             declaration.span,
-            "`__qubit_reflect_trait_payload` is reserved by #[reflect]",
+            "`__qubit_reflect_trait_payload` and `__qubit_reflect_reflected_trait_marker` are reserved by #[reflect]",
         )
         .into_compile_error();
     }
     let hook_item = match parse2(quote! {
         #[doc(hidden)]
-        fn #hook() -> #facade::__private::codegen_v1::descriptor::TraitImplPayload
+        fn #hook() -> #facade::__private::codegen_v2::descriptor::TraitImplPayload
         where
             Self: Sized + 'static,
             #(#hook_type_bounds,)*
         {
             let definition = #support::#definition_factory();
             let arguments = vec![#(#applied_arguments),*];
-            #facade::__private::codegen_v1::descriptor::TraitImplPayload::cached_with_arguments::<Self>(
+            #facade::__private::codegen_v2::descriptor::TraitImplPayload::cached_with_arguments::<Self>(
                 definition,
                 arguments,
                 |arguments| {
-                    #facade::__private::codegen_v1::descriptor::TraitDescriptor::builder(definition)
+                    #facade::__private::codegen_v2::descriptor::TraitDescriptor::builder(definition)
                         .arguments(arguments)
                         .direct_supertraits([#(#direct_supertraits),*])
                         .methods(Box::leak(vec![#(#methods),*].into_boxed_slice()))
@@ -762,12 +762,25 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         Ok(item) => item,
         Err(error) => return error.into_compile_error(),
     };
+    let reflected_marker_item = match parse2(quote! {
+        #[doc(hidden)]
+        fn #reflected_marker(&self) -> bool
+        where
+            Self: Sized,
+        {
+            true
+        }
+    }) {
+        Ok(item) => item,
+        Err(error) => return error.into_compile_error(),
+    };
     for item in default_method_adapter_items {
         match parse2(item.clone()) {
             Ok(item) => trait_item.items.push(item),
             Err(error) => return error.into_compile_error(),
         }
     }
+    trait_item.items.push(reflected_marker_item);
     trait_item.items.push(hook_item);
     quote! {
         #trait_item
@@ -906,13 +919,13 @@ fn dyn_trait_generics(
         factory_arguments.push(quote!(#parameter));
         let name_literal = LitStr::new(&name.to_string(), name.span());
         associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v1::expression::associated_type(
+            #facade::__private::codegen_v2::expression::associated_type(
                 #name_literal,
-                #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v1::expression::concrete(
+                #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v2::expression::concrete(
                         vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
                         vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v1::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
+                        #facade::__private::codegen_v2::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
                     ),
                 ),
             )
@@ -941,13 +954,13 @@ fn dyn_trait_generics(
         factory_arguments.push(quote!(#parameter));
         let name_literal = LitStr::new(&segment.name, declaration.span);
         associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v1::expression::associated_type(
+            #facade::__private::codegen_v2::expression::associated_type(
                 #name_literal,
-                #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v1::expression::concrete(
+                #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v2::expression::concrete(
                         vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
                         vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v1::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
+                        #facade::__private::codegen_v2::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
                     ),
                 ),
             )
@@ -1163,13 +1176,13 @@ fn dyn_inherited_arguments_for_supertrait(
                 .clone();
             let name_literal = LitStr::new(&name, declaration.span);
             let parameter = format_ident!("__QubitReflectAssociated{name}");
-            quote!(#facade::__private::codegen_v1::expression::associated_type(
+            quote!(#facade::__private::codegen_v2::expression::associated_type(
                 #name_literal,
-                #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v1::expression::concrete(
+                #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v2::expression::concrete(
                         vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
                         vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v1::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
+                        #facade::__private::codegen_v2::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
                     ),
                 ),
             ))

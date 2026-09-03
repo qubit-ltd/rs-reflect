@@ -1,0 +1,35 @@
+error[E0277]: the trait bound `(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8): Reflect` is not satisfied
+  --> tests/ui/fail/arity_33_not_reflected_tests.rs:20:34
+   |
+20 |     let _ = TypeDescriptor::of::<Tuple33>();
+   |                                  ^^^^^^^ unsatisfied trait bound
+   |
+   = help: the trait `Reflect` is not implemented for `(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)`
+   = help: the following other types implement trait `Reflect`:
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+           and $N others
+note: required by a bound in `TypeDescriptor::of`
+  --> src/descriptor/type_descriptor.rs
+   |
+   |     pub fn of<T: Reflect + ?Sized>() -> &'static Self {
+   |                  ^^^^^^^ required by this bound in `TypeDescriptor::of`
+
+error[E0277]: the trait bound `fn(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8): Reflect` is not satisfied
+  --> tests/ui/fail/arity_33_not_reflected_tests.rs:21:34
+   |
+21 |     let _ = TypeDescriptor::of::<Function33>();
+   |                                  ^^^^^^^^^^ unsatisfied trait bound
+   |
+   = help: the trait `Reflect` is not implemented for `fn(u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)`
+note: required by a bound in `TypeDescriptor::of`
+  --> src/descriptor/type_descriptor.rs
+   |
+   |     pub fn of<T: Reflect + ?Sized>() -> &'static Self {
+   |                  ^^^^^^^ required by this bound in `TypeDescriptor::of`

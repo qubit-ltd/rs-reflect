@@ -83,6 +83,11 @@ trait DefaultInvocationMatrix {
     }
 
     #[reflect(thread_safe)]
+    fn default_pinned_mode_conflict(self: Pin<&Self>) -> u8 {
+        49
+    }
+
+    #[reflect(thread_safe)]
     fn default_thread_safe(value: u8) -> u8 {
         value + 2
     }
@@ -404,6 +409,10 @@ fn test_default_trait_adapter_reports_precise_complete_unavailable_reasons() {
         (
             "default_unsupported_mutable_borrow",
             &[reflect::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn][..],
+        ),
+        (
+            "default_pinned_mode_conflict",
+            &[reflect::descriptor::InvocationUnavailableReason::PinnedModeConflict][..],
         ),
         (
             "default_all_blockers",

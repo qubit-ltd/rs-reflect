@@ -58,14 +58,10 @@ pub enum FieldAccessError {
         operation: FieldAccessOperation,
     },
     /// The field belongs to a different currently inactive enum variant.
-    #[error("field {field} belongs to inactive variant {variant_rust_name} at index {variant_index}")]
+    #[error("field {field} belongs to an inactive enum variant")]
     InactiveVariant {
         /// The field whose operation was requested.
         field: FieldIdentity,
-        /// The variant's zero-based source declaration index.
-        variant_index: usize,
-        /// The variant's source Rust name.
-        variant_rust_name: &'static str,
     },
 }
 
@@ -76,12 +72,8 @@ impl FieldAccessError {
     /// enum type. The returned error does not modify the target.
     #[doc(hidden)]
     #[must_use]
-    pub const fn inactive_variant(field: FieldIdentity, variant_index: usize, variant_rust_name: &'static str) -> Self {
-        Self::InactiveVariant {
-            field,
-            variant_index,
-            variant_rust_name,
-        }
+    pub const fn inactive_variant(field: FieldIdentity) -> Self {
+        Self::InactiveVariant { field }
     }
 
     /// Returns the field identity shared by every error classification.

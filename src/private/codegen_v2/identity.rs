@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact identity surface consumed by generated code.
+//! Exact identity surface consumed by codegen v2.
 
 #[doc(hidden)]
 pub use crate::identity::ExternalTraitId;

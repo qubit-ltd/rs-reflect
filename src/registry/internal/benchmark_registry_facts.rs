@@ -75,13 +75,12 @@ fn aggregate_prepared_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectReg
         .map(|fact| MaterializedFragment {
             identity: fact.identity.clone(),
             declared_kind: FragmentKind::Capability,
-            declared_target: RuntimeIdentity::Capability {
+            declared_target: RuntimeIdentity::Capabilities {
                 target_type_id: fact.target_type_id,
-                capability_id: fact.descriptor.id().clone(),
             },
             payload: FragmentPayload::Capability(CapabilityRegistration::new(
                 fact.target_type_id,
-                fact.descriptor.clone(),
+                vec![fact.descriptor.clone()],
             )),
         })
         .collect();

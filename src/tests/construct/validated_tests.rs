@@ -11,6 +11,7 @@
 use std::any::TypeId;
 
 use super::error_tests::FIXTURE_FIELDS;
+use crate::construct::ConstructionError;
 use crate::construct::ConstructionUnavailableReason;
 use crate::construct::NamedConstructionInput;
 use crate::construct::StructUpdateInput;
@@ -96,6 +97,24 @@ fn test_validated_update_input_inspection_supports_both_modes() {
         11
     );
     assert!(overrides.is_empty());
+
+    let failure = validate_update(
+        StructUpdateInput::new(
+            DynamicOwned::<ThreadSafe>::new(12_u16),
+            NamedConstructionInput::<ThreadSafe>::new(Vec::<(&str, DynamicOwned<ThreadSafe>)>::new()),
+        ),
+        TypeId::of::<u8>(),
+        &[],
+        thread_safe_type_id,
+    )
+    .expect_err("a mismatched thread-safe base must preserve its input");
+    assert!(matches!(
+        failure.error(),
+        ConstructionError::BaseTypeMismatch { mismatch }
+            if mismatch.expected() == TypeId::of::<u8>()
+                && mismatch.actual() == TypeId::of::<u16>()
+    ));
+    assert_eq!(failure.values().len(), 1);
 }
 
 /// Verifies thread-safe caller input containers retain order and expose their

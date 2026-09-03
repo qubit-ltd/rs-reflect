@@ -13,11 +13,12 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::FieldDescriptor;
@@ -36,9 +37,9 @@ fn registry_independent_shape_descriptor() -> &'static TypeDescriptor {
     &REGISTRY_INDEPENDENT_SHAPE
 }
 
-static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v1::descriptor::opaque_member::<u8>();
+static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v2::descriptor::opaque_member::<u8>();
 static VALUE_TYPE: TypeRef = TypeRef::Opaque(&VALUE_TYPE_DESCRIPTOR);
-static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::descriptor::field(
+static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v2::descriptor::field(
     registry_independent_shape_descriptor,
     0,
     Some("value"),
@@ -46,7 +47,7 @@ static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::descripto
     &VALUE_TYPE,
     Visibility::Private,
 )];
-static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
+static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<
     RegistryIndependentShape,
 >("RegistryIndependentShape", StructKind::Named, &FIELDS);
 
@@ -81,7 +82,7 @@ fn second_payload() -> FragmentPayload {
     FragmentPayload::Type(TypeDescriptor::of::<u8>())
 }
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     RegistrationFragment::new(
         FragmentKind::Type,
         CONFLICTING_IDENTITY,
@@ -90,7 +91,7 @@ reflect::__private::codegen_v1::inventory::submit! {
     )
 }
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     RegistrationFragment::new(
         FragmentKind::Type,
         CONFLICTING_IDENTITY,
@@ -129,4 +130,12 @@ fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
             .index(),
         0
     );
+
+    let isolated = build_registry(&[]).expect("an empty explicit snapshot is valid");
+    assert!(descriptor.impls_in(&isolated).is_empty());
+    assert!(descriptor.methods_in(&isolated).is_empty());
+    assert!(matches!(
+        descriptor.methods_named_in(&isolated, "anything"),
+        reflect::descriptor::MethodLookup::Missing,
+    ));
 }

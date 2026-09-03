@@ -12,11 +12,11 @@
 use std::any::TypeId;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::registry::ReflectRegistry;
@@ -24,7 +24,7 @@ use qubit_reflect::registry::ReflectRegistry;
 struct ExplicitRegistration;
 
 static EXPLICIT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<ExplicitRegistration>("explicit_registration");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<ExplicitRegistration>("explicit_registration");
 
 impl Reflect for ExplicitRegistration {
     /// Returns the exact root submitted by the explicit registration fixture.
@@ -43,7 +43,7 @@ fn explicit_payload() -> FragmentPayload {
     FragmentPayload::Type(&EXPLICIT_DESCRIPTOR)
 }
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     RegistrationFragment::new(
         FragmentKind::Type,
         StaticFragmentIdentity::new(

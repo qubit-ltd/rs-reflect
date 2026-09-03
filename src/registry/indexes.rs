@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 
+use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
@@ -24,6 +25,7 @@ use crate::registry::EffectiveTypeView;
 #[derive(Debug)]
 pub(super) struct RegistryIndexes {
     pub(super) types_by_id: HashMap<TypeId, &'static TypeDescriptor>,
+    pub(super) type_fragments: HashMap<TypeId, FragmentIdentity>,
     pub(super) types_by_type_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
     pub(super) types_by_query_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,
     #[allow(dead_code, reason = "consumed by the T21 effective-view implementation")]
@@ -32,6 +34,7 @@ pub(super) struct RegistryIndexes {
     #[allow(dead_code, reason = "consumed by the T21 effective-view implementation")]
     pub(super) impls_by_target: HashMap<TypeId, Box<[&'static ImplDescriptor]>>,
     pub(super) effective_views_by_target: HashMap<TypeId, EffectiveTypeView>,
+    pub(super) capabilities_by_target: HashMap<TypeId, TypeCapabilities>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
     pub(super) capability_fragments: HashMap<(TypeId, CapabilityId), FragmentIdentity>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]

@@ -37,7 +37,7 @@ use qubit_reflect::expression::FunctionAbi;
 struct LazyOptionalElement;
 
 static LAZY_OPTIONAL_ELEMENT_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
-static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
+static LAZY_OPTIONAL_ELEMENT_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<
     LazyOptionalElement,
 >("lazy_optional_element", StructKind::Unit, &[]);
 
@@ -53,7 +53,7 @@ impl Reflect for LazyOptionalElement {
 struct LazyBoxPointee;
 
 static LAZY_BOX_POINTEE_INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
-static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<
+static LAZY_BOX_POINTEE_DESCRIPTOR: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<
     LazyBoxPointee,
 >("lazy_box_pointee", StructKind::Unit, &[]);
 
@@ -72,7 +72,7 @@ macro_rules! define_lazy_probe {
 
         static $counter: AtomicUsize = AtomicUsize::new(0);
         static $descriptor: TypeDescriptor =
-            reflect::__private::codegen_v1::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
+            reflect::__private::codegen_v2::descriptor::struct_type::<$type_name>($query_name, StructKind::Unit, &[]);
 
         impl Reflect for $type_name {
             /// Counts and returns one stable descriptor used to observe lazy
@@ -677,4 +677,164 @@ fn test_builtin_function_descriptor_supports_c_variadic_signatures() {
         unsafe_variadic.as_function().expect("unsafe variadic view").kind(),
         FunctionPointerKind::Unsafe,
     );
+}
+
+type Tuple31 = (
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+);
+type Tuple32 = (
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+);
+type Function31 = fn(
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+) -> u8;
+type Function32 = fn(
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+) -> u8;
+
+/// Verifies the documented maximum arity is implemented at both boundary
+/// values for tuples and portable function pointers.
+#[test]
+fn test_builtin_tuple_and_function_arity_boundaries() {
+    for (descriptor, expected) in [
+        (TypeDescriptor::of::<Tuple31>(), 31),
+        (TypeDescriptor::of::<Tuple32>(), 32),
+    ] {
+        assert_eq!(descriptor.as_tuple().expect("tuple descriptor").arity(), expected);
+    }
+    for (descriptor, expected) in [
+        (TypeDescriptor::of::<Function31>(), 31),
+        (TypeDescriptor::of::<Function32>(), 32),
+    ] {
+        assert_eq!(
+            descriptor
+                .as_function()
+                .expect("function descriptor")
+                .parameters()
+                .len(),
+            expected
+        );
+    }
 }

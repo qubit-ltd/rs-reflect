@@ -13,11 +13,11 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v1::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v1::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v1::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v1::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
 use qubit_reflect::__private::testing::CapabilityRegistration;
 use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::__private::testing::initialize_registry;
@@ -50,11 +50,11 @@ struct SameTraitMarkerA;
 struct SameTraitMarkerB;
 
 static EARLY_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<EarlyType>("shared-query");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<EarlyType>("shared-query");
 static LATE_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<LateType>("shared-query");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<LateType>("shared-query");
 static INDEPENDENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<IndependentType>("independent");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<IndependentType>("independent");
 
 impl Reflect for IndependentType {
     /// Returns a descriptor whose structural query is independent of the
@@ -106,10 +106,10 @@ static EARLY_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
 static LATE_FRAGMENT: RegistrationFragment =
     RegistrationFragment::new(FragmentKind::Type, LATE_IDENTITY, late_runtime_identity, late_payload);
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     LATE_FRAGMENT
 }
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     EARLY_FRAGMENT
 }
 
@@ -154,9 +154,8 @@ fn shared_capability_id() -> CapabilityId {
 
 /// Returns the audited runtime identity of the shared capability.
 fn capability_runtime_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Capability {
+    RuntimeIdentity::Capabilities {
         target_type_id: TypeId::of::<CapabilityTarget>(),
-        capability_id: shared_capability_id(),
     }
 }
 
@@ -165,7 +164,7 @@ fn first_capability_payload() -> FragmentPayload {
     let key = CapabilityKey::<u8>::new(shared_capability_id());
     FragmentPayload::Capability(CapabilityRegistration::new(
         TypeId::of::<CapabilityTarget>(),
-        CapabilityDescriptor::without_adapter(key),
+        vec![CapabilityDescriptor::without_adapter(key)],
     ))
 }
 
@@ -175,7 +174,7 @@ fn second_capability_payload() -> FragmentPayload {
     let key = CapabilityKey::<u16>::new(shared_capability_id());
     FragmentPayload::Capability(CapabilityRegistration::new(
         TypeId::of::<CapabilityTarget>(),
-        CapabilityDescriptor::without_adapter(key),
+        vec![CapabilityDescriptor::without_adapter(key)],
     ))
 }
 
@@ -401,7 +400,7 @@ static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment = RegistrationFr
     ambiguous_impl_definition_payload,
 );
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     IMPL_FRAGMENT
 }
 

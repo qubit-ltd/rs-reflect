@@ -11,6 +11,7 @@
 #[cfg(feature = "derive")]
 mod associated_item_impl_tests;
 mod builtin_tests;
+#[cfg(feature = "derive")]
 mod capability_tests;
 #[cfg(feature = "derive")]
 mod default_trait_invocation_tests;
@@ -27,4 +28,5 @@ mod reflect_impl_tests;
 #[cfg(feature = "derive")]
 mod reflect_trait_tests;
 mod trait_tests;
+#[cfg(feature = "derive")]
 mod type_descriptor_tests;

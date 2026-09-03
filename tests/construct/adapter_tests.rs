@@ -18,9 +18,19 @@ use qubit_reflect::construct::NamedConstructionInput;
 use qubit_reflect::construct::StructUpdateInput;
 use qubit_reflect::construct::TupleConstructionInput;
 use qubit_reflect::value::ReflectedOwned;
+use qubit_reflect::value::SendReflectedMut;
+use qubit_reflect::value::SendReflectedOwned;
+use qubit_reflect::value::SendReflectedRef;
 
 #[derive(Debug, Eq, PartialEq, Reflect)]
 struct Profile {
+    id: u32,
+    label: String,
+}
+
+#[derive(Debug, Eq, PartialEq, Reflect)]
+#[reflect(thread_safe)]
+struct ConcurrentProfile {
     id: u32,
     label: String,
 }
@@ -45,6 +55,12 @@ enum Event {
         label: String,
     },
     Pair(u32, String),
+}
+
+#[derive(Debug, Eq, PartialEq, Reflect)]
+#[reflect(thread_safe)]
+enum ConcurrentEvent {
+    Value { code: u32 },
 }
 
 #[derive(Reflect)]
@@ -111,6 +127,49 @@ fn test_derive_struct_constructor_and_updater_are_descriptor_queryable() {
 }
 
 #[test]
+fn test_derive_thread_safe_struct_constructor_and_updater_are_queryable() {
+    let construction = ConcurrentProfile::type_descriptor()
+        .struct_construction()
+        .expect("the thread-safe struct exposes construction metadata");
+    let constructor = construction
+        .thread_safe_constructor()
+        .expect("the opt-in derive must emit a thread-safe constructor");
+    let value = constructor
+        .construct_named(NamedConstructionInput::new([
+            ("id", SendReflectedOwned::new(71_u32)),
+            ("label", SendReflectedOwned::new(String::from("safe"))),
+        ]))
+        .expect("thread-safe values must construct the struct");
+    let updater = construction
+        .thread_safe_updater()
+        .expect("the opt-in derive must emit a thread-safe updater");
+    let mut value = updater
+        .update(StructUpdateInput::new(
+            value,
+            NamedConstructionInput::new([("label", SendReflectedOwned::new(String::from("updated")))]),
+        ))
+        .expect("thread-safe overrides must update the struct")
+        .downcast::<ConcurrentProfile>()
+        .unwrap_or_else(|_| panic!("the updater must retain the concrete type"));
+    assert_eq!(value.label, "updated");
+
+    let label = ConcurrentProfile::type_descriptor()
+        .field("label")
+        .expect("label field");
+    let borrowed = label
+        .get_thread_safe(SendReflectedRef::new(&value))
+        .expect("thread-safe shared field access");
+    assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("updated"));
+    label
+        .set_thread_safe(
+            SendReflectedMut::new(&mut value),
+            SendReflectedOwned::new(String::from("replaced")),
+        )
+        .expect("thread-safe field replacement");
+    assert_eq!(value.label, "replaced");
+}
+
+#[test]
 fn test_derive_construction_honors_defaults_and_enum_shapes() {
     let defaults = Defaults::type_descriptor()
         .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(9_u32))]))
@@ -172,6 +231,32 @@ fn test_derive_construction_honors_defaults_and_enum_shapes() {
         .downcast::<Event>()
         .unwrap_or_else(|_| panic!("the variant adapter returns the enum root"));
     assert_eq!(pair, Event::Pair(3, String::from("three")));
+}
+
+#[test]
+fn test_derive_thread_safe_enum_constructor_and_field_access_are_queryable() {
+    let descriptor = ConcurrentEvent::type_descriptor();
+    let variant = descriptor.variant("Value").expect("value variant");
+    let constructor = variant
+        .construction()
+        .expect("variant construction")
+        .thread_safe_constructor()
+        .expect("thread-safe variant constructor");
+    let mut value = constructor
+        .construct_named(NamedConstructionInput::new([("code", SendReflectedOwned::new(7_u32))]))
+        .expect("thread-safe variant construction")
+        .downcast::<ConcurrentEvent>()
+        .unwrap_or_else(|_| panic!("constructor retains enum type"));
+    let code = variant.field("code").expect("code field");
+    assert_eq!(
+        code.get_thread_safe(SendReflectedRef::new(&value))
+            .expect("thread-safe enum field read")
+            .downcast_ref::<u32>(),
+        Some(&7),
+    );
+    code.set_thread_safe(SendReflectedMut::new(&mut value), SendReflectedOwned::new(9_u32))
+        .expect("thread-safe enum field set");
+    assert_eq!(value, ConcurrentEvent::Value { code: 9 });
 }
 
 #[test]

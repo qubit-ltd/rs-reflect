@@ -14,13 +14,13 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use super::enum_repr_ir::EnumReprIr;
 use crate::expand::ExpansionContext;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VariantKindIr;
-use super::enum_repr_ir::EnumReprIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
@@ -30,7 +30,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
     let facade = context.facade().clone();
     let name = declaration.name.clone();
     let reflected_field_types = super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
+    let transparently_reflected_parameters =
+        super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameters: Vec<_> = declaration
         .generics
         .params
@@ -57,21 +58,25 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameters {
-            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#field_type: #facade::__private::codegen_v1::Reflect));
+                .push(syn::parse_quote!(#field_type: #facade::__private::codegen_v2::Reflect));
         }
         for parameter in &transparently_reflected_parameters {
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v1::Reflect));
+                .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v2::Reflect));
         }
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -86,7 +91,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .to_owned();
     let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition = super::structs::capabilities(&declaration, &facade, &self_type, &capability_function);
+    let capability_definition =
+        super::structs::capabilities(&declaration, &facade, &capability_function);
     let representations = enum_representations(&declaration.retained_tokens);
     let integer_repr = declaration
         .variants
@@ -106,7 +112,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque)
     {
-        let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+        let generic_definition_provider =
+            super::generics::definition_provider(&declaration, &facade);
+        let generic_template_provider = super::generics::template_provider(&declaration, &facade);
         let registration = registration(
             &facade,
             &name,
@@ -118,11 +126,11 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             impl #impl_generics #name #type_generics #where_clause {
                 #capability_definition
             }
-            impl #impl_generics #facade::__private::codegen_v1::Reflect for #name #type_generics #where_clause {
-                fn type_descriptor() -> &'static #facade::__private::codegen_v1::TypeDescriptor {
-                    #facade::__private::codegen_v1::descriptor::intern_type::<Self>(|| {
-                        #facade::__private::codegen_v1::descriptor::with_capabilities(
-                            #facade::__private::codegen_v1::descriptor::opaque_root::<Self>(#query_name),
+            impl #impl_generics #facade::__private::codegen_v2::Reflect for #name #type_generics #where_clause {
+                fn type_descriptor() -> &'static #facade::__private::codegen_v2::TypeDescriptor {
+                    #facade::__private::codegen_v2::descriptor::intern_type::<Self>(|| {
+                        #facade::__private::codegen_v2::descriptor::with_capabilities(
+                            #facade::__private::codegen_v2::descriptor::opaque_root::<Self>(#query_name),
                             #capability_resolver,
                         )
                     })
@@ -130,20 +138,46 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             }
             #registration
             #generic_definition_provider
+            #generic_template_provider
         };
     }
+    let thread_safe = declaration
+        .attributes
+        .iter()
+        .any(|attribute| attribute.name == HelperName::ThreadSafe);
     let adapters = declaration
         .variants
         .iter()
-        .flat_map(|variant| adapters(&name, variant, &facade));
+        .filter(|variant| {
+            !variant
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::Skip)
+        })
+        .flat_map(|variant| adapters(&name, variant, &facade, thread_safe));
     let construction_adapters = declaration
         .variants
         .iter()
-        .map(|variant| super::construction::variant_adapters(variant, &facade));
+        .map(|variant| super::construction::variant_adapters(variant, &facade, thread_safe));
     let variants = declaration
         .variants
         .iter()
-        .map(|variant| variant_descriptor(&name, &quote!(#name #type_generics), variant, &facade, integer_repr));
+        .filter(|variant| {
+            !variant
+                .attributes
+                .iter()
+                .any(|attribute| attribute.name == HelperName::Skip)
+        })
+        .map(|variant| {
+            variant_descriptor(
+                &name,
+                &quote!(#name #type_generics),
+                variant,
+                &facade,
+                integer_repr,
+                thread_safe,
+            )
+        });
     let representation_values = representations
         .iter()
         .map(|representation| representation.descriptor_tokens(&facade));
@@ -152,8 +186,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             let representations = ::std::boxed::Box::leak(
                 ::std::vec![#(#representation_values),*].into_boxed_slice(),
             );
-            #facade::__private::codegen_v1::descriptor::with_capabilities(
-                #facade::__private::codegen_v1::descriptor::enum_type_with_repr::<Self>(
+            #facade::__private::codegen_v2::descriptor::with_capabilities(
+                #facade::__private::codegen_v2::descriptor::enum_type_with_repr::<Self>(
                     #query_name,
                     variants,
                     representations,
@@ -168,9 +202,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
                 let representations = ::std::boxed::Box::leak(
                     ::std::vec![#(#representation_values),*].into_boxed_slice(),
                 );
-                #facade::__private::codegen_v1::descriptor::with_concrete_generic(
-                    #facade::__private::codegen_v1::descriptor::with_capabilities(
-                        #facade::__private::codegen_v1::descriptor::enum_type_with_repr::<Self>(
+                #facade::__private::codegen_v2::descriptor::with_concrete_generic(
+                    #facade::__private::codegen_v2::descriptor::with_capabilities(
+                        #facade::__private::codegen_v2::descriptor::enum_type_with_repr::<Self>(
                             #query_name,
                             variants,
                             representations,
@@ -190,6 +224,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         !declaration.generics.params.is_empty(),
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+    let generic_template_provider = super::generics::template_provider(&declaration, &facade);
     let root_descriptor = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -197,9 +232,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             #(#construction_adapters)*
         }
 
-        impl #impl_generics #facade::__private::codegen_v1::Reflect for #name #type_generics #where_clause {
-            fn type_descriptor() -> &'static #facade::__private::codegen_v1::TypeDescriptor {
-                #facade::__private::codegen_v1::descriptor::intern_type::<Self>(|| {
+        impl #impl_generics #facade::__private::codegen_v2::Reflect for #name #type_generics #where_clause {
+            fn type_descriptor() -> &'static #facade::__private::codegen_v2::TypeDescriptor {
+                #facade::__private::codegen_v2::descriptor::intern_type::<Self>(|| {
                     let variants = ::std::boxed::Box::leak(::std::vec![#(#variants),*].into_boxed_slice());
                     #enum_descriptor
                 })
@@ -208,6 +243,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
 
         #registration
         #generic_definition_provider
+        #generic_template_provider
     };
     root_descriptor
 }
@@ -228,20 +264,20 @@ fn registration(
         mod #module {
             use super::*;
 
-            fn runtime_identity() -> #facade::__private::codegen_v1::registration::RuntimeIdentity {
-                #facade::__private::codegen_v1::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
+            fn runtime_identity() -> #facade::__private::codegen_v2::registration::RuntimeIdentity {
+                #facade::__private::codegen_v2::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
             }
 
-            fn payload() -> #facade::__private::codegen_v1::registration::FragmentPayload {
-                #facade::__private::codegen_v1::registration::FragmentPayload::Type(
-                    <#name as #facade::__private::codegen_v1::Reflect>::type_descriptor(),
+            fn payload() -> #facade::__private::codegen_v2::registration::FragmentPayload {
+                #facade::__private::codegen_v2::registration::FragmentPayload::Type(
+                    <#name as #facade::__private::codegen_v2::Reflect>::type_descriptor(),
                 )
             }
 
-            #facade::__private::codegen_v1::inventory::submit! {
-                #facade::__private::codegen_v1::registration::RegistrationFragment::new(
-                    #facade::__private::codegen_v1::registration::FragmentKind::Type,
-                    #facade::__private::codegen_v1::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v2::inventory::submit! {
+                #facade::__private::codegen_v2::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v2::registration::FragmentKind::Type,
+                    #facade::__private::codegen_v2::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", #fingerprint,
                     ),
                     runtime_identity,
@@ -253,7 +289,12 @@ fn registration(
 }
 
 /// Generates active-variant and field-access adapters for one enum variant.
-fn adapters(_name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenStream) -> Vec<TokenStream> {
+fn adapters(
+    _name: &syn::Ident,
+    variant: &crate::ir::VariantIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> Vec<TokenStream> {
     let variant_name = &variant.name;
     let variant_index = variant.index;
     let variant_name_text = variant_name.to_string();
@@ -264,8 +305,8 @@ fn adapters(_name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenSt
         VariantKindIr::Struct => quote!(Self::#variant_name { .. }),
     };
     let mut definitions = vec![quote! {
-        fn #active(value: #facade::__private::codegen_v1::value::ReflectedRef<'_>)
-            -> ::core::result::Result<bool, #facade::__private::codegen_v1::error::TypeMismatch>
+        fn #active(value: #facade::__private::codegen_v2::value::ReflectedRef<'_>)
+            -> ::core::result::Result<bool, #facade::__private::codegen_v2::error::TypeMismatch>
         {
             let value = value.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
             Ok(matches!(value, #active_pattern))
@@ -280,6 +321,10 @@ fn adapters(_name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenSt
             let get_mut = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}");
             let set = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}");
             let set_preflight = format_ident!("__qubit_reflect_preflight_set_variant_{variant_index}_field_{index}");
+            let get_thread_safe = format_ident!("__qubit_reflect_get_variant_{variant_index}_field_{index}_thread_safe");
+            let get_mut_thread_safe = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}_thread_safe");
+            let set_thread_safe = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}_thread_safe");
+            let set_preflight_thread_safe = format_ident!("__qubit_reflect_preflight_set_variant_{variant_index}_field_{index}_thread_safe");
             let ty = &field.ty.tokens;
             let binding = format_ident!("__qubit_reflect_value_{index}");
             let rust_name = field.name.as_ref().map(|value| value.to_string());
@@ -304,40 +349,77 @@ fn adapters(_name: &syn::Ident, variant: &crate::ir::VariantIr, facade: &TokenSt
                 VariantKindIr::Tuple => quote!(Self::#variant_name(..)),
                 VariantKindIr::Unit => return Vec::new(),
             };
-            let inactive = quote!(#facade::__private::codegen_v1::access::FieldAccessError::inactive_variant(
-                #facade::__private::codegen_v1::access::FieldIdentity::new_variant(
+            let inactive = quote!(#facade::__private::codegen_v2::access::FieldAccessError::inactive_variant(
+                #facade::__private::codegen_v2::access::FieldIdentity::new_variant(
                     ::std::any::TypeId::of::<Self>(), ::std::any::type_name::<Self>(), #index, #rust_name,
                     #variant_index, #variant_name_text,
-                ), #variant_index, #variant_name_text,
+                ),
             ));
-            vec![quote! {
-                fn #get<'__qubit_reflect>(target: #facade::__private::codegen_v1::value::ReflectedRef<'__qubit_reflect>)
-                    -> ::core::result::Result<#facade::__private::codegen_v1::value::ReflectedRef<'__qubit_reflect>, #facade::__private::codegen_v1::access::FieldAccessError>
+            let thread_safe_definitions = thread_safe.then(|| quote! {
+                fn #get_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>)
+                    -> ::core::result::Result<#facade::__private::codegen_v2::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>, #facade::__private::codegen_v2::access::FieldAccessError>
                 {
                     let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                    match value { #pattern => Ok(#facade::__private::codegen_v1::value::ReflectedRef::new(#binding)), _ => Err(#inactive) }
+                    match value {
+                        #pattern => Ok(#facade::__private::codegen_v2::value::DynamicRef::<#facade::__private::codegen_v2::value::ThreadSafe>::new(#binding)),
+                        _ => Err(#inactive),
+                    }
                 }
-                fn #get_mut<'__qubit_reflect>(target: #facade::__private::codegen_v1::value::ReflectedMut<'__qubit_reflect>)
-                    -> ::core::result::Result<#facade::__private::codegen_v1::value::ReflectedMut<'__qubit_reflect>, #facade::__private::codegen_v1::access::FieldAccessError>
+                fn #get_mut_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>)
+                    -> ::core::result::Result<#facade::__private::codegen_v2::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>, #facade::__private::codegen_v2::access::FieldAccessError>
                 {
                     let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                    match value { #pattern => Ok(#facade::__private::codegen_v1::value::ReflectedMut::new(#binding)), _ => Err(#inactive) }
+                    match value {
+                        #pattern => Ok(#facade::__private::codegen_v2::value::DynamicMut::<#facade::__private::codegen_v2::value::ThreadSafe>::new(#binding)),
+                        _ => Err(#inactive),
+                    }
                 }
-                fn #set(target: #facade::__private::codegen_v1::value::ReflectedMut<'_>, replacement: #facade::__private::codegen_v1::value::ReflectedOwned)
-                    -> ::core::result::Result<(), #facade::__private::codegen_v1::access::FieldAccessError>
-                {
+                fn #set_thread_safe(
+                    target: #facade::__private::codegen_v2::value::DynamicMut<'_, #facade::__private::codegen_v2::value::ThreadSafe>,
+                    replacement: #facade::__private::codegen_v2::value::DynamicOwned<#facade::__private::codegen_v2::value::ThreadSafe>,
+                ) -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError> {
                     let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
-                    let replacement = #facade::__private::codegen_v1::value::ReflectedOwned::downcast::<#ty>(replacement)
+                    let replacement = replacement.downcast::<#ty>()
                         .unwrap_or_else(|_| unreachable!("validated enum field value"));
                     match value { #pattern => { *#binding = replacement; Ok(()) }, _ => Err(#inactive) }
                 }
-                fn #set_preflight(target: &#facade::__private::codegen_v1::value::ReflectedMut<'_>)
-                    -> ::core::result::Result<(), #facade::__private::codegen_v1::access::FieldAccessError>
+                fn #set_preflight_thread_safe(
+                    target: &#facade::__private::codegen_v2::value::DynamicMut<'_, #facade::__private::codegen_v2::value::ThreadSafe>,
+                ) -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError> {
+                    let value = target.downcast_ref::<Self>()
+                        .unwrap_or_else(|| unreachable!("validated enum target"));
+                    match value { #active_pattern => Ok(()), _ => Err(#inactive) }
+                }
+            });
+            vec![quote! {
+                fn #get<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::ReflectedRef<'__qubit_reflect>)
+                    -> ::core::result::Result<#facade::__private::codegen_v2::value::ReflectedRef<'__qubit_reflect>, #facade::__private::codegen_v2::access::FieldAccessError>
+                {
+                    let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    match value { #pattern => Ok(#facade::__private::codegen_v2::value::ReflectedRef::new(#binding)), _ => Err(#inactive) }
+                }
+                fn #get_mut<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::ReflectedMut<'__qubit_reflect>)
+                    -> ::core::result::Result<#facade::__private::codegen_v2::value::ReflectedMut<'__qubit_reflect>, #facade::__private::codegen_v2::access::FieldAccessError>
+                {
+                    let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    match value { #pattern => Ok(#facade::__private::codegen_v2::value::ReflectedMut::new(#binding)), _ => Err(#inactive) }
+                }
+                fn #set(target: #facade::__private::codegen_v2::value::ReflectedMut<'_>, replacement: #facade::__private::codegen_v2::value::ReflectedOwned)
+                    -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError>
+                {
+                    let value = target.downcast::<Self>().unwrap_or_else(|_| unreachable!("validated enum target"));
+                    let replacement = #facade::__private::codegen_v2::value::ReflectedOwned::downcast::<#ty>(replacement)
+                        .unwrap_or_else(|_| unreachable!("validated enum field value"));
+                    match value { #pattern => { *#binding = replacement; Ok(()) }, _ => Err(#inactive) }
+                }
+                fn #set_preflight(target: &#facade::__private::codegen_v2::value::ReflectedMut<'_>)
+                    -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError>
                 {
                     let value = target.downcast_ref::<Self>()
                         .unwrap_or_else(|| unreachable!("validated enum target"));
                     match value { #active_pattern => Ok(()), _ => Err(#inactive) }
                 }
+                #thread_safe_definitions
             }]
         })
         .collect::<Vec<_>>());
@@ -351,6 +433,7 @@ fn variant_descriptor(
     variant: &crate::ir::VariantIr,
     facade: &TokenStream,
     integer_repr: Option<&str>,
+    thread_safe: bool,
 ) -> TokenStream {
     let variant_name = &variant.name;
     let variant_index = variant.index;
@@ -362,16 +445,20 @@ fn variant_descriptor(
         .unwrap_or(&variant_rust_name)
         .to_owned();
     let kind = match variant.kind {
-        VariantKindIr::Unit => quote!(#facade::__private::codegen_v1::descriptor::VariantKind::Unit),
-        VariantKindIr::Tuple => quote!(#facade::__private::codegen_v1::descriptor::VariantKind::Tuple),
+        VariantKindIr::Unit => {
+            quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Unit)
+        }
+        VariantKindIr::Tuple => {
+            quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Tuple)
+        }
         VariantKindIr::Struct => {
-            quote!(#facade::__private::codegen_v1::descriptor::VariantKind::Struct)
+            quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Struct)
         }
     };
     let origin = if variant.discriminant.is_some() {
-        quote!(#facade::__private::codegen_v1::descriptor::DiscriminantOrigin::Explicit)
+        quote!(#facade::__private::codegen_v2::descriptor::DiscriminantOrigin::Explicit)
     } else {
-        quote!(#facade::__private::codegen_v1::descriptor::DiscriminantOrigin::Implicit)
+        quote!(#facade::__private::codegen_v2::descriptor::DiscriminantOrigin::Implicit)
     };
     let numeric_discriminant = if variant.kind == VariantKindIr::Unit {
         numeric_discriminant(name, variant_name, integer_repr, facade)
@@ -385,6 +472,10 @@ fn variant_descriptor(
         let get_mut = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}");
         let set = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}");
         let set_preflight = format_ident!("__qubit_reflect_preflight_set_variant_{variant_index}_field_{index}");
+        let get_thread_safe = format_ident!("__qubit_reflect_get_variant_{variant_index}_field_{index}_thread_safe");
+        let get_mut_thread_safe = format_ident!("__qubit_reflect_get_mut_variant_{variant_index}_field_{index}_thread_safe");
+        let set_thread_safe = format_ident!("__qubit_reflect_set_variant_{variant_index}_field_{index}_thread_safe");
+        let set_preflight_thread_safe = format_ident!("__qubit_reflect_preflight_set_variant_{variant_index}_field_{index}_thread_safe");
         let field_rust_name = field.name.as_ref().map(|value| value.to_string());
         let field_rust_name = match field_rust_name { Some(value) => quote!(Some(#value)), None => quote!(None) };
         let query_name = field.name.as_ref().map(|field_name| field.attributes.iter().find_map(|attribute| attribute.rename()).unwrap_or(&field_name.to_string()).to_owned());
@@ -392,11 +483,11 @@ fn variant_descriptor(
         let ty = &field.ty.tokens;
         let opaque_field = field.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque);
         let policy = if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
-            quote!(#facade::__private::codegen_v1::access::FieldAccessPolicy::Skipped, None, None, None)
+            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::Skipped, None, None, None)
         } else if field.attributes.iter().any(|attribute| attribute.name == HelperName::ReadOnly) {
-            quote!(#facade::__private::codegen_v1::access::FieldAccessPolicy::ReadOnly, Some(<#self_type>::#get), None, None)
+            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::ReadOnly, Some(<#self_type>::#get), None, None)
         } else {
-            quote!(#facade::__private::codegen_v1::access::FieldAccessPolicy::ReadWrite, Some(<#self_type>::#get), Some(<#self_type>::#get_mut), Some(<#self_type>::#set))
+            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::ReadWrite, Some(<#self_type>::#get), Some(<#self_type>::#get_mut), Some(<#self_type>::#set))
         };
         let preflight = if field.attributes.iter().any(|attribute| {
             matches!(attribute.name, HelperName::Skip | HelperName::ReadOnly)
@@ -405,35 +496,48 @@ fn variant_descriptor(
         } else {
             quote!(Some(<#self_type>::#set_preflight))
         };
+        let thread_safe_access = if !thread_safe {
+            TokenStream::new()
+        } else if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
+            quote!(.with_thread_safe_access(None, None, None))
+        } else if field.attributes.iter().any(|attribute| attribute.name == HelperName::ReadOnly) {
+            quote!(.with_thread_safe_access(Some(<#self_type>::#get_thread_safe), None, None))
+        } else {
+            quote!(.with_thread_safe_access(
+                Some(<#self_type>::#get_thread_safe),
+                Some(<#self_type>::#get_mut_thread_safe),
+                Some(<#self_type>::#set_thread_safe),
+            ).with_thread_safe_set_preflight(Some(<#self_type>::#set_preflight_thread_safe)))
+        };
         let descriptor = if opaque_field {
-            quote!(#facade::__private::codegen_v1::descriptor::field(
-                <#self_type as #facade::__private::codegen_v1::Reflect>::type_descriptor,
+            quote!(#facade::__private::codegen_v2::descriptor::field(
+                <#self_type as #facade::__private::codegen_v2::Reflect>::type_descriptor,
                 #index,
                 #field_rust_name,
                 #query_name,
                 ::std::boxed::Box::leak(::std::boxed::Box::new(
-                    #facade::__private::codegen_v1::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
-                        ::std::boxed::Box::new(#facade::__private::codegen_v1::descriptor::opaque_member::<#ty>()),
+                    #facade::__private::codegen_v2::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
+                        ::std::boxed::Box::new(#facade::__private::codegen_v2::descriptor::opaque_member::<#ty>()),
                     )),
                 )),
-                #facade::__private::codegen_v1::identity::Visibility::Private,
+                #facade::__private::codegen_v2::identity::Visibility::Private,
             ))
         } else {
-            quote!(#facade::__private::codegen_v1::descriptor::lazy_field(
-                <#self_type as #facade::__private::codegen_v1::Reflect>::type_descriptor,
+            quote!(#facade::__private::codegen_v2::descriptor::lazy_field(
+                <#self_type as #facade::__private::codegen_v2::Reflect>::type_descriptor,
                 #index,
                 #field_rust_name,
                 #query_name,
-                #facade::__private::codegen_v1::descriptor::lazy_type_ref::<#ty>(),
-                #facade::__private::codegen_v1::identity::Visibility::Private,
+                #facade::__private::codegen_v2::descriptor::lazy_type_ref::<#ty>(),
+                #facade::__private::codegen_v2::identity::Visibility::Private,
             ))
         };
-        quote!(#descriptor.with_access(#policy).with_set_preflight(#preflight).with_variant(#variant_index, #variant_rust_name))
+        quote!(#descriptor.with_access(#policy).with_set_preflight(#preflight) #thread_safe_access .with_variant(#variant_index, #variant_rust_name))
     });
-    let construction = super::construction::variant_descriptor(variant, facade);
+    let construction = super::construction::variant_descriptor(variant, facade, thread_safe);
     quote! {{
         let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-        #facade::__private::codegen_v1::descriptor::variant(<#self_type as #facade::__private::codegen_v1::Reflect>::type_descriptor, #variant_index, #variant_rust_name, #query_name, #kind, fields, <#self_type>::#active)
+        #facade::__private::codegen_v2::descriptor::variant(<#self_type as #facade::__private::codegen_v2::Reflect>::type_descriptor, #variant_index, #variant_rust_name, #query_name, #kind, fields, <#self_type>::#active)
             .with_discriminant(#origin, #numeric_discriminant)
             #construction
     }}
@@ -445,13 +549,17 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
         return Vec::new();
     };
     let mut representations = Vec::new();
-    for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
+    for attribute in input
+        .attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("repr"))
+    {
         let syn::Meta::List(list) = &attribute.meta else {
             continue;
         };
-        let Ok(values) =
-            list.parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
-        else {
+        let Ok(values) = list.parse_args_with(
+            syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+        ) else {
             continue;
         };
         representations.extend(values.iter().filter_map(parse_enum_representation));
@@ -513,5 +621,5 @@ fn numeric_discriminant(
         _ => return quote!(None),
     };
     let repr = syn::Ident::new(repr, variant_name.span());
-    quote!(Some(#facade::__private::codegen_v1::descriptor::NumericDiscriminant::#variant(#enum_name::#variant_name as #repr)))
+    quote!(Some(#facade::__private::codegen_v2::descriptor::NumericDiscriminant::#variant(#enum_name::#variant_name as #repr)))
 }

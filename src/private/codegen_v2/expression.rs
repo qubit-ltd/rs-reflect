@@ -6,12 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Checked expression factories consumed by generated code.
+//! Checked expression factories consumed by codegen v2.
 
 #[doc(hidden)]
 pub use crate::expression::ArrayTypeExpression;
 #[doc(hidden)]
 pub use crate::expression::AssociatedTypeExpression;
+#[doc(hidden)]
+pub use crate::expression::ConcretePathSegment;
 #[doc(hidden)]
 pub use crate::expression::ConcreteTypeExpression;
 #[doc(hidden)]
@@ -152,6 +154,19 @@ pub fn concrete(
     diagnostic: DiagnosticText,
 ) -> ConcreteTypeExpression {
     let mut expression = ConcreteTypeExpression::new(path, arguments).expect("generated concrete paths are non-empty");
+    expression.diagnostic = diagnostic;
+    expression
+}
+
+/// Creates a concrete type expression from structural path segments.
+#[doc(hidden)]
+#[must_use]
+pub fn concrete_segments(
+    segments: impl IntoIterator<Item = ConcretePathSegment>,
+    diagnostic: DiagnosticText,
+) -> ConcreteTypeExpression {
+    let mut expression =
+        ConcreteTypeExpression::from_segments(segments).expect("generated concrete paths are non-empty");
     expression.diagnostic = diagnostic;
     expression
 }

@@ -11,6 +11,8 @@ use std::any::TypeId;
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::sync::LazyLock;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
 use qubit_reflect::descriptor::AssociatedConstBindingDescriptor;
@@ -20,6 +22,8 @@ use qubit_reflect::descriptor::AssociatedConstReader;
 use qubit_reflect::descriptor::AssociatedTypeBindingDescriptor;
 use qubit_reflect::descriptor::AssociatedTypeDescriptor;
 use qubit_reflect::descriptor::CatchingAvailability;
+use qubit_reflect::descriptor::ImplAssociatedConstDescriptor;
+use qubit_reflect::descriptor::ImplAssociatedTypeDescriptor;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
 use qubit_reflect::descriptor::ImplDescriptor;
 use qubit_reflect::descriptor::ImplDescriptorBuildError;
@@ -152,7 +156,7 @@ static MIDDLE_TRAIT: LazyLock<&'static TraitDescriptor> = LazyLock::new(|| {
 
 fn target_type() -> &'static TypeDescriptor {
     static TARGET: TypeDescriptor =
-        reflect::__private::codegen_v1::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
+        reflect::__private::codegen_v2::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
     &TARGET
 }
 
@@ -228,7 +232,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                reflect::__private::codegen_v1::descriptor::external_supertrait::<RootMarker>(
+                reflect::__private::codegen_v2::descriptor::external_supertrait::<RootMarker>(
                     "test.external.concurrent.root",
                     "fixture::ConcurrentRoot",
                     Vec::new(),
@@ -242,7 +246,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
         .collect();
     assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
 
-    let distinct = reflect::__private::codegen_v1::descriptor::external_supertrait::<RootMarker>(
+    let distinct = reflect::__private::codegen_v2::descriptor::external_supertrait::<RootMarker>(
         "test.external.concurrent.other",
         "fixture::ConcurrentOther",
         Vec::new(),
@@ -278,13 +282,13 @@ fn test_trait_payload_and_object_caches_reuse_initialized_values() {
     assert!(std::ptr::eq(first.applied(), second.applied()));
 
     let first =
-        reflect::__private::codegen_v1::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        reflect::__private::codegen_v2::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
             TraitDescriptor::builder(&ROOT_DEFINITION)
                 .build()
                 .expect("the cached trait object fixture must build")
         });
     let second =
-        reflect::__private::codegen_v1::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        reflect::__private::codegen_v2::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
             panic!("a hot trait-object lookup must not rebuild its descriptor")
         });
     assert!(std::ptr::eq(first, second));
@@ -857,4 +861,41 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
             .map(ImplDefinitionDescriptor::fragment_identity),
         Some(inherent_definition.fragment_identity())
     );
+}
+
+#[test]
+fn test_impl_associated_items_initialize_once_as_one_atomic_pair() {
+    static INITIALIZATIONS: AtomicUsize = AtomicUsize::new(0);
+    let definition: &'static ImplDefinitionDescriptor = Box::leak(Box::new(
+        ImplDefinitionDescriptor::new(
+            FragmentIdentity::new("fixture", "associated", 90, 1, "impl", 90),
+            concrete_u32_expression(),
+            ImplKind::Inherent,
+            None,
+            &EMPTY_GENERIC_DEFINITION,
+        )
+        .expect("the fixture impl definition must be valid"),
+    ));
+    let barrier = Arc::new(Barrier::new(8));
+    let threads = (0..8)
+        .map(|_| {
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                barrier.wait();
+                definition.initialize_associated_items(|_| {
+                    INITIALIZATIONS.fetch_add(1, Ordering::SeqCst);
+                    (
+                        vec![ImplAssociatedTypeDescriptor::new("Item")].into_boxed_slice(),
+                        vec![ImplAssociatedConstDescriptor::new("LIMIT", concrete_u32_expression())].into_boxed_slice(),
+                    )
+                });
+            })
+        })
+        .collect::<Vec<_>>();
+    for thread in threads {
+        thread.join().expect("initializer thread must not panic");
+    }
+    assert_eq!(INITIALIZATIONS.load(Ordering::SeqCst), 1);
+    assert_eq!(definition.associated_types()[0].rust_name(), "Item");
+    assert_eq!(definition.associated_consts()[0].rust_name(), "LIMIT");
 }
