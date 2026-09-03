@@ -1024,7 +1024,7 @@ impl TypeDescriptor {
     /// Both the returned slice and its descriptors belong to the immutable
     /// process-wide registry. A cached [`RegistryError`] is returned when
     /// distributed registration could not be aggregated.
-    #[must_use]
+    #[must_use = "inspect the reflected implementations or handle the registry error"]
     pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(registry.implementations(self.type_id()))
@@ -1036,7 +1036,7 @@ impl TypeDescriptor {
     /// defaulted trait methods replaced by their effective override where
     /// applicable. The slice is empty when no reflected impl targets this
     /// root. A cached [`RegistryError`] is returned when aggregation failed.
-    #[must_use]
+    #[must_use = "inspect the effective methods or handle the registry error"]
     pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(registry.effective_view(self.type_id()).methods())
