@@ -13,6 +13,8 @@ pub(crate) mod benchmark_registry_facts;
 #[cfg(feature = "bench-internals")]
 mod benchmark_target;
 mod built_fragment;
+#[cfg(feature = "bench-internals")]
+mod fact_row;
 mod materialized_fragment;
 mod pending_fragment;
 

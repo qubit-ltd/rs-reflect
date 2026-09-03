@@ -89,7 +89,85 @@ pub use crate::__private::descriptor::with_capabilities;
 #[doc(hidden)]
 pub use crate::__private::descriptor::with_concrete_generic;
 #[doc(hidden)]
+pub use crate::descriptor::AssociatedConstBindingDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::AssociatedConstDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::AssociatedConstImplementationSource;
+#[doc(hidden)]
+pub use crate::descriptor::AssociatedConstReader;
+#[doc(hidden)]
+pub use crate::descriptor::AssociatedTypeBindingDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::AssociatedTypeDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ConcreteGenericDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::DiscriminantOrigin;
+#[doc(hidden)]
+pub use crate::descriptor::EnumRepr;
+#[doc(hidden)]
+pub use crate::descriptor::ImplAssociatedConstDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ImplAssociatedTypeDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ImplDefinitionDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ImplDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ImplKind;
+#[doc(hidden)]
+pub use crate::descriptor::InvocationAdapter;
+#[doc(hidden)]
+pub use crate::descriptor::InvocationUnavailableReason;
+#[doc(hidden)]
+pub use crate::descriptor::MethodDeclarationOwner;
+#[doc(hidden)]
+pub use crate::descriptor::MethodDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::MethodImplementationSource;
+#[doc(hidden)]
+pub use crate::descriptor::MethodInstanceDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::MethodQualifiers;
+#[doc(hidden)]
+pub use crate::descriptor::MethodVisibility;
+#[doc(hidden)]
+pub use crate::descriptor::NumericDiscriminant;
+#[doc(hidden)]
+pub use crate::descriptor::ParameterDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ParameterPassingMode;
+#[doc(hidden)]
+pub use crate::descriptor::ParameterPatternDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ReceiverDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::Reflect;
+#[doc(hidden)]
+pub use crate::descriptor::ReturnDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::ReturnKind;
+#[doc(hidden)]
+pub use crate::descriptor::StructKind;
+#[doc(hidden)]
+pub use crate::descriptor::TraitCompleteness;
+#[doc(hidden)]
+pub use crate::descriptor::TraitDefinitionDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::TraitDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::TraitId;
+#[doc(hidden)]
 pub use crate::descriptor::TraitImplPayload;
+#[doc(hidden)]
+pub use crate::descriptor::TypeDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::TypeDescriptorResolver;
+#[doc(hidden)]
+pub use crate::descriptor::TypeRef;
+#[doc(hidden)]
+pub use crate::descriptor::VariantKind;
 #[doc(hidden)]
 pub use crate::descriptor::cached_trait_object_descriptor;
 #[doc(hidden)]

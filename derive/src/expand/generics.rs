@@ -41,7 +41,7 @@ pub(crate) fn concrete_descriptor(
             GenericKindIr::Lifetime => {}
             GenericKindIr::Type => {
                 let name = syn::Ident::new(&parameter.name, parameter.span);
-                arguments.push(quote!(#facade::expression::GenericArgument::Type(
+                arguments.push(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Type(
                     #facade::__private::codegen_v1::expression::parameter(stringify!(#name)),
                 )));
                 definition_indices.push(definition_index);
@@ -60,8 +60,8 @@ pub(crate) fn concrete_descriptor(
                 let const_type_tokens = &const_type.tokens;
                 let name = syn::Ident::new(&parameter.name, parameter.span);
                 let declared_type = super::traits::type_expression(const_type, facade);
-                arguments.push(quote!(#facade::expression::GenericArgument::Const(
-                    #facade::expression::ConstGenericArgument::new(
+                arguments.push(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v1::expression::ConstGenericArgument::new(
                         #declared_type,
                         #facade::__private::codegen_v1::descriptor::const_argument_expression::<#const_type_tokens>(#name),
                         #facade::__private::codegen_v1::descriptor::const_argument_diagnostic::<#const_type_tokens>(#name),
@@ -71,16 +71,16 @@ pub(crate) fn concrete_descriptor(
                 type_arguments.push(quote!(None));
                 const_argument_values.push(quote!(Some(
                     (|| #facade::__private::codegen_v1::descriptor::const_argument_owned::<#const_type_tokens>(#name))
-                        as fn() -> #facade::value::ReflectedOwned
+                        as fn() -> #facade::__private::codegen_v1::value::ReflectedOwned
                 )));
             }
         }
     }
     quote!({
         static DEFINITION: ::std::sync::OnceLock<
-            #facade::expression::GenericDefinitionDescriptor,
+            #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor,
         > = ::std::sync::OnceLock::new();
-        #facade::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
+        #facade::__private::codegen_v1::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
             DEFINITION.get_or_init(|| #definition),
             ::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()),
             ::std::boxed::Box::leak(::std::vec![#(#definition_indices),*].into_boxed_slice()),
@@ -125,9 +125,9 @@ pub(crate) fn definition_provider(
         super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     quote! {
         #[doc(hidden)]
-        fn #function() -> &'static #facade::expression::GenericDefinitionDescriptor {
+        fn #function() -> &'static #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor {
             static DEFINITION: ::std::sync::OnceLock<
-                #facade::expression::GenericDefinitionDescriptor,
+                #facade::__private::codegen_v1::expression::GenericDefinitionDescriptor,
             > = ::std::sync::OnceLock::new();
             DEFINITION.get_or_init(|| #definition)
         }
