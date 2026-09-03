@@ -6,10 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Crate-internal tests for generated-code support factories.
+//! Impl model facade fixture declaration.
 
-mod assertion_tests;
-mod descriptor_tests;
-mod lazy_type_ref_list_tests;
-#[cfg(feature = "bench-internals")]
-mod registration_tests;
+use model_facade_derive::model_reflect_impl;
+
+use crate::FacadeService;
+use crate::FacadeUser;
+
+#[model_reflect_impl]
+impl FacadeService for FacadeUser {}
