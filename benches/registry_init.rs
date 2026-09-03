@@ -15,15 +15,18 @@
 //! because its `OnceLock` can only initialize once per process.
 
 use std::any::TypeId;
-use std::hint::black_box;
-use std::time::Instant;
 
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::black_box;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use qubit_reflect as reflect;
-use reflect::__private::codegen_v1::registration::FragmentKind;
-use reflect::__private::codegen_v1::registration::FragmentPayload;
-use reflect::__private::codegen_v1::registration::RegistrationFragment;
-use reflect::__private::codegen_v1::registration::RuntimeIdentity;
-use reflect::__private::codegen_v1::registration::StaticFragmentIdentity;
+use reflect::__private::codegen_v2::registration::FragmentKind;
+use reflect::__private::codegen_v2::registration::FragmentPayload;
+use reflect::__private::codegen_v2::registration::RegistrationFragment;
+use reflect::__private::codegen_v2::registration::RuntimeIdentity;
+use reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
 use reflect::__private::testing::aggregate_benchmark_registry_facts;
 use reflect::__private::testing::prepare_benchmark_registry_facts;
 use reflect::TypeDescriptor;
@@ -32,7 +35,7 @@ use reflect::registry::ReflectRegistry;
 struct RegistryBenchmarkType;
 
 static REGISTRY_BENCHMARK_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
+    reflect::__private::codegen_v2::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
 
 /// Returns the runtime identity used by the benchmark fixture.
 fn benchmark_runtime_identity() -> RuntimeIdentity {
@@ -51,24 +54,12 @@ static REGISTRY_BENCHMARK_FRAGMENT: RegistrationFragment = RegistrationFragment:
     benchmark_payload,
 );
 
-reflect::__private::codegen_v1::inventory::submit! {
+reflect::__private::codegen_v2::inventory::submit! {
     REGISTRY_BENCHMARK_FRAGMENT
 }
 
-/// Measures repeated execution of one benchmark operation.
-fn measure_repeated<T>(name: &str, repetitions: usize, mut operation: impl FnMut() -> T) {
-    let started = Instant::now();
-    for _ in 0..repetitions {
-        black_box(operation());
-    }
-    let elapsed = started.elapsed();
-    println!(
-        "{name}: {elapsed:?} total, {:?} per iteration",
-        elapsed / repetitions as u32,
-    );
-}
-
-fn main() {
+/// Registers aggregation, global initialization, and frozen lookup cases.
+fn registry_operations(criterion: &mut Criterion) {
     let one_fragment = prepare_benchmark_registry_facts(1);
     let one_hundred_fragments = prepare_benchmark_registry_facts(100);
     let ten_thousand_fragments = prepare_benchmark_registry_facts(10_000);
@@ -77,27 +68,42 @@ fn main() {
     aggregate_benchmark_registry_facts(&ten_thousand_fragments)
         .expect("10,000-fragment aggregation setup must succeed");
 
-    measure_repeated("post-materialization aggregation: 1 fragment", 1_000, || {
-        aggregate_benchmark_registry_facts(&one_fragment)
+    let mut aggregation = criterion.benchmark_group("registry/aggregation");
+    aggregation.bench_with_input(BenchmarkId::from_parameter(1), &one_fragment, |bench, facts| {
+        bench.iter(|| black_box(aggregate_benchmark_registry_facts(facts)));
     });
-    measure_repeated("post-materialization aggregation: 100 fragments", 100, || {
-        aggregate_benchmark_registry_facts(&one_hundred_fragments)
-    });
-    measure_repeated("post-materialization aggregation: 10000 fragments", 3, || {
-        aggregate_benchmark_registry_facts(&ten_thousand_fragments)
-    });
+    aggregation.bench_with_input(
+        BenchmarkId::from_parameter(100),
+        &one_hundred_fragments,
+        |bench, facts| bench.iter(|| black_box(aggregate_benchmark_registry_facts(facts))),
+    );
+    aggregation.sample_size(10).bench_with_input(
+        BenchmarkId::from_parameter(10_000),
+        &ten_thousand_fragments,
+        |bench, facts| bench.iter(|| black_box(aggregate_benchmark_registry_facts(facts))),
+    );
+    aggregation.finish();
 
     let registry = ReflectRegistry::initialize().expect("production registry initialization");
-    measure_repeated("hot production registry initialize", 10_000, || {
-        ReflectRegistry::initialize()
+    criterion.bench_function("registry/hot_global_initialize", |bench| {
+        bench.iter(|| black_box(ReflectRegistry::initialize()));
     });
 
+    let mut lookup = criterion.benchmark_group("registry/frozen_lookup_batch");
     for batch_size in [1_usize, 100, 10_000] {
-        measure_repeated(&format!("frozen lookup batch {batch_size}"), batch_size, || {
-            (
-                registry.get(TypeId::of::<RegistryBenchmarkType>()),
-                registry.find_by_query_name("registry-benchmark").len(),
-            )
+        lookup.bench_with_input(BenchmarkId::from_parameter(batch_size), &batch_size, |bench, size| {
+            bench.iter(|| {
+                for _ in 0..*size {
+                    black_box((
+                        registry.get(TypeId::of::<RegistryBenchmarkType>()),
+                        registry.find_by_query_name("registry-benchmark").len(),
+                    ));
+                }
+            });
         });
     }
+    lookup.finish();
 }
+
+criterion_group!(benches, registry_operations);
+criterion_main!(benches);

@@ -8,7 +8,7 @@ license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-reflect"
 description = "Macro-based structural and executable reflection for Rust"
 homepage = "https://github.com/qubit-ltd/rs-reflect"
-documentation = "https://docs.rs/qubit-reflect"
+publish = false
 readme = "README.md"
 keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
 categories = ["development-tools"]
@@ -56,6 +56,7 @@ uuid = { version = "1", optional = true }
 qubit-reflect-derive = { version = "=0.1.0", path = "derive", optional = true }
 
 [dev-dependencies]
+criterion = "0.5"
 trybuild = "1"
 
 [[test]]
@@ -91,6 +92,11 @@ required-features = ["derive"]
 [[test]]
 name = "panic_abort_invocation_tests"
 path = "tests/panic_abort_invocation_tests.rs"
+required-features = ["derive"]
+
+[[test]]
+name = "public_derived_capability_conflict_tests"
+path = "tests/public_derived_capability_conflict_tests.rs"
 required-features = ["derive"]
 
 [[bin]]

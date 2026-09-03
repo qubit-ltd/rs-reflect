@@ -18,6 +18,59 @@ jobs:
     uses: qubit-ltd/rs-ci/.github/workflows/rust-ci.yml@7bca0de02da250cdfcf70345a1e313e39e389c15
     with:
       coverage_enforce_thresholds: "1"
+      cargo_fuzz_mode: disabled
       run_windows_tests: true
       run_macos_tests: true
     secrets: inherit
+
+  fuzz-smoke:
+    name: Project cargo-fuzz smoke check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Load toolchain contract
+        run: |
+          source .rs-ci/toolchains.sh
+          configure_rs_ci_toolchains
+          echo "RS_CI_FUZZ_TOOLCHAIN=$RS_CI_FUZZ_TOOLCHAIN" >> "$GITHUB_ENV"
+          echo "CARGO_FUZZ_VERSION=$CARGO_FUZZ_VERSION" >> "$GITHUB_ENV"
+      - name: Install cargo-fuzz
+        run: |
+          rustup toolchain install "$RS_CI_FUZZ_TOOLCHAIN" --profile minimal
+          cargo install --locked cargo-fuzz --version "$CARGO_FUZZ_VERSION"
+      - name: Run fuzz smoke checks
+        run: RS_CI_PROJECT_ROOT="$PWD" scripts/cargo-fuzz-check.sh
+      - name: Upload fuzz crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-artifacts-${{ github.sha }}
+          path: fuzz/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+
+  critical-coverage:
+    name: Critical per-file coverage gate
+    needs: rust-ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Download coverage report
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-reports
+          path: coverage-reports
+      - name: Check critical file thresholds
+        run: |
+          scripts/critical-coverage-check.sh \
+            coverage-reports/coverage.json \
+            .rs-ci-critical-coverage.json \
+            "$PWD"

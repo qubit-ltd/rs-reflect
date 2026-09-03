@@ -6,23 +6,26 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Baseline executable for descriptor lookup benchmarking.
+//! Criterion benchmarks for descriptor lookup.
 
-use std::hint::black_box;
-use std::time::Instant;
-
+use criterion::Criterion;
+use criterion::black_box;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use qubit_reflect::TypeDescriptor;
 
-/// Measures repeated lookup of representative built-in descriptors.
-fn main() {
-    let cold_started = Instant::now();
-    black_box(TypeDescriptor::of::<Vec<Option<String>>>());
-    println!("cold descriptor initialization: {:?}", cold_started.elapsed());
-
-    let hot_started = Instant::now();
-    for _ in 0..100_000 {
-        black_box(TypeDescriptor::of::<u64>());
-        black_box(TypeDescriptor::of::<Vec<String>>());
-    }
-    println!("hot descriptor lookup: {:?}", hot_started.elapsed());
+/// Registers cold-shape and hot-interner descriptor cases.
+fn descriptor_lookup(criterion: &mut Criterion) {
+    criterion.bench_function("descriptor/cold_nested_shape", |bench| {
+        bench.iter(|| black_box(TypeDescriptor::of::<Vec<Option<String>>>()));
+    });
+    criterion.bench_function("descriptor/hot_builtin_pair", |bench| {
+        bench.iter(|| {
+            black_box(TypeDescriptor::of::<u64>());
+            black_box(TypeDescriptor::of::<Vec<String>>());
+        });
+    });
 }
+
+criterion_group!(benches, descriptor_lookup);
+criterion_main!(benches);

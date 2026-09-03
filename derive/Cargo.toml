@@ -2,13 +2,13 @@
 name = "qubit-reflect-derive"
 version = "0.1.0"
 edition = "2024"
+publish = false
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-reflect"
 description = "Procedural macros for qubit-reflect"
 homepage = "https://github.com/qubit-ltd/rs-reflect"
-documentation = "https://docs.rs/qubit-reflect-derive"
 keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
 categories = ["development-tools"]
 
@@ -19,4 +19,4 @@ proc-macro = true
 proc-macro-crate = "3"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
-syn = { version = "2", features = ["full", "extra-traits"] }
+syn = { version = "2", features = ["full", "extra-traits", "visit-mut"] }

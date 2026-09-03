@@ -6,23 +6,30 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Baseline executable for hot external-supertrait cache lookup benchmarking.
+//! Criterion benchmark for hot external-supertrait cache lookup.
 
-use std::hint::black_box;
+use criterion::Criterion;
+use criterion::black_box;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use qubit_reflect::__private::codegen_v2::descriptor::external_supertrait;
 
-use qubit_reflect::__private::codegen_v1::descriptor::external_supertrait;
-
-/// Measures repeated lookup after the exact external application is cached.
-fn main() {
+/// Registers a hot lookup after priming the exact external application.
+fn trait_cache_lookup(criterion: &mut Criterion) {
     let first =
         external_supertrait::<dyn std::fmt::Display>("benchmark.external.display", "std::fmt::Display", Vec::new());
     black_box(first);
 
-    for _ in 0..100_000 {
-        black_box(external_supertrait::<dyn std::fmt::Display>(
-            "benchmark.external.display",
-            "std::fmt::Display",
-            Vec::new(),
-        ));
-    }
+    criterion.bench_function("trait_cache/hot_external_supertrait", |bench| {
+        bench.iter(|| {
+            black_box(external_supertrait::<dyn std::fmt::Display>(
+                "benchmark.external.display",
+                "std::fmt::Display",
+                Vec::new(),
+            ))
+        });
+    });
 }
+
+criterion_group!(benches, trait_cache_lookup);
+criterion_main!(benches);

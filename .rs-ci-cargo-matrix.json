@@ -20,7 +20,35 @@
       "allFeatures": true
     },
     {
-      "name": "derive",
+      "name": "derive-only",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"],
+      "defaultFeatures": false,
+      "features": ["derive"]
+    },
+    {
+      "name": "ecosystem-only",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"],
+      "defaultFeatures": false,
+      "features": ["ecosystem-types"]
+    },
+    {
+      "name": "qubit-only",
+      "commands": ["check", "test", "doc-test"],
+      "packages": ["qubit-reflect"],
+      "defaultFeatures": false,
+      "features": ["qubit-types"]
+    },
+    {
+      "name": "bench-internals",
+      "commands": ["check", "test", "clippy"],
+      "packages": ["qubit-reflect"],
+      "defaultFeatures": false,
+      "features": ["bench-internals"]
+    },
+    {
+      "name": "proc-macro",
       "commands": ["check", "test", "doc-test", "clippy"],
       "packages": ["qubit-reflect-derive"]
     },
