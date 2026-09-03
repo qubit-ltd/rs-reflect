@@ -51,6 +51,7 @@ pub use crate::expression::TypeExpression;
 
 /// Creates a named type-parameter expression from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn parameter(name: impl Into<Box<str>>) -> TypeExpression {
     TypeExpression::parameter(name).expect("generated type parameter names are non-empty")
 }
@@ -79,6 +80,7 @@ where
 
 /// Creates an associated-type equality argument from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn associated_type(name: impl Into<Box<str>>, value: TypeExpression) -> GenericArgument {
     GenericArgument::AssociatedType {
         name: crate::expression::ExpressionName::new(name).expect("generated associated type names are non-empty"),
@@ -143,6 +145,7 @@ pub fn const_generic_parameter(
 
 /// Creates a concrete type expression from generator-validated path data.
 #[doc(hidden)]
+#[must_use]
 pub fn concrete(
     path: Box<[Box<str>]>,
     arguments: Box<[GenericArgument]>,
@@ -165,12 +168,14 @@ pub fn const_argument(
 
 /// Creates an array type expression from generated structural inputs.
 #[doc(hidden)]
+#[must_use]
 pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpression {
     ArrayTypeExpression::new(element, length)
 }
 
 /// Creates a reference type expression from generated structural inputs.
 #[doc(hidden)]
+#[must_use]
 pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> ReferenceTypeExpression {
     ReferenceTypeExpression::new(lifetime, mutable, target)
 }
@@ -178,6 +183,7 @@ pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpres
 /// Creates a non-empty type-bound predicate from generator-validated parallel
 /// inputs.
 #[doc(hidden)]
+#[must_use]
 pub fn type_bound(
     subject: TypeExpression,
     bounds: Box<[TypeExpression]>,
@@ -191,6 +197,7 @@ pub fn type_bound(
 /// Creates a non-empty lifetime-outlives predicate from generator-validated
 /// inputs.
 #[doc(hidden)]
+#[must_use]
 pub fn lifetime_outlives(lifetime: LifetimeExpression, bounds: Box<[LifetimeExpression]>) -> PredicateDescriptor {
     PredicateDescriptor::lifetime_outlives(lifetime, bounds)
         .expect("generated lifetime-outlives predicates have at least one bound")

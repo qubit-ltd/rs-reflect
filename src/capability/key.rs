@@ -26,6 +26,7 @@ pub struct CapabilityKey<A: 'static> {
 
 impl<A: 'static> CapabilityKey<A> {
     /// Creates an externally defined typed key from a validated capability ID.
+    #[must_use]
     pub fn new(id: CapabilityId) -> Self {
         Self {
             id,

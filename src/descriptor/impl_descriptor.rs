@@ -73,6 +73,7 @@ pub struct ImplAssociatedTypeDescriptor {
 impl ImplAssociatedTypeDescriptor {
     /// Creates declaration-level associated type binding facts.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(rust_name: &'static str) -> Self {
         Self { rust_name }
     }
@@ -95,6 +96,7 @@ pub struct ImplAssociatedConstDescriptor {
 impl ImplAssociatedConstDescriptor {
     /// Creates declaration-level associated constant binding facts.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(rust_name: &'static str, declared_type: TypeExpression) -> Self {
         Self {
             rust_name,
@@ -262,6 +264,7 @@ impl ImplDefinitionDescriptor {
 
     /// Returns methods declared by this impl definition in source order.
     #[must_use]
+    #[inline(always)]
     pub fn methods(&self) -> &[MethodDescriptor] {
         self.methods.get().map_or(&[], Box::as_ref)
     }
@@ -380,6 +383,7 @@ impl AssociatedTypeBindingDescriptor {
     ///
     /// `concrete_type` is present only when `value` resolves to an exact root.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         declaration: &'static AssociatedTypeDescriptor,
         value: TypeExpression,
@@ -428,6 +432,7 @@ pub struct AssociatedConstBindingDescriptor {
 impl AssociatedConstBindingDescriptor {
     /// Creates associated constant binding facts.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         declaration: &'static AssociatedConstDescriptor,
         implementation_source: AssociatedConstImplementationSource,
@@ -672,6 +677,7 @@ impl ImplDescriptor {
 
     /// Returns methods explicitly declared by this impl definition.
     #[must_use]
+    #[inline(always)]
     pub const fn methods(&self) -> &[MethodDescriptor] {
         self.methods
     }
@@ -684,6 +690,7 @@ impl ImplDescriptor {
     }
 
     /// Finds a trait declaration by query name.
+    #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)
     }
@@ -790,30 +797,35 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets methods explicitly declared by the impl definition.
+    #[must_use]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
         self
     }
 
     /// Sets concrete effective method instances.
+    #[must_use]
     pub fn method_instances(mut self, instances: Vec<MethodInstanceDescriptor>) -> Self {
         self.method_instances = instances;
         self
     }
 
     /// Sets associated type bindings in declaration order.
+    #[must_use]
     pub fn associated_types(mut self, bindings: Vec<AssociatedTypeBindingDescriptor>) -> Self {
         self.associated_types = bindings;
         self
     }
 
     /// Sets associated constant bindings in declaration order.
+    #[must_use]
     pub fn associated_consts(mut self, bindings: Vec<AssociatedConstBindingDescriptor>) -> Self {
         self.associated_consts = bindings;
         self
     }
 
     /// Sets concrete impl arguments in definition parameter order.
+    #[must_use]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;
         self

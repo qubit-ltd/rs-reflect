@@ -70,6 +70,7 @@ impl<M: Mode> Copy for ConstructionField<M> {}
 
 impl<M: Mode> ConstructionField<M> {
     /// Declares a field that must be present in from-zero construction input.
+    #[must_use]
     pub const fn required(descriptor: &'static FieldDescriptor) -> Self {
         Self {
             descriptor,
@@ -97,6 +98,7 @@ impl<M: Mode> ConstructionField<M> {
     }
 
     /// Marks a field as blocking this generated construction path.
+    #[must_use]
     pub const fn unavailable(
         descriptor: &'static FieldDescriptor,
         reason: crate::construct::ConstructionUnavailableReason,
@@ -152,6 +154,7 @@ pub struct UpdateField {
 
 impl UpdateField {
     /// Declares a field whose exact whole value may be replaced by update.
+    #[must_use]
     pub const fn allowed(descriptor: &'static FieldDescriptor) -> Self {
         Self {
             descriptor,
@@ -160,6 +163,7 @@ impl UpdateField {
     }
 
     /// Declares a field that the generated update path cannot replace.
+    #[must_use]
     pub const fn unavailable(
         descriptor: &'static FieldDescriptor,
         reason: crate::construct::ConstructionUnavailableReason,

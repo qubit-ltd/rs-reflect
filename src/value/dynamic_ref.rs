@@ -65,6 +65,7 @@ impl<'a> DynamicRef<'a, Local> {
     ///
     /// The resulting value is not `Any`-compatible; use [`Self::as_str`] to
     /// access the original borrow.
+    #[must_use]
     pub fn new_str(value: &'a str) -> Self {
         Self {
             storage: LocalRefStorage::Str(value),
@@ -75,6 +76,7 @@ impl<'a> DynamicRef<'a, Local> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| (value as &dyn Any).is::<T>())
     }
@@ -82,6 +84,7 @@ impl<'a> DynamicRef<'a, Local> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| (value as &dyn Any).downcast_ref::<T>())
     }
@@ -173,6 +176,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     ///
     /// The resulting value is not `Any`-compatible; use [`Self::as_str`] to
     /// access the original borrow.
+    #[must_use]
     pub fn new_str(value: &'a str) -> Self {
         Self {
             storage: ThreadSafeRefStorage::Str(value),
@@ -183,6 +187,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| (value as &dyn Any).is::<T>())
     }
@@ -190,6 +195,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| (value as &dyn Any).downcast_ref::<T>())
     }
@@ -260,6 +266,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
 
     /// Downgrades this thread-safe borrow to the local mode without changing
     /// it.
+    #[must_use]
     pub fn into_local(self) -> DynamicRef<'a, Local> {
         let Self { storage, .. } = self;
         let storage = match storage {

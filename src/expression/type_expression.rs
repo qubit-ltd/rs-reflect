@@ -48,6 +48,7 @@ pub struct DiagnosticText(pub(crate) Option<Box<str>>);
 
 impl DiagnosticText {
     /// Returns the diagnostic text when present.
+    #[must_use]
     pub fn as_deref(&self) -> Option<&str> {
         self.0.as_deref()
     }
@@ -148,16 +149,20 @@ impl ConcreteTypeExpression {
     }
 
     /// Returns the path segments in declaration order.
+    #[must_use]
     pub fn path(&self) -> &[Box<str>] {
         &self.path
     }
 
     /// Returns final-segment generic arguments in declaration order.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
 
     /// Returns source-oriented diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -205,22 +210,28 @@ impl AssociatedTypeExpression {
     }
 
     /// Returns the projected self type.
+    #[must_use]
     pub fn self_type(&self) -> &TypeExpression {
         &self.self_type
     }
     /// Returns the optional qualifying trait path.
+    #[must_use]
     pub fn trait_path(&self) -> Option<&TypeExpression> {
         self.trait_path.as_deref()
     }
     /// Returns the associated item name.
+    #[must_use]
     pub fn item(&self) -> &str {
         self.item.as_str()
     }
     /// Returns associated type arguments.
+    #[must_use]
+    #[inline(always)]
     pub fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
     /// Returns source-oriented diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -255,6 +266,7 @@ pub struct ReferenceTypeExpression {
 
 impl ReferenceTypeExpression {
     /// Creates a reference expression.
+    #[must_use]
     pub fn new(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> Self {
         Self {
             lifetime,
@@ -264,18 +276,22 @@ impl ReferenceTypeExpression {
         }
     }
     /// Returns the reference lifetime.
+    #[must_use]
     pub fn lifetime(&self) -> &LifetimeExpression {
         &self.lifetime
     }
     /// Returns whether the reference is mutable.
+    #[must_use]
     pub fn is_mutable(&self) -> bool {
         self.mutable
     }
     /// Returns the referenced type.
+    #[must_use]
     pub fn target(&self) -> &TypeExpression {
         &self.target
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -306,6 +322,7 @@ pub struct RawPointerTypeExpression {
 
 impl RawPointerTypeExpression {
     /// Creates a raw pointer expression.
+    #[must_use]
     pub fn new(mutable: bool, target: TypeExpression) -> Self {
         Self {
             mutable,
@@ -314,14 +331,17 @@ impl RawPointerTypeExpression {
         }
     }
     /// Returns whether the pointer is mutable.
+    #[must_use]
     pub fn is_mutable(&self) -> bool {
         self.mutable
     }
     /// Returns the pointee type.
+    #[must_use]
     pub fn target(&self) -> &TypeExpression {
         &self.target
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -348,6 +368,7 @@ pub struct ArrayTypeExpression {
 
 impl ArrayTypeExpression {
     /// Creates an array expression.
+    #[must_use]
     pub fn new(element: TypeExpression, length: ConstExpression) -> Self {
         Self {
             element: Box::new(element),
@@ -356,14 +377,17 @@ impl ArrayTypeExpression {
         }
     }
     /// Returns the element type.
+    #[must_use]
     pub fn element(&self) -> &TypeExpression {
         &self.element
     }
     /// Returns the structural length expression.
+    #[must_use]
     pub fn length(&self) -> &ConstExpression {
         &self.length
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -439,30 +463,37 @@ impl FunctionPointerExpression {
         }
     }
     /// Returns the calling convention.
+    #[must_use]
     pub fn abi(&self) -> &FunctionAbi {
         &self.abi
     }
     /// Returns the safety qualifier.
+    #[must_use]
     pub fn safety(&self) -> &FunctionSafety {
         &self.safety
     }
     /// Returns whether the signature is variadic.
+    #[must_use]
     pub fn is_variadic(&self) -> bool {
         self.variadic
     }
     /// Returns higher-ranked lifetimes.
+    #[must_use]
     pub fn higher_ranked_lifetimes(&self) -> &[LifetimeExpression] {
         &self.higher_ranked_lifetimes
     }
     /// Returns parameter types.
+    #[must_use]
     pub fn parameters(&self) -> &[TypeExpression] {
         &self.parameters
     }
     /// Returns the return type.
+    #[must_use]
     pub fn return_type(&self) -> &TypeExpression {
         &self.return_type
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -501,10 +532,12 @@ impl TraitObjectExpression {
         }
     }
     /// Returns object bounds.
+    #[must_use]
     pub fn bounds(&self) -> &[PredicateDescriptor] {
         &self.bounds
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -536,10 +569,12 @@ impl OpaqueTypeExpression {
         }
     }
     /// Returns opaque bounds.
+    #[must_use]
     pub fn bounds(&self) -> &[PredicateDescriptor] {
         &self.bounds
     }
     /// Returns diagnostic text when present.
+    #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

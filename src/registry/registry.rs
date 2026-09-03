@@ -194,6 +194,7 @@ impl ReflectRegistry {
     /// Looks up one exact concrete registered type.
     ///
     /// `None` means no linked static fragment registered `type_id`.
+    #[must_use]
     pub fn get(&self, type_id: TypeId) -> Option<&'static TypeDescriptor> {
         self.indexes.types_by_id.get(&type_id).copied()
     }
@@ -245,6 +246,7 @@ impl ReflectRegistry {
     ///
     /// Diagnostic-only text does not participate because
     /// [`TypeExpression`] equality is structural.
+    #[must_use]
     pub fn find_impl_definitions_by_target(&self, target: &TypeExpression) -> ImplDefinitionCandidates {
         ImplDefinitionCandidates {
             descriptors: self
@@ -260,6 +262,7 @@ impl ReflectRegistry {
     ///
     /// Repeated calls borrow the same registry-owned view without allocation.
     /// An unregistered target borrows one stable empty view.
+    #[must_use]
     pub fn effective_view(&self, type_id: TypeId) -> &EffectiveTypeView {
         self.indexes
             .effective_views_by_target
@@ -272,6 +275,7 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked registration fragment declared the requested
     /// trait.
+    #[must_use]
     pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
         self.indexes.traits_by_id.get(trait_id).copied()
     }
@@ -280,6 +284,7 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked reflected trait declaration has the exact path,
     /// or the path is ambiguous across linked fragments.
+    #[must_use]
     pub fn trait_definition_by_path(&self, rust_path: &str) -> Option<&'static TraitDefinitionDescriptor> {
         self.find_trait_definitions_by_path(rust_path).only()
     }

@@ -79,6 +79,7 @@ pub fn registered_type_capabilities<T: 'static>() -> Result<TypeCapabilities, Ca
 /// returns the existing [`TypeDescriptor`](crate::descriptor::TypeDescriptor)
 /// root and never creates a second root.
 #[doc(hidden)]
+#[must_use]
 pub fn registered_reflected_type<T: 'static>() -> Option<&'static TypeDescriptor> {
     let target = TypeId::of::<T>();
     inventory::iter::<ReflectedTypeRegistration>

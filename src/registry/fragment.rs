@@ -39,6 +39,7 @@ pub struct StaticFragmentIdentity {
 impl StaticFragmentIdentity {
     /// Creates static identity facts from macro-provided constants.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         declaring_crate: &'static str,
         module_path: &'static str,
@@ -118,6 +119,7 @@ pub struct CapabilityRegistration {
 impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(target_type_id: TypeId, descriptor: CapabilityDescriptor) -> Self {
         Self {
             target_type_id,

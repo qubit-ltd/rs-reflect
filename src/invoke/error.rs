@@ -152,6 +152,7 @@ pub struct InvocationError {
 
 impl InvocationError {
     /// Creates an invocation error for one exact method member.
+    #[must_use]
     pub fn new(method_identity: MemberId, kind: InvocationErrorKind) -> Self {
         Self {
             method_identity: Box::new(method_identity),
@@ -207,6 +208,7 @@ pub struct InvocationPanic {
 
 impl InvocationPanic {
     /// Creates a caught-panic value retaining method identity and payload.
+    #[must_use]
     pub fn new(method_identity: MemberId, payload: Box<dyn Any + Send>) -> Self {
         Self {
             method_identity: Box::new(method_identity),

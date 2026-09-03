@@ -124,6 +124,7 @@ impl TypeCapabilities {
 
     /// Returns whether the set contains the key's exact ID and adapter
     /// contract.
+    #[must_use]
     pub fn contains<A: 'static>(&self, key: CapabilityKey<A>) -> bool {
         self.find(key.id())
             .is_some_and(|descriptor| descriptor.adapter_type() == key.adapter_type())
@@ -133,6 +134,7 @@ impl TypeCapabilities {
     ///
     /// `None` means the ID is absent, the contract differs, or the descriptor
     /// represents a fact without an executable adapter.
+    #[must_use]
     pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
         self.find(key.id())?.get(&key)
     }

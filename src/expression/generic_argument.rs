@@ -74,14 +74,18 @@ impl ConstGenericArgument {
     }
 
     /// Returns the declared const parameter type.
+    #[must_use]
     pub fn declared_type(&self) -> &TypeExpression {
         &self.declared_type
     }
     /// Returns the structural const value.
+    #[must_use]
+    #[inline(always)]
     pub fn value(&self) -> &ConstExpression {
         &self.value
     }
     /// Returns the normalized source-oriented rendering.
+    #[must_use]
     pub fn normalized_diagnostic(&self) -> &str {
         &self.normalized_diagnostic
     }

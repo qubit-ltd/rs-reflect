@@ -28,6 +28,7 @@ pub struct CapabilityDescriptor {
 
 impl CapabilityDescriptor {
     /// Creates a capability fact without an executable adapter.
+    #[must_use]
     pub fn without_adapter<A: 'static>(key: CapabilityKey<A>) -> Self {
         Self {
             id: key.id().clone(),

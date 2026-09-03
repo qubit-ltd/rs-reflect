@@ -161,6 +161,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     ///
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the supplied input range.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.argument_names.get(index).and_then(|name| name.as_deref())
     }

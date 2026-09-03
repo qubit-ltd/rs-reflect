@@ -56,6 +56,7 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     ///
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the recovered input range.
+    #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.argument_names.get(index).and_then(|name| name.as_deref())
     }
@@ -102,10 +103,14 @@ pub struct InvocationFailure<'call, M: InvocationMode> {
 
 impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     /// Returns the structured validation error.
+    #[must_use]
+    #[inline(always)]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable invocation input.
+    #[must_use]
+    #[inline(always)]
     pub const fn recovery(&self) -> &InvocationRecovery<'call, M> {
         &self.recovery
     }

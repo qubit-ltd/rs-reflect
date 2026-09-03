@@ -149,6 +149,7 @@ impl FieldDescriptor {
     /// their dynamic operations return [`FieldAccessError::Unavailable`]. The
     /// policy is enforced before any adapter is invoked.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_access(
         mut self,
         access_policy: FieldAccessPolicy,
@@ -169,6 +170,7 @@ impl FieldDescriptor {
     /// Generated enum fields use this hook to validate the active variant
     /// while the replacement remains recoverable by the descriptor.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_set_preflight(mut self, set_preflight: Option<FieldSetPreflightAdapter>) -> Self {
         self.set_preflight = set_preflight;
         self
@@ -180,6 +182,7 @@ impl FieldDescriptor {
     /// runtime identity, so fields at equal positions in different variants
     /// remain distinct.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_variant(mut self, variant_index: usize, variant_rust_name: &'static str) -> Self {
         self.variant_index = Some(variant_index);
         self.variant_rust_name = Some(variant_rust_name);
