@@ -37,6 +37,7 @@ pub(super) fn specialization_associated_type_resolver_arms(
     replacements: &[(Ident, TokenStream)],
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
+    let codegen = quote!(#facade::__private::codegen_v1);
     let impl_declaration = &declaration.generics.impl_declaration;
     let where_clause = &declaration.generics.where_clause;
     let specialization_arguments: Vec<_> = declaration
@@ -65,7 +66,7 @@ pub(super) fn specialization_associated_type_resolver_arms(
                         -> Option<#facade::__private::codegen_v1::descriptor::TypeDescriptorResolver>
                         #where_clause
                     {
-                        use #facade::__private::codegen_v1::descriptor::ResolveReflectTypeDescriptor as _;
+                        use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
                         let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<#value>::new();
                         (&probe).resolve_reflect_type_descriptor()
                     }

@@ -8,8 +8,14 @@
 
 //! Expansion of reflected trait declarations and their registration fragments.
 
+// qubit-style: allow multiple-public-types
+// qubit-style: allow explicit-imports
+
 mod default_invocation;
+mod default_method_expansion;
+mod dyn_trait_generics;
 mod metadata;
+mod trait_metadata;
 mod token_rewrite;
 
 use proc_macro2::Group;
@@ -59,6 +65,8 @@ use crate::ir::TraitDeclarationIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::WherePredicateIr;
+use self::dyn_trait_generics::DynTraitGenerics;
+use self::default_method_expansion::DefaultMethodExpansion;
 
 /// Conservatively rejects unresolved lifetime shapes before the semantic
 /// `Sized` probe. Rust method selection does not treat an unmet region
@@ -347,13 +355,6 @@ fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
         .collect()
 }
 
-/// Generated pieces associated with reflected trait default methods.
-struct DefaultMethodExpansion {
-    adapter_items: Vec<TokenStream>,
-    adapter_entries: Vec<TokenStream>,
-    unavailable_reason_entries: Vec<TokenStream>,
-}
-
 /// Analyzes and emits all default-method adapter protocol entries.
 fn default_method_expansion(
     declaration: &TraitDeclarationIr,
@@ -422,6 +423,7 @@ fn associated_type_resolver_entries(
     declaration: &TraitDeclarationIr,
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
+    let codegen = quote!(#facade::__private::codegen_v1);
     declaration
         .associated_types
         .iter()
@@ -429,7 +431,7 @@ fn associated_type_resolver_entries(
             if item.generics.params.is_empty() {
                 let name = &item.name;
                 quote!({
-                    use #facade::__private::codegen_v1::descriptor::ResolveReflectTypeDescriptor as _;
+                    use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
                     let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<Self::#name>::new();
                     (&probe).resolve_reflect_type_descriptor()
                 })
@@ -444,6 +446,7 @@ fn associated_type_resolver_entries(
 /// semantics.
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
+    let codegen = quote!(#facade::__private::codegen_v1);
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let suffix = format!("{fingerprint:016x}");
     let marker = Ident::new(
@@ -595,7 +598,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             };
             let reader_entry = if has_proven_static_shape {
                 quote!({
-                    use #facade::__private::codegen_v1::descriptor::ResolveAssociatedConstReader as _;
+                    use #codegen::descriptor::ResolveAssociatedConstReader as _;
                     let probe = #facade::__private::codegen_v1::descriptor::AssociatedConstProbe::<
                         #support::#provider<#(#generic_arguments,)* Self>
                     >::new();
@@ -612,13 +615,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         .map(|(provider, _)| provider);
     let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
         quote! {
-            #[allow(unused_imports)]
             use super::*;
         }
     });
     let associated_const_reader_entries =
         associated_const_providers.iter().map(|(_, reader)| reader);
-    let metadata::TraitMetadata {
+    let trait_metadata::TraitMetadata {
         methods,
         associated_types,
         associated_consts,
@@ -777,7 +779,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 
         #[doc(hidden)]
         mod #support {
-            use #facade::__private::codegen_v1 as __qubit_reflect_codegen;
+            use #codegen as __qubit_reflect_codegen;
             #associated_const_scope_import
 
             #[allow(non_camel_case_types)]
@@ -848,15 +850,6 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             }
         }
     }
-}
-
-/// Generated generic syntax and associated-type identities for one dyn root.
-struct DynTraitGenerics {
-    impl_declaration: TokenStream,
-    trait_application: TokenStream,
-    factory_arguments: Vec<TokenStream>,
-    where_clause: TokenStream,
-    associated_type_arguments: Vec<TokenStream>,
 }
 
 /// Builds a `'static` concrete dyn application from the trait declaration.

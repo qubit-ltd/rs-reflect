@@ -8,6 +8,8 @@
 
 //! Expansion of reflected struct declarations.
 
+// qubit-style: allow explicit-imports
+
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
@@ -319,22 +321,21 @@ fn registration(
         #[doc(hidden)]
         mod #module {
             use super::*;
-            use #facade::__private::codegen_v1 as __qubit_reflect_codegen;
 
-            fn runtime_identity() -> __qubit_reflect_codegen::registration::RuntimeIdentity {
-                __qubit_reflect_codegen::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
+            fn runtime_identity() -> #facade::__private::codegen_v1::registration::RuntimeIdentity {
+                #facade::__private::codegen_v1::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
             }
 
-            fn payload() -> __qubit_reflect_codegen::registration::FragmentPayload {
-                __qubit_reflect_codegen::registration::FragmentPayload::Type(
-                    <#name as __qubit_reflect_codegen::Reflect>::type_descriptor(),
+            fn payload() -> #facade::__private::codegen_v1::registration::FragmentPayload {
+                #facade::__private::codegen_v1::registration::FragmentPayload::Type(
+                    <#name as #facade::__private::codegen_v1::Reflect>::type_descriptor(),
                 )
             }
 
-            __qubit_reflect_codegen::inventory::submit! {
-                __qubit_reflect_codegen::registration::RegistrationFragment::new(
-                    __qubit_reflect_codegen::registration::FragmentKind::Type,
-                    __qubit_reflect_codegen::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v1::inventory::submit! {
+                #facade::__private::codegen_v1::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v1::registration::FragmentKind::Type,
+                    #facade::__private::codegen_v1::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", #fingerprint,
                     ),
                     runtime_identity,

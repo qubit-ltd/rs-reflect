@@ -73,6 +73,7 @@ use crate::parse::type_ir::convert_bound;
 use crate::parse::type_ir::convert_path;
 use crate::parse::type_ir::convert_type;
 use crate::validate::validation_error;
+use super::parsed_pipeline::ParsedPipeline;
 
 /// Parses a procedural macro invocation into shared declaration IR.
 ///
@@ -116,13 +117,6 @@ pub(crate) fn parse_and_validate_declaration(
             declaration: pipeline.declaration.declaration,
         }),
     }
-}
-
-/// Holds parser diagnostics alongside IR until the validation pipeline
-/// completes.
-struct ParsedPipeline {
-    declaration: ParsedDeclaration,
-    error: Option<Error>,
 }
 
 /// Runs only the syntax and IR conversion phase for one macro kind.

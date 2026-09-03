@@ -10,6 +10,7 @@
 
 mod attributes;
 mod declaration;
+mod parsed_pipeline;
 mod type_ir;
 
 #[allow(

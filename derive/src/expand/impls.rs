@@ -8,7 +8,10 @@
 
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
+// qubit-style: allow explicit-imports
+
 mod concrete_emission;
+mod concrete_impl_emission;
 mod invocation_adapter;
 mod specialization_codegen;
 
@@ -22,7 +25,7 @@ use specialization_codegen::substitute_impl_method_types;
 use specialization_codegen::substitute_tokens;
 use specialization_codegen::substitute_type_tokens;
 use specialization_codegen::typed_extension_receiver_type;
-use concrete_emission::ConcreteImplEmission;
+use concrete_impl_emission::ConcreteImplEmission;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;

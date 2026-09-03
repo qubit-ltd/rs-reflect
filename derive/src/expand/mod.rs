@@ -11,6 +11,7 @@
 mod construction;
 mod context;
 mod dispatcher;
+mod enum_repr_ir;
 mod enums;
 mod expression_codegen;
 mod generics;

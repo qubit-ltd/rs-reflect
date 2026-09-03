@@ -8,6 +8,8 @@
 
 //! Expansion of non-generic reflected enum declarations.
 
+// qubit-style: allow explicit-imports
+
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -18,74 +20,7 @@ use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VariantKindIr;
-
-/// A normalized enum representation component retained by generated metadata.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-enum EnumReprIr {
-    Rust,
-    C,
-    Transparent,
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    Isize,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    Usize,
-    Align(usize),
-}
-
-impl EnumReprIr {
-    /// Returns the primitive integer spelling used for compiler-checked casts.
-    fn integer_name(&self) -> Option<&'static str> {
-        match self {
-            Self::I8 => Some("i8"),
-            Self::I16 => Some("i16"),
-            Self::I32 => Some("i32"),
-            Self::I64 => Some("i64"),
-            Self::I128 => Some("i128"),
-            Self::Isize => Some("isize"),
-            Self::U8 => Some("u8"),
-            Self::U16 => Some("u16"),
-            Self::U32 => Some("u32"),
-            Self::U64 => Some("u64"),
-            Self::U128 => Some("u128"),
-            Self::Usize => Some("usize"),
-            Self::Rust | Self::C | Self::Transparent | Self::Align(_) => None,
-        }
-    }
-
-    /// Emits the public structured representation value for descriptor data.
-    fn descriptor_tokens(&self, facade: &TokenStream) -> TokenStream {
-        match self {
-            Self::Rust => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Rust),
-            Self::C => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::C),
-            Self::Transparent => {
-                quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Transparent)
-            }
-            Self::I8 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I8),
-            Self::I16 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I16),
-            Self::I32 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I32),
-            Self::I64 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I64),
-            Self::I128 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::I128),
-            Self::Isize => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Isize),
-            Self::U8 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U8),
-            Self::U16 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U16),
-            Self::U32 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U32),
-            Self::U64 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U64),
-            Self::U128 => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::U128),
-            Self::Usize => quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Usize),
-            Self::Align(alignment) => {
-                quote!(#facade::__private::codegen_v1::descriptor::EnumRepr::Align(#alignment))
-            }
-        }
-    }
-}
+use super::enum_repr_ir::EnumReprIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
@@ -292,22 +227,21 @@ fn registration(
         #[doc(hidden)]
         mod #module {
             use super::*;
-            use #facade::__private::codegen_v1 as __qubit_reflect_codegen;
 
-            fn runtime_identity() -> __qubit_reflect_codegen::registration::RuntimeIdentity {
-                __qubit_reflect_codegen::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
+            fn runtime_identity() -> #facade::__private::codegen_v1::registration::RuntimeIdentity {
+                #facade::__private::codegen_v1::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
             }
 
-            fn payload() -> __qubit_reflect_codegen::registration::FragmentPayload {
-                __qubit_reflect_codegen::registration::FragmentPayload::Type(
-                    <#name as __qubit_reflect_codegen::Reflect>::type_descriptor(),
+            fn payload() -> #facade::__private::codegen_v1::registration::FragmentPayload {
+                #facade::__private::codegen_v1::registration::FragmentPayload::Type(
+                    <#name as #facade::__private::codegen_v1::Reflect>::type_descriptor(),
                 )
             }
 
-            __qubit_reflect_codegen::inventory::submit! {
-                __qubit_reflect_codegen::registration::RegistrationFragment::new(
-                    __qubit_reflect_codegen::registration::FragmentKind::Type,
-                    __qubit_reflect_codegen::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v1::inventory::submit! {
+                #facade::__private::codegen_v1::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v1::registration::FragmentKind::Type,
+                    #facade::__private::codegen_v1::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", #fingerprint,
                     ),
                     runtime_identity,

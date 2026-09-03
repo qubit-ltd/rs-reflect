@@ -8,36 +8,12 @@
 
 //! Final token emission for one concrete reflected impl.
 
-use proc_macro2::Ident;
+// qubit-style: allow explicit-imports
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
-/// Fully materialized token groups needed to emit one concrete impl module.
-pub(super) struct ConcreteImplEmission {
-    pub(super) retained: TokenStream,
-    pub(super) module: Ident,
-    pub(super) applicability_witness: Option<TokenStream>,
-    pub(super) invocation_adapter_definitions: Vec<TokenStream>,
-    pub(super) generic_specialization_adapter_definitions: Vec<TokenStream>,
-    pub(super) facade: TokenStream,
-    pub(super) line: u32,
-    pub(super) column: u32,
-    pub(super) fingerprint: u64,
-    pub(super) target: TokenStream,
-    pub(super) trait_setup: TokenStream,
-    pub(super) definition_setup: TokenStream,
-    pub(super) method_entries: Vec<TokenStream>,
-    pub(super) invocation_adapter_entries: Vec<TokenStream>,
-    pub(super) invocation_unavailable_reason_entries: Vec<TokenStream>,
-    pub(super) method_specialization_entries: Vec<TokenStream>,
-    pub(super) implemented_trait: TokenStream,
-    pub(super) associated_type_binding_arms: Vec<TokenStream>,
-    pub(super) specialized_associated_type_resolver_arms: Vec<TokenStream>,
-    pub(super) associated_const_override_arms: Vec<TokenStream>,
-    pub(super) associated_const_reader_override_arms: Vec<TokenStream>,
-    pub(super) impl_arguments: TokenStream,
-    pub(super) external_registration: TokenStream,
-}
+use super::concrete_impl_emission::ConcreteImplEmission;
 
 /// Emits the isolated registration module for one concrete impl.
 pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
