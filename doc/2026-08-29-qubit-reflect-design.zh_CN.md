@@ -137,17 +137,20 @@ trait 默认方法与 concrete impl 共用同一 invocation 分析和语义 emit
 
 ## 5. 版本化生成协议与 facade
 
-生成代码只能通过：
+生成代码只能通过以下版本化协议根访问 runtime 类型、工厂和注册钩子：
 
 ```text
-facade::__private::codegen_v1::{descriptor, expression, registration}
+facade::__private::codegen_v1
 ```
 
-访问 runtime 工厂。根 `__private` 不平铺 descriptor/registration 工厂。公开结构字段不是生成 ABI；
-工厂负责建立 runtime 已验证的数据模型。协议发生不兼容变化时新增兄弟版本，而不是静默扩大 v1。
+协议按领域精确暴露 `access`、`capability`、`construct`、`descriptor`、`error`、
+`expression`、`identity`、`invoke`、`registration`、`value`，以及生成 impl 所需的根反射类型。
+这些是生成协议符号，不是供业务代码手写调用的 API；协议也不会重导出 runtime 的完整公开模块。
+根 `__private` 不平铺这些符号。协议发生不兼容变化时新增兄弟版本，而不是静默扩大 v1。
 
-下游 facade 必须逐项重导出承诺的公开符号，并精确暴露 `__private::codegen_v1`。不得使用
-`pub use qubit_reflect::*` 或 `pub use qubit_reflect::__private::*`。
+下游 facade 为生成代码精确暴露 `__private::codegen_v1`，并独立逐项重导出它向业务代码承诺的公开符号。
+不得使用 `pub use qubit_reflect::*`、`pub use qubit_reflect::__private::*`，也不应仅为满足宏展开而重导出
+runtime 的完整模块。
 
 `qubit-model-metadata` 另外维护自己的 `__private::v2` 模型元数据 ABI。它将 reflect 协议精确别名为
 `reflect_codegen_v1`，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
@@ -184,6 +187,9 @@ facade::__private::codegen_v1::{descriptor, expression, registration}
 | registry | 跨 crate 聚合、冲突、冻结、稳定排序、并发初始化 |
 | ABI/facade | 重命名依赖、显式 facade、`codegen_v1` 与模型 `v2` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
+
+覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
+关键路径被高覆盖率的简单模块掩盖。
 
 仓库的 `.rs-ci-cargo-matrix.json` 是 feature 支持矩阵的机器可执行来源。
 [需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) 保持 284 个需求 ID 一一对应，

@@ -1309,7 +1309,8 @@ pass/fail 至少覆盖：非法 target、union、helper 合法目标/重复/互�
 
 - [ ] **步骤 1：编写 facade 终端用户 fixture**
 
-`model-facade-runtime` 模拟 `qubit-model-metadata`，依赖并在 `__private` 重导出 runtime 与 `Reflect` derive；
+`model-facade-runtime` 模拟 `qubit-model-metadata`，只在 `__private` 精确重导出版本匹配的 `codegen_v1`，并逐项导出业务层
+承诺的宏和类型，不为宏展开重导出完整 runtime 模块；
 `model-facade-derive` 是独立 proc-macro package，依赖 `qubit-reflect` 的公共契约并输出带 runtime facade 路径 derive 的
 原类型；终端 `model-facade-app` 只依赖这两个 facade package，依赖清单不直接出现 `qubit-reflect`。
 
@@ -1319,7 +1320,8 @@ pass/fail 至少覆盖：非法 target、union、helper 合法目标/重复/互�
 
 - [ ] **步骤 3：只修正通用 facade 路径协议**
 
-若失败，修改 `proc-macro-crate` 路径选择和 `__private` 重导出；不得在 runtime/derive 中加入 Entity、Model 或字段约束分支。
+若失败，修改 `proc-macro-crate` 路径选择、`codegen_v1` 精确协议面和所有生成路径；不得以重导出完整 runtime 模块规避
+协议缺口，也不得在 runtime/derive 中加入 Entity、Model 或字段约束分支。
 
 - [ ] **步骤 4：运行 facade 和无模型依赖检查**
 

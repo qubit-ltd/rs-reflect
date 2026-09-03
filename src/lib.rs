@@ -34,8 +34,12 @@
 //! assert_eq!(value[0], "Ada");
 //! ```
 //!
-//! # User guide
-#![doc = include_str!("../doc/2026-08-29-qubit-reflect-user-guide.md")]
+//! # Guides
+//!
+//! - [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.md)
+//! - [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
+//! - [Architecture and design](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-01-qubit-reflect-design.md)
+//! - [架构与设计](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-design.zh_CN.md)
 #![forbid(unsafe_code)]
 
 /// APIs for reflected field and variant access.

@@ -144,19 +144,25 @@ rules.
 
 ## 5. Versioned generated-code protocol and facades
 
-Generated reflection code reaches runtime factories only through:
+Generated reflection code reaches runtime types, factories, and registration
+hooks only through the versioned protocol rooted at:
 
 ```text
-facade::__private::codegen_v1::{descriptor, expression, registration}
+facade::__private::codegen_v1
 ```
 
-The `__private` root does not flatten descriptor or registration factories. Public struct fields are not a codegen
-ABI; factories construct the runtime's validated data model. An incompatible protocol introduces a sibling version
-instead of silently widening v1.
+The protocol exposes exact domain surfaces for `access`, `capability`,
+`construct`, `descriptor`, `error`, `expression`, `identity`, `invoke`,
+`registration`, and `value`, plus the root reflection types consumed by
+generated impls. These are protocol exports, not handwritten application APIs.
+The `__private` root does not flatten them, and the protocol does not re-export
+whole public runtime modules. An incompatible protocol introduces a sibling
+version instead of silently widening v1.
 
-A downstream facade explicitly re-exports every public symbol it promises and exposes exactly
-`__private::codegen_v1`. It must not use `pub use qubit_reflect::*` or
-`pub use qubit_reflect::__private::*`.
+A downstream facade exposes exactly `__private::codegen_v1` for generated code
+and independently re-exports each public application symbol it promises. It
+must not use `pub use qubit_reflect::*`, `pub use qubit_reflect::__private::*`,
+or re-export whole runtime modules merely to satisfy macro expansion.
 
 `qubit-model-metadata` separately owns its `__private::v2` model-metadata ABI. It gives the reflection protocol the
 exact alias `reflect_codegen_v1`, keeping ownership, versioning, and migration reasons orthogonal.
@@ -195,6 +201,9 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | registry | cross-crate aggregation, conflicts, freeze, stable ordering, concurrent initialization |
 | ABI/facade | renamed dependencies, explicit facade, `codegen_v1`, and model `v2` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
+
+Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
+`.rs-ci-critical-coverage.json`, so well-covered simple modules cannot mask regressions in critical paths.
 
 `.rs-ci-cargo-matrix.json` is the executable source of truth for supported feature combinations. The
 [requirements traceability matrix](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) keeps all 284

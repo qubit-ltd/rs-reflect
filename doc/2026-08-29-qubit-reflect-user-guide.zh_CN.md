@@ -153,9 +153,9 @@ assert_eq!(value.name, "Ada");
 
 ### 通过下游 facade 或宏集成
 
-如果 facade 直接承载 `qubit-reflect` 的派生宏，应当逐项重导出它承诺的公共符号，并在派生宏约定的路径下暴露带版本的生成协议：
+如果 facade 直接承载 `qubit-reflect` 的派生宏，应在派生宏约定的路径下暴露带版本的生成协议。面向业务代码的公开导出可以独立选择；下面的最小示例只导出调用方使用的两个类型：
 
-```rust,ignore
+```rust
 pub use qubit_reflect::Reflect;
 pub use qubit_reflect::TypeDescriptor;
 
@@ -165,7 +165,7 @@ pub mod __private {
 }
 ```
 
-业务声明随后可使用 `#[reflect(crate = my_facade)]`。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v1`，并让生成代码只通过该别名引用协议。`codegen_v1` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
+业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v1`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v1`。`codegen_v1` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
 
 ### 描述 trait 与可调用实现
 
@@ -204,7 +204,7 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 | 注册表初始化失败 | 检查 `RegistryError`；初始化错误会缓存，修复冲突后需要启动新进程。 |
 | 跨线程调用不可用 | 方法必须显式标记 `thread_safe`，并且只在 Rust bound 满足时构造 `SendReflected*` 值。 |
 | 外部类型没有 `Reflect` 实现 | 在拥有反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`；这些实现默认不会启用。 |
-| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，并确认它精确暴露 `__private::codegen_v1`，不要意外绕过 facade 指向底层 crate。 |
+| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v1`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
 
 ## 限制与最佳实践
 

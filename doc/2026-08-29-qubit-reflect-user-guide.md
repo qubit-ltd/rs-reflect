@@ -191,11 +191,12 @@ that implement `Drop`.
 
 ### Integrate through a downstream facade or macro
 
-A facade that directly hosts `qubit-reflect` derives must explicitly re-export
-the public symbols it promises and expose the versioned generated-code entry
-under the path expected by the derive:
+A facade that directly hosts `qubit-reflect` derives exposes the versioned
+generated-code protocol under the path expected by the derive. Public
+application exports are an independent choice; this minimal example exports
+the two types used by its callers:
 
-```rust,ignore
+```rust
 pub use qubit_reflect::Reflect;
 pub use qubit_reflect::TypeDescriptor;
 
@@ -205,12 +206,13 @@ pub mod __private {
 }
 ```
 
-Declarations can then use `#[reflect(crate = my_facade)]`. Do not glob-re-export
+Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
+only the `codegen_v1` export; the facade does not need to re-export runtime
+modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
 `qubit_reflect` or its `__private` module: that turns unrelated implementation
-details into the facade's API. A downstream procedural macro may instead expose
-the same module under an exact private alias such as `reflect_codegen_v1` and
-emit only paths through that alias. `codegen_v1` is a compiler-to-runtime
-protocol for generated code, not a supported handwritten construction API; a
+details into the facade's API. A downstream procedural macro may give the same
+module an exact private alias such as `reflect_codegen_v1`. `codegen_v1` is a
+compiler-to-runtime protocol, not a supported handwritten construction API; a
 future incompatible protocol receives a new versioned module.
 
 ### Declare traits and callable implementations
@@ -284,7 +286,7 @@ do not choose an executor or poll it, and async methods cannot use
 | Registry initialization fails | Inspect `RegistryError`; initialization errors are cached, so start a new process after fixing conflicting registrations. |
 | Cross-thread invocation is unavailable | Use a method explicitly marked `thread_safe` and construct `SendReflected*` values only where Rust's bounds are satisfied. |
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
-| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]` and expose exactly `__private::codegen_v1`; do not point the derive at the underlying crate by accident. |
+| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v1`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
 
 ## Limitations and Best Practices
 
