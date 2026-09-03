@@ -6,15 +6,21 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact registration surface consumed by generated code.
+//! Exact dynamic-value surface consumed by codegen v2.
 
 #[doc(hidden)]
-pub use crate::__private::registration::FragmentKind;
+pub use crate::value::DynamicMut;
 #[doc(hidden)]
-pub use crate::__private::registration::FragmentPayload;
+pub use crate::value::DynamicOwned;
 #[doc(hidden)]
-pub use crate::__private::registration::RegistrationFragment;
+pub use crate::value::DynamicRef;
 #[doc(hidden)]
-pub use crate::__private::registration::RuntimeIdentity;
+pub use crate::value::Local;
 #[doc(hidden)]
-pub use crate::__private::registration::StaticFragmentIdentity;
+pub use crate::value::ReflectedMut;
+#[doc(hidden)]
+pub use crate::value::ReflectedOwned;
+#[doc(hidden)]
+pub use crate::value::ReflectedRef;
+#[doc(hidden)]
+pub use crate::value::ThreadSafe;

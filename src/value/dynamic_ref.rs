@@ -163,6 +163,14 @@ impl Clone for DynamicRef<'_, Local> {
 }
 
 impl<'a> DynamicRef<'a, ThreadSafe> {
+    /// Reuses an existing thread-safe erased borrow.
+    pub(crate) fn from_any(value: &'a (dyn Any + Send + Sync)) -> Self {
+        Self {
+            storage: ThreadSafeRefStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
     /// Wraps a sized, `'static`, and `Sync` value as a thread-safe shared
     /// borrow.
     pub fn new<T: Sized + 'static + Sync>(value: &'a T) -> Self {

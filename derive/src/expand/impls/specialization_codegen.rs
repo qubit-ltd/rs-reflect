@@ -12,8 +12,9 @@ use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
-use quote::format_ident;
+use quote::ToTokens;
 use quote::quote;
+use syn::visit_mut::VisitMut;
 
 use crate::ir::GenericKindIr;
 use crate::ir::ImplDeclarationIr;
@@ -37,7 +38,7 @@ pub(super) fn specialization_associated_type_resolver_arms(
     replacements: &[(Ident, TokenStream)],
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v1);
+    let codegen = quote!(#facade::__private::codegen_v2);
     let impl_declaration = &declaration.generics.impl_declaration;
     let where_clause = &declaration.generics.where_clause;
     let specialization_arguments: Vec<_> = declaration
@@ -63,11 +64,11 @@ pub(super) fn specialization_associated_type_resolver_arms(
             Some(quote! {
                 #name => {
                     fn resolve #impl_declaration ()
-                        -> Option<#facade::__private::codegen_v1::descriptor::TypeDescriptorResolver>
+                        -> Option<#facade::__private::codegen_v2::descriptor::TypeDescriptorResolver>
                         #where_clause
                     {
                         use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                        let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<#value>::new();
+                        let probe = #facade::__private::codegen_v2::descriptor::ReflectArgumentProbe::<#value>::new();
                         (&probe).resolve_reflect_type_descriptor()
                     }
                     resolve::<#(#specialization_arguments),*>()
@@ -95,31 +96,131 @@ pub(super) fn specialization_replacements(
         .collect()
 }
 
-/// Replaces generic identifiers recursively while retaining source grouping.
-pub(super) fn substitute_tokens(
+/// Substitutes generic symbols only where the Rust AST identifies a type or
+/// const expression path. Member names, labels, patterns, and unrelated token
+/// identifiers are never rewritten.
+pub(super) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
 ) -> TokenStream {
-    tokens
-        .clone()
-        .into_iter()
-        .flat_map(|tree| match tree {
-            TokenTree::Ident(ident) => replacements
-                .iter()
-                .find(|(name, _)| *name == ident)
-                .map(|(_, tokens)| tokens.clone())
-                .unwrap_or_else(|| TokenStream::from(TokenTree::Ident(ident))),
-            TokenTree::Group(group) => {
-                let mut replacement = Group::new(
-                    group.delimiter(),
-                    substitute_tokens(&group.stream(), replacements),
-                );
-                replacement.set_span(group.span());
-                TokenStream::from(TokenTree::Group(replacement))
+    let mut ty: syn::Type = syn::parse2(tokens.clone())
+        .expect("validated specialization target must remain valid type syntax");
+    GenericSubstituter { replacements }.visit_type_mut(&mut ty);
+    ty.into_token_stream()
+}
+
+struct GenericSubstituter<'a> {
+    replacements: &'a [(Ident, TokenStream)],
+}
+
+impl GenericSubstituter<'_> {
+    fn replacement(&self, identifier: &Ident) -> Option<&TokenStream> {
+        self.replacements
+            .iter()
+            .find_map(|(name, value)| (name == identifier).then_some(value))
+    }
+}
+
+impl VisitMut for GenericSubstituter<'_> {
+    fn visit_type_mut(&mut self, ty: &mut syn::Type) {
+        if let syn::Type::Path(path) = ty
+            && path.qself.is_none()
+            && path.path.leading_colon.is_none()
+            && !path.path.segments.is_empty()
+            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
+        {
+            if path.path.segments.len() > 1 {
+                let tail = syn::Path {
+                    leading_colon: None,
+                    segments: path.path.segments.iter().skip(1).cloned().collect(),
+                };
+                if let Ok(mut replacement) = syn::parse2::<syn::Type>(quote!(#replacement :: #tail))
+                {
+                    syn::visit_mut::visit_type_mut(self, &mut replacement);
+                    *ty = replacement;
+                    return;
+                }
             }
-            other => TokenStream::from(other),
-        })
-        .collect()
+            let Ok(replacement) = syn::parse2::<syn::Type>(replacement.clone()) else {
+                return;
+            };
+            if path.path.segments.len() == 1 {
+                *ty = replacement;
+                return;
+            }
+            if let syn::Type::Path(replacement) = replacement
+                && replacement.qself.is_none()
+            {
+                let tail = path.path.segments.iter().skip(1).cloned();
+                let mut segments = replacement.path.segments;
+                segments.extend(tail);
+                path.path.leading_colon = replacement.path.leading_colon;
+                path.path.segments = segments;
+                syn::visit_mut::visit_type_path_mut(self, path);
+            }
+            return;
+        }
+        syn::visit_mut::visit_type_mut(self, ty);
+    }
+
+    fn visit_expr_mut(&mut self, expression: &mut syn::Expr) {
+        if let syn::Expr::Path(path) = expression
+            && path.qself.is_none()
+            && path.path.leading_colon.is_none()
+            && !path.path.segments.is_empty()
+            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
+        {
+            if path.path.segments.len() > 1 {
+                let tail = syn::Path {
+                    leading_colon: None,
+                    segments: path.path.segments.iter().skip(1).cloned().collect(),
+                };
+                if let Ok(mut replacement) = syn::parse2::<syn::Expr>(quote!(#replacement :: #tail))
+                {
+                    syn::visit_mut::visit_expr_mut(self, &mut replacement);
+                    *expression = replacement;
+                    return;
+                }
+            }
+            let Ok(replacement) = syn::parse2::<syn::Expr>(replacement.clone()) else {
+                return;
+            };
+            if path.path.segments.len() == 1 {
+                *expression = replacement;
+                return;
+            }
+            if let syn::Expr::Path(replacement) = replacement
+                && replacement.qself.is_none()
+            {
+                let tail = path.path.segments.iter().skip(1).cloned();
+                let mut segments = replacement.path.segments;
+                segments.extend(tail);
+                path.path.leading_colon = replacement.path.leading_colon;
+                path.path.segments = segments;
+                syn::visit_mut::visit_expr_path_mut(self, path);
+            }
+            return;
+        }
+        syn::visit_mut::visit_expr_mut(self, expression);
+    }
+
+    fn visit_generic_argument_mut(&mut self, argument: &mut syn::GenericArgument) {
+        if let syn::GenericArgument::Type(syn::Type::Path(path)) = argument
+            && path.qself.is_none()
+            && path.path.leading_colon.is_none()
+            && path.path.segments.len() == 1
+            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
+            && let Ok(expression) = syn::parse2::<syn::Expr>(replacement.clone())
+            && syn::parse2::<syn::Type>(replacement.clone()).is_err()
+        {
+            *argument = syn::GenericArgument::Const(expression);
+            return;
+        }
+        syn::visit_mut::visit_generic_argument_mut(self, argument);
+    }
 }
 
 /// Replaces impl generic references in method signature types while retaining
@@ -129,14 +230,25 @@ pub(super) fn substitute_impl_method_types(
     replacements: &[(Ident, TokenStream)],
 ) {
     for method in &mut declaration.methods {
+        let replacements = replacements
+            .iter()
+            .filter(|(name, _)| {
+                !method
+                    .generics
+                    .params
+                    .iter()
+                    .any(|parameter| name == parameter.name.as_str())
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         if let Some(receiver) = &mut method.receiver {
-            substitute_type_tokens(&mut receiver.ty, replacements);
+            substitute_type_tokens(&mut receiver.ty, &replacements);
         }
         for parameter in &mut method.parameters {
-            substitute_type_tokens(&mut parameter.ty, replacements);
+            substitute_type_tokens(&mut parameter.ty, &replacements);
         }
         if let ReturnTypeIr::Type(ty) = &mut method.return_type {
-            substitute_type_tokens(ty, replacements);
+            substitute_type_tokens(ty, &replacements);
         }
     }
 }
@@ -158,7 +270,7 @@ pub(super) fn substitute_impl_associated_item_types(
 
 /// Rebuilds structural type IR after specialization changes a root path.
 fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
-    let tokens = substitute_tokens(&ty.tokens, replacements);
+    let tokens = substitute_type_syntax(&ty.tokens, replacements);
     let parsed: syn::Type = syn::parse2(tokens)
         .expect("validated specialization must retain valid associated-item type syntax");
     *ty = crate::parse::convert_type(&parsed);
@@ -317,75 +429,18 @@ fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> 
 
 /// Recursively substitutes one type and every nested type retained by its IR.
 pub(super) fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
-    ty.tokens = substitute_tokens(&ty.tokens, replacements);
-    ty.source = ty.tokens.to_string();
-    match &mut ty.kind {
-        TypeKindIr::Path(path) => substitute_path_tokens(path, replacements),
-        TypeKindIr::Reference { element, .. }
-        | TypeKindIr::Slice(element)
-        | TypeKindIr::Pointer { element, .. } => substitute_type_tokens(element, replacements),
-        TypeKindIr::Tuple(elements) => {
-            for element in elements {
-                substitute_type_tokens(element, replacements);
-            }
-        }
-        TypeKindIr::Array { element, length } => {
-            substitute_type_tokens(element, replacements);
-            *length = substitute_tokens(length, replacements);
-        }
-        TypeKindIr::BareFunction { inputs, output, .. } => {
-            for input in inputs {
-                substitute_type_tokens(input, replacements);
-            }
-            if let Some(output) = output {
-                substitute_type_tokens(output, replacements);
-            }
-        }
-        TypeKindIr::TraitObject { .. }
-        | TypeKindIr::ImplTrait { .. }
-        | TypeKindIr::Never
-        | TypeKindIr::Infer
-        | TypeKindIr::Macro
-        | TypeKindIr::Other => {}
-    }
+    reparse_substituted_type(ty, replacements);
 }
 
-/// Substitutes nested type and const tokens in one path IR.
-fn substitute_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
-    path.tokens = substitute_tokens(&path.tokens, replacements);
-    path.source = path.tokens.to_string();
-    if let Some(qualified_self) = &mut path.qualified_self {
-        substitute_type_tokens(&mut qualified_self.ty, replacements);
-    }
-    for segment in &mut path.segments {
-        match &mut segment.arguments {
-            PathArgumentsIr::None => {}
-            PathArgumentsIr::AngleBracketed(arguments) => {
-                for argument in arguments {
-                    match argument {
-                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
-                            substitute_type_tokens(ty, replacements);
-                        }
-                        PathArgumentIr::Const(tokens)
-                        | PathArgumentIr::AssociatedConst { value: tokens, .. } => {
-                            *tokens = substitute_tokens(tokens, replacements);
-                        }
-                        PathArgumentIr::Lifetime(_)
-                        | PathArgumentIr::Constraint { .. }
-                        | PathArgumentIr::Other(_) => {}
-                    }
-                }
-            }
-            PathArgumentsIr::Parenthesized { inputs, output } => {
-                for input in inputs {
-                    substitute_type_tokens(input, replacements);
-                }
-                if let Some(output) = output {
-                    substitute_type_tokens(output, replacements);
-                }
-            }
-        }
-    }
+/// Rebuilds a trait path after substituting bound impl generic parameters.
+pub(super) fn substitute_trait_path_tokens(
+    path: &mut crate::ir::PathIr,
+    replacements: &[(Ident, TokenStream)],
+) {
+    let mut parsed: syn::Path = syn::parse2(path.tokens.clone())
+        .expect("validated specialization must retain valid trait path syntax");
+    GenericSubstituter { replacements }.visit_path_mut(&mut parsed);
+    *path = crate::parse::convert_path(&parsed);
 }
 
 /// Returns a non-core explicit receiver type that requires a registered
@@ -402,7 +457,7 @@ pub(super) fn typed_extension_receiver_type(
         return None;
     }
     let self_identifier = Ident::new("Self", receiver.span);
-    Some(substitute_tokens(
+    Some(substitute_type_syntax(
         &receiver.ty.tokens,
         &[(self_identifier, target.clone())],
     ))
@@ -414,6 +469,8 @@ pub(super) fn specialization_arguments(
     generics: &crate::ir::GenericsIr,
     facade: &TokenStream,
 ) -> TokenStream {
+    let environment =
+        crate::expand::generic_environment::GenericEnvironment::from_generics(generics);
     let arguments = generics.params.iter().filter_map(|parameter| {
         if parameter.kind == GenericKindIr::Lifetime {
             return None;
@@ -424,16 +481,17 @@ pub(super) fn specialization_arguments(
             .find(|binding| binding.name == parameter.name)?;
         match (parameter.kind, &binding.value) {
             (GenericKindIr::Type, SpecializationValueIr::Type(ty)) => {
-                let expression = crate::expand::traits::type_expression(ty, facade);
-                Some(quote!(#facade::__private::codegen_v1::expression::GenericArgument::Type(#expression)))
+                let expression =
+                    crate::expand::traits::type_expression(ty, &environment, facade);
+                Some(quote!(#facade::__private::codegen_v2::expression::GenericArgument::Type(#expression)))
             }
             (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(tokens)) => Some(quote!(
-                #facade::__private::codegen_v1::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v1::expression::concrete(
+                #facade::__private::codegen_v2::expression::GenericArgument::Type(
+                    #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                        #facade::__private::codegen_v2::expression::concrete(
                             vec![stringify!(#tokens).into()].into_boxed_slice(),
                             vec![].into_boxed_slice(),
-                            #facade::__private::codegen_v1::expression::DiagnosticText::from(stringify!(#tokens)),
+                            #facade::__private::codegen_v2::expression::DiagnosticText::from(stringify!(#tokens)),
                         ),
                     ),
                 )
@@ -446,16 +504,16 @@ pub(super) fn specialization_arguments(
                 let declared_type = parameter.const_type.as_ref()?.source.as_str();
                 let declared_type_literal = syn::LitStr::new(declared_type, parameter.span);
                 Some(quote!(
-                    #facade::__private::codegen_v1::expression::GenericArgument::Const(
-                        #facade::__private::codegen_v1::expression::ConstGenericArgument::new(
-                            #facade::__private::codegen_v1::expression::TypeExpression::Concrete(
-                                #facade::__private::codegen_v1::expression::concrete(
+                    #facade::__private::codegen_v2::expression::GenericArgument::Const(
+                        #facade::__private::codegen_v2::expression::ConstGenericArgument::new(
+                            #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
+                                #facade::__private::codegen_v2::expression::concrete(
                                     vec![#declared_type_literal.into()].into_boxed_slice(),
                                     vec![].into_boxed_slice(),
-                                    #facade::__private::codegen_v1::expression::DiagnosticText::from(#declared_type_literal),
+                                    #facade::__private::codegen_v2::expression::DiagnosticText::from(#declared_type_literal),
                                 ),
                             ),
-                            #facade::__private::codegen_v1::expression::const_path([
+                            #facade::__private::codegen_v2::expression::const_path([
                                 stringify!(#tokens),
                             ]),
                             stringify!(#tokens),
@@ -469,32 +527,13 @@ pub(super) fn specialization_arguments(
     quote!(::std::vec![#(#arguments),*].into_boxed_slice())
 }
 
-/// Generates a local adapter for the safely erasable subset of an explicitly
-/// registered generic associated function. More complex signatures remain
-/// registered as specializations but explicitly unavailable.
-pub(super) fn simple_generic_specialization_adapter(
+/// Materializes one method specialization as concrete method IR and call
+/// arguments. The ordinary invocation analyzer and emitter can then make the
+/// same availability decision as they do for a non-generic method.
+pub(super) fn specialized_method(
     method: &MethodIr,
     specialization: &SpecializationIr,
-    target: &TokenStream,
-    target_source: &str,
-    facade: &TokenStream,
-    method_index: usize,
-    specialization_index: usize,
-) -> Option<TokenStream> {
-    if method.receiver.is_some()
-        || method.qualifiers.is_async
-        || method.qualifiers.is_unsafe
-        || method.qualifiers.abi.is_some()
-        || method.qualifiers.is_variadic
-        || super::invocation_disabled_by_policy(method)
-        || method
-            .generics
-            .params
-            .iter()
-            .any(|parameter| parameter.kind == GenericKindIr::Lifetime)
-    {
-        return None;
-    }
+) -> Option<(MethodIr, Vec<TokenStream>)> {
     let generic_arguments: Vec<_> = method
         .generics
         .params
@@ -505,82 +544,23 @@ pub(super) fn simple_generic_specialization_adapter(
             GenericKindIr::Lifetime => None,
         })
         .collect::<Option<_>>()?;
-    let parameter_types: Vec<_> = method
-        .parameters
-        .iter()
-        .map(|parameter| specialize_type_tokens(&parameter.ty, &method.generics, specialization))
-        .collect::<Option<_>>()?;
-    let return_type = match &method.return_type {
-        ReturnTypeIr::Unit => None,
-        ReturnTypeIr::Type(ty) => Some(specialize_type_tokens(
-            ty,
-            &method.generics,
-            specialization,
-        )?),
-    };
-    let argument_expectations = parameter_types
-        .iter()
-        .map(|ty| quote!(#facade::__private::codegen_v1::invoke::ArgumentExpectation::owned::<#ty>()));
-    let argument_bindings = parameter_types.iter().enumerate().map(|(index, ty)| {
-        let argument = format_ident!("__qubit_reflect_specialized_argument_{index}");
-        quote! {
-            let #argument: #ty = match arguments.next().expect("validation checked argument count") {
-                #facade::__private::codegen_v1::invoke::InvocationArg::Owned(value) =>
-                    #facade::__private::codegen_v1::value::DynamicOwned::<#facade::__private::codegen_v1::value::Local>::downcast::<#ty>(value)
-                        .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                _ => unreachable!("validation checked argument mode"),
-            };
-        }
-    });
-    let call_arguments = (0..parameter_types.len())
-        .map(|index| format_ident!("__qubit_reflect_specialized_argument_{index}"));
-    let method_name = &method.name;
-    let adapter_name = format_ident!(
-        "__qubit_reflect_invoke_specialization_{method_index}_{specialization_index}"
-    );
-    let descriptor_name = format_ident!(
-        "__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}"
-    );
-    let output = match return_type {
-        None => quote! {
-            <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*);
-            #facade::__private::codegen_v1::invoke::InvocationOutput::Unit
-        },
-        Some(_) => quote! {
-            #facade::__private::codegen_v1::invoke::InvocationOutput::Owned(
-                #facade::__private::codegen_v1::value::DynamicOwned::<#facade::__private::codegen_v1::value::Local>::new(
-                    <#target>::#method_name::<#(#generic_arguments),*>(#(#call_arguments),*),
-                ),
-            )
-        },
-    };
-    Some(quote! {
-        fn #adapter_name<'call>(
-            invocation: #facade::__private::codegen_v1::invoke::Invocation<'call, #facade::__private::codegen_v1::value::Local>,
-        ) -> ::core::result::Result<
-            #facade::__private::codegen_v1::invoke::InvocationOutput<'call, #facade::__private::codegen_v1::value::Local>,
-            #facade::__private::codegen_v1::invoke::InvocationFailure<'call, #facade::__private::codegen_v1::value::Local>,
-        > {
-            let identity = #facade::__private::codegen_v1::identity::MemberId::new(
-                #target_source,
-                "method-specialization",
-                #method_index,
-                fragment_identity(),
-            );
-            let validated = invocation.validate(
-                &identity,
-                #facade::__private::codegen_v1::invoke::ReceiverExpectation::none(),
-                &[#(#argument_expectations),*],
-            )?;
-            let (_receiver, arguments) = validated.into_parts();
-            let mut arguments = arguments.into_vec().into_iter();
-            #(#argument_bindings)*
-            Ok(#output)
-        }
-
-        static #descriptor_name: #facade::__private::codegen_v1::descriptor::InvocationAdapter =
-            #facade::__private::codegen_v1::descriptor::InvocationAdapter::local(#adapter_name);
-    })
+    let replacements = specialization_replacements(specialization);
+    let mut concrete = method.clone();
+    if let Some(receiver) = &mut concrete.receiver {
+        substitute_type_tokens(&mut receiver.ty, &replacements);
+    }
+    for parameter in &mut concrete.parameters {
+        substitute_type_tokens(&mut parameter.ty, &replacements);
+    }
+    if let ReturnTypeIr::Type(ty) = &mut concrete.return_type {
+        substitute_type_tokens(ty, &replacements);
+    }
+    concrete
+        .generics
+        .params
+        .retain(|parameter| parameter.kind == GenericKindIr::Lifetime);
+    concrete.specializations.clear();
+    Some((concrete, generic_arguments))
 }
 
 /// Resolves one named type argument from a validated specialization.
@@ -616,22 +596,4 @@ fn specialization_const_argument(
         }
         SpecializationValueIr::Type(_) => None,
     }
-}
-
-/// Recursively replaces method-generic type and const parameters in one type.
-fn specialize_type_tokens(
-    ty: &TypeIr,
-    generics: &crate::ir::GenericsIr,
-    specialization: &SpecializationIr,
-) -> Option<TokenStream> {
-    let mut replacements = Vec::new();
-    for parameter in &generics.params {
-        let tokens = match parameter.kind {
-            GenericKindIr::Type => specialization_type_argument(specialization, &parameter.name),
-            GenericKindIr::Const => specialization_const_argument(specialization, &parameter.name),
-            GenericKindIr::Lifetime => None,
-        }?;
-        replacements.push((Ident::new(&parameter.name, parameter.span), tokens));
-    }
-    Some(substitute_tokens(&ty.tokens, &replacements))
 }

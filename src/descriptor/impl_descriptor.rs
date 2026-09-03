@@ -60,8 +60,13 @@ pub struct ImplDefinitionDescriptor {
     implemented_trait_path: Option<Box<str>>,
     generic_definition: &'static GenericDefinitionDescriptor,
     methods: OnceLock<Box<[MethodDescriptor]>>,
-    associated_types: OnceLock<Box<[ImplAssociatedTypeDescriptor]>>,
-    associated_consts: OnceLock<Box<[ImplAssociatedConstDescriptor]>>,
+    associated_items: OnceLock<ImplAssociatedItems>,
+}
+
+#[derive(Debug)]
+struct ImplAssociatedItems {
+    types: Box<[ImplAssociatedTypeDescriptor]>,
+    consts: Box<[ImplAssociatedConstDescriptor]>,
 }
 
 /// One associated type explicitly bound by an impl definition.
@@ -172,8 +177,7 @@ impl ImplDefinitionDescriptor {
             implemented_trait_path: implemented_trait.map(|descriptor| descriptor.rust_path().into()),
             generic_definition,
             methods: OnceLock::new(),
-            associated_types: OnceLock::new(),
-            associated_consts: OnceLock::new(),
+            associated_items: OnceLock::new(),
         })
     }
 
@@ -196,8 +200,7 @@ impl ImplDefinitionDescriptor {
             implemented_trait_path: Some(implemented_trait_path.into()),
             generic_definition,
             methods: OnceLock::new(),
-            associated_types: OnceLock::new(),
-            associated_consts: OnceLock::new(),
+            associated_items: OnceLock::new(),
         }
     }
 
@@ -273,7 +276,7 @@ impl ImplDefinitionDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn associated_types(&self) -> &[ImplAssociatedTypeDescriptor] {
-        self.associated_types.get().map_or(&[], Box::as_ref)
+        self.associated_items.get().map_or(&[], |items| items.types.as_ref())
     }
 
     /// Returns associated constants explicitly bound by this impl in source
@@ -281,7 +284,7 @@ impl ImplDefinitionDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn associated_consts(&self) -> &[ImplAssociatedConstDescriptor] {
-        self.associated_consts.get().map_or(&[], Box::as_ref)
+        self.associated_items.get().map_or(&[], |items| items.consts.as_ref())
     }
 
     /// Initializes declaration-level methods exactly once.
@@ -301,9 +304,10 @@ impl ImplDefinitionDescriptor {
             Box<[ImplAssociatedConstDescriptor]>,
         ),
     ) {
-        let (associated_types, associated_consts) = initialize(self);
-        self.associated_types.get_or_init(|| associated_types);
-        self.associated_consts.get_or_init(|| associated_consts);
+        self.associated_items.get_or_init(|| {
+            let (types, consts) = initialize(self);
+            ImplAssociatedItems { types, consts }
+        });
     }
 }
 
@@ -689,7 +693,8 @@ impl ImplDescriptor {
         self.methods
     }
 
-    /// Finds a trait declaration by query name.
+    /// Finds a method explicitly declared by this concrete impl, by query
+    /// name.
     #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)

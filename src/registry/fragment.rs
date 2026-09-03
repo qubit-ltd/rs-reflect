@@ -17,7 +17,6 @@ use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
-use crate::identity::CapabilityId;
 use crate::identity::FragmentIdentity;
 
 /// Const-constructible stable source and content facts for one fragment.
@@ -99,12 +98,10 @@ pub enum RuntimeIdentity {
     ImplDefinition(FragmentIdentity),
     /// A concrete implementation target.
     Impl(TypeId),
-    /// A capability ID attached to an exact concrete type.
-    Capability {
+    /// Capability facts attached to an exact concrete type.
+    Capabilities {
         /// The exact concrete target type.
         target_type_id: TypeId,
-        /// The stable capability identity.
-        capability_id: CapabilityId,
     },
 }
 
@@ -113,17 +110,17 @@ pub enum RuntimeIdentity {
 #[derive(Debug)]
 pub struct CapabilityRegistration {
     target_type_id: TypeId,
-    descriptor: CapabilityDescriptor,
+    descriptors: Vec<CapabilityDescriptor>,
 }
 
 impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
     #[doc(hidden)]
     #[must_use]
-    pub const fn new(target_type_id: TypeId, descriptor: CapabilityDescriptor) -> Self {
+    pub const fn new(target_type_id: TypeId, descriptors: Vec<CapabilityDescriptor>) -> Self {
         Self {
             target_type_id,
-            descriptor,
+            descriptors,
         }
     }
 
@@ -134,11 +131,11 @@ impl CapabilityRegistration {
         self.target_type_id
     }
 
-    /// Returns the immutable capability descriptor.
+    /// Returns the immutable capability descriptors.
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn descriptor(&self) -> &CapabilityDescriptor {
-        &self.descriptor
+    pub(crate) fn descriptors(&self) -> &[CapabilityDescriptor] {
+        &self.descriptors
     }
 }
 
@@ -181,9 +178,8 @@ impl FragmentPayload {
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
             Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
-            Self::Capability(registration) => RuntimeIdentity::Capability {
+            Self::Capability(registration) => RuntimeIdentity::Capabilities {
                 target_type_id: registration.target_type_id(),
-                capability_id: registration.descriptor().id().clone(),
             },
         }
     }

@@ -12,9 +12,11 @@ mod construction_runtime {
     use std::any::TypeId;
     use std::cell::Cell;
     use std::rc::Rc;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
     use qubit_reflect as reflect;
-    use qubit_reflect::__private::codegen_v1::descriptor;
+    use qubit_reflect::__private::codegen_v2::descriptor;
     use qubit_reflect::access::VariantActiveAdapter;
     use qubit_reflect::construct::ConstructionError;
     use qubit_reflect::construct::ConstructionField;
@@ -30,6 +32,7 @@ mod construction_runtime {
     use qubit_reflect::construct::UpdateField;
     use qubit_reflect::construct::ValidatedConstructionInput;
     use qubit_reflect::construct::ValidatedUpdateInput;
+    use qubit_reflect::construct::VariantConstructionDescriptor;
     use qubit_reflect::construct::VariantConstructor;
     use qubit_reflect::descriptor::FieldDescriptor;
     use qubit_reflect::descriptor::OpaqueTypeDescriptor;
@@ -317,6 +320,10 @@ mod construction_runtime {
         ConstructionField::required(&FAILED_FIELDS[1]),
     ];
     static STARTED_CONSTRUCTION_FIELDS: [ConstructionField<Local>; 0] = [];
+    static STARTED_CONSTRUCTOR_FACTORY_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static CONCURRENT_STARTED_CONSTRUCTOR_FACTORY_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static STARTED_CONSTRUCTOR: VariantConstructor<Local> =
+        VariantConstructor::new(&EVENT_VARIANTS[0], &STARTED_CONSTRUCTION_FIELDS, construct_started);
     static STARTED_THREAD_SAFE_FIELDS: [ConstructionField<ThreadSafe>; 0] = [];
 
     /// Builds a profile from descriptor-ordered, already validated values.
@@ -409,6 +416,50 @@ mod construction_runtime {
     fn construct_started(input: ValidatedConstructionInput<Local>) -> DynamicOwned<Local> {
         assert!(input.values().is_empty());
         DynamicOwned::<Local>::new(Event::Started)
+    }
+
+    /// Returns the shared unit-variant constructor and records factory calls.
+    fn counted_started_constructor() -> &'static VariantConstructor<Local> {
+        STARTED_CONSTRUCTOR_FACTORY_CALLS.fetch_add(1, Ordering::SeqCst);
+        &STARTED_CONSTRUCTOR
+    }
+
+    /// Returns the shared constructor for the concurrent cache test.
+    fn concurrent_counted_started_constructor() -> &'static VariantConstructor<Local> {
+        CONCURRENT_STARTED_CONSTRUCTOR_FACTORY_CALLS.fetch_add(1, Ordering::SeqCst);
+        &STARTED_CONSTRUCTOR
+    }
+
+    /// Verifies variant constructor factories are evaluated exactly once.
+    #[test]
+    fn test_variant_construction_descriptor_caches_factory_once() {
+        STARTED_CONSTRUCTOR_FACTORY_CALLS.store(0, Ordering::SeqCst);
+        let descriptor = VariantConstructionDescriptor::new(counted_started_constructor);
+
+        let first = descriptor.local_constructor();
+        let second = descriptor.local_constructor();
+
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(STARTED_CONSTRUCTOR_FACTORY_CALLS.load(Ordering::SeqCst), 1);
+    }
+
+    /// Verifies concurrent readers share the first cached constructor.
+    #[test]
+    fn test_variant_construction_descriptor_concurrently_caches_factory_once() {
+        CONCURRENT_STARTED_CONSTRUCTOR_FACTORY_CALLS.store(0, Ordering::SeqCst);
+        let descriptor = VariantConstructionDescriptor::new(concurrent_counted_started_constructor);
+        let addresses = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..32)
+                .map(|_| scope.spawn(|| descriptor.local_constructor() as *const VariantConstructor<Local> as usize))
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().expect("constructor reader must finish"))
+                .collect::<Vec<_>>()
+        });
+
+        assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
+        assert_eq!(CONCURRENT_STARTED_CONSTRUCTOR_FACTORY_CALLS.load(Ordering::SeqCst), 1);
     }
 
     /// Builds the unit enum variant through the thread-safe erased boundary.
@@ -1197,6 +1248,20 @@ mod construction_runtime {
                 .unwrap_or_else(|_| panic!("the update must retain ThreadScalar")),
             ThreadScalar(11),
         );
+        let failure = expect_construction_failure(
+            updater.update(StructUpdateInput::new(
+                DynamicOwned::<ThreadSafe>::new(12_u16),
+                NamedConstructionInput::new(std::iter::empty::<(&str, DynamicOwned<ThreadSafe>)>()),
+            )),
+            "a thread-safe base mismatch must preserve the owned input",
+        );
+        assert!(matches!(
+            failure.error(),
+            ConstructionError::BaseTypeMismatch { mismatch }
+                if mismatch.expected() == TypeId::of::<ThreadScalar>()
+                    && mismatch.actual() == TypeId::of::<u16>()
+        ));
+        assert_eq!(failure.values().len(), 1);
 
         let variant = VariantConstructor::new(
             &EVENT_VARIANTS[0],

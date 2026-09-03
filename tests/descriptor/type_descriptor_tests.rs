@@ -26,7 +26,7 @@ struct NamedRecord {
 }
 
 static NAMED_RECORD: TypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
+    reflect::__private::codegen_v2::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
 
 impl Reflect for NamedRecord {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -34,11 +34,11 @@ impl Reflect for NamedRecord {
     }
 }
 
-static UNIT_TUPLE: TypeDescriptor = reflect::__private::codegen_v1::descriptor::tuple::<()>("unit", &[]);
+static UNIT_TUPLE: TypeDescriptor = reflect::__private::codegen_v2::descriptor::tuple::<()>("unit", &[]);
 
 struct ReflectedMember;
 
-static REFLECTED_MEMBER: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<ReflectedMember>(
+static REFLECTED_MEMBER: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<ReflectedMember>(
     "reflected_member",
     StructKind::Unit,
     &[],
@@ -57,9 +57,9 @@ fn opaque_container_descriptor() -> &'static TypeDescriptor {
 }
 
 static OPAQUE_MEMBER: OpaqueTypeDescriptor =
-    reflect::__private::codegen_v1::descriptor::opaque_member::<ReflectedMember>();
+    reflect::__private::codegen_v2::descriptor::opaque_member::<ReflectedMember>();
 static OPAQUE_MEMBER_TYPE: TypeRef = TypeRef::Opaque(&OPAQUE_MEMBER);
-static OPAQUE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::descriptor::field(
+static OPAQUE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v2::descriptor::field(
     opaque_container_descriptor,
     0,
     Some("member"),
@@ -67,7 +67,7 @@ static OPAQUE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::de
     &OPAQUE_MEMBER_TYPE,
     Visibility::Private,
 )];
-static OPAQUE_CONTAINER: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<OpaqueContainer>(
+static OPAQUE_CONTAINER: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<OpaqueContainer>(
     "opaque_container",
     StructKind::Named,
     &OPAQUE_FIELDS,
@@ -86,7 +86,7 @@ fn recursive_node_descriptor() -> &'static TypeDescriptor {
 }
 
 static RECURSIVE_NODE_TYPE: TypeRef = TypeRef::Resolved(&RECURSIVE_NODE);
-static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1::descriptor::field(
+static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v2::descriptor::field(
     recursive_node_descriptor,
     0,
     Some("next"),
@@ -94,7 +94,7 @@ static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v1:
     &RECURSIVE_NODE_TYPE,
     Visibility::Private,
 )];
-static RECURSIVE_NODE: TypeDescriptor = reflect::__private::codegen_v1::descriptor::struct_type::<RecursiveNode>(
+static RECURSIVE_NODE: TypeDescriptor = reflect::__private::codegen_v2::descriptor::struct_type::<RecursiveNode>(
     "recursive_node",
     StructKind::Named,
     &RECURSIVE_FIELDS,

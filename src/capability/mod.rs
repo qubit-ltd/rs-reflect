@@ -25,17 +25,7 @@ pub use builtin::send_key;
 pub use builtin::sync_descriptor;
 pub use builtin::sync_key;
 pub use descriptor::CapabilityDescriptor;
-#[doc(hidden)]
-pub use inventory as __inventory;
 pub use key::CapabilityKey;
-#[doc(hidden)]
-pub use registration::ReflectedTypeRegistration;
-#[doc(hidden)]
-pub use registration::TypeCapabilityRegistration;
-#[doc(hidden)]
-pub use registration::registered_reflected_type;
-#[doc(hidden)]
-pub use registration::registered_type_capabilities;
 pub use set::CapabilityConflict;
 pub use set::CapabilityConflictKind;
 pub use set::TypeCapabilities;

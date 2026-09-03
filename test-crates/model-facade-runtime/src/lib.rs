@@ -17,5 +17,5 @@ pub use qubit_reflect::reflect_impl;
 /// Re-exports the generated-code contract without exposing a model dependency.
 #[doc(hidden)]
 pub mod __private {
-    pub use qubit_reflect::__private::codegen_v1;
+    pub use qubit_reflect::__private::codegen_v2;
 }

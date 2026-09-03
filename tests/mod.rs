@@ -8,11 +8,11 @@
 
 //! Unified integration-test entry point for `qubit-reflect`.
 
-#![cfg(feature = "derive")]
-
 mod access;
+#[cfg(feature = "derive")]
 mod construct;
 mod descriptor;
+#[cfg(feature = "derive")]
 mod invoke;
 mod registry;
 mod value;

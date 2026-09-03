@@ -19,6 +19,7 @@ pub struct FieldIdentity {
     declaring_type_name: &'static str,
     index: usize,
     rust_name: Option<&'static str>,
+    query_name: Option<&'static str>,
     variant_index: Option<usize>,
     variant_rust_name: Option<&'static str>,
 }
@@ -40,6 +41,7 @@ impl FieldIdentity {
             declaring_type_name,
             index,
             rust_name,
+            query_name: rust_name,
             variant_index: None,
             variant_rust_name: None,
         }
@@ -64,6 +66,51 @@ impl FieldIdentity {
             declaring_type_name,
             index,
             rust_name,
+            query_name: rust_name,
+            variant_index: Some(variant_index),
+            variant_rust_name: Some(variant_rust_name),
+        }
+    }
+
+    /// Creates a direct-field identity with distinct Rust and query names.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn new_with_query_name(
+        declaring_type: TypeId,
+        declaring_type_name: &'static str,
+        index: usize,
+        rust_name: Option<&'static str>,
+        query_name: Option<&'static str>,
+    ) -> Self {
+        Self {
+            declaring_type,
+            declaring_type_name,
+            index,
+            rust_name,
+            query_name,
+            variant_index: None,
+            variant_rust_name: None,
+        }
+    }
+
+    /// Creates a variant-field identity with distinct Rust and query names.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn new_variant_with_query_name(
+        declaring_type: TypeId,
+        declaring_type_name: &'static str,
+        index: usize,
+        rust_name: Option<&'static str>,
+        query_name: Option<&'static str>,
+        variant_index: usize,
+        variant_rust_name: &'static str,
+    ) -> Self {
+        Self {
+            declaring_type,
+            declaring_type_name,
+            index,
+            rust_name,
+            query_name,
             variant_index: Some(variant_index),
             variant_rust_name: Some(variant_rust_name),
         }
@@ -95,6 +142,13 @@ impl FieldIdentity {
     #[inline(always)]
     pub const fn rust_name(&self) -> Option<&'static str> {
         self.rust_name
+    }
+
+    /// Returns the reflection query name used for lookup.
+    #[must_use]
+    #[inline(always)]
+    pub const fn query_name(&self) -> Option<&'static str> {
+        self.query_name
     }
 
     /// Returns the containing variant's source index for an enum field.

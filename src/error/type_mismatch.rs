@@ -41,6 +41,13 @@ impl TypeMismatch {
         self.actual_name = Some(actual_name);
         self
     }
+    /// Adds the expected diagnostic type name when the actual erased name is
+    /// unavailable.
+    #[must_use]
+    pub const fn with_expected_name(mut self, expected_name: &'static str) -> Self {
+        self.expected_name = Some(expected_name);
+        self
+    }
     /// Returns the expected runtime type ID.
     #[must_use]
     #[inline(always)]

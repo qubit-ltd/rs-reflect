@@ -18,6 +18,7 @@ use qubit_reflect::descriptor::DiscriminantOrigin;
 use qubit_reflect::descriptor::EnumRepr;
 use qubit_reflect::descriptor::NumericDiscriminant;
 use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::VariantDescriptor;
 use qubit_reflect::descriptor::VariantKind;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::ReflectedMut;
@@ -104,6 +105,44 @@ enum MultiAttributeReprEvent {
 enum GenericEvent<T> {
     Value(T),
     Empty,
+}
+
+#[derive(Reflect)]
+#[allow(dead_code)]
+enum VariantPolicyEvent {
+    Visible,
+    #[reflect(skip)]
+    Hidden,
+    #[reflect(no_construct)]
+    ConstructionDisabled,
+    Last(u8),
+}
+
+/// Verifies skipped variants are absent while `no_construct` keeps structure.
+#[test]
+fn test_derive_reflect_variant_skip_and_no_construct_are_distinct() {
+    let descriptor = TypeDescriptor::of::<VariantPolicyEvent>();
+    let indices: Vec<_> = descriptor.variants().iter().map(VariantDescriptor::index).collect();
+
+    assert_eq!(indices, [0, 2, 3]);
+    assert!(descriptor.variant("Hidden").is_none());
+    assert!(descriptor.variant_at(1).is_none());
+    let disabled = descriptor
+        .variant_at(2)
+        .expect("no_construct must retain the source variant");
+    assert_eq!(disabled.rust_name(), "ConstructionDisabled");
+    assert!(disabled.construction().is_none());
+    assert!(
+        disabled
+            .is_active(ReflectedRef::new(&VariantPolicyEvent::ConstructionDisabled))
+            .expect("the retained variant must preserve access semantics")
+    );
+    assert!(
+        descriptor
+            .variant_at(3)
+            .and_then(|variant| variant.construction())
+            .is_some()
+    );
 }
 
 #[test]

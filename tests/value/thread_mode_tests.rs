@@ -102,6 +102,18 @@ fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
     assert_eq!(number, 42);
 }
 
+#[test]
+fn test_thread_safe_owned_borrow_bridges_preserve_thread_safe_mode() {
+    let mut value = SendReflectedOwned::new(61_u32);
+    let shared: SendReflectedRef<'_> = value.as_reflected_ref();
+    assert_eq!(shared.downcast_ref::<u32>(), Some(&61));
+    let mut mutable: SendReflectedMut<'_> = value.as_reflected_mut();
+    *mutable
+        .downcast_mut::<u32>()
+        .expect("the owned thread-safe value must expose a mutable bridge") = 67;
+    assert_eq!(value.downcast_ref::<u32>(), Some(&67));
+}
+
 /// Confirms thread-safe `str` variants retain their dedicated accessors after
 /// downgrade.
 #[test]

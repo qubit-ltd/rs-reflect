@@ -8,7 +8,7 @@
 
 //! Tests hidden descriptor factories used by generated code.
 
-use crate::__private::codegen_v1::expression as codegen_expression;
+use crate::__private::codegen_v2::expression as codegen_expression;
 use crate::__private::descriptor;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::EnumRepr;
@@ -111,7 +111,7 @@ fn test_const_argument_factories_cover_supported_primitives() {
 /// Verifies the versioned code-generation facade preserves checked expression
 /// invariants and every structural input passed by generated code.
 #[test]
-fn test_codegen_v1_expression_factories_preserve_structural_inputs() {
+fn test_codegen_v2_expression_factories_preserve_structural_inputs() {
     let concrete = codegen_expression::concrete(
         vec![
             Box::<str>::from("std"),

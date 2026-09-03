@@ -754,6 +754,11 @@ impl TypeDescriptor {
         (self.capabilities)()
     }
 
+    /// Returns capabilities declared directly by this descriptor.
+    pub(crate) fn declared_capabilities(&self) -> &'static TypeCapabilities {
+        (self.capabilities)()
+    }
+
     /// Retrieves one executable capability adapter through its typed key.
     ///
     /// `None` means this descriptor did not register the key, registered a
@@ -1001,10 +1006,10 @@ impl TypeDescriptor {
 
     /// Returns a variant by source index.
     ///
-    /// `None` means the index is outside the variant range.
+    /// `None` means no visible variant has the source declaration index.
     #[must_use]
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor> {
-        self.variants.get(index)
+        self.variants.iter().find(|variant| variant.index() == index)
     }
 
     /// Finds the fieldless integer-`repr` variant with the exact numeric value.
@@ -1027,7 +1032,14 @@ impl TypeDescriptor {
     #[must_use = "inspect the reflected implementations or handle the registry error"]
     pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
-        Ok(registry.implementations(self.type_id()))
+        Ok(self.impls_in(registry))
+    }
+
+    /// Returns implementations from an explicitly supplied immutable registry
+    /// snapshot without consulting process-wide initialization.
+    #[must_use]
+    pub fn impls_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [&'static ImplDescriptor] {
+        registry.implementations(self.type_id())
     }
 
     /// Returns the frozen effective method instances for this exact root.
@@ -1039,7 +1051,17 @@ impl TypeDescriptor {
     #[must_use = "inspect the effective methods or handle the registry error"]
     pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
-        Ok(registry.effective_view(self.type_id()).methods())
+        Ok(self.methods_in(registry))
+    }
+
+    /// Returns effective methods from an explicitly supplied immutable
+    /// registry snapshot.
+    #[must_use]
+    pub fn methods_in<'registry>(
+        &self,
+        registry: &'registry ReflectRegistry,
+    ) -> &'registry [&'static MethodInstanceDescriptor] {
+        registry.effective_view(self.type_id()).methods()
     }
 
     /// Looks up an effective method by query name across all namespaces.
@@ -1051,9 +1073,19 @@ impl TypeDescriptor {
     /// view. A cached [`RegistryError`] is returned when aggregation failed.
     pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
         let registry = ReflectRegistry::initialize()?;
-        Ok(registry
+        Ok(self.methods_named_in(registry, name))
+    }
+
+    /// Looks up an effective method in an explicitly supplied immutable
+    /// registry snapshot.
+    pub fn methods_named_in<'registry>(
+        &self,
+        registry: &'registry ReflectRegistry,
+        name: &str,
+    ) -> MethodLookup<'registry> {
+        registry
             .effective_view(self.type_id())
-            .lookup_method(MethodQualifier::Any, name))
+            .lookup_method(MethodQualifier::Any, name)
     }
 }
 

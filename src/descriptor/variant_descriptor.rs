@@ -153,7 +153,7 @@ impl VariantDescriptor {
     /// Attaches a generated dynamic-construction entry point to this variant.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_construction(mut self, construction: VariantConstructionDescriptor) -> Self {
+    pub fn with_construction(mut self, construction: VariantConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
     }
@@ -280,7 +280,7 @@ impl VariantDescriptor {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(&value);
         if actual != expected {
-            return Err(TypeMismatch::new(expected, actual));
+            return Err(TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()));
         }
         (self.active_test)(value)
     }

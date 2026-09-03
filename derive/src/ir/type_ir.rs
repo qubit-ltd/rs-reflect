@@ -56,9 +56,18 @@ pub(crate) enum PathArgumentIr {
     Lifetime(String),
     Type(TypeIr),
     Const(TokenStream),
-    AssociatedType { name: String, ty: TypeIr },
-    AssociatedConst { name: String, value: TokenStream },
-    Constraint { name: String, bounds: Vec<GenericBoundIr> },
+    AssociatedType {
+        name: String,
+        ty: TypeIr,
+    },
+    AssociatedConst {
+        name: String,
+        value: TokenStream,
+    },
+    Constraint {
+        name: String,
+        bounds: Vec<GenericBoundIr>,
+    },
     Other(TokenStream),
 }
 

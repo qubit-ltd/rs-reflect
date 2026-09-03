@@ -14,7 +14,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v1::descriptor;
+use qubit_reflect::__private::codegen_v2::descriptor;
 use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::access::FieldAccessOperation;
 use qubit_reflect::access::FieldAccessPolicy;
@@ -285,9 +285,14 @@ fn test_field_descriptor_rejects_type_mismatches_without_modifying_target() {
         Ok(_) => panic!("an unrelated target type must be rejected"),
         Err(error) => error,
     };
-    let FieldAccessError::TargetTypeMismatch { mismatch, .. } = error else {
+    let FieldAccessError::TargetTypeMismatch {
+        field: identity,
+        mismatch,
+    } = error
+    else {
         panic!("the error should classify a target type mismatch");
     };
+    assert_eq!(identity.query_name(), Some("secret"));
     assert_eq!(mismatch.expected(), TypeId::of::<Account>());
     assert_eq!(mismatch.actual(), TypeId::of::<OtherTarget>());
 
@@ -546,7 +551,17 @@ fn test_field_access_operations_and_errors_preserve_context() {
     assert_eq!(FieldAccessOperation::Set.to_string(), "set");
 
     let field = FieldIdentity::new(TypeId::of::<Account>(), "Account", 0, Some("secret"));
-    let inactive = FieldAccessError::inactive_variant(field.clone(), 1, "Disabled");
-    assert_eq!(inactive.field(), &field);
-    assert!(inactive.to_string().contains("inactive variant Disabled"));
+    let inactive = FieldAccessError::inactive_variant(FieldIdentity::new_variant(
+        TypeId::of::<Account>(),
+        "Account",
+        0,
+        Some("secret"),
+        1,
+        "Disabled",
+    ));
+    assert_eq!(inactive.field().declaring_type(), field.declaring_type());
+    assert_eq!(inactive.field().rust_name(), field.rust_name());
+    assert_eq!(inactive.field().variant_index(), Some(1));
+    assert_eq!(inactive.field().variant_rust_name(), Some("Disabled"));
+    assert!(inactive.to_string().contains("inactive enum variant"));
 }

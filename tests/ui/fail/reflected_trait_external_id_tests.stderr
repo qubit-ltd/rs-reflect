@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+  --> tests/ui/fail/reflected_trait_external_id_tests.rs:22:1
+   |
+22 | #[reflect_impl(external_trait_id = "invalid.reflected.service")]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `()`, found `bool`
+   |
+   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact capability surface consumed by generated code.
+//! Exact capability surface consumed by codegen v2.
 
 #[doc(hidden)]
 pub use crate::capability::TypeCapabilities;
@@ -14,8 +14,6 @@ pub use crate::capability::TypeCapabilities;
 pub use crate::capability::clone_descriptor;
 #[doc(hidden)]
 pub use crate::capability::default_descriptor;
-#[doc(hidden)]
-pub use crate::capability::registered_type_capabilities;
 #[doc(hidden)]
 pub use crate::capability::send_descriptor;
 #[doc(hidden)]

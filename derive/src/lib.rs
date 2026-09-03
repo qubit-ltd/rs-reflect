@@ -10,7 +10,7 @@
 //!
 //! Generated code uses the runtime selected by `#[reflect(crate = path)]` and
 //! reaches implementation details only through that runtime's versioned
-//! `__private::codegen_v1` protocol. Applications should normally use the
+//! `__private::codegen_v2` protocol. Applications should normally use the
 //! re-exported macros from `qubit-reflect` instead of depending on this crate
 //! directly.
 
@@ -36,7 +36,7 @@ use ir::MacroKind;
 /// conflicting policies with source-oriented compiler diagnostics.
 ///
 /// `crate = path` is intended for downstream facades. The selected facade must
-/// expose the matching `__private::codegen_v1` protocol; generated code does
+/// expose the matching `__private::codegen_v2` protocol; generated code does
 /// not require it to re-export the runtime's public modules.
 ///
 /// See the

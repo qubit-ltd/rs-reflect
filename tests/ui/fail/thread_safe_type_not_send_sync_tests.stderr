@@ -1,0 +1,79 @@
+error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:11:10
+   |
+11 | #[derive(Reflect)]
+   |          ^^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
+   |
+   = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
+note: required by a bound in `DynamicRef::<'a, ThreadSafe>::new`
+  --> src/value/dynamic_ref.rs
+   |
+   |     pub fn new<T: Sized + 'static + Sync>(value: &'a T) -> Self {
+   |                                     ^^^^ required by this bound in `DynamicRef::<'a, ThreadSafe>::new`
+   = note: this error originates in the derive macro `Reflect` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `std::rc::Rc<u8>` cannot be sent between threads safely
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:11:10
+   |
+11 | #[derive(Reflect)]
+   |          ^^^^^^^ `std::rc::Rc<u8>` cannot be sent between threads safely
+   |
+   = help: the trait `Send` is not implemented for `std::rc::Rc<u8>`
+note: required by a bound in `DynamicMut::<'a, ThreadSafe>::new`
+  --> src/value/dynamic_mut.rs
+   |
+   |     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
+   |                                     ^^^^ required by this bound in `DynamicMut::<'a, ThreadSafe>::new`
+   = note: this error originates in the derive macro `Reflect` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:11:10
+   |
+11 | #[derive(Reflect)]
+   |          ^^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
+   |
+   = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
+note: required by a bound in `DynamicMut::<'a, ThreadSafe>::new`
+  --> src/value/dynamic_mut.rs
+   |
+   |     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
+   |                                            ^^^^ required by this bound in `DynamicMut::<'a, ThreadSafe>::new`
+   = note: this error originates in the derive macro `Reflect` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `std::rc::Rc<u8>` cannot be sent between threads safely
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:11:10
+   |
+11 | #[derive(Reflect)]
+   |          ^^^^^^^ `std::rc::Rc<u8>` cannot be sent between threads safely
+   |
+   = help: within `LocalOnly`, the trait `Send` is not implemented for `std::rc::Rc<u8>`
+note: required because it appears within the type `LocalOnly`
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:13:8
+   |
+13 | struct LocalOnly {
+   |        ^^^^^^^^^
+note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
+  --> src/value/dynamic_owned.rs
+   |
+   |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {
+   |                             ^^^^ required by this bound in `DynamicOwned::<ThreadSafe>::new`
+   = note: this error originates in the derive macro `Reflect` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:11:10
+   |
+11 | #[derive(Reflect)]
+   |          ^^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
+   |
+   = help: within `LocalOnly`, the trait `Sync` is not implemented for `std::rc::Rc<u8>`
+note: required because it appears within the type `LocalOnly`
+  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:13:8
+   |
+13 | struct LocalOnly {
+   |        ^^^^^^^^^
+note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
+  --> src/value/dynamic_owned.rs
+   |
+   |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {
+   |                                    ^^^^ required by this bound in `DynamicOwned::<ThreadSafe>::new`
+   = note: this error originates in the derive macro `Reflect` (in Nightly builds, run with -Z macro-backtrace for more info)

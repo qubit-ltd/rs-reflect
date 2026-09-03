@@ -25,6 +25,7 @@ use crate::identity::Visibility;
 
 struct UnitTraitMarker;
 struct UnitChildMarker;
+struct UnitAlternateMarker;
 
 static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
     parameters: Box::new([]),
@@ -50,6 +51,17 @@ static CHILD_DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| 
         "UnitChild",
         "crate::UnitChild",
         "unit_child",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC,
+    )
+});
+
+static ALTERNATE_DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<UnitAlternateMarker>()),
+        "UnitAlternate",
+        "crate::UnitTrait",
+        "alternate_trait",
         TraitCompleteness::Complete,
         &EMPTY_GENERIC,
     )
@@ -83,6 +95,7 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
     assert_eq!(UNIT_DEFINITION.rust_path(), "crate::UnitTrait");
     assert_eq!(UNIT_DEFINITION.query_name(), "unit_trait");
     assert_eq!(UNIT_DEFINITION.completeness(), TraitCompleteness::Complete);
+    assert!(UNIT_DEFINITION.is_compatible_with(&CHILD_DEFINITION));
     assert!(UNIT_DEFINITION.methods().is_empty());
     assert_eq!(UNIT_DEFINITION.associated_types().len(), 1);
     assert_eq!(UNIT_DEFINITION.associated_consts().len(), 1);
@@ -108,6 +121,8 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
     assert_eq!(root.rust_name(), "UnitTrait");
     assert_eq!(root.query_name(), "unit_trait");
     assert_eq!(root.completeness(), TraitCompleteness::Complete);
+    assert_eq!(root.associated_types().len(), 1);
+    assert_eq!(root.associated_consts().len(), 1);
     assert!(root.method("missing").is_none());
     assert_eq!(
         root.associated_type("item").map(AssociatedTypeDescriptor::index),
@@ -139,6 +154,22 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
     );
     assert_eq!(child.all_supertraits().len(), 1);
     assert_eq!(child.all_supertraits().iter().count(), 1);
+
+    let alternate = Box::leak(Box::new(
+        TraitDescriptor::builder(&ALTERNATE_DEFINITION)
+            .build()
+            .expect("alternate trait facts must build"),
+    ));
+    let sorted = TraitDescriptor::builder(&CHILD_DEFINITION)
+        .direct_supertraits([root as &'static TraitDescriptor, alternate as &'static TraitDescriptor])
+        .build()
+        .expect("same-path supertraits must use query names as a stable tie-breaker");
+    let sorted_names = sorted
+        .all_supertraits()
+        .iter()
+        .map(TraitDescriptor::query_name)
+        .collect::<Vec<_>>();
+    assert_eq!(sorted_names, ["alternate_trait", "unit_trait"]);
 
     let payload = TraitImplPayload::new(&UNIT_DEFINITION, root);
     assert!(std::ptr::eq(payload.definition(), &*UNIT_DEFINITION));

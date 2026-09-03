@@ -10,7 +10,7 @@
 
 /// Versioned protocol consumed by code generated for this release.
 #[doc(hidden)]
-pub mod codegen_v1;
+pub mod codegen_v2;
 /// Conformance hooks kept separate from the generated-code ABI.
 #[doc(hidden)]
 pub mod testing;

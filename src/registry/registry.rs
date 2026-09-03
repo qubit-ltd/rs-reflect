@@ -12,6 +12,8 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityKey;
+use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
@@ -19,6 +21,7 @@ use crate::descriptor::TraitId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
 use crate::expression::TypeExpression;
+use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
 use crate::registry::indexes::RegistryIndexes;
 use crate::registry::registry_builder::build_inventory_registry;
@@ -178,6 +181,7 @@ pub struct ReflectRegistry {
     pub(super) impl_definitions: Box<[&'static ImplDefinitionDescriptor]>,
     pub(super) indexes: RegistryIndexes,
     pub(super) empty_effective_view: EffectiveTypeView,
+    pub(super) empty_capabilities: TypeCapabilities,
 }
 
 impl ReflectRegistry {
@@ -220,6 +224,46 @@ impl ReflectRegistry {
     #[inline(always)]
     pub fn types(&self) -> &[&'static TypeDescriptor] {
         &self.types
+    }
+
+    /// Enumerates registered roots together with their source fragments.
+    pub fn types_with_identity(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&'static TypeDescriptor, &FragmentIdentity)> + '_ {
+        self.types.iter().map(|descriptor| {
+            let identity = self
+                .indexes
+                .type_fragments
+                .get(&descriptor.type_id())
+                .expect("every frozen type has a source fragment");
+            (*descriptor, identity)
+        })
+    }
+
+    /// Returns the source fragment that registered one exact concrete type.
+    #[must_use]
+    pub fn type_source(&self, type_id: TypeId) -> Option<&FragmentIdentity> {
+        self.indexes.type_fragments.get(&type_id)
+    }
+
+    /// Returns the frozen effective capabilities for one exact concrete type.
+    #[must_use]
+    pub fn capabilities(&self, type_id: TypeId) -> &TypeCapabilities {
+        self.indexes
+            .capabilities_by_target
+            .get(&type_id)
+            .unwrap_or(&self.empty_capabilities)
+    }
+
+    /// Enumerates registered roots carrying the exact typed capability key.
+    pub fn types_with_capability<A: 'static>(
+        &self,
+        key: CapabilityKey<A>,
+    ) -> impl Iterator<Item = &'static TypeDescriptor> + '_ {
+        self.types
+            .iter()
+            .copied()
+            .filter(move |descriptor| self.capabilities(descriptor.type_id()).contains(key.clone()))
     }
 
     /// Returns every reflected implementation targeting `type_id`.

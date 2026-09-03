@@ -321,6 +321,14 @@ pub enum InvocationUnavailableReason {
     OpaqueReturn,
     /// An unsized value has no dedicated safe adapter.
     UnsupportedUnsizedValue,
+    /// A default method has call-site bounds that reflection cannot prove.
+    UnprovenDefaultConstraint,
+    /// A default method depends on an associated type that is not proven at
+    /// the declaration hook.
+    UnprovenAssociatedType,
+    /// A pinned receiver conflicts with the requested async, thread-safe,
+    /// catching, or borrowed-output mode.
+    PinnedModeConflict,
     /// Invocation was disabled by reflection policy.
     DisabledByPolicy,
 }

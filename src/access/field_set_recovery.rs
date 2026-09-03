@@ -13,18 +13,20 @@ use std::fmt;
 
 use crate::access::FieldAccessError;
 use crate::access::FieldIdentity;
-use crate::value::ReflectedOwned;
+use crate::value::DynamicOwned;
+use crate::value::Local;
+use crate::value::Mode;
 
 /// An untouched replacement retained after field-set validation fails.
-pub struct FieldSetRecovery {
+pub struct FieldSetRecovery<M: Mode = Local> {
     field: FieldIdentity,
     query_name: Option<&'static str>,
-    value: ReflectedOwned,
+    value: DynamicOwned<M>,
 }
 
-impl FieldSetRecovery {
+impl<M: Mode> FieldSetRecovery<M> {
     /// Creates recovery for one field replacement value.
-    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: ReflectedOwned) -> Self {
+    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: DynamicOwned<M>) -> Self {
         Self {
             field,
             query_name,
@@ -49,7 +51,7 @@ impl FieldSetRecovery {
     /// Returns the untouched replacement value.
     #[must_use]
     #[inline(always)]
-    pub const fn value(&self) -> &ReflectedOwned {
+    pub const fn value(&self) -> &DynamicOwned<M> {
         &self.value
     }
 
@@ -58,7 +60,7 @@ impl FieldSetRecovery {
     ///
     /// `None` means this recovery is positional or belongs to another name.
     #[must_use]
-    pub fn value_by_name(&self, name: &str) -> Option<&ReflectedOwned> {
+    pub fn value_by_name(&self, name: &str) -> Option<&DynamicOwned<M>> {
         (self.query_name == Some(name)).then_some(&self.value)
     }
 
@@ -66,14 +68,14 @@ impl FieldSetRecovery {
     ///
     /// `None` means this recovery belongs to another field position.
     #[must_use]
-    pub fn value_at(&self, index: usize) -> Option<&ReflectedOwned> {
+    pub fn value_at(&self, index: usize) -> Option<&DynamicOwned<M>> {
         (self.field.index() == index).then_some(&self.value)
     }
 
     /// Consumes recovery and returns the untouched replacement value.
     #[must_use]
     #[inline(always)]
-    pub fn into_value(self) -> ReflectedOwned {
+    pub fn into_value(self) -> DynamicOwned<M> {
         self.value
     }
 
@@ -81,7 +83,7 @@ impl FieldSetRecovery {
     ///
     /// Returns the intact recovery when `name` does not match or the field is
     /// positional.
-    pub fn into_value_by_name(self, name: &str) -> Result<ReflectedOwned, Self> {
+    pub fn into_value_by_name(self, name: &str) -> Result<DynamicOwned<M>, Self> {
         if self.query_name == Some(name) {
             Ok(self.value)
         } else {
@@ -92,7 +94,7 @@ impl FieldSetRecovery {
     /// Takes the replacement by its source index without panicking.
     ///
     /// Returns the intact recovery when `index` does not match.
-    pub fn into_value_at(self, index: usize) -> Result<ReflectedOwned, Self> {
+    pub fn into_value_at(self, index: usize) -> Result<DynamicOwned<M>, Self> {
         if self.field.index() == index {
             Ok(self.value)
         } else {
@@ -101,7 +103,7 @@ impl FieldSetRecovery {
     }
 }
 
-impl fmt::Debug for FieldSetRecovery {
+impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
     /// Formats binding metadata without requiring the erased value to be
     /// `Debug`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -120,18 +122,18 @@ impl fmt::Debug for FieldSetRecovery {
 /// Adapter errors occur after the adapter accepts ownership and therefore do
 /// not contain recovery. Call [`Self::recovery`] to distinguish the two
 /// phases without inspecting display text.
-pub struct FieldSetFailure {
+pub struct FieldSetFailure<M: Mode = Local> {
     error: Box<FieldAccessError>,
-    recovery: Option<Box<FieldSetRecovery>>,
+    recovery: Option<Box<FieldSetRecovery<M>>>,
 }
 
-impl FieldSetFailure {
+impl<M: Mode> FieldSetFailure<M> {
     /// Creates a pre-execution failure retaining the untouched replacement.
     pub(crate) fn before_execution(
         error: FieldAccessError,
         field: FieldIdentity,
         query_name: Option<&'static str>,
-        value: ReflectedOwned,
+        value: DynamicOwned<M>,
     ) -> Self {
         Self {
             error: Box::new(error),
@@ -161,13 +163,13 @@ impl FieldSetFailure {
     /// the error.
     #[must_use]
     #[inline(always)]
-    pub fn recovery(&self) -> Option<&FieldSetRecovery> {
+    pub fn recovery(&self) -> Option<&FieldSetRecovery<M>> {
         self.recovery.as_deref()
     }
 
     /// Consumes the failure and returns its error and optional recovery.
     #[must_use]
-    pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery>) {
+    pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery<M>>) {
         (*self.error, self.recovery.map(|recovery| *recovery))
     }
 
@@ -175,7 +177,7 @@ impl FieldSetFailure {
     ///
     /// Returns the structured adapter error when execution already accepted
     /// ownership and recovery is therefore unavailable.
-    pub fn into_recovery(self) -> Result<FieldSetRecovery, FieldAccessError> {
+    pub fn into_recovery(self) -> Result<FieldSetRecovery<M>, FieldAccessError> {
         match self.recovery {
             Some(recovery) => Ok(*recovery),
             None => Err(*self.error),
@@ -190,7 +192,7 @@ impl FieldSetFailure {
     }
 }
 
-impl fmt::Debug for FieldSetFailure {
+impl<M: Mode> fmt::Debug for FieldSetFailure<M> {
     /// Formats the error and recovery metadata without formatting erased
     /// values.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -202,21 +204,21 @@ impl fmt::Debug for FieldSetFailure {
     }
 }
 
-impl fmt::Display for FieldSetFailure {
+impl<M: Mode> fmt::Display for FieldSetFailure<M> {
     /// Delegates human-readable output to the structured access error.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.error.fmt(formatter)
     }
 }
 
-impl std::error::Error for FieldSetFailure {
+impl<M: Mode> std::error::Error for FieldSetFailure<M> {
     /// Returns the underlying machine-readable access error.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(self.error.as_ref())
     }
 }
 
-impl AsRef<FieldAccessError> for FieldSetFailure {
+impl<M: Mode> AsRef<FieldAccessError> for FieldSetFailure<M> {
     /// Borrows the underlying access error for compatibility with generic
     /// error inspection code.
     fn as_ref(&self) -> &FieldAccessError {

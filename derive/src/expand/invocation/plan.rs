@@ -116,5 +116,8 @@ pub(crate) enum UnavailableReasonPlan {
     UnsupportedBorrowedReturn,
     OpaqueReturn,
     UnsupportedUnsizedValue,
+    UnprovenDefaultConstraint,
+    UnprovenAssociatedType,
+    PinnedModeConflict,
     DisabledByPolicy,
 }

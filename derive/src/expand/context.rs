@@ -107,20 +107,24 @@ mod tests {
             span: Span::call_site(),
             value_span: Span::call_site(),
         }];
-        let context = ExpansionContext::from_attributes(&attributes).expect("explicit facade must resolve");
+        let context =
+            ExpansionContext::from_attributes(&attributes).expect("explicit facade must resolve");
         assert_eq!(context.facade().to_string(), "framework :: reflect");
     }
 
     #[test]
     fn renamed_dependency_becomes_an_absolute_path() {
-        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Name("reflect_runtime".to_owned())))
-            .expect("renamed dependency must resolve");
+        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Name(
+            "reflect_runtime".to_owned(),
+        )))
+        .expect("renamed dependency must resolve");
         assert_eq!(context.facade().to_string(), ":: reflect_runtime");
     }
 
     #[test]
     fn missing_facade_reports_actionable_error() {
-        let error = ExpansionContext::from_found_crate(None).expect_err("missing runtime must fail");
+        let error =
+            ExpansionContext::from_found_crate(None).expect_err("missing runtime must fail");
         assert!(error.to_string().contains("#[reflect(crate = path)]"));
     }
 }

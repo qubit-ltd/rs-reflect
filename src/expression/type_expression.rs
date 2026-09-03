@@ -123,6 +123,8 @@ pub struct ConcreteTypeExpression {
     pub(crate) path: Box<[Box<str>]>,
     /// Generic arguments of the final path segment in declaration order.
     pub(crate) arguments: Box<[GenericArgument]>,
+    /// Structural path segments with arguments retained at their source site.
+    pub(crate) segments: Box<[ConcretePathSegment]>,
     /// Optional source-oriented diagnostic text excluded from identity.
     pub(crate) diagnostic: DiagnosticText,
 }
@@ -141,9 +143,39 @@ impl ConcreteTypeExpression {
         if let Some(index) = path.iter().position(|segment| segment.is_empty()) {
             return Err(ExpressionError::EmptyPathSegment { index });
         }
+        let arguments = arguments.into_iter().collect::<Box<[_]>>();
+        let mut segments = path
+            .iter()
+            .map(|name| ConcretePathSegment::new(name.clone(), Box::default()))
+            .collect::<Vec<_>>();
+        if let Some(last) = segments.last_mut() {
+            last.arguments = arguments.clone();
+        }
         Ok(Self {
             path,
-            arguments: arguments.into_iter().collect(),
+            arguments,
+            segments: segments.into_boxed_slice(),
+            diagnostic: DiagnosticText::default(),
+        })
+    }
+
+    /// Creates a concrete type expression from structural path segments.
+    pub fn from_segments(segments: impl IntoIterator<Item = ConcretePathSegment>) -> Result<Self, ExpressionError> {
+        let segments = segments.into_iter().collect::<Box<[_]>>();
+        if segments.is_empty() {
+            return Err(ExpressionError::EmptyConcretePath);
+        }
+        if let Some(index) = segments.iter().position(|segment| segment.name.is_empty()) {
+            return Err(ExpressionError::EmptyPathSegment { index });
+        }
+        let path = segments.iter().map(|segment| segment.name.clone()).collect();
+        let arguments = segments
+            .last()
+            .map_or_else(Box::default, |segment| segment.arguments.clone());
+        Ok(Self {
+            path,
+            arguments,
+            segments,
             diagnostic: DiagnosticText::default(),
         })
     }
@@ -161,6 +193,12 @@ impl ConcreteTypeExpression {
         &self.arguments
     }
 
+    /// Returns structural path segments with their local generic arguments.
+    #[must_use]
+    pub fn segments(&self) -> &[ConcretePathSegment] {
+        &self.segments
+    }
+
     /// Returns source-oriented diagnostic text when present.
     #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
@@ -175,7 +213,36 @@ impl ConcreteTypeExpression {
     }
 }
 
-impl_identity_without_diagnostic!(ConcreteTypeExpression { path, arguments });
+impl_identity_without_diagnostic!(ConcreteTypeExpression { segments });
+
+/// One concrete path segment and the generic arguments written on it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ConcretePathSegment {
+    name: Box<str>,
+    arguments: Box<[GenericArgument]>,
+}
+
+impl ConcretePathSegment {
+    /// Creates a structural concrete path segment.
+    pub fn new(name: impl Into<Box<str>>, arguments: impl Into<Box<[GenericArgument]>>) -> Self {
+        Self {
+            name: name.into(),
+            arguments: arguments.into(),
+        }
+    }
+
+    /// Returns this path segment's identifier.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns generic arguments attached to this exact segment.
+    #[must_use]
+    pub fn arguments(&self) -> &[GenericArgument] {
+        &self.arguments
+    }
+}
 
 /// An associated type projection.
 #[derive(Clone, Debug)]
