@@ -82,23 +82,18 @@ implementations by itself.
 ### 1. Derive the structural descriptor
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
-use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
+use qubit_reflect::{Reflect, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let descriptor = TypeDescriptor::of::<User>();
-assert_eq!(descriptor.query_name(), "User");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+fn main() {
+    let descriptor = TypeDescriptor::of::<User>();
+    assert_eq!(descriptor.query_name(), "User");
+}
 ```
 
 `TypeDescriptor::of::<T>()` returns the same immutable root for repeated
@@ -113,70 +108,64 @@ code has static proof; it never guesses a type from a string name.
 ### 2. Read and replace one field
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
 use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let name = TypeDescriptor::of::<User>().field("name").expect("field exists");
-let mut user = User { id: 7, name: String::from("Ada") };
+fn main() {
+    let name = TypeDescriptor::of::<User>().field("name").expect("field exists");
+    let mut user = User { id: 7, name: String::from("Ada") };
 
-let value = name.get(ReflectedRef::new(&user)).expect("shared read is allowed");
-assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    let value = name.get(ReflectedRef::new(&user)).expect("shared read is allowed");
+    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
-name.set(
-    ReflectedMut::new(&mut user),
-    ReflectedOwned::new(String::from("Grace")),
-)
-.expect("the replacement has the exact field type");
-assert_eq!(user.name, "Grace");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+    name.set(
+        ReflectedMut::new(&mut user),
+        ReflectedOwned::new(String::from("Grace")),
+    )
+    .expect("the replacement has the exact field type");
+    assert_eq!(user.name, "Grace");
+}
 ```
 
 `get` needs a shared borrow; `get_mut` and `set` need an exclusive borrow.
 Before entering generated code, the adapter checks the receiver type, operation
-policy, and replacement `TypeId`. A failed `set` returns `FieldSetFailure`,
-whose recovery retains both the original target borrow and the owned
-replacement instead of silently dropping either input.
+policy, and replacement `TypeId`. A `set` rejected during those pre-execution
+checks returns `FieldSetFailure` with recovery containing the field identity
+and the untouched owned replacement. The target borrow is released when the
+failed call ends; it is not stored in `FieldSetRecovery`. If an adapter accepts
+ownership and then reports an execution error,
+`FieldSetFailure::recovery()` returns `None`; do not treat every failure as
+retryable.
 
 ### 3. Construct a new value from editor input
 
 For a named struct, supply every constructible field by query name:
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
 use qubit_reflect::{NamedConstructionInput, Reflect, ReflectedOwned, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let value = TypeDescriptor::of::<User>()
-    .construct_struct(NamedConstructionInput::new([
-        ("id", ReflectedOwned::new(7_u64)),
-        ("name", ReflectedOwned::new(String::from("Ada"))),
-    ]))
-    .expect("complete, exactly typed input")
-    .downcast::<User>()
-    .unwrap_or_else(|_| unreachable!("the descriptor constructs User"));
-assert_eq!(value.name, "Ada");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+fn main() {
+    let value = TypeDescriptor::of::<User>()
+        .construct_struct(NamedConstructionInput::new([
+            ("id", ReflectedOwned::new(7_u64)),
+            ("name", ReflectedOwned::new(String::from("Ada"))),
+        ]))
+        .expect("complete, exactly typed input")
+        .downcast::<User>()
+        .unwrap_or_else(|_| unreachable!("the descriptor constructs User"));
+    assert_eq!(value.name, "Ada");
+}
 ```
 
 Use `construct_tuple` or `construct_unit` for the corresponding struct shape;
@@ -255,13 +244,32 @@ arbitrary-self receiver forms require an exact `ReceiverAdapter` registered by
 `register_type_capabilities!`; otherwise the method remains discoverable but
 reports a stable unavailable reason.
 
+### Choose transparent, opaque, and thread-safe boundaries
+
+Use the narrowest boundary that matches what downstream code must do:
+
+| Boundary | What it exposes | Important constraint |
+| --- | --- | --- |
+| Ordinary reflected field | A resolved `TypeRef` and navigation into the field type | The concrete field type must implement `Reflect`. |
+| `#[reflect(opaque)]` field | Whole-value read, replacement, argument passing, and outer construction | Operations still require exact `TypeId`; internal structure and independent root construction stay unavailable. |
+| `#[reflect(opaque)]` type | One opaque root descriptor and explicitly registered capabilities | It exposes no fields, variants, or per-member construction. |
+| Local dynamic wrapper | Checked operations on ordinary local values and borrows | It is not upgraded to `Send` or `Sync` by registry metadata. |
+| `SendReflected*` wrapper | A thread-safe erased boundary created under compile-time bounds | It can be consumed with `into_local`; a local wrapper cannot be upgraded at runtime. |
+
+Keep model semantics downstream. A model or schema layer may associate a
+`FieldDescriptor` with validation, persistence, codec, relation, or redaction
+metadata, but those facts do not become `qubit-reflect` capabilities or
+descriptor attributes. This preserves the dependency direction from model
+crates to `qubit-reflect`.
+
 ## Errors and Diagnostics
 
 The API avoids implicit conversion: it does not coerce numeric values, parse
 strings, infer `Into`, or manufacture `Send`/`Sync` after type erasure.
 
-- Field access returns `FieldAccessError`; failed replacement preserves inputs
-  in `FieldSetFailure`.
+- Field access returns `FieldAccessError`. A replacement rejected before the
+  adapter runs preserves the untouched owned value in `FieldSetFailure`; an
+  error after ownership crosses the adapter boundary has no recovery payload.
 - Construction returns `ConstructionRecovery` with the error and caller-owned
   input values.
 - Pre-execution invocation failures retain their receiver and arguments in
@@ -269,6 +277,11 @@ strings, infer `Into`, or manufacture `Send`/`Sync` after type erasure.
 - An inactive enum variant field produces a structured access error. Fieldless
   integer-`repr` enums expose normalized representation and discriminants;
   data-carrying enums do not invent an integer mapping.
+
+Handle these errors by matching their structured categories, not their
+`Display` text. Inspect recovery before retrying: construction and invocation
+recovery preserve caller order, while `FieldSetFailure::recovery()` explicitly
+distinguishes a retryable pre-execution rejection from a post-boundary error.
 
 Normal invocation does not catch panics. `#[reflect(catch_unwind)]` adds an
 explicit catching entry point when supported; a `panic=abort` build reports it

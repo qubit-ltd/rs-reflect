@@ -59,23 +59,18 @@ qubit-reflect = { version = "0.1", features = ["qubit-types"] }
 ### 1. 为类型派生结构描述符
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
-use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
+use qubit_reflect::{Reflect, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let descriptor = TypeDescriptor::of::<User>();
-assert_eq!(descriptor.query_name(), "User");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+fn main() {
+    let descriptor = TypeDescriptor::of::<User>();
+    assert_eq!(descriptor.query_name(), "User");
+}
 ```
 
 同一个具体类型多次调用 `TypeDescriptor::of::<T>()` 会得到同一份不可变根描述符。递归关系按需解析，因此 `Node -> Vec<Node>` 这样的关系不会导致无限递归初始化。
@@ -85,66 +80,56 @@ assert_eq!(descriptor.query_name(), "User");
 ### 2. 读取并替换字段
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
 use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let name = TypeDescriptor::of::<User>().field("name").expect("字段存在");
-let mut user = User { id: 7, name: String::from("Ada") };
+fn main() {
+    let name = TypeDescriptor::of::<User>().field("name").expect("字段存在");
+    let mut user = User { id: 7, name: String::from("Ada") };
 
-let value = name.get(ReflectedRef::new(&user)).expect("允许共享读取");
-assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    let value = name.get(ReflectedRef::new(&user)).expect("允许共享读取");
+    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
-name.set(
-    ReflectedMut::new(&mut user),
-    ReflectedOwned::new(String::from("Grace")),
-)
-.expect("替换值与字段类型精确匹配");
-assert_eq!(user.name, "Grace");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+    name.set(
+        ReflectedMut::new(&mut user),
+        ReflectedOwned::new(String::from("Grace")),
+    )
+    .expect("替换值与字段类型精确匹配");
+    assert_eq!(user.name, "Grace");
+}
 ```
 
-`get` 需要共享借用，`get_mut`、`set` 需要独占可变借用。进入生成代码前，适配器会检查 receiver 类型、操作策略和替换值的 `TypeId`。`set` 失败会得到 `FieldSetFailure`，其中的恢复对象同时保留原目标借用和待写入的 owned 值，不会静默丢失输入。
+`get` 需要共享借用，`get_mut`、`set` 需要独占可变借用。进入生成代码前，适配器会检查 receiver 类型、操作策略和替换值的 `TypeId`。如果 `set` 在这些执行前检查中被拒绝，`FieldSetFailure` 的恢复对象会保留字段身份和未改动的 owned 替换值；失败调用结束后目标借用会释放，并不会存进 `FieldSetRecovery`。若适配器已经接收所有权，随后才报告执行错误，`FieldSetFailure::recovery()` 会返回 `None`；不能假定每次失败都能直接重试。
 
 ### 3. 用编辑器输入构造新对象
 
 命名结构体通过查询名称提供所有可构造字段：
 
 ```rust
-# #![allow(proc_macro_derive_resolution_fallback)]
-# #[cfg(feature = "derive")]
-# fn main() {
 use qubit_reflect::{NamedConstructionInput, Reflect, ReflectedOwned, TypeDescriptor};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     id: u64,
     name: String,
 }
 
-let value = TypeDescriptor::of::<User>()
-    .construct_struct(NamedConstructionInput::new([
-        ("id", ReflectedOwned::new(7_u64)),
-        ("name", ReflectedOwned::new(String::from("Ada"))),
-    ]))
-    .expect("输入完整且类型精确")
-    .downcast::<User>()
-    .unwrap_or_else(|_| unreachable!("该描述符构造 User"));
-assert_eq!(value.name, "Ada");
-# }
-# #[cfg(not(feature = "derive"))]
-# fn main() {}
+fn main() {
+    let value = TypeDescriptor::of::<User>()
+        .construct_struct(NamedConstructionInput::new([
+            ("id", ReflectedOwned::new(7_u64)),
+            ("name", ReflectedOwned::new(String::from("Ada"))),
+        ]))
+        .expect("输入完整且类型精确")
+        .downcast::<User>()
+        .unwrap_or_else(|_| unreachable!("该描述符构造 User"));
+    assert_eq!(value.name, "Ada");
+}
 ```
 
 元组结构体和单元结构体分别使用 `construct_tuple`、`construct_unit`；enum 的 `VariantDescriptor` 也提供同样的三个构造方法。构造会在消费 owned 输入前检查形状、名称或位置、重复项、缺失项、策略和精确类型。失败时 `ConstructionRecovery` 会按调用方原顺序返还输入。结构体更新也遵循先完整校验、后整体移动的原则，包含实现 `Drop` 的类型。
@@ -183,14 +168,30 @@ pub mod __private {
 
 `Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
 
+### 选择透明、opaque 与线程安全边界
+
+应按下游真正需要的操作选择最窄边界：
+
+| 边界 | 可见能力 | 关键约束 |
+| --- | --- | --- |
+| 普通反射字段 | 提供 resolved `TypeRef`，可继续导航字段类型 | concrete 字段类型必须实现 `Reflect`。 |
+| `#[reflect(opaque)]` 字段 | 支持整体读取、替换、传参和外层构造 | 操作仍要求 `TypeId` 精确匹配；不能导航内部结构，也不能从该成员视图独立构造根对象。 |
+| `#[reflect(opaque)]` 类型 | 提供唯一 opaque 根描述符和显式登记的 capability | 不公开字段、variant 或成员级构造入口。 |
+| 本地动态包装器 | 对普通本地值和借用执行受检操作 | registry 元数据不能把它升级为 `Send` 或 `Sync`。 |
+| `SendReflected*` 包装器 | 在编译期 bound 成立时建立线程安全擦除边界 | 可消费自身并通过 `into_local` 降级；本地包装器不能在运行时升级。 |
+
+模型语义应留在下游。模型层或 schema 层可以把 `FieldDescriptor` 与 validation、持久化、codec、relation、redaction 等元数据关联起来，但这些事实不会变成 `qubit-reflect` 的 capability 或 descriptor 属性。这样才能保持模型 crate 单向依赖 `qubit-reflect`。
+
 ## 错误与诊断
 
 API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，也不会在类型擦除后凭空增加 `Send`/`Sync`。
 
-- 字段访问返回 `FieldAccessError`；字段替换失败则通过 `FieldSetFailure` 保留输入。
+- 字段访问返回 `FieldAccessError`。字段替换在适配器执行前被拒绝时，`FieldSetFailure` 会保留未改动的 owned 替换值；所有权越过适配器边界后才发生的错误不带 recovery payload。
 - 构造失败返回 `ConstructionRecovery`，同时携带错误和调用方持有的值。
 - 调用前校验失败时，`InvocationRecovery` 会返还 receiver 和参数。
 - 访问未激活 enum variant 的字段会得到结构化错误。无字段的整数 `repr` enum 可公开规范化表示和 discriminant；携带数据的 enum 不会被伪造为整数映射。
+
+处理错误时应匹配结构化分类，不要解析 `Display` 文本。重试前先检查 recovery：构造和调用恢复对象会保持调用方输入顺序；`FieldSetFailure::recovery()` 则明确区分可重试的执行前拒绝与已经越过所有权边界的错误。
 
 普通调用不捕获 panic。使用 `#[reflect(catch_unwind)]` 时，在支持的平台上会增加显式的捕获入口；`panic=abort` 构建会报告该能力不可用。异步适配器只返回绑定于调用生命周期的 future，不选择执行器，也不主动 poll；异步方法不能使用 `catch_unwind`。
 

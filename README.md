@@ -53,19 +53,21 @@ struct User {
     name: String,
 }
 
-let descriptor = TypeDescriptor::of::<User>();
-let name = descriptor.field("name").expect("derived field");
-let mut user = User { id: 7, name: String::from("Ada") };
+fn main() {
+    let descriptor = TypeDescriptor::of::<User>();
+    let name = descriptor.field("name").expect("derived field");
+    let mut user = User { id: 7, name: String::from("Ada") };
 
-let current = name.get(ReflectedRef::new(&user)).expect("checked read");
-assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    let current = name.get(ReflectedRef::new(&user)).expect("checked read");
+    assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
 
-name.set(
-    ReflectedMut::new(&mut user),
-    ReflectedOwned::new(String::from("Grace")),
-)
-.expect("exactly typed replacement");
-assert_eq!(user.name, "Grace");
+    name.set(
+        ReflectedMut::new(&mut user),
+        ReflectedOwned::new(String::from("Grace")),
+    )
+    .expect("exactly typed replacement");
+    assert_eq!(user.name, "Grace");
+}
 ```
 
 ## Why This Project Exists
@@ -83,7 +85,8 @@ facts even where an operation is unavailable.
 - Immutable descriptors for reflected structs, enums, traits, implementations,
   generic facts, and supported built-in type families.
 - Checked field reads, mutable borrows, replacements, enum-branch checks, and
-  dynamic construction. Failed owned-input operations return recovery objects.
+  dynamic construction. Pre-execution validation failures preserve
+  caller-owned inputs in recovery objects.
 - Generated invocation adapters for supported methods, with local and
   explicitly requested thread-safe modes.
 - A deterministic registry assembled from linked inventory fragments, plus
