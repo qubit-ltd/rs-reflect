@@ -1,6 +1,6 @@
 # qubit-reflect User Guide
 
-[简体中文](2026-08-29-qubit-reflect-user-guide.zh_CN.md) · [README](../README.md) · [API documentation](https://docs.rs/qubit-reflect)
+[简体中文](2026-08-29-qubit-reflect-user-guide.zh_CN.md) · [README](../README.md) · API documentation: `cargo doc --all-features`
 
 This guide targets framework and library authors using `qubit-reflect` 0.1 on
 Rust 1.94 or later. It explains how to expose a Rust declaration to a
@@ -49,8 +49,13 @@ Add the crate with its default features to use the macros:
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = { path = "../rs-reflect" }
 ```
+
+This crate is currently an internal Qubit dependency and is not published to
+crates.io. Use the workspace path shown above or an approved internal Git
+revision, and keep `qubit-reflect` and `qubit-reflect-derive` on that same
+revision.
 
 The default `derive` feature re-exports `Reflect`, `reflect`, and
 `reflect_impl` macros. `default-features = false` keeps the runtime and
@@ -60,13 +65,13 @@ Choose the narrowest dependency profile that matches the integration:
 
 ```toml
 # Runtime descriptors, dynamic values, and handwritten registration only.
-qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect = { path = "../rs-reflect", default-features = false }
 
 # Macros plus BigDecimal, chrono, and UUID reflection implementations.
-qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+qubit-reflect = { path = "../rs-reflect", features = ["ecosystem-types"] }
 
 # Macros plus Qubit DataType and Id reflection implementations.
-qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+qubit-reflect = { path = "../rs-reflect", features = ["qubit-types"] }
 ```
 
 `ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
@@ -129,6 +134,17 @@ fn main() {
     )
     .expect("the replacement has the exact field type");
     assert_eq!(user.name, "Grace");
+
+    let failure = name
+        .set(ReflectedMut::new(&mut user), ReflectedOwned::new(9_u64))
+        .expect_err("a u64 cannot replace a String field");
+    let recovered = failure
+        .into_recovery()
+        .expect("pre-execution rejection retains ownership")
+        .into_value()
+        .downcast::<u64>()
+        .unwrap_or_else(|_| unreachable!("the original type is retained"));
+    assert_eq!(recovered, 9);
 }
 ```
 
@@ -191,16 +207,16 @@ pub use qubit_reflect::TypeDescriptor;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use qubit_reflect::__private::codegen_v1;
+    pub use qubit_reflect::__private::codegen_v2;
 }
 ```
 
 Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
-only the `codegen_v1` export; the facade does not need to re-export runtime
+only the `codegen_v2` export; the facade does not need to re-export runtime
 modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
 `qubit_reflect` or its `__private` module: that turns unrelated implementation
 details into the facade's API. A downstream procedural macro may give the same
-module an exact private alias such as `reflect_codegen_v1`. `codegen_v1` is a
+module an exact private alias such as `reflect_codegen_v2`. `codegen_v2` is a
 compiler-to-runtime protocol, not a supported handwritten construction API; a
 future incompatible protocol receives a new versioned module.
 
@@ -238,6 +254,26 @@ capability, and effective-method indexes do not change. Static built-ins are
 available before a lookup; on-demand composite descriptors use a separate
 interner and do not mutate the public frozen registry.
 
+```rust
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::registry::ReflectRegistry;
+
+#[derive(Reflect)]
+struct Service;
+
+fn main() {
+    let snapshot = ReflectRegistry::initialize().expect("all fragments validate");
+    let descriptor = TypeDescriptor::of::<Service>();
+    let _methods = descriptor.methods_in(snapshot);
+    assert!(snapshot.get(descriptor.type_id()).is_some());
+}
+```
+
+Passing the snapshot to `impls_in`, `methods_in`, or `methods_named_in` makes
+the lookup dependency explicit. The snapshot is immutable; a failed global
+initialization never exposes a partially built registry.
+
 `Clone` and `Default` are typed capabilities. Register them only where their
 Rust bounds hold, then query with `clone_key()` or `default_key()`. Other
 arbitrary-self receiver forms require an exact `ReceiverAdapter` registered by
@@ -261,6 +297,41 @@ Keep model semantics downstream. A model or schema layer may associate a
 metadata, but those facts do not become `qubit-reflect` capabilities or
 descriptor attributes. This preserves the dependency direction from model
 crates to `qubit-reflect`.
+
+For a type-level thread-safe contract, the same mode covers owned-to-borrow
+bridges, field access, construction, updates, and generated method adapters:
+
+```rust
+use qubit_reflect::Reflect;
+use qubit_reflect::SendReflectedMut;
+use qubit_reflect::SendReflectedOwned;
+use qubit_reflect::SendReflectedRef;
+use qubit_reflect::TypeDescriptor;
+
+#[derive(Reflect)]
+#[reflect(thread_safe)]
+struct SharedCounter {
+    value: u64,
+}
+
+fn main() {
+    let field = TypeDescriptor::of::<SharedCounter>()
+        .field("value")
+        .expect("derived field");
+    let mut counter = SharedCounter { value: 1 };
+    let current = field
+        .get_thread_safe(SendReflectedRef::new(&counter))
+        .expect("thread-safe read adapter");
+    assert_eq!(current.downcast_ref::<u64>(), Some(&1));
+    field
+        .set_thread_safe(
+            SendReflectedMut::new(&mut counter),
+            SendReflectedOwned::new(2_u64),
+        )
+        .expect("thread-safe set adapter");
+    assert_eq!(counter.value, 2);
+}
+```
 
 ## Errors and Diagnostics
 
@@ -299,7 +370,7 @@ do not choose an executor or poll it, and async methods cannot use
 | Registry initialization fails | Inspect `RegistryError`; initialization errors are cached, so start a new process after fixing conflicting registrations. |
 | Cross-thread invocation is unavailable | Use a method explicitly marked `thread_safe` and construct `SendReflected*` values only where Rust's bounds are satisfied. |
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
-| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v1`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
+| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v2`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
 
 ## Limitations and Best Practices
 
@@ -310,11 +381,14 @@ infer domain rules or to bypass Rust ownership, privacy, type, or thread-safety
 checks. Unsafe functions, unsupported ABIs, variadics, unsafely erasable
 unsized values, unspecialized generics, and opaque `impl Trait` returns may be
 described, but are not dynamically callable.
+Tuple and portable function-pointer descriptors support arities 0 through 32.
+Arity 33 and above is intentionally unsupported and has no `Reflect` impl.
 
 ## Further Reading
 
 - [README](../README.md) and [简体中文 README](../README.zh_CN.md)
 - [简体中文用户指南](2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- [API documentation](https://docs.rs/qubit-reflect)
-- [English design](2026-09-01-qubit-reflect-design.md) and [简体中文设计](2026-08-29-qubit-reflect-design.zh_CN.md)
-- [Requirements traceability matrix](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- API documentation generated internally with `cargo doc --all-features`
+- [English design](2026-09-03-qubit-reflect-design.md) and [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
+- [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) and [追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)

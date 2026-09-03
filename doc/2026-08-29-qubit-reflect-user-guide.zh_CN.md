@@ -1,6 +1,6 @@
 # qubit-reflect 用户指南
 
-[English](2026-08-29-qubit-reflect-user-guide.md) · [README](../README.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
+[English](2026-08-29-qubit-reflect-user-guide.md) · [README](../README.zh_CN.md) · API 文档：`cargo doc --all-features`
 
 本手册面向使用 Rust 1.94 及以上版本、采用 `qubit-reflect` 0.1 的框架和基础库作者。它说明怎样让模式驱动的工具了解 Rust 类型，同时不赋予工具不受限制的值访问或内存布局访问能力。反射始终需要显式选择：宏在声明位置生成普通的安全 Rust 代码；生成的不可变描述符只在当前进程中有效。
 
@@ -33,8 +33,10 @@ Rust 声明 --宏--> TypeDescriptor / 成员描述符
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = { path = "../rs-reflect" }
 ```
+
+本 crate 当前只作为 Qubit 内部依赖使用，尚未发布到 crates.io。请通过上述 workspace path 或经过批准的内部 Git revision 接入，并确保 `qubit-reflect` 与 `qubit-reflect-derive` 来自同一个 revision。
 
 默认 `derive` feature 会重导出 `Reflect`、`reflect`、`reflect_impl` 三个宏。设置 `default-features = false` 后，运行时和手写注册 API 仍然存在，但这些宏不再被重导出。
 
@@ -42,13 +44,13 @@ qubit-reflect = "0.1"
 
 ```toml
 # 只使用运行时描述符、动态值和手写注册。
-qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect = { path = "../rs-reflect", default-features = false }
 
 # 使用宏，并为 BigDecimal、chrono、UUID 类型提供反射实现。
-qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+qubit-reflect = { path = "../rs-reflect", features = ["ecosystem-types"] }
 
 # 使用宏，并为 Qubit DataType、Id 类型提供反射实现。
-qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+qubit-reflect = { path = "../rs-reflect", features = ["qubit-types"] }
 ```
 
 `ecosystem-types` 与 `qubit-types` 相互独立，而且都不属于默认 feature。只使用运行时的下游不会编译这些依赖，也不会在未声明的情况下获得相应 trait 实现。
@@ -101,6 +103,17 @@ fn main() {
     )
     .expect("替换值与字段类型精确匹配");
     assert_eq!(user.name, "Grace");
+
+    let failure = name
+        .set(ReflectedMut::new(&mut user), ReflectedOwned::new(9_u64))
+        .expect_err("u64 不能替换 String 字段");
+    let recovered = failure
+        .into_recovery()
+        .expect("执行前拒绝会保留所有权")
+        .into_value()
+        .downcast::<u64>()
+        .unwrap_or_else(|_| unreachable!("恢复值保留原始类型"));
+    assert_eq!(recovered, 9);
 }
 ```
 
@@ -146,11 +159,11 @@ pub use qubit_reflect::TypeDescriptor;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use qubit_reflect::__private::codegen_v1;
+    pub use qubit_reflect::__private::codegen_v2;
 }
 ```
 
-业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v1`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v1`。`codegen_v1` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
+业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v2`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v2`。`codegen_v2` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
 
 ### 描述 trait 与可调用实现
 
@@ -165,6 +178,24 @@ pub mod __private {
 ### Capability 与注册表发现
 
 在相关 crate 已链接后调用 `ReflectRegistry::initialize()`。注册表会事务性聚合 fragment：冲突时返回 `RegistryError`，不会发布部分结果；冻结后类型、名称、trait、impl、capability 和有效方法索引均不会改变。静态内置类型会在首次查询前出现；按需生成的复合类型使用独立 interner，不会改写公开的冻结注册表。
+
+```rust
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::registry::ReflectRegistry;
+
+#[derive(Reflect)]
+struct Service;
+
+fn main() {
+    let snapshot = ReflectRegistry::initialize().expect("所有 fragment 均通过校验");
+    let descriptor = TypeDescriptor::of::<Service>();
+    let _methods = descriptor.methods_in(snapshot);
+    assert!(snapshot.get(descriptor.type_id()).is_some());
+}
+```
+
+将 snapshot 显式传给 `impls_in`、`methods_in` 或 `methods_named_in`，可以避免隐藏的全局查询依赖。snapshot 一旦生成便不可变；即便全局初始化失败，也不会暴露只构建了一部分的注册表。
 
 `Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
 
@@ -181,6 +212,40 @@ pub mod __private {
 | `SendReflected*` 包装器 | 在编译期 bound 成立时建立线程安全擦除边界 | 可消费自身并通过 `into_local` 降级；本地包装器不能在运行时升级。 |
 
 模型语义应留在下游。模型层或 schema 层可以把 `FieldDescriptor` 与 validation、持久化、codec、relation、redaction 等元数据关联起来，但这些事实不会变成 `qubit-reflect` 的 capability 或 descriptor 属性。这样才能保持模型 crate 单向依赖 `qubit-reflect`。
+
+类型级 `thread_safe` 约定会统一覆盖 owned-to-borrow bridge、字段访问、构造、更新与方法适配器：
+
+```rust
+use qubit_reflect::Reflect;
+use qubit_reflect::SendReflectedMut;
+use qubit_reflect::SendReflectedOwned;
+use qubit_reflect::SendReflectedRef;
+use qubit_reflect::TypeDescriptor;
+
+#[derive(Reflect)]
+#[reflect(thread_safe)]
+struct SharedCounter {
+    value: u64,
+}
+
+fn main() {
+    let field = TypeDescriptor::of::<SharedCounter>()
+        .field("value")
+        .expect("派生字段存在");
+    let mut counter = SharedCounter { value: 1 };
+    let current = field
+        .get_thread_safe(SendReflectedRef::new(&counter))
+        .expect("线程安全读取适配器可用");
+    assert_eq!(current.downcast_ref::<u64>(), Some(&1));
+    field
+        .set_thread_safe(
+            SendReflectedMut::new(&mut counter),
+            SendReflectedOwned::new(2_u64),
+        )
+        .expect("线程安全替换适配器可用");
+    assert_eq!(counter.value, 2);
+}
+```
 
 ## 错误与诊断
 
@@ -205,16 +270,18 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 | 注册表初始化失败 | 检查 `RegistryError`；初始化错误会缓存，修复冲突后需要启动新进程。 |
 | 跨线程调用不可用 | 方法必须显式标记 `thread_safe`，并且只在 Rust bound 满足时构造 `SendReflected*` 值。 |
 | 外部类型没有 `Reflect` 实现 | 在拥有反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`；这些实现默认不会启用。 |
-| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v1`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
+| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v2`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
 
 ## 限制与最佳实践
 
 将反射属性放在拥有该约定的声明附近。对于不希望递归暴露内部结构的类型，使用 opaque 边界；将 descriptor 视为进程内不可变元数据。不要借助反射推导领域规则，也不要试图绕开 Rust 的所有权、隐私、类型或线程安全检查。unsafe 函数、不支持的 ABI、variadic、无法安全擦除的 unsized 值、未 specialize 的泛型和 opaque `impl Trait` 返回值可以被描述，但不能动态调用。
+tuple 与可移植函数指针 descriptor 支持 0 到 32 个元素或参数；33 及以上 arity 明确不支持，也不会获得 `Reflect` 实现。
 
 ## 延伸阅读
 
 - [README](../README.zh_CN.md) 与 [English README](../README.md)
 - [English user guide](2026-08-29-qubit-reflect-user-guide.md)
-- [API 文档](https://docs.rs/qubit-reflect)
-- [中文详细设计](2026-08-29-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-01-qubit-reflect-design.md)
-- [需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- 使用 `cargo doc --all-features` 在内部生成 API 文档
+- [中文详细设计](2026-09-03-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-03-qubit-reflect-design.md)
+- [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)

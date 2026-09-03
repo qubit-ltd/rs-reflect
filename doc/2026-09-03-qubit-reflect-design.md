@@ -1,12 +1,12 @@
 # `qubit-reflect` Design
 
-- Date: 2026-09-01
-- Last reviewed: 2026-09-02
-- Status: breaking boundary redesign implemented and verified in staged checks; the full release matrix remains continuously enforced by CI
-- Translation: [简体中文设计](2026-08-29-qubit-reflect-design.zh_CN.md)
-- Source requirements: [final requirements specification](2026-08-28-qubit-reflect-requirements.zh_CN.md)
+- Date: 2026-09-03
+- Last reviewed: 2026-09-03
+- Status: breaking boundary redesign implemented; internal-repository consumption only, with release intentionally deferred
+- Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`
-- Protocol: `qubit-reflect 0.1` / `__private::codegen_v1`
+- Protocol: `qubit-reflect 0.1` / `__private::codegen_v2`
 
 ## 1. Purpose and boundary
 
@@ -86,7 +86,7 @@ src/
 ├── identity/                   # fragment, member, trait, visibility identity
 ├── invoke/                     # invocation, future, and failure recovery
 ├── private/
-│   └── codegen_v1/             # sole generated-code protocol
+│   └── codegen_v2/             # sole generated-code protocol
 ├── registry/
 │   ├── registry_builder.rs     # conflict checks and pre-freeze aggregation
 │   ├── registry.rs             # immutable queries
@@ -101,6 +101,11 @@ Diagnostic text does not participate in `Eq` or `Hash`, so formatting cannot cha
 The registry collects all fragments, checks duplicate identities and type/trait/impl/capability conflicts, then
 publishes indexes once. Failure cannot expose partial state. Candidate and index order follows stable fragment order.
 Effective method views are built during freezing, and query paths do not execute user code.
+Aggregate navigation is available in both convenience and explicit-snapshot
+forms: `methods()` initializes the process-wide snapshot, while `methods_in`,
+`impls_in`, and `methods_named_in` use the caller-supplied immutable registry.
+This keeps isolated snapshot queries independent from an unrelated cached
+global initialization failure.
 
 ## 4. Derive pipeline
 
@@ -148,7 +153,7 @@ Generated reflection code reaches runtime types, factories, and registration
 hooks only through the versioned protocol rooted at:
 
 ```text
-facade::__private::codegen_v1
+facade::__private::codegen_v2
 ```
 
 The protocol exposes exact domain surfaces for `access`, `capability`,
@@ -159,13 +164,13 @@ The `__private` root does not flatten them, and the protocol does not re-export
 whole public runtime modules. An incompatible protocol introduces a sibling
 version instead of silently widening v1.
 
-A downstream facade exposes exactly `__private::codegen_v1` for generated code
+A downstream facade exposes exactly `__private::codegen_v2` for generated code
 and independently re-exports each public application symbol it promises. It
 must not use `pub use qubit_reflect::*`, `pub use qubit_reflect::__private::*`,
 or re-export whole runtime modules merely to satisfy macro expansion.
 
-`qubit-model-metadata` separately owns its `__private::v2` model-metadata ABI. It gives the reflection protocol the
-exact alias `reflect_codegen_v1`, keeping ownership, versioning, and migration reasons orthogonal.
+`qubit-model-metadata` separately owns its `__private::v3` model-metadata ABI. It gives the reflection protocol the
+exact alias `reflect_codegen_v2`, keeping ownership, versioning, and migration reasons orthogonal.
 
 ## 6. Dynamic safety boundary
 
@@ -180,6 +185,10 @@ and `Send + Sync` bounds. Field access, invocation, and construction follow the 
 
 The library performs no numeric conversion, string parsing, or `Into` inference. Reflection describes and executes
 exact Rust semantics rather than creating a second implicit type system.
+Generated type-level ThreadSafe support covers field adapters, struct/variant
+construction, struct update, owned-to-borrow bridges, and method invocation as
+one mode contract. Tuple and portable function-pointer built-ins deliberately
+stop at arity 32; arity 33 has no `Reflect` implementation.
 
 ## 7. Errors and diagnostics
 
@@ -199,7 +208,7 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | all features | ecosystem/Qubit types, workspace tests, Clippy, Rustdoc |
 | derive | parser/analysis unit tests, trybuild pass/fail, invocation integration |
 | registry | cross-crate aggregation, conflicts, freeze, stable ordering, concurrent initialization |
-| ABI/facade | renamed dependencies, explicit facade, `codegen_v1`, and model `v2` |
+| ABI/facade | renamed dependencies, explicit facade, `codegen_v2`, and model `v3` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
