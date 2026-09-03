@@ -27,6 +27,7 @@ pub(crate) fn concrete_descriptor(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
 ) -> TokenStream {
+    let codegen = quote!(#facade::__private::codegen_v1);
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
@@ -46,7 +47,7 @@ pub(crate) fn concrete_descriptor(
                 )));
                 definition_indices.push(definition_index);
                 type_arguments.push(quote!({
-                    use #facade::__private::codegen_v1::descriptor::ResolveReflectArgument as _;
+                    use #codegen::descriptor::ResolveReflectArgument as _;
                     let probe = #facade::__private::codegen_v1::descriptor::ReflectArgumentProbe::<#name>::new();
                     (&probe).resolve_reflect_argument()
                 }));

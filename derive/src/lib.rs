@@ -16,14 +16,14 @@
 
 #![forbid(unsafe_code)]
 
-use proc_macro::TokenStream;
-
 mod entry;
 mod expand;
 mod internal;
 mod ir;
 mod parse;
 mod validate;
+
+use proc_macro::TokenStream;
 
 use ir::MacroKind;
 

@@ -13,6 +13,7 @@ use quote::quote;
 use syn::LitStr;
 
 use super::generic_definition;
+use super::trait_metadata::TraitMetadata;
 use super::type_expression;
 use crate::expand::expression_codegen::const_expression;
 use crate::expand::expression_codegen::lifetime_expression;
@@ -23,15 +24,6 @@ use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TraitDeclarationIr;
 use crate::ir::TypeKindIr;
-
-/// Token groups used by both trait definitions and applied descriptors.
-pub(super) struct TraitMetadata {
-    pub(super) methods: Vec<TokenStream>,
-    pub(super) associated_types: Vec<TokenStream>,
-    pub(super) associated_consts: Vec<TokenStream>,
-    pub(super) parameters: Vec<TokenStream>,
-    pub(super) where_predicates: Vec<TokenStream>,
-}
 
 /// Emits structural method, associated-item, and generic metadata.
 pub(super) fn build(

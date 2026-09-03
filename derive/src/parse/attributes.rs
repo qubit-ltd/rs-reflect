@@ -8,6 +8,8 @@
 
 //! Parsing for the shared `reflect` helper grammar.
 
+// qubit-style: allow multiple-public-types
+
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Attribute;

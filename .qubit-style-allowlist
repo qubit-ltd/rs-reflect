@@ -4,3 +4,5 @@ multiple-public-types | derive/src/expand/invocation/plan.rs | Invocation plan f
 multiple-public-types | derive/src/ir/attribute.rs | Attribute keys, values, and specialization records share one helper-grammar invariant.
 multiple-public-types | derive/src/ir/declaration.rs | Declaration nodes form one closed semantic tree consumed as a unit by validation and expansion.
 multiple-public-types | derive/src/ir/type_ir.rs | Type and path nodes form one recursive syn-independent type representation.
+multiple-public-types | derive/src/expand/traits.rs | Trait expansion records and emits one closed declaration protocol.
+multiple-public-types | derive/src/parse/attributes.rs | Helper parser syntax nodes share one grammar and are consumed together.
