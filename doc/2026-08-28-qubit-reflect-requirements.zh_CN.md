@@ -1097,8 +1097,10 @@ assert_eq!(model.field("username").unwrap().descriptor().index(), 1);
   或 registry 提供，避免形成循环依赖。
 - **REQ-INT-011**：`qubit-model-derive` 和 `qubit-model-metadata` 必须依赖 `qubit-reflect` 的公共契约实现结构反射；
   模型角色 attribute macro 应在展开结果中委托给由模型 facade 重导出的 `Reflect` derive，不得复制一套字段、variant、
-  泛型 bound、opaque 或注册代码生成逻辑。模型 facade 必须隐藏地重导出所需运行时与 derive 路径，使终端用户无需
-  为宏展开细节额外声明直接依赖；同一声明重复叠加角色宏与显式 `Reflect` derive 必须给出编译期诊断。
+  泛型 bound、opaque 或注册代码生成逻辑。模型 facade 必须隐藏地重导出版本匹配的
+  `__private::codegen_v1` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
+  重导出 `descriptor`、`construct`、`value` 等完整 runtime 业务模块。同一声明重复叠加角色宏与显式 `Reflect`
+  derive 必须给出编译期诊断。
 - **REQ-INT-012**：涉及反射结构、动态操作或两层依赖方向时，本文是 `rs-reflect`、`rs-model-derive` 与
   `rs-model-metadata` 后续对齐的权威需求源；模型层文档若与本文冲突，必须修改模型层文档和实现，不得在
   `qubit-reflect` 中加入领域概念或兼容性分叉。
@@ -1236,7 +1238,8 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
 - **REQ-ACCPT-046**：必须测试带 lifetime 参数的 derive 类型只在 `'static` concrete 实例上取得根 descriptor，且可
   从该实例导航到包含完整 lifetime 参数和字段符号类型的定义 descriptor；非 `'static` 根值进入动态边界必须编译失败。
 - **REQ-ACCPT-047**：必须提供跨 crate 集成测试，证明模型角色宏通过模型 facade 委托同一 `Reflect` derive、终端用户
-  不需直接添加 `qubit-reflect` 依赖、模型 descriptor 与反射根 descriptor 身份一致，并验证重复显式 derive 的诊断。
+  不需直接添加 `qubit-reflect` 依赖、最小 facade 不重导出完整 runtime 业务模块也能覆盖 struct、enum、generic、trait
+  与 impl 生成路径、模型 descriptor 与反射根 descriptor 身份一致，并验证重复显式 derive 的诊断。
 - **REQ-ACCPT-048**：必须测试三种线程安全包装到本地包装的无损 `into_local` 降级，并用编译失败测试证明本地包装
   不能凭 descriptor capability 或运行时检查升级为线程安全包装；降级后的值必须可用于字段访问和动态构造。
 

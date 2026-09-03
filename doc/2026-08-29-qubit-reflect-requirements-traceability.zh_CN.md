@@ -75,7 +75,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-044 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `derive/src/expand/structs.rs`、`src/descriptor/type_ref.rs` | `tests/ui/pass/opaque_generic_tests.rs`、`tests/descriptor/generic_tests.rs` |
 | REQ-ACCPT-045 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/invoke/adapter.rs`、`derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`、`tests/ui/pass/catch_unwind_thread_safe_tests.rs` |
 | REQ-ACCPT-046 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `derive/src/expand/generics.rs`、`derive/src/expand/structs.rs` | `tests/ui/pass/lifetime_generic_tests.rs`、`tests/descriptor/generic_tests.rs` |
-| REQ-ACCPT-047 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `test-crates/model-facade-derive/src/lib.rs`、`test-crates/model-facade-runtime/src/lib.rs` | `test-crates/model-facade-app/src/lib.rs`、`tests/registry/model_facade_tests.rs` |
+| REQ-ACCPT-047 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/private/codegen_v1/mod.rs`、`derive/src/expand/`、`test-crates/model-facade-derive/src/lib.rs`、`test-crates/model-facade-runtime/src/lib.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs`、`tests/registry/model_facade_tests.rs` |
 | REQ-ACCPT-048 | T14、T15、T17、T18、T19、T21、T22、T24、T25、T26 | `src/value/aliases.rs`、`src/value/mode.rs` | `tests/value/thread_mode_tests.rs` |
 | REQ-AGG-001 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-002 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
@@ -196,7 +196,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-MAC-014 | T13、T14、T15、T16、T17、T22 | `derive/src/expand/impls.rs`、`derive/src/expand/traits.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-015 | T13、T14、T15、T16、T17、T22 | `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-016 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs` | `derive/tests/parser_tests.rs` |
-| REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs`、`derive/src/expand/mod.rs` | `test-crates/model-facade-app/src/lib.rs` |
+| REQ-MAC-017 | T13、T14、T15、T16、T17、T22 | `derive/src/lib.rs`、`derive/src/expand/mod.rs`、`src/private/codegen_v1/mod.rs` | `derive/tests/codegen_protocol_tests.rs`、`test-crates/model-facade-app/src/lib.rs` |
 | REQ-MAC-018 | T13、T14、T15、T16、T17、T22 | `derive/src/parse/attributes.rs`、`derive/src/expand/impls.rs` | `tests/ui/fail/external_trait_id_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-019 | T13、T14、T15、T16、T17、T22 | `derive/src/parse/attributes.rs`、`derive/src/ir/attribute.rs` | `tests/descriptor/derive_struct_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-020 | T13、T14、T15、T16、T17、T20、T22 | `derive/src/expand/impls.rs`、`src/descriptor/impl_descriptor.rs` | `tests/ui/pass/generic_impl_specialization_tests.rs`、`tests/descriptor/reflect_impl_tests.rs` |
