@@ -66,11 +66,11 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 
 ## 核心能力与边界
 
-- 描述已反射的 struct、enum、trait、impl、泛型信息，以及支持的内置类型族。
+- 分别描述具体运行时类型与泛型源码定义，并描述 trait、impl 及支持的内置类型族。
 - 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；执行前校验失败时，恢复对象会保留调用方传入的 owned 值。
 - 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
-- 所有注册入口都汇入同一条经过校验的 inventory fragment 数据流，生成确定性的不可变注册表；调用方既可使用进程全局结果，也可持有显式 registry snapshot。注册表还提供类型安全的 `Clone`、`Default` capability adapter。
-- derive 与 facade 通过版本化的 `__private::codegen_v2` 协议集成，下游 model metadata 使用 ABI v3。
+- 所有注册入口都汇入同一条经过校验的 inventory fragment 数据流，生成确定性的不可变注册表；它是解析具体类型与泛型定义 effective capability 的唯一公开入口，并提供类型安全的 `Clone`、`Default` adapter。
+- derive 与 facade 通过版本化的 `__private::codegen_v2` 协议集成；下游模型生成代码独立使用 ABI v4。
 - 动态值明确区分 `Local` 与选择性启用的 `ThreadSafe` 边界；只有生成代码证明类型满足所需 `Send + Sync` 约束时，才会提供线程安全字段访问和构造。
 
 反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、descriptor 地址和 trait marker 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。

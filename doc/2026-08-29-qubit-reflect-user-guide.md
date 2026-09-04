@@ -22,7 +22,10 @@ linked registration fragments --> ReflectRegistry --> effective type view
 ```
 
 - `TypeDescriptor` is the unique immutable root for a concrete reflected type.
-  It exposes structural views, fields, variants, construction, and capabilities.
+  It exposes structural views, fields, variants, and construction. Effective
+  capabilities are resolved by `ReflectRegistry`.
+- `TypeDefinitionDescriptor` is the non-executable root for one generic source
+  declaration; concrete instances link to it and retain resolved arguments.
 - `ReflectedRef`, `ReflectedMut`, and `ReflectedOwned` carry a shared borrow,
   mutable borrow, or owned value across a checked dynamic boundary.
 - Field, construction, and invocation adapters validate policy and exact
@@ -216,7 +219,7 @@ only the `codegen_v2` export; the facade does not need to re-export runtime
 modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
 `qubit_reflect` or its `__private` module: that turns unrelated implementation
 details into the facade's API. A downstream procedural macro may give the same
-module an exact private alias such as `reflect_codegen_v2`. `codegen_v2` is a
+module through exact item re-exports. `codegen_v2` is a
 compiler-to-runtime protocol, not a supported handwritten construction API; a
 future incompatible protocol receives a new versioned module.
 
@@ -267,12 +270,19 @@ fn main() {
     let descriptor = TypeDescriptor::of::<Service>();
     let _methods = descriptor.methods_in(snapshot);
     assert!(snapshot.get(descriptor.type_id()).is_some());
+    let _clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone");
 }
 ```
 
 Passing the snapshot to `impls_in`, `methods_in`, or `methods_named_in` makes
 the lookup dependency explicit. The snapshot is immutable; a failed global
 initialization never exposes a partially built registry.
+
+`snapshot.definitions()` enumerates generic declarations even when no concrete
+instance is registered. Query them by `TypeDefinitionId`, Rust path, or query
+name, and use `definition_capability` or `definition_capability_by_id` for
+definition-level extensions. Definition fields contain `TypeExpression`
+values and intentionally provide no value-access adapters.
 
 `Clone` and `Default` are typed capabilities. Register them only where their
 Rust bounds hold, then query with `clone_key()` or `default_key()`. Other

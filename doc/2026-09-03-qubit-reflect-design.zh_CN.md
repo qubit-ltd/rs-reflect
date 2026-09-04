@@ -155,8 +155,14 @@ facade::__private::codegen_v2
 不得使用 `pub use qubit_reflect::*`、`pub use qubit_reflect::__private::*`，也不应仅为满足宏展开而重导出
 runtime 的完整模块。
 
-`qubit-model-metadata` 另外维护自己的 `__private::v3` 模型元数据 ABI。它将 reflect 协议精确别名为
-`reflect_codegen_v2`，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
+`qubit-model-metadata` 另外维护自己的 `__private::v4` 模型元数据 ABI，并只在该精确私有模块中消费
+反射协议，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
+
+## 泛型定义与 effective capability
+
+泛型声明是一等 `TypeDefinitionDescriptor`：定义字段只保存符号表达式，不包含运行时适配器；具体
+`TypeDescriptor` 链回定义并保存已解析实参。两者都进入同一个冻结 `ReflectRegistry`。该注册表是唯一公开的
+effective capability 解析入口，并支持无需分配 capability identity 的类型化与文本查询。
 
 ## 6. 动态安全边界
 

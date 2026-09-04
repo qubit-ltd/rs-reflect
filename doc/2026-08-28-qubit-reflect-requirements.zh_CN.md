@@ -1067,8 +1067,11 @@ struct Page<T> {
 - **REQ-GEN-011**：opaque 与 resolved 的选择必须由源码属性确定，不得因单态化实参后来实现了 `Reflect` 而改变
   generic 字段的 shape；同一 generic 定义的不同 concrete 实例必须保持相同的字段透明性策略。
 - **REQ-GEN-012**：带 lifetime 参数的 derive 类型只为满足 `Self: 'static` 的 concrete 实例实现 `Reflect`；其完整
-  lifetime-generic 声明由 `GenericDefinitionDescriptor` 保存，并可从任一合法 `'static` concrete descriptor 导航。
-  框架不得为非 `'static` 根值伪造 `TypeId`，也不得为访问定义信息引入与 `Reflect` 同义的第二套公共类型 trait。
+  泛型声明仍可从有效实例导航，不得制造假的非静态 `TypeId` 或第二套公共 descriptor trait。每个派生的泛型
+  struct 或 enum 必须注册一个一等 `TypeDefinitionDescriptor`，且不要求先构造具体单态实例；定义字段与变体
+  只能表达声明事实，不得暴露运行时字段、构造、调用或 active-variant adapter。具体泛型 descriptor 必须链接到
+  共享定义身份，同时保留自身 `TypeId` 与已解析实参。`ReflectRegistry` 必须是具体类型与泛型定义 effective
+  capability 的唯一公开解析入口；文本查询接受 `&str` 且不分配 `CapabilityId`。
 
 ## 14. 与 `rs-model-derive` 的集成边界
 
