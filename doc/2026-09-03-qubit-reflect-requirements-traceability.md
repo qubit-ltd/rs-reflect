@@ -8,7 +8,7 @@ breaking boundary redesign.
 
 `T01` through `T26` are historical task identifiers retained as decision
 provenance; they do not imply unfinished work. The generated-code protocol is
-`__private::codegen_v2`, model metadata uses ABI v3, and the sole registry
+`__private::codegen_v2`, model metadata uses ABI v4, and the sole registry
 builder is `src/registry/registry_builder.rs`.
 
 ## Verification
@@ -158,7 +158,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-GEN-009 | T03, T06, T14, T20, T22 | `src/descriptor/generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-010 | T03, T06, T14, T20, T22 | `src/descriptor/generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-011 | T03, T06, T14, T20, T22 | `src/descriptor/generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
-| REQ-GEN-012 | T03, T06, T14, T20, T22 | `src/descriptor/generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
+| REQ-GEN-012 | T03, T06, T07, T12, T14, T20, T22 | `src/descriptor/generic_descriptor.rs`, `src/descriptor/type_definition_descriptor.rs`, `src/descriptor/type_descriptor.rs`, `derive/src/expand/generics.rs`, `src/registry/registry.rs` | `tests/descriptor/generic_tests.rs`, `tests/public_type_definition_registry_tests.rs`, `tests/public_capability_registry_tests.rs`, `tests/capability_key_allocation_tests.rs` |
 | REQ-INT-001 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
 | REQ-INT-002 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
 | REQ-INT-003 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |

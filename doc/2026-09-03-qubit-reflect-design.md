@@ -169,8 +169,17 @@ and independently re-exports each public application symbol it promises. It
 must not use `pub use qubit_reflect::*`, `pub use qubit_reflect::__private::*`,
 or re-export whole runtime modules merely to satisfy macro expansion.
 
-`qubit-model-metadata` separately owns its `__private::v3` model-metadata ABI. It gives the reflection protocol the
-exact alias `reflect_codegen_v2`, keeping ownership, versioning, and migration reasons orthogonal.
+`qubit-model-metadata` separately owns its `__private::v4` model-metadata ABI. It consumes the reflection protocol only
+inside that exact private module, keeping ownership, versioning, and migration reasons orthogonal.
+
+## Generic definitions and effective capabilities
+
+Generic declarations are first-class `TypeDefinitionDescriptor` values. They
+contain symbolic field expressions and no runtime adapters; concrete
+`TypeDescriptor` values link back to the definition and retain their resolved
+arguments. Both are registered in one frozen `ReflectRegistry`. That registry
+is the sole public effective-capability resolver and supports typed or textual
+lookup without allocating capability identities.
 
 ## 6. Dynamic safety boundary
 

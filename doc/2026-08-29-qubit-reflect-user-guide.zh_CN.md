@@ -16,7 +16,8 @@ Rust 声明 --宏--> TypeDescriptor / 成员描述符
 链接得到的注册片段 --> ReflectRegistry --> 有效类型视图
 ```
 
-- `TypeDescriptor` 是某个具体反射类型唯一且不可变的根描述符，负责暴露结构视图、字段、枚举分支、构造入口和 capability。
+- `TypeDescriptor` 是某个具体反射类型唯一且不可变的根描述符，负责暴露结构视图、字段、枚举分支和构造入口；effective capability 统一由 `ReflectRegistry` 解析。
+- `TypeDefinitionDescriptor` 是泛型源码声明的不可执行根；具体实例链接到它并保留已解析实参。
 - `ReflectedRef`、`ReflectedMut`、`ReflectedOwned` 分别携带共享借用、可变借用和所有权，使值能安全经过动态边界。
 - 字段、构造和调用适配器会先校验访问策略与精确 `TypeId`，再进入用户代码。
 - `ReflectRegistry` 只会聚合一次静态链接的 inventory fragment：要么发布完整的冻结注册表，要么返回结构化初始化错误。
@@ -163,7 +164,7 @@ pub mod __private {
 }
 ```
 
-业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v2`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏也可以把同一模块精确别名为 `reflect_codegen_v2`。`codegen_v2` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
+业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v2`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏应只在自己的精确私有 ABI 中逐项重导出所需协议项。`codegen_v2` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
 
 ### 描述 trait 与可调用实现
 
@@ -192,10 +193,13 @@ fn main() {
     let descriptor = TypeDescriptor::of::<Service>();
     let _methods = descriptor.methods_in(snapshot);
     assert!(snapshot.get(descriptor.type_id()).is_some());
+    let _clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone");
 }
 ```
 
 将 snapshot 显式传给 `impls_in`、`methods_in` 或 `methods_named_in`，可以避免隐藏的全局查询依赖。snapshot 一旦生成便不可变；即便全局初始化失败，也不会暴露只构建了一部分的注册表。
+
+`snapshot.definitions()` 可在没有注册任何具体实例时枚举泛型声明，并支持按 `TypeDefinitionId`、Rust 路径或查询名定位。定义级扩展通过 `definition_capability` 或 `definition_capability_by_id` 查询。定义字段只包含 `TypeExpression`，不会伪造值访问 adapter。
 
 `Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
 

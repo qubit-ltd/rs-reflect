@@ -84,19 +84,20 @@ facts even where an operation is unavailable.
 
 ## What It Provides
 
-- Immutable descriptors for reflected structs, enums, traits, implementations,
-  generic facts, and supported built-in type families.
+- Separate immutable descriptors for concrete runtime types and generic source
+  definitions, plus traits, implementations, and supported built-in families.
 - Checked field reads, mutable borrows, replacements, enum-branch checks, and
   dynamic construction. Pre-execution validation failures preserve
   caller-owned inputs in recovery objects.
 - Generated invocation adapters for supported methods, with local and
   explicitly requested thread-safe modes.
-- A deterministic registry assembled from linked inventory fragments, plus
-  typed `Clone` and `Default` capability adapters. Every registration path
+- A deterministic registry assembled from linked inventory fragments. It is
+  the only public resolver for effective concrete and definition capabilities,
+  including typed `Clone` and `Default` adapters. Every registration path
   enters this one validated fragment stream; callers may hold an explicit,
   immutable registry snapshot instead of consulting the process-global result.
-- A versioned `__private::codegen_v2` protocol for derive/facade integration,
-  including model metadata ABI v3 consumers.
+- A versioned `__private::codegen_v2` protocol for derive/facade integration;
+  downstream model code uses its own independent ABI v4.
 - Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
   field access and construction exist only for types whose generated code
   proves the required `Send + Sync` bounds.
