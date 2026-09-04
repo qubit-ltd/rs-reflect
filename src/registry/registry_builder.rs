@@ -10,6 +10,7 @@
 
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::capability::CapabilityDescriptor;
@@ -20,12 +21,16 @@ use crate::descriptor::ImplDescriptor;
 use crate::descriptor::ImplKind;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
+use crate::descriptor::TypeDefinitionDescriptor;
+use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
 use crate::identity::CapabilityId;
 use crate::identity::ExternalTraitId;
 use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
+use crate::registry::fragment::CapabilityRegistration;
+use crate::registry::fragment::CapabilityTarget;
 use crate::registry::fragment::FragmentPayload;
 use crate::registry::fragment::RegistrationFragment;
 use crate::registry::indexes::RegistryIndexes;
@@ -39,13 +44,16 @@ use crate::registry::registry::ReflectRegistry;
 struct RegistryBuilder {
     types: Vec<&'static TypeDescriptor>,
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
+    definitions: Vec<&'static TypeDefinitionDescriptor>,
+    definitions_by_id: HashMap<TypeDefinitionId, (&'static TypeDefinitionDescriptor, FragmentIdentity)>,
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
     external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
-    capabilities: HashMap<(TypeId, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
+    capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
+    loaded_intrinsic_capabilities: HashSet<TypeId>,
     fragment_identities: Vec<FragmentIdentity>,
 }
 
@@ -54,6 +62,7 @@ impl RegistryBuilder {
     fn push(&mut self, built: BuiltFragment) -> Result<(), RegistryError> {
         match built.payload {
             FragmentPayload::Type(descriptor) => self.push_type(descriptor, &built.identity)?,
+            FragmentPayload::TypeDefinition(descriptor) => self.push_definition(descriptor, &built.identity)?,
             FragmentPayload::Trait(descriptor) => self.push_trait(descriptor, &built.identity)?,
             FragmentPayload::ImplDefinition(descriptor) => {
                 if descriptor.fragment_identity() != &built.identity {
@@ -66,12 +75,25 @@ impl RegistryBuilder {
             }
             FragmentPayload::Impl(descriptor) => self.push_impl(descriptor, &built.identity)?,
             FragmentPayload::Capability(registration) => {
-                for descriptor in registration.descriptors() {
-                    self.push_capability(registration.target_type_id(), descriptor.clone(), &built.identity)?;
-                }
+                self.push_capability_registration(&registration, &built.identity)?;
             }
         }
         self.fragment_identities.push(built.identity);
+        Ok(())
+    }
+
+    /// Adds one unique source-level generic type declaration.
+    fn push_definition(
+        &mut self,
+        descriptor: &'static TypeDefinitionDescriptor,
+        identity: &FragmentIdentity,
+    ) -> Result<(), RegistryError> {
+        if let Some((_, first)) = self.definitions_by_id.get(&descriptor.id()) {
+            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
+        }
+        self.definitions.push(descriptor);
+        self.definitions_by_id
+            .insert(descriptor.id(), (descriptor, identity.clone()));
         Ok(())
     }
 
@@ -87,8 +109,40 @@ impl RegistryBuilder {
         self.types.push(descriptor);
         self.types_by_id
             .insert(descriptor.type_id(), (descriptor, identity.clone()));
+        self.push_intrinsic_capabilities(descriptor, identity)?;
+        Ok(())
+    }
+
+    /// Adds one capability registration and the target's intrinsic facts.
+    fn push_capability_registration(
+        &mut self,
+        registration: &CapabilityRegistration,
+        identity: &FragmentIdentity,
+    ) -> Result<(), RegistryError> {
+        if let Some(descriptor) = registration.type_descriptor() {
+            self.push_intrinsic_capabilities(descriptor, identity)?;
+        }
+        for descriptor in registration.descriptors() {
+            self.push_capability(registration.target(), descriptor.clone(), identity)?;
+        }
+        Ok(())
+    }
+
+    /// Adds one concrete descriptor's intrinsic facts at most once.
+    fn push_intrinsic_capabilities(
+        &mut self,
+        descriptor: &'static TypeDescriptor,
+        identity: &FragmentIdentity,
+    ) -> Result<(), RegistryError> {
+        if !self.loaded_intrinsic_capabilities.insert(descriptor.type_id()) {
+            return Ok(());
+        }
         for capability in descriptor.declared_capabilities().descriptors() {
-            self.push_capability(descriptor.type_id(), capability.clone(), identity)?;
+            self.push_capability(
+                CapabilityTarget::Type(descriptor.type_id()),
+                capability.clone(),
+                identity,
+            )?;
         }
         Ok(())
     }
@@ -96,11 +150,11 @@ impl RegistryBuilder {
     /// Adds one capability while retaining the source fragment that claimed it.
     fn push_capability(
         &mut self,
-        target_type_id: TypeId,
+        target: CapabilityTarget,
         descriptor: CapabilityDescriptor,
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
-        let key = (target_type_id, descriptor.id().clone());
+        let key = (target, *descriptor.id());
         if let Some((_, first)) = self.capabilities.get(&key) {
             return Err(RegistryError::capability_conflict(first.clone(), identity.clone()));
         }
@@ -239,6 +293,8 @@ impl RegistryBuilder {
 
         let types_by_type_name = group_types(&self.types, TypeDescriptor::type_name);
         let types_by_query_name = group_types(&self.types, TypeDescriptor::query_name);
+        let definitions_by_rust_path = group_definitions(&self.definitions, TypeDefinitionDescriptor::rust_path);
+        let definitions_by_query_name = group_definitions(&self.definitions, TypeDefinitionDescriptor::query_name);
         let mut trait_definitions: Vec<_> = self.traits_by_id.into_iter().collect();
         trait_definitions.sort_by(|(left_id, _), (right_id, _)| {
             self.trait_fragments
@@ -256,6 +312,16 @@ impl RegistryBuilder {
             .into_iter()
             .map(|(type_id, (descriptor, _))| (type_id, descriptor))
             .collect();
+        let definition_fragments = self
+            .definitions_by_id
+            .iter()
+            .map(|(id, (_, identity))| (*id, identity.clone()))
+            .collect();
+        let definitions_by_id = self
+            .definitions_by_id
+            .into_iter()
+            .map(|(id, (descriptor, _))| (id, descriptor))
+            .collect();
         let impls_by_target = self
             .impls_by_target
             .into_iter()
@@ -265,13 +331,25 @@ impl RegistryBuilder {
             .iter()
             .map(|(type_id, implementations)| (*type_id, EffectiveTypeView::new(implementations)))
             .collect();
-        let mut capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> = HashMap::new();
+        let mut type_capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> = HashMap::new();
+        let mut definition_capability_descriptors: HashMap<TypeDefinitionId, Vec<CapabilityDescriptor>> =
+            HashMap::new();
         let mut capability_fragments = HashMap::new();
-        for ((type_id, capability_id), (descriptor, identity)) in self.capabilities {
-            capability_descriptors.entry(type_id).or_default().push(descriptor);
-            capability_fragments.insert((type_id, capability_id), identity);
+        for ((target, capability_id), (descriptor, identity)) in self.capabilities {
+            match target {
+                CapabilityTarget::Type(type_id) => {
+                    type_capability_descriptors.entry(type_id).or_default().push(descriptor);
+                }
+                CapabilityTarget::TypeDefinition(definition_id) => {
+                    definition_capability_descriptors
+                        .entry(definition_id)
+                        .or_default()
+                        .push(descriptor);
+                }
+            }
+            capability_fragments.insert((target, capability_id), identity);
         }
-        let capabilities_by_target = capability_descriptors
+        let capabilities_by_target = type_capability_descriptors
             .into_iter()
             .map(|(type_id, descriptors)| {
                 let capabilities = TypeCapabilities::try_new(descriptors)
@@ -279,27 +357,56 @@ impl RegistryBuilder {
                 (type_id, capabilities)
             })
             .collect();
+        let capabilities_by_definition = definition_capability_descriptors
+            .into_iter()
+            .map(|(definition_id, descriptors)| {
+                let capabilities = TypeCapabilities::try_new(descriptors)
+                    .expect("registry capability conflicts were validated before freezing");
+                (definition_id, capabilities)
+            })
+            .collect();
         let indexes = RegistryIndexes {
             types_by_id,
             type_fragments,
             types_by_type_name,
             types_by_query_name,
+            definitions_by_id,
+            definition_fragments,
+            definitions_by_rust_path,
+            definitions_by_query_name,
             traits_by_id: trait_definitions.into_iter().collect(),
             traits_by_rust_path,
             impls_by_target,
             effective_views_by_target,
             capabilities_by_target,
+            capabilities_by_definition,
             capability_fragments,
             fragment_identities: self.fragment_identities.into_boxed_slice(),
         };
         ReflectRegistry {
             types: self.types.into_boxed_slice(),
+            definitions: self.definitions.into_boxed_slice(),
             impl_definitions: self.impl_definitions.into_boxed_slice(),
             indexes,
             empty_effective_view: EffectiveTypeView::empty(),
             empty_capabilities: TypeCapabilities::default(),
         }
     }
+}
+
+/// Groups generic declarations by one static name in fragment order.
+fn group_definitions(
+    definitions: &[&'static TypeDefinitionDescriptor],
+    name: fn(&TypeDefinitionDescriptor) -> &'static str,
+) -> HashMap<&'static str, Box<[&'static TypeDefinitionDescriptor]>> {
+    let mut groups: HashMap<_, Vec<_>> = HashMap::new();
+    for descriptor in definitions {
+        groups.entry(name(descriptor)).or_default().push(*descriptor);
+    }
+    groups
+        .into_iter()
+        .map(|(key, descriptors)| (key, descriptors.into_boxed_slice()))
+        .collect()
 }
 
 /// Returns whether a source trait path uniquely denotes a registered reflected

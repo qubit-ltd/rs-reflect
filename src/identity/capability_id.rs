@@ -12,17 +12,23 @@
 use crate::error::IdError;
 
 /// A stable, namespaced identifier for a reflection capability.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CapabilityId(Box<str>);
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CapabilityId(&'static str);
 
 impl CapabilityId {
-    /// Creates an externally owned capability ID.
+    /// Validates a potentially dynamic external capability name without
+    /// promoting it to a static ABI identity.
+    pub fn validate(value: &str) -> Result<(), IdError> {
+        validate(value, IdAuthority::EXTERNAL)
+    }
+
+    /// Creates an externally defined static capability ID.
     ///
     /// Returns [`IdError`] when `value` is malformed or uses the reserved
     /// `qubit.reflect` namespace.
-    pub fn new(value: &str) -> Result<Self, IdError> {
-        validate(value, IdAuthority::EXTERNAL)?;
-        Ok(Self(value.into()))
+    pub fn new(value: &'static str) -> Result<Self, IdError> {
+        Self::validate(value)?;
+        Ok(Self(value))
     }
 
     /// Creates a capability ID owned by the reflection library.
@@ -31,9 +37,9 @@ impl CapabilityId {
     /// constructor is reserved for future built-in `qubit.reflect.*`
     /// registrations and must not become a downstream API.
     #[allow(dead_code, reason = "reserved for future built-in capability registrations")]
-    pub(crate) fn new_core(value: &str) -> Result<Self, IdError> {
+    pub(crate) fn new_core(value: &'static str) -> Result<Self, IdError> {
         validate(value, IdAuthority::CORE)?;
-        Ok(Self(value.into()))
+        Ok(Self(value))
     }
 
     /// Returns the stable textual representation of this ID.
@@ -54,14 +60,6 @@ impl AsRef<str> for CapabilityId {
 impl std::fmt::Display for CapabilityId {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for CapabilityId {
-    type Err = IdError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Self::new(value)
     }
 }
 

@@ -18,8 +18,8 @@ const MAX_INPUT_BYTES: usize = 4_096;
 fuzz_target!(|unbounded: &[u8]| {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
     let data = String::from_utf8_lossy(data);
-    let capability_id = CapabilityId::new(&data);
-    let repeated_capability_id = CapabilityId::new(&data);
+    let capability_id = CapabilityId::validate(&data);
+    let repeated_capability_id = CapabilityId::validate(&data);
     assert_eq!(capability_id, repeated_capability_id);
 
     let external_trait_id = ExternalTraitId::new(&data);

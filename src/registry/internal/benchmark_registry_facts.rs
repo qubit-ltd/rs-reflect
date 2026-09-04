@@ -16,6 +16,7 @@ use crate::error::RegistryError;
 use crate::identity::CapabilityId;
 use crate::identity::FragmentIdentity;
 use crate::registry::fragment::CapabilityRegistration;
+use crate::registry::fragment::CapabilityTarget;
 use crate::registry::fragment::FragmentKind;
 use crate::registry::fragment::FragmentPayload;
 use crate::registry::fragment::RuntimeIdentity;
@@ -41,8 +42,9 @@ pub(crate) fn prepare_benchmark_registry_facts(fragment_count: usize) -> Benchma
     let fragments = (0..fragment_count)
         .rev()
         .map(|index| {
-            let capability_id = CapabilityId::new(&format!("benchmark.registry.fragment{index}"))
-                .expect("generated benchmark capability ID must be valid");
+            let capability_name = Box::leak(format!("benchmark.registry.fragment{index}").into_boxed_str());
+            let capability_id =
+                CapabilityId::new(capability_name).expect("generated benchmark capability ID must be valid");
             FactRow {
                 identity: FragmentIdentity::new(
                     "qubit-reflect-benchmark",
@@ -75,10 +77,8 @@ fn aggregate_prepared_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectReg
         .map(|fact| MaterializedFragment {
             identity: fact.identity.clone(),
             declared_kind: FragmentKind::Capability,
-            declared_target: RuntimeIdentity::Capabilities {
-                target_type_id: fact.target_type_id,
-            },
-            payload: FragmentPayload::Capability(CapabilityRegistration::new(
+            declared_target: RuntimeIdentity::Capabilities(CapabilityTarget::Type(fact.target_type_id)),
+            payload: FragmentPayload::Capability(CapabilityRegistration::for_type_id(
                 fact.target_type_id,
                 vec![fact.descriptor.clone()],
             )),

@@ -70,10 +70,12 @@ impl CapabilityConflict {
 /// # Examples
 ///
 /// ```
-/// use qubit_reflect::TypeDescriptor;
+/// use qubit_reflect::{ReflectRegistry, TypeDescriptor};
 ///
-/// let capabilities = TypeDescriptor::of::<u32>().capabilities();
+/// let registry = ReflectRegistry::initialize()?;
+/// let capabilities = registry.capabilities(TypeDescriptor::of::<u32>());
 /// assert!(capabilities.descriptors().windows(2).all(|pair| pair[0].id() < pair[1].id()));
+/// # Ok::<(), qubit_reflect::RegistryError>(())
 /// ```
 #[derive(Clone, Debug)]
 pub struct TypeCapabilities {
@@ -105,7 +107,7 @@ impl TypeCapabilities {
             };
             return Err(CapabilityConflict {
                 kind,
-                id: first.id().clone(),
+                id: *first.id(),
                 first_adapter_type: first.adapter_type(),
                 second_adapter_type: second.adapter_type(),
             });
@@ -137,6 +139,17 @@ impl TypeCapabilities {
     #[must_use]
     pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
         self.find(key.id())?.get(&key)
+    }
+
+    /// Finds a capability descriptor by its stable textual ID without
+    /// allocating an owned identity.
+    #[must_use]
+    pub fn descriptor(&self, id: &str) -> Option<&CapabilityDescriptor> {
+        let index = self
+            .descriptors
+            .binary_search_by(|descriptor| descriptor.id().as_str().cmp(id))
+            .ok()?;
+        self.descriptors.get(index)
     }
 
     /// Finds one descriptor by stable ID in the sorted collection.

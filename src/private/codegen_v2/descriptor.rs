@@ -89,6 +89,8 @@ pub use crate::__private::descriptor::with_capabilities;
 #[doc(hidden)]
 pub use crate::__private::descriptor::with_concrete_generic;
 #[doc(hidden)]
+pub use crate::__private::descriptor::with_type_definition;
+#[doc(hidden)]
 pub use crate::descriptor::AssociatedConstBindingDescriptor;
 #[doc(hidden)]
 pub use crate::descriptor::AssociatedConstDescriptor;
@@ -106,6 +108,8 @@ pub use crate::descriptor::ConcreteGenericDescriptor;
 pub use crate::descriptor::DiscriminantOrigin;
 #[doc(hidden)]
 pub use crate::descriptor::EnumRepr;
+#[doc(hidden)]
+pub use crate::descriptor::FieldDefinitionDescriptor;
 #[doc(hidden)]
 pub use crate::descriptor::ImplAssociatedConstDescriptor;
 #[doc(hidden)]
@@ -161,11 +165,17 @@ pub use crate::descriptor::TraitId;
 #[doc(hidden)]
 pub use crate::descriptor::TraitImplPayload;
 #[doc(hidden)]
+pub use crate::descriptor::TypeDefinitionDescriptor;
+#[doc(hidden)]
+pub use crate::descriptor::TypeDefinitionId;
+#[doc(hidden)]
 pub use crate::descriptor::TypeDescriptor;
 #[doc(hidden)]
 pub use crate::descriptor::TypeDescriptorResolver;
 #[doc(hidden)]
 pub use crate::descriptor::TypeRef;
+#[doc(hidden)]
+pub use crate::descriptor::VariantDefinitionDescriptor;
 #[doc(hidden)]
 pub use crate::descriptor::VariantKind;
 #[doc(hidden)]

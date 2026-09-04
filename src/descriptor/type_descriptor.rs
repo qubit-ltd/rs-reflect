@@ -14,7 +14,6 @@ use std::fmt;
 
 use crate::__private::LazyTypeRef;
 use crate::__private::LazyTypeRefList;
-use crate::capability::CapabilityKey;
 use crate::capability::TypeCapabilities;
 use crate::construct::ConstructionError;
 use crate::construct::ConstructionRecovery;
@@ -55,6 +54,8 @@ use crate::descriptor::TextKind;
 use crate::descriptor::TextTypeDescriptor;
 use crate::descriptor::TraitObjectTypeDescriptor;
 use crate::descriptor::TupleTypeDescriptor;
+use crate::descriptor::TypeDefinitionDescriptor;
+use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeKind;
 use crate::descriptor::TypeRef;
 use crate::descriptor::VariantDescriptor;
@@ -127,6 +128,7 @@ pub struct TypeDescriptor {
     capabilities: fn() -> &'static TypeCapabilities,
     construction: Option<StructConstructionDescriptor>,
     generic: Option<&'static ConcreteGenericDescriptor>,
+    definition: Option<fn() -> &'static TypeDefinitionDescriptor>,
 }
 
 impl TypeDescriptor {
@@ -151,6 +153,32 @@ impl TypeDescriptor {
     #[inline(always)]
     pub const fn concrete_generic(&self) -> Option<&'static ConcreteGenericDescriptor> {
         self.generic
+    }
+
+    /// Returns the declaration and concrete substitutions for this generic
+    /// instance.
+    #[must_use]
+    #[inline(always)]
+    pub const fn generic_arguments(&self) -> Option<&'static ConcreteGenericDescriptor> {
+        self.generic
+    }
+
+    /// Returns the generic declaration shared by this concrete instance.
+    ///
+    /// `None` means this descriptor does not originate from a registered
+    /// generic type declaration.
+    #[must_use]
+    pub fn type_definition(&self) -> Option<&'static TypeDefinitionDescriptor> {
+        self.definition.map(|definition| definition())
+    }
+
+    /// Returns the generic declaration identity associated with this instance.
+    ///
+    /// `None` means this descriptor does not originate from a generic
+    /// declaration.
+    #[must_use]
+    pub fn definition_id(&self) -> Option<TypeDefinitionId> {
+        self.type_definition().map(TypeDefinitionDescriptor::id)
     }
 
     /// Constructs a named struct through its generated local adapter.
@@ -235,6 +263,14 @@ impl TypeDescriptor {
     #[doc(hidden)]
     pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
         self.generic = Some(generic);
+        self
+    }
+
+    /// Links this concrete descriptor to its source-level generic declaration.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
+        self.definition = Some(definition);
         self
     }
 
@@ -712,6 +748,7 @@ impl TypeDescriptor {
             capabilities,
             construction: None,
             generic: None,
+            definition: None,
         }
     }
 
@@ -747,24 +784,9 @@ impl TypeDescriptor {
         self.query_name
     }
 
-    /// Returns this descriptor's immutable registered capability set.
-    #[must_use]
-    #[inline(always)]
-    pub fn capabilities(&self) -> &'static TypeCapabilities {
-        (self.capabilities)()
-    }
-
     /// Returns capabilities declared directly by this descriptor.
     pub(crate) fn declared_capabilities(&self) -> &'static TypeCapabilities {
         (self.capabilities)()
-    }
-
-    /// Retrieves one executable capability adapter through its typed key.
-    ///
-    /// `None` means this descriptor did not register the key, registered a
-    /// different contract, or records a fact without an operation adapter.
-    pub fn get_capability<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
-        self.capabilities().get(key)
     }
 
     /// Returns the stable hierarchical type category.
@@ -1101,7 +1123,10 @@ impl fmt::Debug for TypeDescriptor {
             .field("kind", &self.kind())
             .field("field_count", &self.fields.len())
             .field("variant_count", &self.variants.len())
-            .field("capability_count", &self.capabilities().descriptors().len())
+            .field(
+                "intrinsic_capability_count",
+                &self.declared_capabilities().descriptors().len(),
+            )
             .finish()
     }
 }

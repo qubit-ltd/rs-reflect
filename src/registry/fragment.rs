@@ -16,6 +16,8 @@ use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
+use crate::descriptor::TypeDefinitionDescriptor;
+use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDescriptor;
 use crate::identity::FragmentIdentity;
 
@@ -76,6 +78,8 @@ impl StaticFragmentIdentity {
 pub enum FragmentKind {
     /// A concrete root type descriptor.
     Type,
+    /// A source-level generic type declaration.
+    TypeDefinition,
     /// A reflected or external trait definition descriptor.
     Trait,
     /// A generic, blanket, constrained, or concrete impl definition.
@@ -92,6 +96,8 @@ pub enum FragmentKind {
 pub enum RuntimeIdentity {
     /// An exact concrete Rust type.
     Type(TypeId),
+    /// A source-level generic type declaration.
+    TypeDefinition(TypeDefinitionId),
     /// A reflected marker or stable external trait identity.
     Trait(TraitId),
     /// An impl declaration identified by its stable source fragment.
@@ -99,17 +105,31 @@ pub enum RuntimeIdentity {
     /// A concrete implementation target.
     Impl(TypeId),
     /// Capability facts attached to an exact concrete type.
-    Capabilities {
-        /// The exact concrete target type.
-        target_type_id: TypeId,
-    },
+    Capabilities(CapabilityTarget),
+}
+
+/// The process-local target of one capability registration.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum CapabilityTarget {
+    /// An exact concrete reflected type.
+    Type(TypeId),
+    /// A source-level generic type declaration.
+    TypeDefinition(TypeDefinitionId),
+}
+
+/// A descriptor provider retained by a capability registration.
+#[derive(Clone, Copy, Debug)]
+enum CapabilityRegistrationTarget {
+    Type(&'static TypeDescriptor),
+    TypeId(TypeId),
+    TypeDefinition(&'static TypeDefinitionDescriptor),
 }
 
 /// One capability payload contributed by generated registration code.
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct CapabilityRegistration {
-    target_type_id: TypeId,
+    target: CapabilityRegistrationTarget,
     descriptors: Vec<CapabilityDescriptor>,
 }
 
@@ -117,18 +137,56 @@ impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
     #[doc(hidden)]
     #[must_use]
-    pub const fn new(target_type_id: TypeId, descriptors: Vec<CapabilityDescriptor>) -> Self {
+    pub const fn for_type(target: &'static TypeDescriptor, descriptors: Vec<CapabilityDescriptor>) -> Self {
         Self {
-            target_type_id,
+            target: CapabilityRegistrationTarget::Type(target),
             descriptors,
         }
     }
 
-    /// Returns the exact concrete target type.
+    /// Creates a capability payload for one generic type declaration.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn for_definition(
+        target: &'static TypeDefinitionDescriptor,
+        descriptors: Vec<CapabilityDescriptor>,
+    ) -> Self {
+        Self {
+            target: CapabilityRegistrationTarget::TypeDefinition(target),
+            descriptors,
+        }
+    }
+
+    /// Creates a benchmark-only payload when no reflected descriptor exists.
+    #[doc(hidden)]
+    pub const fn for_type_id(target: TypeId, descriptors: Vec<CapabilityDescriptor>) -> Self {
+        Self {
+            target: CapabilityRegistrationTarget::TypeId(target),
+            descriptors,
+        }
+    }
+
+    /// Returns the process-local target identity.
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn target_type_id(&self) -> TypeId {
-        self.target_type_id
+    pub fn target(&self) -> CapabilityTarget {
+        match self.target {
+            CapabilityRegistrationTarget::Type(descriptor) => CapabilityTarget::Type(descriptor.type_id()),
+            CapabilityRegistrationTarget::TypeId(type_id) => CapabilityTarget::Type(type_id),
+            CapabilityRegistrationTarget::TypeDefinition(descriptor) => {
+                CapabilityTarget::TypeDefinition(descriptor.id())
+            }
+        }
+    }
+
+    /// Returns the concrete target descriptor when this registration targets a
+    /// type.
+    #[must_use]
+    pub(crate) const fn type_descriptor(&self) -> Option<&'static TypeDescriptor> {
+        match self.target {
+            CapabilityRegistrationTarget::Type(descriptor) => Some(descriptor),
+            CapabilityRegistrationTarget::TypeId(_) | CapabilityRegistrationTarget::TypeDefinition(_) => None,
+        }
     }
 
     /// Returns the immutable capability descriptors.
@@ -145,6 +203,8 @@ impl CapabilityRegistration {
 pub enum FragmentPayload {
     /// One concrete root type descriptor.
     Type(&'static TypeDescriptor),
+    /// One source-level generic type declaration.
+    TypeDefinition(&'static TypeDefinitionDescriptor),
     /// One reflected or external trait definition descriptor.
     Trait(&'static TraitDefinitionDescriptor),
     /// One impl declaration descriptor without a concrete target instance.
@@ -162,6 +222,7 @@ impl FragmentPayload {
     pub(crate) const fn kind(&self) -> FragmentKind {
         match self {
             Self::Type(_) => FragmentKind::Type,
+            Self::TypeDefinition(_) => FragmentKind::TypeDefinition,
             Self::Trait(_) => FragmentKind::Trait,
             Self::ImplDefinition(_) => FragmentKind::ImplDefinition,
             Self::Impl(_) => FragmentKind::Impl,
@@ -175,12 +236,11 @@ impl FragmentPayload {
     pub(crate) fn runtime_identity(&self) -> RuntimeIdentity {
         match self {
             Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
+            Self::TypeDefinition(descriptor) => RuntimeIdentity::TypeDefinition(descriptor.id()),
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
             Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
-            Self::Capability(registration) => RuntimeIdentity::Capabilities {
-                target_type_id: registration.target_type_id(),
-            },
+            Self::Capability(registration) => RuntimeIdentity::Capabilities(registration.target()),
         }
     }
 }

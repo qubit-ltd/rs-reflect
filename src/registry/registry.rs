@@ -12,12 +12,15 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::descriptor::TraitId;
+use crate::descriptor::TypeDefinitionDescriptor;
+use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
 use crate::expression::TypeExpression;
@@ -31,6 +34,54 @@ use crate::registry::registry_builder::initialize_cached;
 #[derive(Clone, Copy, Debug)]
 pub struct TypeCandidates<'registry> {
     descriptors: &'registry [&'static TypeDescriptor],
+}
+
+/// A borrowed, deterministic set of generic declaration matches.
+#[derive(Clone, Copy, Debug)]
+pub struct TypeDefinitionCandidates<'registry> {
+    descriptors: &'registry [&'static TypeDefinitionDescriptor],
+}
+
+impl<'registry> TypeDefinitionCandidates<'registry> {
+    /// Creates a candidate view over one registry-owned slice.
+    pub(crate) const fn new(descriptors: &'registry [&'static TypeDefinitionDescriptor]) -> Self {
+        Self { descriptors }
+    }
+
+    /// Returns candidates in stable fragment order.
+    #[must_use]
+    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDefinitionDescriptor> + 'registry {
+        self.descriptors.iter().copied()
+    }
+
+    /// Returns the number of matching declarations.
+    #[must_use]
+    pub const fn len(self) -> usize {
+        self.descriptors.len()
+    }
+
+    /// Returns whether no declaration matched.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.descriptors.is_empty()
+    }
+
+    /// Returns the sole matching declaration, or `None` when absent or
+    /// ambiguous.
+    #[must_use]
+    pub fn only(self) -> Option<&'static TypeDefinitionDescriptor> {
+        (self.descriptors.len() == 1).then(|| self.descriptors[0])
+    }
+}
+
+impl<'registry> IntoIterator for TypeDefinitionCandidates<'registry> {
+    type Item = &'static TypeDefinitionDescriptor;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDefinitionDescriptor>>;
+
+    /// Iterates over declarations in stable fragment order.
+    fn into_iter(self) -> Self::IntoIter {
+        self.descriptors.iter().copied()
+    }
 }
 
 impl<'registry> TypeCandidates<'registry> {
@@ -178,6 +229,7 @@ impl IntoIterator for ImplDefinitionCandidates {
 #[derive(Debug)]
 pub struct ReflectRegistry {
     pub(super) types: Box<[&'static TypeDescriptor]>,
+    pub(super) definitions: Box<[&'static TypeDefinitionDescriptor]>,
     pub(super) impl_definitions: Box<[&'static ImplDefinitionDescriptor]>,
     pub(super) indexes: RegistryIndexes,
     pub(super) empty_effective_view: EffectiveTypeView,
@@ -226,6 +278,53 @@ impl ReflectRegistry {
         &self.types
     }
 
+    /// Enumerates all registered generic type declarations in fragment order.
+    #[must_use]
+    pub fn definitions(&self) -> &[&'static TypeDefinitionDescriptor] {
+        &self.definitions
+    }
+
+    /// Looks up one generic declaration by its process-local identity.
+    #[must_use]
+    pub fn definition(&self, id: TypeDefinitionId) -> Option<&'static TypeDefinitionDescriptor> {
+        self.indexes.definitions_by_id.get(&id).copied()
+    }
+
+    /// Finds generic declarations with the exact Rust source path.
+    pub fn find_definitions_by_rust_path(&self, path: &str) -> TypeDefinitionCandidates<'_> {
+        TypeDefinitionCandidates::new(self.indexes.definitions_by_rust_path.get(path).map_or(&[], Box::as_ref))
+    }
+
+    /// Finds generic declarations with the exact reflection query name.
+    pub fn find_definitions_by_query_name(&self, name: &str) -> TypeDefinitionCandidates<'_> {
+        TypeDefinitionCandidates::new(
+            self.indexes
+                .definitions_by_query_name
+                .get(name)
+                .map_or(&[], Box::as_ref),
+        )
+    }
+
+    /// Returns the fragment that registered one generic declaration.
+    #[must_use]
+    pub fn definition_source(&self, id: TypeDefinitionId) -> Option<&FragmentIdentity> {
+        self.indexes.definition_fragments.get(&id)
+    }
+
+    /// Enumerates generic declarations together with their source fragments.
+    pub fn definitions_with_identity(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&'static TypeDefinitionDescriptor, &FragmentIdentity)> + '_ {
+        self.definitions.iter().map(|definition| {
+            let identity = self
+                .indexes
+                .definition_fragments
+                .get(&definition.id())
+                .expect("every frozen type definition has a source fragment");
+            (*definition, identity)
+        })
+    }
+
     /// Enumerates registered roots together with their source fragments.
     pub fn types_with_identity(
         &self,
@@ -246,13 +345,68 @@ impl ReflectRegistry {
         self.indexes.type_fragments.get(&type_id)
     }
 
-    /// Returns the frozen effective capabilities for one exact concrete type.
+    /// Returns the effective capabilities for one exact concrete descriptor.
+    ///
+    /// Registered targets borrow the frozen merged set. An unregistered
+    /// generic monomorph borrows its generated intrinsic set.
     #[must_use]
-    pub fn capabilities(&self, type_id: TypeId) -> &TypeCapabilities {
+    pub fn capabilities<'registry>(
+        &'registry self,
+        descriptor: &'registry TypeDescriptor,
+    ) -> &'registry TypeCapabilities {
         self.indexes
             .capabilities_by_target
-            .get(&type_id)
+            .get(&descriptor.type_id())
+            .unwrap_or_else(|| descriptor.declared_capabilities())
+    }
+
+    /// Retrieves one effective typed capability for a concrete descriptor.
+    #[must_use]
+    pub fn capability<'registry, A: 'static>(
+        &'registry self,
+        descriptor: &'registry TypeDescriptor,
+        key: CapabilityKey<A>,
+    ) -> Option<&'registry A> {
+        self.indexes
+            .capabilities_by_target
+            .get(&descriptor.type_id())
+            .unwrap_or_else(|| descriptor.declared_capabilities())
+            .get(key)
+    }
+
+    /// Finds one effective concrete capability by textual ID.
+    #[must_use]
+    pub fn capability_by_id<'registry>(
+        &'registry self,
+        descriptor: &'registry TypeDescriptor,
+        id: &str,
+    ) -> Option<&'registry CapabilityDescriptor> {
+        self.capabilities(descriptor).descriptor(id)
+    }
+
+    /// Returns the effective capabilities of one generic declaration.
+    #[must_use]
+    pub fn definition_capabilities(&self, id: TypeDefinitionId) -> &TypeCapabilities {
+        self.indexes
+            .capabilities_by_definition
+            .get(&id)
             .unwrap_or(&self.empty_capabilities)
+    }
+
+    /// Retrieves one effective typed capability for a generic declaration.
+    #[must_use]
+    pub fn definition_capability<A: 'static>(&self, id: TypeDefinitionId, key: CapabilityKey<A>) -> Option<&A> {
+        self.definition_capabilities(id).get(key)
+    }
+
+    /// Finds one effective declaration capability by textual ID.
+    #[must_use]
+    pub fn definition_capability_by_id(
+        &self,
+        id: TypeDefinitionId,
+        capability_id: &str,
+    ) -> Option<&CapabilityDescriptor> {
+        self.definition_capabilities(id).descriptor(capability_id)
     }
 
     /// Enumerates registered roots carrying the exact typed capability key.
@@ -263,7 +417,18 @@ impl ReflectRegistry {
         self.types
             .iter()
             .copied()
-            .filter(move |descriptor| self.capabilities(descriptor.type_id()).contains(key.clone()))
+            .filter(move |descriptor| self.capabilities(descriptor).contains(key))
+    }
+
+    /// Enumerates generic declarations carrying the exact typed capability.
+    pub fn definitions_with_capability<A: 'static>(
+        &self,
+        key: CapabilityKey<A>,
+    ) -> impl Iterator<Item = &'static TypeDefinitionDescriptor> + '_ {
+        self.definitions
+            .iter()
+            .copied()
+            .filter(move |definition| self.definition_capabilities(definition.id()).contains(key))
     }
 
     /// Returns every reflected implementation targeting `type_id`.

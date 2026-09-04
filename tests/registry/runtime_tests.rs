@@ -13,6 +13,7 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
+use qubit_reflect::__private::codegen_v2::registration::CapabilityTarget as RegistrationCapabilityTarget;
 use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
 use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
 use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
@@ -154,15 +155,13 @@ fn shared_capability_id() -> CapabilityId {
 
 /// Returns the audited runtime identity of the shared capability.
 fn capability_runtime_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Capabilities {
-        target_type_id: TypeId::of::<CapabilityTarget>(),
-    }
+    RuntimeIdentity::Capabilities(RegistrationCapabilityTarget::Type(TypeId::of::<CapabilityTarget>()))
 }
 
 /// Builds the first capability payload.
 fn first_capability_payload() -> FragmentPayload {
     let key = CapabilityKey::<u8>::new(shared_capability_id());
-    FragmentPayload::Capability(CapabilityRegistration::new(
+    FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
         vec![CapabilityDescriptor::without_adapter(key)],
     ))
@@ -172,7 +171,7 @@ fn first_capability_payload() -> FragmentPayload {
 /// ID.
 fn second_capability_payload() -> FragmentPayload {
     let key = CapabilityKey::<u16>::new(shared_capability_id());
-    FragmentPayload::Capability(CapabilityRegistration::new(
+    FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
         vec![CapabilityDescriptor::without_adapter(key)],
     ))

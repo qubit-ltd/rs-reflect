@@ -31,7 +31,7 @@ impl CapabilityDescriptor {
     #[must_use]
     pub fn without_adapter<A: 'static>(key: CapabilityKey<A>) -> Self {
         Self {
-            id: key.id().clone(),
+            id: *key.id(),
             adapter_type: key.adapter_type(),
             adapter: None,
         }
@@ -40,7 +40,7 @@ impl CapabilityDescriptor {
     /// Creates a capability fact carrying an adapter of the key's exact type.
     pub fn with_adapter<A: Send + Sync + 'static>(key: CapabilityKey<A>, adapter: A) -> Self {
         Self {
-            id: key.id().clone(),
+            id: *key.id(),
             adapter_type: key.adapter_type(),
             adapter: Some(Arc::new(adapter)),
         }
@@ -80,7 +80,7 @@ impl Clone for CapabilityDescriptor {
     /// Shares the immutable adapter while cloning portable descriptor facts.
     fn clone(&self) -> Self {
         Self {
-            id: self.id.clone(),
+            id: self.id,
             adapter_type: self.adapter_type,
             adapter: self.adapter.clone(),
         }
