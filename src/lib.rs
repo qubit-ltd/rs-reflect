@@ -86,12 +86,20 @@ pub use construct::TupleConstructionInput;
 // Descriptor facade.
 /// The concrete arguments applied to one generic definition.
 pub use descriptor::ConcreteGenericDescriptor;
+/// One source-level field in a reflected generic declaration.
+pub use descriptor::FieldDefinitionDescriptor;
 /// One reflected field declaration.
 pub use descriptor::FieldDescriptor;
 /// The static reflection contract implemented by reflected Rust types.
 pub use descriptor::Reflect;
+/// The immutable source-level descriptor for a generic type declaration.
+pub use descriptor::TypeDefinitionDescriptor;
+/// The process-local identity of a generic type declaration.
+pub use descriptor::TypeDefinitionId;
 /// The immutable root descriptor for a reflected Rust type.
 pub use descriptor::TypeDescriptor;
+/// One source-level enum variant in a reflected generic declaration.
+pub use descriptor::VariantDefinitionDescriptor;
 /// One reflected enum variant declaration.
 pub use descriptor::VariantDescriptor;
 // Error facade.

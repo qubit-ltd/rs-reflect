@@ -30,5 +30,6 @@ pub use registry::ImplDefinitionCandidates;
 pub use registry::ReflectRegistry;
 pub use registry::TraitCandidates;
 pub use registry::TypeCandidates;
+pub use registry::TypeDefinitionCandidates;
 pub(crate) use registry_builder::build_registry;
 pub(crate) use registry_builder::initialize_registry;

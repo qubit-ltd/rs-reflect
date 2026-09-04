@@ -11,6 +11,8 @@
 #[doc(hidden)]
 pub use crate::__private::registration::CapabilityRegistration;
 #[doc(hidden)]
+pub use crate::__private::registration::CapabilityTarget;
+#[doc(hidden)]
 pub use crate::__private::registration::FragmentKind;
 #[doc(hidden)]
 pub use crate::__private::registration::FragmentPayload;

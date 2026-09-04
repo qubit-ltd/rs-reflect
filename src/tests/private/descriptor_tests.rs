@@ -240,7 +240,7 @@ fn test_descriptor_factories_preserve_typed_categories() {
     assert!(format!("{:?}", trait_object.as_trait_object().expect("trait object")).contains("Debug"));
     assert!(opaque.as_opaque().is_some());
     assert!(opaque_caps.as_opaque().is_some());
-    assert!(attached_caps.capabilities().descriptors().is_empty());
+    assert!(attached_caps.declared_capabilities().descriptors().is_empty());
 
     let opaque_member = descriptor::opaque_member::<u16>();
     assert_eq!(opaque_member.type_name(), std::any::type_name::<u16>());

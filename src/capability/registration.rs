@@ -44,14 +44,16 @@ macro_rules! __qubit_reflect_capability_descriptor {
 ///
 /// #[derive(Clone, Copy)]
 /// struct Adapter;
-/// struct Registered;
 ///
 /// fn key() -> CapabilityKey<Adapter> {
 ///     CapabilityKey::new(CapabilityId::new("example.adapter").expect("valid test ID"))
 /// }
 ///
-/// register_type_capabilities!(Registered: [key() => Adapter]);
-/// let _ = TypeCapabilities::default();
+/// register_type_capabilities!(String: [key() => Adapter]);
+///
+/// fn main() {
+///     let _ = TypeCapabilities::default();
+/// }
 /// ```
 ///
 /// ```compile_fail
@@ -69,8 +71,8 @@ macro_rules! __qubit_reflect_capability_descriptor {
 macro_rules! register_type_capabilities {
     ($target:ty: [$($key:expr => $adapter:expr),+ $(,)?]) => {
         const _: () = {
-            fn __qubit_reflect_target_type_id() -> ::std::any::TypeId {
-                ::std::any::TypeId::of::<$target>()
+            fn __qubit_reflect_target_descriptor() -> &'static $crate::descriptor::TypeDescriptor {
+                $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 
             fn __qubit_reflect_descriptors(
@@ -87,16 +89,18 @@ macro_rules! register_type_capabilities {
 
             fn __qubit_reflect_runtime_identity(
             ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
-                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities {
-                    target_type_id: __qubit_reflect_target_type_id(),
-                }
+                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities(
+                    $crate::__private::codegen_v2::registration::CapabilityTarget::Type(
+                        __qubit_reflect_target_descriptor().type_id(),
+                    ),
+                )
             }
 
             fn __qubit_reflect_payload(
             ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
                 $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
-                    $crate::__private::codegen_v2::registration::CapabilityRegistration::new(
-                        __qubit_reflect_target_type_id(),
+                    $crate::__private::codegen_v2::registration::CapabilityRegistration::for_type(
+                        __qubit_reflect_target_descriptor(),
                         __qubit_reflect_descriptors(),
                     ),
                 )
@@ -116,8 +120,8 @@ macro_rules! register_type_capabilities {
     };
     ($target:ty: $($capability:ident),+ $(,)?) => {
         const _: () = {
-            fn __qubit_reflect_target_type_id() -> ::std::any::TypeId {
-                ::std::any::TypeId::of::<$target>()
+            fn __qubit_reflect_target_descriptor() -> &'static $crate::descriptor::TypeDescriptor {
+                $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 
             fn __qubit_reflect_descriptors(
@@ -134,16 +138,18 @@ macro_rules! register_type_capabilities {
 
             fn __qubit_reflect_runtime_identity(
             ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
-                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities {
-                    target_type_id: __qubit_reflect_target_type_id(),
-                }
+                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities(
+                    $crate::__private::codegen_v2::registration::CapabilityTarget::Type(
+                        __qubit_reflect_target_descriptor().type_id(),
+                    ),
+                )
             }
 
             fn __qubit_reflect_payload(
             ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
                 $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
-                    $crate::__private::codegen_v2::registration::CapabilityRegistration::new(
-                        __qubit_reflect_target_type_id(),
+                    $crate::__private::codegen_v2::registration::CapabilityRegistration::for_type(
+                        __qubit_reflect_target_descriptor(),
                         __qubit_reflect_descriptors(),
                     ),
                 )

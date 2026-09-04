@@ -8,18 +8,24 @@
 
 //! Immutable type and member descriptor APIs.
 
+mod field_definition_descriptor;
 mod field_descriptor;
 mod generic_descriptor;
 mod impl_descriptor;
 mod internal;
 mod method_descriptor;
 mod trait_descriptor;
+mod type_definition_data;
+mod type_definition_descriptor;
+mod type_definition_id;
 mod type_descriptor;
 mod type_kind;
 mod type_ref;
 mod typed_view;
+mod variant_definition_descriptor;
 mod variant_descriptor;
 
+pub use field_definition_descriptor::FieldDefinitionDescriptor;
 pub use field_descriptor::FieldDescriptor;
 pub use field_descriptor::TypeDescriptorResolver;
 pub use generic_descriptor::ConcreteGenericDescriptor;
@@ -67,6 +73,9 @@ pub use trait_descriptor::TraitId;
 pub use trait_descriptor::TraitImplPayload;
 pub use trait_descriptor::cached_trait_object_descriptor;
 pub use trait_descriptor::external_supertrait;
+pub use type_definition_data::TypeDefinitionData;
+pub use type_definition_descriptor::TypeDefinitionDescriptor;
+pub use type_definition_id::TypeDefinitionId;
 pub use type_descriptor::Reflect;
 pub use type_descriptor::TypeDescriptor;
 pub use type_kind::FunctionPointerKind;
@@ -100,6 +109,7 @@ pub use typed_view::StructTypeDescriptor;
 pub use typed_view::TextTypeDescriptor;
 pub use typed_view::TraitObjectTypeDescriptor;
 pub use typed_view::TupleTypeDescriptor;
+pub use variant_definition_descriptor::VariantDefinitionDescriptor;
 pub use variant_descriptor::DiscriminantOrigin;
 pub use variant_descriptor::NumericDiscriminant;
 pub use variant_descriptor::VariantDescriptor;

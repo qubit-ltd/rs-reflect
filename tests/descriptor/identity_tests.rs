@@ -31,7 +31,7 @@ fn test_namespaced_ids_accept_ascii_identifier_segments() {
     assert_eq!(capability.as_ref(), "example.fixture.clone");
     assert_eq!(capability.to_string(), "example.fixture.clone");
     assert_eq!(
-        CapabilityId::from_str("example.fixture.clone").expect("capability parses"),
+        CapabilityId::new("example.fixture.clone").expect("capability parses"),
         capability,
     );
     assert!(CapabilityId::new("Example.fixture_2.Clone3").is_ok());

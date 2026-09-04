@@ -289,8 +289,14 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         root_descriptor
     } else {
         let generic = super::generics::concrete_descriptor(&declaration, &facade);
-        quote!(#facade::__private::codegen_v2::descriptor::with_concrete_generic({ #root_descriptor },
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#generic))))
+        let definition = super::generics::type_definition_provider_name(&declaration.name);
+        quote!(#facade::__private::codegen_v2::descriptor::with_type_definition(
+            #facade::__private::codegen_v2::descriptor::with_concrete_generic(
+                { #root_descriptor },
+                ::std::boxed::Box::leak(::std::boxed::Box::new(#generic)),
+            ),
+            #definition,
+        ))
     };
     let registration = registration(
         &facade,
@@ -300,7 +306,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         !declaration.generics.params.is_empty(),
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
-    let generic_template_provider = super::generics::template_provider(&declaration, &facade);
+    let type_definition_provider =
+        super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -316,7 +323,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
 
         #registration
         #generic_definition_provider
-        #generic_template_provider
+        #type_definition_provider
     }
 }
 

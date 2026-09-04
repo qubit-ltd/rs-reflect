@@ -36,7 +36,7 @@ impl<A: 'static> CapabilityKey<A> {
     }
 
     /// Creates a built-in typed key using this crate's reserved ID authority.
-    pub(crate) fn new_core(id: &str) -> Self {
+    pub(crate) fn new_core(id: &'static str) -> Self {
         let id = CapabilityId::new_core(id).expect("built-in capability IDs must use valid qubit.reflect names");
         Self::new(id)
     }
@@ -57,15 +57,13 @@ impl<A: 'static> CapabilityKey<A> {
 }
 
 impl<A: 'static> Clone for CapabilityKey<A> {
-    /// Clones the stable ID while retaining the same adapter contract.
+    /// Copies the static ID while retaining the same adapter contract.
     fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            adapter_type: self.adapter_type,
-            marker: PhantomData,
-        }
+        *self
     }
 }
+
+impl<A: 'static> Copy for CapabilityKey<A> {}
 
 impl<A: 'static> std::fmt::Debug for CapabilityKey<A> {
     /// Formats the stable ID and adapter contract identity.

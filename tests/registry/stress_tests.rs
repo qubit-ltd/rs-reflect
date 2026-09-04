@@ -16,6 +16,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
+use qubit_reflect::__private::codegen_v2::registration::CapabilityTarget as RegistrationCapabilityTarget;
 use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
 use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
 use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
@@ -102,13 +103,11 @@ fn stress_capability_id() -> CapabilityId {
 }
 
 fn capability_runtime_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Capabilities {
-        target_type_id: TypeId::of::<CapabilityTarget>(),
-    }
+    RuntimeIdentity::Capabilities(RegistrationCapabilityTarget::Type(TypeId::of::<CapabilityTarget>()))
 }
 
 fn capability_u8_payload() -> FragmentPayload {
-    FragmentPayload::Capability(CapabilityRegistration::new(
+    FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
         vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(
             stress_capability_id(),
@@ -117,7 +116,7 @@ fn capability_u8_payload() -> FragmentPayload {
 }
 
 fn capability_u16_payload() -> FragmentPayload {
-    FragmentPayload::Capability(CapabilityRegistration::new(
+    FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
         vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u16>::new(
             stress_capability_id(),

@@ -18,6 +18,8 @@ use crate::registry::ReflectRegistry;
 #[doc(hidden)]
 pub use crate::registry::fragment::CapabilityRegistration;
 #[doc(hidden)]
+pub use crate::registry::fragment::CapabilityTarget;
+#[doc(hidden)]
 pub use crate::registry::fragment::FragmentKind;
 #[doc(hidden)]
 pub use crate::registry::fragment::FragmentPayload;
@@ -39,7 +41,9 @@ pub fn has_registered_capability<T: 'static, A: 'static>(key: CapabilityKey<A>) 
         .into_iter()
         .filter(|fragment| fragment.kind() == FragmentKind::Capability)
         .any(|fragment| match fragment.build() {
-            FragmentPayload::Capability(registration) if registration.target_type_id() == TypeId::of::<T>() => {
+            FragmentPayload::Capability(registration)
+                if registration.target() == CapabilityTarget::Type(TypeId::of::<T>()) =>
+            {
                 registration.descriptors().iter().any(|descriptor| {
                     descriptor.id() == key.id()
                         && descriptor.adapter_type() == key.adapter_type()

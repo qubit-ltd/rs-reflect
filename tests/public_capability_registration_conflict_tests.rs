@@ -12,11 +12,8 @@ use qubit_reflect::error::RegistryErrorKind;
 use qubit_reflect::register_type_capabilities;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[derive(Clone)]
-struct DuplicateCapability;
-
-register_type_capabilities!(DuplicateCapability: Clone);
-register_type_capabilities!(DuplicateCapability: Clone);
+register_type_capabilities!(String: Clone);
+register_type_capabilities!(String: Clone);
 
 /// Verifies duplicate public capability registrations fail central registry
 /// initialization.

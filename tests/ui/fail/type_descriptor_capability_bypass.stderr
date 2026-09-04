@@ -1,0 +1,11 @@
+error[E0599]: no method named `capabilities` found for reference `&TypeDescriptor` in the current scope
+ --> tests/ui/fail/type_descriptor_capability_bypass.rs:6:24
+  |
+6 |     let _ = descriptor.capabilities();
+  |                        ^^^^^^^^^^^^ private field, not a method
+  |
+help: there is a method `with_capabilities` with a similar name, but with different arguments
+ --> src/descriptor/type_descriptor.rs
+  |
+  |     pub const fn with_capabilities(mut self, capabilities: fn() -> &'static TypeCapabilities) -> Self {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

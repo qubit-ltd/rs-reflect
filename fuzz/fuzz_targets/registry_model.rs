@@ -64,8 +64,8 @@ fuzz_target!(|unbounded: &[u8]| {
         let query = String::from_utf8_lossy(payload);
         match command % 8 {
             0 => {
-                let first = CapabilityId::new(query.as_ref());
-                let second = CapabilityId::new(query.as_ref());
+                let first = CapabilityId::validate(query.as_ref());
+                let second = CapabilityId::validate(query.as_ref());
                 last_identifier_was_valid = first.is_ok();
                 assert_eq!(first, second);
             }

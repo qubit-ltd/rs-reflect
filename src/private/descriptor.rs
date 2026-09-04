@@ -308,6 +308,16 @@ pub const fn with_concrete_generic(
     descriptor.with_concrete_generic(generic)
 }
 
+/// Links one concrete descriptor to its source-level generic declaration.
+#[doc(hidden)]
+#[must_use]
+pub const fn with_type_definition(
+    descriptor: TypeDescriptor,
+    definition: fn() -> &'static crate::descriptor::TypeDefinitionDescriptor,
+) -> TypeDescriptor {
+    descriptor.with_type_definition(definition)
+}
+
 /// Attaches a generated capability resolver to one descriptor root before it
 /// is interned.
 #[doc(hidden)]
