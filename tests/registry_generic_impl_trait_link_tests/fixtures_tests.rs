@@ -143,7 +143,7 @@ fn test_generic_impl_definition_resolves_qualified_and_aliased_trait_paths() {
         let definition = definition_by_trait_path(registry, source_path);
         assert_eq!(
             definition
-                .implemented_trait()
+                .implemented_trait_in(registry)
                 .expect("the registry must link the reflected trait marker")
                 .rust_name(),
             expected_trait,

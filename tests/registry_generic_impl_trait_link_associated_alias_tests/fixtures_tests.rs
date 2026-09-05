@@ -67,7 +67,7 @@ fn test_generic_impl_definition_resolves_associated_item_alias() {
         .expect("the generic impl definition must be registered");
     assert_eq!(
         definition
-            .implemented_trait()
+            .implemented_trait_in(registry)
             .expect("the alias must resolve to its reflected marker")
             .rust_name(),
         "AssociatedAliasTrait",

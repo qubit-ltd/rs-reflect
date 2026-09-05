@@ -17,10 +17,12 @@ use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
 use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
 use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::capability::clone_key;
+use qubit_reflect::capability::default_key;
 use qubit_reflect::descriptor::StructKind;
 use qubit_reflect::descriptor::TypeDefinitionData;
 use qubit_reflect::descriptor::TypeDefinitionDescriptor;
@@ -257,3 +259,96 @@ fn test_type_definition_constructors_preserve_declared_shape() {
 struct OpaqueMarker;
 struct StructMarker;
 struct EnumMarker;
+
+#[derive(Clone, Default, Reflect)]
+#[reflect(crate = qubit_reflect, capabilities(Clone, Default, concrete_provider))]
+struct CapabilityRecord<T: Clone + Default> {
+    value: T,
+}
+
+#[derive(Clone, Reflect)]
+#[reflect(crate = qubit_reflect, capabilities(Clone, concrete_provider))]
+enum CapabilityEnum<T: Clone> {
+    Value(T),
+}
+
+/// Returns the exact concrete identity through a custom typed adapter.
+fn concrete_provider<T: 'static>() -> CapabilityDescriptor {
+    CapabilityDescriptor::with_adapter(concrete_key(), std::any::TypeId::of::<T> as fn() -> std::any::TypeId)
+}
+
+/// Identifies the custom provider contract shared by all concrete instances.
+fn concrete_key() -> CapabilityKey<fn() -> std::any::TypeId> {
+    CapabilityKey::new(CapabilityId::new("example.concrete_identity").expect("valid capability ID"))
+}
+
+/// Executes adapters instead of merely checking that capability IDs exist.
+fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &ReflectRegistry) {
+    let descriptor = TypeDescriptor::of::<T>();
+    let owned = ReflectedOwned::new(value);
+    let cloned = registry
+        .capability(descriptor, clone_key())
+        .expect("clone adapter")
+        .clone_owned(&owned)
+        .expect("clone must accept its exact monomorph");
+    assert!(cloned.downcast_ref::<T>().is_some());
+    assert_eq!(
+        registry
+            .capability(descriptor, concrete_key())
+            .expect("custom provider")(),
+        std::any::TypeId::of::<T>()
+    );
+    if let Some(default) = registry.capability(descriptor, default_key()) {
+        assert!(
+            default.create().downcast_ref::<T>().is_some(),
+            "default must create its exact monomorph"
+        );
+    }
+}
+
+/// Different generic arguments must never share concrete capability adapters.
+#[test]
+fn test_generic_capabilities_preserve_each_monomorph() {
+    let registry = ReflectRegistry::initialize().expect("valid registry");
+    assert_concrete_capabilities(CapabilityRecord { value: 7_u32 }, registry);
+    assert_concrete_capabilities(
+        CapabilityRecord {
+            value: String::from("second"),
+        },
+        registry,
+    );
+    assert_concrete_capabilities(CapabilityEnum::Value(String::from("first")), registry);
+    assert_concrete_capabilities(CapabilityEnum::Value(9_u32), registry);
+    std::thread::scope(|scope| {
+        for _ in 0..8 {
+            scope.spawn(|| {
+                assert_concrete_capabilities(CapabilityRecord { value: 3_u64 }, registry);
+                assert_concrete_capabilities(CapabilityRecord { value: false }, registry);
+            });
+        }
+    });
+}
+
+#[derive(Reflect)]
+#[reflect(crate = qubit_reflect, definition_provider_v2 = domain_definition)]
+struct DomainDefinition<T> {
+    value: T,
+}
+
+/// The facade chooses the provider name through the versioned contract.
+#[test]
+fn test_explicit_definition_provider_needs_no_monomorph() {
+    let registry = ReflectRegistry::initialize().expect("valid definitions");
+    let definition = domain_definition();
+    assert!(std::ptr::eq(
+        registry.definition(definition.id()).expect("registered definition"),
+        definition
+    ));
+    assert_eq!(definition.query_name(), "DomainDefinition");
+    assert!(std::ptr::eq(
+        TypeDescriptor::of::<DomainDefinition<u8>>()
+            .type_definition()
+            .expect("concrete link"),
+        definition
+    ));
+}

@@ -289,7 +289,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         root_descriptor
     } else {
         let generic = super::generics::concrete_descriptor(&declaration, &facade);
-        let definition = super::generics::type_definition_provider_name(&declaration.name);
+        let definition = super::generics::type_definition_provider_name(&declaration);
         quote!(#facade::__private::codegen_v2::descriptor::with_type_definition(
             #facade::__private::codegen_v2::descriptor::with_concrete_generic(
                 { #root_descriptor },
@@ -363,9 +363,7 @@ pub(crate) fn capabilities(
     });
     quote! {
         fn #function() -> &'static #facade::__private::codegen_v2::capability::TypeCapabilities {
-            static CAPABILITIES: ::std::sync::OnceLock<#facade::__private::codegen_v2::capability::TypeCapabilities> =
-                ::std::sync::OnceLock::new();
-            CAPABILITIES.get_or_init(|| {
+            #facade::__private::codegen_v2::capability::intern_capabilities::<Self>(|| {
                 #facade::__private::codegen_v2::capability::TypeCapabilities::try_new(
                     ::std::vec![#(#descriptors),*],
                 )

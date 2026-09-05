@@ -104,8 +104,13 @@ pub(crate) fn definition_provider_name(name: &syn::Ident) -> syn::Ident {
 
 /// Returns the stable hidden provider name for the source-level type
 /// declaration shared with domain derive crates.
-pub(crate) fn type_definition_provider_name(name: &syn::Ident) -> syn::Ident {
-    format_ident!("__qubit_reflect_type_definition_{}", name)
+pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> syn::Ident {
+    for attribute in &declaration.attributes {
+        if let crate::ir::HelperValueIr::DefinitionProviderV2(name) = &attribute.value {
+            return name.clone();
+        }
+    }
+    format_ident!("__qubit_reflect_type_definition_{}", declaration.name)
 }
 
 /// Emits a non-generic provider for the declaration-level generic metadata.
@@ -145,7 +150,7 @@ pub(crate) fn type_definition_provider(
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
-    let function = type_definition_provider_name(&declaration.name);
+    let function = type_definition_provider_name(declaration);
     let generic_function = definition_provider_name(&declaration.name);
     let declaration_name = &declaration.name;
     let marker = format_ident!("__QubitReflectTypeDefinition{}", declaration.name);

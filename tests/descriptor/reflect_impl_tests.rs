@@ -1526,7 +1526,7 @@ fn test_reflect_impl_registers_trait_and_blanket_definitions_without_instances()
     assert_eq!(generic_trait.generic_definition().parameters().len(), 1);
     assert_eq!(
         generic_trait
-            .implemented_trait()
+            .implemented_trait_in(registry)
             .expect("reflected trait definition must be resolved")
             .rust_name(),
         "GenericImplDefinitionTrait",
@@ -1544,7 +1544,7 @@ fn test_reflect_impl_registers_trait_and_blanket_definitions_without_instances()
     assert!(!blanket.generic_definition().predicates().is_empty());
     assert_eq!(
         blanket
-            .implemented_trait()
+            .implemented_trait_in(registry)
             .expect("external blanket trait definition must be resolved")
             .rust_path(),
         "ExternalBlanketDefinitionTrait",

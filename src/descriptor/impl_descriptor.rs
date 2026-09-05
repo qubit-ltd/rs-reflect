@@ -55,7 +55,7 @@ pub struct ImplDefinitionDescriptor {
     fragment_identity: FragmentIdentity,
     target_type: TypeExpression,
     kind: ImplKind,
-    implemented_trait: OnceLock<&'static TraitDefinitionDescriptor>,
+    implemented_trait: Option<&'static TraitDefinitionDescriptor>,
     implemented_trait_id: Option<TraitId>,
     implemented_trait_path: Option<Box<str>>,
     generic_definition: &'static GenericDefinitionDescriptor,
@@ -162,17 +162,11 @@ impl ImplDefinitionDescriptor {
         generic_definition: &'static GenericDefinitionDescriptor,
     ) -> Result<Self, ImplDescriptorBuildError> {
         validate_kind(kind, implemented_trait.is_some())?;
-        let implemented_trait_cell = OnceLock::new();
-        if let Some(descriptor) = implemented_trait {
-            implemented_trait_cell
-                .set(descriptor)
-                .expect("a newly-created impl definition has no trait link");
-        }
         Ok(Self {
             fragment_identity,
             target_type,
             kind,
-            implemented_trait: implemented_trait_cell,
+            implemented_trait,
             implemented_trait_id: implemented_trait.map(|descriptor| descriptor.trait_id().clone()),
             implemented_trait_path: implemented_trait.map(|descriptor| descriptor.rust_path().into()),
             generic_definition,
@@ -195,7 +189,7 @@ impl ImplDefinitionDescriptor {
             fragment_identity,
             target_type,
             kind: ImplKind::Trait,
-            implemented_trait: OnceLock::new(),
+            implemented_trait: None,
             implemented_trait_id,
             implemented_trait_path: Some(implemented_trait_path.into()),
             generic_definition,
@@ -227,11 +221,12 @@ impl ImplDefinitionDescriptor {
 
     /// Returns the implemented trait definition.
     ///
-    /// `None` identifies an inherent impl definition.
+    /// `None` identifies an inherent impl or an unresolved trait declaration.
+    /// Use [`Self::implemented_trait_in`] for snapshot-resolved links.
     #[must_use]
     #[inline(always)]
     pub fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
-        self.implemented_trait.get().copied()
+        self.implemented_trait
     }
 
     /// Returns the diagnostic trait path recorded by the impl declaration.
@@ -249,13 +244,15 @@ impl ImplDefinitionDescriptor {
         self.implemented_trait_id.as_ref()
     }
 
-    /// Resolves a symbolic trait link exactly once while freezing the global
-    /// registry.
-    pub(crate) fn resolve_implemented_trait(&'static self, descriptor: &'static TraitDefinitionDescriptor) -> bool {
-        match self.implemented_trait.get() {
-            Some(existing) => std::ptr::eq(*existing, descriptor),
-            None => self.implemented_trait.set(descriptor).is_ok(),
-        }
+    /// Returns the trait link resolved in `registry`, or `None` when this
+    /// definition has no trait link in that snapshot. Never initializes a
+    /// global registry or changes this declaration.
+    #[must_use]
+    pub fn implemented_trait_in(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
+        registry.impl_definition_trait(self)
     }
 
     /// Returns generic parameters and predicates in source order.
