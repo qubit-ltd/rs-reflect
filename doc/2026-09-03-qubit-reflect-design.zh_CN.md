@@ -214,3 +214,11 @@ effective capability 解析入口，并支持无需分配 capability identity �
 - 不保留公开字段、旧平铺 `__private` 或 deprecated shim。
 - 不为了缩短文件制造一次性 helper 或一类型一文件的机械碎片。
 - 不承诺 `no_std`；当前运行时依赖 `std`。
+
+## 2026-09-05 评审整改
+
+- 类型相关 capability 按具体 `TypeId` 缓存；生成 factory 不在缓存表锁内执行。泛型 struct、enum 和自定义模型 provider 均覆盖多个实际类型及并发调用。
+- `ImplDefinitionDescriptor::implemented_trait()` 只返回声明时已知的链接；未解析声明使用 `implemented_trait_in(&registry)` 或 `ReflectRegistry::impl_definition_trait` 查询。解析结果保存在快照索引中，构建失败或另一个快照不会修改共享声明。
+- 下游泛型宏使用 `#[reflect(definition_provider_v2 = identifier)]` 选择自己拥有的访问函数名。v2 契约为无参数函数，返回 `&'static TypeDefinitionDescriptor`；不要求具体单态化，也不依赖反射宏默认生成名称。
+- `scripts/check-downstream.sh` 验证真实 `rs-model-metadata` workspace（包含 `derive/` 子项目）与 `rs-platform`。本地 `ci-check.sh` 和独立 GitHub Actions job 均执行该门禁；缺少相邻仓库会显式失败。远端依赖使用各仓库 `main`，私有依赖可配置 `DEPENDENCY_TOKEN`。
+- descriptor 首次初始化由全新子进程测量，报告的时间不含进程启动；热路径和 1/4/8 线程查询单独测量。平台 benchmark 使用实际链接的模型，报告投影、关系校验耗时与分配请求数量/字节数。
