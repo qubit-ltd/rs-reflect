@@ -270,7 +270,9 @@ fn main() {
     let descriptor = TypeDescriptor::of::<Service>();
     let _methods = descriptor.methods_in(snapshot);
     assert!(snapshot.get(descriptor.type_id()).is_some());
-    let _clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone");
+    let clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone")
+        .expect("valid capability declarations");
+    assert!(clone.is_none());
 }
 ```
 
@@ -289,6 +291,42 @@ Rust bounds hold, then query with `clone_key()` or `default_key()`. Other
 arbitrary-self receiver forms require an exact `ReceiverAdapter` registered by
 `register_type_capabilities!`; otherwise the method remains discoverable but
 reports a stable unavailable reason.
+
+### Migrating effective capability queries
+
+The existing query names now return `Result`; no error-swallowing compatibility entry remains.
+`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`; typed/textual single
+queries return `Result<Option<_>, CapabilityConflict>`. Handle failure before testing for absence.
+Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
+the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
+
+`Ok(None)` can mean an absent ID, a typed key with a different adapter type, or a fact-only descriptor.
+These are distinct from an invalid set. `types_with_capability` and definition queries read frozen
+indexes without executing factories and do not gain `Result`. Effective queries for unregistered
+concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
+
+Providers must depend only on static type facts, never on snapshots, time, or mutable external
+configuration, and must not re-enter registry initialization. Generic intrinsic factories run outside
+the cache-map lock; successes and conflicts are cached by concrete `TypeId` and shared by concurrent
+queries. Provider panics still propagate; they do not become absence or `CapabilityConflict`.
+Generated invocation adapters preserve registry/receiver-capability failures as structured invocation
+errors and restore the receiver, values, names, and original caller ordering.
+
+Downstream `ModelRegistry::metadata_for` similarly returns `Result<Option<_>, ModelMetadataError>`.
+Property queries propagate `PropertyResolutionError`; resolver diagnostics retain the original
+`cause()` and path context. `qubit-platform-testkit::link_all::validate_all_models` returns
+`ModelRegistryError` and validates registration availability only.
+
+### Constructing empty structs
+
+| Declaration | Descriptor shape | Construction entry |
+| --- | --- | --- |
+| `struct A;` | `StructKind::Unit` | `construct_unit()` |
+| `struct B {}` | `StructKind::Named` | `construct_struct(NamedConstructionInput::new([]))` |
+| `struct C();` | `StructKind::Tuple` | `construct_tuple(TupleConstructionInput::new([]))` |
+
+The distinction also applies to empty const-generic structs. A wrong shape returns a construction
+error, never a value of a different type or an internal assertion failure.
 
 ### Choose transparent, opaque, and thread-safe boundaries
 

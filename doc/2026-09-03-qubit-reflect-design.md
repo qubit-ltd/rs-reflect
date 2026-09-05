@@ -181,6 +181,23 @@ arguments. Both are registered in one frozen `ReflectRegistry`. That registry
 is the sole public effective-capability resolver and supports typed or textual
 lookup without allocating capability identities.
 
+
+### Fallible queries and source fidelity
+
+A frozen registry validates linked targets; unregistered concrete generic instances remain eligible
+for on-demand intrinsic capability queries. `capabilities`, `capability`, and `capability_by_id`
+return `Result` and preserve complete conflicts. Registration exposes the same cause through
+`RegistryError::intrinsic_conflict`. Frozen enumeration reads indexes directly without running
+providers. The cache retains successes and conflicts per concrete TypeId; factories run outside
+the cache-map lock. Providers must be snapshot-independent and must not re-enter initialization;
+the contract does not catch provider panics.
+
+Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
+definitions, and construction expansion. Empty field counts no longer determine source shape.
+This internal change does not change `codegen_v2` or model v4. Downstream metadata/property queries
+propagate structured errors; resolution adds root model, full path, and provenance. An underlying
+failure must not create synthetic MissingProperty/InvalidValueClosure errors or suppress independent failures.
+
 ## 6. Dynamic safety boundary
 
 Dynamic values have local and thread-safe modes. Erasure remains constrained by exact `TypeId`, borrow lifetimes,
@@ -217,7 +234,7 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | all features | ecosystem/Qubit types, workspace tests, Clippy, Rustdoc |
 | derive | parser/analysis unit tests, trybuild pass/fail, invocation integration |
 | registry | cross-crate aggregation, conflicts, freeze, stable ordering, concurrent initialization |
-| ABI/facade | renamed dependencies, explicit facade, `codegen_v2`, and model `v3` |
+| ABI/facade | renamed dependencies, explicit facade, `codegen_v2`, and model `v4` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in

@@ -193,7 +193,9 @@ fn main() {
     let descriptor = TypeDescriptor::of::<Service>();
     let _methods = descriptor.methods_in(snapshot);
     assert!(snapshot.get(descriptor.type_id()).is_some());
-    let _clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone");
+    let clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone")
+        .expect("valid capability declarations");
+    assert!(clone.is_none());
 }
 ```
 
@@ -202,6 +204,39 @@ fn main() {
 `snapshot.definitions()` 可在没有注册任何具体实例时枚举泛型声明，并支持按 `TypeDefinitionId`、Rust 路径或查询名定位。定义级扩展通过 `definition_capability` 或 `definition_capability_by_id` 查询。定义字段只包含 `TypeExpression`，不会伪造值访问 adapter。
 
 `Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
+
+### 迁移 effective capability 查询
+
+原有查询名称直接改为 `Result`，没有兼容的吞错入口。`capabilities` 返回
+`Result<&TypeCapabilities, CapabilityConflict>`；typed/textual 单项查询返回
+`Result<Option<_>, CapabilityConflict>`。先处理错误，再判断能力是否存在。
+错误保留冲突类别、能力 ID 和双方 adapter TypeId；注册阶段也可通过
+`RegistryError::intrinsic_conflict()` 和 `Error::source()` 读取原始冲突。
+
+`Ok(None)` 可能是 ID 不存在、typed key 的适配器类型不匹配，或只有事实没有 adapter。
+这与整个集合冲突不同。`types_with_capability` 及定义级查询只读冻结索引，不执行 factory，
+因此不为这些入口增加 `Result`。传入未注册具体实例时，effective 查询可以执行 intrinsic factory，
+但不会将该实例加入 snapshot。
+
+provider 必须只依赖静态类型事实，不能依赖 snapshot、时间或外部可变配置，也不能重入注册表初始化。
+泛型 intrinsic factory 在缓存表锁外执行；成功和冲突按具体 `TypeId` 缓存，并发查询共享结果。
+provider 自身的 panic 仍会传播，不转成能力缺失或 `CapabilityConflict`。
+生成调用适配器遇到注册初始化或 receiver 能力冲突时，返回结构化调用错误，并恢复原 receiver、
+参数值、名称和调用方顺序。
+
+下游 `ModelRegistry::metadata_for` 也返回 `Result<Option<_>, ModelMetadataError>`，
+属性查询传播 `PropertyResolutionError`；解析错误通过 `cause()` 保留原因和路径上下文。
+`qubit-platform-testkit::link_all::validate_all_models` 返回 `ModelRegistryError`，只验证注册可用性。
+
+### 空结构体的构造方式
+
+| 声明 | 描述符形状 | 构造入口 |
+| --- | --- | --- |
+| `struct A;` | `StructKind::Unit` | `construct_unit()` |
+| `struct B {}` | `StructKind::Named` | `construct_struct(NamedConstructionInput::new([]))` |
+| `struct C();` | `StructKind::Tuple` | `construct_tuple(TupleConstructionInput::new([]))` |
+
+上述区别同样适用于 const 泛型空结构体。传错形状返回构造错误，不返回错误类型的值，也不触发内部断言。
 
 ### 选择透明、opaque 与线程安全边界
 

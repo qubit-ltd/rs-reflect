@@ -76,6 +76,16 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、descriptor 地址和 trait marker 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
 tuple 和可移植函数指针 descriptor 支持 0 到 32 个元素或参数；33 及以上 arity 明确不支持，也不会获得 `Reflect` 实现。
 
+## 查询失败与声明形状
+
+`ReflectRegistry::capabilities`、`capability` 和 `capability_by_id` 返回 `Result`。
+`Ok(None)` 表示合法能力集合中没有匹配适配器；`Err(CapabilityConflict)` 表示声明本身冲突。
+已注册目标的查询和枚举只读取冻结索引。未注册泛型实例的查询可以懒初始化其能力；
+成功或冲突按具体类型缓存，不改变注册表成员。
+
+空字段不等于 unit：`struct A;`、`struct B {}`、`struct C();` 分别保留 Unit、Named、Tuple
+形状，并使用对应动态构造入口。详细迁移和 provider 约束见用户指南。
+
 ## 延伸阅读
 
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
