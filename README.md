@@ -110,6 +110,18 @@ operations remain visible as descriptors with structured unavailable reasons.
 Tuple and portable function-pointer descriptors support arities 0 through 32;
 arity 33 and above are unsupported and intentionally have no `Reflect` impl.
 
+## Lookup failures and declaration shape
+
+`ReflectRegistry::capabilities`, `capability`, and `capability_by_id` return `Result`.
+`Ok(None)` means a valid capability set has no matching adapter; `Err(CapabilityConflict)`
+means the declarations conflict. Registered-target queries and enumeration read frozen
+indexes only. Queries for unregistered generic instances may lazily initialize their
+capabilities; successes and conflicts are cached per concrete type without changing registry membership.
+
+Empty fields do not imply a unit struct: `struct A;`, `struct B {}`, and `struct C();`
+retain Unit, Named, and Tuple shape and use the corresponding dynamic construction entry.
+See the user guide for migration and provider requirements.
+
 ## Learn More
 
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)

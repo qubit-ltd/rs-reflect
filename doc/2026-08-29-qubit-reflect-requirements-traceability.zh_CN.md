@@ -305,3 +305,17 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-VAR-007 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
 | REQ-VAR-008 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
 | REQ-VAR-009 | T08、T15、T19 | `src/descriptor/variant_descriptor.rs`、`derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`、`tests/construct/adapter_tests.rs` |
+
+## 2026-09-06：查询错误与零字段声明补充验收
+
+- effective capability 查询必须区分合法缺失与集合冲突，并保留完整冲突对象；冻结查询及枚举不得执行 factory。
+- 泛型 intrinsic 成功和失败按具体 TypeId 缓存，并发查询不修改 snapshot。
+- unit、空具名、空元组 struct 的源码形状必须贯穿 IR、泛型定义、具体描述符和构造入口；错形状返回错误。
+- receiver 适配前的注册/能力失败必须保留所有调用输入；下游传播结构化原因而非缺失或字符串。
+
+| 验收范围 | 回归证据 |
+| --- | --- |
+| 查询三态、冲突缓存、receiver 恢复 | `tests/public_generic_capability_conflict_tests.rs`、`tests/public_receiver_resolution_failure_tests.rs` |
+| 冻结 provider 边界 | `tests/public_frozen_capability_tests.rs` |
+| struct 形状保真 | `tests/public_empty_struct_tests.rs`、derive parser 单元测试 |
+| 下游错误链 | rs-model-metadata `metadata_resolution_error_tests`、`metadata_path_error_tests`、rs-platform `registry_failure_tests` |

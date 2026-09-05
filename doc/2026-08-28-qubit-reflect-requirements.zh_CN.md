@@ -5,8 +5,8 @@
 - 状态：需求确认稿；审核占位符已经全部关闭
 - 适用范围：`qubit-reflect` 的声明宏、运行时 descriptor、动态访问、动态调用与动态构造能力
 - 面向读者：架构审核者、实现者、测试者、下游框架开发者和后续用户手册维护者
-- 参考文档：`rs-model-derive` 的[最终需求规范](../../rs-model-derive/doc/2026-08-28-rs-model-derive-requirements.md)
-  与[目标 API 用户手册](../../rs-model-derive/doc/2026-08-28-rs-model-derive-target-api-guide.zh_CN.md)
+- 历史参考：原 `rs-model-derive` 最终需求规范与目标 API 手册；当前下游已整合至
+  `rs-model-metadata`，现行接口见[模型用户指南](../../rs-model-metadata/doc/user_guide.zh_CN.md)。
 
 ## 0. 文档定位与规范用语
 
@@ -1289,3 +1289,10 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
 | `REQ-ACCPT-*` | 验收标准 | 48 |
 
 当前最终需求规范共定义 284 条带编码需求，不再保留待确认占位符。
+
+## 2026-09-06：查询错误与零字段声明补充验收
+
+- effective capability 查询必须区分合法缺失与集合冲突，并保留完整冲突对象；冻结查询及枚举不得执行 factory。
+- 泛型 intrinsic 成功和失败按具体 TypeId 缓存，并发查询不修改 snapshot。
+- unit、空具名、空元组 struct 的源码形状必须贯穿 IR、泛型定义、具体描述符和构造入口；错形状返回错误。
+- receiver 适配前的注册/能力失败必须保留所有调用输入；下游传播结构化原因而非缺失或字符串。

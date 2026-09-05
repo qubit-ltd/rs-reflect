@@ -329,3 +329,10 @@ maps every identifier to current implementation and executable tests.
 - **REQ-ACCPT-046**: Tests prove lifetime-generic derives produce roots only for `'static` concrete instances, retain full lifetime/symbolic definition navigation, and reject non-static dynamic roots.
 - **REQ-ACCPT-047**: Cross-crate integration proves model role macros delegate through the facade to the same derive, terminal users need no direct reflection dependency, minimal facade supports struct/enum/generic/trait/impl paths, model/reflection root identity matches, and duplicate explicit derive is diagnosed.
 - **REQ-ACCPT-048**: Tests cover lossless `into_local` for all three ThreadSafe wrappers, reject runtime/capability Local upgrades, and use downgraded values for field access and dynamic construction.
+
+## 2026-09-06: lookup errors and empty declarations
+
+- Effective capability queries distinguish valid absence from an invalid set and retain complete conflicts; frozen queries and enumeration never execute factories.
+- Generic intrinsic successes and failures are cached per concrete TypeId; concurrent queries never mutate snapshots.
+- Unit, empty named, and empty tuple struct shape survives IR, generic definitions, concrete descriptors, and construction; wrong shapes return errors.
+- Registry/capability failure before receiver adaptation preserves all invocation inputs; downstream consumers retain structured causes instead of absence or strings.

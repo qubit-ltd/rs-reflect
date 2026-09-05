@@ -312,3 +312,17 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-VAR-007 | T08, T15, T19 | `src/descriptor/variant_descriptor.rs`, `derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`, `tests/construct/adapter_tests.rs` |
 | REQ-VAR-008 | T08, T15, T19 | `src/descriptor/variant_descriptor.rs`, `derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`, `tests/construct/adapter_tests.rs` |
 | REQ-VAR-009 | T08, T15, T19 | `src/descriptor/variant_descriptor.rs`, `derive/src/expand/enums.rs` | `tests/descriptor/derive_enum_tests.rs`, `tests/construct/adapter_tests.rs` |
+
+## 2026-09-06: lookup errors and empty declarations
+
+- Effective capability queries distinguish valid absence from an invalid set and retain complete conflicts; frozen queries and enumeration never execute factories.
+- Generic intrinsic successes and failures are cached per concrete TypeId; concurrent queries never mutate snapshots.
+- Unit, empty named, and empty tuple struct shape survives IR, generic definitions, concrete descriptors, and construction; wrong shapes return errors.
+- Registry/capability failure before receiver adaptation preserves all invocation inputs; downstream consumers retain structured causes instead of absence or strings.
+
+| Acceptance scope | Regression evidence |
+| --- | --- |
+| Query states, conflict caching, receiver recovery | `tests/public_generic_capability_conflict_tests.rs`, `tests/public_receiver_resolution_failure_tests.rs` |
+| Frozen provider boundary | `tests/public_frozen_capability_tests.rs` |
+| Struct shape fidelity | `tests/public_empty_struct_tests.rs`, derive parser unit tests |
+| Downstream error chain | rs-model-metadata `metadata_resolution_error_tests`, `metadata_path_error_tests`, rs-platform `registry_failure_tests` |

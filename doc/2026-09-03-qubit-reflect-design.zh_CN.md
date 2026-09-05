@@ -164,6 +164,20 @@ runtime 的完整模块。
 `TypeDescriptor` 链回定义并保存已解析实参。两者都进入同一个冻结 `ReflectRegistry`。该注册表是唯一公开的
 effective capability 解析入口，并支持无需分配 capability identity 的类型化与文本查询。
 
+
+### 可失败查询与结构保真
+
+冻结注册表只验证已链接目标；未注册的具体泛型实例仍可按需查询 intrinsic capability。
+`capabilities`、`capability`、`capability_by_id` 返回 `Result`，所有冲突对象完整保留，
+注册阶段通过 `RegistryError::intrinsic_conflict` 暴露相同原因。冻结枚举直接查询 index，
+不执行 provider。缓存继续按具体 TypeId 保存成功或冲突，factory 在缓存表锁外执行；
+provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 不在本契约捕获范围。
+
+derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
+空字段数量不再决定结构形状。此内部修订不改变 `codegen_v2` 或模型 v4 协议。
+下游元数据和属性查询传播结构化错误，解析器附加根模型、完整路径、来源；
+一条基础失败不生成伪 MissingProperty/InvalidValueClosure，也不阻断独立错误收集。
+
 ## 6. 动态安全边界
 
 动态值有 local 与 thread-safe 两套模式。类型擦除仍受准确 `TypeId`、借用生命周期以及
@@ -196,7 +210,7 @@ effective capability 解析入口，并支持无需分配 capability identity �
 | all-features | 生态/Qubit 类型、workspace tests、Clippy、Rustdoc |
 | derive | parser/analysis 单元测试、trybuild pass/fail、invocation 集成 |
 | registry | 跨 crate 聚合、冲突、冻结、稳定排序、并发初始化 |
-| ABI/facade | 重命名依赖、显式 facade、`codegen_v2` 与模型 `v3` |
+| ABI/facade | 重命名依赖、显式 facade、`codegen_v2` 与模型 `v4` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
 覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
