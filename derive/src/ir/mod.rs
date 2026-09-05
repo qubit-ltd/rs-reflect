@@ -29,6 +29,7 @@ pub(crate) use declaration::AssociatedConstIr;
 pub(crate) use declaration::AssociatedTypeIr;
 pub(crate) use declaration::DeclarationIr;
 pub(crate) use declaration::FieldIr;
+pub(crate) use declaration::FieldShapeIr;
 pub(crate) use declaration::GenericBoundIr;
 pub(crate) use declaration::GenericDefaultIr;
 pub(crate) use declaration::GenericKindIr;
