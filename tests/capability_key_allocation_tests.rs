@@ -9,8 +9,8 @@
 use std::alloc::GlobalAlloc;
 use std::alloc::Layout;
 use std::alloc::System;
+use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect::capability::CapabilityDescriptor;
@@ -20,14 +20,18 @@ use qubit_reflect::identity::CapabilityId;
 
 struct CountingAllocator;
 
-static COUNTING: AtomicBool = AtomicBool::new(false);
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    // Const TLS initialization does not allocate or run a destructor.
+    static ALLOCATIONS: Cell<Option<usize>> = const { Cell::new(None) };
+}
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.load(Ordering::Relaxed) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        let _ = ALLOCATIONS.try_with(|count| {
+            if let Some(current) = count.get() {
+                count.set(Some(current + 1));
+            }
+        });
         unsafe { System.alloc(layout) }
     }
 
@@ -53,14 +57,34 @@ fn test_capability_key_lookup_is_allocation_free() {
     let capabilities =
         TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(key, 7_u32)]).expect("unique capability");
 
-    ALLOCATIONS.store(0, Ordering::Relaxed);
-    COUNTING.store(true, Ordering::SeqCst);
+    ALLOCATIONS.with(|count| count.set(Some(0)));
+    drop(std::hint::black_box(Box::new(7_u32)));
+    let control = ALLOCATIONS.with(|count| count.replace(None).expect("control counting is active"));
+    assert!(control > 0, "allocations on the measured thread must be counted");
+
+    // Background work must not be charged to this thread's lookup contract.
+    static START_BACKGROUND: AtomicBool = AtomicBool::new(false);
+    static BACKGROUND_DONE: AtomicBool = AtomicBool::new(false);
+    let background = std::thread::spawn(|| {
+        while !START_BACKGROUND.load(Ordering::Acquire) {
+            std::thread::yield_now();
+        }
+        drop(std::hint::black_box(vec![0_u8; 4096]));
+        BACKGROUND_DONE.store(true, Ordering::Release);
+    });
+
+    ALLOCATIONS.with(|count| count.set(Some(0)));
+    START_BACKGROUND.store(true, Ordering::Release);
     for _ in 0..1_000 {
         let key = CapabilityKey::new(CapabilityId::new("example.allocation_free").expect("valid capability ID"));
         assert!(capabilities.contains(key));
         assert_eq!(capabilities.get(key), Some(&7_u32));
     }
-    COUNTING.store(false, Ordering::SeqCst);
+    while !BACKGROUND_DONE.load(Ordering::Acquire) {
+        std::thread::yield_now();
+    }
+    let allocations = ALLOCATIONS.with(|count| count.replace(None).expect("counting is active"));
+    background.join().expect("background allocation must complete");
 
-    assert_eq!(ALLOCATIONS.load(Ordering::Relaxed), 0);
+    assert_eq!(allocations, 0);
 }
