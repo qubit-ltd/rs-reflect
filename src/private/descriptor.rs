@@ -12,7 +12,7 @@
 use crate::__private::LazyTypeRef;
 use crate::__private::LazyTypeRefList;
 use crate::access::VariantActiveAdapter;
-use crate::capability::TypeCapabilities;
+use crate::capability::TypeCapabilitiesResult;
 use crate::construct::StructConstructionDescriptor;
 use crate::descriptor::AssociatedConstReader;
 use crate::descriptor::ConcreteGenericDescriptor;
@@ -253,7 +253,7 @@ pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: Prim
 pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: PrimitiveKind,
-    capabilities: fn() -> &'static TypeCapabilities,
+    capabilities: fn() -> TypeCapabilitiesResult,
 ) -> TypeDescriptor {
     TypeDescriptor::new_primitive_with_capabilities::<T>(query_name, kind, capabilities)
 }
@@ -271,7 +271,7 @@ pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind)
 pub const fn text_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
     kind: TextKind,
-    capabilities: fn() -> &'static TypeCapabilities,
+    capabilities: fn() -> TypeCapabilitiesResult,
 ) -> TypeDescriptor {
     TypeDescriptor::new_text_with_capabilities::<T>(query_name, kind, capabilities)
 }
@@ -323,7 +323,7 @@ pub const fn with_type_definition(
 #[doc(hidden)]
 pub const fn with_capabilities(
     descriptor: TypeDescriptor,
-    capabilities: fn() -> &'static TypeCapabilities,
+    capabilities: fn() -> TypeCapabilitiesResult,
 ) -> TypeDescriptor {
     descriptor.with_capabilities(capabilities)
 }
@@ -495,7 +495,7 @@ pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeD
 #[doc(hidden)]
 pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
-    capabilities: fn() -> &'static TypeCapabilities,
+    capabilities: fn() -> TypeCapabilitiesResult,
 ) -> TypeDescriptor {
     TypeDescriptor::new_opaque_with_capabilities::<T>(query_name, capabilities)
 }

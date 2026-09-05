@@ -10,7 +10,9 @@
 
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityConflict;
 use crate::capability::TypeCapabilities;
+use crate::capability::TypeCapabilitiesResult;
 use crate::capability::clone_descriptor;
 use crate::capability::default_descriptor;
 use crate::capability::send_descriptor;
@@ -22,17 +24,19 @@ use crate::descriptor::TypeDescriptor;
 
 macro_rules! reflected_primitive {
     ($type:ty, $kind:expr, $descriptor:ident, $capabilities:ident) => {
-        fn $capabilities() -> &'static TypeCapabilities {
-            static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
-            CAPABILITIES.get_or_init(|| {
-                TypeCapabilities::try_new(vec![
-                    send_descriptor::<$type>(),
-                    sync_descriptor::<$type>(),
-                    clone_descriptor::<$type>(),
-                    default_descriptor::<$type>(),
-                ])
-                .expect("built-in core capability IDs must be distinct")
-            })
+        fn $capabilities() -> TypeCapabilitiesResult {
+            static CAPABILITIES: OnceLock<Result<TypeCapabilities, CapabilityConflict>> = OnceLock::new();
+            CAPABILITIES
+                .get_or_init(|| {
+                    TypeCapabilities::try_new(vec![
+                        send_descriptor::<$type>(),
+                        sync_descriptor::<$type>(),
+                        clone_descriptor::<$type>(),
+                        default_descriptor::<$type>(),
+                    ])
+                })
+                .as_ref()
+                .map_err(Clone::clone)
         }
 
         static $descriptor: TypeDescriptor =
@@ -65,17 +69,19 @@ reflected_primitive!(f32, PrimitiveKind::F32, F32_DESCRIPTOR, f32_capabilities);
 reflected_primitive!(f64, PrimitiveKind::F64, F64_DESCRIPTOR, f64_capabilities);
 
 /// Returns the core capabilities registered for the concrete `String` type.
-fn string_capabilities() -> &'static TypeCapabilities {
-    static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
-    CAPABILITIES.get_or_init(|| {
-        TypeCapabilities::try_new(vec![
-            send_descriptor::<String>(),
-            sync_descriptor::<String>(),
-            clone_descriptor::<String>(),
-            default_descriptor::<String>(),
-        ])
-        .expect("built-in core capability IDs must be distinct")
-    })
+fn string_capabilities() -> TypeCapabilitiesResult {
+    static CAPABILITIES: OnceLock<Result<TypeCapabilities, CapabilityConflict>> = OnceLock::new();
+    CAPABILITIES
+        .get_or_init(|| {
+            TypeCapabilities::try_new(vec![
+                send_descriptor::<String>(),
+                sync_descriptor::<String>(),
+                clone_descriptor::<String>(),
+                default_descriptor::<String>(),
+            ])
+        })
+        .as_ref()
+        .map_err(Clone::clone)
 }
 
 static STRING_DESCRIPTOR: TypeDescriptor =

@@ -672,10 +672,9 @@ fn test_registry_runtime_reuses_frozen_effective_views() {
     assert!(missing_first.methods().is_empty());
 }
 
-/// Reusing declaration facts must not let one snapshot resolve another's
-/// ambiguity.
+/// Unresolved declarations never infer a trait identity from a snapshot.
 #[test]
-fn test_registry_trait_resolution_is_snapshot_local() {
+fn test_registry_rejects_unresolved_trait_definition_in_every_snapshot() {
     let ambiguous = [
         &AMBIGUOUS_IMPL_DEFINITION_FRAGMENT,
         &SAME_TRAIT_FRAGMENT_A,
@@ -685,8 +684,12 @@ fn test_registry_trait_resolution_is_snapshot_local() {
         build_registry(&ambiguous).expect_err("ambiguous traits").kind(),
         RegistryErrorKind::ImplTraitResolution
     );
-    let first =
-        build_registry(&[&AMBIGUOUS_IMPL_DEFINITION_FRAGMENT, &SAME_TRAIT_FRAGMENT_A]).expect("one matching trait");
+    assert_eq!(
+        build_registry(&[&AMBIGUOUS_IMPL_DEFINITION_FRAGMENT, &SAME_TRAIT_FRAGMENT_A])
+            .expect_err("one matching signature is not an explicit trait identity")
+            .kind(),
+        RegistryErrorKind::ImplTraitResolution
+    );
     assert_eq!(
         build_registry(&ambiguous)
             .expect_err("still ambiguous after another snapshot")
@@ -697,31 +700,9 @@ fn test_registry_trait_resolution_is_snapshot_local() {
         AMBIGUOUS_IMPL_DEFINITION.implemented_trait().is_none(),
         "declaration facts remain unresolved"
     );
-    assert!(std::ptr::eq(
+    assert!(
         AMBIGUOUS_IMPL_DEFINITION
-            .implemented_trait_in(&first)
-            .expect("first link"),
-        &*SAME_TRAIT_A
-    ));
-    std::thread::scope(|scope| {
-        for _ in 0..8 {
-            scope.spawn(|| {
-                let second = build_registry(&[&AMBIGUOUS_IMPL_DEFINITION_FRAGMENT, &SAME_TRAIT_FRAGMENT_B])
-                    .expect("second snapshot");
-                assert!(std::ptr::eq(
-                    AMBIGUOUS_IMPL_DEFINITION
-                        .implemented_trait_in(&second)
-                        .expect("second link"),
-                    &*SAME_TRAIT_B
-                ));
-                assert!(build_registry(&ambiguous).is_err());
-            });
-        }
-    });
-    assert!(std::ptr::eq(
-        AMBIGUOUS_IMPL_DEFINITION
-            .implemented_trait_in(&first)
-            .expect("unchanged first link"),
-        &*SAME_TRAIT_A
-    ));
+            .implemented_trait_in(&build_registry(&[]).expect("empty snapshot"))
+            .is_none()
+    );
 }

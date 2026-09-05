@@ -362,12 +362,11 @@ pub(crate) fn capabilities(
             })
     });
     quote! {
-        fn #function() -> &'static #facade::__private::codegen_v2::capability::TypeCapabilities {
+        fn #function() -> #facade::__private::codegen_v2::capability::TypeCapabilitiesResult {
             #facade::__private::codegen_v2::capability::intern_capabilities::<Self>(|| {
                 #facade::__private::codegen_v2::capability::TypeCapabilities::try_new(
                     ::std::vec![#(#descriptors),*],
                 )
-                    .expect("generated capability declarations are unique")
             })
         }
     }

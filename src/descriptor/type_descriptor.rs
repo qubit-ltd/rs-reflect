@@ -14,7 +14,7 @@ use std::fmt;
 
 use crate::__private::LazyTypeRef;
 use crate::__private::LazyTypeRefList;
-use crate::capability::TypeCapabilities;
+use crate::capability::TypeCapabilitiesResult;
 use crate::construct::ConstructionError;
 use crate::construct::ConstructionRecovery;
 use crate::construct::NamedConstructionInput;
@@ -125,7 +125,7 @@ pub struct TypeDescriptor {
     data: TypeDescriptorData,
     fields: &'static [FieldDescriptor],
     variants: &'static [VariantDescriptor],
-    capabilities: fn() -> &'static TypeCapabilities,
+    capabilities: fn() -> TypeCapabilitiesResult,
     construction: Option<StructConstructionDescriptor>,
     generic: Option<&'static ConcreteGenericDescriptor>,
     definition: Option<fn() -> &'static TypeDefinitionDescriptor>,
@@ -669,7 +669,7 @@ impl TypeDescriptor {
     #[doc(hidden)]
     pub(crate) const fn new_opaque_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
-        capabilities: fn() -> &'static TypeCapabilities,
+        capabilities: fn() -> TypeCapabilitiesResult,
     ) -> Self {
         Self::new_with_capabilities::<T>(
             query_name,
@@ -685,7 +685,7 @@ impl TypeDescriptor {
     pub(crate) const fn new_primitive_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: PrimitiveKind,
-        capabilities: fn() -> &'static TypeCapabilities,
+        capabilities: fn() -> TypeCapabilitiesResult,
     ) -> Self {
         Self::new_with_capabilities::<T>(
             query_name,
@@ -701,7 +701,7 @@ impl TypeDescriptor {
     pub(crate) const fn new_text_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
         kind: TextKind,
-        capabilities: fn() -> &'static TypeCapabilities,
+        capabilities: fn() -> TypeCapabilitiesResult,
     ) -> Self {
         Self::new_with_capabilities::<T>(
             query_name,
@@ -720,13 +720,9 @@ impl TypeDescriptor {
         fields: &'static [FieldDescriptor],
         variants: &'static [VariantDescriptor],
     ) -> Self {
-        Self::new_with_capabilities::<T>(
-            query_name,
-            data,
-            fields,
-            variants,
-            crate::capability::empty_capabilities,
-        )
+        Self::new_with_capabilities::<T>(query_name, data, fields, variants, || {
+            Ok(crate::capability::empty_capabilities())
+        })
     }
 
     /// Builds common immutable root state with a descriptor-owned capability
@@ -736,7 +732,7 @@ impl TypeDescriptor {
         data: TypeDescriptorData,
         fields: &'static [FieldDescriptor],
         variants: &'static [VariantDescriptor],
-        capabilities: fn() -> &'static TypeCapabilities,
+        capabilities: fn() -> TypeCapabilitiesResult,
     ) -> Self {
         Self {
             type_id: type_id_of::<T>,
@@ -757,7 +753,7 @@ impl TypeDescriptor {
     /// Generated descriptor roots call this before the root is interned, so
     /// every query observes one stable capability set for the concrete type.
     #[doc(hidden)]
-    pub const fn with_capabilities(mut self, capabilities: fn() -> &'static TypeCapabilities) -> Self {
+    pub const fn with_capabilities(mut self, capabilities: fn() -> TypeCapabilitiesResult) -> Self {
         self.capabilities = capabilities;
         self
     }
@@ -785,7 +781,7 @@ impl TypeDescriptor {
     }
 
     /// Returns capabilities declared directly by this descriptor.
-    pub(crate) fn declared_capabilities(&self) -> &'static TypeCapabilities {
+    pub(crate) fn declared_capabilities(&self) -> TypeCapabilitiesResult {
         (self.capabilities)()
     }
 
@@ -1125,7 +1121,9 @@ impl fmt::Debug for TypeDescriptor {
             .field("variant_count", &self.variants.len())
             .field(
                 "intrinsic_capability_count",
-                &self.declared_capabilities().descriptors().len(),
+                &self
+                    .declared_capabilities()
+                    .map_or(0, |capabilities| capabilities.descriptors().len()),
             )
             .finish()
     }

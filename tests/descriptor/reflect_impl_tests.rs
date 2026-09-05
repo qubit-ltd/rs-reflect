@@ -375,7 +375,7 @@ trait GenericImplDefinitionTrait {
     fn generic_definition_value(&self) -> usize;
 }
 
-#[reflect_impl]
+#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_GenericImplDefinitionTrait)]
 impl<T: Clone + Send> GenericImplDefinitionTrait for GenericTraitImplDefinitionOnly<T> {
     fn generic_definition_value(&self) -> usize {
         1
