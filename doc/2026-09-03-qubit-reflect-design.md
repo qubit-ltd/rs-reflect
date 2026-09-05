@@ -235,3 +235,11 @@ requirement IDs mapped one-to-one and validates every referenced code and test p
 - No public-field compatibility, flattened `__private`, or deprecated shim.
 - No one-use helpers or one-type-per-file fragmentation created solely to reduce line counts.
 - No `no_std` promise; the runtime currently depends on `std`.
+
+## Review corrections, 2026-09-05
+
+- Type-dependent capabilities are cached by concrete `TypeId`. Factories execute outside the cache map lock. Regressions execute adapters for multiple struct/enum monomorphs and custom model providers, including concurrent calls.
+- `ImplDefinitionDescriptor::implemented_trait()` exposes only declaration-known links. Resolve symbolic links through `implemented_trait_in(&registry)` or `ReflectRegistry::impl_definition_trait`. Links belong to snapshot indexes; failed builds and other snapshots never mutate shared declarations.
+- Facade macros select an owned provider name with `#[reflect(definition_provider_v2 = identifier)]`. The v2 contract is a parameterless function returning `&'static TypeDefinitionDescriptor`, available without a concrete monomorph. Consumers must not infer reflect's default generated names.
+- `scripts/check-downstream.sh` validates the real model metadata workspace (including its `derive/` member) and platform repository. Local `ci-check.sh` and a dedicated GitHub Actions job both run this gate. Missing sibling checkouts are errors. Remote dependency checkouts use `main`; private repositories may use `DEPENDENCY_TOKEN`.
+- First descriptor initialization is sampled in fresh child processes, excluding process startup. Warm lookup and 1/4/8-thread lookup are measured separately. The platform benchmark measures projection and relationship validation over the actual linked models, including allocation request counts and requested bytes.
