@@ -140,7 +140,12 @@ fn test_registry_registers_generic_type_definition() {
             .any(|candidate| candidate.id() == definition.id())
     );
     assert!(registry.get(concrete.type_id()).is_none());
-    assert!(registry.capability(concrete, clone_key()).is_some());
+    assert!(
+        registry
+            .capability(concrete, clone_key())
+            .expect("valid capability declarations")
+            .is_some()
+    );
 }
 
 /// Verifies concrete monomorphs share one declaration identity while retaining
@@ -288,6 +293,7 @@ fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &Reflect
     let owned = ReflectedOwned::new(value);
     let cloned = registry
         .capability(descriptor, clone_key())
+        .expect("valid capability declarations")
         .expect("clone adapter")
         .clone_owned(&owned)
         .expect("clone must accept its exact monomorph");
@@ -295,10 +301,14 @@ fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &Reflect
     assert_eq!(
         registry
             .capability(descriptor, concrete_key())
+            .expect("valid capability declarations")
             .expect("custom provider")(),
         std::any::TypeId::of::<T>()
     );
-    if let Some(default) = registry.capability(descriptor, default_key()) {
+    if let Some(default) = registry
+        .capability(descriptor, default_key())
+        .expect("valid capability declarations")
+    {
         assert!(
             default.create().downcast_ref::<T>().is_some(),
             "default must create its exact monomorph"

@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::capability::CapabilityConflict;
 use crate::identity::CapabilityId;
 use crate::identity::FragmentIdentity;
 
@@ -33,15 +34,15 @@ pub enum RegistryErrorKind {
 }
 
 /// A shareable immutable registry aggregation error.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegistryError(Arc<RegistryErrorData>);
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct RegistryErrorData {
     kind: RegistryErrorKind,
     left: Option<FragmentIdentity>,
     right: Option<FragmentIdentity>,
-    capability_id: Option<CapabilityId>,
+    intrinsic_conflict: Option<CapabilityConflict>,
 }
 
 impl RegistryError {
@@ -73,12 +74,12 @@ impl RegistryError {
 
     /// Creates an error for an invalid intrinsic capability declaration.
     #[must_use]
-    pub fn intrinsic_capability_conflict(fragment: FragmentIdentity, capability_id: CapabilityId) -> Self {
+    pub fn intrinsic_capability_conflict(fragment: FragmentIdentity, conflict: CapabilityConflict) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::CapabilityConflict,
             left: Some(fragment),
             right: None,
-            capability_id: Some(capability_id),
+            intrinsic_conflict: Some(conflict),
         }))
     }
 
@@ -90,7 +91,7 @@ impl RegistryError {
             kind: RegistryErrorKind::ImplTraitResolution,
             left: Some(fragment),
             right: None,
-            capability_id: None,
+            intrinsic_conflict: None,
         }))
     }
 
@@ -102,7 +103,7 @@ impl RegistryError {
             kind: RegistryErrorKind::UnsupportedPlatform,
             left: None,
             right: None,
-            capability_id: None,
+            intrinsic_conflict: None,
         }))
     }
 
@@ -143,7 +144,14 @@ impl RegistryError {
     #[inline(always)]
     pub fn capability_id(&self) -> Option<CapabilityId> {
         let Self(data) = self;
-        data.capability_id
+        data.intrinsic_conflict.as_ref().map(|conflict| *conflict.id())
+    }
+
+    /// Returns the complete intrinsic conflict, or `None` for other failures.
+    #[must_use]
+    pub fn intrinsic_conflict(&self) -> Option<&CapabilityConflict> {
+        let Self(data) = self;
+        data.intrinsic_conflict.as_ref()
     }
 
     /// Creates a conflict error retaining both conflicting registration
@@ -153,7 +161,7 @@ impl RegistryError {
             kind,
             left: Some(left),
             right: Some(right),
-            capability_id: None,
+            intrinsic_conflict: None,
         }))
     }
 }
@@ -186,8 +194,17 @@ impl std::fmt::Display for RegistryError {
                 right.content_fingerprint(),
             )?;
         }
+        if let Some(conflict) = &data.intrinsic_conflict {
+            write!(formatter, ": {conflict}")?;
+        }
         Ok(())
     }
 }
 
-impl std::error::Error for RegistryError {}
+impl std::error::Error for RegistryError {
+    /// Preserves the complete intrinsic conflict as the underlying cause.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.intrinsic_conflict()
+            .map(|conflict| conflict as &dyn std::error::Error)
+    }
+}

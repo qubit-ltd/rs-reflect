@@ -197,10 +197,19 @@ fn test_registry_resolves_descriptor_intrinsic_capabilities() {
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
 
     assert_eq!(
-        registry.capability(descriptor, extension_key()),
+        registry
+            .capability(descriptor, extension_key())
+            .expect("valid capability declarations"),
         Some(&ExtensionAdapter("descriptor"))
     );
-    assert_eq!(registry.capabilities(descriptor).descriptors().len(), 1);
+    assert_eq!(
+        registry
+            .capabilities(descriptor)
+            .expect("valid capability declarations")
+            .descriptors()
+            .len(),
+        1
+    );
 }
 
 /// Confirms type-level derive helpers attach their bound-checked capability
@@ -210,8 +219,18 @@ fn test_derive_capabilities_attach_to_the_generated_descriptor() {
     let descriptor = DerivedCapabilities::type_descriptor();
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
 
-    assert!(registry.capability(descriptor, clone_key()).is_some());
-    assert!(registry.capability(descriptor, default_key()).is_some());
+    assert!(
+        registry
+            .capability(descriptor, clone_key())
+            .expect("valid capability declarations")
+            .is_some()
+    );
+    assert!(
+        registry
+            .capability(descriptor, default_key())
+            .expect("valid capability declarations")
+            .is_some()
+    );
 }
 
 /// Confirms explicit typed capability registrations join the registry's
@@ -222,7 +241,10 @@ fn test_derive_descriptor_includes_explicit_extension_registration() {
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
 
     assert_eq!(
-        registry.capabilities(descriptor).get(extension_key()),
+        registry
+            .capabilities(descriptor)
+            .expect("valid capability declarations")
+            .get(extension_key()),
         Some(&ExtensionAdapter("derived"))
     );
 }
@@ -234,13 +256,34 @@ fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
     let text = TypeDescriptor::of::<String>();
     let registry = ReflectRegistry::initialize().expect("built-ins must register");
 
-    assert!(registry.capabilities(primitive).contains(send_key()));
-    assert!(registry.capabilities(primitive).contains(sync_key()));
-    assert!(registry.capability(primitive, clone_key()).is_some());
-    assert!(registry.capability(primitive, default_key()).is_some());
+    assert!(
+        registry
+            .capabilities(primitive)
+            .expect("valid capability declarations")
+            .contains(send_key())
+    );
+    assert!(
+        registry
+            .capabilities(primitive)
+            .expect("valid capability declarations")
+            .contains(sync_key())
+    );
+    assert!(
+        registry
+            .capability(primitive, clone_key())
+            .expect("valid capability declarations")
+            .is_some()
+    );
+    assert!(
+        registry
+            .capability(primitive, default_key())
+            .expect("valid capability declarations")
+            .is_some()
+    );
     assert_eq!(
         registry
             .capability(text, clone_key())
+            .expect("valid capability declarations")
             .expect("String must have an actual clone adapter")
             .clone_owned(&ReflectedOwned::new(String::from("text")))
             .expect("the registered String adapter must accept String")
@@ -254,7 +297,9 @@ fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
 #[test]
 fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry.capabilities(TypeDescriptor::of::<LocalOnly>());
+    let capabilities = registry
+        .capabilities(TypeDescriptor::of::<LocalOnly>())
+        .expect("valid capability declarations");
 
     assert!(capabilities.get(clone_key()).is_some());
     assert!(capabilities.get(default_key()).is_some());
@@ -276,7 +321,9 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
 #[test]
 fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotion() {
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry.capabilities(TypeDescriptor::of::<SendSync>());
+    let capabilities = registry
+        .capabilities(TypeDescriptor::of::<SendSync>())
+        .expect("valid capability declarations");
 
     assert!(capabilities.contains(send_key()));
     assert!(capabilities.contains(sync_key()));
@@ -288,7 +335,9 @@ fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotio
 #[test]
 fn test_concrete_registration_accepts_third_party_typed_adapter() {
     let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry.capabilities(TypeDescriptor::of::<ExtensionRegistration>());
+    let capabilities = registry
+        .capabilities(TypeDescriptor::of::<ExtensionRegistration>())
+        .expect("valid capability declarations");
 
     assert_eq!(capabilities.get(extension_key()), Some(&ExtensionAdapter("registered")));
 }

@@ -303,14 +303,10 @@ fn definition_for_call(
     };
     let receiver_binding = if let Some(receiver_type) = &typed_extension_receiver {
         quote! {
-            let registry = #facade::__private::codegen_v2::registration::ReflectRegistry::initialize().ok();
-            let adapter = registry.and_then(|registry| {
-                registry
-                    .capabilities(<#target as #facade::__private::codegen_v2::Reflect>::type_descriptor())
-                    .get(#facade::__private::codegen_v2::invoke::receiver_adapter_key::<#receiver_type, #mode>())
-            });
-            let (receiver, arguments) = validated
-                .adapt_receiver::<#receiver_type>(&identity, adapter)?;
+            let (receiver, arguments) = validated.adapt_registered_receiver::<#receiver_type>(
+                &identity,
+                <#target as #facade::__private::codegen_v2::Reflect>::type_descriptor(),
+            )?;
         }
     } else if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),

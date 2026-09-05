@@ -36,17 +36,21 @@ register_type_capabilities!(RegisteredCapability: Clone);
 #[test]
 fn test_registry_projects_typed_capabilities() {
     let registry = ReflectRegistry::initialize().expect("the registrations must be valid");
-    let capabilities = registry.capabilities(RegisteredCapability::type_descriptor());
+    let capabilities = registry
+        .capabilities(RegisteredCapability::type_descriptor())
+        .expect("valid capability declarations");
 
     assert!(capabilities.contains(clone_key()));
     assert!(
         registry
             .capability_by_id(RegisteredCapability::type_descriptor(), "qubit.reflect.clone",)
+            .expect("valid capability declarations")
             .is_some()
     );
     assert!(
         registry
             .capability_by_id(RegisteredCapability::type_descriptor(), "not-valid!")
+            .expect("valid capability declarations")
             .is_none()
     );
     let matches: Vec<_> = registry.types_with_capability(clone_key()).collect();

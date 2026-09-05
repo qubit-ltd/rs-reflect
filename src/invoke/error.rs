@@ -18,6 +18,12 @@ use crate::invoke::InvocationInputMode;
 /// The machine-readable reason pre-execution invocation validation failed.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum InvocationErrorKind {
+    /// The registry could not resolve explicit receiver capabilities.
+    #[error("receiver registry initialization failed: {0}")]
+    RegistryInitialization(#[source] crate::error::RegistryError),
+    /// Intrinsic explicit receiver capabilities contain conflicting facts.
+    #[error("receiver capability resolution failed: {0}")]
+    CapabilityResolution(#[source] crate::capability::CapabilityConflict),
     /// The supplied receiver shape differs from the method signature.
     #[error("invocation receiver mode mismatch: expected {expected:?}, got {actual:?}")]
     ReceiverModeMismatch {

@@ -140,7 +140,7 @@ impl RegistryBuilder {
         }
         let capabilities = descriptor
             .declared_capabilities()
-            .map_err(|error| RegistryError::intrinsic_capability_conflict(identity.clone(), *error.id()))?;
+            .map_err(|error| RegistryError::intrinsic_capability_conflict(identity.clone(), error))?;
         for capability in capabilities.descriptors() {
             self.push_capability(
                 CapabilityTarget::Type(descriptor.type_id()),
