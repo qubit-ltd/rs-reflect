@@ -185,16 +185,7 @@ pub(crate) fn type_definition_provider(
                     )
                 }
             });
-            let kind = match declaration.fields.len() {
-                0 => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Unit),
-                1 if declaration.fields[0].name.is_none() => {
-                    quote!(#facade::__private::codegen_v2::descriptor::StructKind::Newtype)
-                }
-                _ if declaration.fields.first().is_some_and(|field| field.name.is_none()) => {
-                    quote!(#facade::__private::codegen_v2::descriptor::StructKind::Tuple)
-                }
-                _ => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Named),
-            };
+            let kind = super::structs::kind_tokens(declaration, facade);
             quote! {
                 let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
                 #facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor::struct_type(

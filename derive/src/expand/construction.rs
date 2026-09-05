@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use crate::ir::FieldShapeIr;
 use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
 use crate::ir::TypeDeclarationIr;
@@ -111,16 +112,16 @@ fn struct_mode_adapters(
             ).unwrap_or_else(|_| unreachable!("validated construction field type"))
         }
     });
-    let literal = match fields.first().and_then(|field| field.name.as_ref()) {
-        Some(_) => {
+    let literal = match declaration.field_shape {
+        FieldShapeIr::Named => {
             let assignments = declaration.fields.iter().zip(values).map(|(field, value)| {
                 let name = field.name.as_ref().expect("named struct field");
                 quote!(#name: #value)
             });
             quote!(Self { #(#assignments),* })
         }
-        None if fields.is_empty() => quote!(Self),
-        None => quote!(Self(#(#values),*)),
+        FieldShapeIr::Unit => quote!(Self),
+        FieldShapeIr::Unnamed => quote!(Self(#(#values),*)),
     };
     let assignments = fields.iter().map(|field| {
         let index = field.index;

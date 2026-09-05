@@ -41,6 +41,7 @@ use crate::ir::AssociatedConstIr;
 use crate::ir::AssociatedTypeIr;
 use crate::ir::DeclarationIr;
 use crate::ir::FieldIr;
+use crate::ir::FieldShapeIr;
 use crate::ir::GenericBoundIr;
 use crate::ir::GenericDefaultIr;
 use crate::ir::GenericKindIr;
@@ -150,6 +151,11 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
         Data::Struct(data) => TypeDeclarationIr {
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Struct,
+            field_shape: match data.fields {
+                Fields::Unit => FieldShapeIr::Unit,
+                Fields::Named(_) => FieldShapeIr::Named,
+                Fields::Unnamed(_) => FieldShapeIr::Unnamed,
+            },
             visibility,
             generics,
             attributes,
@@ -161,6 +167,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
         Data::Enum(data) => TypeDeclarationIr {
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Enum,
+            field_shape: FieldShapeIr::Unit,
             visibility,
             generics,
             attributes,
@@ -197,6 +204,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
         Data::Union(data) => TypeDeclarationIr {
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Union,
+            field_shape: FieldShapeIr::Named,
             visibility,
             generics,
             attributes,

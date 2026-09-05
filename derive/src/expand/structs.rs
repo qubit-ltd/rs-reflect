@@ -16,6 +16,7 @@ use quote::format_ident;
 use quote::quote;
 
 use crate::expand::ExpansionContext;
+use crate::ir::FieldShapeIr;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
@@ -255,20 +256,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         }
         }).collect()
     };
-    let struct_kind = match declaration.fields.len() {
-        0 => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Unit),
-        1 if declaration.fields[0].name.is_none() => {
-            quote!(#facade::__private::codegen_v2::descriptor::StructKind::Newtype)
-        }
-        _ if declaration
-            .fields
-            .first()
-            .is_some_and(|field| field.name.is_none()) =>
-        {
-            quote!(#facade::__private::codegen_v2::descriptor::StructKind::Tuple)
-        }
-        _ => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Named),
-    };
+    let struct_kind = kind_tokens(&declaration, &facade);
     let root_descriptor = if opaque_root {
         quote!(#facade::__private::codegen_v2::descriptor::with_capabilities(
             #facade::__private::codegen_v2::descriptor::opaque_root::<Self>(#query_name),
@@ -427,5 +415,17 @@ fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> To
             let path = syn::LitStr::new(&path.source, span);
             quote!(#facade::__private::codegen_v2::identity::Visibility::Restricted(#path.into()))
         }
+    }
+}
+
+/// Emits the runtime struct category shared by concrete and generic descriptors.
+pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+    match declaration.field_shape {
+        FieldShapeIr::Unit => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Unit),
+        FieldShapeIr::Named => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Named),
+        FieldShapeIr::Unnamed if declaration.fields.len() == 1 => {
+            quote!(#facade::__private::codegen_v2::descriptor::StructKind::Newtype)
+        }
+        FieldShapeIr::Unnamed => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Tuple),
     }
 }

@@ -718,3 +718,19 @@ fn test_definition_provider_v2_validates_target_and_identifier() {
         assert!(parse_invalid(MacroKind::Derive, TokenStream::new(), declaration).contains(expected), "expected diagnostic: {expected}");
     }
 }
+
+/// Empty fields must retain their source container before any code generation.
+#[test]
+fn test_empty_struct_ir_retains_source_field_shape() {
+    use crate::ir::FieldShapeIr;
+    for (input, expected) in [
+        (quote!(struct Unit;), FieldShapeIr::Unit),
+        (quote!(struct Named {}), FieldShapeIr::Named),
+        (quote!(struct Tuple();), FieldShapeIr::Unnamed),
+    ] {
+        let parsed = parse_valid(MacroKind::Derive, TokenStream::new(), input);
+        let DeclarationIr::Type(declaration) = parsed.declaration else { panic!("type declaration") };
+        assert_eq!(declaration.field_shape, expected);
+        assert!(declaration.fields.is_empty());
+    }
+}

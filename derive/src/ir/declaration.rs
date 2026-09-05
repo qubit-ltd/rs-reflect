@@ -57,6 +57,8 @@ pub(crate) struct TypeDeclarationIr {
     pub(crate) name: Ident,
     /// The Rust data-declaration form.
     pub(crate) kind: TypeDeclarationKindIr,
+    /// The source field container; enum variants retain their own shapes.
+    pub(crate) field_shape: FieldShapeIr,
     /// The normalized source visibility.
     pub(crate) visibility: VisibilityIr,
     /// Generic parameters and where predicates.
@@ -71,6 +73,17 @@ pub(crate) struct TypeDeclarationIr {
     pub(crate) retained_tokens: TokenStream,
     /// The declaration-name span used for diagnostics.
     pub(crate) span: Span,
+}
+
+/// Source syntax of a declaration's field container, including empty lists.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FieldShapeIr {
+    /// A unit declaration without braces or parentheses.
+    Unit,
+    /// Fields enclosed in braces.
+    Named,
+    /// Fields enclosed in parentheses.
+    Unnamed,
 }
 
 /// Distinguishes the three data declaration forms accepted by `syn`.
