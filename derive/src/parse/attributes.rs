@@ -118,6 +118,12 @@ fn convert_meta(
         return None;
     };
     let value = match name {
+        HelperName::DefinitionProviderV2 => {
+            match &meta {
+                Meta::NameValue(value) => syn::parse2(value.value.to_token_stream()).map(crate::ir::HelperValueIr::DefinitionProviderV2),
+                _ => Err(Error::new(span, "definition_provider_v2 requires one function identifier")),
+            }
+        }
         HelperName::Rename => {
             parse_string_value(&meta, "rename").map(crate::ir::HelperValueIr::Rename)
         }

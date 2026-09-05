@@ -27,6 +27,7 @@ use crate::registry::fragment::CapabilityTarget;
 /// Immutable lookup indexes built only after all fragments validate.
 #[derive(Debug)]
 pub(super) struct RegistryIndexes {
+    pub(super) impl_definition_traits: HashMap<FragmentIdentity, &'static TraitDefinitionDescriptor>,
     pub(super) types_by_id: HashMap<TypeId, &'static TypeDescriptor>,
     pub(super) type_fragments: HashMap<TypeId, FragmentIdentity>,
     pub(super) types_by_type_name: HashMap<&'static str, Box<[&'static TypeDescriptor]>>,

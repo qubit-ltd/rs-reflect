@@ -130,7 +130,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             ))
         } else {
             let generic = super::generics::concrete_descriptor(&declaration, &facade);
-            let definition = super::generics::type_definition_provider_name(&declaration.name);
+            let definition = super::generics::type_definition_provider_name(&declaration);
             quote!(#facade::__private::codegen_v2::descriptor::with_type_definition(
                 #facade::__private::codegen_v2::descriptor::with_concrete_generic(
                     #facade::__private::codegen_v2::descriptor::with_capabilities(
@@ -214,7 +214,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         })
     } else {
         let generic = super::generics::concrete_descriptor(&declaration, &facade);
-        let definition = super::generics::type_definition_provider_name(&declaration.name);
+        let definition = super::generics::type_definition_provider_name(&declaration);
         quote! {
             {
                 let representations = ::std::boxed::Box::leak(

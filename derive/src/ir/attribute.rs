@@ -35,6 +35,7 @@ pub(crate) enum HelperName {
     Supertrait,
     DynCompatible,
     RuntimeCrate,
+    DefinitionProviderV2,
 }
 
 impl HelperName {
@@ -57,6 +58,7 @@ impl HelperName {
             Self::Supertrait => "supertrait",
             Self::DynCompatible => "dyn_compatible",
             Self::RuntimeCrate => "crate",
+            Self::DefinitionProviderV2 => "definition_provider_v2",
         }
     }
 
@@ -142,6 +144,11 @@ const TRAIT: u16 = HelperTarget::Trait.bit();
 
 /// The single legality table used by both parsing diagnostics and validation.
 const HELPER_RULES: &[HelperRule] = &[
+    HelperRule {
+        name: HelperName::DefinitionProviderV2,
+        source_name: "definition_provider_v2",
+        targets: TargetSet::new(TYPE),
+    },
     HelperRule {
         name: HelperName::Rename,
         source_name: "rename",
@@ -252,6 +259,7 @@ pub(crate) enum HelperValueIr {
     ExternalTrait(ExternalTraitIr),
     DynCompatible(Vec<PathIr>),
     RuntimeCrate(PathIr),
+    DefinitionProviderV2(syn::Ident),
 }
 
 /// A named concrete specialization before type/const kind resolution.

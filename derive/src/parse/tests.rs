@@ -701,3 +701,20 @@ fn test_trait_and_impl_accept_explicit_runtime_facade() {
         1,
     );
 }
+
+/// The versioned provider hook accepts only one caller-owned identifier on a generic type.
+#[test]
+fn test_definition_provider_v2_validates_target_and_identifier() {
+    parse_valid(MacroKind::Derive, TokenStream::new(), quote! {
+        #[reflect(definition_provider_v2 = caller_provider)] struct Valid<T> { value: T }
+    });
+    for (declaration, expected) in [
+        (quote! { #[reflect(definition_provider_v2 = provider)] struct Plain; }, "requires a generic type"),
+        (quote! { #[reflect(definition_provider_v2)] struct Missing<T>(T); }, "requires one function identifier"),
+        (quote! { #[reflect(definition_provider_v2 = module::provider)] struct Path<T>(T); }, "unexpected token"),
+        (quote! { #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)] struct Duplicate<T>(T); }, "duplicate"),
+        (quote! { struct Field<T> { #[reflect(definition_provider_v2 = provider)] value: T } }, "not valid on a field"),
+    ] {
+        assert!(parse_invalid(MacroKind::Derive, TokenStream::new(), declaration).contains(expected), "expected diagnostic: {expected}");
+    }
+}

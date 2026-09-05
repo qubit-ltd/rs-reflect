@@ -64,6 +64,13 @@ pub(crate) fn validation_error(declaration: &DeclarationIr) -> Option<syn::Error
 /// Validates a struct, enum, or rejected union declaration.
 fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
     validate_attributes(&declaration.attributes, errors);
+    if declaration.generics.params.is_empty() {
+        for attribute in &declaration.attributes {
+            if attribute.name == HelperName::DefinitionProviderV2 {
+                errors.push(syn::Error::new(attribute.span, "definition_provider_v2 requires a generic type"));
+            }
+        }
+    }
     if declaration.kind == TypeDeclarationKindIr::Union {
         errors.push(syn::Error::new(
             declaration.span,

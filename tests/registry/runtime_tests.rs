@@ -671,3 +671,57 @@ fn test_registry_runtime_reuses_frozen_effective_views() {
     assert!(missing_first.implementations().is_empty());
     assert!(missing_first.methods().is_empty());
 }
+
+/// Reusing declaration facts must not let one snapshot resolve another's
+/// ambiguity.
+#[test]
+fn test_registry_trait_resolution_is_snapshot_local() {
+    let ambiguous = [
+        &AMBIGUOUS_IMPL_DEFINITION_FRAGMENT,
+        &SAME_TRAIT_FRAGMENT_A,
+        &SAME_TRAIT_FRAGMENT_B,
+    ];
+    assert_eq!(
+        build_registry(&ambiguous).expect_err("ambiguous traits").kind(),
+        RegistryErrorKind::ImplTraitResolution
+    );
+    let first =
+        build_registry(&[&AMBIGUOUS_IMPL_DEFINITION_FRAGMENT, &SAME_TRAIT_FRAGMENT_A]).expect("one matching trait");
+    assert_eq!(
+        build_registry(&ambiguous)
+            .expect_err("still ambiguous after another snapshot")
+            .kind(),
+        RegistryErrorKind::ImplTraitResolution
+    );
+    assert!(
+        AMBIGUOUS_IMPL_DEFINITION.implemented_trait().is_none(),
+        "declaration facts remain unresolved"
+    );
+    assert!(std::ptr::eq(
+        AMBIGUOUS_IMPL_DEFINITION
+            .implemented_trait_in(&first)
+            .expect("first link"),
+        &*SAME_TRAIT_A
+    ));
+    std::thread::scope(|scope| {
+        for _ in 0..8 {
+            scope.spawn(|| {
+                let second = build_registry(&[&AMBIGUOUS_IMPL_DEFINITION_FRAGMENT, &SAME_TRAIT_FRAGMENT_B])
+                    .expect("second snapshot");
+                assert!(std::ptr::eq(
+                    AMBIGUOUS_IMPL_DEFINITION
+                        .implemented_trait_in(&second)
+                        .expect("second link"),
+                    &*SAME_TRAIT_B
+                ));
+                assert!(build_registry(&ambiguous).is_err());
+            });
+        }
+    });
+    assert!(std::ptr::eq(
+        AMBIGUOUS_IMPL_DEFINITION
+            .implemented_trait_in(&first)
+            .expect("unchanged first link"),
+        &*SAME_TRAIT_A
+    ));
+}

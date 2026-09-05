@@ -479,6 +479,21 @@ impl ReflectRegistry {
             .unwrap_or(&self.empty_effective_view)
     }
 
+    /// Returns the trait linked to an impl definition in this snapshot.
+    ///
+    /// `None` means the definition is absent or describes an inherent impl.
+    /// Links belong to the snapshot and never mutate shared declaration facts.
+    #[must_use]
+    pub fn impl_definition_trait(
+        &self,
+        definition: &ImplDefinitionDescriptor,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
+        self.indexes
+            .impl_definition_traits
+            .get(definition.fragment_identity())
+            .copied()
+    }
+
     /// Finds a reflected or external trait declaration by its process-local
     /// identity.
     ///

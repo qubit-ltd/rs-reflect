@@ -50,6 +50,7 @@ struct RegistryBuilder {
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
     external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
+    impl_definition_traits: HashMap<FragmentIdentity, &'static TraitDefinitionDescriptor>,
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
     capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
@@ -218,9 +219,14 @@ impl RegistryBuilder {
 
     /// Resolves generic trait-impl definitions after every linked trait
     /// declaration has been validated.
-    fn resolve_impl_definition_traits(&self) -> Result<(), RegistryError> {
+    fn resolve_impl_definition_traits(&mut self) -> Result<(), RegistryError> {
         for definition in &self.impl_definitions {
-            if definition.kind() != ImplKind::Trait || definition.implemented_trait().is_some() {
+            if definition.kind() != ImplKind::Trait {
+                continue;
+            }
+            if let Some(declared) = definition.implemented_trait() {
+                self.impl_definition_traits
+                    .insert(definition.fragment_identity().clone(), declared);
                 continue;
             }
             if let Some(trait_id) = definition.implemented_trait_id() {
@@ -229,11 +235,8 @@ impl RegistryBuilder {
                         definition.fragment_identity().clone(),
                     ));
                 };
-                if !definition.resolve_implemented_trait(candidate) {
-                    return Err(RegistryError::impl_trait_resolution(
-                        definition.fragment_identity().clone(),
-                    ));
-                }
+                self.impl_definition_traits
+                    .insert(definition.fragment_identity().clone(), candidate);
                 continue;
             }
             let Some(path) = definition.implemented_trait_path() else {
@@ -275,11 +278,8 @@ impl RegistryBuilder {
                     ));
                 }
             };
-            if !definition.resolve_implemented_trait(candidate) {
-                return Err(RegistryError::impl_trait_resolution(
-                    definition.fragment_identity().clone(),
-                ));
-            }
+            self.impl_definition_traits
+                .insert(definition.fragment_identity().clone(), candidate);
         }
         Ok(())
     }
@@ -366,6 +366,7 @@ impl RegistryBuilder {
             })
             .collect();
         let indexes = RegistryIndexes {
+            impl_definition_traits: self.impl_definition_traits,
             types_by_id,
             type_fragments,
             types_by_type_name,
