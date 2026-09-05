@@ -74,3 +74,65 @@ jobs:
             coverage-reports/coverage.json \
             .rs-ci-critical-coverage.json \
             "$PWD"
+
+  downstream-contracts:
+    name: Real model and platform consumers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout reflection under review
+        uses: actions/checkout@v6
+        with:
+          path: rust-platform/rs-reflect
+          submodules: recursive
+      - name: Checkout rs-model-metadata
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-model-metadata
+          ref: main
+          path: rust-platform/rs-model-metadata
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-platform
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-platform
+          ref: main
+          path: rust-platform/rs-platform
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-id
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-id
+          ref: main
+          path: rust-common/rs-id
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-datatype
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-datatype
+          ref: main
+          path: rust-common/rs-datatype
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-redact
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-redact
+          ref: main
+          path: rust-common/rs-redact
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-validator
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-validator
+          ref: main
+          path: rust-common/rs-validator
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Install build toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal
+      - name: Validate real downstream contracts
+        run: rust-platform/rs-reflect/scripts/check-downstream.sh

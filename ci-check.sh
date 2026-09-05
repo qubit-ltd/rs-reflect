@@ -14,3 +14,5 @@ env RS_CI_PROJECT_ROOT="$PROJECT_ROOT" "$PROJECT_ROOT/.rs-ci/ci-check.sh" "$@"
     "$PROJECT_ROOT/target/llvm-cov/coverage.json" \
     "$PROJECT_ROOT/.rs-ci-critical-coverage.json" \
     "$PROJECT_ROOT"
+
+"$PROJECT_ROOT/scripts/check-downstream.sh"
