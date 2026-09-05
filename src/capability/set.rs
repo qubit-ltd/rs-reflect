@@ -73,7 +73,7 @@ impl CapabilityConflict {
 /// use qubit_reflect::{ReflectRegistry, TypeDescriptor};
 ///
 /// let registry = ReflectRegistry::initialize()?;
-/// let capabilities = registry.capabilities(TypeDescriptor::of::<u32>());
+/// let capabilities = registry.capabilities(TypeDescriptor::of::<u32>()).expect("valid capability declarations");
 /// assert!(capabilities.descriptors().windows(2).all(|pair| pair[0].id() < pair[1].id()));
 /// # Ok::<(), qubit_reflect::RegistryError>(())
 /// ```
@@ -177,3 +177,6 @@ pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
     static EMPTY: OnceLock<TypeCapabilities> = OnceLock::new();
     EMPTY.get_or_init(TypeCapabilities::default)
 }
+
+/// A lazily initialized capability set or its structural conflict.
+pub type TypeCapabilitiesResult = Result<&'static TypeCapabilities, CapabilityConflict>;

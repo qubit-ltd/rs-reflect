@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
 use crate::capability::TypeCapabilities;
@@ -347,49 +348,66 @@ impl ReflectRegistry {
 
     /// Returns the effective capabilities for one exact concrete descriptor.
     ///
-    /// Registered targets borrow the frozen merged set. An unregistered
-    /// generic monomorph borrows its generated intrinsic set.
-    #[must_use]
+    /// Registered targets borrow frozen facts without executing a provider.
+    /// Unregistered monomorphs may initialize their intrinsic capability set.
+    ///
+    /// # Errors
+    ///
+    /// Returns the complete conflict if intrinsic capability declarations use
+    /// the same ID more than once. Failure never changes this snapshot.
     pub fn capabilities<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
-    ) -> &'registry TypeCapabilities {
-        self.indexes
-            .capabilities_by_target
-            .get(&descriptor.type_id())
-            .unwrap_or_else(|| {
-                descriptor
-                    .declared_capabilities()
-                    .unwrap_or_else(|_| crate::capability::empty_capabilities())
-            })
+    ) -> Result<&'registry TypeCapabilities, CapabilityConflict> {
+        let type_id = descriptor.type_id();
+        if let Some(capabilities) = self.indexes.capabilities_by_target.get(&type_id) {
+            return Ok(capabilities);
+        }
+        if self.indexes.types_by_id.contains_key(&type_id) {
+            return Ok(&self.empty_capabilities);
+        }
+        descriptor.declared_capabilities()
     }
 
-    /// Retrieves one effective typed capability for a concrete descriptor.
-    #[must_use]
+    /// Retrieves an effective adapter matching the exact typed key.
+    ///
+    /// `Ok(None)` means no executable adapter matches the key. Intrinsic
+    /// declaration conflicts return `Err`, never an absent capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns an intrinsic conflict for an invalid unregistered descriptor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_reflect::{ReflectRegistry, TypeDescriptor};
+    /// use qubit_reflect::capability::clone_key;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let registry = ReflectRegistry::initialize()?;
+    /// let adapter = registry.capability(TypeDescriptor::of::<String>(), clone_key())?;
+    /// assert!(adapter.is_some());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn capability<'registry, A: 'static>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
         key: CapabilityKey<A>,
-    ) -> Option<&'registry A> {
-        self.indexes
-            .capabilities_by_target
-            .get(&descriptor.type_id())
-            .unwrap_or_else(|| {
-                descriptor
-                    .declared_capabilities()
-                    .unwrap_or_else(|_| crate::capability::empty_capabilities())
-            })
-            .get(key)
+    ) -> Result<Option<&'registry A>, CapabilityConflict> {
+        Ok(self.capabilities(descriptor)?.get(key))
     }
 
-    /// Finds one effective concrete capability by textual ID.
-    #[must_use]
+    /// Finds an effective concrete capability by textual ID.
+    ///
+    /// Returns `Ok(None)` for unmatched IDs, including invalid textual IDs,
+    /// and `Err` when the intrinsic capability set cannot be formed.
     pub fn capability_by_id<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
         id: &str,
-    ) -> Option<&'registry CapabilityDescriptor> {
-        self.capabilities(descriptor).descriptor(id)
+    ) -> Result<Option<&'registry CapabilityDescriptor>, CapabilityConflict> {
+        Ok(self.capabilities(descriptor)?.descriptor(id))
     }
 
     /// Returns the effective capabilities of one generic declaration.
@@ -422,10 +440,12 @@ impl ReflectRegistry {
         &self,
         key: CapabilityKey<A>,
     ) -> impl Iterator<Item = &'static TypeDescriptor> + '_ {
-        self.types
-            .iter()
-            .copied()
-            .filter(move |descriptor| self.capabilities(descriptor).contains(key))
+        self.types.iter().copied().filter(move |descriptor| {
+            self.indexes
+                .capabilities_by_target
+                .get(&descriptor.type_id())
+                .is_some_and(|capabilities| capabilities.contains(key))
+        })
     }
 
     /// Enumerates generic declarations carrying the exact typed capability.

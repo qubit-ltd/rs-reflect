@@ -7,5 +7,5 @@ error[E0599]: no method named `capabilities` found for reference `&TypeDescripto
 help: there is a method `with_capabilities` with a similar name, but with different arguments
  --> src/descriptor/type_descriptor.rs
   |
-  |     pub const fn with_capabilities(mut self, capabilities: fn() -> &'static TypeCapabilities) -> Self {
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     pub const fn with_capabilities(mut self, capabilities: fn() -> TypeCapabilitiesResult) -> Self {
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -118,3 +118,55 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     let recovered = recovery.into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
+
+/// Splitting a rejection preserves both its method identity and a retryable
+/// pin.
+#[test]
+fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
+    let mut value = 41_u8;
+    let invocation = PinnedRefInvocation::<u8, Local>::new(
+        Pin::new(&value),
+        [InvocationArg::Owned(DynamicOwned::<Local>::new(43_u16))],
+    );
+    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()]) else {
+        panic!("wrong argument type must fail");
+    };
+    assert_eq!(failure.error().method_identity(), &method_identity());
+    let (error, recovery) = failure.into_parts();
+    assert_eq!(error.method_identity(), &method_identity());
+    let Ok(validated) = recovery
+        .into_invocation()
+        .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
+    else {
+        panic!("retry with the original argument contract must succeed");
+    };
+    let (receiver, arguments) = validated.into_parts();
+    assert!(std::ptr::eq(receiver.get_ref(), &value));
+    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+        panic!("owned input")
+    };
+    assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 43);
+
+    let invocation = PinnedMutInvocation::<u8, Local>::new(
+        Pin::new(&mut value),
+        [InvocationArg::Owned(DynamicOwned::<Local>::new(47_u16))],
+    );
+    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()]) else {
+        panic!("wrong mutable argument type must fail");
+    };
+    let (error, recovery) = failure.into_parts();
+    assert_eq!(error.method_identity(), &method_identity());
+    let Ok(validated) = recovery
+        .into_invocation()
+        .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
+    else {
+        panic!("mutable retry must retain the original pin");
+    };
+    let (mut receiver, arguments) = validated.into_parts();
+    *receiver.as_mut().get_mut() = 53;
+    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+        panic!("owned input")
+    };
+    assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 47);
+    assert_eq!(value, 53);
+}

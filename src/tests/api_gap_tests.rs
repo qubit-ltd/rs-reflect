@@ -437,3 +437,29 @@ fn test_registry_query_views_preserve_empty_and_exact_lookup_contracts() {
     assert!(traits.only().is_none());
     assert_eq!(traits.into_iter().count(), 0);
 }
+
+#[test]
+fn test_missing_receiver_and_owned_unit_keep_distinct_validation_facts() {
+    use crate::invoke::Invocation;
+    use crate::invoke::InvocationReceiver;
+    use crate::invoke::ReceiverExpectation;
+
+    let absent = ReceiverExpectation::none();
+    let unit = ReceiverExpectation::owned::<()>();
+    assert_eq!(absent.type_id(), None);
+    assert_eq!(absent.type_name(), None);
+    assert_eq!(unit.type_id(), Some(TypeId::of::<()>()));
+    assert_eq!(unit.type_name(), Some(std::any::type_name::<()>()));
+
+    let identity = MemberId::new("Unit", "run", 0, fragment(91));
+    let invocation = Invocation::<Local>::associated([]);
+    let failure = match invocation.validate(&identity, unit, &[]) {
+        Ok(_) => panic!("an absent receiver cannot satisfy an owned unit receiver"),
+        Err(failure) => failure,
+    };
+    assert_eq!(failure.error().method_identity(), &identity);
+    let recovered = failure.into_recovery().into_invocation();
+    assert!(recovered.validate(&identity, absent, &[]).is_ok());
+    let invocation = Invocation::<Local>::new(Some(InvocationReceiver::Owned(ReflectedOwned::new(()))), []);
+    assert!(invocation.validate(&identity, unit, &[]).is_ok());
+}

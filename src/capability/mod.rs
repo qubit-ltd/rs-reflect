@@ -29,6 +29,5 @@ pub use key::CapabilityKey;
 pub use set::CapabilityConflict;
 pub use set::CapabilityConflictKind;
 pub use set::TypeCapabilities;
-/// A lazily initialized capability set or its structural conflict.
-pub type TypeCapabilitiesResult = Result<&'static TypeCapabilities, CapabilityConflict>;
+pub use set::TypeCapabilitiesResult;
 pub(crate) use set::empty_capabilities;

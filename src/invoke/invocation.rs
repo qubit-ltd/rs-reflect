@@ -516,6 +516,41 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
         &self.arguments
     }
 
+    /// Resolves an explicit receiver adapter from the global registry.
+    ///
+    /// Registry and intrinsic capability conflicts are returned with every
+    /// input intact, including caller-order named bindings. A valid absent
+    /// adapter is reported separately by [`Self::adapt_receiver`].
+    pub fn adapt_registered_receiver<R: 'static>(
+        self,
+        method_identity: &MemberId,
+        descriptor: &crate::descriptor::TypeDescriptor,
+    ) -> ReceiverAdaptationResult<'call, R, M>
+    where
+        M: 'static,
+    {
+        let registry = match crate::registry::ReflectRegistry::initialize() {
+            Ok(registry) => registry,
+            Err(error) => return Err(self.reject(method_identity, InvocationErrorKind::RegistryInitialization(error))),
+        };
+        let adapter = match registry.capability(descriptor, crate::invoke::receiver_adapter_key::<R, M>()) {
+            Ok(adapter) => adapter,
+            Err(error) => return Err(self.reject(method_identity, InvocationErrorKind::CapabilityResolution(error))),
+        };
+        self.adapt_receiver(method_identity, adapter)
+    }
+
+    /// Rejects validated input while restoring the caller's original bindings.
+    fn reject(self, method_identity: &MemberId, kind: InvocationErrorKind) -> InvocationFailure<'call, M> {
+        Invocation {
+            receiver: self.receiver,
+            arguments: self.arguments,
+            argument_names: self.argument_names,
+            binding_recovery: self.binding_recovery,
+        }
+        .reject(method_identity, kind)
+    }
+
     /// Applies an optional explicit-receiver capability without losing the
     /// invocation recovery retained during descriptor-aware argument binding.
     ///
