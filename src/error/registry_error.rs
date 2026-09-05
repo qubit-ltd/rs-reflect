@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use crate::identity::CapabilityId;
 use crate::identity::FragmentIdentity;
 
 /// The machine-readable class of a registry aggregation error.
@@ -40,6 +41,7 @@ struct RegistryErrorData {
     kind: RegistryErrorKind,
     left: Option<FragmentIdentity>,
     right: Option<FragmentIdentity>,
+    capability_id: Option<CapabilityId>,
 }
 
 impl RegistryError {
@@ -69,6 +71,17 @@ impl RegistryError {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
 
+    /// Creates an error for an invalid intrinsic capability declaration.
+    #[must_use]
+    pub fn intrinsic_capability_conflict(fragment: FragmentIdentity, capability_id: CapabilityId) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::CapabilityConflict,
+            left: Some(fragment),
+            right: None,
+            capability_id: Some(capability_id),
+        }))
+    }
+
     /// Creates an error when a symbolic generic trait impl cannot resolve one
     /// unique linked trait declaration.
     #[must_use]
@@ -77,6 +90,7 @@ impl RegistryError {
             kind: RegistryErrorKind::ImplTraitResolution,
             left: Some(fragment),
             right: None,
+            capability_id: None,
         }))
     }
 
@@ -88,6 +102,7 @@ impl RegistryError {
             kind: RegistryErrorKind::UnsupportedPlatform,
             left: None,
             right: None,
+            capability_id: None,
         }))
     }
 
@@ -123,6 +138,14 @@ impl RegistryError {
         }
     }
 
+    /// Returns the capability ID involved in an intrinsic capability conflict.
+    #[must_use]
+    #[inline(always)]
+    pub fn capability_id(&self) -> Option<CapabilityId> {
+        let Self(data) = self;
+        data.capability_id
+    }
+
     /// Creates a conflict error retaining both conflicting registration
     /// fragments.
     fn conflict(kind: RegistryErrorKind, left: FragmentIdentity, right: FragmentIdentity) -> Self {
@@ -130,6 +153,7 @@ impl RegistryError {
             kind,
             left: Some(left),
             right: Some(right),
+            capability_id: None,
         }))
     }
 }

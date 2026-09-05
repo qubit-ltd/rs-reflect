@@ -10,7 +10,6 @@
 
 use crate::__private::codegen_v2::expression as codegen_expression;
 use crate::__private::descriptor;
-use crate::capability::TypeCapabilities;
 use crate::descriptor::EnumRepr;
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::MapKind;
@@ -44,8 +43,8 @@ fn build_interned_fixture() -> TypeDescriptor {
 }
 
 /// Returns the empty capability set for capability-bearing factory fixtures.
-fn empty_capabilities() -> &'static TypeCapabilities {
-    crate::capability::empty_capabilities()
+fn empty_capabilities() -> crate::capability::TypeCapabilitiesResult {
+    Ok(crate::capability::empty_capabilities())
 }
 
 /// Resolves the built-in debug trait object declaration for a trait-object
@@ -240,7 +239,13 @@ fn test_descriptor_factories_preserve_typed_categories() {
     assert!(format!("{:?}", trait_object.as_trait_object().expect("trait object")).contains("Debug"));
     assert!(opaque.as_opaque().is_some());
     assert!(opaque_caps.as_opaque().is_some());
-    assert!(attached_caps.declared_capabilities().descriptors().is_empty());
+    assert!(
+        attached_caps
+            .declared_capabilities()
+            .expect("empty capability factory must succeed")
+            .descriptors()
+            .is_empty()
+    );
 
     let opaque_member = descriptor::opaque_member::<u16>();
     assert_eq!(opaque_member.type_name(), std::any::type_name::<u16>());

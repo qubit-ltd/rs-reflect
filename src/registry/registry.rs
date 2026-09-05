@@ -357,7 +357,11 @@ impl ReflectRegistry {
         self.indexes
             .capabilities_by_target
             .get(&descriptor.type_id())
-            .unwrap_or_else(|| descriptor.declared_capabilities())
+            .unwrap_or_else(|| {
+                descriptor
+                    .declared_capabilities()
+                    .unwrap_or_else(|_| crate::capability::empty_capabilities())
+            })
     }
 
     /// Retrieves one effective typed capability for a concrete descriptor.
@@ -370,7 +374,11 @@ impl ReflectRegistry {
         self.indexes
             .capabilities_by_target
             .get(&descriptor.type_id())
-            .unwrap_or_else(|| descriptor.declared_capabilities())
+            .unwrap_or_else(|| {
+                descriptor
+                    .declared_capabilities()
+                    .unwrap_or_else(|_| crate::capability::empty_capabilities())
+            })
             .get(key)
     }
 

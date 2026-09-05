@@ -125,30 +125,6 @@ impl ImplAssociatedConstDescriptor {
 }
 
 impl ImplDefinitionDescriptor {
-    /// Returns whether complete declaration facts identify the same trait.
-    pub(crate) fn matches_trait_definition(&self, candidate: &TraitDefinitionDescriptor) -> bool {
-        if candidate.completeness() != crate::descriptor::TraitCompleteness::Complete {
-            return false;
-        }
-        let has_facts =
-            !self.methods().is_empty() || !self.associated_types().is_empty() || !self.associated_consts().is_empty();
-        has_facts
-            && MethodDescriptor::signatures_match(self.methods(), candidate.methods())
-            && self
-                .associated_types()
-                .iter()
-                .map(|item| item.rust_name())
-                .eq(candidate.associated_types().iter().map(|item| item.rust_name()))
-            && self
-                .associated_consts()
-                .iter()
-                .map(|item| (item.rust_name(), item.declared_type()))
-                .eq(candidate
-                    .associated_consts()
-                    .iter()
-                    .map(|item| (item.rust_name(), item.declared_type())))
-    }
-
     /// Creates an impl definition without claiming a concrete target instance.
     ///
     /// Returns [`ImplDescriptorBuildError`] when `kind` and

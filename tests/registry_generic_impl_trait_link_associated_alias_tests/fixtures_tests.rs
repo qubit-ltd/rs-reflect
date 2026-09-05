@@ -44,7 +44,7 @@ use AssociatedAliasTrait as AssociatedAlias;
 
 struct AssociatedTarget<T>(PhantomData<T>);
 
-#[reflect_impl]
+#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_AssociatedAliasTrait)]
 impl<T> AssociatedAlias for AssociatedTarget<T> {
     type Output = usize;
 
@@ -63,7 +63,11 @@ fn test_generic_impl_definition_resolves_associated_item_alias() {
     let definition = registry
         .impl_definitions()
         .iter()
-        .find(|definition| definition.implemented_trait_path() == Some("AssociatedAlias"))
+        .find(|definition| {
+            definition
+                .implemented_trait_in(registry)
+                .is_some_and(|trait_definition| trait_definition.rust_name() == "AssociatedAliasTrait")
+        })
         .expect("the generic impl definition must be registered");
     assert_eq!(
         definition

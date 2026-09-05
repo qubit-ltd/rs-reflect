@@ -62,15 +62,15 @@ struct DerivedCapabilities;
 struct DerivedExtensionRegistration;
 
 /// Builds the test root's capability set once for its static descriptor.
-fn reflected_root_capabilities() -> &'static TypeCapabilities {
+fn reflected_root_capabilities() -> reflect::capability::TypeCapabilitiesResult {
     static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
-    CAPABILITIES.get_or_init(|| {
+    Ok(CAPABILITIES.get_or_init(|| {
         TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(
             extension_key(),
             ExtensionAdapter("descriptor"),
         )])
         .expect("the test extension capability must be valid")
-    })
+    }))
 }
 
 static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =

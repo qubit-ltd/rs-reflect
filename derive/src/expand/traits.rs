@@ -454,6 +454,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         declaration.span,
     );
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
+    let definition_provider = format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
     let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
     let generic_factory = Ident::new(
         &format!("__qubit_reflect_trait_generics_{suffix}"),
@@ -786,6 +787,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         #trait_item
 
         #dyn_reflect_impl
+
+        #[doc(hidden)]
+        #[allow(non_snake_case)]
+        pub fn #definition_provider() -> &'static #facade::__private::codegen_v2::descriptor::TraitDefinitionDescriptor {
+            #support::#definition_factory()
+        }
 
         #[doc(hidden)]
         const #rust_path: &str = concat!(module_path!(), "::", #trait_name_literal);

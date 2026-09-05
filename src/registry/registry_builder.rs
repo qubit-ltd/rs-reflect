@@ -138,7 +138,10 @@ impl RegistryBuilder {
         if !self.loaded_intrinsic_capabilities.insert(descriptor.type_id()) {
             return Ok(());
         }
-        for capability in descriptor.declared_capabilities().descriptors() {
+        let capabilities = descriptor
+            .declared_capabilities()
+            .map_err(|error| RegistryError::intrinsic_capability_conflict(identity.clone(), *error.id()))?;
+        for capability in capabilities.descriptors() {
             self.push_capability(
                 CapabilityTarget::Type(descriptor.type_id()),
                 capability.clone(),
@@ -239,47 +242,9 @@ impl RegistryBuilder {
                     .insert(definition.fragment_identity().clone(), candidate);
                 continue;
             }
-            let Some(path) = definition.implemented_trait_path() else {
-                return Err(RegistryError::impl_trait_resolution(
-                    definition.fragment_identity().clone(),
-                ));
-            };
-            let candidates: Vec<_> = self
-                .traits_by_id
-                .values()
-                .copied()
-                .filter(|descriptor| {
-                    matches!(descriptor.trait_id(), TraitId::Reflected(_))
-                        && reflected_trait_path_matches(path, descriptor.rust_path())
-                })
-                .collect();
-            let candidate = match candidates.as_slice() {
-                [candidate] => *candidate,
-                [] => {
-                    let compatible: Vec<_> = self
-                        .traits_by_id
-                        .values()
-                        .copied()
-                        .filter(|descriptor| {
-                            matches!(descriptor.trait_id(), TraitId::Reflected(_))
-                                && definition.matches_trait_definition(descriptor)
-                        })
-                        .collect();
-                    let [candidate] = compatible.as_slice() else {
-                        return Err(RegistryError::impl_trait_resolution(
-                            definition.fragment_identity().clone(),
-                        ));
-                    };
-                    *candidate
-                }
-                _ => {
-                    return Err(RegistryError::impl_trait_resolution(
-                        definition.fragment_identity().clone(),
-                    ));
-                }
-            };
-            self.impl_definition_traits
-                .insert(definition.fragment_identity().clone(), candidate);
+            return Err(RegistryError::impl_trait_resolution(
+                definition.fragment_identity().clone(),
+            ));
         }
         Ok(())
     }
@@ -408,23 +373,6 @@ fn group_definitions(
         .into_iter()
         .map(|(key, descriptors)| (key, descriptors.into_boxed_slice()))
         .collect()
-}
-
-/// Returns whether a source trait path uniquely denotes a registered reflected
-/// declaration after removing Rust-relative path anchors.
-fn reflected_trait_path_matches(source_path: &str, registered_path: &str) -> bool {
-    let mut relative_path = source_path;
-    while let Some(stripped) = relative_path
-        .strip_prefix("crate::")
-        .or_else(|| relative_path.strip_prefix("self::"))
-        .or_else(|| relative_path.strip_prefix("super::"))
-    {
-        relative_path = stripped;
-    }
-    registered_path == relative_path
-        || registered_path
-            .strip_suffix(relative_path)
-            .is_some_and(|prefix| prefix.ends_with("::"))
 }
 
 /// Builds a registry from all linker-discovered fragments.

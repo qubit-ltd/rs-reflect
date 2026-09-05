@@ -147,7 +147,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::DefinitionProviderV2,
         source_name: "definition_provider_v2",
-        targets: TargetSet::new(TYPE),
+        targets: TargetSet::new(TYPE | IMPL),
     },
     HelperRule {
         name: HelperName::Rename,

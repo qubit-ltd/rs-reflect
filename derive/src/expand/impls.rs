@@ -164,6 +164,10 @@ fn expand_generic_impl_definition(
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
         });
+    let reflected_provider = declaration.attributes.iter().find_map(|attribute| match &attribute.value {
+        HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
+        _ => None,
+    });
     let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
         let path = trait_path
             .segments
@@ -177,8 +181,26 @@ fn expand_generic_impl_definition(
                 #facade::__private::codegen_v2::identity::ExternalTraitId::new(#id)
                     .expect("validated external trait ID"),
             ))),
-            None => quote!(None),
+            None => reflected_provider.map_or_else(
+                || quote!(None),
+                |provider| quote!(Some(#provider().trait_id().clone())),
+            ),
         };
+        let trait_definition = reflected_provider.map_or_else(
+            || quote!(None),
+            |provider| quote!(Some(#provider())),
+        );
+        if external_id.is_none() && reflected_provider.is_some() {
+            quote! {
+                #facade::__private::codegen_v2::descriptor::ImplDefinitionDescriptor::new(
+                    fragment_identity(),
+                    #target,
+                    #facade::__private::codegen_v2::descriptor::ImplKind::Trait,
+                    #trait_definition,
+                    ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
+                ).expect("generated generic reflected impl definition is consistent")
+            }
+        } else {
         quote! {
             #facade::__private::codegen_v2::descriptor::ImplDefinitionDescriptor::new_unresolved_trait(
                 fragment_identity(),
@@ -187,6 +209,7 @@ fn expand_generic_impl_definition(
                 #trait_id,
                 ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
             )
+        }
         }
     } else {
         quote! {
