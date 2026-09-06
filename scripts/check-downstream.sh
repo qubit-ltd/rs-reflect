@@ -14,6 +14,7 @@ record_evidence() {
 
     {
         printf 'overall_exit_code=%s\n' "$overall_status"
+        printf 'features=default\n'
         printf 'platform=%s\n' "$(uname -a 2>/dev/null || printf unavailable)"
         rustc -Vv 2>&1 || true
         if [[ -n "${RS_CI_BUILD_TOOLCHAIN:-}" ]]; then
