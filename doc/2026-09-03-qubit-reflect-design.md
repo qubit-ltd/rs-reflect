@@ -89,6 +89,7 @@ src/
 │   └── codegen_v2/             # sole generated-code protocol
 ├── registry/
 │   ├── registry_builder.rs     # conflict checks and pre-freeze aggregation
+│   ├── registry_snapshot_builder.rs      # explicit isolated snapshot construction
 │   ├── registry.rs             # immutable queries
 │   └── effective_type_view.rs  # resolved impl and method view
 └── value/                      # local and thread-safe dynamic modes
@@ -106,6 +107,16 @@ forms: `methods()` initializes the process-wide snapshot, while `methods_in`,
 `impls_in`, and `methods_named_in` use the caller-supplied immutable registry.
 This keeps isolated snapshot queries independent from an unrelated cached
 global initialization failure.
+
+`RegistrySnapshotBuilder` is the public construction path for an explicitly
+owned fragment set. It begins with no linker inventory, records typed payloads
+and their `FragmentIdentity` values, and validates the complete set
+transactionally in `build()`. Type membership, definition membership, and
+capability payloads are independent: a capability-only target is queryable but
+is not added to the snapshot's root enumeration. A failed build returns the
+complete `RegistryError` without publishing a partial snapshot. The same
+immutable query/index path is used after freezing, so `methods_in`,
+`impls_in`, effective views, and capability queries all remain snapshot-local.
 
 ## 4. Derive pipeline
 
@@ -172,6 +183,12 @@ or re-export whole runtime modules merely to satisfy macro expansion.
 `qubit-model-metadata` separately owns its `__private::v4` model-metadata ABI. It consumes the reflection protocol only
 inside that exact private module, keeping ownership, versioning, and migration reasons orthogonal.
 
+The explicit snapshot builder is a runtime API and does not widen either
+generated-code protocol. Existing derives and facades continue to use
+`__private::codegen_v2`; downstream model code continues to use its independent
+v4 ABI. This lets a downstream fixture or library assemble a deterministic
+subset of facts without coupling protocol migration to registry ownership.
+
 ## Generic definitions and effective capabilities
 
 Generic declarations are first-class `TypeDefinitionDescriptor` values. They
@@ -191,6 +208,14 @@ return `Result` and preserve complete conflicts. Registration exposes the same c
 providers. The cache retains successes and conflicts per concrete TypeId; factories run outside
 the cache-map lock. Providers must be snapshot-independent and must not re-enter initialization;
 the contract does not catch provider panics.
+
+The same provider boundary applies to `RegistrySnapshotBuilder` consumers:
+providers may depend on static type facts only. They must not consult a
+snapshot, mutable external state, or registry initialization, and a provider
+panic is not converted to absence. Detailed capability failures retain the
+conflict kind, ID, adapter `TypeId`s, target, and source fragments through
+`RegistryError`, including the original conflict as its error source where a
+downstream layer wraps it.
 
 Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
 definitions, and construction expansion. Empty field counts no longer determine source shape.
@@ -258,5 +283,5 @@ requirement IDs mapped one-to-one and validates every referenced code and test p
 - Type-dependent capabilities are cached by concrete `TypeId`. Factories execute outside the cache map lock. Regressions execute adapters for multiple struct/enum monomorphs and custom model providers, including concurrent calls.
 - `ImplDefinitionDescriptor::implemented_trait()` exposes only declaration-known links. Resolve symbolic links through `implemented_trait_in(&registry)` or `ReflectRegistry::impl_definition_trait`. Links belong to snapshot indexes; failed builds and other snapshots never mutate shared declarations.
 - Facade macros select an owned provider name with `#[reflect(definition_provider_v2 = identifier)]`. The v2 contract is a parameterless function returning `&'static TypeDefinitionDescriptor`, available without a concrete monomorph. Consumers must not infer reflect's default generated names.
-- `scripts/check-downstream.sh` validates the real model metadata workspace (including its `derive/` member) and platform repository. Local `ci-check.sh` and a dedicated GitHub Actions job both run this gate. Missing sibling checkouts are errors. Remote dependency checkouts use `main`; private repositories may use `DEPENDENCY_TOKEN`.
+- `scripts/check-downstream.sh` validates the real model metadata workspace (including its `derive/` member) and platform repository. Local `ci-check.sh` and a dedicated GitHub Actions job both run this gate. Missing sibling checkouts are errors. The baseline channel checks the exact SHA recorded in the manifest; the head channel checks each dependency's `main` revision. Private repositories may use `DEPENDENCY_TOKEN`.
 - First descriptor initialization is sampled in fresh child processes, excluding process startup. Warm lookup and 1/4/8-thread lookup are measured separately. The platform benchmark measures projection and relationship validation over the actual linked models, including allocation request counts and requested bytes.

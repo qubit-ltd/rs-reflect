@@ -2,7 +2,7 @@
 
 本矩阵逐项对应最终需求规范中的全部 284 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个真实实现文件和至少一个真实测试文件；所有路径均按 2026-09-01 完成破坏性边界重构后的仓库结构核验。
 
-表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v2`，registry 构建器位于 `src/registry/registry_builder.rs`。
+表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v2`，唯一的 registry resolver 是 `ReflectRegistry`；公共 `RegistrySnapshotBuilder` 为明确拥有的 fragment 提供隔离且事务性的构建入口。
 
 ## 验证方法
 
@@ -81,15 +81,15 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-AGG-002 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-003 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-004 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-005 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-006 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-007 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
+| REQ-AGG-005 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/registry_snapshot_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs`、`tests/public_snapshot_builder_tests.rs` |
+| REQ-AGG-006 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/registry_snapshot_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs`、`tests/public_snapshot_builder_tests.rs` |
+| REQ-AGG-007 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/registry_snapshot_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs`、`tests/public_snapshot_builder_tests.rs` |
 | REQ-AGG-008 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-009 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-010 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-011 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-012 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-013 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
+| REQ-AGG-013 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/registry_snapshot_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs`、`tests/public_snapshot_builder_tests.rs` |
 | REQ-AGG-014 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-015 | T12、T17、T20、T21、T26 | `src/registry/registry_builder.rs`、`src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`、`tests/registry/cross_crate_tests.rs` |
 | REQ-CON-001 | T10、T15、T19、T22 | `src/construct/validated.rs`、`derive/src/expand/construction.rs` | `tests/construct/runtime_tests.rs`、`tests/construct/adapter_tests.rs` |

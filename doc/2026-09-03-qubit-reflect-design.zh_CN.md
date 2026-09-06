@@ -84,6 +84,7 @@ src/
 │   └── codegen_v2/             # 唯一生成协议入口
 ├── registry/
 │   ├── registry_builder.rs     # 冲突检查与冻结前聚合
+│   ├── registry_snapshot_builder.rs      # 显式构建隔离 snapshot
 │   ├── registry.rs             # 只读查询
 │   └── effective_type_view.rs  # 已解析的 impl/method 视图
 └── value/                      # local/thread-safe 动态值模式
@@ -99,6 +100,13 @@ registry 先收集全部 fragment，再检查重复 identity、类型/trait/impl
 聚合导航同时提供便捷入口与显式 snapshot 入口：`methods()` 会初始化进程全局 snapshot，
 `methods_in`、`impls_in`、`methods_named_in` 则只查询调用方传入的不可变 registry。
 因此，一个隔离 snapshot 的查询不会被无关的全局初始化缓存错误污染。
+
+`RegistrySnapshotBuilder` 是为明确拥有 fragment 集合的调用方提供的公共构建入口。它不读取
+linker inventory，从空集合开始收集带 `FragmentIdentity` 的类型化 payload，并在 `build()` 中
+事务性校验完整集合。类型成员、定义成员和 capability payload 相互独立：只有 capability 的目标
+可以被查询，但不会进入 snapshot 的根成员枚举。构建失败时返回完整的 `RegistryError`，不会发布
+部分 snapshot。冻结后仍使用同一套不可变查询和索引路径，因此 `methods_in`、`impls_in`、有效类型视图
+及 capability 查询都保持在当前 snapshot 内。
 
 ## 4. derive 流水线
 
@@ -158,6 +166,10 @@ runtime 的完整模块。
 `qubit-model-metadata` 另外维护自己的 `__private::v4` 模型元数据 ABI，并只在该精确私有模块中消费
 反射协议，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
 
+显式 snapshot builder 属于 runtime 公共 API，不会扩大任一生成代码协议。现有 derive 和 facade 继续使用
+`__private::codegen_v2`，下游模型代码继续使用独立的 v4 ABI。因此，下游 fixture 或库可以构建确定性的
+事实子集，而不必把协议迁移与 registry 所有权绑定在一起。
+
 ## 泛型定义与 effective capability
 
 泛型声明是一等 `TypeDefinitionDescriptor`：定义字段只保存符号表达式，不包含运行时适配器；具体
@@ -172,6 +184,11 @@ effective capability 解析入口，并支持无需分配 capability identity �
 注册阶段通过 `RegistryError::intrinsic_conflict` 暴露相同原因。冻结枚举直接查询 index，
 不执行 provider。缓存继续按具体 TypeId 保存成功或冲突，factory 在缓存表锁外执行；
 provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 不在本契约捕获范围。
+
+这一 provider 边界同样适用于 `RegistrySnapshotBuilder` 的调用方：provider 只能依赖静态类型事实，不能
+查询 snapshot、可变外部状态或 registry 初始化；provider panic 不会被转换成能力缺失。详细 capability
+失败会通过 `RegistryError` 保留冲突类别、ID、adapter `TypeId`、target 和来源 fragment；下游包装时，
+原始冲突也会作为错误 source 暴露。
 
 derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
 空字段数量不再决定结构形状。此内部修订不改变 `codegen_v2` 或模型 v4 协议。
@@ -234,5 +251,5 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 - 类型相关 capability 按具体 `TypeId` 缓存；生成 factory 不在缓存表锁内执行。泛型 struct、enum 和自定义模型 provider 均覆盖多个实际类型及并发调用。
 - `ImplDefinitionDescriptor::implemented_trait()` 只返回声明时已知的链接；未解析声明使用 `implemented_trait_in(&registry)` 或 `ReflectRegistry::impl_definition_trait` 查询。解析结果保存在快照索引中，构建失败或另一个快照不会修改共享声明。
 - 下游泛型宏使用 `#[reflect(definition_provider_v2 = identifier)]` 选择自己拥有的访问函数名。v2 契约为无参数函数，返回 `&'static TypeDefinitionDescriptor`；不要求具体单态化，也不依赖反射宏默认生成名称。
-- `scripts/check-downstream.sh` 验证真实 `rs-model-metadata` workspace（包含 `derive/` 子项目）与 `rs-platform`。本地 `ci-check.sh` 和独立 GitHub Actions job 均执行该门禁；缺少相邻仓库会显式失败。远端依赖使用各仓库 `main`，私有依赖可配置 `DEPENDENCY_TOKEN`。
+- `scripts/check-downstream.sh` 验证真实 `rs-model-metadata` workspace（包含 `derive/` 子项目）与 `rs-platform`。本地 `ci-check.sh` 和独立 GitHub Actions job 均执行该门禁；缺少相邻仓库会显式失败。baseline 通道使用清单记录的精确 SHA，head 通道使用各依赖仓库的 `main` 修订；私有依赖可配置 `DEPENDENCY_TOKEN`。
 - descriptor 首次初始化由全新子进程测量，报告的时间不含进程启动；热路径和 1/4/8 线程查询单独测量。平台 benchmark 使用实际链接的模型，报告投影、关系校验耗时与分配请求数量/字节数。

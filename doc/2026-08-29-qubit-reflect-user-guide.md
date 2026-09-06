@@ -292,6 +292,76 @@ arbitrary-self receiver forms require an exact `ReceiverAdapter` registered by
 `register_type_capabilities!`; otherwise the method remains discoverable but
 reports a stable unavailable reason.
 
+### Build an isolated registry snapshot
+
+`ReflectRegistry::initialize()` is the process-global inventory entry point.
+Use `RegistrySnapshotBuilder` when a library, fixture, or test owns an explicit
+set of fragments and must keep it independent from linked inventory and global
+initialization state. The builder starts empty, does not execute providers while
+facts are being added, and freezes one immutable `ReflectRegistry` only when
+`build()` succeeds.
+
+```rust
+use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::TypeDescriptor;
+
+fn source(kind: &str, line: u32) -> FragmentIdentity {
+    FragmentIdentity::new("example", "fixture", line, 1, kind, u64::from(line))
+}
+
+fn main() -> Result<(), qubit_reflect::RegistryError> {
+    let target = TypeDescriptor::of::<u32>();
+    let key = CapabilityKey::<u32>::new(
+        CapabilityId::new("example.limit").expect("valid capability ID"),
+    );
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder
+        .add_type(target, source("type", 10))
+        .add_type_capabilities(
+            target,
+            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+            source("capability", 11),
+        );
+    let snapshot = builder.build()?;
+
+    assert!(snapshot.get(target.type_id()).is_some());
+    assert_eq!(
+        snapshot
+            .capability(target, key)
+            .expect("valid capability declarations"),
+        Some(&7),
+    );
+    assert!(target.methods_in(&snapshot).is_empty());
+    Ok(())
+}
+```
+
+The membership and capability payloads are separate. An empty builder yields a
+snapshot with no registered roots. Calling only `add_type_capabilities` creates
+a capability-only snapshot: `types()` remains empty, while `capability()` and
+`capability_by_id()` can still resolve the target. The other typed inputs are
+`add_definition`, `add_trait`, `add_impl_definition`, `add_impl`, and
+`add_definition_capabilities`.
+
+Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
+`methods_named_in` when a property or method query must use that exact set of
+facts. `build()` validates all identities, links, and capability conflicts as
+one transaction. It returns a `RegistryError` without publishing partial
+state; provide stable `FragmentIdentity` values so duplicate or changed source
+identities are diagnosable. For a conflict, inspect
+`conflicting_fragments()`, `capability_details()`, `capability_target()`, and
+`capability_id()`. Intrinsic provider failures remain available through
+`intrinsic_conflict()` and `Error::source()`.
+
+This API does not change the generated-code protocols. Existing facades keep
+exposing `__private::codegen_v2`, and `qubit-model-metadata` keeps its separate
+model ABI v4. Intrinsic capability providers must use static type facts only;
+they must not depend on a snapshot or re-enter registry initialization. The
+provider runs outside the capability cache lock, and its panic is not converted
+into absence or `CapabilityConflict`.
+
 ### Migrating effective capability queries
 
 The existing query names now return `Result`; no error-swallowing compatibility entry remains.

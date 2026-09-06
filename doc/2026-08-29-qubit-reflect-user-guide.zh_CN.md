@@ -205,6 +205,68 @@ fn main() {
 
 `Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
 
+### 构建隔离的 registry snapshot
+
+`ReflectRegistry::initialize()` 是进程全局 inventory 的入口。当库、fixture
+或测试只拥有一组明确 fragment，且需要与链接得到的 inventory 及全局初始化状态隔离时，
+使用 `RegistrySnapshotBuilder`。builder 从空集合开始；添加事实时不会执行 provider，只有
+`build()` 成功后才会冻结一份不可变的 `ReflectRegistry`。
+
+```rust
+use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::TypeDescriptor;
+
+fn source(kind: &str, line: u32) -> FragmentIdentity {
+    FragmentIdentity::new("example", "fixture", line, 1, kind, u64::from(line))
+}
+
+fn main() -> Result<(), qubit_reflect::RegistryError> {
+    let target = TypeDescriptor::of::<u32>();
+    let key = CapabilityKey::<u32>::new(
+        CapabilityId::new("example.limit").expect("合法的 capability ID"),
+    );
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder
+        .add_type(target, source("type", 10))
+        .add_type_capabilities(
+            target,
+            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+            source("capability", 11),
+        );
+    let snapshot = builder.build()?;
+
+    assert!(snapshot.get(target.type_id()).is_some());
+    assert_eq!(
+        snapshot
+            .capability(target, key)
+            .expect("capability 声明合法"),
+        Some(&7),
+    );
+    assert!(target.methods_in(&snapshot).is_empty());
+    Ok(())
+}
+```
+
+成员资格与 capability payload 相互独立。空 builder 会生成不含注册根的 snapshot。
+只调用 `add_type_capabilities` 会生成 capability-only snapshot：`types()` 仍为空，但
+`capability()` 和 `capability_by_id()` 仍可解析该目标。其他带类型的输入包括
+`add_definition`、`add_trait`、`add_impl_definition`、`add_impl` 和
+`add_definition_capabilities`。
+
+需要让属性或方法查询只使用这组事实时，把生成的 snapshot 显式传给
+`impls_in`、`methods_in` 或 `methods_named_in`。`build()` 会把所有 identity、链接关系和
+capability 冲突作为一个事务统一校验；失败返回 `RegistryError`，不会发布部分结果。请给每个
+fragment 提供稳定的 `FragmentIdentity`，这样重复或内容变化的来源可以被诊断。冲突时可读取
+`conflicting_fragments()`、`capability_details()`、`capability_target()` 和 `capability_id()`；
+intrinsic provider 失败可通过 `intrinsic_conflict()` 与 `Error::source()` 继续追踪。
+
+该 API 不改变生成代码协议。现有 facade 继续暴露 `__private::codegen_v2`，
+`qubit-model-metadata` 继续使用独立的模型 ABI v4。intrinsic capability provider 只能依赖静态
+类型事实，不能依赖 snapshot，也不能重新进入 registry 初始化。provider 在 capability 缓存锁外执行；
+自身 panic 不会被转成能力缺失或 `CapabilityConflict`。
+
 ### 迁移 effective capability 查询
 
 原有查询名称直接改为 `Result`，没有兼容的吞错入口。`capabilities` 返回
