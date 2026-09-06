@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::AppliedTraitId;
@@ -138,9 +139,13 @@ impl RegistryBuilder {
         if !self.loaded_intrinsic_capabilities.insert(descriptor.type_id()) {
             return Ok(());
         }
-        let capabilities = descriptor
-            .declared_capabilities()
-            .map_err(|error| RegistryError::intrinsic_capability_conflict(identity.clone(), error))?;
+        let capabilities = descriptor.declared_capabilities().map_err(|error| {
+            RegistryError::intrinsic_capability_conflict_with_target(
+                identity.clone(),
+                CapabilityTarget::Type(descriptor.type_id()),
+                error,
+            )
+        })?;
         for capability in capabilities.descriptors() {
             self.push_capability(
                 CapabilityTarget::Type(descriptor.type_id()),
@@ -159,8 +164,14 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         let key = (target, *descriptor.id());
-        if let Some((_, first)) = self.capabilities.get(&key) {
-            return Err(RegistryError::capability_conflict(first.clone(), identity.clone()));
+        if let Some((first_descriptor, first_identity)) = self.capabilities.get(&key) {
+            let conflict = CapabilityConflict::from_same_id(first_descriptor, &descriptor);
+            return Err(RegistryError::capability_conflict_with_details(
+                first_identity.clone(),
+                identity.clone(),
+                target,
+                conflict,
+            ));
         }
         self.capabilities.insert(key, (descriptor, identity.clone()));
         Ok(())

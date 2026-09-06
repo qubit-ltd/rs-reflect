@@ -18,8 +18,10 @@ mod internal;
 )]
 mod registry;
 mod registry_builder;
+mod registry_snapshot_builder;
 
 pub use effective_type_view::EffectiveTypeView;
+pub use fragment::CapabilityTarget;
 #[cfg(feature = "bench-internals")]
 pub(crate) use internal::benchmark_registry_facts::BenchmarkRegistryFacts;
 #[cfg(feature = "bench-internals")]
@@ -33,3 +35,4 @@ pub use registry::TypeCandidates;
 pub use registry::TypeDefinitionCandidates;
 pub(crate) use registry_builder::build_registry;
 pub(crate) use registry_builder::initialize_registry;
+pub use registry_snapshot_builder::RegistrySnapshotBuilder;

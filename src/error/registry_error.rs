@@ -14,6 +14,7 @@ use std::sync::Arc;
 use crate::capability::CapabilityConflict;
 use crate::identity::CapabilityId;
 use crate::identity::FragmentIdentity;
+use crate::registry::fragment::CapabilityTarget;
 
 /// The machine-readable class of a registry aggregation error.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -42,7 +43,9 @@ struct RegistryErrorData {
     kind: RegistryErrorKind,
     left: Option<FragmentIdentity>,
     right: Option<FragmentIdentity>,
-    intrinsic_conflict: Option<CapabilityConflict>,
+    capability_details: Option<CapabilityConflict>,
+    capability_target: Option<CapabilityTarget>,
+    intrinsic_conflict: bool,
 }
 
 impl RegistryError {
@@ -79,7 +82,44 @@ impl RegistryError {
             kind: RegistryErrorKind::CapabilityConflict,
             left: Some(fragment),
             right: None,
-            intrinsic_conflict: Some(conflict),
+            capability_details: Some(conflict),
+            capability_target: None,
+            intrinsic_conflict: true,
+        }))
+    }
+
+    /// Creates a cross-fragment capability conflict with complete diagnostic
+    /// context from the registry builder.
+    pub(crate) fn capability_conflict_with_details(
+        left: FragmentIdentity,
+        right: FragmentIdentity,
+        target: CapabilityTarget,
+        conflict: CapabilityConflict,
+    ) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::CapabilityConflict,
+            left: Some(left),
+            right: Some(right),
+            capability_details: Some(conflict),
+            capability_target: Some(target),
+            intrinsic_conflict: false,
+        }))
+    }
+
+    /// Creates an intrinsic capability conflict with its concrete registry
+    /// target and complete descriptor details.
+    pub(crate) fn intrinsic_capability_conflict_with_target(
+        fragment: FragmentIdentity,
+        target: CapabilityTarget,
+        conflict: CapabilityConflict,
+    ) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::CapabilityConflict,
+            left: Some(fragment),
+            right: None,
+            capability_details: Some(conflict),
+            capability_target: Some(target),
+            intrinsic_conflict: true,
         }))
     }
 
@@ -91,7 +131,9 @@ impl RegistryError {
             kind: RegistryErrorKind::ImplTraitResolution,
             left: Some(fragment),
             right: None,
-            intrinsic_conflict: None,
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
         }))
     }
 
@@ -103,7 +145,9 @@ impl RegistryError {
             kind: RegistryErrorKind::UnsupportedPlatform,
             left: None,
             right: None,
-            intrinsic_conflict: None,
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
         }))
     }
 
@@ -139,19 +183,38 @@ impl RegistryError {
         }
     }
 
-    /// Returns the capability ID involved in an intrinsic capability conflict.
+    /// Returns the stable ID involved in a detailed capability conflict.
     #[must_use]
     #[inline(always)]
     pub fn capability_id(&self) -> Option<CapabilityId> {
         let Self(data) = self;
-        data.intrinsic_conflict.as_ref().map(|conflict| *conflict.id())
+        data.capability_details.as_ref().map(|conflict| *conflict.id())
+    }
+
+    /// Returns the complete capability conflict details retained by registry
+    /// construction, or `None` when a legacy constructor had no details.
+    #[must_use]
+    #[inline(always)]
+    pub fn capability_details(&self) -> Option<&CapabilityConflict> {
+        let Self(data) = self;
+        data.capability_details.as_ref()
+    }
+
+    /// Returns the concrete or definition target involved in a capability
+    /// conflict when registry construction supplied it.
+    #[must_use]
+    #[inline(always)]
+    pub fn capability_target(&self) -> Option<CapabilityTarget> {
+        let Self(data) = self;
+        data.capability_target
     }
 
     /// Returns the complete intrinsic conflict, or `None` for other failures.
     #[must_use]
     pub fn intrinsic_conflict(&self) -> Option<&CapabilityConflict> {
         let Self(data) = self;
-        data.intrinsic_conflict.as_ref()
+        data.intrinsic_conflict.then_some(())?;
+        data.capability_details.as_ref()
     }
 
     /// Creates a conflict error retaining both conflicting registration
@@ -161,7 +224,9 @@ impl RegistryError {
             kind,
             left: Some(left),
             right: Some(right),
-            intrinsic_conflict: None,
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
         }))
     }
 }
@@ -170,6 +235,12 @@ impl std::fmt::Display for RegistryError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self(data) = self;
         write!(formatter, "reflection registry error: {:?}", data.kind)?;
+        if let Some(conflict) = &data.capability_details {
+            write!(formatter, " for capability `{}` ({:?})", conflict.id(), conflict.kind(),)?;
+        }
+        if let Some(target) = data.capability_target {
+            write!(formatter, " on {target:?}")?;
+        }
         if let Some(left) = &data.left {
             write!(
                 formatter,
@@ -194,17 +265,14 @@ impl std::fmt::Display for RegistryError {
                 right.content_fingerprint(),
             )?;
         }
-        if let Some(conflict) = &data.intrinsic_conflict {
-            write!(formatter, ": {conflict}")?;
-        }
         Ok(())
     }
 }
 
 impl std::error::Error for RegistryError {
-    /// Preserves the complete intrinsic conflict as the underlying cause.
+    /// Preserves complete capability conflict details as the underlying cause.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.intrinsic_conflict()
+        self.capability_details()
             .map(|conflict| conflict as &dyn std::error::Error)
     }
 }
