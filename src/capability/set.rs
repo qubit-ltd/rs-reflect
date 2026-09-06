@@ -36,6 +36,23 @@ pub struct CapabilityConflict {
 }
 
 impl CapabilityConflict {
+    /// Classifies two descriptors already known to claim the same capability
+    /// ID while preserving their input contract order.
+    pub(crate) fn from_same_id(first: &CapabilityDescriptor, second: &CapabilityDescriptor) -> Self {
+        debug_assert_eq!(first.id(), second.id());
+        let kind = if first.adapter_type() == second.adapter_type() {
+            CapabilityConflictKind::DuplicateId
+        } else {
+            CapabilityConflictKind::AdapterTypeMismatch
+        };
+        Self {
+            kind,
+            id: *first.id(),
+            first_adapter_type: first.adapter_type(),
+            second_adapter_type: second.adapter_type(),
+        }
+    }
+
     /// Returns the machine-readable conflict class.
     #[must_use]
     #[inline(always)]
@@ -100,17 +117,7 @@ impl TypeCapabilities {
             if first.id() != second.id() {
                 continue;
             }
-            let kind = if first.adapter_type() == second.adapter_type() {
-                CapabilityConflictKind::DuplicateId
-            } else {
-                CapabilityConflictKind::AdapterTypeMismatch
-            };
-            return Err(CapabilityConflict {
-                kind,
-                id: *first.id(),
-                first_adapter_type: first.adapter_type(),
-                second_adapter_type: second.adapter_type(),
-            });
+            return Err(CapabilityConflict::from_same_id(first, second));
         }
         Ok(Self {
             descriptors: descriptors.into_boxed_slice(),
