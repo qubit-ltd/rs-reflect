@@ -9,7 +9,8 @@ breaking boundary redesign.
 `T01` through `T26` are historical task identifiers retained as decision
 provenance; they do not imply unfinished work. The generated-code protocol is
 `__private::codegen_v2`, model metadata uses ABI v4, and the sole registry
-builder is `src/registry/registry_builder.rs`.
+resolver is `ReflectRegistry`. The public `RegistrySnapshotBuilder` provides
+an isolated, transactional construction path for explicitly owned fragments.
 
 ## Verification
 
@@ -88,15 +89,15 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-AGG-002 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-003 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-004 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-005 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-006 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-007 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
+| REQ-AGG-005 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/registry_snapshot_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs`, `tests/public_snapshot_builder_tests.rs` |
+| REQ-AGG-006 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/registry_snapshot_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs`, `tests/public_snapshot_builder_tests.rs` |
+| REQ-AGG-007 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/registry_snapshot_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs`, `tests/public_snapshot_builder_tests.rs` |
 | REQ-AGG-008 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-009 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-010 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-011 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-012 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
-| REQ-AGG-013 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
+| REQ-AGG-013 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/registry_snapshot_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs`, `tests/public_snapshot_builder_tests.rs` |
 | REQ-AGG-014 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-015 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-CON-001 | T10, T15, T19, T22 | `src/construct/validated.rs`, `derive/src/expand/construction.rs` | `tests/construct/runtime_tests.rs`, `tests/construct/adapter_tests.rs` |

@@ -86,6 +86,63 @@ tuple 和可移植函数指针 descriptor 支持 0 到 32 个元素或参数；3
 空字段不等于 unit：`struct A;`、`struct B {}`、`struct C();` 分别保留 Unit、Named、Tuple
 形状，并使用对应动态构造入口。详细迁移和 provider 约束见用户指南。
 
+## 构建隔离的 snapshot
+
+当库或测试只拥有一组明确的反射事实时，可以使用
+`RegistrySnapshotBuilder`。它不会读取 linker inventory，也不会修改进程全局
+registry。空 builder 会生成空 snapshot；类型成员与 capability 相互独立，因此
+只有 capability 的 snapshot 不会让目标出现在 `types()` 中。
+
+```rust
+use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::TypeDescriptor;
+
+fn source(kind: &str, line: u32) -> FragmentIdentity {
+    FragmentIdentity::new("example", "config", line, 1, kind, u64::from(line))
+}
+
+fn main() -> Result<(), qubit_reflect::RegistryError> {
+    let target = TypeDescriptor::of::<u32>();
+    let key = CapabilityKey::<u32>::new(
+        CapabilityId::new("example.limit").expect("合法的 capability ID"),
+    );
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder
+        .add_type(target, source("type", 10))
+        .add_type_capabilities(
+            target,
+            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+            source("capability", 11),
+        );
+    let snapshot = builder.build()?;
+
+    assert!(snapshot.get(target.type_id()).is_some());
+    assert_eq!(
+        snapshot
+            .capability(target, key)
+            .expect("capability 声明合法"),
+        Some(&7),
+    );
+    assert!(target.methods_in(&snapshot).is_empty());
+    Ok(())
+}
+```
+
+如果只需要 capability snapshot，可以省略 `add_type`，直接调用
+`add_type_capabilities`；目标仍不会出现在 `types()` 中，但
+`capability` 与 `capability_by_id` 仍然可查询。其他带类型的 fragment 可分别使用
+`add_definition`、`add_trait`、`add_impl_definition`、`add_impl` 和
+`add_definition_capabilities`。`build()` 会事务性校验所有 identity 与冲突，返回
+`RegistryError`，不会发布部分结果。每个 fragment 都应使用稳定的
+`FragmentIdentity`；重复或内容变化的来源 identity 会产生诊断。
+
+builder 属于 runtime 公共 API，不会改变生成代码协议：facade 继续暴露
+`__private::codegen_v2`，下游模型元数据继续使用独立的 ABI v4。intrinsic
+capability provider 只能依赖静态类型事实，不能重新进入 registry 初始化。能力冲突会在
+registry error 链中保留冲突类别、ID、adapter `TypeId`、target、来源 fragment 和原始冲突。
+
 ## 延伸阅读
 
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
