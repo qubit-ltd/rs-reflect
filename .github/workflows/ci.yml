@@ -75,64 +75,333 @@ jobs:
             .rs-ci-critical-coverage.json \
             "$PWD"
 
-  downstream-contracts:
-    name: Real model and platform consumers
+  downstream-baseline:
+    name: Downstream contracts (fixed baseline)
     runs-on: ubuntu-latest
+    env:
+      EVIDENCE_DIR: ${{ github.workspace }}/downstream-evidence/baseline
     steps:
+      - name: Initialize baseline evidence
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          uname -a > "$EVIDENCE_DIR/runner.txt"
+          rustc -Vv >> "$EVIDENCE_DIR/runner.txt" 2>&1 || true
       - name: Checkout reflection under review
+        id: reflect
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
           path: rust-platform/rs-reflect
           submodules: recursive
+      - name: Validate and resolve baseline revisions
+        id: resolve
+        if: steps.reflect.outcome == 'success'
+        run: |
+          manifest=rust-platform/rs-reflect/.github/downstream-baseline.json
+          if [[ ! -f "$manifest" ]]; then
+            echo "error: fixed downstream baseline is missing: $manifest" >&2
+            exit 1
+          fi
+          python3 rust-platform/rs-reflect/scripts/downstream_manifest.py validate \
+            --manifest "$manifest"
+          matrix=$(python3 rust-platform/rs-reflect/scripts/downstream_manifest.py matrix \
+            --manifest "$manifest" --mode baseline)
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
       - name: Checkout rs-model-metadata
+        id: model-metadata
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-model-metadata
-          ref: main
-          path: rust-platform/rs-model-metadata
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-platform
+        id: platform
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-platform
-          ref: main
-          path: rust-platform/rs-platform
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-id
+        id: id
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-id
-          ref: main
-          path: rust-common/rs-id
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-datatype
+        id: datatype
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-datatype
-          ref: main
-          path: rust-common/rs-datatype
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-redact
+        id: redact
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-redact
-          ref: main
-          path: rust-common/rs-redact
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-validator
+        id: validator
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: qubit-ltd/rs-validator
-          ref: main
-          path: rust-common/rs-validator
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
+      - name: Record baseline checkout results
+        id: checkout-results
+        if: always()
+        env:
+          REFLECT_RESULT: ${{ steps.reflect.outcome }}
+          MODEL_METADATA_RESULT: ${{ steps.model-metadata.outcome }}
+          PLATFORM_RESULT: ${{ steps.platform.outcome }}
+          ID_RESULT: ${{ steps.id.outcome }}
+          DATATYPE_RESULT: ${{ steps.datatype.outcome }}
+          REDACT_RESULT: ${{ steps.redact.outcome }}
+          VALIDATOR_RESULT: ${{ steps.validator.outcome }}
+        run: |
+          results="$EVIDENCE_DIR/checkout-results.txt"
+          missing="$EVIDENCE_DIR/missing-repositories.txt"
+          : > "$results"
+          : > "$missing"
+          failed=0
+          record() {
+            name=$1
+            path=$2
+            outcome=$3
+            printf '%s=%s\n' "$name" "$outcome" >> "$results"
+            if [[ "$outcome" != success ]] || ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
+              printf '%s\n' "$name" >> "$missing"
+              failed=1
+              return
+            fi
+            git -C "$path" rev-parse HEAD >> "$results"
+            git -C "$path" status --porcelain >> "$results"
+          }
+          record rs-reflect rust-platform/rs-reflect "$REFLECT_RESULT"
+          record rs-model-metadata rust-platform/rs-model-metadata "$MODEL_METADATA_RESULT"
+          record rs-platform rust-platform/rs-platform "$PLATFORM_RESULT"
+          record rs-id rust-common/rs-id "$ID_RESULT"
+          record rs-datatype rust-common/rs-datatype "$DATATYPE_RESULT"
+          record rs-redact rust-common/rs-redact "$REDACT_RESULT"
+          record rs-validator rust-common/rs-validator "$VALIDATOR_RESULT"
+          find rust-platform rust-common -name Cargo.lock -type f -print0 2>/dev/null \
+            | sort -z | xargs -0 -r sha256sum > "$EVIDENCE_DIR/checkout-lock-sha256.txt"
+          exit "$failed"
+      - name: Cache baseline Cargo state
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-platform/*/target
+            rust-common/*/target
+          key: downstream-baseline-${{ runner.os }}-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/rs-reflect/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/*/Cargo.lock', 'rust-common/*/Cargo.lock') }}
       - name: Install build toolchain
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
         run: rustup toolchain install 1.94.0 --profile minimal
-      - name: Validate real downstream contracts
+      - name: Validate fixed downstream contracts
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
+        env:
+          REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
+        run: |
+          python3 rust-platform/rs-reflect/scripts/downstream_manifest.py verify \
+            --layout-root "$GITHUB_WORKSPACE" \
+            --manifest rust-platform/rs-reflect/.github/downstream-baseline.json
+          rust-platform/rs-reflect/scripts/check-downstream.sh
+      - name: Upload fixed baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: downstream-baseline-${{ github.sha }}
+          path: downstream-evidence/baseline
+          if-no-files-found: error
+          retention-days: 14
+
+  downstream-head:
+    name: Downstream contracts (main heads)
+    runs-on: ubuntu-latest
+    env:
+      EVIDENCE_DIR: ${{ github.workspace }}/downstream-evidence/head
+    steps:
+      - name: Initialize head evidence
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          uname -a > "$EVIDENCE_DIR/runner.txt"
+          rustc -Vv >> "$EVIDENCE_DIR/runner.txt" 2>&1 || true
+      - name: Checkout reflection under review
+        id: reflect
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          path: rust-platform/rs-reflect
+          submodules: recursive
+      - name: Resolve head revisions
+        id: resolve
+        if: steps.reflect.outcome == 'success'
+        run: |
+          manifest=rust-platform/rs-reflect/.github/downstream-baseline.json
+          python3 rust-platform/rs-reflect/scripts/downstream_manifest.py validate \
+            --manifest "$manifest"
+          matrix=$(python3 rust-platform/rs-reflect/scripts/downstream_manifest.py matrix \
+            --manifest "$manifest" \
+            --mode head)
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+      - name: Checkout rs-model-metadata
+        id: model-metadata
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-platform
+        id: platform
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-id
+        id: id
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-datatype
+        id: datatype
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-redact
+        id: redact
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-validator
+        id: validator
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Record head checkout results
+        id: checkout-results
+        if: always()
+        env:
+          REFLECT_RESULT: ${{ steps.reflect.outcome }}
+          MODEL_METADATA_RESULT: ${{ steps.model-metadata.outcome }}
+          PLATFORM_RESULT: ${{ steps.platform.outcome }}
+          ID_RESULT: ${{ steps.id.outcome }}
+          DATATYPE_RESULT: ${{ steps.datatype.outcome }}
+          REDACT_RESULT: ${{ steps.redact.outcome }}
+          VALIDATOR_RESULT: ${{ steps.validator.outcome }}
+        run: |
+          results="$EVIDENCE_DIR/checkout-results.txt"
+          missing="$EVIDENCE_DIR/missing-repositories.txt"
+          : > "$results"
+          : > "$missing"
+          failed=0
+          record() {
+            name=$1
+            path=$2
+            outcome=$3
+            printf '%s=%s\n' "$name" "$outcome" >> "$results"
+            if [[ "$outcome" != success ]] || ! git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
+              printf '%s\n' "$name" >> "$missing"
+              failed=1
+              return
+            fi
+            git -C "$path" rev-parse HEAD >> "$results"
+            git -C "$path" status --porcelain >> "$results"
+          }
+          record rs-reflect rust-platform/rs-reflect "$REFLECT_RESULT"
+          record rs-model-metadata rust-platform/rs-model-metadata "$MODEL_METADATA_RESULT"
+          record rs-platform rust-platform/rs-platform "$PLATFORM_RESULT"
+          record rs-id rust-common/rs-id "$ID_RESULT"
+          record rs-datatype rust-common/rs-datatype "$DATATYPE_RESULT"
+          record rs-redact rust-common/rs-redact "$REDACT_RESULT"
+          record rs-validator rust-common/rs-validator "$VALIDATOR_RESULT"
+          find rust-platform rust-common -name Cargo.lock -type f -print0 2>/dev/null \
+            | sort -z | xargs -0 -r sha256sum > "$EVIDENCE_DIR/checkout-lock-sha256.txt"
+          exit "$failed"
+      - name: Cache head Cargo state
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-platform/*/target
+            rust-common/*/target
+          key: downstream-head-${{ runner.os }}-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/rs-reflect/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/*/Cargo.lock', 'rust-common/*/Cargo.lock') }}
+      - name: Install build toolchain
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
+        run: rustup toolchain install 1.94.0 --profile minimal
+      - name: Validate head downstream contracts
+        if: steps.resolve.outcome == 'success' && steps.checkout-results.outcome == 'success'
+        env:
+          REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ env.EVIDENCE_DIR }}
         run: rust-platform/rs-reflect/scripts/check-downstream.sh
+      - name: Upload head evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: downstream-head-${{ github.sha }}
+          path: downstream-evidence/head
+          if-no-files-found: error
+          retention-days: 14
