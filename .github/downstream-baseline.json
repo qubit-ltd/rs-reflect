@@ -4,7 +4,7 @@
     {
       "repository": "qubit-ltd/rs-model-metadata",
       "path": "rust-platform/rs-model-metadata",
-      "revision": "50e122c3cf56182bbc6dcc486fea22c535c0eda2"
+      "revision": "432adae8d9e2be059a020ccfaad169c4b3d0d917"
     },
     {
       "repository": "qubit-ltd/rs-platform",
