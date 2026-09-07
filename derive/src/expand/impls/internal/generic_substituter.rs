@@ -162,6 +162,7 @@ mod tests {
     use quote::quote;
     use syn::Path;
     use syn::Type;
+    use syn::parse2;
 
     use super::substitute_path_syntax;
     use super::substitute_type_syntax;
@@ -175,9 +176,9 @@ mod tests {
 
     #[test]
     fn test_substitute_path_syntax_rewrites_trait_type_and_const_arguments() {
-        let input: Path = syn::parse2(quote!(Trait<T, N>)).expect("the trait path must be valid path syntax");
+        let input: Path = parse2(quote!(Trait<T, N>)).expect("the trait path must be valid path syntax");
         let expected: Path =
-            syn::parse2(quote!(Trait<Vec<u8>, 4>)).expect("the expected trait path must be valid path syntax");
+            parse2(quote!(Trait<Vec<u8>, 4>)).expect("the expected trait path must be valid path syntax");
 
         let actual = substitute_path_syntax(&input, &replacements());
 
@@ -192,9 +193,9 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let actual: Type = syn::parse2(substitute_type_syntax(&input, &replacements()))
+            let actual: Type = parse2(substitute_type_syntax(&input, &replacements()))
                 .expect("substitution must retain valid type syntax");
-            let expected: Type = syn::parse2(expected).expect("the expected result must be valid type syntax");
+            let expected: Type = parse2(expected).expect("the expected result must be valid type syntax");
             assert_eq!(actual, expected, "input: {input}");
         }
     }
@@ -202,10 +203,10 @@ mod tests {
     #[test]
     fn test_substitute_type_syntax_rewrites_qself_and_const_expressions() {
         let input = quote!([<T as Trait<N>>::Assoc; N + 1]);
-        let expected: Type = syn::parse2(quote!([<Vec<u8> as Trait<4>>::Assoc; 4 + 1]))
+        let expected: Type = parse2(quote!([<Vec<u8> as Trait<4>>::Assoc; 4 + 1]))
             .expect("the expected result must be valid type syntax");
 
-        let actual: Type = syn::parse2(substitute_type_syntax(&input, &replacements()))
+        let actual: Type = parse2(substitute_type_syntax(&input, &replacements()))
             .expect("substitution must retain valid type syntax");
 
         assert_eq!(actual, expected);
@@ -216,9 +217,9 @@ mod tests {
         let replacements = [(Ident::new("T", Span::call_site()), quote!(::std::vec::Vec<u8>))];
         let input = quote!(T::Item);
         let expected: Type =
-            syn::parse2(quote!(::std::vec::Vec<u8>::Item)).expect("the expected result must be valid type syntax");
+            parse2(quote!(::std::vec::Vec<u8>::Item)).expect("the expected result must be valid type syntax");
 
-        let actual: Type = syn::parse2(substitute_type_syntax(&input, &replacements))
+        let actual: Type = parse2(substitute_type_syntax(&input, &replacements))
             .expect("substitution must retain valid type syntax");
 
         assert_eq!(actual, expected);
