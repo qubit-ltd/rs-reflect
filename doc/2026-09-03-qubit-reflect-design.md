@@ -6,7 +6,7 @@
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`
-- Protocol: `qubit-reflect 0.1` / `__private::codegen_v2`
+- Protocol: `qubit-reflect 0.1` / `__private::codegen_v3`
 
 ## 1. Purpose and boundary
 
@@ -86,7 +86,7 @@ src/
 ├── identity/                   # fragment, member, trait, visibility identity
 ├── invoke/                     # invocation, future, and failure recovery
 ├── private/
-│   └── codegen_v2/             # sole generated-code protocol
+│   └── codegen_v3/             # sole generated-code protocol
 ├── registry/
 │   ├── registry_builder.rs     # conflict checks and pre-freeze aggregation
 │   ├── registry_snapshot_builder.rs      # explicit isolated snapshot construction
@@ -164,7 +164,7 @@ Generated reflection code reaches runtime types, factories, and registration
 hooks only through the versioned protocol rooted at:
 
 ```text
-facade::__private::codegen_v2
+facade::__private::codegen_v3
 ```
 
 The protocol exposes exact domain surfaces for `access`, `capability`,
@@ -175,7 +175,7 @@ The `__private` root does not flatten them, and the protocol does not re-export
 whole public runtime modules. An incompatible protocol introduces a sibling
 version instead of silently widening v1.
 
-A downstream facade exposes exactly `__private::codegen_v2` for generated code
+A downstream facade exposes exactly `__private::codegen_v3` for generated code
 and independently re-exports each public application symbol it promises. It
 must not use `pub use qubit_reflect::*`, `pub use qubit_reflect::__private::*`,
 or re-export whole runtime modules merely to satisfy macro expansion.
@@ -185,7 +185,7 @@ inside that exact private module, keeping ownership, versioning, and migration r
 
 The explicit snapshot builder is a runtime API and does not widen either
 generated-code protocol. Existing derives and facades continue to use
-`__private::codegen_v2`; downstream model code continues to use its independent
+`__private::codegen_v3`; downstream model code continues to use its independent
 v4 ABI. This lets a downstream fixture or library assemble a deterministic
 subset of facts without coupling protocol migration to registry ownership.
 
@@ -219,7 +219,7 @@ downstream layer wraps it.
 
 Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
 definitions, and construction expansion. Empty field counts no longer determine source shape.
-This internal change does not change `codegen_v2` or model v4. Downstream metadata/property queries
+This internal change does not change `codegen_v3` or model v4. Downstream metadata/property queries
 propagate structured errors; resolution adds root model, full path, and provenance. An underlying
 failure must not create synthetic MissingProperty/InvalidValueClosure errors or suppress independent failures.
 
@@ -259,7 +259,7 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | all features | ecosystem/Qubit types, workspace tests, Clippy, Rustdoc |
 | derive | parser/analysis unit tests, trybuild pass/fail, invocation integration |
 | registry | cross-crate aggregation, conflicts, freeze, stable ordering, concurrent initialization |
-| ABI/facade | renamed dependencies, explicit facade, `codegen_v2`, and model `v4` |
+| ABI/facade | renamed dependencies, explicit facade, `codegen_v3`, and model `v4` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
@@ -285,3 +285,41 @@ requirement IDs mapped one-to-one and validates every referenced code and test p
 - Facade macros select an owned provider name with `#[reflect(definition_provider_v2 = identifier)]`. The v2 contract is a parameterless function returning `&'static TypeDefinitionDescriptor`, available without a concrete monomorph. Consumers must not infer reflect's default generated names.
 - `scripts/check-downstream.sh` validates the real model metadata workspace (including its `derive/` member) and platform repository. Local `ci-check.sh` and a dedicated GitHub Actions job both run this gate. Missing sibling checkouts are errors. The baseline channel checks the exact SHA recorded in the manifest, while the head channel checks each dependency's `main` revision; both channels record their feature selection explicitly. Private repositories may use `DEPENDENCY_TOKEN`.
 - First descriptor initialization is sampled in fresh child processes, excluding process startup. Warm lookup and 1/4/8-thread lookup are measured separately. The platform benchmark measures projection and relationship validation over the actual linked models, including allocation request counts and requested bytes.
+
+## 2026-09-07: Explicit invocation snapshots and codegen_v3
+
+Every ordinary, catching, thread-safe, and pinned entry explicitly accepts `&ReflectRegistry`.
+Callers look up methods with `methods_named_in(registry, ...)`, then invoke with
+`invoke_*(registry, invocation)` using the same registry. Function pointers quantify
+independent `for<'registry, 'call>` lifetimes. Outputs, futures, and recovery retain no
+registry borrow, while input lifetimes, Local/ThreadSafe, and Pin constraints remain.
+Invocation neither initializes the global registry nor falls back to global capabilities.
+
+Safely generated special receivers always have static adapters; inventory probing no
+longer determines entry availability. Missing, mistyped, and fact-only receiver capabilities
+in the selected snapshot yield `ReceiverAdapterUnavailable` with all original caller-ordered
+inputs. Adapter rejection and intrinsic conflicts retain distinct structured causes.
+Statically unsupported signatures still have no entry point.
+
+`TypeDescriptor` Debug prints structural facts without capability queries or provider
+execution. Frozen member, name, and method indexes do not execute providers; capability
+queries for unregistered concrete types may still lazily initialize intrinsic facts.
+Providers depend only on static type facts and must not explicitly re-enter capability or
+registry initialization. Downstream custom capabilities/providers may carry model metadata;
+reflect does not define or interpret domain semantics.
+
+This breaking change removes `codegen_v2`; facades must expose exactly `codegen_v3`.
+Model `__private::v4` and `definition_provider_v2` retain their independent contracts.
+Package version remains 0.1.0 and unpublished. Earlier dated sections describe historical
+changes; their statements about preserving protocols apply only to those changes.
+
+Markdown acceptance runs each `rust` program in an independent package and process.
+`rust,no_run` compiles a library; `rust,compile_fail` must fail compilation; both require
+an explanation. Unknown markers, empty blocks, and unclosed fences fail. A temporary
+workspace copies and verifies Cargo.lock before `--locked` builds. Runs time out after
+10 seconds; failures retain commands, output, and lockfiles.
+The original six coverage gates remain. Four new function/line/region gates are floored
+from baseline d929d96: set 100/98/99, registry 98/98/98, registry_builder 100/97/96,
+snapshot_builder 100/100/100. Bounded registry_snapshot fuzz limits inputs to 4096 bytes,
+32 fragments, 16 sources, eight static IDs, and four descriptors; it verifies ordering,
+conflict atomicity, capability-only membership, and independent snapshots through public APIs.

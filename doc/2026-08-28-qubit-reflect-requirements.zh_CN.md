@@ -119,7 +119,7 @@ Rust declarations
   不得产生未定义行为。
 - **REQ-SYS-007**：能从当前宏输入判断的错误必须在编译期报告；只有跨声明汇聚、运行时值和动态参数相关问题
   才可作为运行时错误。
-- **REQ-SYS-008**：公共 descriptor API、错误和宏行为必须具备 Rustdoc，且最终用户手册中的示例必须作为验收输入。
+- **REQ-SYS-008**：公共 descriptor API、错误和宏行为必须具备 Rustdoc，且最终用户手册中的示例必须作为验收输入。 `rust` 示例必须逐块独立执行并验证断言；只编译和预期编译失败的例子须显式标记并说明理由。descriptor Debug 不得执行 provider。
 - **REQ-SYS-009**：descriptor 图必须允许递归类型关系，但任何遍历或格式化都不得无限递归。
 - **REQ-SYS-010**：相同声明片段集合在不同编译、链接和查询中的成员次序必须确定；字段与 variant 采用源码顺序，
   分散 impl 不得采用链接器枚举顺序或首次查询线程决定次序。
@@ -882,8 +882,8 @@ pub enum InvocationOutput<'call, Mode> {
 }
 ```
 
-- **REQ-INV-001**：无 receiver 的关联函数、`&self`、`&mut self` 和 `self` 方法必须采用不同的调用输入约束。
-- **REQ-INV-002**：参数数量或类型不匹配时必须在进入用户方法前失败。
+- **REQ-INV-001**：无 receiver 的关联函数、`&self`、`&mut self` 和 `self` 方法必须采用不同的调用输入约束。 所有调用入口必须显式接受 registry，receiver capability 只在该快照解析，不回退全局；输出、future、recovery 不借用 registry。
+- **REQ-INV-002**：参数数量或类型不匹配时必须在进入用户方法前失败。 静态适配器存在性不得依赖 inventory capability；缺失、类型不匹配或 fact-only capability 在调用时报告 unavailable，并按原顺序恢复输入。
 - **REQ-INV-003**：`&mut self` 调用必须要求独占可变借用；`self` 调用必须消费拥有值。
 - **REQ-INV-004**：返回值可以是拥有值或绑定到 receiver/参数生命周期的借用；API 必须在类型上保留该关系。
 - **REQ-INV-005**：普通 `invoke` 必须原样传播方法内部 panic，不得伪装成参数错误。另行提供的
@@ -1120,7 +1120,7 @@ assert_eq!(model.field("username").unwrap().descriptor().index(), 1);
 - **REQ-INT-011**：`qubit-model-derive` 和 `qubit-model-metadata` 必须依赖 `qubit-reflect` 的公共契约实现结构反射；
   模型角色 attribute macro 应在展开结果中委托给由模型 facade 重导出的 `Reflect` derive，不得复制一套字段、variant、
   泛型 bound、opaque 或注册代码生成逻辑。模型 facade 必须隐藏地重导出版本匹配的
-  `__private::codegen_v2` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
+  `__private::codegen_v3` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
   重导出 `descriptor`、`construct`、`value` 等完整 runtime 业务模块。同一声明重复叠加角色宏与显式 `Reflect`
   derive 必须给出编译期诊断。
 - **REQ-INT-012**：涉及反射结构、动态操作或两层依赖方向时，本文是 `rs-reflect`、`rs-model-derive` 与

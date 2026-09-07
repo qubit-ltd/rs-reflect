@@ -152,19 +152,19 @@ fn main() {
 
 ### 通过下游 facade 或宏集成
 
-如果 facade 直接承载 `qubit-reflect` 的派生宏，应在派生宏约定的路径下暴露带版本的生成协议。面向业务代码的公开导出可以独立选择；下面的最小示例只导出调用方使用的两个类型：
+如果 facade 直接承载 `qubit-reflect` 的派生宏，应在派生宏约定的路径下暴露带版本的生成协议。面向业务代码的公开导出可以独立选择；下面代码属于 facade 库，没有程序入口，因此只编译、不运行；最小示例只导出调用方使用的两个类型：
 
-```rust
+```rust,no_run
 pub use qubit_reflect::Reflect;
 pub use qubit_reflect::TypeDescriptor;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use qubit_reflect::__private::codegen_v2;
+    pub use qubit_reflect::__private::codegen_v3;
 }
 ```
 
-业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v2`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏应只在自己的精确私有 ABI 中逐项重导出所需协议项。`codegen_v2` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
+业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v3`，facade 无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等 runtime 模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会被固化成 facade API。下游过程宏应只在自己的精确私有 ABI 中逐项重导出所需协议项。`codegen_v3` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
 
 ### 描述 trait 与可调用实现
 
@@ -172,9 +172,88 @@ pub mod __private {
 - `#[reflect_impl]` 描述 inherent impl 或 trait impl，并为 receiver、参数、ABI、返回值均能安全通过动态边界的方法生成调用适配器。
 - `#[reflect(rename = "...")]` 仅改查询名称，`rust_name()` 保留源码身份；`skip`、`read_only`、`no_construct`、`no_invoke`、`opaque` 会保留适用的结构事实，同时禁用或限制对应动态操作。
 
-从 registry 或有效类型视图取得 `MethodInstanceDescriptor` 后，用 `Invocation` 调用 `invoke_local`。位置参数是规范入口。运行时按 receiver、参数数量、传递方式、精确类型的顺序校验；在用户代码执行前失败时，`InvocationRecovery` 会完整保留 receiver 与参数。
+从 registry 或有效类型视图取得 `MethodInstanceDescriptor` 后，用 `invoke_local(registry, invocation)` 显式传入同一个 registry 与 `Invocation`。位置参数是规范入口。运行时按 receiver、参数数量、传递方式、精确类型的顺序校验；在用户代码执行前失败时，`InvocationRecovery` 会完整保留 receiver 与参数。
 
 泛型和 blanket impl 会注册定义级元数据。若要让有限的具体泛型实例参与有效查找或调用，使用 `#[reflect(specialize(...))]`。`#[reflect(thread_safe)]` 会显式请求线程安全适配器，只有生成代码证明 receiver、输入、owned 输出和 future 的边界都满足 Rust 约束时才能通过。线程安全值可以降级到本地模式，但不能靠运行时标志反向升级。
+
+### 调用服务方法并恢复错误输入
+
+同一个 registry 用于查找与执行。`None` 表示静态不支持；`Some(Err(...))` 表示调用失败；成功输出仍需按确切类型解码。
+
+```rust
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectedMut, ReflectedOwned,
+                    ReflectRegistry, TypeDescriptor, reflect_impl};
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::invoke::{InvocationArg, InvocationErrorKind};
+
+#[derive(Reflect)]
+struct Counter { value: u64 }
+
+#[reflect_impl]
+impl Counter {
+    fn add(&mut self, amount: u64) -> u64 {
+        self.value += amount;
+        self.value
+    }
+}
+
+fn main() {
+    let registry = ReflectRegistry::initialize().expect("valid declarations");
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>()
+        .methods_named_in(registry, "add") else { panic!("unique method") };
+    let mut counter = Counter { value: 1 };
+    {
+        let invocation = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
+            [InvocationArg::Owned(ReflectedOwned::new(2_u64))]);
+        let output = method.invoke_local(registry, invocation)
+            .expect("statically supported signature")
+            .expect("valid receiver and arguments");
+        let InvocationOutput::Owned(value) = output else { panic!("owned output") };
+        assert_eq!(value.downcast::<u64>().unwrap_or_else(|_| panic!("u64")), 3);
+    }
+
+    {
+        let invalid = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
+            [InvocationArg::Owned(ReflectedOwned::new(String::from("2")))]);
+        let failure = method.invoke_local(registry, invalid)
+            .expect("static entry still exists").err().expect("exact types required");
+        assert!(matches!(failure.error().kind(), InvocationErrorKind::ArgumentTypeMismatch { .. }));
+        let (receiver, arguments) = failure.into_recovery().into_parts();
+        drop(receiver);
+        let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap() else {
+            panic!("original owned input")
+        };
+        assert_eq!(value.downcast::<String>().unwrap_or_else(|_| panic!("String")), "2");
+    }
+    assert_eq!(counter.value, 3);
+}
+```
+
+### 显式泛型 specialization
+
+下面为 `Service<u8>` 注册有限的具体 impl，通过具体类型查找并执行。
+
+```rust
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectRegistry, TypeDescriptor, reflect_impl};
+use qubit_reflect::descriptor::MethodLookup;
+
+#[derive(Reflect)]
+struct Service<T> { value: T }
+
+#[reflect_impl(specialize(T = u8))]
+impl<T> Service<T> {
+    fn answer() -> u8 { 42 }
+}
+
+fn main() {
+    let registry = ReflectRegistry::initialize().unwrap();
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Service<u8>>()
+        .methods_named_in(registry, "answer") else { panic!("explicit specialization") };
+    let output = method.invoke_local(registry, Invocation::associated([])).unwrap().unwrap();
+    let InvocationOutput::Owned(value) = output else { panic!("owned output") };
+    assert_eq!(value.downcast::<u8>().unwrap_or_else(|_| panic!("u8")), 42);
+}
+```
 
 ### Capability 与注册表发现
 
@@ -203,7 +282,7 @@ fn main() {
 
 `snapshot.definitions()` 可在没有注册任何具体实例时枚举泛型声明，并支持按 `TypeDefinitionId`、Rust 路径或查询名定位。定义级扩展通过 `definition_capability` 或 `definition_capability_by_id` 查询。定义字段只包含 `TypeExpression`，不会伪造值访问 adapter。
 
-`Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。其他任意 `self` receiver 需要由 `register_type_capabilities!` 注册精确的 `ReceiverAdapter`；否则方法仍可发现，但会给出稳定的不可用原因。
+`Clone` 和 `Default` 是类型安全的 capability。只有具体类型满足 Rust bound 时才注册，然后用 `clone_key()`、`default_key()` 查询。可安全生成适配器的特殊 `self` receiver 需要在所选 registry 中注册精确的 `ReceiverAdapter`。可以使用全局注册宏或显式 builder；缺少 capability 时入口仍存在，调用返回 `Some(Err(ReceiverAdapterUnavailable))` 并保留输入。静态不支持的签名才没有入口。
 
 ### 构建隔离的 registry snapshot
 
@@ -262,7 +341,7 @@ fragment 提供稳定的 `FragmentIdentity`，这样重复或内容变化的来�
 `conflicting_fragments()`、`capability_details()`、`capability_target()` 和 `capability_id()`；
 intrinsic provider 失败可通过 `intrinsic_conflict()` 与 `Error::source()` 继续追踪。
 
-该 API 不改变生成代码协议。现有 facade 继续暴露 `__private::codegen_v2`，
+该 API 不改变生成代码协议。现有 facade 继续暴露 `__private::codegen_v3`，
 `qubit-model-metadata` 继续使用独立的模型 ABI v4。intrinsic capability provider 只能依赖静态
 类型事实，不能依赖 snapshot，也不能重新进入 registry 初始化。provider 在 capability 缓存锁外执行；
 自身 panic 不会被转成能力缺失或 `CapabilityConflict`。
@@ -283,8 +362,8 @@ intrinsic provider 失败可通过 `intrinsic_conflict()` 与 `Error::source()` 
 provider 必须只依赖静态类型事实，不能依赖 snapshot、时间或外部可变配置，也不能重入注册表初始化。
 泛型 intrinsic factory 在缓存表锁外执行；成功和冲突按具体 `TypeId` 缓存，并发查询共享结果。
 provider 自身的 panic 仍会传播，不转成能力缺失或 `CapabilityConflict`。
-生成调用适配器遇到注册初始化或 receiver 能力冲突时，返回结构化调用错误，并恢复原 receiver、
-参数值、名称和调用方顺序。
+生成调用适配器遇到 receiver 能力解析失败时，返回结构化调用错误，并恢复原 receiver、
+参数值、名称和调用方顺序。调用本身不执行 registry 初始化。
 
 下游 `ModelRegistry::metadata_for` 也返回 `Result<Option<_>, ModelMetadataError>`，
 属性查询传播 `PropertyResolutionError`；解析错误通过 `cause()` 保留原因和路径上下文。
@@ -312,7 +391,7 @@ provider 自身的 panic 仍会传播，不转成能力缺失或 `CapabilityConf
 | 本地动态包装器 | 对普通本地值和借用执行受检操作 | registry 元数据不能把它升级为 `Send` 或 `Sync`。 |
 | `SendReflected*` 包装器 | 在编译期 bound 成立时建立线程安全擦除边界 | 可消费自身并通过 `into_local` 降级；本地包装器不能在运行时升级。 |
 
-模型语义应留在下游。模型层或 schema 层可以把 `FieldDescriptor` 与 validation、持久化、codec、relation、redaction 等元数据关联起来，但这些事实不会变成 `qubit-reflect` 的 capability 或 descriptor 属性。这样才能保持模型 crate 单向依赖 `qubit-reflect`。
+模型语义应留在下游。模型层或 schema 层可以把 `FieldDescriptor` 与 validation、持久化、codec、relation、redaction 等元数据关联起来，下游可以用自己拥有的自定义 capability 和 provider 承载这些元数据。`qubit-reflect` 不定义或解释领域语义，模型 crate 仍单向依赖它。
 
 类型级 `thread_safe` 约定会统一覆盖 owned-to-borrow bridge、字段访问、构造、更新与方法适配器：
 
@@ -371,7 +450,7 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 | 注册表初始化失败 | 检查 `RegistryError`；初始化错误会缓存，修复冲突后需要启动新进程。 |
 | 跨线程调用不可用 | 方法必须显式标记 `thread_safe`，并且只在 Rust bound 满足时构造 `SendReflected*` 值。 |
 | 外部类型没有 `Reflect` 实现 | 在拥有反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`；这些实现默认不会启用。 |
-| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v2`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
+| 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v3`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
 
 ## 限制与最佳实践
 
@@ -386,3 +465,9 @@ tuple 与可移植函数指针 descriptor 支持 0 到 32 个元素或参数；3
 - [中文详细设计](2026-09-03-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-03-qubit-reflect-design.md)
 - [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
+
+### 显式调用迁移与排障
+
+所有 `invoke_*` 入口现在必须传入 registry。查得到方法但调用返回 `ReceiverAdapterUnavailable` 时，检查所选快照是否拥有匹配模式和确切类型的 receiver capability；静态入口存在并不保证能力存在。同一 key 在两个快照可以绑定不同 adapter，不会交叉污染；全局失败也不影响有效本地调用。输出与 future 不借用 registry，但仍借用输入。
+
+旧 `codegen_v2` facade 会编译失败，请把精确导出迁移为 `codegen_v3`；模型 v4 与 `definition_provider_v2` 保持独立。Debug 只输出结构，不执行 provider；provider 自己不得重入初始化。

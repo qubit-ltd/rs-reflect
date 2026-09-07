@@ -202,24 +202,24 @@ that implement `Drop`.
 A facade that directly hosts `qubit-reflect` derives exposes the versioned
 generated-code protocol under the path expected by the derive. Public
 application exports are an independent choice; this minimal example exports
-the two types used by its callers:
+the two types used by its callers. This is library code without a program entry point, so it is compiled without execution:
 
-```rust
+```rust,no_run
 pub use qubit_reflect::Reflect;
 pub use qubit_reflect::TypeDescriptor;
 
 #[doc(hidden)]
 pub mod __private {
-    pub use qubit_reflect::__private::codegen_v2;
+    pub use qubit_reflect::__private::codegen_v3;
 }
 ```
 
 Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
-only the `codegen_v2` export; the facade does not need to re-export runtime
+only the `codegen_v3` export; the facade does not need to re-export runtime
 modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
 `qubit_reflect` or its `__private` module: that turns unrelated implementation
 details into the facade's API. A downstream procedural macro may give the same
-module through exact item re-exports. `codegen_v2` is a
+module through exact item re-exports. `codegen_v3` is a
 compiler-to-runtime protocol, not a supported handwritten construction API; a
 future incompatible protocol receives a new versioned module.
 
@@ -236,7 +236,7 @@ future incompatible protocol receives a new versioned module.
   disabling or limiting the associated dynamic operation.
 
 Look up a `MethodInstanceDescriptor` through the registry or an effective type
-view, then call `invoke_local` with an `Invocation`. Positional arguments are
+view, then call `invoke_local(registry, invocation)` with the same explicit registry. Positional arguments are
 the canonical form. The runtime validates receiver, argument count, passing
 mode, and exact types in that order; a failure before user code returns the
 complete `InvocationRecovery`.
@@ -247,6 +247,85 @@ finite concrete generic case callable or effective, declare
 thread-safe adapter and is accepted only when the generated Rust bounds prove
 the receiver, inputs, owned output, and future boundary. A thread-safe value
 can be downgraded to local mode, never upgraded by a runtime flag.
+
+### Invoke a service and recover invalid input
+
+Use the same registry for lookup and execution. `None` denotes a statically unsupported entry, `Some(Err(...))` a failed invocation; decode successful output by its exact type.
+
+```rust
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectedMut, ReflectedOwned,
+                    ReflectRegistry, TypeDescriptor, reflect_impl};
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::invoke::{InvocationArg, InvocationErrorKind};
+
+#[derive(Reflect)]
+struct Counter { value: u64 }
+
+#[reflect_impl]
+impl Counter {
+    fn add(&mut self, amount: u64) -> u64 {
+        self.value += amount;
+        self.value
+    }
+}
+
+fn main() {
+    let registry = ReflectRegistry::initialize().expect("valid declarations");
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>()
+        .methods_named_in(registry, "add") else { panic!("unique method") };
+    let mut counter = Counter { value: 1 };
+    {
+        let invocation = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
+            [InvocationArg::Owned(ReflectedOwned::new(2_u64))]);
+        let output = method.invoke_local(registry, invocation)
+            .expect("statically supported signature")
+            .expect("valid receiver and arguments");
+        let InvocationOutput::Owned(value) = output else { panic!("owned output") };
+        assert_eq!(value.downcast::<u64>().unwrap_or_else(|_| panic!("u64")), 3);
+    }
+
+    {
+        let invalid = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
+            [InvocationArg::Owned(ReflectedOwned::new(String::from("2")))]);
+        let failure = method.invoke_local(registry, invalid)
+            .expect("static entry still exists").err().expect("exact types required");
+        assert!(matches!(failure.error().kind(), InvocationErrorKind::ArgumentTypeMismatch { .. }));
+        let (receiver, arguments) = failure.into_recovery().into_parts();
+        drop(receiver);
+        let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap() else {
+            panic!("original owned input")
+        };
+        assert_eq!(value.downcast::<String>().unwrap_or_else(|_| panic!("String")), "2");
+    }
+    assert_eq!(counter.value, 3);
+}
+```
+
+### Explicit generic specialization
+
+Register a finite concrete impl for `Service<u8>`, then look up and invoke it through that concrete type.
+
+```rust
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectRegistry, TypeDescriptor, reflect_impl};
+use qubit_reflect::descriptor::MethodLookup;
+
+#[derive(Reflect)]
+struct Service<T> { value: T }
+
+#[reflect_impl(specialize(T = u8))]
+impl<T> Service<T> {
+    fn answer() -> u8 { 42 }
+}
+
+fn main() {
+    let registry = ReflectRegistry::initialize().unwrap();
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Service<u8>>()
+        .methods_named_in(registry, "answer") else { panic!("explicit specialization") };
+    let output = method.invoke_local(registry, Invocation::associated([])).unwrap().unwrap();
+    let InvocationOutput::Owned(value) = output else { panic!("owned output") };
+    assert_eq!(value.downcast::<u8>().unwrap_or_else(|_| panic!("u8")), 42);
+}
+```
 
 ### Capabilities and registry discovery
 
@@ -288,9 +367,11 @@ values and intentionally provide no value-access adapters.
 
 `Clone` and `Default` are typed capabilities. Register them only where their
 Rust bounds hold, then query with `clone_key()` or `default_key()`. Other
-arbitrary-self receiver forms require an exact `ReceiverAdapter` registered by
-`register_type_capabilities!`; otherwise the method remains discoverable but
-reports a stable unavailable reason.
+safely generated special receiver forms require an exact `ReceiverAdapter` in
+the selected registry, supplied by global registration or an explicit builder.
+A missing capability leaves the entry point present: invocation returns
+`Some(Err(ReceiverAdapterUnavailable))` with the original inputs. Statically
+unsupported signatures have no entry point.
 
 ### Build an isolated registry snapshot
 
@@ -356,7 +437,7 @@ identities are diagnosable. For a conflict, inspect
 `intrinsic_conflict()` and `Error::source()`.
 
 This API does not change the generated-code protocols. Existing facades keep
-exposing `__private::codegen_v2`, and `qubit-model-metadata` keeps its separate
+exposing `__private::codegen_v3`, and `qubit-model-metadata` keeps its separate
 model ABI v4. Intrinsic capability providers must use static type facts only;
 they must not depend on a snapshot or re-enter registry initialization. The
 provider runs outside the capability cache lock, and its panic is not converted
@@ -379,8 +460,9 @@ Providers must depend only on static type facts, never on snapshots, time, or mu
 configuration, and must not re-enter registry initialization. Generic intrinsic factories run outside
 the cache-map lock; successes and conflicts are cached by concrete `TypeId` and shared by concurrent
 queries. Provider panics still propagate; they do not become absence or `CapabilityConflict`.
-Generated invocation adapters preserve registry/receiver-capability failures as structured invocation
-errors and restore the receiver, values, names, and original caller ordering.
+Generated invocation adapters preserve receiver-capability resolution failures as structured
+invocation errors and restore the receiver, values, names, and original caller ordering.
+Invocation itself does not initialize a registry.
 
 Downstream `ModelRegistry::metadata_for` similarly returns `Result<Option<_>, ModelMetadataError>`.
 Property queries propagate `PropertyResolutionError`; resolver diagnostics retain the original
@@ -412,8 +494,8 @@ Use the narrowest boundary that matches what downstream code must do:
 
 Keep model semantics downstream. A model or schema layer may associate a
 `FieldDescriptor` with validation, persistence, codec, relation, or redaction
-metadata, but those facts do not become `qubit-reflect` capabilities or
-descriptor attributes. This preserves the dependency direction from model
+metadata through downstream-owned custom capabilities and providers.
+`qubit-reflect` neither defines nor interprets those domain semantics. This preserves the dependency direction from model
 crates to `qubit-reflect`.
 
 For a type-level thread-safe contract, the same mode covers owned-to-borrow
@@ -488,7 +570,7 @@ do not choose an executor or poll it, and async methods cannot use
 | Registry initialization fails | Inspect `RegistryError`; initialization errors are cached, so start a new process after fixing conflicting registrations. |
 | Cross-thread invocation is unavailable | Use a method explicitly marked `thread_safe` and construct `SendReflected*` values only where Rust's bounds are satisfied. |
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
-| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v2`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
+| A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v3`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
 
 ## Limitations and Best Practices
 
@@ -510,3 +592,9 @@ Arity 33 and above is intentionally unsupported and has no `Reflect` impl.
 - [English design](2026-09-03-qubit-reflect-design.md) and [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
 - [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) and [追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+
+### Explicit invocation migration and troubleshooting
+
+Every `invoke_*` entry now requires a registry. If lookup succeeds but invocation returns `ReceiverAdapterUnavailable`, check the selected snapshot for the exact receiver capability and invocation mode. A static entry does not guarantee that capability exists. The same key may select different adapters in two snapshots without cross-contamination; global failure does not affect valid local calls. Outputs and futures do not borrow the registry, but remain constrained by input lifetimes.
+
+Old `codegen_v2` facades fail compilation: migrate the exact export to `codegen_v3`. Model v4 and `definition_provider_v2` remain independent. Debug prints structural facts without running providers; providers themselves must not re-enter initialization.
