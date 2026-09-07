@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
 //! Invalid intrinsic facts on unregistered monomorphs must remain errors.
@@ -13,6 +15,7 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
+use qubit_reflect::capability::CapabilityLookup;
 use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 
@@ -22,6 +25,18 @@ fn key() -> CapabilityKey<fn()> {
 }
 /// A harmless executable adapter.
 fn adapter() {}
+/// A fact-only contract used to exercise strict capability lookup.
+fn fact_key() -> CapabilityKey<fn()> {
+    CapabilityKey::new(CapabilityId::new("example.generic_fact").unwrap())
+}
+/// Declares the fact-only contract for each concrete monomorph.
+#[allow(
+    clippy::extra_unused_type_parameters,
+    reason = "derive capability providers receive the concrete type parameter"
+)]
+fn fact<T: 'static>() -> CapabilityDescriptor {
+    CapabilityDescriptor::without_adapter(fact_key())
+}
 /// First declaration of the conflicting ID.
 fn first<T: 'static>() -> CapabilityDescriptor {
     *FAIL_COUNTS
@@ -106,7 +121,7 @@ static COUNTS: std::sync::Mutex<std::collections::BTreeMap<std::any::TypeId, usi
     std::sync::Mutex::new(std::collections::BTreeMap::new());
 
 #[derive(Reflect)]
-#[reflect(capabilities(counted))]
+#[reflect(capabilities(counted, fact))]
 struct Counted<T> {
     value: T,
 }
@@ -143,6 +158,22 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
     assert!(registry.capability_by_id(other, "invalid!").unwrap().is_none());
     let wrong: CapabilityKey<usize> = CapabilityKey::new(*key().id());
     assert!(registry.capability(other, wrong).unwrap().is_none());
+    assert!(matches!(
+        registry.capability_lookup(other, missing).unwrap(),
+        CapabilityLookup::Missing
+    ));
+    assert!(matches!(
+        registry.capability_lookup(other, fact_key()).unwrap(),
+        CapabilityLookup::FactOnly(_)
+    ));
+    assert!(matches!(
+        registry.capability_lookup(other, wrong).unwrap(),
+        CapabilityLookup::AdapterTypeMismatch { .. }
+    ));
+    assert!(matches!(
+        registry.capability_lookup(other, key()).unwrap(),
+        CapabilityLookup::Found(_)
+    ));
     assert_eq!(registry.types().len(), before);
 }
 
