@@ -1109,7 +1109,9 @@ impl TypeDescriptor {
 
 impl fmt::Debug for TypeDescriptor {
     /// Formats root-local facts and collection sizes without recursively
-    /// expanding relationships.
+    /// expanding relationships or evaluating intrinsic capability providers.
+    /// Logging a descriptor from its own provider cannot re-enter
+    /// initialization.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("TypeDescriptor")
@@ -1119,12 +1121,6 @@ impl fmt::Debug for TypeDescriptor {
             .field("kind", &self.kind())
             .field("field_count", &self.fields.len())
             .field("variant_count", &self.variants.len())
-            .field(
-                "intrinsic_capability_count",
-                &self
-                    .declared_capabilities()
-                    .map_or(0, |capabilities| capabilities.descriptors().len()),
-            )
             .finish()
     }
 }
