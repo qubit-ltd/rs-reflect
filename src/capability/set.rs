@@ -165,11 +165,7 @@ impl TypeCapabilities {
         if !descriptor.has_adapter() {
             return CapabilityLookup::FactOnly(descriptor);
         }
-        CapabilityLookup::Found(
-            descriptor
-                .get(&key)
-                .expect("declared adapter contract must downcast"),
-        )
+        CapabilityLookup::Found(descriptor.get(&key).expect("declared adapter contract must downcast"))
     }
 
     /// Finds a capability descriptor by its stable textual ID without
