@@ -1,6 +1,7 @@
 # qubit-reflect
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
@@ -15,6 +16,8 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
 
 当前仅允许从 Qubit 内部 workspace 或经过批准的内部 Git revision 引用本 crate，尚未发布到 crates.io。运行时 crate 与 derive crate 必须来自同一个仓库 revision。
+
+<!-- 在 publish = false 期间故意不显示 crates.io badge；否则会生成失效链接。 -->
 
 默认启用的 `derive` feature 会导出 `#[derive(Reflect)]`、`#[reflect]` 和
 `#[reflect_impl]`。关闭默认 feature 后，运行时和手写注册 API 仍然可用，但这三个宏不会被重导出。
@@ -100,6 +103,7 @@ registry 同时传给方法查找和调用。各 snapshot 独立解析 receiver 
 - 使用 `cargo doc --all-features` 在内部生成 API 文档
 - [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
 - [English design](doc/2026-09-03-qubit-reflect-design.md)
+- [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md) · [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md)
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)

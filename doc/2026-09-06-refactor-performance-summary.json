@@ -1,0 +1,57 @@
+{
+  "measured_at": "2026-09-07",
+  "rust": "1.94.0",
+  "raw_samples_available": false,
+  "source": "doc/2026-09-06-refactor-performance.md",
+  "build_scenarios": [
+    {
+      "name": "clean build",
+      "before": { "median_seconds": 125.485, "range_seconds": [109.262, 182.896] },
+      "after": { "median_seconds": 76.821, "range_seconds": [69.728, 170.259], "median_binary_bytes": 6441176 }
+    },
+    {
+      "name": "Cargo cached no-op",
+      "before": { "median_seconds": 0.234, "range_seconds": [0.087, 0.310] },
+      "after": { "median_seconds": 0.079, "range_seconds": [0.064, 0.283], "median_binary_bytes": 6441176 }
+    },
+    {
+      "name": "method edit warmup",
+      "before": { "median_seconds": 138.421, "range_seconds": [67.456, 143.195] },
+      "after": { "median_seconds": 142.335, "range_seconds": [69.141, 192.836], "median_binary_bytes": 6441200 }
+    },
+    {
+      "name": "method incremental build",
+      "before": { "median_seconds": 44.311, "range_seconds": [40.260, 58.239] },
+      "after": { "median_seconds": 53.415, "range_seconds": [36.789, 96.919], "median_binary_bytes": 6441200 }
+    },
+    {
+      "name": "field edit warmup",
+      "before": { "median_seconds": 158.174, "range_seconds": [116.111, 189.763] },
+      "after": { "median_seconds": 81.219, "range_seconds": [70.845, 277.109], "median_binary_bytes": 6441184 }
+    },
+    {
+      "name": "field incremental build",
+      "before": { "median_seconds": 63.248, "range_seconds": [60.626, 221.639] },
+      "after": { "median_seconds": 43.313, "range_seconds": [40.679, 117.173], "median_binary_bytes": 6445424 }
+    }
+  ],
+  "representative_runtime_metrics": {
+    "property_output": {
+      "scalar_borrowed_ns": 15.847,
+      "scalar_property_get_ns": 98.510,
+      "scalar_property_get_plus_conversion_ns": 80.853,
+      "lookup_plus_scalar_get_ns": 82.600
+    },
+    "platform_model_registry": {
+      "linked_models": 131,
+      "cold_link_projection_ns": 1545247,
+      "cold_link_allocation_requests": 10504,
+      "cold_link_requested_bytes": 1984949,
+      "type_metadata_try_of_ns_per_op": 4054,
+      "type_metadata_try_of_allocation_requests": 33,
+      "type_metadata_try_of_requested_bytes": 1952,
+      "warm_projection_ns_per_op": 428422,
+      "relationship_validation_ns_per_op": 417798
+    }
+  }
+}

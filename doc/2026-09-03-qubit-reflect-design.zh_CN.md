@@ -1,9 +1,10 @@
 # `qubit-reflect` 详细设计
 
 - 日期：2026-09-03
-- 最近审核：2026-09-03
+- 最近审核：2026-09-07
 - 状态：破坏性边界重构已实现；当前只供内部仓库使用，发布流程明确暂缓
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
+- 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
 - 适用仓库：`rs-reflect`
 - 对应协议：`qubit-reflect 0.1` / `__private::codegen_v3`
@@ -190,6 +191,12 @@ provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 
 失败会通过 `RegistryError` 保留冲突类别、ID、adapter `TypeId`、target 和来源 fragment；下游包装时，
 原始冲突也会作为错误 source 暴露。
 
+`ImplDefinitionDescriptor::implemented_trait()` 只暴露声明已知的链接；符号链接通过
+`implemented_trait_in(&registry)` 或 `ReflectRegistry::impl_definition_trait` 解析，解析结果属于
+snapshot 索引，构建失败和其他 snapshot 不会修改共享声明。facade 宏使用
+`#[reflect(definition_provider_v2 = identifier)]` 选择 facade 所有的 provider 名称；v2 provider 是
+无参数函数，返回 `&'static TypeDefinitionDescriptor`，不要求具体单态化，也不推断生成名称。
+
 derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
 空字段数量不再决定结构形状。此内部修订不改变 `codegen_v3` 或模型 v4 协议。
 下游元数据和属性查询传播结构化错误，解析器附加根模型、完整路径、来源；
@@ -209,6 +216,19 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 库不做数值转换、字符串解析或 `Into` 推导。反射边界描述并执行准确 Rust 语义，不建立第二套隐式类型系统。
 类型级 ThreadSafe 生成覆盖字段 adapter、struct/variant 构造、struct update、owned-to-borrow bridge 与方法调用，
 共同形成一个 mode 契约。tuple 与可移植函数指针内建描述明确支持到 arity 32；arity 33 不提供 `Reflect` 实现。
+
+所有普通、catching、thread-safe 和 pinned 调用入口都显式接受
+`&ReflectRegistry`。调用方先用 `methods_named_in(registry, ...)` 查找，
+再将同一个 registry 传给 `invoke_*(registry, invocation)`。函数指针采用
+独立的 `for<'registry, 'call>` 生命周期；输出、future 与 recovery 不保留
+registry 借用，但仍受输入生命周期、Local/ThreadSafe 和 Pin 约束。调用不会
+初始化全局 registry，也不会回退到全局 capability。
+
+可安全生成的特殊 receiver 总有静态 adapter。所选 snapshot 缺少、类型不匹配
+或只声明 fact 的 receiver capability 时，返回 `ReceiverAdapterUnavailable`，
+并按调用者顺序保留全部输入；adapter 拒绝与 intrinsic 冲突分别保留结构化原因。
+静态不支持的签名仍无入口。`TypeDescriptor` 的 Debug 只输出结构事实，不查询
+capability，也不执行 provider。
 
 ## 7. 错误与诊断
 
@@ -233,9 +253,21 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
 关键路径被高覆盖率的简单模块掩盖。
 
+Markdown 验收以独立 package 和进程执行每个 `rust` 程序。`rust,no_run` 只编译库，
+`rust,compile_fail` 必须编译失败，且二者都需要正文解释。未知标记、空块和未闭合围栏均失败。
+临时 workspace 会在 `--locked` 构建前核对 `Cargo.lock`；每次运行限时 10 秒，失败时保留日志和锁文件。
+覆盖率保留原六项门禁，并按 d929d96 基线向下取整新增四项函数/行/区域阈值：`set` 100/98/99、
+`registry` 98/98/98、`registry_builder` 100/97/96、`snapshot_builder` 100/100/100。
+有界 `registry_snapshot` fuzz 将输入限制为 4096 字节、32 个 fragment、16 个来源、8 个静态 ID
+和 4 个 descriptor，并通过公开 API 验证排序、冲突原子性、capability-only 成员和 snapshot 独立性。
+
 仓库的 `.rs-ci-cargo-matrix.json` 是 feature 支持矩阵的机器可执行来源。
 [需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) 保持 284 个需求 ID 一一对应，
 并验证其中引用的代码与测试路径存在。
+
+下游门禁校验真实 `rs-model-metadata` workspace（包含 `derive/`）和 `rs-platform`；缺少相邻仓库会报错。
+baseline 通道使用清单记录的精确 SHA，head 通道使用各依赖仓库的 `main` 修订；两条通道都显式记录
+feature 选择，私有仓库可使用 `DEPENDENCY_TOKEN`。
 
 ## 9. 明确不做的事情
 
@@ -245,40 +277,3 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 - 不保留公开字段、旧平铺 `__private` 或 deprecated shim。
 - 不为了缩短文件制造一次性 helper 或一类型一文件的机械碎片。
 - 不承诺 `no_std`；当前运行时依赖 `std`。
-
-## 2026-09-05 评审整改
-
-- 类型相关 capability 按具体 `TypeId` 缓存；生成 factory 不在缓存表锁内执行。泛型 struct、enum 和自定义模型 provider 均覆盖多个实际类型及并发调用。
-- `ImplDefinitionDescriptor::implemented_trait()` 只返回声明时已知的链接；未解析声明使用 `implemented_trait_in(&registry)` 或 `ReflectRegistry::impl_definition_trait` 查询。解析结果保存在快照索引中，构建失败或另一个快照不会修改共享声明。
-- 下游泛型宏使用 `#[reflect(definition_provider_v2 = identifier)]` 选择自己拥有的访问函数名。v2 契约为无参数函数，返回 `&'static TypeDefinitionDescriptor`；不要求具体单态化，也不依赖反射宏默认生成名称。
-- `scripts/check-downstream.sh` 验证真实 `rs-model-metadata` workspace（包含 `derive/` 子项目）与 `rs-platform`。本地 `ci-check.sh` 和独立 GitHub Actions job 均执行该门禁；缺少相邻仓库会显式失败。baseline 通道使用清单记录的精确 SHA，head 通道使用各依赖仓库的 `main` 修订；两个通道都会显式记录实际 feature 选择，私有依赖可配置 `DEPENDENCY_TOKEN`。
-- descriptor 首次初始化由全新子进程测量，报告的时间不含进程启动；热路径和 1/4/8 线程查询单独测量。平台 benchmark 使用实际链接的模型，报告投影、关系校验耗时与分配请求数量/字节数。
-
-## 2026-09-07：显式调用快照与 codegen_v3
-
-当前调用协议在所有普通、catching、thread-safe、pinned 入口中显式接受 `&ReflectRegistry`。
-调用方先用 `methods_named_in(registry, ...)` 查找，再将同一个 registry 传给 `invoke_*(registry, invocation)`。
-函数指针采用独立的 `for<'registry, 'call>` 生命周期；输出、future 与 recovery 不保留 registry 借用，
-但仍受输入生命周期、Local/ThreadSafe 及 Pin 约束。没有隐式全局初始化或全局能力回退。
-
-可安全生成的特殊 receiver 总有静态适配器，不再扫描 inventory 决定入口是否存在。
-所选快照缺少、类型不匹配或只声明 fact 的 receiver capability 时，调用返回结构化
-`ReceiverAdapterUnavailable` 并按调用者顺序保留全部输入。adapter 主动拒绝与 intrinsic
-集合冲突分别保留自己的错误类别。静态不支持的签名仍无入口。
-
-`TypeDescriptor` 的 Debug 只输出结构信息，不查询能力或执行 provider；打印 descriptor 不会隐式重入。
-冻结成员、名称与方法索引查询不执行 provider；未注册具体类型的能力查询仍可惰性初始化 intrinsic facts。
-provider 只能依赖静态类型事实，禁止显式重入 capability 或 registry 初始化。
-下游可用自定义 capability/provider 承载模型元数据；reflect 不定义或解释领域语义。
-
-本次破坏性变更移除 `codegen_v2`，facade 必须精确迁移到 `codegen_v3`。
-模型 `__private::v4`、`definition_provider_v2` 各自独立且保持原契约；包版本仍为 0.1.0、未发布。
-此前日期章节记录历史整改；其中“不改变协议”的表述只适用于对应历史变更。
-
-Markdown 验收以独立 package 和进程执行每个 `rust` 程序；`rust,no_run` 只编译库，
-`rust,compile_fail` 必须编译失败，后二者须有正文解释。未知标记、空块和未闭合围栏均失败。
-临时 workspace 复制并核对 Cargo.lock，随后使用 `--locked`；运行限时 10 秒，失败保留日志与锁文件。
-覆盖率保留原六项门禁，新增四项阈值按 d929d96 基线函数/行/区域覆盖率向下取整：
-set 100/98/99、registry 98/98/98、registry_builder 100/97/96、snapshot_builder 100/100/100。
-有界 registry_snapshot fuzz 使用 4096 字节、32 fragment、16 来源、8 静态 ID、4 descriptor 上限，
-通过公开 API 验证顺序、冲突原子性、capability-only 成员与快照独立性。
