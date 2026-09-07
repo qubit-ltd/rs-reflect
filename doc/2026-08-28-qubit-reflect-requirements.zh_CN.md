@@ -475,6 +475,9 @@ assert_eq!(username.query_name(), Some("username"));
   `TypeKind::Opaque` 的根 descriptor；它不公开字段、variant 或内部导航，但仍可承载声明过且经编译期验证的
   capability。除 capability 自身提供的 adapter 外，它不支持逐字段/variant 构造。类型级 opaque 与字段级 opaque
   都必须是源码显式策略，禁止自动推断或降级。
+- **REQ-TYPE-030**：严格 capability 查询必须保留四种结构化状态：ID 缺失、仅有事实的 descriptor、adapter 契约类型
+  不匹配和找到可执行 adapter。旧的 `Option` 查询可以把非成功状态折叠为 `None`，但严格查询及其下游 provider
+  校验必须使用这些状态拒绝无效契约；不得仅凭缺失把契约错误解释为 capability 未登记。
 
 ## 4. 字段反射
 
@@ -1288,7 +1291,7 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
 | `REQ-ERR-*` / `REQ-OUT-*` | 错误与非目标 | 22 |
 | `REQ-ACCPT-*` | 验收标准 | 48 |
 
-当前最终需求规范共定义 284 条带编码需求，不再保留待确认占位符。
+当前最终需求规范共定义 285 条带编码需求，不再保留待确认占位符。
 
 ## 2026-09-06：查询错误与零字段声明补充验收
 

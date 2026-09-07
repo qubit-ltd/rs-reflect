@@ -6,7 +6,7 @@
 - Scope: declaration macros, descriptors, checked access, invocation, construction, and registry integration
 
 The key words **MUST**, **SHOULD**, **MUST NOT**, and **MAY** are normative.
-This English edition preserves exactly the same 284 requirement identifiers as
+This English edition preserves exactly the same 285 requirement identifiers as
 the Chinese edition. The [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
 maps every identifier to current implementation and executable tests.
 
@@ -95,6 +95,7 @@ maps every identifier to current implementation and executable tests.
 - **REQ-TYPE-027**: The internal `DescriptorInterner` and public `ReflectRegistry` remain separate. On-demand generic/composite interning MUST NOT mutate the frozen enumeration; only static definitions and explicit concrete registrations appear there.
 - **REQ-TYPE-028**: Field types use `TypeRef`: resolvable reflected concrete fields are `Resolved`, explicit opaque fields are `Opaque`, and unspecialized generic-definition fields are `Symbolic`. `OpaqueTypeDescriptor` is a member view, not a second root, and explicit opacity persists even if the concrete type implements `Reflect` elsewhere.
 - **REQ-TYPE-029**: Type-level `#[reflect(opaque)]` creates that type's unique `TypeKind::Opaque` root with no fields, variants, or internal navigation, but MAY retain compile-time-validated capabilities. Type and field opacity MUST be explicit, never inferred or downgraded automatically.
+- **REQ-TYPE-030**: Strict capability lookup MUST preserve four structured states: missing ID, fact-only descriptor, adapter-contract type mismatch, and executable adapter found. The legacy `Option` lookup MAY collapse non-success states to `None`, but strict lookup and downstream provider validation MUST use these states to reject invalid contracts; absence MUST NOT be treated as proof that a contract was never registered.
 
 ## Fields and Variants
 
