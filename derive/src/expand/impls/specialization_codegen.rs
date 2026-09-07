@@ -12,9 +12,7 @@ use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
-use quote::ToTokens;
 use quote::quote;
-use syn::visit_mut::VisitMut;
 
 use crate::ir::GenericKindIr;
 use crate::ir::ImplDeclarationIr;
@@ -103,124 +101,7 @@ pub(super) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
 ) -> TokenStream {
-    let mut ty: syn::Type = syn::parse2(tokens.clone())
-        .expect("validated specialization target must remain valid type syntax");
-    GenericSubstituter { replacements }.visit_type_mut(&mut ty);
-    ty.into_token_stream()
-}
-
-struct GenericSubstituter<'a> {
-    replacements: &'a [(Ident, TokenStream)],
-}
-
-impl GenericSubstituter<'_> {
-    fn replacement(&self, identifier: &Ident) -> Option<&TokenStream> {
-        self.replacements
-            .iter()
-            .find_map(|(name, value)| (name == identifier).then_some(value))
-    }
-}
-
-impl VisitMut for GenericSubstituter<'_> {
-    fn visit_type_mut(&mut self, ty: &mut syn::Type) {
-        if let syn::Type::Path(path) = ty
-            && path.qself.is_none()
-            && path.path.leading_colon.is_none()
-            && !path.path.segments.is_empty()
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
-            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
-        {
-            if path.path.segments.len() > 1 {
-                let tail = syn::Path {
-                    leading_colon: None,
-                    segments: path.path.segments.iter().skip(1).cloned().collect(),
-                };
-                if let Ok(mut replacement) = syn::parse2::<syn::Type>(quote!(#replacement :: #tail))
-                {
-                    syn::visit_mut::visit_type_mut(self, &mut replacement);
-                    *ty = replacement;
-                    return;
-                }
-            }
-            let Ok(replacement) = syn::parse2::<syn::Type>(replacement.clone()) else {
-                return;
-            };
-            if path.path.segments.len() == 1 {
-                *ty = replacement;
-                return;
-            }
-            if let syn::Type::Path(replacement) = replacement
-                && replacement.qself.is_none()
-            {
-                let tail = path.path.segments.iter().skip(1).cloned();
-                let mut segments = replacement.path.segments;
-                segments.extend(tail);
-                path.path.leading_colon = replacement.path.leading_colon;
-                path.path.segments = segments;
-                syn::visit_mut::visit_type_path_mut(self, path);
-            }
-            return;
-        }
-        syn::visit_mut::visit_type_mut(self, ty);
-    }
-
-    fn visit_expr_mut(&mut self, expression: &mut syn::Expr) {
-        if let syn::Expr::Path(path) = expression
-            && path.qself.is_none()
-            && path.path.leading_colon.is_none()
-            && !path.path.segments.is_empty()
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
-            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
-        {
-            if path.path.segments.len() > 1 {
-                let tail = syn::Path {
-                    leading_colon: None,
-                    segments: path.path.segments.iter().skip(1).cloned().collect(),
-                };
-                if let Ok(mut replacement) = syn::parse2::<syn::Expr>(quote!(#replacement :: #tail))
-                {
-                    syn::visit_mut::visit_expr_mut(self, &mut replacement);
-                    *expression = replacement;
-                    return;
-                }
-            }
-            let Ok(replacement) = syn::parse2::<syn::Expr>(replacement.clone()) else {
-                return;
-            };
-            if path.path.segments.len() == 1 {
-                *expression = replacement;
-                return;
-            }
-            if let syn::Expr::Path(replacement) = replacement
-                && replacement.qself.is_none()
-            {
-                let tail = path.path.segments.iter().skip(1).cloned();
-                let mut segments = replacement.path.segments;
-                segments.extend(tail);
-                path.path.leading_colon = replacement.path.leading_colon;
-                path.path.segments = segments;
-                syn::visit_mut::visit_expr_path_mut(self, path);
-            }
-            return;
-        }
-        syn::visit_mut::visit_expr_mut(self, expression);
-    }
-
-    fn visit_generic_argument_mut(&mut self, argument: &mut syn::GenericArgument) {
-        if let syn::GenericArgument::Type(syn::Type::Path(path)) = argument
-            && path.qself.is_none()
-            && path.path.leading_colon.is_none()
-            && path.path.segments.len() == 1
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
-            && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
-            && let Ok(expression) = syn::parse2::<syn::Expr>(replacement.clone())
-            && syn::parse2::<syn::Type>(replacement.clone()).is_err()
-        {
-            *argument = syn::GenericArgument::Const(expression);
-            return;
-        }
-        syn::visit_mut::visit_generic_argument_mut(self, argument);
-    }
+    super::internal::generic_substituter::substitute_type_syntax(tokens, replacements)
 }
 
 /// Replaces impl generic references in method signature types while retaining
@@ -439,7 +320,7 @@ pub(super) fn substitute_trait_path_tokens(
 ) {
     let mut parsed: syn::Path = syn::parse2(path.tokens.clone())
         .expect("validated specialization must retain valid trait path syntax");
-    GenericSubstituter { replacements }.visit_path_mut(&mut parsed);
+    parsed = super::internal::generic_substituter::substitute_path_syntax(&parsed, replacements);
     *path = crate::parse::convert_path(&parsed);
 }
 
@@ -595,5 +476,47 @@ fn specialization_const_argument(
             Some(tokens.clone())
         }
         SpecializationValueIr::Type(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    use super::substitute_type_syntax;
+
+    #[test]
+    fn test_substitute_type_syntax_rewrites_only_generic_type_and_const_paths() {
+        let replacements =
+            [(quote!(T), quote!(u8)), (quote!(N), quote!(4))].map(|(name, value)| {
+                (
+                    syn::parse2(name).expect("the replacement name must be an identifier"),
+                    value,
+                )
+            });
+        let cases: [(TokenStream, TokenStream); 6] = [
+            (quote!(Vec<T>), quote!(Vec<u8>)),
+            (
+                quote!(<T as Iterator>::Item),
+                quote!(<u8 as Iterator>::Item),
+            ),
+            (
+                quote!(Option<Result<T, Vec<T>>>),
+                quote!(Option<Result<u8, Vec<u8>>>),
+            ),
+            (quote!([T; N + 1]), quote!([u8; 4 + 1])),
+            (quote!(Wrapper<Unmatched>), quote!(Wrapper<Unmatched>)),
+            (quote!(T::T), quote!(u8::T)),
+        ];
+
+        for (input, expected) in cases {
+            let actual = substitute_type_syntax(&input, &replacements);
+            let actual: syn::Type =
+                syn::parse2(actual).expect("substitution must retain valid type syntax");
+            let expected: syn::Type =
+                syn::parse2(expected).expect("the expected result must be valid type syntax");
+            assert_eq!(actual, expected, "input: {input}");
+        }
     }
 }

@@ -8,9 +8,14 @@
 
 //! Expansion helpers for generic root-instance metadata.
 
+use proc_macro2::Ident;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+use syn::ExprPath;
+use syn::LitStr;
+use syn::parse2;
 
 use crate::expand::generic_environment::GenericEnvironment;
 use crate::ir::GenericBoundIr;
@@ -43,7 +48,7 @@ pub(crate) fn concrete_descriptor(
         match parameter.kind {
             GenericKindIr::Lifetime => {}
             GenericKindIr::Type => {
-                let name = syn::Ident::new(&parameter.name, parameter.span);
+                let name = Ident::new(&parameter.name, parameter.span);
                 arguments.push(
                     quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(
                         #facade::__private::codegen_v3::expression::parameter(stringify!(#name)),
@@ -63,7 +68,7 @@ pub(crate) fn concrete_descriptor(
                     .as_ref()
                     .expect("const generic parameters retain their declared type");
                 let const_type_tokens = &const_type.tokens;
-                let name = syn::Ident::new(&parameter.name, parameter.span);
+                let name = Ident::new(&parameter.name, parameter.span);
                 let declared_type =
                     super::traits::type_expression(const_type, &environment, facade);
                 arguments.push(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
@@ -98,13 +103,13 @@ pub(crate) fn concrete_descriptor(
 
 /// Returns the stable hidden provider name shared with facade macros that
 /// augment one reflected generic declaration.
-pub(crate) fn definition_provider_name(name: &syn::Ident) -> syn::Ident {
+pub(crate) fn definition_provider_name(name: &Ident) -> Ident {
     format_ident!("__qubit_reflect_generic_definition_{}", name)
 }
 
 /// Returns the stable hidden provider name for the source-level type
 /// declaration shared with domain derive crates.
-pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> syn::Ident {
+pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> Ident {
     for attribute in &declaration.attributes {
         if let crate::ir::HelperValueIr::DefinitionProviderV2(name) = &attribute.value {
             return name.clone();
@@ -278,14 +283,12 @@ pub(crate) fn type_definition_provider(
 
         #[doc(hidden)]
         mod #registration_module {
-            use super::*;
-
             fn runtime_identity() -> #facade::__private::codegen_v3::registration::RuntimeIdentity {
-                #facade::__private::codegen_v3::registration::RuntimeIdentity::TypeDefinition(#function().id())
+                #facade::__private::codegen_v3::registration::RuntimeIdentity::TypeDefinition(super::#function().id())
             }
 
             fn payload() -> #facade::__private::codegen_v3::registration::FragmentPayload {
-                #facade::__private::codegen_v3::registration::FragmentPayload::TypeDefinition(#function())
+                #facade::__private::codegen_v3::registration::FragmentPayload::TypeDefinition(super::#function())
             }
 
             #facade::__private::codegen_v3::inventory::submit! {
@@ -312,7 +315,7 @@ fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStrea
             quote!(#facade::__private::codegen_v3::identity::Visibility::Private)
         }
         crate::ir::VisibilityIr::Restricted(path) => {
-            let path = syn::LitStr::new(&path.source, proc_macro2::Span::call_site());
+            let path = LitStr::new(&path.source, Span::call_site());
             quote!(#facade::__private::codegen_v3::identity::Visibility::Restricted(#path.into()))
         }
     }
@@ -368,7 +371,7 @@ fn reflected_field_type(field: &crate::ir::FieldIr) -> Option<&TypeIr> {
 /// argument itself to implement `Reflect`.
 pub(crate) fn transparently_reflected_type_parameters(
     declaration: &TypeDeclarationIr,
-) -> Vec<syn::Ident> {
+) -> Vec<Ident> {
     declaration
         .generics
         .params
@@ -379,7 +382,7 @@ pub(crate) fn transparently_reflected_type_parameters(
                 .into_iter()
                 .any(|field_type| transparent_type_uses_parameter(field_type, &parameter.name))
         })
-        .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
+        .map(|parameter| Ident::new(&parameter.name, parameter.span))
         .collect()
 }
 
@@ -688,7 +691,7 @@ fn path_arguments_use_const(arguments: &PathArgumentsIr, parameter: &str) -> boo
 
 /// Returns whether a const-expression token is the direct parameter path.
 fn token_is_parameter(tokens: &TokenStream, parameter: &str) -> bool {
-    syn::parse2::<syn::ExprPath>(tokens.clone())
+    parse2::<ExprPath>(tokens.clone())
         .is_ok_and(|path| path.qself.is_none() && path.path.is_ident(parameter))
 }
 
@@ -705,12 +708,23 @@ fn type_is_parameter(ty: &TypeIr, parameter: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro2::TokenStream;
     use quote::quote;
+    use syn::parse2;
 
     use super::reflected_field_types;
+    use super::transparently_reflected_type_parameters;
+    use super::type_uses_const;
+    use super::type_uses_lifetime;
+    use super::type_uses_parameter;
     use crate::ir::DeclarationIr;
     use crate::ir::MacroKind;
     use crate::parse::parse_declaration;
+
+    fn parsed_type(tokens: TokenStream) -> crate::ir::TypeIr {
+        let ty = parse2(tokens).expect("the fixture type must parse");
+        crate::parse::convert_type(&ty)
+    }
 
     #[test]
     fn test_const_and_lifetime_only_fields_receive_complete_reflect_bounds() {
@@ -735,5 +749,82 @@ mod tests {
             .collect();
 
         assert_eq!(field_types, ["& 'a str", "[u8 ; N]", "Conditional < N >"]);
+    }
+
+    #[test]
+    fn test_structured_generic_usage_detection_handles_nested_type_forms() {
+        let type_cases = [
+            (quote!(Vec<T>), true),
+            (quote!(<T as Iterator>::Item), true),
+            (quote!(Option<Result<Vec<T>, u8>>), true),
+            (quote!(fn(u8) -> T), true),
+            (quote!(dyn Iterator<Item = T>), true),
+            (quote!(impl Iterator<Item: Into<T>>), true),
+            (quote!(Wrapper<Unmatched>), false),
+        ];
+        for (tokens, expected) in type_cases {
+            assert_eq!(
+                type_uses_parameter(&parsed_type(tokens.clone()), "T"),
+                expected,
+                "type fixture: {tokens}",
+            );
+        }
+
+        let lifetime_cases = [
+            (quote!(&'a str), true),
+            (quote!(Wrapper<'a>), true),
+            (quote!(fn(&'a str) -> u8), true),
+            (quote!(for<'a> fn(&'a str) -> u8), false),
+            (quote!(Wrapper<'static>), false),
+        ];
+        for (tokens, expected) in lifetime_cases {
+            assert_eq!(
+                type_uses_lifetime(&parsed_type(tokens.clone()), "a"),
+                expected,
+                "lifetime fixture: {tokens}",
+            );
+        }
+
+        let const_cases = [
+            (quote!([u8; N]), true),
+            (quote!(Wrapper<N>), true),
+            (quote!(Wrapper<COUNT = N>), true),
+            (quote!([N; 1]), true),
+            (quote!(Wrapper<M>), false),
+        ];
+        for (tokens, expected) in const_cases {
+            assert_eq!(
+                type_uses_const(&parsed_type(tokens.clone()), "N"),
+                expected,
+                "const fixture: {tokens}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_transparent_reflect_bounds_only_follow_known_container_paths() {
+        let parsed = parse_declaration(
+            MacroKind::Derive,
+            quote!(),
+            quote! {
+                struct Transparent<T, U> {
+                    nested: std::vec::Vec<std::boxed::Box<T>>,
+                    custom: Custom<U>,
+                    #[reflect(opaque)]
+                    hidden: U,
+                }
+            },
+        )
+        .expect("the transparent container fixture must parse");
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("the fixture must parse as a type declaration");
+        };
+
+        let parameters: Vec<_> = transparently_reflected_type_parameters(&declaration)
+            .into_iter()
+            .map(|parameter| parameter.to_string())
+            .collect();
+
+        assert_eq!(parameters, ["T"]);
     }
 }

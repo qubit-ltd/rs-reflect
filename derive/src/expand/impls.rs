@@ -12,10 +12,12 @@
 
 mod concrete_emission;
 mod concrete_impl_emission;
+mod internal;
 mod invocation_adapter;
 mod specialization_codegen;
 
 use concrete_impl_emission::ConcreteImplEmission;
+use internal::generic_substituter::substitute_type_syntax;
 use specialization_codegen::specialization_arguments;
 use specialization_codegen::specialization_associated_type_resolver_arms;
 use specialization_codegen::specialization_replacements;
@@ -24,7 +26,6 @@ use specialization_codegen::substitute_impl_associated_item_types;
 use specialization_codegen::substitute_impl_lifetimes;
 use specialization_codegen::substitute_impl_method_types;
 use specialization_codegen::substitute_trait_path_tokens;
-use specialization_codegen::substitute_type_syntax;
 use specialization_codegen::substitute_type_tokens;
 use specialization_codegen::typed_extension_receiver_type;
 
@@ -164,10 +165,16 @@ fn expand_generic_impl_definition(
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
         });
-    let reflected_provider = declaration.attributes.iter().find_map(|attribute| match &attribute.value {
-        HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
-        _ => None,
-    });
+    let reflected_provider =
+        declaration
+            .attributes
+            .iter()
+            .find_map(|attribute| match &attribute.value {
+                HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
+                _ => None,
+            });
+    let reflected_provider_import =
+        reflected_provider.map(|provider| quote!(use super::#provider;));
     let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
         let path = trait_path
             .segments
@@ -186,10 +193,8 @@ fn expand_generic_impl_definition(
                 |provider| quote!(Some(#provider().trait_id().clone())),
             ),
         };
-        let trait_definition = reflected_provider.map_or_else(
-            || quote!(None),
-            |provider| quote!(Some(#provider())),
-        );
+        let trait_definition =
+            reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider())));
         if external_id.is_none() && reflected_provider.is_some() {
             quote! {
                 #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new(
@@ -201,15 +206,15 @@ fn expand_generic_impl_definition(
                 ).expect("generated generic reflected impl definition is consistent")
             }
         } else {
-        quote! {
-            #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new_unresolved_trait(
-                fragment_identity(),
-                #target,
-                #path,
-                #trait_id,
-                ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
-            )
-        }
+            quote! {
+                #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new_unresolved_trait(
+                    fragment_identity(),
+                    #target,
+                    #path,
+                    #trait_id,
+                    ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
+                )
+            }
         }
     } else {
         quote! {
@@ -277,7 +282,7 @@ fn expand_generic_impl_definition(
     quote! {
         #[doc(hidden)]
         mod #module {
-            use super::*;
+            #reflected_provider_import
 
             fn fragment_identity() -> #facade::__private::codegen_v3::identity::FragmentIdentity {
                 #facade::__private::codegen_v3::identity::FragmentIdentity::new(

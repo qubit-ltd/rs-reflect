@@ -452,6 +452,18 @@ API 不做隐式转换：不会转换数值、解析字符串、推导 `Into`，
 | 外部类型没有 `Reflect` 实现 | 在拥有反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`；这些实现默认不会启用。 |
 | 通过 facade 派生时找不到生成辅助项 | 检查 `#[reflect(crate = ...)]` 指向的 facade，确认它精确暴露版本匹配的 `__private::codegen_v3`，并确保 facade 与派生宏使用兼容的 `qubit-reflect` 协议版本。 |
 
+### 显式调用迁移与排障
+
+所有 `invoke_*` 入口现在必须传入 registry。查得到方法但调用返回
+`ReceiverAdapterUnavailable` 时，检查所选 snapshot 是否拥有匹配模式和确切类型的
+receiver capability；静态入口存在并不保证能力存在。同一 key 在两个 snapshot 可以绑定
+不同 adapter，不会交叉污染；全局失败也不影响有效本地调用。输出与 future 不借用 registry，
+但仍受输入生命周期约束。
+
+旧 `codegen_v2` facade 会编译失败，请把精确导出迁移为 `codegen_v3`；模型 v4 与
+`definition_provider_v2` 保持独立。Debug 只输出结构，不执行 provider；provider 自己
+不得重入初始化。
+
 ## 限制与最佳实践
 
 将反射属性放在拥有该约定的声明附近。对于不希望递归暴露内部结构的类型，使用 opaque 边界；将 descriptor 视为进程内不可变元数据。不要借助反射推导领域规则，也不要试图绕开 Rust 的所有权、隐私、类型或线程安全检查。unsafe 函数、不支持的 ABI、variadic、无法安全擦除的 unsized 值、未 specialize 的泛型和 opaque `impl Trait` 返回值可以被描述，但不能动态调用。
@@ -463,11 +475,6 @@ tuple 与可移植函数指针 descriptor 支持 0 到 32 个元素或参数；3
 - [English user guide](2026-08-29-qubit-reflect-user-guide.md)
 - 使用 `cargo doc --all-features` 在内部生成 API 文档
 - [中文详细设计](2026-09-03-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-03-qubit-reflect-design.md)
+- [中文演进历史](2026-09-07-qubit-reflect-evolution.zh_CN.md) 与 [Evolution history](2026-09-07-qubit-reflect-evolution.md)
 - [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
-
-### 显式调用迁移与排障
-
-所有 `invoke_*` 入口现在必须传入 registry。查得到方法但调用返回 `ReceiverAdapterUnavailable` 时，检查所选快照是否拥有匹配模式和确切类型的 receiver capability；静态入口存在并不保证能力存在。同一 key 在两个快照可以绑定不同 adapter，不会交叉污染；全局失败也不影响有效本地调用。输出与 future 不借用 registry，但仍借用输入。
-
-旧 `codegen_v2` facade 会编译失败，请把精确导出迁移为 `codegen_v3`；模型 v4 与 `definition_provider_v2` 保持独立。Debug 只输出结构，不执行 provider；provider 自己不得重入初始化。

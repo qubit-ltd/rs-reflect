@@ -1,6 +1,6 @@
 # qubit-reflect Requirements Traceability Matrix
 
-This matrix maps all 284 unique `REQ-*` identifiers in the final requirements
+This matrix maps all 285 unique `REQ-*` identifiers in the final requirements
 specification. Every row names the historical implementation tasks, at least
 one current implementation path, and at least one executable verification
 path. Paths were rechecked against the repository after the 2026-09-03
@@ -19,9 +19,9 @@ rg -o 'REQ-[A-Z]+-[0-9]+' doc/2026-09-03-qubit-reflect-requirements.md | sort -u
 rg '^\| REQ-[A-Z]+-[0-9]+ \|' doc/2026-09-03-qubit-reflect-requirements-traceability.md \
   | sed -E 's/^\| (REQ-[A-Z]+-[0-9]+).*/\1/' > /tmp/reflect-traceability-rows
 sort -u /tmp/reflect-traceability-rows > /tmp/reflect-traceability
-test "$(wc -l < /tmp/reflect-requirements)" -eq 284
-test "$(wc -l < /tmp/reflect-traceability-rows)" -eq 284
-test "$(wc -l < /tmp/reflect-traceability)" -eq 284
+test "$(wc -l < /tmp/reflect-requirements)" -eq 285
+test "$(wc -l < /tmp/reflect-traceability-rows)" -eq 285
+test "$(wc -l < /tmp/reflect-traceability)" -eq 285
 diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 ```
 
@@ -289,6 +289,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-TYPE-027 | T06, T12 | `src/registry/interner.rs`, `src/registry/registry.rs`, `src/registry/registry_builder.rs` | `tests/builtin_registry_freeze_tests.rs`, `tests/descriptor/builtin_tests.rs` |
 | REQ-TYPE-028 | T05, T14, T15, T20 | `src/descriptor/type_ref.rs`, `src/private/lazy_type_ref.rs`, `derive/src/expand/structs.rs`, `src/construct/validated.rs` | `tests/descriptor/type_descriptor_tests.rs`, `tests/descriptor/derive_struct_tests.rs`, `tests/access/field_tests.rs` |
 | REQ-TYPE-029 | T05, T07, T14, T15, T19 | `derive/src/expand/structs.rs`, `derive/src/expand/enums.rs`, `src/private/descriptor.rs` | `tests/descriptor/derive_struct_tests.rs`, `tests/ui/pass/opaque_generic_tests.rs`, `tests/descriptor/capability_tests.rs` |
+| REQ-TYPE-030 | T01, T02, T10 | `src/capability/capability_lookup.rs`, `src/capability/set.rs`, `src/registry/registry.rs` | `tests/public_generic_capability_conflict_tests.rs`, `tests/descriptor/capability_tests.rs` |
 | REQ-VAL-001 | T04, T22 | `src/value/dynamic_owned.rs`, `src/value/dynamic_ref.rs`, `src/value/dynamic_mut.rs` | `tests/value/dynamic_owned_tests.rs`, `tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-002 | T04, T22 | `src/value/dynamic_ref.rs`, `src/value/dynamic_mut.rs` | `src/value/mode.rs`, `tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-003 | T04, T22 | `src/value/dynamic_owned.rs` | `tests/value/dynamic_owned_tests.rs`, `tests/value/thread_mode_tests.rs` |
