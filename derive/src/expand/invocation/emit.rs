@@ -30,17 +30,8 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Emits the canonical runtime unavailability slice for one adapter plan.
-pub(crate) fn emit_unavailable_reasons(
-    plan: &InvocationPlan,
-    context: &ExpansionContext,
-) -> TokenStream {
-    debug_assert!(
-        !plan.is_executable()
-            || !matches!(
-                plan.output,
-                OutputPlan::Opaque | OutputPlan::Unsupported
-            )
-    );
+pub(crate) fn emit_unavailable_reasons(plan: &InvocationPlan, context: &ExpansionContext) -> TokenStream {
+    debug_assert!(!plan.is_executable() || !matches!(plan.output, OutputPlan::Opaque | OutputPlan::Unsupported));
     let facade = context.facade();
     let reasons = match &plan.availability {
         AvailabilityPlan::Executable => return quote!(&[]),
@@ -130,12 +121,7 @@ pub(crate) fn thread_safe_assertions(
         }
     });
     let output = match &method.return_type {
-        ReturnTypeIr::Type(ty)
-            if !matches!(
-                ty.kind,
-                TypeKindIr::Reference { .. } | TypeKindIr::Never
-            ) =>
-        {
+        ReturnTypeIr::Type(ty) if !matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) => {
             let tokens = &ty.tokens;
             let span = ty.span;
             quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#tokens>();)
@@ -213,12 +199,9 @@ pub(crate) fn catching_assertions(
             quote_spanned!(span=> __qubit_reflect_assert_ref_unwind_safe::<#ty>();)
         }
         ReturnTypeIr::Type(TypeIr {
-            kind:
-                TypeKindIr::Reference {
-                    mutable: true,
-                    element,
-                    ..
-                },
+            kind: TypeKindIr::Reference {
+                mutable: true, element, ..
+            },
             ..
         }) => {
             let ty = &element.tokens;
@@ -242,15 +225,10 @@ pub(crate) fn catching_assertions(
 }
 
 /// Emits the runtime expectation for one positional parameter.
-pub(crate) fn argument_expectation(
-    parameter: &ParameterIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn argument_expectation(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
     match &parameter.ty.kind {
         TypeKindIr::Reference {
-            mutable: true,
-            element,
-            ..
+            mutable: true, element, ..
         } => {
             let element = &element.tokens;
             quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::borrowed_mut::<#element>())
@@ -267,18 +245,11 @@ pub(crate) fn argument_expectation(
 }
 
 /// Emits extraction of one already validated positional argument.
-pub(crate) fn argument_binding(
-    parameter: &ParameterIr,
-    facade: &TokenStream,
-    mode: &TokenStream,
-) -> TokenStream {
-    let argument =
-        format_ident!("__qubit_reflect_argument_{}", parameter.index);
+pub(crate) fn argument_binding(parameter: &ParameterIr, facade: &TokenStream, mode: &TokenStream) -> TokenStream {
+    let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {
         TypeKindIr::Reference {
-            mutable: true,
-            element,
-            ..
+            mutable: true, element, ..
         } => {
             if super::analysis::is_str_type(element) {
                 quote! {

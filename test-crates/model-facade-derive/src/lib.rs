@@ -21,18 +21,12 @@ pub fn model_reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Reflects a trait through the runtime facade's attribute macro.
 #[proc_macro_attribute]
-pub fn model_reflect_trait(
-    attribute: TokenStream,
-    item: TokenStream,
-) -> TokenStream {
+pub fn model_reflect_trait(attribute: TokenStream, item: TokenStream) -> TokenStream {
     macros::model_reflect_trait(attribute, item)
 }
 
 /// Reflects an impl through the runtime facade's attribute macro.
 #[proc_macro_attribute]
-pub fn model_reflect_impl(
-    attribute: TokenStream,
-    item: TokenStream,
-) -> TokenStream {
+pub fn model_reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
     macros::model_reflect_impl(attribute, item)
 }

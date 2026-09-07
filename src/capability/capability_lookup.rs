@@ -37,9 +37,7 @@ impl<'a, A: 'static> CapabilityLookup<'a, A> {
     pub const fn found(self) -> Option<&'a A> {
         match self {
             Self::Found(value) => Some(value),
-            Self::Missing
-            | Self::FactOnly(_)
-            | Self::AdapterTypeMismatch { .. } => None,
+            Self::Missing | Self::FactOnly(_) | Self::AdapterTypeMismatch { .. } => None,
         }
     }
 }

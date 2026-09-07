@@ -23,10 +23,7 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> syn::Result<TokenStream> {
     };
     let context = match ExpansionContext::from_attributes(attributes) {
         Ok(context) => context,
-        Err(_)
-            if std::env::var("CARGO_PKG_NAME").as_deref()
-                == Ok("qubit-reflect-derive") =>
-        {
+        Err(_) if std::env::var("CARGO_PKG_NAME").as_deref() == Ok("qubit-reflect-derive") => {
             return Ok(match declaration {
                 DeclarationIr::Type(_) => TokenStream::new(),
                 DeclarationIr::Trait(value) => value.retained_tokens,
@@ -37,19 +34,11 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> syn::Result<TokenStream> {
     };
     Ok(match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
-            TypeDeclarationKindIr::Struct => {
-                super::structs::expand(declaration, &context)
-            }
-            TypeDeclarationKindIr::Enum => {
-                super::enums::expand(declaration, &context)
-            }
+            TypeDeclarationKindIr::Struct => super::structs::expand(declaration, &context),
+            TypeDeclarationKindIr::Enum => super::enums::expand(declaration, &context),
             TypeDeclarationKindIr::Union => TokenStream::new(),
         },
-        DeclarationIr::Trait(declaration) => {
-            super::traits::expand(declaration, &context)
-        }
-        DeclarationIr::Impl(declaration) => {
-            super::impls::expand_impl(declaration, &context)
-        }
+        DeclarationIr::Trait(declaration) => super::traits::expand(declaration, &context),
+        DeclarationIr::Impl(declaration) => super::impls::expand_impl(declaration, &context),
     })
 }

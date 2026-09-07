@@ -44,13 +44,10 @@ impl BenchmarkRecord {
 
 /// Registers direct and reflected operation pairs.
 fn dynamic_operations(criterion: &mut Criterion) {
-    let registry = ReflectRegistry::initialize()
-        .expect("benchmark registry must initialize");
+    let registry = ReflectRegistry::initialize().expect("benchmark registry must initialize");
     let descriptor = TypeDescriptor::of::<BenchmarkRecord>();
     let field = descriptor.field("id").expect("benchmark field must exist");
-    let MethodLookup::Unique(method) =
-        descriptor.methods_named_in(registry, "increment")
-    else {
+    let MethodLookup::Unique(method) = descriptor.methods_named_in(registry, "increment") else {
         panic!("benchmark method must resolve uniquely");
     };
 
@@ -63,10 +60,7 @@ fn dynamic_operations(criterion: &mut Criterion) {
         Some(&1),
     );
     field
-        .set(
-            ReflectedMut::new(&mut field_probe),
-            ReflectedOwned::new(2_u64),
-        )
+        .set(ReflectedMut::new(&mut field_probe), ReflectedOwned::new(2_u64))
         .expect("dynamic field set setup must succeed");
     assert_eq!(field_probe.id, 2);
 
@@ -74,29 +68,20 @@ fn dynamic_operations(criterion: &mut Criterion) {
     let method_probe_output = method
         .invoke_local(
             registry,
-            Invocation::borrowed_mut(
-                DynamicMut::<Local>::new(&mut method_probe),
-                [],
-            ),
+            Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut method_probe), []),
         )
         .expect("dynamic method setup must have an adapter")
         .expect("dynamic method setup must validate");
-    let InvocationOutput::Owned(method_probe_value) = method_probe_output
-    else {
+    let InvocationOutput::Owned(method_probe_value) = method_probe_output else {
         panic!("dynamic method setup must return an owned value");
     };
     assert_eq!(
         DynamicOwned::<Local>::downcast::<u64>(method_probe_value)
-            .unwrap_or_else(|_| panic!(
-                "dynamic method setup output must retain its type"
-            )),
+            .unwrap_or_else(|_| panic!("dynamic method setup output must retain its type")),
         3,
     );
     descriptor
-        .construct_struct(NamedConstructionInput::new([(
-            "id",
-            ReflectedOwned::new(3_u64),
-        )]))
+        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(3_u64))]))
         .expect("dynamic construction setup must succeed");
 
     criterion.bench_function("field/direct_get", |bench| {
@@ -117,12 +102,7 @@ fn dynamic_operations(criterion: &mut Criterion) {
     criterion.bench_function("field/reflected_set", |bench| {
         bench.iter_batched(
             || BenchmarkRecord { id: 0 },
-            |mut value| {
-                black_box(field.set(
-                    ReflectedMut::new(&mut value),
-                    ReflectedOwned::new(black_box(1_u64)),
-                ))
-            },
+            |mut value| black_box(field.set(ReflectedMut::new(&mut value), ReflectedOwned::new(black_box(1_u64)))),
             BatchSize::SmallInput,
         );
     });
@@ -139,10 +119,7 @@ fn dynamic_operations(criterion: &mut Criterion) {
             |mut value| {
                 let output = method.invoke_local(
                     registry,
-                    Invocation::borrowed_mut(
-                        DynamicMut::<Local>::new(&mut value),
-                        [],
-                    ),
+                    Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut value), []),
                 );
                 black_box(output.is_some());
             },
@@ -154,9 +131,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
     });
     criterion.bench_function("construction/reflected", |bench| {
         bench.iter(|| {
-            black_box(descriptor.construct_struct(NamedConstructionInput::new(
-                [("id", ReflectedOwned::new(black_box(1_u64)))],
-            )))
+            black_box(descriptor.construct_struct(NamedConstructionInput::new([(
+                "id",
+                ReflectedOwned::new(black_box(1_u64)),
+            )])))
         });
     });
 }

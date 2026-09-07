@@ -16,8 +16,7 @@ macro_rules! reflected_opaque {
         impl $crate::descriptor::Reflect for $type {
             /// Returns the static opaque descriptor for this external value
             /// type.
-            fn type_descriptor() -> &'static $crate::descriptor::TypeDescriptor
-            {
+            fn type_descriptor() -> &'static $crate::descriptor::TypeDescriptor {
                 &$descriptor
             }
         }

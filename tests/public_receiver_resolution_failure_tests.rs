@@ -52,9 +52,7 @@ fn receiver_adapter<'a>(
     receiver: InvocationReceiver<'a, Local>,
 ) -> Result<Pin<Rc<Receiver>>, InvocationReceiver<'a, Local>> {
     match receiver {
-        InvocationReceiver::Owned(value) => value
-            .downcast::<Pin<Rc<Receiver>>>()
-            .map_err(InvocationReceiver::Owned),
+        InvocationReceiver::Owned(value) => value.downcast::<Pin<Rc<Receiver>>>().map_err(InvocationReceiver::Owned),
         receiver => Err(receiver),
     }
 }
@@ -77,13 +75,8 @@ fn isolated_builder() -> RegistrySnapshotBuilder {
         })
         .expect("isolated method fragment");
     let mut builder = RegistrySnapshotBuilder::new();
-    for implementation in
-        fragments.implementations(Receiver::type_descriptor().type_id())
-    {
-        builder.add_impl(
-            implementation,
-            implementation.definition().fragment_identity().clone(),
-        );
+    for implementation in fragments.implementations(Receiver::type_descriptor().type_id()) {
+        builder.add_impl(implementation, implementation.definition().fragment_identity().clone());
     }
     builder
 }
@@ -101,17 +94,10 @@ fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
     };
     let receiver = Pin::new(Rc::new(Receiver));
     let invocation = Invocation::from_bindings(
-        Some(InvocationReceiver::Owned(ReflectedOwned::new(
-            receiver.clone(),
-        ))),
+        Some(InvocationReceiver::Owned(ReflectedOwned::new(receiver.clone()))),
         [
-            InvocationBinding::named(
-                "second",
-                InvocationArg::Owned(ReflectedOwned::new(22_u16)),
-            ),
-            InvocationBinding::positional(InvocationArg::Owned(
-                ReflectedOwned::new(11_u8),
-            )),
+            InvocationBinding::named("second", InvocationArg::Owned(ReflectedOwned::new(22_u16))),
+            InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
         ],
     );
     let Some(Err(failure)) = method.invoke_local(&registry, invocation) else {
@@ -121,17 +107,11 @@ fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterUnavailable { .. }
     ));
-    assert_eq!(
-        failure.error().method_identity(),
-        method.effective_method().identity()
-    );
+    assert_eq!(failure.error().method_identity(), method.effective_method().identity());
     assert_eq!(failure.recovery().argument_name(0), Some("second"));
     assert_eq!(failure.recovery().argument_name(1), None);
     let (error, recovery) = failure.into_parts();
-    assert_eq!(
-        error.method_identity(),
-        method.effective_method().identity()
-    );
+    assert_eq!(error.method_identity(), method.effective_method().identity());
     let (recovered, arguments) = recovery.into_parts();
     let Some(InvocationReceiver::Owned(recovered)) = recovered else {
         panic!("owned receiver")
@@ -144,23 +124,12 @@ fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
     let Some(InvocationArg::Owned(first)) = arguments.next() else {
         panic!("first input")
     };
-    assert_eq!(
-        second
-            .downcast::<u16>()
-            .unwrap_or_else(|_| panic!("u16 input")),
-        22
-    );
-    assert_eq!(
-        first
-            .downcast::<u8>()
-            .unwrap_or_else(|_| panic!("u8 input")),
-        11
-    );
+    assert_eq!(second.downcast::<u16>().unwrap_or_else(|_| panic!("u16 input")), 22);
+    assert_eq!(first.downcast::<u8>().unwrap_or_else(|_| panic!("u8 input")), 11);
 }
 
 #[test]
-fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failure()
- {
+fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failure() {
     assert!(ReflectRegistry::initialize().is_err());
     let mut builder = isolated_builder();
     builder.add_type_capabilities(
@@ -172,9 +141,7 @@ fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failur
         FragmentIdentity::new("isolated", "receiver", 1, 1, "capability", 1),
     );
     let registry = builder.build().unwrap();
-    let MethodLookup::Unique(method) =
-        Receiver::type_descriptor().methods_named_in(&registry, "run")
-    else {
+    let MethodLookup::Unique(method) = Receiver::type_descriptor().methods_named_in(&registry, "run") else {
         panic!("generated method in local snapshot")
     };
     let invocation = Invocation::owned(
@@ -188,9 +155,6 @@ fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failur
     let InvocationOutput::Owned(value) = output else {
         panic!("owned result")
     };
-    assert_eq!(
-        value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")),
-        33
-    );
+    assert_eq!(value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")), 33);
     assert!(ReflectRegistry::initialize().is_err());
 }

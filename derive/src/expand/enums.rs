@@ -23,19 +23,14 @@ use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VariantKindIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
-pub(crate) fn expand(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return TokenStream::new();
     }
     let facade = context.facade().clone();
     let name = declaration.name.clone();
-    let reflected_field_types =
-        super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let reflected_field_types = super::generics::reflected_field_types(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameters: Vec<_> = declaration
         .generics
         .params
@@ -43,15 +38,12 @@ pub(crate) fn expand(
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics =
-        match syn::parse2(declaration.generics.declaration.clone()) {
-            Ok(generics) => generics,
-            Err(_) => return TokenStream::new(),
-        };
+    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
+        Ok(generics) => generics,
+        Err(_) => return TokenStream::new(),
+    };
     if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) =
-            syn::parse2(declaration.generics.where_clause.clone())
-        else {
+        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
             return TokenStream::new();
         };
         generics.where_clause = Some(where_clause);
@@ -64,18 +56,11 @@ pub(crate) fn expand(
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
-            let lifetime = syn::Lifetime::new(
-                &format!("'{}", parameter.name),
-                parameter.span,
-            );
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameters {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -89,36 +74,30 @@ pub(crate) fn expand(
                 .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v3::Reflect));
         }
     }
-    let (impl_generics, type_generics, where_clause) =
-        generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let self_type = quote!(#name #type_generics);
-    let fingerprint =
-        context.fingerprint(&declaration.retained_tokens.to_string());
-    let registration_module =
-        format_ident!("__qubit_reflect_enum_registration_{fingerprint:016x}");
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
+    let registration_module = format_ident!("__qubit_reflect_enum_registration_{fingerprint:016x}");
     let query_name = declaration
         .attributes
         .iter()
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
-    let capability_function =
-        format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition = super::structs::capabilities(
-        &declaration,
-        &facade,
-        &capability_function,
-    );
+    let capability_definition = super::structs::capabilities(&declaration, &facade, &capability_function);
     let representations = enum_representations(&declaration.retained_tokens);
     let integer_repr = declaration
         .variants
         .iter()
         .all(|variant| variant.kind == VariantKindIr::Unit)
         .then(|| {
-            declaration.generics.params.is_empty().then(|| {
-                representations.iter().find_map(EnumReprIr::integer_name)
-            })
+            declaration
+                .generics
+                .params
+                .is_empty()
+                .then(|| representations.iter().find_map(EnumReprIr::integer_name))
         })
         .flatten()
         .flatten();
@@ -127,14 +106,8 @@ pub(crate) fn expand(
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque)
     {
-        let generic_definition_provider =
-            super::generics::definition_provider(&declaration, &facade);
-        let type_definition_provider =
-            super::generics::type_definition_provider(
-                &declaration,
-                &facade,
-                fingerprint,
-            );
+        let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+        let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
         let registration = registration(
             &facade,
             &name,
@@ -148,10 +121,8 @@ pub(crate) fn expand(
                 #capability_resolver,
             ))
         } else {
-            let generic =
-                super::generics::concrete_descriptor(&declaration, &facade);
-            let definition =
-                super::generics::type_definition_provider_name(&declaration);
+            let generic = super::generics::concrete_descriptor(&declaration, &facade);
+            let definition = super::generics::type_definition_provider_name(&declaration);
             quote!(#facade::__private::codegen_v3::descriptor::with_type_definition(
                 #facade::__private::codegen_v3::descriptor::with_concrete_generic(
                     #facade::__private::codegen_v3::descriptor::with_capabilities(
@@ -193,9 +164,10 @@ pub(crate) fn expand(
                 .any(|attribute| attribute.name == HelperName::Skip)
         })
         .flat_map(|variant| adapters(&name, variant, &facade, thread_safe));
-    let construction_adapters = declaration.variants.iter().map(|variant| {
-        super::construction::variant_adapters(variant, &facade, thread_safe)
-    });
+    let construction_adapters = declaration
+        .variants
+        .iter()
+        .map(|variant| super::construction::variant_adapters(variant, &facade, thread_safe));
     let variants = declaration
         .variants
         .iter()
@@ -233,10 +205,8 @@ pub(crate) fn expand(
             )
         })
     } else {
-        let generic =
-            super::generics::concrete_descriptor(&declaration, &facade);
-        let definition =
-            super::generics::type_definition_provider_name(&declaration);
+        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        let definition = super::generics::type_definition_provider_name(&declaration);
         quote! {
             {
                 let representations = ::std::boxed::Box::leak(
@@ -266,13 +236,8 @@ pub(crate) fn expand(
         fingerprint,
         !declaration.generics.params.is_empty(),
     );
-    let generic_definition_provider =
-        super::generics::definition_provider(&declaration, &facade);
-    let type_definition_provider = super::generics::type_definition_provider(
-        &declaration,
-        &facade,
-        fingerprint,
-    );
+    let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+    let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     let root_descriptor = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -582,8 +547,7 @@ fn variant_descriptor(
         };
         quote!(#descriptor.with_access(#policy).with_set_preflight(#preflight) #thread_safe_access .with_variant(#variant_index, #variant_rust_name))
     });
-    let construction =
-        super::construction::variant_descriptor(variant, facade, thread_safe);
+    let construction = super::construction::variant_descriptor(variant, facade, thread_safe);
     quote! {{
         let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
         #facade::__private::codegen_v3::descriptor::variant(<#self_type as #facade::__private::codegen_v3::Reflect>::type_descriptor, #variant_index, #variant_rust_name, #query_name, #kind, fields, <#self_type>::#active)
@@ -598,11 +562,7 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
         return Vec::new();
     };
     let mut representations = Vec::new();
-    for attribute in input
-        .attrs
-        .iter()
-        .filter(|attribute| attribute.path().is_ident("repr"))
-    {
+    for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
         let syn::Meta::List(list) = &attribute.meta else {
             continue;
         };
@@ -611,8 +571,7 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
         else {
             continue;
         };
-        representations
-            .extend(values.iter().filter_map(parse_enum_representation));
+        representations.extend(values.iter().filter_map(parse_enum_representation));
     }
     representations.sort_unstable();
     representations.dedup();
@@ -622,36 +581,23 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
 /// Parses one compiler-validated `repr` component into structural metadata.
 fn parse_enum_representation(meta: &syn::Meta) -> Option<EnumReprIr> {
     match meta {
-        syn::Meta::Path(path) if path.is_ident("Rust") => {
-            Some(EnumReprIr::Rust)
-        }
+        syn::Meta::Path(path) if path.is_ident("Rust") => Some(EnumReprIr::Rust),
         syn::Meta::Path(path) if path.is_ident("C") => Some(EnumReprIr::C),
-        syn::Meta::Path(path) if path.is_ident("transparent") => {
-            Some(EnumReprIr::Transparent)
-        }
+        syn::Meta::Path(path) if path.is_ident("transparent") => Some(EnumReprIr::Transparent),
         syn::Meta::Path(path) if path.is_ident("i8") => Some(EnumReprIr::I8),
         syn::Meta::Path(path) if path.is_ident("i16") => Some(EnumReprIr::I16),
         syn::Meta::Path(path) if path.is_ident("i32") => Some(EnumReprIr::I32),
         syn::Meta::Path(path) if path.is_ident("i64") => Some(EnumReprIr::I64),
-        syn::Meta::Path(path) if path.is_ident("i128") => {
-            Some(EnumReprIr::I128)
-        }
-        syn::Meta::Path(path) if path.is_ident("isize") => {
-            Some(EnumReprIr::Isize)
-        }
+        syn::Meta::Path(path) if path.is_ident("i128") => Some(EnumReprIr::I128),
+        syn::Meta::Path(path) if path.is_ident("isize") => Some(EnumReprIr::Isize),
         syn::Meta::Path(path) if path.is_ident("u8") => Some(EnumReprIr::U8),
         syn::Meta::Path(path) if path.is_ident("u16") => Some(EnumReprIr::U16),
         syn::Meta::Path(path) if path.is_ident("u32") => Some(EnumReprIr::U32),
         syn::Meta::Path(path) if path.is_ident("u64") => Some(EnumReprIr::U64),
-        syn::Meta::Path(path) if path.is_ident("u128") => {
-            Some(EnumReprIr::U128)
-        }
-        syn::Meta::Path(path) if path.is_ident("usize") => {
-            Some(EnumReprIr::Usize)
-        }
+        syn::Meta::Path(path) if path.is_ident("u128") => Some(EnumReprIr::U128),
+        syn::Meta::Path(path) if path.is_ident("usize") => Some(EnumReprIr::Usize),
         syn::Meta::List(list) if list.path.is_ident("align") => {
-            let alignment =
-                syn::parse2::<syn::LitInt>(list.tokens.clone()).ok()?;
+            let alignment = syn::parse2::<syn::LitInt>(list.tokens.clone()).ok()?;
             alignment.base10_parse().ok().map(EnumReprIr::Align)
         }
         _ => None,

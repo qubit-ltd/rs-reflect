@@ -85,10 +85,7 @@ fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
 fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
     let mut value = SendReflectedOwned::new(41_u32);
 
-    assert_eq!(
-        value.as_any().and_then(|value| value.downcast_ref::<u32>()),
-        Some(&41)
-    );
+    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
     *value
         .as_any_mut()
         .and_then(|value| value.downcast_mut::<u32>())
@@ -100,9 +97,7 @@ fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
     };
     let number = match value.downcast::<u32>() {
         Ok(number) => number,
-        Err(_) => panic!(
-            "a matching thread-safe owned downcast must recover the value"
-        ),
+        Err(_) => panic!("a matching thread-safe owned downcast must recover the value"),
     };
     assert_eq!(number, 42);
 }
@@ -115,8 +110,7 @@ fn test_thread_safe_owned_borrow_bridges_preserve_thread_safe_mode() {
     let mut mutable: SendReflectedMut<'_> = value.as_reflected_mut();
     *mutable
         .downcast_mut::<u32>()
-        .expect("the owned thread-safe value must expose a mutable bridge") =
-        67;
+        .expect("the owned thread-safe value must expose a mutable bridge") = 67;
     assert_eq!(value.downcast_ref::<u32>(), Some(&67));
 }
 
@@ -161,11 +155,9 @@ fn test_thread_safe_ref_consuming_downcast_recovers_mismatch() {
         Err(value) => value,
     };
 
-    let number_ref = value.downcast::<u32>().unwrap_or_else(|_| {
-        panic!(
-            "an exact consuming downcast should return the thread-safe borrow"
-        )
-    });
+    let number_ref = value
+        .downcast::<u32>()
+        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the thread-safe borrow"));
     assert_eq!(number_ref, &42);
 }
 
@@ -202,9 +194,7 @@ fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
     let mut text = String::from("hello");
     let value = SendReflectedMut::new_str_mut(text.as_mut_str());
     let mut value = match value.downcast::<String>() {
-        Ok(_) => panic!(
-            "a dedicated mutable str variant must not downcast through Any"
-        ),
+        Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
         Err(value) => value,
     };
     value
@@ -217,14 +207,11 @@ fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
 /// Confirms consuming thread-safe `str` extraction returns the original shared
 /// borrow and preserves a non-`str` wrapper on failure.
 #[test]
-fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper()
- {
+fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let text = String::from("hello");
     let extracted = match SendReflectedRef::new_str(text.as_str()).into_str() {
         Ok(extracted) => extracted,
-        Err(_) => panic!(
-            "a dedicated thread-safe str wrapper must extract successfully"
-        ),
+        Err(_) => panic!("a dedicated thread-safe str wrapper must extract successfully"),
     };
     assert_eq!(extracted, "hello");
 
@@ -239,14 +226,11 @@ fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper
 /// Confirms consuming thread-safe mutable `str` extraction returns the
 /// original exclusive borrow and preserves a non-`str` wrapper on failure.
 #[test]
-fn test_thread_safe_mutable_str_consuming_extraction_preserves_borrow_and_wrapper()
- {
+fn test_thread_safe_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let mut text = String::from("hello");
     match SendReflectedMut::new_str_mut(text.as_mut_str()).into_str_mut() {
         Ok(extracted) => extracted.make_ascii_uppercase(),
-        Err(_) => panic!(
-            "a dedicated thread-safe mutable str wrapper must extract successfully"
-        ),
+        Err(_) => panic!("a dedicated thread-safe mutable str wrapper must extract successfully"),
     }
     assert_eq!(text, "HELLO");
 

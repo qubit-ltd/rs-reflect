@@ -124,9 +124,7 @@ impl TypeDefinitionDescriptor {
 
     /// Returns enum variants, or `None` for non-enum declarations.
     #[must_use]
-    pub const fn variants(
-        &self,
-    ) -> Option<&'static [VariantDefinitionDescriptor]> {
+    pub const fn variants(&self) -> Option<&'static [VariantDefinitionDescriptor]> {
         match &self.data {
             TypeDefinitionData::Enum { variants } => Some(variants),
             _ => None,

@@ -49,10 +49,7 @@ impl<'a> MethodContext<'a> {
     }
 
     /// Creates default-trait-method analysis context.
-    pub(crate) fn trait_default(
-        target: &'a TokenStream,
-        has_unproven_associated_type: bool,
-    ) -> Self {
+    pub(crate) fn trait_default(target: &'a TokenStream, has_unproven_associated_type: bool) -> Self {
         Self {
             target,
             extension_receiver: None,
@@ -63,47 +60,30 @@ impl<'a> MethodContext<'a> {
 }
 
 /// Produces one complete invocation decision without emitting tokens.
-pub(crate) fn analyze_method(
-    method: &MethodIr,
-    context: MethodContext<'_>,
-) -> syn::Result<InvocationPlan> {
-    let receiver =
-        method
-            .receiver
-            .as_ref()
-            .map(|receiver| match receiver.kind {
-                ReceiverKindIr::Value => ReceiverPlan::Value,
-                ReceiverKindIr::SharedReference => {
-                    ReceiverPlan::SharedReference
-                }
-                ReceiverKindIr::MutableReference => {
-                    ReceiverPlan::MutableReference
-                }
-                ReceiverKindIr::Typed => {
-                    if let Some(receiver) =
-                        typed_owned_receiver_type(receiver, context.target)
-                    {
-                        ReceiverPlan::OwnedContainer(receiver)
-                    } else if let Some(mutable) =
-                        typed_pinned_receiver_mutable(receiver)
-                    {
-                        ReceiverPlan::Pinned { mutable }
-                    } else if let Some(receiver) = context.extension_receiver {
-                        ReceiverPlan::Extension(receiver)
-                    } else {
-                        ReceiverPlan::Unsupported
-                    }
-                }
-            });
+pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> syn::Result<InvocationPlan> {
+    let receiver = method.receiver.as_ref().map(|receiver| match receiver.kind {
+        ReceiverKindIr::Value => ReceiverPlan::Value,
+        ReceiverKindIr::SharedReference => ReceiverPlan::SharedReference,
+        ReceiverKindIr::MutableReference => ReceiverPlan::MutableReference,
+        ReceiverKindIr::Typed => {
+            if let Some(receiver) = typed_owned_receiver_type(receiver, context.target) {
+                ReceiverPlan::OwnedContainer(receiver)
+            } else if let Some(mutable) = typed_pinned_receiver_mutable(receiver) {
+                ReceiverPlan::Pinned { mutable }
+            } else if let Some(receiver) = context.extension_receiver {
+                ReceiverPlan::Extension(receiver)
+            } else {
+                ReceiverPlan::Unsupported
+            }
+        }
+    });
     let parameters = method
         .parameters
         .iter()
         .map(|parameter| ParameterPlan {
             index: parameter.index,
             supported: supports_invocation_parameter(&parameter.ty),
-            unsupported_unsized: has_unsupported_unsized_parameter(
-                &parameter.ty,
-            ),
+            unsupported_unsized: has_unsupported_unsized_parameter(&parameter.ty),
         })
         .collect::<Vec<_>>();
     debug_assert!(
@@ -115,32 +95,22 @@ pub(crate) fn analyze_method(
     let output = output_plan(&method.return_type);
     let modes = AdapterModes {
         thread_safe: has_helper(method, HelperName::ThreadSafe),
-        catching: has_helper(method, HelperName::CatchUnwind)
-            && !method.qualifiers.is_async,
+        catching: has_helper(method, HelperName::CatchUnwind) && !method.qualifiers.is_async,
         asynchronous: method.qualifiers.is_async,
     };
     let pinned = matches!(receiver, Some(ReceiverPlan::Pinned { .. }));
-    let supported_receiver =
-        !matches!(receiver, Some(ReceiverPlan::Unsupported));
+    let supported_receiver = !matches!(receiver, Some(ReceiverPlan::Unsupported));
     let supported_parameters = parameters.iter().all(|plan| plan.supported);
-    let supported_borrow =
-        !return_contains_non_static_lifetime(&method.return_type)
-            || is_supported_shared_borrow_return(&method.return_type)
-            || is_supported_mutable_borrow_return(method);
+    let supported_borrow = !return_contains_non_static_lifetime(&method.return_type)
+        || is_supported_shared_borrow_return(&method.return_type)
+        || is_supported_mutable_borrow_return(method);
     let policy_disabled = invocation_disabled_by_policy(method);
-    let unproven_default_constraint =
-        context.default_method && !method.generics.where_predicates.is_empty();
-    let unproven_associated_type =
-        context.default_method && context.has_unproven_associated_type;
-    let default_blocked = context.default_method
-        && (!method.has_default
-            || unproven_default_constraint
-            || unproven_associated_type);
+    let unproven_default_constraint = context.default_method && !method.generics.where_predicates.is_empty();
+    let unproven_associated_type = context.default_method && context.has_unproven_associated_type;
+    let default_blocked =
+        context.default_method && (!method.has_default || unproven_default_constraint || unproven_associated_type);
     let mode_blocked = pinned
-        && (method.qualifiers.is_async
-            || is_borrow_return(&method.return_type)
-            || modes.thread_safe
-            || modes.catching);
+        && (method.qualifiers.is_async || is_borrow_return(&method.return_type) || modes.thread_safe || modes.catching);
     let executable = supported_receiver
         && supported_parameters
         && method.generics.params.is_empty()
@@ -148,8 +118,7 @@ pub(crate) fn analyze_method(
         && method.qualifiers.abi.is_none()
         && !method.qualifiers.is_variadic
         && supported_borrow
-        && (!method.qualifiers.is_async
-            || !is_borrow_return(&method.return_type))
+        && (!method.qualifiers.is_async || !is_borrow_return(&method.return_type))
         && !policy_disabled
         && !default_blocked
         && !mode_blocked
@@ -166,13 +135,8 @@ pub(crate) fn analyze_method(
             mode_blocked,
         ))
     };
-    debug_assert!(
-        !matches!(receiver, Some(ReceiverPlan::Unsupported)) || !executable
-    );
-    debug_assert!(
-        !matches!(output, OutputPlan::Unsupported | OutputPlan::Opaque)
-            || !executable
-    );
+    debug_assert!(!matches!(receiver, Some(ReceiverPlan::Unsupported)) || !executable);
+    debug_assert!(!matches!(output, OutputPlan::Unsupported | OutputPlan::Opaque) || !executable);
     Ok(InvocationPlan {
         receiver,
         parameters,
@@ -256,26 +220,19 @@ fn output_plan(return_type: &ReturnTypeIr) -> OutputPlan {
             kind: TypeKindIr::ImplTrait { .. },
             ..
         }) => OutputPlan::Opaque,
-        ReturnTypeIr::Type(ty) if supports_owned_dynamic_type(ty) => {
-            OutputPlan::Owned
-        }
+        ReturnTypeIr::Type(ty) if supports_owned_dynamic_type(ty) => OutputPlan::Owned,
         ReturnTypeIr::Type(_) => OutputPlan::Unsupported,
     }
 }
 
 fn has_helper(method: &MethodIr, helper: HelperName) -> bool {
-    method
-        .attributes
-        .iter()
-        .any(|attribute| attribute.name == helper)
+    method.attributes.iter().any(|attribute| attribute.name == helper)
 }
 
 /// Returns whether a parameter can cross the safe dynamic boundary.
 pub(crate) fn supports_invocation_parameter(ty: &TypeIr) -> bool {
     match &ty.kind {
-        TypeKindIr::Reference { element, .. } => {
-            supports_owned_dynamic_type(element)
-        }
+        TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
         _ => supports_owned_dynamic_type(ty),
     }
 }
@@ -296,16 +253,16 @@ pub(crate) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
     match return_type {
         ReturnTypeIr::Unit => true,
         ReturnTypeIr::Type(ty) => {
-            matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never)
-                || supports_owned_dynamic_type(ty)
+            matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) || supports_owned_dynamic_type(ty)
         }
     }
 }
 
 fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
-    method.attributes.iter().any(|attribute| {
-        matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip)
-    })
+    method
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip))
 }
 
 fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
@@ -317,10 +274,7 @@ fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
 }
 
 /// Returns the owned standard container for an explicit receiver.
-pub(crate) fn typed_owned_receiver_type(
-    receiver: &crate::ir::ReceiverIr,
-    target: &TokenStream,
-) -> Option<TokenStream> {
+pub(crate) fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStream) -> Option<TokenStream> {
     if receiver.kind != ReceiverKindIr::Typed {
         return None;
     }
@@ -332,18 +286,10 @@ pub(crate) fn typed_owned_receiver_type(
         return None;
     };
     match (segment.name.as_str(), arguments.as_slice()) {
-        ("Box", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
-            Some(quote!(::std::boxed::Box<#target>))
-        }
-        ("Rc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
-            Some(quote!(::std::rc::Rc<#target>))
-        }
-        ("Arc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => {
-            Some(quote!(::std::sync::Arc<#target>))
-        }
-        ("Pin", [PathArgumentIr::Type(argument)])
-            if is_box_self_type(argument) =>
-        {
+        ("Box", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::boxed::Box<#target>)),
+        ("Rc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::rc::Rc<#target>)),
+        ("Arc", [PathArgumentIr::Type(argument)]) if is_self_type(argument) => Some(quote!(::std::sync::Arc<#target>)),
+        ("Pin", [PathArgumentIr::Type(argument)]) if is_box_self_type(argument) => {
             Some(quote!(::std::pin::Pin<::std::boxed::Box<#target>>))
         }
         _ => None,
@@ -351,9 +297,7 @@ pub(crate) fn typed_owned_receiver_type(
 }
 
 /// Returns pinned shared/mutable receiver mode for `Pin<&Self>` shapes.
-pub(crate) fn typed_pinned_receiver_mutable(
-    receiver: &crate::ir::ReceiverIr,
-) -> Option<bool> {
+pub(crate) fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) -> Option<bool> {
     if receiver.kind != ReceiverKindIr::Typed {
         return None;
     }
@@ -367,10 +311,7 @@ pub(crate) fn typed_pinned_receiver_mutable(
     let [PathArgumentIr::Type(argument)] = arguments.as_slice() else {
         return None;
     };
-    let TypeKindIr::Reference {
-        mutable, element, ..
-    } = &argument.kind
-    else {
+    let TypeKindIr::Reference { mutable, element, .. } = &argument.kind else {
         return None;
     };
     (segment.name == "Pin" && is_self_type(element)).then_some(*mutable)
@@ -395,16 +336,12 @@ fn is_box_self_type(ty: &TypeIr) -> bool {
 }
 
 /// Returns whether a return declaration contains a non-static lifetime.
-pub(crate) fn return_contains_non_static_lifetime(
-    return_type: &ReturnTypeIr,
-) -> bool {
+pub(crate) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
     super::lifetime::return_contains_non_static_lifetime(return_type)
 }
 
 /// Returns whether a shared borrow can retain the invocation call lifetime.
-pub(crate) fn is_supported_shared_borrow_return(
-    return_type: &ReturnTypeIr,
-) -> bool {
+pub(crate) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> bool {
     matches!(
         return_type,
         ReturnTypeIr::Type(TypeIr {
@@ -419,18 +356,17 @@ pub(crate) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
     matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
         Some(ReceiverKindIr::MutableReference)
-    ) && !method.parameters.iter().any(|parameter| {
-        matches!(
-            parameter.ty.kind,
-            TypeKindIr::Reference { mutable: true, .. }
+    ) && !method
+        .parameters
+        .iter()
+        .any(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { mutable: true, .. }))
+        && matches!(
+            method.return_type,
+            ReturnTypeIr::Type(TypeIr {
+                kind: TypeKindIr::Reference { mutable: true, .. },
+                ..
+            })
         )
-    }) && matches!(
-        method.return_type,
-        ReturnTypeIr::Type(TypeIr {
-            kind: TypeKindIr::Reference { mutable: true, .. },
-            ..
-        })
-    )
 }
 
 /// Returns whether the declaration returns a borrow.
@@ -473,12 +409,8 @@ mod tests {
     use crate::parse::parse_and_validate_declaration;
 
     fn impl_method(input: TokenStream) -> MethodIr {
-        let parsed = parse_and_validate_declaration(
-            MacroKind::Impl,
-            TokenStream::new(),
-            input,
-        )
-        .expect("the reflected impl should parse");
+        let parsed = parse_and_validate_declaration(MacroKind::Impl, TokenStream::new(), input)
+            .expect("the reflected impl should parse");
         let DeclarationIr::Impl(declaration) = parsed.declaration else {
             panic!("expected an impl declaration");
         };
@@ -544,10 +476,7 @@ mod tests {
                 fn execute(&self) {}
             }
         });
-        assert_eq!(
-            reasons(&plan(&disabled)),
-            &[UnavailableReasonPlan::DisabledByPolicy],
-        );
+        assert_eq!(reasons(&plan(&disabled)), &[UnavailableReasonPlan::DisabledByPolicy],);
 
         let asynchronous = impl_method(quote! {
             impl Service {
@@ -571,10 +500,7 @@ mod tests {
         let pinned_plan = plan(&thread_safe);
         assert!(pinned_plan.modes.thread_safe);
         assert_eq!(pinned_plan.pinned_receiver_mutability(), Some(true));
-        assert_eq!(
-            reasons(&pinned_plan),
-            &[UnavailableReasonPlan::PinnedModeConflict],
-        );
+        assert_eq!(reasons(&pinned_plan), &[UnavailableReasonPlan::PinnedModeConflict],);
 
         let catching = impl_method(quote! {
             impl Service {
@@ -604,14 +530,8 @@ mod tests {
             panic!("expected a trait declaration");
         };
         let method = &declaration.methods[0];
-        let plan = analyze_method(
-            method,
-            MethodContext::trait_default(&quote!(Self), true),
-        )
-        .expect("method analysis should be infallible");
-        assert_eq!(
-            reasons(&plan),
-            &[UnavailableReasonPlan::UnprovenAssociatedType],
-        );
+        let plan = analyze_method(method, MethodContext::trait_default(&quote!(Self), true))
+            .expect("method analysis should be infallible");
+        assert_eq!(reasons(&plan), &[UnavailableReasonPlan::UnprovenAssociatedType],);
     }
 }

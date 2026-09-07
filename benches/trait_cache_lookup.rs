@@ -16,11 +16,8 @@ use qubit_reflect::__private::codegen_v3::descriptor::external_supertrait;
 
 /// Registers a hot lookup after priming the exact external application.
 fn trait_cache_lookup(criterion: &mut Criterion) {
-    let first = external_supertrait::<dyn std::fmt::Display>(
-        "benchmark.external.display",
-        "std::fmt::Display",
-        Vec::new(),
-    );
+    let first =
+        external_supertrait::<dyn std::fmt::Display>("benchmark.external.display", "std::fmt::Display", Vec::new());
     black_box(first);
 
     criterion.bench_function("trait_cache/hot_external_supertrait", |bench| {

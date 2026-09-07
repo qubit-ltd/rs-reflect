@@ -36,9 +36,7 @@ pub enum ExpressionError {
     #[error("a lifetime-outlives predicate must contain at least one bound")]
     EmptyLifetimeBounds,
     /// Trait bounds and their modifiers had different lengths.
-    #[error(
-        "trait-bound modifiers must match bounds: {bounds} bounds, {modifiers} modifiers"
-    )]
+    #[error("trait-bound modifiers must match bounds: {bounds} bounds, {modifiers} modifiers")]
     BoundModifierCount {
         /// Number of trait bounds.
         bounds: usize,

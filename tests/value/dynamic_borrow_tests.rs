@@ -18,14 +18,8 @@ fn local_dynamic_values_can_be_reborrowed_and_cloned() {
     let borrowed = owned.as_reflected_ref();
     let cloned: DynamicRef<'_, Local> = borrowed.clone();
 
-    assert_eq!(
-        borrowed.downcast_ref::<String>().map(String::as_str),
-        Some("value")
-    );
-    assert_eq!(
-        cloned.downcast_ref::<String>().map(String::as_str),
-        Some("value")
-    );
+    assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("value"));
+    assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("value"));
     owned
         .as_reflected_mut()
         .downcast_mut::<String>()

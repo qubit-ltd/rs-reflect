@@ -53,10 +53,7 @@ impl EnumReprIr {
     }
 
     /// Emits the public structured representation value for descriptor data.
-    pub(super) fn descriptor_tokens(
-        &self,
-        facade: &TokenStream,
-    ) -> TokenStream {
+    pub(super) fn descriptor_tokens(&self, facade: &TokenStream) -> TokenStream {
         match self {
             Self::Rust => {
                 quote!(#facade::__private::codegen_v3::descriptor::EnumRepr::Rust)

@@ -18,8 +18,7 @@ use qubit_reflect::registry::ReflectRegistry;
 
 struct ManuallyReflected;
 
-static MANUALLY_REFLECTED_DESCRIPTOR: TypeDescriptor =
-    opaque_root::<ManuallyReflected>("ManuallyReflected");
+static MANUALLY_REFLECTED_DESCRIPTOR: TypeDescriptor = opaque_root::<ManuallyReflected>("ManuallyReflected");
 
 impl Reflect for ManuallyReflected {
     /// Returns the manually authored descriptor used by this integration test.
@@ -33,14 +32,10 @@ register_reflected_type!(ManuallyReflected);
 /// Verifies the public registration macro contributes to the central registry.
 #[test]
 fn test_register_reflected_type_adds_type_to_reflect_registry() {
-    let registry = ReflectRegistry::initialize()
-        .expect("the registration must produce a valid registry");
+    let registry = ReflectRegistry::initialize().expect("the registration must produce a valid registry");
     let registered = registry
         .get(TypeId::of::<ManuallyReflected>())
         .expect("the manually registered type must be discoverable");
 
-    assert!(std::ptr::eq(
-        registered,
-        ManuallyReflected::type_descriptor()
-    ));
+    assert!(std::ptr::eq(registered, ManuallyReflected::type_descriptor()));
 }
