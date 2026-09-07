@@ -180,7 +180,10 @@ fn invoke_default_owned(registry: &ReflectRegistry, method_name: &str) -> Dynami
     let output = default_method(registry, method_name)
         .adapter()
         .expect("safe default output shape needs an adapter")
-        .invoke_local(Invocation::associated([]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("local default adapter must be present")
         .expect("default invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -228,9 +231,12 @@ fn test_default_trait_adapter_preserves_the_dedicated_str_variant_and_origin() {
     let output = default_method(registry, "default_shared_str")
         .adapter()
         .expect("shared str default method needs an adapter")
-        .invoke_local(Invocation::associated([reflect::invoke::InvocationArg::Ref(
-            reflect::value::DynamicRef::<reflect::value::Local>::new_str("default"),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([reflect::invoke::InvocationArg::Ref(reflect::value::DynamicRef::<
+                reflect::value::Local,
+            >::new_str("default"))]),
+        )
         .expect("local default adapter must be present")
         .expect("shared str default invocation must validate");
     let InvocationOutput::Ref { value, origins } = output else {
@@ -275,7 +281,10 @@ fn test_default_trait_adapter_supports_owned_smart_receivers() {
         let output = instance
             .adapter()
             .expect("safe default smart receiver needs an adapter")
-            .invoke_local(Invocation::owned(receiver, []))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::owned(receiver, []),
+            )
             .expect("local default adapter must be present")
             .expect("default smart receiver invocation must validate");
         let InvocationOutput::Owned(value) = output else {
@@ -297,7 +306,10 @@ fn test_default_trait_adapter_supports_pinned_borrow_receivers() {
     let output = shared_instance
         .adapter()
         .expect("default pinned shared receiver needs an adapter")
-        .invoke_pinned_ref_local(reflect::invoke::PinnedRefInvocation::new(shared_receiver.as_ref(), []))
+        .invoke_pinned_ref_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            reflect::invoke::PinnedRefInvocation::new(shared_receiver.as_ref(), []),
+        )
         .expect("default pinned shared entry point must be present")
         .expect("default pinned shared invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -314,7 +326,10 @@ fn test_default_trait_adapter_supports_pinned_borrow_receivers() {
     let output = mutable_instance
         .adapter()
         .expect("default pinned mutable receiver needs an adapter")
-        .invoke_pinned_mut_local(reflect::invoke::PinnedMutInvocation::new(mutable_receiver.as_mut(), []))
+        .invoke_pinned_mut_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            reflect::invoke::PinnedMutInvocation::new(mutable_receiver.as_mut(), []),
+        )
         .expect("default pinned mutable entry point must be present")
         .expect("default pinned mutable invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -332,11 +347,21 @@ fn test_default_trait_adapter_supports_thread_safe_mode() {
     let instance = default_method(registry, "default_thread_safe");
     assert!(instance.unavailable_reasons().is_empty());
     let adapter = instance.adapter().expect("thread-safe default method needs an adapter");
-    assert!(adapter.invoke_local(Invocation::associated([])).is_none());
+    assert!(
+        adapter
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
     let output = adapter
-        .invoke_thread_safe(Invocation::associated([reflect::invoke::InvocationArg::Owned(
-            reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::new(51_u8),
-        )]))
+        .invoke_thread_safe(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([reflect::invoke::InvocationArg::Owned(reflect::value::DynamicOwned::<
+                reflect::value::ThreadSafe,
+            >::new(51_u8))]),
+        )
         .expect("thread-safe default entry point must be present")
         .expect("thread-safe default invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -357,7 +382,10 @@ fn test_default_trait_adapter_supports_catching_and_thread_safe_composition() {
     let local = local.adapter().expect("catching default method needs an adapter");
     assert_eq!(local.catching_availability(), CatchingAvailability::Available);
     let panic = match local
-        .invoke_catching_local(Invocation::associated([]))
+        .invoke_catching_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("local catching default entry point must be present")
         .expect("local catching default invocation must validate")
     {
@@ -375,9 +403,19 @@ fn test_default_trait_adapter_supports_catching_and_thread_safe_composition() {
         .adapter()
         .expect("thread-safe catching default method needs an adapter");
     assert_eq!(combined.catching_availability(), CatchingAvailability::Available);
-    assert!(combined.invoke_catching_local(Invocation::associated([])).is_none());
+    assert!(
+        combined
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
     let panic = match combined
-        .invoke_catching_thread_safe(Invocation::associated([]))
+        .invoke_catching_thread_safe(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("thread-safe catching default entry point must be present")
         .expect("thread-safe catching default invocation must validate")
     {

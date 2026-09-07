@@ -104,10 +104,13 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
     };
     let suffix = String::from("world");
     let output = method("borrowed_local")
-        .invoke_local(Invocation::borrowed(
-            DynamicRef::<Local>::new(&worker),
-            [InvocationArg::Ref(DynamicRef::<Local>::new(&suffix))],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(
+                DynamicRef::<Local>::new(&worker),
+                [InvocationArg::Ref(DynamicRef::<Local>::new(&suffix))],
+            ),
+        )
         .expect("the default local adapter must exist")
         .expect("borrow validation must succeed");
     let InvocationOutput::Future(mut future) = output else {
@@ -127,9 +130,10 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
 #[test]
 fn test_local_async_adapter_accepts_a_non_send_future() {
     let output = method("non_send_local")
-        .invoke_local(Invocation::associated([InvocationArg::Owned(
-            DynamicOwned::<Local>::new(6_u8),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(6_u8))]),
+        )
         .expect("the default local adapter must exist")
         .expect("owned validation must succeed");
     let InvocationOutput::Future(mut future) = output else {
@@ -148,13 +152,21 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
 fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability() {
     let polls = Arc::new(AtomicUsize::new(0));
     let output = method("send_future")
-        .invoke_thread_safe(Invocation::associated([InvocationArg::Owned(
-            DynamicOwned::<ThreadSafe>::new(Arc::clone(&polls)),
-        )]))
+        .invoke_thread_safe(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<ThreadSafe>::new(Arc::clone(
+                &polls,
+            )))]),
+        )
         .expect("the explicit thread-safe adapter must exist")
         .expect("owned validation must succeed");
     assert!(
-        method("send_future").invoke_local(Invocation::associated([])).is_none(),
+        method("send_future")
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none(),
         "thread-safe capability must not be inferred as local"
     );
     let InvocationOutput::Future(future) = output else {
@@ -183,14 +195,29 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         ordinary.adapter().unwrap().catching_availability(),
         CatchingAvailability::NotRequested
     );
-    assert!(ordinary.invoke_catching_local(Invocation::associated([])).is_none());
     assert!(
-        ordinary.invoke_thread_safe(Invocation::associated([])).is_none(),
+        ordinary
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
+    assert!(
+        ordinary
+            .invoke_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none(),
         "thread-safe capability must require its explicit attribute"
     );
     let payload = match catch_unwind(AssertUnwindSafe(|| {
         ordinary
-            .invoke_local(Invocation::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([]),
+            )
             .expect("the normal adapter must exist")
             .expect("validation must succeed")
     })) {
@@ -208,7 +235,10 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
     );
     let payload = match catch_unwind(AssertUnwindSafe(|| {
         catching
-            .invoke_local(Invocation::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([]),
+            )
             .expect("the normal adapter must remain present")
             .expect("validation must succeed")
     })) {
@@ -219,7 +249,10 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
     };
     assert_eq!(payload.downcast_ref::<&str>(), Some(&"caught panic payload"));
     let panic = match catching
-        .invoke_catching_local(Invocation::associated([]))
+        .invoke_catching_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("the explicit catching adapter must exist")
         .expect("validation must succeed")
     {
@@ -232,14 +265,31 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
 #[test]
 fn test_thread_safe_and_catching_attributes_compose_explicitly() {
     let catching = method("thread_safe_catching_panic");
-    assert!(catching.invoke_local(Invocation::associated([])).is_none());
-    assert!(catching.invoke_catching_local(Invocation::associated([])).is_none());
+    assert!(
+        catching
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
+    assert!(
+        catching
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
     assert_eq!(
         catching.adapter().unwrap().catching_availability(),
         CatchingAvailability::Available
     );
     let panic = match catching
-        .invoke_catching_thread_safe(Invocation::associated([]))
+        .invoke_catching_thread_safe(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("the explicit thread-safe catching adapter must exist")
         .expect("validation must succeed")
     {

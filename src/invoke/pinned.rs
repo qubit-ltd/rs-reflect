@@ -19,16 +19,19 @@ use crate::invoke::InvocationBinding;
 use crate::invoke::InvocationError;
 use crate::invoke::InvocationMode;
 use crate::invoke::InvocationOutput;
+use crate::registry::ReflectRegistry;
 
 /// A generated entry point for a method whose receiver is `Pin<&T>`.
 pub type PinnedRefAdapter<T, M> =
-    for<'call> fn(
+    for<'registry, 'call> fn(
+        &'registry ReflectRegistry,
         PinnedRefInvocation<'call, T, M>,
     ) -> Result<InvocationOutput<'call, M>, PinnedRefInvocationFailure<'call, T, M>>;
 
 /// A generated entry point for a method whose receiver is `Pin<&mut T>`.
 pub type PinnedMutAdapter<T, M> =
-    for<'call> fn(
+    for<'registry, 'call> fn(
+        &'registry ReflectRegistry,
         PinnedMutInvocation<'call, T, M>,
     ) -> Result<InvocationOutput<'call, M>, PinnedMutInvocationFailure<'call, T, M>>;
 

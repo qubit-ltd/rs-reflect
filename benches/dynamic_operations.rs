@@ -21,6 +21,7 @@ use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationOutput;
 use qubit_reflect::reflect_impl;
+use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
@@ -43,12 +44,10 @@ impl BenchmarkRecord {
 
 /// Registers direct and reflected operation pairs.
 fn dynamic_operations(criterion: &mut Criterion) {
+    let registry = ReflectRegistry::initialize().expect("benchmark registry must initialize");
     let descriptor = TypeDescriptor::of::<BenchmarkRecord>();
     let field = descriptor.field("id").expect("benchmark field must exist");
-    let MethodLookup::Unique(method) = descriptor
-        .methods_named("increment")
-        .expect("benchmark registry must initialize")
-    else {
+    let MethodLookup::Unique(method) = descriptor.methods_named_in(registry, "increment") else {
         panic!("benchmark method must resolve uniquely");
     };
 
@@ -67,10 +66,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
 
     let mut method_probe = BenchmarkRecord { id: 2 };
     let method_probe_output = method
-        .invoke_local(Invocation::borrowed_mut(
-            DynamicMut::<Local>::new(&mut method_probe),
-            [],
-        ))
+        .invoke_local(
+            registry,
+            Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut method_probe), []),
+        )
         .expect("dynamic method setup must have an adapter")
         .expect("dynamic method setup must validate");
     let InvocationOutput::Owned(method_probe_value) = method_probe_output else {
@@ -118,7 +117,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
         bench.iter_batched(
             || BenchmarkRecord { id: 0 },
             |mut value| {
-                let output = method.invoke_local(Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut value), []));
+                let output = method.invoke_local(
+                    registry,
+                    Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut value), []),
+                );
                 black_box(output.is_some());
             },
             BatchSize::SmallInput,

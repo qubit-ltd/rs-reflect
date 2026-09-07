@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-use qubit_reflect::__private::codegen_v2::descriptor::opaque_root_with_capabilities;
+use qubit_reflect::__private::codegen_v3::descriptor::opaque_root_with_capabilities;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;

@@ -516,23 +516,33 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
         &self.arguments
     }
 
-    /// Resolves an explicit receiver adapter from the global registry.
+    /// Resolves an explicit receiver adapter from the caller-selected registry.
     ///
-    /// Registry and intrinsic capability conflicts are returned with every
+    /// Intrinsic capability conflicts are returned with every
     /// input intact, including caller-order named bindings. A valid absent
     /// adapter is reported separately by [`Self::adapt_receiver`].
-    pub fn adapt_registered_receiver<R: 'static>(
+    /// No process-global registry is consulted. The registry borrow does not
+    /// escape into the adapted receiver or recovery.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capability-resolution error for an invalid intrinsic set,
+    /// an unavailable error for an absent, fact-only, or mistyped adapter,
+    /// or a rejection error if the adapter rejects the receiver. Every such
+    /// failure retains inputs and names in their original caller order.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from capability providers and receiver adapters.
+    pub fn adapt_receiver_in<R: 'static>(
         self,
+        registry: &crate::registry::ReflectRegistry,
         method_identity: &MemberId,
         descriptor: &crate::descriptor::TypeDescriptor,
     ) -> ReceiverAdaptationResult<'call, R, M>
     where
         M: 'static,
     {
-        let registry = match crate::registry::ReflectRegistry::initialize() {
-            Ok(registry) => registry,
-            Err(error) => return Err(self.reject(method_identity, InvocationErrorKind::RegistryInitialization(error))),
-        };
         let adapter = match registry.capability(descriptor, crate::invoke::receiver_adapter_key::<R, M>()) {
             Ok(adapter) => adapter,
             Err(error) => return Err(self.reject(method_identity, InvocationErrorKind::CapabilityResolution(error))),

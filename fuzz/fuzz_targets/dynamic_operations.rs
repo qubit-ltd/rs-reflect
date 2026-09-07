@@ -68,7 +68,7 @@ fuzz_target!(|unbounded: &[u8]| {
         .get(descriptor.type_id())
         .expect("the derived fuzz target must be registered");
     let field = descriptor.field("value").expect("derived field");
-    let MethodLookup::Unique(method) = descriptor.methods_named("add").expect("registry lookup") else {
+    let MethodLookup::Unique(method) = descriptor.methods_named_in(registry, "add") else {
         panic!("derived method must resolve uniquely");
     };
 
@@ -98,10 +98,13 @@ fuzz_target!(|unbounded: &[u8]| {
             }),
             3 => assert_one_recovered_drop(|argument| {
                 let result = method
-                    .invoke_local(Invocation::borrowed_mut(
-                        DynamicMut::<Local>::new(&mut record),
-                        [InvocationArg::Owned(argument)],
-                    ))
+                    .invoke_local(
+                        registry,
+                        Invocation::borrowed_mut(
+                            DynamicMut::<Local>::new(&mut record),
+                            [InvocationArg::Owned(argument)],
+                        ),
+                    )
                     .expect("generated adapter");
                 let Err(failure) = result else {
                     panic!("wrong invocation argument type");

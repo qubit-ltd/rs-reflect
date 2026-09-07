@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-use qubit_reflect::__private::codegen_v2::descriptor::opaque_root;
+use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::TypeDescriptor;

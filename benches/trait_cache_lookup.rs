@@ -12,7 +12,7 @@ use criterion::Criterion;
 use criterion::black_box;
 use criterion::criterion_group;
 use criterion::criterion_main;
-use qubit_reflect::__private::codegen_v2::descriptor::external_supertrait;
+use qubit_reflect::__private::codegen_v3::descriptor::external_supertrait;
 
 /// Registers a hot lookup after priming the exact external application.
 fn trait_cache_lookup(criterion: &mut Criterion) {

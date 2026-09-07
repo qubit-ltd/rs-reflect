@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact registration surface consumed by codegen v2.
+//! Exact registration surface consumed by codegen v3.
 
 #[doc(hidden)]
 pub use crate::__private::registration::CapabilityRegistration;
@@ -22,7 +22,5 @@ pub use crate::__private::registration::RegistrationFragment;
 pub use crate::__private::registration::RuntimeIdentity;
 #[doc(hidden)]
 pub use crate::__private::registration::StaticFragmentIdentity;
-#[doc(hidden)]
-pub use crate::__private::registration::has_registered_capability;
 #[doc(hidden)]
 pub use crate::registry::ReflectRegistry;

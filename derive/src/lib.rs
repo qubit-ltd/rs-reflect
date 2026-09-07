@@ -10,7 +10,7 @@
 //!
 //! Generated code uses the runtime selected by `#[reflect(crate = path)]` and
 //! reaches implementation details only through that runtime's versioned
-//! `__private::codegen_v2` protocol. Applications should normally use the
+//! `__private::codegen_v3` protocol. Applications should normally use the
 //! re-exported macros from `qubit-reflect` instead of depending on this crate
 //! directly.
 
@@ -31,7 +31,7 @@ use ir::MacroKind;
 ///
 /// Generic facade macros may request `definition_provider_v2 = identifier`.
 /// It emits the caller-named `fn() -> &'static TypeDefinitionDescriptor` without
-/// requiring a concrete monomorph, using `facade::__private::codegen_v2` types.
+/// requiring a concrete monomorph, using `facade::__private::codegen_v3` types.
 /// The helper is valid only on generic types; the identifier belongs to the caller.
 ///
 /// Type-level helpers include `rename`, `opaque`, `capabilities(...)`, and
@@ -41,7 +41,7 @@ use ir::MacroKind;
 /// conflicting policies with source-oriented compiler diagnostics.
 ///
 /// `crate = path` is intended for downstream facades. The selected facade must
-/// expose the matching `__private::codegen_v2` protocol; generated code does
+/// expose the matching `__private::codegen_v3` protocol; generated code does
 /// not require it to re-export the runtime's public modules.
 ///
 /// See the

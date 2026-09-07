@@ -6,7 +6,6 @@
 
 //! Invalid intrinsic facts on unregistered monomorphs must remain errors.
 #![cfg(feature = "derive")]
-
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::ReflectedOwned;
@@ -15,6 +14,7 @@ use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::registry::RegistrySnapshotBuilder;
 
 /// The shared capability contract intentionally registered twice.
 fn key() -> CapabilityKey<fn()> {
@@ -148,6 +148,7 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
 
 #[test]
 fn test_receiver_capability_conflict_preserves_validated_inputs() {
+    let registry = RegistrySnapshotBuilder::new().build().unwrap();
     use qubit_reflect::identity::FragmentIdentity;
     use qubit_reflect::identity::MemberId;
     use qubit_reflect::invoke::ArgumentExpectation;
@@ -175,7 +176,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
             &[ArgumentExpectation::owned::<u8>()],
         )
         .unwrap();
-    let failure = match validated.adapt_registered_receiver::<()>(&identity, TypeDescriptor::of::<Conflict<u16>>()) {
+    let failure = match validated.adapt_receiver_in::<()>(&registry, &identity, TypeDescriptor::of::<Conflict<u16>>()) {
         Err(failure) => failure,
         Ok(_) => panic!("invalid capabilities must reject adaptation"),
     };

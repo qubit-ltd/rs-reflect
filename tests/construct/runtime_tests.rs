@@ -16,7 +16,7 @@ mod construction_runtime {
     use std::sync::atomic::Ordering;
 
     use qubit_reflect as reflect;
-    use qubit_reflect::__private::codegen_v2::descriptor;
+    use qubit_reflect::__private::codegen_v3::descriptor;
     use qubit_reflect::access::VariantActiveAdapter;
     use qubit_reflect::construct::ConstructionError;
     use qubit_reflect::construct::ConstructionField;

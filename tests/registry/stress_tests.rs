@@ -16,12 +16,12 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v2::registration::CapabilityTarget as RegistrationCapabilityTarget;
-use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v3::registration::CapabilityTarget as RegistrationCapabilityTarget;
+use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use qubit_reflect::__private::testing::CapabilityRegistration;
 use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::Reflect;
@@ -62,9 +62,9 @@ struct NameCandidateRight;
 struct CapabilityTarget;
 
 static NAME_LEFT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<NameCandidateLeft>("stress-name");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<NameCandidateLeft>("stress-name");
 static NAME_RIGHT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<NameCandidateRight>("stress-name");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<NameCandidateRight>("stress-name");
 
 const fn identity(module: &'static str, line: u32, fingerprint: u64) -> StaticFragmentIdentity {
     StaticFragmentIdentity::new("stress-fixture", module, line, 1, "type", fingerprint)

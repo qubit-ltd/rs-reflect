@@ -215,7 +215,13 @@ impl IntoIterator for ImplDefinitionCandidates {
     }
 }
 
-/// The immutable process-wide snapshot of linked reflection fragments.
+/// An immutable snapshot of validated reflection fragments.
+///
+/// [`Self::initialize`] resolves linked inventory once for the process;
+/// [`super::RegistrySnapshotBuilder`] constructs independent snapshots from
+/// explicit facts. Pass the selected snapshot to both method lookup and
+/// invocation. Receiver capabilities never fall back to another registry.
+/// Invocation outputs and futures do not borrow this snapshot.
 ///
 /// # Examples
 ///

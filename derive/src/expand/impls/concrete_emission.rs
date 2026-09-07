@@ -54,21 +54,21 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
             #(#invocation_adapter_definitions)*
             #(#generic_specialization_adapter_definitions)*
 
-            fn fragment_identity() -> #facade::__private::codegen_v2::identity::FragmentIdentity {
-                #facade::__private::codegen_v2::identity::FragmentIdentity::new(
+            fn fragment_identity() -> #facade::__private::codegen_v3::identity::FragmentIdentity {
+                #facade::__private::codegen_v3::identity::FragmentIdentity::new(
                     env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
                     "impl", #fingerprint,
                 )
             }
 
-            fn runtime_identity() -> #facade::__private::codegen_v2::registration::RuntimeIdentity {
-                #facade::__private::codegen_v2::registration::RuntimeIdentity::Impl(
+            fn runtime_identity() -> #facade::__private::codegen_v3::registration::RuntimeIdentity {
+                #facade::__private::codegen_v3::registration::RuntimeIdentity::Impl(
                     ::std::any::TypeId::of::<#target>(),
                 )
             }
 
-            fn payload() -> #facade::__private::codegen_v2::registration::FragmentPayload {
-                static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v2::descriptor::ImplDescriptor> =
+            fn payload() -> #facade::__private::codegen_v3::registration::FragmentPayload {
+                static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v3::descriptor::ImplDescriptor> =
                     ::std::sync::OnceLock::new();
                 let descriptor = DESCRIPTOR.get_or_init(|| {
                     let (
@@ -79,26 +79,26 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                         associated_type_resolvers,
                         associated_const_readers,
                     ): (
-                        Option<&'static #facade::__private::codegen_v2::descriptor::TraitDefinitionDescriptor>,
-                        Option<&'static #facade::__private::codegen_v2::descriptor::TraitDescriptor>,
-                        &'static [Option<&'static #facade::__private::codegen_v2::descriptor::InvocationAdapter>],
-                        &'static [&'static [#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason]],
-                        &'static [Option<#facade::__private::codegen_v2::descriptor::TypeDescriptorResolver>],
-                        &'static [Option<&'static #facade::__private::codegen_v2::descriptor::AssociatedConstReader>],
+                        Option<&'static #facade::__private::codegen_v3::descriptor::TraitDefinitionDescriptor>,
+                        Option<&'static #facade::__private::codegen_v3::descriptor::TraitDescriptor>,
+                        &'static [Option<&'static #facade::__private::codegen_v3::descriptor::InvocationAdapter>],
+                        &'static [&'static [#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason]],
+                        &'static [Option<#facade::__private::codegen_v3::descriptor::TypeDescriptorResolver>],
+                        &'static [Option<&'static #facade::__private::codegen_v3::descriptor::AssociatedConstReader>],
                     ) = #trait_setup;
-                    let definition: &'static #facade::__private::codegen_v2::descriptor::ImplDefinitionDescriptor =
+                    let definition: &'static #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor =
                         #definition_setup;
-                    let methods: &'static [#facade::__private::codegen_v2::descriptor::MethodDescriptor] =
+                    let methods: &'static [#facade::__private::codegen_v3::descriptor::MethodDescriptor] =
                         ::std::boxed::Box::leak(::std::vec![#(#method_entries),*].into_boxed_slice());
-                    let adapters: &[Option<&'static #facade::__private::codegen_v2::descriptor::InvocationAdapter>] =
+                    let adapters: &[Option<&'static #facade::__private::codegen_v3::descriptor::InvocationAdapter>] =
                         &[#(#invocation_adapter_entries),*];
                     let declared_unavailable_reasons: &[&[
-                        #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason
+                        #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                     ]] = &[#(#invocation_unavailable_reason_entries),*];
                     let specializations: ::std::vec::Vec<::std::vec::Vec<(
-                        ::std::boxed::Box<[#facade::__private::codegen_v2::expression::GenericArgument]>,
-                        Option<&'static #facade::__private::codegen_v2::descriptor::InvocationAdapter>,
-                        &'static [#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason],
+                        ::std::boxed::Box<[#facade::__private::codegen_v3::expression::GenericArgument]>,
+                        Option<&'static #facade::__private::codegen_v3::descriptor::InvocationAdapter>,
+                        &'static [#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason],
                     )>> = ::std::vec![#(#method_specialization_entries),*];
                     let method_instances = if let Some(trait_descriptor) = implemented_trait {
                         trait_descriptor.methods().iter().enumerate().flat_map(|(declaration_index, declaration)| {
@@ -118,10 +118,10 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                                 } else {
                                                     reasons.to_vec().into_boxed_slice()
                                                 };
-                                                #facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::with_arguments(
+                                                #facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::with_arguments(
                                                     declaration,
                                                     Some(method),
-                                                    #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Overridden,
+                                                    #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Overridden,
                                                     adapter,
                                                     arguments,
                                                     unavailable_reasons,
@@ -131,7 +131,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                     }
                                     let adapter = adapters[method_index];
                                     let unavailable_reasons: ::std::boxed::Box<[
-                                        #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason
+                                        #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                                     ]> = if adapter.is_some() {
                                         ::std::vec![].into_boxed_slice()
                                     } else {
@@ -139,10 +139,10 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                             .to_vec()
                                             .into_boxed_slice()
                                     };
-                                    ::std::vec![#facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::new(
+                                    ::std::vec![#facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::new(
                                         declaration,
                                         Some(method),
-                                        #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Overridden,
+                                        #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Overridden,
                                         adapter,
                                         unavailable_reasons,
                                     ).expect("generated trait method instance is consistent")]
@@ -153,7 +153,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                         .copied()
                                         .flatten();
                                     let unavailable_reasons: ::std::boxed::Box<[
-                                        #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason
+                                        #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                                     ]> = if adapter.is_some() {
                                         ::std::vec![].into_boxed_slice()
                                     } else {
@@ -161,25 +161,25 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                             .get(declaration_index)
                                             .copied()
                                             .unwrap_or(&[
-                                                #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::DisabledByPolicy,
+                                                #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::DisabledByPolicy,
                                             ])
                                             .to_vec()
                                             .into_boxed_slice()
                                     };
-                                    ::std::vec![#facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::new(
+                                    ::std::vec![#facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::new(
                                         declaration,
                                         None,
-                                        #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Defaulted,
+                                        #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Defaulted,
                                         adapter,
                                         unavailable_reasons,
                                     ).expect("generated default trait method instance is consistent")]
                                 },
-                                None => ::std::vec![#facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::new(
+                                None => ::std::vec![#facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::new(
                                     declaration, None,
-                                    #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Required,
+                                    #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Required,
                                     None,
                                     ::std::boxed::Box::new([
-                                        #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::DisabledByPolicy,
+                                        #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::DisabledByPolicy,
                                     ]),
                                 ).expect("generated required trait method instance is consistent")],
                             }
@@ -189,16 +189,16 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                             if !specializations[index].is_empty() {
                                 return specializations[index].iter().cloned().map(|(arguments, adapter, reasons)| {
                                     let unavailable_reasons: ::std::boxed::Box<[
-                                        #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason
+                                        #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                                     ]> = if adapter.is_some() {
                                         ::std::vec![].into_boxed_slice()
                                     } else {
                                         reasons.to_vec().into_boxed_slice()
                                     };
-                                    #facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::with_arguments(
+                                    #facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::with_arguments(
                                         method,
                                         None,
-                                        #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Declared,
+                                        #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Declared,
                                         adapter,
                                         arguments,
                                         unavailable_reasons,
@@ -206,7 +206,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                 }).collect::<::std::vec::Vec<_>>();
                             }
                             let unavailable_reasons: ::std::boxed::Box<[
-                                #facade::__private::codegen_v2::descriptor::InvocationUnavailableReason
+                                #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                             ]> = if adapter.is_some() {
                                 ::std::vec![] .into_boxed_slice()
                             } else {
@@ -214,10 +214,10 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                     .to_vec()
                                     .into_boxed_slice()
                             };
-                            ::std::vec![#facade::__private::codegen_v2::descriptor::MethodInstanceDescriptor::new(
+                            ::std::vec![#facade::__private::codegen_v3::descriptor::MethodInstanceDescriptor::new(
                                 method,
                                 None,
-                                #facade::__private::codegen_v2::descriptor::MethodImplementationSource::Declared,
+                                #facade::__private::codegen_v3::descriptor::MethodImplementationSource::Declared,
                                 adapter,
                                 unavailable_reasons,
                             ).expect("generated inherent method instance is consistent")]
@@ -239,7 +239,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                     #(#specialized_associated_type_resolver_arms,)*
                                     _ => None,
                                 });
-                            #facade::__private::codegen_v2::descriptor::AssociatedTypeBindingDescriptor::new(
+                            #facade::__private::codegen_v3::descriptor::AssociatedTypeBindingDescriptor::new(
                                 declaration,
                                 value,
                                 concrete_type,
@@ -250,7 +250,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                         trait_descriptor.associated_consts().iter().enumerate().map(|(index, declaration)| {
                             let implementation_source = match declaration.rust_name() {
                                 #(#associated_const_override_arms,)*
-                                _ => #facade::__private::codegen_v2::descriptor::AssociatedConstImplementationSource::Defaulted,
+                                _ => #facade::__private::codegen_v3::descriptor::AssociatedConstImplementationSource::Defaulted,
                             };
                             let reader = match declaration.rust_name() {
                                 #(#associated_const_reader_override_arms,)*
@@ -259,16 +259,16 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                                     .copied()
                                     .flatten(),
                             };
-                            #facade::__private::codegen_v2::descriptor::AssociatedConstBindingDescriptor::new(
+                            #facade::__private::codegen_v3::descriptor::AssociatedConstBindingDescriptor::new(
                                 declaration,
                                 implementation_source,
                                 reader,
                             )
                         }).collect()
                     });
-                    let mut builder = #facade::__private::codegen_v2::descriptor::ImplDescriptor::builder(
+                    let mut builder = #facade::__private::codegen_v3::descriptor::ImplDescriptor::builder(
                         definition,
-                        || <#target as #facade::__private::codegen_v2::Reflect>::type_descriptor(),
+                        || <#target as #facade::__private::codegen_v3::Reflect>::type_descriptor(),
                     )
                     .methods(methods)
                     .method_instances(method_instances)
@@ -280,13 +280,13 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                     }
                     builder.build().expect("generated impl descriptor is consistent")
                 });
-                #facade::__private::codegen_v2::registration::FragmentPayload::Impl(descriptor)
+                #facade::__private::codegen_v3::registration::FragmentPayload::Impl(descriptor)
             }
 
-            #facade::__private::codegen_v2::inventory::submit! {
-                #facade::__private::codegen_v2::registration::RegistrationFragment::new(
-                    #facade::__private::codegen_v2::registration::FragmentKind::Impl,
-                    #facade::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v3::inventory::submit! {
+                #facade::__private::codegen_v3::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v3::registration::FragmentKind::Impl,
+                    #facade::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
                         "impl", #fingerprint,
                     ),

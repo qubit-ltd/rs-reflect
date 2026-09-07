@@ -8,14 +8,14 @@
 
 #![cfg(feature = "derive")]
 
-use qubit_reflect::__private::codegen_v2::inventory;
-use qubit_reflect::__private::codegen_v2::registration::CapabilityRegistration;
-use qubit_reflect::__private::codegen_v2::registration::CapabilityTarget;
-use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v3::inventory;
+use qubit_reflect::__private::codegen_v3::registration::CapabilityRegistration;
+use qubit_reflect::__private::codegen_v3::registration::CapabilityTarget;
+use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;

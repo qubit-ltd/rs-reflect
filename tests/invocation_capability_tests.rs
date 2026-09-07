@@ -8,7 +8,7 @@
 
 // qubit-style: allow explicit-imports
 //! Standalone coverage for invocation capability descriptor state.
-
+use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::CatchingAvailability;
 use qubit_reflect::descriptor::InvocationAdapter;
 use qubit_reflect::invoke::CatchingInvocationResult;
@@ -20,23 +20,31 @@ use qubit_reflect::value::Local;
 use qubit_reflect::value::ThreadSafe;
 
 fn return_seven<'call>(
+    _registry: &ReflectRegistry,
     _invocation: Invocation<'call, Local>,
 ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
     Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(7_u8)))
 }
 
 fn return_eight<'call>(
+    _registry: &ReflectRegistry,
     _invocation: Invocation<'call, ThreadSafe>,
 ) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
     Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
 }
 
-fn catch_seven<'call>(invocation: Invocation<'call, Local>) -> CatchingInvocationResult<'call, Local> {
-    return_seven(invocation).map(Ok)
+fn catch_seven<'call>(
+    _registry: &ReflectRegistry,
+    invocation: Invocation<'call, Local>,
+) -> CatchingInvocationResult<'call, Local> {
+    return_seven(_registry, invocation).map(Ok)
 }
 
-fn catch_eight<'call>(invocation: Invocation<'call, ThreadSafe>) -> CatchingInvocationResult<'call, ThreadSafe> {
-    return_eight(invocation).map(Ok)
+fn catch_eight<'call>(
+    _registry: &ReflectRegistry,
+    invocation: Invocation<'call, ThreadSafe>,
+) -> CatchingInvocationResult<'call, ThreadSafe> {
+    return_eight(_registry, invocation).map(Ok)
 }
 
 #[test]
@@ -45,7 +53,10 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
     assert_eq!(local.catching_availability(), CatchingAvailability::Available);
     assert!(
         local
-            .invoke_catching_local(Invocation::associated([]))
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
             .expect("the local catching entry point must be present")
             .expect("validation must succeed")
             .is_ok()
@@ -55,7 +66,10 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
     assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
     assert!(
         thread_safe
-            .invoke_catching_thread_safe(Invocation::associated([]))
+            .invoke_catching_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
             .expect("the thread-safe catching entry point must be present")
             .expect("validation must succeed")
             .is_ok()
@@ -72,5 +86,12 @@ fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catch
         unavailable.catching_availability(),
         CatchingAvailability::UnavailablePanicAbort
     );
-    assert!(unavailable.invoke_catching_local(Invocation::associated([])).is_none());
+    assert!(
+        unavailable
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
 }
