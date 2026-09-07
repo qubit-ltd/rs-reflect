@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact invocation surface consumed by codegen v2.
+//! Exact invocation surface consumed by codegen v3.
 
 #[doc(hidden)]
 pub use crate::invoke::ArgumentExpectation;
@@ -46,3 +46,6 @@ pub use crate::invoke::ReceiverExpectation;
 pub use crate::invoke::ReflectedFuture;
 #[doc(hidden)]
 pub use crate::invoke::receiver_adapter_key;
+/// The explicit immutable snapshot supplied to every generated invocation.
+#[doc(hidden)]
+pub use crate::registry::ReflectRegistry;

@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact capability surface consumed by codegen v2.
+//! Exact capability surface consumed by codegen v3.
 
 #[doc(hidden)]
 pub use crate::capability::TypeCapabilities;

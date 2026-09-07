@@ -45,34 +45,34 @@ pub(crate) fn emit_unavailable_reasons(
     };
     let reasons = reasons.iter().map(|reason| match reason {
         UnavailableReasonPlan::UnsupportedReceiver => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnsupportedReceiver)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnsupportedReceiver)
         }
         UnavailableReasonPlan::UnspecializedGeneric => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnspecializedGeneric)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnspecializedGeneric)
         }
-        UnavailableReasonPlan::UnsafeMethod => quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnsafeMethod),
+        UnavailableReasonPlan::UnsafeMethod => quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnsafeMethod),
         UnavailableReasonPlan::UnsupportedAbi => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnsupportedAbi)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnsupportedAbi)
         }
-        UnavailableReasonPlan::Variadic => quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::Variadic),
+        UnavailableReasonPlan::Variadic => quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::Variadic),
         UnavailableReasonPlan::UnsupportedBorrowedReturn => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnsupportedBorrowedReturn)
         }
-        UnavailableReasonPlan::OpaqueReturn => quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::OpaqueReturn),
+        UnavailableReasonPlan::OpaqueReturn => quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::OpaqueReturn),
         UnavailableReasonPlan::UnsupportedUnsizedValue => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnsupportedUnsizedValue)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnsupportedUnsizedValue)
         }
         UnavailableReasonPlan::UnprovenDefaultConstraint => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnprovenDefaultConstraint)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnprovenDefaultConstraint)
         }
         UnavailableReasonPlan::UnprovenAssociatedType => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::UnprovenAssociatedType)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::UnprovenAssociatedType)
         }
         UnavailableReasonPlan::PinnedModeConflict => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::PinnedModeConflict)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::PinnedModeConflict)
         }
         UnavailableReasonPlan::DisabledByPolicy => {
-            quote!(#facade::__private::codegen_v2::descriptor::InvocationUnavailableReason::DisabledByPolicy)
+            quote!(#facade::__private::codegen_v3::descriptor::InvocationUnavailableReason::DisabledByPolicy)
         }
     });
     quote!(&[#(#reasons),*])
@@ -242,15 +242,15 @@ pub(crate) fn argument_expectation(parameter: &ParameterIr, facade: &TokenStream
             ..
         } => {
             let element = &element.tokens;
-            quote!(#facade::__private::codegen_v2::invoke::ArgumentExpectation::borrowed_mut::<#element>())
+            quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::borrowed_mut::<#element>())
         }
         TypeKindIr::Reference { element, .. } => {
             let element = &element.tokens;
-            quote!(#facade::__private::codegen_v2::invoke::ArgumentExpectation::borrowed::<#element>())
+            quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::borrowed::<#element>())
         }
         _ => {
             let ty = &parameter.ty.tokens;
-            quote!(#facade::__private::codegen_v2::invoke::ArgumentExpectation::owned::<#ty>())
+            quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::owned::<#ty>())
         }
     }
 }
@@ -271,8 +271,8 @@ pub(crate) fn argument_binding(
             if super::analysis::is_str_type(element) {
                 quote! {
                     let #argument = match arguments.next().expect("validation checked argument count") {
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Mut(value) =>
-                            #facade::__private::codegen_v2::value::DynamicMut::<#mode>::into_str_mut(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) =>
+                            #facade::__private::codegen_v3::value::DynamicMut::<#mode>::into_str_mut(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                         _ => unreachable!("validation checked argument mode"),
                     };
@@ -281,8 +281,8 @@ pub(crate) fn argument_binding(
                 let element = &element.tokens;
                 quote! {
                     let #argument = match arguments.next().expect("validation checked argument count") {
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Mut(value) =>
-                            #facade::__private::codegen_v2::value::DynamicMut::<#mode>::downcast::<#element>(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) =>
+                            #facade::__private::codegen_v3::value::DynamicMut::<#mode>::downcast::<#element>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                         _ => unreachable!("validation checked argument mode"),
                     };
@@ -293,11 +293,11 @@ pub(crate) fn argument_binding(
             if super::analysis::is_str_type(element) {
                 quote! {
                     let #argument = match arguments.next().expect("validation checked argument count") {
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Ref(value) =>
-                            #facade::__private::codegen_v2::value::DynamicRef::<#mode>::into_str(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Ref(value) =>
+                            #facade::__private::codegen_v3::value::DynamicRef::<#mode>::into_str(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Mut(value) => {
-                            let value = #facade::__private::codegen_v2::value::DynamicMut::<#mode>::into_str_mut(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) => {
+                            let value = #facade::__private::codegen_v3::value::DynamicMut::<#mode>::into_str_mut(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type"));
                             &*value
                         }
@@ -308,11 +308,11 @@ pub(crate) fn argument_binding(
                 let element = &element.tokens;
                 quote! {
                     let #argument = match arguments.next().expect("validation checked argument count") {
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Ref(value) =>
-                            #facade::__private::codegen_v2::value::DynamicRef::<#mode>::downcast::<#element>(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Ref(value) =>
+                            #facade::__private::codegen_v3::value::DynamicRef::<#mode>::downcast::<#element>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type")),
-                        #facade::__private::codegen_v2::invoke::InvocationArg::Mut(value) => {
-                            let value = #facade::__private::codegen_v2::value::DynamicMut::<#mode>::downcast::<#element>(value)
+                        #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) => {
+                            let value = #facade::__private::codegen_v3::value::DynamicMut::<#mode>::downcast::<#element>(value)
                                 .unwrap_or_else(|_| unreachable!("validation checked argument type"));
                             &*value
                         }
@@ -325,8 +325,8 @@ pub(crate) fn argument_binding(
             let ty = &parameter.ty.tokens;
             quote! {
                 let #argument: #ty = match arguments.next().expect("validation checked argument count") {
-                    #facade::__private::codegen_v2::invoke::InvocationArg::Owned(value) =>
-                        #facade::__private::codegen_v2::value::DynamicOwned::<#mode>::downcast::<#ty>(value)
+                    #facade::__private::codegen_v3::invoke::InvocationArg::Owned(value) =>
+                        #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::downcast::<#ty>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked argument type")),
                     _ => unreachable!("validation checked argument mode"),
                 };

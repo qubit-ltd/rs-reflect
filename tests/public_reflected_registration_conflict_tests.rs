@@ -8,7 +8,7 @@
 
 //! Public reflected-type registration conflict integration tests.
 
-use qubit_reflect::__private::codegen_v2::descriptor::opaque_root;
+use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
 use qubit_reflect::descriptor::Reflect;
 use qubit_reflect::descriptor::TypeDescriptor;
 use qubit_reflect::error::RegistryErrorKind;

@@ -22,11 +22,11 @@ use criterion::black_box;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use qubit_reflect as reflect;
-use reflect::__private::codegen_v2::registration::FragmentKind;
-use reflect::__private::codegen_v2::registration::FragmentPayload;
-use reflect::__private::codegen_v2::registration::RegistrationFragment;
-use reflect::__private::codegen_v2::registration::RuntimeIdentity;
-use reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
+use reflect::__private::codegen_v3::registration::FragmentKind;
+use reflect::__private::codegen_v3::registration::FragmentPayload;
+use reflect::__private::codegen_v3::registration::RegistrationFragment;
+use reflect::__private::codegen_v3::registration::RuntimeIdentity;
+use reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use reflect::__private::testing::aggregate_benchmark_registry_facts;
 use reflect::__private::testing::prepare_benchmark_registry_facts;
 use reflect::TypeDescriptor;
@@ -35,7 +35,7 @@ use reflect::registry::ReflectRegistry;
 struct RegistryBenchmarkType;
 
 static REGISTRY_BENCHMARK_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
 
 /// Returns the runtime identity used by the benchmark fixture.
 fn benchmark_runtime_identity() -> RuntimeIdentity {
@@ -54,7 +54,7 @@ static REGISTRY_BENCHMARK_FRAGMENT: RegistrationFragment = RegistrationFragment:
     benchmark_payload,
 );
 
-reflect::__private::codegen_v2::inventory::submit! {
+reflect::__private::codegen_v3::inventory::submit! {
     REGISTRY_BENCHMARK_FRAGMENT
 }
 

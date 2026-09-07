@@ -13,12 +13,12 @@ use std::sync::LazyLock;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v2::registration::CapabilityTarget as RegistrationCapabilityTarget;
-use qubit_reflect::__private::codegen_v2::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v2::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v2::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v2::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v2::registration::StaticFragmentIdentity;
+use qubit_reflect::__private::codegen_v3::registration::CapabilityTarget as RegistrationCapabilityTarget;
+use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
+use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
+use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
+use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
+use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use qubit_reflect::__private::testing::CapabilityRegistration;
 use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::__private::testing::initialize_registry;
@@ -51,11 +51,11 @@ struct SameTraitMarkerA;
 struct SameTraitMarkerB;
 
 static EARLY_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<EarlyType>("shared-query");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<EarlyType>("shared-query");
 static LATE_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<LateType>("shared-query");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<LateType>("shared-query");
 static INDEPENDENT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root::<IndependentType>("independent");
+    reflect::__private::codegen_v3::descriptor::opaque_root::<IndependentType>("independent");
 
 impl Reflect for IndependentType {
     /// Returns a descriptor whose structural query is independent of the
@@ -107,10 +107,10 @@ static EARLY_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
 static LATE_FRAGMENT: RegistrationFragment =
     RegistrationFragment::new(FragmentKind::Type, LATE_IDENTITY, late_runtime_identity, late_payload);
 
-reflect::__private::codegen_v2::inventory::submit! {
+reflect::__private::codegen_v3::inventory::submit! {
     LATE_FRAGMENT
 }
-reflect::__private::codegen_v2::inventory::submit! {
+reflect::__private::codegen_v3::inventory::submit! {
     EARLY_FRAGMENT
 }
 
@@ -399,7 +399,7 @@ static AMBIGUOUS_IMPL_DEFINITION_FRAGMENT: RegistrationFragment = RegistrationFr
     ambiguous_impl_definition_payload,
 );
 
-reflect::__private::codegen_v2::inventory::submit! {
+reflect::__private::codegen_v3::inventory::submit! {
     IMPL_FRAGMENT
 }
 

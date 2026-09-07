@@ -38,7 +38,7 @@ pub(super) fn specialization_associated_type_resolver_arms(
     replacements: &[(Ident, TokenStream)],
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v2);
+    let codegen = quote!(#facade::__private::codegen_v3);
     let impl_declaration = &declaration.generics.impl_declaration;
     let where_clause = &declaration.generics.where_clause;
     let specialization_arguments: Vec<_> = declaration
@@ -64,11 +64,11 @@ pub(super) fn specialization_associated_type_resolver_arms(
             Some(quote! {
                 #name => {
                     fn resolve #impl_declaration ()
-                        -> Option<#facade::__private::codegen_v2::descriptor::TypeDescriptorResolver>
+                        -> Option<#facade::__private::codegen_v3::descriptor::TypeDescriptorResolver>
                         #where_clause
                     {
                         use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                        let probe = #facade::__private::codegen_v2::descriptor::ReflectArgumentProbe::<#value>::new();
+                        let probe = #facade::__private::codegen_v3::descriptor::ReflectArgumentProbe::<#value>::new();
                         (&probe).resolve_reflect_type_descriptor()
                     }
                     resolve::<#(#specialization_arguments),*>()
@@ -483,15 +483,15 @@ pub(super) fn specialization_arguments(
             (GenericKindIr::Type, SpecializationValueIr::Type(ty)) => {
                 let expression =
                     crate::expand::traits::type_expression(ty, &environment, facade);
-                Some(quote!(#facade::__private::codegen_v2::expression::GenericArgument::Type(#expression)))
+                Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(#expression)))
             }
             (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(tokens)) => Some(quote!(
-                #facade::__private::codegen_v2::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v2::expression::concrete(
+                #facade::__private::codegen_v3::expression::GenericArgument::Type(
+                    #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                        #facade::__private::codegen_v3::expression::concrete(
                             vec![stringify!(#tokens).into()].into_boxed_slice(),
                             vec![].into_boxed_slice(),
-                            #facade::__private::codegen_v2::expression::DiagnosticText::from(stringify!(#tokens)),
+                            #facade::__private::codegen_v3::expression::DiagnosticText::from(stringify!(#tokens)),
                         ),
                     ),
                 )
@@ -504,16 +504,16 @@ pub(super) fn specialization_arguments(
                 let declared_type = parameter.const_type.as_ref()?.source.as_str();
                 let declared_type_literal = syn::LitStr::new(declared_type, parameter.span);
                 Some(quote!(
-                    #facade::__private::codegen_v2::expression::GenericArgument::Const(
-                        #facade::__private::codegen_v2::expression::ConstGenericArgument::new(
-                            #facade::__private::codegen_v2::expression::TypeExpression::Concrete(
-                                #facade::__private::codegen_v2::expression::concrete(
+                    #facade::__private::codegen_v3::expression::GenericArgument::Const(
+                        #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
+                            #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                                #facade::__private::codegen_v3::expression::concrete(
                                     vec![#declared_type_literal.into()].into_boxed_slice(),
                                     vec![].into_boxed_slice(),
-                                    #facade::__private::codegen_v2::expression::DiagnosticText::from(#declared_type_literal),
+                                    #facade::__private::codegen_v3::expression::DiagnosticText::from(#declared_type_literal),
                                 ),
                             ),
-                            #facade::__private::codegen_v2::expression::const_path([
+                            #facade::__private::codegen_v3::expression::const_path([
                                 stringify!(#tokens),
                             ]),
                             stringify!(#tokens),

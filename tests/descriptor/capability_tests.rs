@@ -74,7 +74,7 @@ fn reflected_root_capabilities() -> reflect::capability::TypeCapabilitiesResult 
 }
 
 static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v2::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
+    reflect::__private::codegen_v3::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
         "ReflectedRoot",
         reflected_root_capabilities,
     );

@@ -46,7 +46,7 @@ struct IntrinsicConflict;
 mod runtime_only {
     use std::sync::OnceLock;
 
-    use qubit_reflect::__private::codegen_v2::descriptor::opaque_root;
+    use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
     use qubit_reflect::Reflect;
     use qubit_reflect::TypeDescriptor;
     use qubit_reflect::capability::CapabilityConflict;

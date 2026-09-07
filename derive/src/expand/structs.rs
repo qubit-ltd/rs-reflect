@@ -83,12 +83,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             let field_type = &field_type.tokens;
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#field_type: #facade::__private::codegen_v2::Reflect));
+                .push(syn::parse_quote!(#field_type: #facade::__private::codegen_v3::Reflect));
         }
         for parameter in &transparently_reflected_parameters {
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v2::Reflect));
+                .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v3::Reflect));
         }
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -122,26 +122,26 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             }
         };
         let thread_safe_adapters = thread_safe.then(|| quote! {
-            fn #get_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>)
-                -> ::core::result::Result<#facade::__private::codegen_v2::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>, #facade::__private::codegen_v2::access::FieldAccessError>
+            fn #get_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v3::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v3::value::ThreadSafe>)
+                -> ::core::result::Result<#facade::__private::codegen_v3::value::DynamicRef<'__qubit_reflect, #facade::__private::codegen_v3::value::ThreadSafe>, #facade::__private::codegen_v3::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
-                Ok(#facade::__private::codegen_v2::value::DynamicRef::<#facade::__private::codegen_v2::value::ThreadSafe>::new(&value.#access))
+                Ok(#facade::__private::codegen_v3::value::DynamicRef::<#facade::__private::codegen_v3::value::ThreadSafe>::new(&value.#access))
             }
 
-            fn #get_mut_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>)
-                -> ::core::result::Result<#facade::__private::codegen_v2::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v2::value::ThreadSafe>, #facade::__private::codegen_v2::access::FieldAccessError>
+            fn #get_mut_thread_safe<'__qubit_reflect>(target: #facade::__private::codegen_v3::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v3::value::ThreadSafe>)
+                -> ::core::result::Result<#facade::__private::codegen_v3::value::DynamicMut<'__qubit_reflect, #facade::__private::codegen_v3::value::ThreadSafe>, #facade::__private::codegen_v3::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
-                Ok(#facade::__private::codegen_v2::value::DynamicMut::<#facade::__private::codegen_v2::value::ThreadSafe>::new(&mut value.#access))
+                Ok(#facade::__private::codegen_v3::value::DynamicMut::<#facade::__private::codegen_v3::value::ThreadSafe>::new(&mut value.#access))
             }
 
             fn #set_thread_safe(
-                target: #facade::__private::codegen_v2::value::DynamicMut<'_, #facade::__private::codegen_v2::value::ThreadSafe>,
-                replacement: #facade::__private::codegen_v2::value::DynamicOwned<#facade::__private::codegen_v2::value::ThreadSafe>,
-            ) -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError> {
+                target: #facade::__private::codegen_v3::value::DynamicMut<'_, #facade::__private::codegen_v3::value::ThreadSafe>,
+                replacement: #facade::__private::codegen_v3::value::DynamicOwned<#facade::__private::codegen_v3::value::ThreadSafe>,
+            ) -> ::core::result::Result<(), #facade::__private::codegen_v3::access::FieldAccessError> {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
                 let replacement = replacement.downcast::<#ty>()
@@ -151,28 +151,28 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             }
         });
         quote! {
-            fn #get<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::ReflectedRef<'__qubit_reflect>)
-                -> ::core::result::Result<#facade::__private::codegen_v2::value::ReflectedRef<'__qubit_reflect>, #facade::__private::codegen_v2::access::FieldAccessError>
+            fn #get<'__qubit_reflect>(target: #facade::__private::codegen_v3::value::ReflectedRef<'__qubit_reflect>)
+                -> ::core::result::Result<#facade::__private::codegen_v3::value::ReflectedRef<'__qubit_reflect>, #facade::__private::codegen_v3::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
-                Ok(#facade::__private::codegen_v2::value::ReflectedRef::new(&value.#access))
+                Ok(#facade::__private::codegen_v3::value::ReflectedRef::new(&value.#access))
             }
 
-            fn #get_mut<'__qubit_reflect>(target: #facade::__private::codegen_v2::value::ReflectedMut<'__qubit_reflect>)
-                -> ::core::result::Result<#facade::__private::codegen_v2::value::ReflectedMut<'__qubit_reflect>, #facade::__private::codegen_v2::access::FieldAccessError>
+            fn #get_mut<'__qubit_reflect>(target: #facade::__private::codegen_v3::value::ReflectedMut<'__qubit_reflect>)
+                -> ::core::result::Result<#facade::__private::codegen_v3::value::ReflectedMut<'__qubit_reflect>, #facade::__private::codegen_v3::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
-                Ok(#facade::__private::codegen_v2::value::ReflectedMut::new(&mut value.#access))
+                Ok(#facade::__private::codegen_v3::value::ReflectedMut::new(&mut value.#access))
             }
 
-            fn #set(target: #facade::__private::codegen_v2::value::ReflectedMut<'_>, replacement: #facade::__private::codegen_v2::value::ReflectedOwned)
-                -> ::core::result::Result<(), #facade::__private::codegen_v2::access::FieldAccessError>
+            fn #set(target: #facade::__private::codegen_v3::value::ReflectedMut<'_>, replacement: #facade::__private::codegen_v3::value::ReflectedOwned)
+                -> ::core::result::Result<(), #facade::__private::codegen_v3::access::FieldAccessError>
             {
                 let value = target.downcast::<#self_type>()
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field target"));
-                let replacement = #facade::__private::codegen_v2::value::ReflectedOwned::downcast::<#ty>(replacement)
+                let replacement = #facade::__private::codegen_v3::value::ReflectedOwned::downcast::<#ty>(replacement)
                     .unwrap_or_else(|_| unreachable!("descriptor validated derived field value"));
                 value.#access = replacement;
                 Ok(())
@@ -208,11 +208,11 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         let ty = &field.ty.tokens;
         let opaque_field = field.attributes.iter().any(|attribute| attribute.name == HelperName::Opaque);
         let policy = if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
-            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::Skipped, None, None, None)
+            quote!(#facade::__private::codegen_v3::access::FieldAccessPolicy::Skipped, None, None, None)
         } else if field.attributes.iter().any(|attribute| attribute.name == HelperName::ReadOnly) {
-            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::ReadOnly, Some(<#self_type>::#get), None, None)
+            quote!(#facade::__private::codegen_v3::access::FieldAccessPolicy::ReadOnly, Some(<#self_type>::#get), None, None)
         } else {
-            quote!(#facade::__private::codegen_v2::access::FieldAccessPolicy::ReadWrite, Some(<#self_type>::#get), Some(<#self_type>::#get_mut), Some(<#self_type>::#set))
+            quote!(#facade::__private::codegen_v3::access::FieldAccessPolicy::ReadWrite, Some(<#self_type>::#get), Some(<#self_type>::#get_mut), Some(<#self_type>::#set))
         };
         let thread_safe_access = if !thread_safe {
             TokenStream::new()
@@ -230,12 +230,12 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         let visibility = visibility(&field.visibility, &facade, field.span);
         let descriptor = if opaque_field {
             quote! {
-                #facade::__private::codegen_v2::descriptor::field(
-                    <#self_type as #facade::__private::codegen_v2::Reflect>::type_descriptor,
+                #facade::__private::codegen_v3::descriptor::field(
+                    <#self_type as #facade::__private::codegen_v3::Reflect>::type_descriptor,
                     #index, #rust_name, #query_name,
                     ::std::boxed::Box::leak(::std::boxed::Box::new(
-                        #facade::__private::codegen_v2::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
-                            ::std::boxed::Box::new(#facade::__private::codegen_v2::descriptor::opaque_member::<#ty>()),
+                        #facade::__private::codegen_v3::descriptor::TypeRef::Opaque(::std::boxed::Box::leak(
+                            ::std::boxed::Box::new(#facade::__private::codegen_v3::descriptor::opaque_member::<#ty>()),
                         )),
                     )),
                     #visibility,
@@ -243,10 +243,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             }
         } else {
             quote! {
-                #facade::__private::codegen_v2::descriptor::lazy_field(
-                    <#self_type as #facade::__private::codegen_v2::Reflect>::type_descriptor,
+                #facade::__private::codegen_v3::descriptor::lazy_field(
+                    <#self_type as #facade::__private::codegen_v3::Reflect>::type_descriptor,
                     #index, #rust_name, #query_name,
-                    #facade::__private::codegen_v2::descriptor::lazy_type_ref::<#ty>(),
+                    #facade::__private::codegen_v3::descriptor::lazy_type_ref::<#ty>(),
                     #visibility,
                 )
             }
@@ -258,15 +258,15 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
     };
     let struct_kind = kind_tokens(&declaration, &facade);
     let root_descriptor = if opaque_root {
-        quote!(#facade::__private::codegen_v2::descriptor::with_capabilities(
-            #facade::__private::codegen_v2::descriptor::opaque_root::<Self>(#query_name),
+        quote!(#facade::__private::codegen_v3::descriptor::with_capabilities(
+            #facade::__private::codegen_v3::descriptor::opaque_root::<Self>(#query_name),
             #capability_resolver,
         ))
     } else {
         quote! {
             let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-            #facade::__private::codegen_v2::descriptor::with_capabilities(
-                #facade::__private::codegen_v2::descriptor::struct_type_with_construction::<Self>(
+            #facade::__private::codegen_v3::descriptor::with_capabilities(
+                #facade::__private::codegen_v3::descriptor::struct_type_with_construction::<Self>(
                     #query_name, #struct_kind, fields, #construction_descriptor,
                 ),
                 #capability_resolver,
@@ -278,8 +278,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
     } else {
         let generic = super::generics::concrete_descriptor(&declaration, &facade);
         let definition = super::generics::type_definition_provider_name(&declaration);
-        quote!(#facade::__private::codegen_v2::descriptor::with_type_definition(
-            #facade::__private::codegen_v2::descriptor::with_concrete_generic(
+        quote!(#facade::__private::codegen_v3::descriptor::with_type_definition(
+            #facade::__private::codegen_v3::descriptor::with_concrete_generic(
                 { #root_descriptor },
                 ::std::boxed::Box::leak(::std::boxed::Box::new(#generic)),
             ),
@@ -303,9 +303,9 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             #construction_adapters
         }
 
-        impl #impl_generics #facade::__private::codegen_v2::Reflect for #name #type_generics #where_clause {
-            fn type_descriptor() -> &'static #facade::__private::codegen_v2::TypeDescriptor {
-                #facade::__private::codegen_v2::descriptor::intern_type::<Self>(|| { #descriptor })
+        impl #impl_generics #facade::__private::codegen_v3::Reflect for #name #type_generics #where_clause {
+            fn type_descriptor() -> &'static #facade::__private::codegen_v3::TypeDescriptor {
+                #facade::__private::codegen_v3::descriptor::intern_type::<Self>(|| { #descriptor })
             }
         }
 
@@ -332,16 +332,16 @@ pub(crate) fn capabilities(
             .flatten()
             .map(|path| match path.source.rsplit("::").next() {
                 Some("Clone") => {
-                    quote!(#facade::__private::codegen_v2::capability::clone_descriptor::<Self>())
+                    quote!(#facade::__private::codegen_v3::capability::clone_descriptor::<Self>())
                 }
                 Some("Default") => {
-                    quote!(#facade::__private::codegen_v2::capability::default_descriptor::<Self>())
+                    quote!(#facade::__private::codegen_v3::capability::default_descriptor::<Self>())
                 }
                 Some("Send") => {
-                    quote!(#facade::__private::codegen_v2::capability::send_descriptor::<Self>())
+                    quote!(#facade::__private::codegen_v3::capability::send_descriptor::<Self>())
                 }
                 Some("Sync") => {
-                    quote!(#facade::__private::codegen_v2::capability::sync_descriptor::<Self>())
+                    quote!(#facade::__private::codegen_v3::capability::sync_descriptor::<Self>())
                 }
                 Some(_) | None => {
                     let tokens = &path.tokens;
@@ -350,9 +350,9 @@ pub(crate) fn capabilities(
             })
     });
     quote! {
-        fn #function() -> #facade::__private::codegen_v2::capability::TypeCapabilitiesResult {
-            #facade::__private::codegen_v2::capability::intern_capabilities::<Self>(|| {
-                #facade::__private::codegen_v2::capability::TypeCapabilities::try_new(
+        fn #function() -> #facade::__private::codegen_v3::capability::TypeCapabilitiesResult {
+            #facade::__private::codegen_v3::capability::intern_capabilities::<Self>(|| {
+                #facade::__private::codegen_v3::capability::TypeCapabilities::try_new(
                     ::std::vec![#(#descriptors),*],
                 )
             })
@@ -376,20 +376,20 @@ fn registration(
         mod #module {
             use super::*;
 
-            fn runtime_identity() -> #facade::__private::codegen_v2::registration::RuntimeIdentity {
-                #facade::__private::codegen_v2::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
+            fn runtime_identity() -> #facade::__private::codegen_v3::registration::RuntimeIdentity {
+                #facade::__private::codegen_v3::registration::RuntimeIdentity::Type(::std::any::TypeId::of::<#name>())
             }
 
-            fn payload() -> #facade::__private::codegen_v2::registration::FragmentPayload {
-                #facade::__private::codegen_v2::registration::FragmentPayload::Type(
-                    <#name as #facade::__private::codegen_v2::Reflect>::type_descriptor(),
+            fn payload() -> #facade::__private::codegen_v3::registration::FragmentPayload {
+                #facade::__private::codegen_v3::registration::FragmentPayload::Type(
+                    <#name as #facade::__private::codegen_v3::Reflect>::type_descriptor(),
                 )
             }
 
-            #facade::__private::codegen_v2::inventory::submit! {
-                #facade::__private::codegen_v2::registration::RegistrationFragment::new(
-                    #facade::__private::codegen_v2::registration::FragmentKind::Type,
-                    #facade::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v3::inventory::submit! {
+                #facade::__private::codegen_v3::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v3::registration::FragmentKind::Type,
+                    #facade::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", #fingerprint,
                     ),
                     runtime_identity,
@@ -404,16 +404,16 @@ fn registration(
 fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => {
-            quote!(#facade::__private::codegen_v2::identity::Visibility::Public)
+            quote!(#facade::__private::codegen_v3::identity::Visibility::Public)
         }
-        VisibilityIr::Crate => quote!(#facade::__private::codegen_v2::identity::Visibility::Crate),
-        VisibilityIr::Super => quote!(#facade::__private::codegen_v2::identity::Visibility::Super),
+        VisibilityIr::Crate => quote!(#facade::__private::codegen_v3::identity::Visibility::Crate),
+        VisibilityIr::Super => quote!(#facade::__private::codegen_v3::identity::Visibility::Super),
         VisibilityIr::SelfValue | VisibilityIr::Inherited => {
-            quote!(#facade::__private::codegen_v2::identity::Visibility::Private)
+            quote!(#facade::__private::codegen_v3::identity::Visibility::Private)
         }
         VisibilityIr::Restricted(path) => {
             let path = syn::LitStr::new(&path.source, span);
-            quote!(#facade::__private::codegen_v2::identity::Visibility::Restricted(#path.into()))
+            quote!(#facade::__private::codegen_v3::identity::Visibility::Restricted(#path.into()))
         }
     }
 }
@@ -421,11 +421,11 @@ fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> To
 /// Emits the runtime struct category shared by concrete and generic descriptors.
 pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     match declaration.field_shape {
-        FieldShapeIr::Unit => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Unit),
-        FieldShapeIr::Named => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Named),
+        FieldShapeIr::Unit => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Unit),
+        FieldShapeIr::Named => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Named),
         FieldShapeIr::Unnamed if declaration.fields.len() == 1 => {
-            quote!(#facade::__private::codegen_v2::descriptor::StructKind::Newtype)
+            quote!(#facade::__private::codegen_v3::descriptor::StructKind::Newtype)
         }
-        FieldShapeIr::Unnamed => quote!(#facade::__private::codegen_v2::descriptor::StructKind::Tuple),
+        FieldShapeIr::Unnamed => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Tuple),
     }
 }

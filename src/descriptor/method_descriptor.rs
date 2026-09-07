@@ -345,10 +345,14 @@ pub enum CatchingAvailability {
     UnavailablePanicAbort,
 }
 
-/// An opaque invocation entry point supplied by a later invocation layer.
+/// Generated invocation entry points and their static mode availability.
 ///
 /// This descriptor layer records adapter identity and availability. The
 /// invocation layer owns argument validation and the complete call contract.
+/// A present special-receiver entry still requires the matching capability in
+/// the registry selected for invocation. Missing capabilities yield a failure
+/// with recovery, not a missing entry. Ordinary entries propagate user panics;
+/// explicitly requested catching entries capture only supported user panics.
 #[derive(Clone, Copy, Debug)]
 pub struct InvocationAdapter {
     entry_point: fn(),
@@ -550,9 +554,14 @@ impl InvocationAdapter {
     ///
     /// Returns `None` for legacy descriptor-only entries and for adapters that
     /// are available exclusively in another invocation mode.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_local<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<
         Result<
@@ -560,7 +569,7 @@ impl InvocationAdapter {
             crate::invoke::InvocationFailure<'call, crate::value::Local>,
         >,
     > {
-        self.local.map(|entry_point| entry_point(invocation))
+        self.local.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the thread-safe generated entry point when this descriptor has
@@ -571,9 +580,14 @@ impl InvocationAdapter {
     ///
     /// Returns `None` when this method was not explicitly generated with a
     /// thread-safe adapter.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
     ) -> Option<
         Result<
@@ -581,29 +595,40 @@ impl InvocationAdapter {
             crate::invoke::InvocationFailure<'call, crate::value::ThreadSafe>,
         >,
     > {
-        self.thread_safe.map(|entry_point| entry_point(invocation))
+        self.thread_safe.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the explicit local catching entry point when one was generated.
     ///
     /// This raw adapter entry point accepts positional inputs only. Use
     /// [`MethodInstanceDescriptor::invoke_catching_local`] for named bindings.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
-        self.catching_local.map(|entry_point| entry_point(invocation))
+        self.catching_local.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the explicit thread-safe catching entry point when one was
     /// generated.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
-        self.catching_thread_safe.map(|entry_point| entry_point(invocation))
+        self.catching_thread_safe
+            .map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes a typed local `Pin<&T>` entry point when its exact receiver
@@ -615,9 +640,14 @@ impl InvocationAdapter {
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
@@ -629,7 +659,7 @@ impl InvocationAdapter {
             .and_then(|entry_point| {
                 entry_point.downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()
             })
-            .map(|entry_point| entry_point(invocation))
+            .map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes a typed local `Pin<&mut T>` entry point when its exact receiver
@@ -641,9 +671,14 @@ impl InvocationAdapter {
     ///
     /// `None` means this method has no such adapter or `T` is not its exact
     /// receiver type. The `Err` case preserves the original pin and arguments.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
@@ -655,7 +690,7 @@ impl InvocationAdapter {
             .and_then(|entry_point| {
                 entry_point.downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()
             })
-            .map(|entry_point| entry_point(invocation))
+            .map(|entry_point| entry_point(registry, invocation))
     }
 }
 
@@ -1011,6 +1046,12 @@ pub enum MethodImplementationSource {
 }
 
 /// A concrete specialization of one method declaration.
+///
+/// Invoke with the same registry used for lookup. Descriptor-aware entries
+/// bind named arguments before validating and adapting the receiver. A static
+/// mode without an entry returns `None`; pre-execution errors return
+/// `Some(Err(...))` with caller-ordered recovery. Outputs, futures, and
+/// recovery retain input lifetimes without borrowing the selected registry.
 #[derive(Clone, Debug)]
 pub struct MethodInstanceDescriptor {
     declaration: &'static MethodDescriptor,
@@ -1097,15 +1138,20 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no explicitly generated
     /// thread-safe catching adapter.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
         let entry_point = self.adapter?.catching_thread_safe?;
         Some(
             match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
-                Ok(invocation) => entry_point(invocation),
+                Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
         )
@@ -1237,9 +1283,14 @@ impl MethodInstanceDescriptor {
     /// Returns `None` when this instance has no local adapter. Otherwise the
     /// result contains either the invocation output or a structured
     /// pre-execution failure.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_local<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<
         Result<
@@ -1251,7 +1302,7 @@ impl MethodInstanceDescriptor {
         Some(
             invocation
                 .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(entry_point),
+                .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
 
@@ -1263,9 +1314,14 @@ impl MethodInstanceDescriptor {
     /// Returns `None` when this instance has no explicitly generated
     /// thread-safe adapter. Otherwise the result contains either the invocation
     /// output or a structured pre-execution failure.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
     ) -> Option<
         Result<
@@ -1277,7 +1333,7 @@ impl MethodInstanceDescriptor {
         Some(
             invocation
                 .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(entry_point),
+                .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
 
@@ -1292,15 +1348,20 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no explicitly generated local
     /// catching adapter.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
         let entry_point = self.adapter?.catching_local?;
         Some(
             match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
-                Ok(invocation) => entry_point(invocation),
+                Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
         )
@@ -1316,9 +1377,14 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no pinned shared adapter for the
     /// exact receiver type `T`.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
@@ -1333,7 +1399,7 @@ impl MethodInstanceDescriptor {
         Some(
             invocation
                 .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(entry_point),
+                .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
 
@@ -1347,9 +1413,14 @@ impl MethodInstanceDescriptor {
     ///
     /// Returns `None` when this instance has no pinned mutable adapter for the
     /// exact receiver type `T`.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
     #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
+        registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
     ) -> Option<
         Result<
@@ -1364,7 +1435,7 @@ impl MethodInstanceDescriptor {
         Some(
             invocation
                 .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(entry_point),
+                .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
 }

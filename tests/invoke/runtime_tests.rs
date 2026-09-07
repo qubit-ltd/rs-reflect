@@ -25,6 +25,7 @@ mod invocation_runtime {
     use std::task::Waker;
 
     use qubit_reflect as reflect;
+    use qubit_reflect::ReflectRegistry;
     use qubit_reflect::identity::FragmentIdentity;
     use qubit_reflect::identity::MemberId;
     use qubit_reflect::invoke::ArgumentExpectation;
@@ -481,7 +482,10 @@ mod invocation_runtime {
         ]);
 
         let output = named_invocation_method()
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation")
             .expect("all three bindings are valid");
 
@@ -508,7 +512,10 @@ mod invocation_runtime {
         ]);
 
         let output = named_invocation_method()
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation")
             .expect("the positional binding must skip the named first parameter");
 
@@ -535,7 +542,10 @@ mod invocation_runtime {
         ]);
 
         let result = named_invocation_method()
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation");
         let Err(failure) = result else {
             panic!("binding the first parameter twice must fail")
@@ -605,7 +615,10 @@ mod invocation_runtime {
         ]);
 
         let result = named_invocation_method()
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation");
         let Err(failure) = result else {
             panic!("the second parameter must reject the wrong exact type")
@@ -665,7 +678,10 @@ mod invocation_runtime {
         ]);
 
         let output = method
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation")
             .expect("wildcard and destructuring parameters must support positional binding");
 
@@ -692,7 +708,10 @@ mod invocation_runtime {
         ]);
 
         let result = named_invocation_method_by_name("encode_patterns")
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation");
         let Err(failure) = result else {
             panic!("a wildcard parameter has no bindable identifier")
@@ -719,7 +738,10 @@ mod invocation_runtime {
         ]);
 
         let result = named_invocation_method()
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the generated adapter must support local invocation");
         let Err(failure) = result else {
             panic!("the omitted second parameter must fail binding")
@@ -748,7 +770,10 @@ mod invocation_runtime {
         ]);
 
         let output = named_invocation_method_by_name("encode_catching")
-            .invoke_catching_local(invocation)
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the catching adapter must be generated")
             .expect("binding must pass before entering the catching adapter")
             .expect("the user function must not panic");
@@ -780,7 +805,10 @@ mod invocation_runtime {
         );
 
         let output = named_invocation_method_by_name("encode_pinned")
-            .invoke_pinned_ref_local(invocation)
+            .invoke_pinned_ref_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the pinned shared adapter must be generated")
             .expect("all pinned shared bindings must validate");
 
@@ -814,7 +842,10 @@ mod invocation_runtime {
         );
 
         let result = named_invocation_method_by_name("encode_pinned_mut")
-            .invoke_pinned_mut_local(invocation)
+            .invoke_pinned_mut_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the pinned mutable adapter must be generated");
         let Err(failure) = result else {
             panic!("the wrong second type must fail before the pinned method runs")
@@ -855,7 +886,12 @@ mod invocation_runtime {
             InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(33_u8))),
         ]);
 
-        let result = adapter.invoke_local(invocation).expect("the raw local adapter exists");
+        let result = adapter
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
+            .expect("the raw local adapter exists");
         let Err(failure) = result else {
             panic!("a raw adapter must not silently treat named inputs as positional")
         };
@@ -889,7 +925,10 @@ mod invocation_runtime {
         ]);
 
         let output = method
-            .invoke_local(invocation)
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                invocation,
+            )
             .expect("the local adapter must be generated")
             .expect("the at-subpattern must remain position-bindable");
 

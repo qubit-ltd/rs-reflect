@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
+use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::AssociatedConstBindingDescriptor;
 use qubit_reflect::descriptor::AssociatedConstDescriptor;
 use qubit_reflect::descriptor::AssociatedConstImplementationSource;
@@ -156,7 +157,7 @@ static MIDDLE_TRAIT: LazyLock<&'static TraitDescriptor> = LazyLock::new(|| {
 
 fn target_type() -> &'static TypeDescriptor {
     static TARGET: TypeDescriptor =
-        reflect::__private::codegen_v2::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
+        reflect::__private::codegen_v3::descriptor::primitive::<u32>("u32", PrimitiveKind::U32);
     &TARGET
 }
 
@@ -180,12 +181,14 @@ fn member_id(kind: &str, index: usize) -> MemberId {
 fn invocation_adapter_token() {}
 
 fn local_invocation_entry<'call>(
+    _registry: &ReflectRegistry,
     _: reflect::invoke::Invocation<'call, Local>,
 ) -> Result<reflect::invoke::InvocationOutput<'call, Local>, reflect::invoke::InvocationFailure<'call, Local>> {
     Ok(reflect::invoke::InvocationOutput::Unit)
 }
 
 fn thread_safe_invocation_entry<'call>(
+    _registry: &ReflectRegistry,
     _: reflect::invoke::Invocation<'call, ThreadSafe>,
 ) -> Result<reflect::invoke::InvocationOutput<'call, ThreadSafe>, reflect::invoke::InvocationFailure<'call, ThreadSafe>>
 {
@@ -232,7 +235,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                reflect::__private::codegen_v2::descriptor::external_supertrait::<RootMarker>(
+                reflect::__private::codegen_v3::descriptor::external_supertrait::<RootMarker>(
                     "test.external.concurrent.root",
                     "fixture::ConcurrentRoot",
                     Vec::new(),
@@ -246,7 +249,7 @@ fn test_external_supertrait_concurrent_first_access_is_key_stable() {
         .collect();
     assert!(addresses.windows(2).all(|pair| pair[0] == pair[1]));
 
-    let distinct = reflect::__private::codegen_v2::descriptor::external_supertrait::<RootMarker>(
+    let distinct = reflect::__private::codegen_v3::descriptor::external_supertrait::<RootMarker>(
         "test.external.concurrent.other",
         "fixture::ConcurrentOther",
         Vec::new(),
@@ -282,13 +285,13 @@ fn test_trait_payload_and_object_caches_reuse_initialized_values() {
     assert!(std::ptr::eq(first.applied(), second.applied()));
 
     let first =
-        reflect::__private::codegen_v2::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
             TraitDescriptor::builder(&ROOT_DEFINITION)
                 .build()
                 .expect("the cached trait object fixture must build")
         });
     let second =
-        reflect::__private::codegen_v2::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+        reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
             panic!("a hot trait-object lookup must not rebuild its descriptor")
         });
     assert!(std::ptr::eq(first, second));
@@ -316,7 +319,10 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     let local_adapter = InvocationAdapter::local(local_invocation_entry);
     assert!(
         local_adapter
-            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<Local>::associated([])
+            )
             .is_some()
     );
     assert_eq!(
@@ -326,7 +332,10 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     let thread_safe_adapter = InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_invocation_entry);
     assert!(
         thread_safe_adapter
-            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .invoke_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<ThreadSafe>::associated([])
+            )
             .is_some()
     );
     assert_eq!(
@@ -413,22 +422,34 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     );
     assert!(
         adapter
-            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<Local>::associated([])
+            )
             .is_none()
     );
     assert!(
         adapter
-            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .invoke_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<ThreadSafe>::associated([])
+            )
             .is_none()
     );
     assert!(
         adapter
-            .invoke_catching_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<Local>::associated([])
+            )
             .is_none()
     );
     assert!(
         adapter
-            .invoke_catching_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .invoke_catching_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<ThreadSafe>::associated([])
+            )
             .is_none()
     );
 }
@@ -768,22 +789,34 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     assert!(instance.arguments().is_empty());
     assert!(
         instance
-            .invoke_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<Local>::associated([])
+            )
             .is_none()
     );
     assert!(
         instance
-            .invoke_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .invoke_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<ThreadSafe>::associated([])
+            )
             .is_none()
     );
     assert!(
         instance
-            .invoke_catching_local(reflect::invoke::Invocation::<Local>::associated([]))
+            .invoke_catching_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<Local>::associated([])
+            )
             .is_none()
     );
     assert!(
         instance
-            .invoke_catching_thread_safe(reflect::invoke::Invocation::<ThreadSafe>::associated([]))
+            .invoke_catching_thread_safe(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                reflect::invoke::Invocation::<ThreadSafe>::associated([])
+            )
             .is_none()
     );
     assert_eq!(

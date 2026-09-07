@@ -28,7 +28,7 @@ pub(crate) fn concrete_descriptor(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
 ) -> TokenStream {
-    let codegen = quote!(#facade::__private::codegen_v2);
+    let codegen = quote!(#facade::__private::codegen_v3);
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
@@ -45,14 +45,14 @@ pub(crate) fn concrete_descriptor(
             GenericKindIr::Type => {
                 let name = syn::Ident::new(&parameter.name, parameter.span);
                 arguments.push(
-                    quote!(#facade::__private::codegen_v2::expression::GenericArgument::Type(
-                        #facade::__private::codegen_v2::expression::parameter(stringify!(#name)),
+                    quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(
+                        #facade::__private::codegen_v3::expression::parameter(stringify!(#name)),
                     )),
                 );
                 definition_indices.push(definition_index);
                 type_arguments.push(quote!({
                     use #codegen::descriptor::ResolveReflectArgument as _;
-                    let probe = #facade::__private::codegen_v2::descriptor::ReflectArgumentProbe::<#name>::new();
+                    let probe = #facade::__private::codegen_v3::descriptor::ReflectArgumentProbe::<#name>::new();
                     (&probe).resolve_reflect_argument()
                 }));
                 const_argument_values.push(quote!(None));
@@ -66,27 +66,27 @@ pub(crate) fn concrete_descriptor(
                 let name = syn::Ident::new(&parameter.name, parameter.span);
                 let declared_type =
                     super::traits::type_expression(const_type, &environment, facade);
-                arguments.push(quote!(#facade::__private::codegen_v2::expression::GenericArgument::Const(
-                    #facade::__private::codegen_v2::expression::ConstGenericArgument::new(
+                arguments.push(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
                         #declared_type,
-                        #facade::__private::codegen_v2::descriptor::const_argument_expression::<#const_type_tokens>(#name),
-                        #facade::__private::codegen_v2::descriptor::const_argument_diagnostic::<#const_type_tokens>(#name),
+                        #facade::__private::codegen_v3::descriptor::const_argument_expression::<#const_type_tokens>(#name),
+                        #facade::__private::codegen_v3::descriptor::const_argument_diagnostic::<#const_type_tokens>(#name),
                     ),
                 )));
                 definition_indices.push(definition_index);
                 type_arguments.push(quote!(None));
                 const_argument_values.push(quote!(Some(
-                    (|| #facade::__private::codegen_v2::descriptor::const_argument_owned::<#const_type_tokens>(#name))
-                        as fn() -> #facade::__private::codegen_v2::value::ReflectedOwned
+                    (|| #facade::__private::codegen_v3::descriptor::const_argument_owned::<#const_type_tokens>(#name))
+                        as fn() -> #facade::__private::codegen_v3::value::ReflectedOwned
                 )));
             }
         }
     }
     quote!({
         static DEFINITION: ::std::sync::OnceLock<
-            #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor,
+            #facade::__private::codegen_v3::expression::GenericDefinitionDescriptor,
         > = ::std::sync::OnceLock::new();
-        #facade::__private::codegen_v2::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
+        #facade::__private::codegen_v3::descriptor::ConcreteGenericDescriptor::new_with_runtime_arguments(
             DEFINITION.get_or_init(|| #definition),
             ::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()),
             ::std::boxed::Box::leak(::std::vec![#(#definition_indices),*].into_boxed_slice()),
@@ -131,9 +131,9 @@ pub(crate) fn definition_provider(
     quote! {
         #[doc(hidden)]
         #[allow(non_snake_case)]
-        fn #function() -> &'static #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor {
+        fn #function() -> &'static #facade::__private::codegen_v3::expression::GenericDefinitionDescriptor {
             static DEFINITION: ::std::sync::OnceLock<
-                #facade::__private::codegen_v2::expression::GenericDefinitionDescriptor,
+                #facade::__private::codegen_v3::expression::GenericDefinitionDescriptor,
             > = ::std::sync::OnceLock::new();
             DEFINITION.get_or_init(|| #definition)
         }
@@ -176,7 +176,7 @@ pub(crate) fn type_definition_provider(
                 let expression = super::traits::type_expression(&field.ty, &environment, facade);
                 let visibility = symbolic_visibility(&field.visibility, facade);
                 quote! {
-                    #facade::__private::codegen_v2::descriptor::FieldDefinitionDescriptor::new(
+                    #facade::__private::codegen_v3::descriptor::FieldDefinitionDescriptor::new(
                         #index,
                         #rust_name,
                         #query_name,
@@ -188,8 +188,8 @@ pub(crate) fn type_definition_provider(
             let kind = super::structs::kind_tokens(declaration, facade);
             quote! {
                 let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-                #facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor::struct_type(
-                    #facade::__private::codegen_v2::descriptor::TypeDefinitionId::of::<#marker>(),
+                #facade::__private::codegen_v3::descriptor::TypeDefinitionDescriptor::struct_type(
+                    #facade::__private::codegen_v3::descriptor::TypeDefinitionId::of::<#marker>(),
                     concat!(module_path!(), "::", stringify!(#declaration_name)),
                     #query_name,
                     #generic_function(),
@@ -214,7 +214,7 @@ pub(crate) fn type_definition_provider(
                     let expression = super::traits::type_expression(&field.ty, &environment, facade);
                     let visibility = symbolic_visibility(&field.visibility, facade);
                     quote! {
-                        #facade::__private::codegen_v2::descriptor::FieldDefinitionDescriptor::new(
+                        #facade::__private::codegen_v3::descriptor::FieldDefinitionDescriptor::new(
                             #index,
                             #rust_field_name,
                             #field_query_name,
@@ -224,16 +224,16 @@ pub(crate) fn type_definition_provider(
                     }
                 });
                 let kind = match variant.fields.len() {
-                    0 => quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Unit),
+                    0 => quote!(#facade::__private::codegen_v3::descriptor::VariantKind::Unit),
                     _ if variant.fields.first().is_some_and(|field| field.name.is_none()) => {
-                        quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Tuple)
+                        quote!(#facade::__private::codegen_v3::descriptor::VariantKind::Tuple)
                     }
-                    _ => quote!(#facade::__private::codegen_v2::descriptor::VariantKind::Struct),
+                    _ => quote!(#facade::__private::codegen_v3::descriptor::VariantKind::Struct),
                 };
                 quote! {
                     {
                         let fields = ::std::boxed::Box::leak(::std::vec![#(#fields),*].into_boxed_slice());
-                        #facade::__private::codegen_v2::descriptor::VariantDefinitionDescriptor::new(
+                        #facade::__private::codegen_v3::descriptor::VariantDefinitionDescriptor::new(
                             #variant_index,
                             #rust_name,
                             #variant_query_name,
@@ -245,8 +245,8 @@ pub(crate) fn type_definition_provider(
             });
             quote! {
                 let variants = ::std::boxed::Box::leak(::std::vec![#(#variants),*].into_boxed_slice());
-                #facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor::enum_type(
-                    #facade::__private::codegen_v2::descriptor::TypeDefinitionId::of::<#marker>(),
+                #facade::__private::codegen_v3::descriptor::TypeDefinitionDescriptor::enum_type(
+                    #facade::__private::codegen_v3::descriptor::TypeDefinitionId::of::<#marker>(),
                     concat!(module_path!(), "::", stringify!(#declaration_name)),
                     #query_name,
                     #generic_function(),
@@ -255,8 +255,8 @@ pub(crate) fn type_definition_provider(
             }
         }
         TypeDeclarationKindIr::Union => {
-            quote!(#facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor::opaque(
-                #facade::__private::codegen_v2::descriptor::TypeDefinitionId::of::<#marker>(),
+            quote!(#facade::__private::codegen_v3::descriptor::TypeDefinitionDescriptor::opaque(
+                #facade::__private::codegen_v3::descriptor::TypeDefinitionId::of::<#marker>(),
                 concat!(module_path!(), "::", stringify!(#declaration_name)),
                 #query_name,
                 #generic_function(),
@@ -270,8 +270,8 @@ pub(crate) fn type_definition_provider(
 
         #[doc(hidden)]
         #[allow(non_snake_case)]
-        fn #function() -> &'static #facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor {
-            static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v2::descriptor::TypeDefinitionDescriptor> =
+        fn #function() -> &'static #facade::__private::codegen_v3::descriptor::TypeDefinitionDescriptor {
+            static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v3::descriptor::TypeDefinitionDescriptor> =
                 ::std::sync::OnceLock::new();
             DESCRIPTOR.get_or_init(|| { #body })
         }
@@ -280,18 +280,18 @@ pub(crate) fn type_definition_provider(
         mod #registration_module {
             use super::*;
 
-            fn runtime_identity() -> #facade::__private::codegen_v2::registration::RuntimeIdentity {
-                #facade::__private::codegen_v2::registration::RuntimeIdentity::TypeDefinition(#function().id())
+            fn runtime_identity() -> #facade::__private::codegen_v3::registration::RuntimeIdentity {
+                #facade::__private::codegen_v3::registration::RuntimeIdentity::TypeDefinition(#function().id())
             }
 
-            fn payload() -> #facade::__private::codegen_v2::registration::FragmentPayload {
-                #facade::__private::codegen_v2::registration::FragmentPayload::TypeDefinition(#function())
+            fn payload() -> #facade::__private::codegen_v3::registration::FragmentPayload {
+                #facade::__private::codegen_v3::registration::FragmentPayload::TypeDefinition(#function())
             }
 
-            #facade::__private::codegen_v2::inventory::submit! {
-                #facade::__private::codegen_v2::registration::RegistrationFragment::new(
-                    #facade::__private::codegen_v2::registration::FragmentKind::TypeDefinition,
-                    #facade::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            #facade::__private::codegen_v3::inventory::submit! {
+                #facade::__private::codegen_v3::registration::RegistrationFragment::new(
+                    #facade::__private::codegen_v3::registration::FragmentKind::TypeDefinition,
+                    #facade::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(),
                         "type-definition", #fingerprint,
                     ),
@@ -305,15 +305,15 @@ pub(crate) fn type_definition_provider(
 
 fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStream) -> TokenStream {
     match visibility {
-        crate::ir::VisibilityIr::Public => quote!(#facade::__private::codegen_v2::identity::Visibility::Public),
-        crate::ir::VisibilityIr::Crate => quote!(#facade::__private::codegen_v2::identity::Visibility::Crate),
-        crate::ir::VisibilityIr::Super => quote!(#facade::__private::codegen_v2::identity::Visibility::Super),
+        crate::ir::VisibilityIr::Public => quote!(#facade::__private::codegen_v3::identity::Visibility::Public),
+        crate::ir::VisibilityIr::Crate => quote!(#facade::__private::codegen_v3::identity::Visibility::Crate),
+        crate::ir::VisibilityIr::Super => quote!(#facade::__private::codegen_v3::identity::Visibility::Super),
         crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
-            quote!(#facade::__private::codegen_v2::identity::Visibility::Private)
+            quote!(#facade::__private::codegen_v3::identity::Visibility::Private)
         }
         crate::ir::VisibilityIr::Restricted(path) => {
             let path = syn::LitStr::new(&path.source, proc_macro2::Span::call_site());
-            quote!(#facade::__private::codegen_v2::identity::Visibility::Restricted(#path.into()))
+            quote!(#facade::__private::codegen_v3::identity::Visibility::Restricted(#path.into()))
         }
     }
 }

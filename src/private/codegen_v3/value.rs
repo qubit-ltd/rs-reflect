@@ -6,19 +6,21 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact field-access surface consumed by codegen v2.
+//! Exact dynamic-value surface consumed by codegen v3.
 
 #[doc(hidden)]
-pub use crate::access::FieldAccessError;
+pub use crate::value::DynamicMut;
 #[doc(hidden)]
-pub use crate::access::FieldAccessPolicy;
+pub use crate::value::DynamicOwned;
 #[doc(hidden)]
-pub use crate::access::FieldIdentity;
+pub use crate::value::DynamicRef;
 #[doc(hidden)]
-pub use crate::access::ThreadSafeFieldGetAdapter;
+pub use crate::value::Local;
 #[doc(hidden)]
-pub use crate::access::ThreadSafeFieldGetMutAdapter;
+pub use crate::value::ReflectedMut;
 #[doc(hidden)]
-pub use crate::access::ThreadSafeFieldSetAdapter;
+pub use crate::value::ReflectedOwned;
 #[doc(hidden)]
-pub use crate::access::ThreadSafeFieldSetPreflightAdapter;
+pub use crate::value::ReflectedRef;
+#[doc(hidden)]
+pub use crate::value::ThreadSafe;

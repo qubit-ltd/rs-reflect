@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+ --> tests/ui/fail/snapshot_local_upgrade_tests.rs:7:49
+  |
+7 |     let _ = method.invoke_thread_safe(registry, input);
+  |                    ------------------           ^^^^^ expected `Invocation<'_, ThreadSafe>`, found `Invocation<'_, Local>`
+  |                    |
+  |                    arguments to this method are incorrect
+  |
+  = note: expected struct `Invocation<'_, ThreadSafe>`
+             found struct `Invocation<'_, Local>`
+note: method defined here
+ --> src/descriptor/method_descriptor.rs
+  |
+  |     pub fn invoke_thread_safe<'call>(
+  |            ^^^^^^^^^^^^^^^^^^

@@ -6,7 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Exact error surface consumed by codegen v2.
+//! Exact identity surface consumed by codegen v3.
 
 #[doc(hidden)]
-pub use crate::error::TypeMismatch;
+pub use crate::identity::ExternalTraitId;
+#[doc(hidden)]
+pub use crate::identity::FragmentIdentity;
+#[doc(hidden)]
+pub use crate::identity::MemberId;
+#[doc(hidden)]
+pub use crate::identity::Visibility;

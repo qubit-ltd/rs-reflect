@@ -42,7 +42,7 @@ impl Reflect for Sample {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v2::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
+            reflect::__private::codegen_v3::descriptor::struct_type::<Sample>("Sample", StructKind::Named, &[])
         })
     }
 }
@@ -304,7 +304,7 @@ impl Reflect for Counter {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v2::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
+            reflect::__private::codegen_v3::descriptor::struct_type::<Counter>("Counter", StructKind::Named, &[])
         })
     }
 }
@@ -448,7 +448,7 @@ impl Reflect for SmartReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v2::descriptor::struct_type::<SmartReceiver>(
+            reflect::__private::codegen_v3::descriptor::struct_type::<SmartReceiver>(
                 "SmartReceiver",
                 StructKind::Named,
                 &[],
@@ -461,7 +461,7 @@ impl Reflect for PinnedOnlyReceiver {
     fn type_descriptor() -> &'static reflect::TypeDescriptor {
         static DESCRIPTOR: OnceLock<reflect::TypeDescriptor> = OnceLock::new();
         DESCRIPTOR.get_or_init(|| {
-            reflect::__private::codegen_v2::descriptor::struct_type::<PinnedOnlyReceiver>(
+            reflect::__private::codegen_v3::descriptor::struct_type::<PinnedOnlyReceiver>(
                 "PinnedOnlyReceiver",
                 StructKind::Named,
                 &[],
@@ -608,10 +608,10 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_receiver() {
     let adapter = instance.adapter().expect("safe shared method needs adapter");
     let sample = Sample;
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&sample), []),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -637,9 +637,12 @@ fn test_reflect_impl_generated_str_adapter_preserves_parameter_borrow_origin() {
     let output = instance
         .adapter()
         .expect("shared str method needs a dedicated adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Ref(
-            reflect::value::DynamicRef::<reflect::value::Local>::new_str("hello"),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Ref(
+                reflect::value::DynamicRef::<reflect::value::Local>::new_str("hello"),
+            )]),
+        )
         .expect("local adapter must be present")
         .expect("shared str invocation must validate");
     let InvocationOutput::Ref { value, origins } = output else {
@@ -667,9 +670,12 @@ fn test_reflect_impl_generated_mut_str_adapter_uses_dedicated_dynamic_variant() 
     let output = instance
         .adapter()
         .expect("mutable str method needs a dedicated adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Mut(
-            reflect::value::DynamicMut::<reflect::value::Local>::new_str_mut(text.as_mut_str()),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Mut(
+                reflect::value::DynamicMut::<reflect::value::Local>::new_str_mut(text.as_mut_str()),
+            )]),
+        )
         .expect("local adapter must be present")
         .expect("mutable str invocation must validate");
     assert!(matches!(output, InvocationOutput::Unit));
@@ -708,7 +714,10 @@ fn test_reflect_impl_invokes_safe_owned_non_path_output_shapes() {
         instance
             .adapter()
             .expect("safe owned output shape needs an adapter")
-            .invoke_local(Invocation::associated([]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([]),
+            )
             .expect("local adapter must be present")
             .expect("owned output invocation must validate")
     };
@@ -866,9 +875,10 @@ fn test_reflect_impl_registers_explicit_generic_method_specialization() {
         .adapter()
         .expect("simple registered specialization needs an adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(31_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(31_u8))]),
+        )
         .expect("local adapter must be present")
         .expect("specialized invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -894,12 +904,13 @@ fn test_reflect_impl_recursively_substitutes_nested_generic_method_specializatio
     let output = instance
         .adapter()
         .expect("nested generic method specialization needs an adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(vec![
-            Some(31_u8),
-            None,
-        ]))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(vec![
+                Some(31_u8),
+                None,
+            ]))]),
+        )
         .expect("local adapter must be present")
         .expect("nested generic invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -927,9 +938,12 @@ fn test_reflect_impl_specialized_method_accepts_borrowed_parameter() {
     let output = instance
         .adapter()
         .expect("the borrowed specialization must have an adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Ref(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Ref(
+                reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
+            )]),
+        )
         .expect("the local adapter must exist")
         .expect("the shared argument must validate");
     let InvocationOutput::Owned(output) = output else {
@@ -953,10 +967,13 @@ fn test_reflect_impl_specialized_method_uses_the_shared_receiver_emitter() {
     let output = instance
         .adapter()
         .expect("the receiver specialization must have an adapter")
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(47_u8))],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(
+                reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
+                [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(47_u8))],
+            ),
+        )
         .expect("the local adapter must exist")
         .expect("the specialized receiver invocation must validate");
     let InvocationOutput::Owned(output) = output else {
@@ -979,9 +996,10 @@ fn test_reflect_impl_specialized_method_uses_the_shared_async_emitter() {
     let output = instance
         .adapter()
         .expect("the async specialization must have an adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(53_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(53_u8))]),
+        )
         .expect("the local adapter must exist")
         .expect("the specialized async invocation must validate");
     let InvocationOutput::Future(mut future) = output else {
@@ -1027,9 +1045,12 @@ fn test_reflect_impl_invokes_explicit_const_generic_method_specialization() {
         .adapter()
         .expect("registered const specialization needs an adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(7_usize))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(
+                7_usize,
+            ))]),
+        )
         .expect("local adapter must be present")
         .expect("specialized invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1056,9 +1077,10 @@ fn test_reflect_impl_records_and_invokes_const_function_at_runtime() {
     let output = instance
         .adapter()
         .expect("const function needs an ordinary runtime adapter")
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(41_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(41_u8))]),
+        )
         .expect("local adapter must be present")
         .expect("const function invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1083,10 +1105,13 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_receiver() {
     let mut counter = Counter(3);
     let value = {
         let output = adapter
-            .invoke_local(Invocation::borrowed_mut(
-                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
-                [],
-            ))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::borrowed_mut(
+                    reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
+                    [],
+                ),
+            )
             .expect("local adapter must be present")
             .expect("validated invocation must call method");
         let InvocationOutput::Owned(value) = output else {
@@ -1114,10 +1139,10 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_receiver() {
     };
     let adapter = instance.adapter().expect("safe owned method needs adapter");
     let output = adapter
-        .invoke_local(Invocation::owned(
-            DynamicOwned::<reflect::value::Local>::new(Counter(23)),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::owned(DynamicOwned::<reflect::value::Local>::new(Counter(23)), []),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -1160,7 +1185,10 @@ fn test_reflect_impl_generates_callable_adapters_for_owned_smart_receivers() {
         };
         let adapter = instance.adapter().expect("supported smart receiver needs an adapter");
         let output = adapter
-            .invoke_local(Invocation::owned(receiver, []))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::owned(receiver, []),
+            )
             .expect("local adapter must be present")
             .expect("validated invocation must call method");
         let InvocationOutput::Owned(value) = output else {
@@ -1188,7 +1216,10 @@ fn test_reflect_impl_invokes_pinned_borrow_receivers_without_erasing_pin() {
         _pin: PhantomPinned,
     });
     let shared_output = shared_adapter
-        .invoke_pinned_ref_local(reflect::invoke::PinnedRefInvocation::new(shared_receiver.as_ref(), []))
+        .invoke_pinned_ref_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            reflect::invoke::PinnedRefInvocation::new(shared_receiver.as_ref(), []),
+        )
         .expect("exact typed pinned adapter must be present")
         .expect("pinned shared invocation must validate");
     let InvocationOutput::Owned(shared_value) = shared_output else {
@@ -1212,7 +1243,10 @@ fn test_reflect_impl_invokes_pinned_borrow_receivers_without_erasing_pin() {
         _pin: PhantomPinned,
     });
     let mutable_output = mutable_adapter
-        .invoke_pinned_mut_local(reflect::invoke::PinnedMutInvocation::new(mutable_receiver.as_mut(), []))
+        .invoke_pinned_mut_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            reflect::invoke::PinnedMutInvocation::new(mutable_receiver.as_mut(), []),
+        )
         .expect("exact typed pinned adapter must be present")
         .expect("pinned mutable invocation must validate");
     let InvocationOutput::Owned(mutable_value) = mutable_output else {
@@ -1237,10 +1271,13 @@ fn test_reflect_impl_invokes_an_explicit_receiver_through_a_registered_adapter()
         .adapter()
         .expect("registered receiver adapter must enable invocation");
     let output = adapter
-        .invoke_local(Invocation::owned(
-            DynamicOwned::<reflect::value::Local>::new(Pin::new(Rc::new(ExtensionReceiver(53)))),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::owned(
+                DynamicOwned::<reflect::value::Local>::new(Pin::new(Rc::new(ExtensionReceiver(53)))),
+                [],
+            ),
+        )
         .expect("local adapter must be present")
         .expect("receiver adapter must accept the exact container");
     let InvocationOutput::Owned(value) = output else {
@@ -1280,7 +1317,10 @@ fn test_explicit_receiver_rejection_recovers_named_arguments_in_caller_order() {
         ],
     );
 
-    let Some(Err(failure)) = instance.invoke_local(invocation) else {
+    let Some(Err(failure)) = instance.invoke_local(
+        ReflectRegistry::initialize().expect("valid fixture registry"),
+        invocation,
+    ) else {
         panic!("the explicit receiver adapter must reject an incompatible container")
     };
     assert!(matches!(
@@ -1312,7 +1352,7 @@ fn test_explicit_receiver_rejection_recovers_named_arguments_in_caller_order() {
 }
 
 #[test]
-fn test_reflect_impl_only_describes_an_explicit_receiver_without_an_adapter() {
+fn test_reflect_impl_resolves_missing_explicit_receiver_capability_at_invocation() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let implementations = registry.implementations(UnadaptedReceiver::type_descriptor().type_id());
     let reflect::descriptor::MethodLookup::Unique(instance) =
@@ -1320,12 +1360,20 @@ fn test_reflect_impl_only_describes_an_explicit_receiver_without_an_adapter() {
     else {
         panic!("unadapted explicit receiver method must remain discoverable");
     };
-    assert!(instance.adapter().is_none());
-    assert!(
-        instance
-            .unavailable_reasons()
-            .contains(&reflect::descriptor::InvocationUnavailableReason::UnsupportedReceiver)
-    );
+    assert!(instance.adapter().is_some());
+    assert!(instance.unavailable_reasons().is_empty());
+    let invocation = Invocation::owned(reflect::ReflectedOwned::new(Pin::new(Rc::new(UnadaptedReceiver))), []);
+    let failure = instance.invoke_local(registry, invocation).unwrap().err().unwrap();
+    assert!(matches!(
+        failure.error().kind(),
+        reflect::invoke::InvocationErrorKind::ReceiverAdapterUnavailable { .. }
+    ));
+    let (receiver, arguments) = failure.into_recovery().into_parts();
+    assert!(arguments.is_empty());
+    let Some(reflect::invoke::InvocationReceiver::Owned(receiver)) = receiver else {
+        panic!("missing capability must preserve the owned receiver")
+    };
+    assert!(receiver.downcast::<Pin<Rc<UnadaptedReceiver>>>().is_ok());
 }
 
 #[test]
@@ -1361,7 +1409,10 @@ fn test_reflect_impl_registers_explicit_generic_impl_specialization() {
         .adapter()
         .expect("concrete generic impl method needs an adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("local adapter must be present")
         .expect("specialized generic impl invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1379,9 +1430,10 @@ fn test_reflect_impl_registers_explicit_generic_impl_specialization() {
     };
     let adapter = instance.adapter().expect("concrete generic method needs an adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(19_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(19_u8))]),
+        )
         .expect("local adapter must be present")
         .expect("concrete generic impl invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1419,7 +1471,10 @@ fn test_reflect_impl_registers_explicit_const_generic_impl_specialization() {
         .adapter()
         .expect("concrete const generic impl method needs an adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("local adapter must be present")
         .expect("specialized const generic impl invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1565,10 +1620,10 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_borrowed_output() {
     let adapter = instance.adapter().expect("shared borrowed output needs adapter");
     let counter = Counter(23);
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&counter),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&counter), []),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Ref { value, origins } = output else {
@@ -1593,10 +1648,13 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_borrowed_output() {
     let mut counter = Counter(23);
     {
         let output = adapter
-            .invoke_local(Invocation::borrowed_mut(
-                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
-                [],
-            ))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::borrowed_mut(
+                    reflect::value::DynamicMut::<reflect::value::Local>::new(&mut counter),
+                    [],
+                ),
+            )
             .expect("local adapter must be present")
             .expect("validated invocation must call method");
         let InvocationOutput::Mut { mut value, origin } = output else {
@@ -1702,10 +1760,10 @@ fn test_reflect_impl_invokes_overridden_trait_method_through_descriptor_adapter(
         .expect("supported overridden trait method needs an adapter");
     let sample = Sample;
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&sample), []),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call the overridden trait method");
     let InvocationOutput::Owned(value) = output else {
@@ -1741,10 +1799,13 @@ fn test_reflect_impl_registers_and_invokes_trait_method_specialization() {
     let output = instance
         .adapter()
         .expect("the trait method specialization must have an adapter")
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(59_u8))],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(
+                reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
+                [InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(59_u8))],
+            ),
+        )
         .expect("the local adapter must exist")
         .expect("the trait method specialization must validate");
     let InvocationOutput::Owned(output) = output else {
@@ -1781,10 +1842,10 @@ fn test_reflect_impl_invokes_defaulted_trait_method_through_descriptor_adapter()
         .expect("supported defaulted trait method needs an adapter");
     let sample = Sample;
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&sample), []),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call the defaulted trait method");
     let InvocationOutput::Owned(value) = output else {
@@ -1825,10 +1886,10 @@ fn test_reflect_impl_matches_renamed_trait_override_by_rust_identity() {
         .expect("renaming a declaration must not disable its override adapter");
     let sample = Sample;
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&sample), []),
+        )
         .expect("local adapter must be present")
         .expect("renamed override invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -1869,10 +1930,10 @@ fn test_reflect_impl_keeps_renamed_trait_default_by_rust_identity() {
         .expect("renaming a declaration must not disable its default adapter");
     let sample = Sample;
     let output = adapter
-        .invoke_local(Invocation::borrowed(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&sample),
-            [],
-        ))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::borrowed(reflect::value::DynamicRef::<reflect::value::Local>::new(&sample), []),
+        )
         .expect("local adapter must be present")
         .expect("renamed default invocation must validate");
     let InvocationOutput::Owned(value) = output else {
@@ -2007,7 +2068,10 @@ fn test_reflect_impl_generates_callable_adapter_for_safe_associated_function() {
     };
     let adapter = instance.adapter().expect("safe associated method needs adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -2032,9 +2096,10 @@ fn test_reflect_impl_generates_callable_adapter_for_owned_argument() {
     };
     let adapter = instance.adapter().expect("owned argument method needs adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(41_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(41_u8))]),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -2060,9 +2125,12 @@ fn test_reflect_impl_generates_callable_adapter_for_shared_argument() {
     let adapter = instance.adapter().expect("shared argument method needs adapter");
     let input = 40_u8;
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Ref(
-            reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
-        )]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Ref(
+                reflect::value::DynamicRef::<reflect::value::Local>::new(&input),
+            )]),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -2089,9 +2157,12 @@ fn test_reflect_impl_generates_callable_adapter_for_mutable_argument() {
     let mut input = 40_u8;
     let value = {
         let output = adapter
-            .invoke_local(Invocation::associated([InvocationArg::Mut(
-                reflect::value::DynamicMut::<reflect::value::Local>::new(&mut input),
-            )]))
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([InvocationArg::Mut(
+                    reflect::value::DynamicMut::<reflect::value::Local>::new(&mut input),
+                )]),
+            )
             .expect("local adapter must be present")
             .expect("validated invocation must call method");
         let InvocationOutput::Owned(value) = output else {
@@ -2119,10 +2190,13 @@ fn test_reflect_impl_preserves_all_owned_arguments_after_validation_failure() {
     };
     let adapter = instance.adapter().expect("safe owned-argument method needs adapter");
     let result = adapter
-        .invoke_local(Invocation::associated([
-            InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(7_u8)),
-            InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(String::from("wrong"))),
-        ]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([
+                InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(7_u8)),
+                InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(String::from("wrong"))),
+            ]),
+        )
         .expect("local adapter must be present");
     let Err(failure) = result else {
         panic!("the second argument must fail exact type validation");
@@ -2158,9 +2232,10 @@ fn test_reflect_impl_generates_callable_adapter_for_async_method() {
     };
     let adapter = instance.adapter().expect("safe async method needs adapter");
     let output = adapter
-        .invoke_local(Invocation::associated([InvocationArg::Owned(DynamicOwned::<
-            reflect::value::Local,
-        >::new(39_u8))]))
+        .invoke_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<reflect::value::Local>::new(39_u8))]),
+        )
         .expect("local adapter must be present")
         .expect("validated invocation must start method");
     let InvocationOutput::Future(mut future) = output else {
@@ -2187,11 +2262,21 @@ fn test_reflect_impl_generates_explicit_thread_safe_adapter() {
         panic!("generated thread-safe method instance must be discoverable");
     };
     let adapter = instance.adapter().expect("explicit thread-safe method needs adapter");
-    assert!(adapter.invoke_local(Invocation::associated([])).is_none());
+    assert!(
+        adapter
+            .invoke_local(
+                ReflectRegistry::initialize().expect("valid fixture registry"),
+                Invocation::associated([])
+            )
+            .is_none()
+    );
     let output = adapter
-        .invoke_thread_safe(Invocation::associated([InvocationArg::Owned(
-            reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::new(38_u8),
-        )]))
+        .invoke_thread_safe(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([InvocationArg::Owned(reflect::value::DynamicOwned::<
+                reflect::value::ThreadSafe,
+            >::new(38_u8))]),
+        )
         .expect("thread-safe adapter must be present")
         .expect("validated invocation must call method");
     let InvocationOutput::Owned(value) = output else {
@@ -2216,7 +2301,10 @@ fn test_reflect_impl_generates_explicit_catching_adapter() {
     };
     let adapter = instance.adapter().expect("catching method needs adapter");
     let caught = match adapter
-        .invoke_catching_local(Invocation::associated([]))
+        .invoke_catching_local(
+            ReflectRegistry::initialize().expect("valid fixture registry"),
+            Invocation::associated([]),
+        )
         .expect("catching adapter must be present")
         .expect("validated invocation must begin")
     {

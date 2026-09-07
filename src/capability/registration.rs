@@ -88,28 +88,28 @@ macro_rules! register_type_capabilities {
             }
 
             fn __qubit_reflect_runtime_identity(
-            ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
-                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities(
-                    $crate::__private::codegen_v2::registration::CapabilityTarget::Type(
+            ) -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
+                $crate::__private::codegen_v3::registration::RuntimeIdentity::Capabilities(
+                    $crate::__private::codegen_v3::registration::CapabilityTarget::Type(
                         __qubit_reflect_target_descriptor().type_id(),
                     ),
                 )
             }
 
             fn __qubit_reflect_payload(
-            ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
-                $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
-                    $crate::__private::codegen_v2::registration::CapabilityRegistration::for_type(
+            ) -> $crate::__private::codegen_v3::registration::FragmentPayload {
+                $crate::__private::codegen_v3::registration::FragmentPayload::Capability(
+                    $crate::__private::codegen_v3::registration::CapabilityRegistration::for_type(
                         __qubit_reflect_target_descriptor(),
                         __qubit_reflect_descriptors(),
                     ),
                 )
             }
 
-            $crate::__private::codegen_v2::inventory::submit! {
-                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
-                    $crate::__private::codegen_v2::registration::FragmentKind::Capability,
-                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            $crate::__private::codegen_v3::inventory::submit! {
+                $crate::__private::codegen_v3::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v3::registration::FragmentKind::Capability,
+                    $crate::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "capability", 0,
                     ),
                     __qubit_reflect_runtime_identity,
@@ -137,28 +137,28 @@ macro_rules! register_type_capabilities {
             }
 
             fn __qubit_reflect_runtime_identity(
-            ) -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
-                $crate::__private::codegen_v2::registration::RuntimeIdentity::Capabilities(
-                    $crate::__private::codegen_v2::registration::CapabilityTarget::Type(
+            ) -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
+                $crate::__private::codegen_v3::registration::RuntimeIdentity::Capabilities(
+                    $crate::__private::codegen_v3::registration::CapabilityTarget::Type(
                         __qubit_reflect_target_descriptor().type_id(),
                     ),
                 )
             }
 
             fn __qubit_reflect_payload(
-            ) -> $crate::__private::codegen_v2::registration::FragmentPayload {
-                $crate::__private::codegen_v2::registration::FragmentPayload::Capability(
-                    $crate::__private::codegen_v2::registration::CapabilityRegistration::for_type(
+            ) -> $crate::__private::codegen_v3::registration::FragmentPayload {
+                $crate::__private::codegen_v3::registration::FragmentPayload::Capability(
+                    $crate::__private::codegen_v3::registration::CapabilityRegistration::for_type(
                         __qubit_reflect_target_descriptor(),
                         __qubit_reflect_descriptors(),
                     ),
                 )
             }
 
-            $crate::__private::codegen_v2::inventory::submit! {
-                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
-                    $crate::__private::codegen_v2::registration::FragmentKind::Capability,
-                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            $crate::__private::codegen_v3::inventory::submit! {
+                $crate::__private::codegen_v3::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v3::registration::FragmentKind::Capability,
+                    $crate::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "capability", 0,
                     ),
                     __qubit_reflect_runtime_identity,
@@ -186,18 +186,18 @@ macro_rules! register_reflected_type {
                 $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 
-            fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v2::registration::RuntimeIdentity {
-                $crate::__private::codegen_v2::registration::RuntimeIdentity::Type(__qubit_reflect_target_type_id())
+            fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
+                $crate::__private::codegen_v3::registration::RuntimeIdentity::Type(__qubit_reflect_target_type_id())
             }
 
-            fn __qubit_reflect_payload() -> $crate::__private::codegen_v2::registration::FragmentPayload {
-                $crate::__private::codegen_v2::registration::FragmentPayload::Type(__qubit_reflect_descriptor())
+            fn __qubit_reflect_payload() -> $crate::__private::codegen_v3::registration::FragmentPayload {
+                $crate::__private::codegen_v3::registration::FragmentPayload::Type(__qubit_reflect_descriptor())
             }
 
-            $crate::__private::codegen_v2::inventory::submit! {
-                $crate::__private::codegen_v2::registration::RegistrationFragment::new(
-                    $crate::__private::codegen_v2::registration::FragmentKind::Type,
-                    $crate::__private::codegen_v2::registration::StaticFragmentIdentity::new(
+            $crate::__private::codegen_v3::inventory::submit! {
+                $crate::__private::codegen_v3::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v3::registration::FragmentKind::Type,
+                    $crate::__private::codegen_v3::registration::StaticFragmentIdentity::new(
                         env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "type", 0,
                     ),
                     __qubit_reflect_runtime_identity,
