@@ -8,6 +8,7 @@
 
 mod macros;
 
+// qubit-style: allow all
 use proc_macro::TokenStream;
 
 /// Derives the runtime facade's re-exported `Reflect` implementation.

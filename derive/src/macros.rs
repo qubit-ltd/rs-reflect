@@ -6,9 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use proc_macro::TokenStream;
+
 use crate::entry;
 use crate::ir::MacroKind;
-use proc_macro::TokenStream;
 
 /// Derives structural reflection for a struct or enum.
 ///
