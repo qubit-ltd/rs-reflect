@@ -23,16 +23,16 @@ mod ir;
 mod parse;
 mod validate;
 
-use proc_macro::TokenStream;
-
 use ir::MacroKind;
+use proc_macro::TokenStream;
 
 /// Derives structural reflection for a struct or enum.
 ///
 /// Generic facade macros may request `definition_provider_v2 = identifier`.
-/// It emits the caller-named `fn() -> &'static TypeDefinitionDescriptor` without
-/// requiring a concrete monomorph, using `facade::__private::codegen_v3` types.
-/// The helper is valid only on generic types; the identifier belongs to the caller.
+/// It emits the caller-named `fn() -> &'static TypeDefinitionDescriptor`
+/// without requiring a concrete monomorph, using
+/// `facade::__private::codegen_v3` types. The helper is valid only on generic
+/// types; the identifier belongs to the caller.
 ///
 /// Type-level helpers include `rename`, `opaque`, `capabilities(...)`, and
 /// `crate = path`. Fields and variants support `rename`, `skip`, `opaque`,

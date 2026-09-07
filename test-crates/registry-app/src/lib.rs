@@ -46,8 +46,7 @@ mod tests {
         assert_eq!(user.label_a(), 13);
         assert_eq!(user.label_b(), 23);
 
-        let registry =
-            ReflectRegistry::initialize().expect("dependency fragments must form one registry");
+        let registry = ReflectRegistry::initialize().expect("dependency fragments must form one registry");
         let implementations = registry.implementations(RegistryUser::type_descriptor().type_id());
         assert_eq!(implementations.len(), 2);
         assert!(

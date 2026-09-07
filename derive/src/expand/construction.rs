@@ -21,10 +21,7 @@ use crate::ir::VariantIr;
 use crate::ir::VariantKindIr;
 
 /// Emits generated local construction and update adapters for one struct.
-pub(crate) fn struct_adapters(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let local = struct_mode_adapters(declaration, facade, false);
     let thread_safe = declaration
         .attributes
@@ -34,11 +31,7 @@ pub(crate) fn struct_adapters(
     quote!(#local #thread_safe)
 }
 
-fn struct_mode_adapters(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
@@ -190,10 +183,7 @@ fn struct_mode_adapters(
 
 /// Returns the descriptor expression linking a struct to its generated entry
 /// points.
-pub(crate) fn struct_descriptor(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let thread_safe = declaration
         .attributes
         .iter()
@@ -212,23 +202,14 @@ pub(crate) fn struct_descriptor(
 
 /// Emits a local constructor and its descriptor attachment for one enum
 /// variant.
-pub(crate) fn variant_adapters(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     let local = variant_adapters_for_mode(variant, facade, false);
-    let thread_safe_adapters =
-        thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
+    let thread_safe_adapters = thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
     quote!(#local #thread_safe_adapters)
 }
 
 /// Emits one mode-specific enum variant constructor.
-fn variant_adapters_for_mode(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes
         .iter()
@@ -251,7 +232,8 @@ fn variant_adapters_for_mode(
             .iter()
             .find(|attribute| attribute.name == HelperName::Default)?;
         let provider = format_ident!(
-            "__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}", field.index
+            "__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}",
+            field.index
         );
         let ty = &field.ty.tokens;
         let expression = match &default.value {
@@ -337,11 +319,7 @@ fn variant_adapters_for_mode(
 }
 
 /// Returns an optional descriptor attachment for one variant.
-pub(crate) fn variant_descriptor(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes
         .iter()

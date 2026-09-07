@@ -30,8 +30,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
     let facade = context.facade().clone();
     let name = declaration.name.clone();
     let reflected_field_types = super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameters: Vec<_> = declaration
         .generics
         .params
@@ -58,14 +57,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameters {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -91,8 +86,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .to_owned();
     let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition =
-        super::structs::capabilities(&declaration, &facade, &capability_function);
+    let capability_definition = super::structs::capabilities(&declaration, &facade, &capability_function);
     let representations = enum_representations(&declaration.retained_tokens);
     let integer_repr = declaration
         .variants
@@ -112,10 +106,8 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .iter()
         .any(|attribute| attribute.name == HelperName::Opaque)
     {
-        let generic_definition_provider =
-            super::generics::definition_provider(&declaration, &facade);
-        let type_definition_provider =
-            super::generics::type_definition_provider(&declaration, &facade, fingerprint);
+        let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+        let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
         let registration = registration(
             &facade,
             &name,
@@ -245,8 +237,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         !declaration.generics.params.is_empty(),
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
-    let type_definition_provider =
-        super::generics::type_definition_provider(&declaration, &facade, fingerprint);
+    let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     let root_descriptor = quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -571,17 +562,13 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
         return Vec::new();
     };
     let mut representations = Vec::new();
-    for attribute in input
-        .attrs
-        .iter()
-        .filter(|attribute| attribute.path().is_ident("repr"))
-    {
+    for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
         let syn::Meta::List(list) = &attribute.meta else {
             continue;
         };
-        let Ok(values) = list.parse_args_with(
-            syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-        ) else {
+        let Ok(values) =
+            list.parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+        else {
             continue;
         };
         representations.extend(values.iter().filter_map(parse_enum_representation));
