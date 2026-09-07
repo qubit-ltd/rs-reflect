@@ -68,12 +68,11 @@ impl VisitMut for GenericSubstituter<'_> {
             && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
         {
             if path.path.segments.len() > 1 {
-                    let tail = Path {
+                let tail = Path {
                     leading_colon: None,
                     segments: path.path.segments.iter().skip(1).cloned().collect(),
                 };
-                if let Ok(mut replacement) = parse2::<Type>(quote!(#replacement :: #tail))
-                {
+                if let Ok(mut replacement) = parse2::<Type>(quote!(#replacement :: #tail)) {
                     visit_type_mut(self, &mut replacement);
                     *ty = replacement;
                     return;
@@ -114,8 +113,7 @@ impl VisitMut for GenericSubstituter<'_> {
                     leading_colon: None,
                     segments: path.path.segments.iter().skip(1).cloned().collect(),
                 };
-                if let Ok(mut replacement) = parse2::<Expr>(quote!(#replacement :: #tail))
-                {
+                if let Ok(mut replacement) = parse2::<Expr>(quote!(#replacement :: #tail)) {
                     visit_expr_mut(self, &mut replacement);
                     *expression = replacement;
                     return;
