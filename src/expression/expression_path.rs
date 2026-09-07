@@ -49,3 +49,20 @@ impl ExpressionPath {
         &self.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ExpressionPath;
+
+    #[test]
+    fn validates_non_empty_segments() {
+        let path = ExpressionPath::new(["user", "name"]).expect("valid path");
+        assert_eq!(path.segments().len(), 2);
+    }
+
+    #[test]
+    fn rejects_empty_paths_and_segments() {
+        assert!(ExpressionPath::new(std::iter::empty::<&str>()).is_err());
+        assert!(ExpressionPath::new(["user", ""]).is_err());
+    }
+}

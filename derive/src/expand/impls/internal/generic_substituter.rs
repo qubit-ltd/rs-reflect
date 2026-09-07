@@ -219,8 +219,8 @@ mod tests {
         let expected: Type =
             parse2(quote!(::std::vec::Vec<u8>::Item)).expect("the expected result must be valid type syntax");
 
-        let actual: Type = parse2(substitute_type_syntax(&input, &replacements))
-            .expect("substitution must retain valid type syntax");
+        let actual: Type =
+            parse2(substitute_type_syntax(&input, &replacements)).expect("substitution must retain valid type syntax");
 
         assert_eq!(actual, expected);
     }

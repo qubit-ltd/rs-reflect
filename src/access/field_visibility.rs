@@ -40,3 +40,24 @@ impl<'a> FieldVisibility<'a> {
         matches!(self, Self::VariantInherited)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::FieldVisibility;
+    use crate::identity::Visibility;
+
+    #[test]
+    fn declared_visibility_exposes_value() {
+        let visibility = Visibility::Public;
+        let field = FieldVisibility::Declared(&visibility);
+        assert_eq!(field.as_declared(), Some(&visibility));
+        assert!(!field.is_variant_inherited());
+    }
+
+    #[test]
+    fn inherited_visibility_has_no_declared_value() {
+        let field = FieldVisibility::VariantInherited;
+        assert_eq!(field.as_declared(), None);
+        assert!(field.is_variant_inherited());
+    }
+}
