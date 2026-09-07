@@ -73,10 +73,8 @@ pub struct InvocationAdapter {
     entry_point: fn(),
     pub(super) local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
     pub(super) thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
-    pub(super) catching_local:
-        Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
-    pub(super) catching_thread_safe:
-        Option<crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>>,
+    pub(super) catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
+    pub(super) catching_thread_safe: Option<crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>>,
     catching_availability: CatchingAvailability,
     pub(super) pinned_ref_local: Option<&'static (dyn Any + Send + Sync)>,
     pub(super) pinned_mut_local: Option<&'static (dyn Any + Send + Sync)>,
@@ -122,9 +120,7 @@ impl InvocationAdapter {
     /// The entry point's type preserves both the call lifetime and the runtime
     /// `Send` boundary required by [`ThreadSafe`](crate::value::ThreadSafe).
     #[doc(hidden)]
-    pub const fn thread_safe(
-        entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
-    ) -> Self {
+    pub const fn thread_safe(entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
             local: None,
@@ -289,8 +285,7 @@ impl InvocationAdapter {
             crate::invoke::InvocationFailure<'call, crate::value::Local>,
         >,
     > {
-        self.local
-            .map(|entry_point| entry_point(registry, invocation))
+        self.local.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the thread-safe generated entry point when this descriptor has
@@ -317,8 +312,7 @@ impl InvocationAdapter {
             crate::invoke::InvocationFailure<'call, crate::value::ThreadSafe>,
         >,
     > {
-        self.thread_safe
-            .map(|entry_point| entry_point(registry, invocation))
+        self.thread_safe.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the explicit local catching entry point when one was generated.
@@ -336,8 +330,7 @@ impl InvocationAdapter {
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
-        self.catching_local
-            .map(|entry_point| entry_point(registry, invocation))
+        self.catching_local.map(|entry_point| entry_point(registry, invocation))
     }
 
     /// Invokes the explicit thread-safe catching entry point when one was
@@ -382,8 +375,7 @@ impl InvocationAdapter {
     > {
         self.pinned_ref_local
             .and_then(|entry_point| {
-                entry_point
-                    .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()
+                entry_point.downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()
             })
             .map(|entry_point| entry_point(registry, invocation))
     }
@@ -414,8 +406,7 @@ impl InvocationAdapter {
     > {
         self.pinned_mut_local
             .and_then(|entry_point| {
-                entry_point
-                    .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()
+                entry_point.downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()
             })
             .map(|entry_point| entry_point(registry, invocation))
     }

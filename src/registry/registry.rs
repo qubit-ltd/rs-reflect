@@ -402,8 +402,7 @@ impl ReflectRegistry {
         descriptor: &'registry TypeDescriptor,
         key: CapabilityKey<A>,
     ) -> Result<Option<&'registry A>, CapabilityConflict> {
-        self.capability_lookup(descriptor, key)
-            .map(CapabilityLookup::found)
+        self.capability_lookup(descriptor, key).map(CapabilityLookup::found)
     }
 
     /// Looks up one effective typed capability without collapsing diagnostic

@@ -59,14 +59,7 @@ fn method_identity(index: usize) -> MemberId {
         "fixture::MethodTarget",
         "method",
         index,
-        FragmentIdentity::new(
-            "fixture",
-            "method_descriptor_tests",
-            1,
-            1,
-            "method",
-            index as u64,
-        ),
+        FragmentIdentity::new("fixture", "method_descriptor_tests", 1, 1, "method", index as u64),
     )
 }
 
@@ -110,9 +103,7 @@ fn return_thread_safe<'call>(
     _registry: &ReflectRegistry,
     _invocation: Invocation<'call, ThreadSafe>,
 ) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(
-        8_u8,
-    )))
+    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
 }
 
 /// Wraps the local fixture output in the catching contract.
@@ -233,16 +224,8 @@ fn test_method_descriptor_builder_preserves_parameter_and_debug_field_order() {
 fn test_invocation_adapter_mode_availability_remains_distinct() {
     let registry = ReflectRegistry::initialize().expect("the fixture registry must initialize");
     let local = InvocationAdapter::local_with_catching(return_local, catch_local);
-    assert!(
-        local
-            .invoke_local(registry, Invocation::associated([]))
-            .is_some()
-    );
-    assert!(
-        local
-            .invoke_thread_safe(registry, Invocation::associated([]))
-            .is_none()
-    );
+    assert!(local.invoke_local(registry, Invocation::associated([])).is_some());
+    assert!(local.invoke_thread_safe(registry, Invocation::associated([])).is_none());
     assert!(
         local
             .invoke_catching_local(registry, Invocation::associated([]))
@@ -253,18 +236,10 @@ fn test_invocation_adapter_mode_availability_remains_distinct() {
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
             .is_none()
     );
-    assert_eq!(
-        local.catching_availability(),
-        CatchingAvailability::Available
-    );
+    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
 
-    let thread_safe =
-        InvocationAdapter::thread_safe_with_catching(return_thread_safe, catch_thread_safe);
-    assert!(
-        thread_safe
-            .invoke_local(registry, Invocation::associated([]))
-            .is_none()
-    );
+    let thread_safe = InvocationAdapter::thread_safe_with_catching(return_thread_safe, catch_thread_safe);
+    assert!(thread_safe.invoke_local(registry, Invocation::associated([])).is_none());
     assert!(
         thread_safe
             .invoke_thread_safe(registry, Invocation::associated([]))
@@ -280,10 +255,7 @@ fn test_invocation_adapter_mode_availability_remains_distinct() {
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
             .is_some()
     );
-    assert_eq!(
-        thread_safe.catching_availability(),
-        CatchingAvailability::Available
-    );
+    assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
 }
 
 #[test]
@@ -349,10 +321,7 @@ fn test_method_instance_validation_failure_recovers_caller_order() {
     )
     .expect("the fixture method instance must be valid");
     let invocation = Invocation::associated_bindings([
-        InvocationBinding::named(
-            "third",
-            InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32)),
-        ),
+        InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32))),
         InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(10_u8))),
         InvocationBinding::named(
             "second",
@@ -382,10 +351,6 @@ fn test_method_instance_validation_failure_recovers_caller_order() {
             .iter()
             .map(InvocationArg::type_id)
             .collect::<Vec<TypeId>>(),
-        [
-            TypeId::of::<u32>(),
-            TypeId::of::<u8>(),
-            TypeId::of::<String>()
-        ]
+        [TypeId::of::<u32>(), TypeId::of::<u8>(), TypeId::of::<String>()]
     );
 }
