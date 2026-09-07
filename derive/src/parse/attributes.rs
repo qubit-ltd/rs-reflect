@@ -35,6 +35,7 @@ use syn::spanned::Spanned;
 use crate::internal::ErrorCollector;
 use crate::ir::ExternalTraitIr;
 use crate::ir::HelperAttributeIr;
+use crate::ir::HelperValueIr;
 use crate::ir::HelperName;
 use crate::ir::HelperTarget;
 use crate::ir::PathIr;
@@ -120,7 +121,7 @@ fn convert_meta(
     let value = match name {
         HelperName::DefinitionProviderV2 => {
             match &meta {
-                Meta::NameValue(value) => syn::parse2(value.value.to_token_stream()).map(crate::ir::HelperValueIr::DefinitionProviderV2),
+                Meta::NameValue(value) => parse2(value.value.to_token_stream()).map(HelperValueIr::DefinitionProviderV2),
                 _ => Err(Error::new(span, "definition_provider_v2 requires one function identifier")),
             }
         }

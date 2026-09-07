@@ -460,8 +460,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         Ok(item) => item,
         Err(error) => return error.into_compile_error(),
     };
-    let generate_dyn_descriptor =
-        dyn_compatibility::is_provably_dyn_compatible(&trait_item, &declaration);
+    let generate_dyn_descriptor = is_provably_dyn_compatible(&trait_item, &declaration);
     let trait_ident = &declaration.name;
     let dyn_generics = dyn_trait_generics(&trait_item, &declaration, &facade);
     let dyn_impl_declaration = &dyn_generics.impl_declaration;
@@ -938,8 +937,9 @@ fn replace_self_associated_types(
     output
 }
 
-use dyn_compatibility::{
-    associated_type_requires_dyn_binding, dyn_inherited_arguments_for_supertrait,
-    dyn_inherited_associated_types, dyn_reflected_supertrait_path,
-};
+use self::dyn_compatibility::associated_type_requires_dyn_binding;
+use self::dyn_compatibility::dyn_inherited_arguments_for_supertrait;
+use self::dyn_compatibility::dyn_inherited_associated_types;
+use self::dyn_compatibility::dyn_reflected_supertrait_path;
+use self::dyn_compatibility::is_provably_dyn_compatible;
 // Expression generation lives in `expand::expression_codegen`.

@@ -9,9 +9,9 @@
 //! Typed, immutable capabilities attached to reflected concrete types.
 
 mod builtin;
+mod capability_lookup;
 mod descriptor;
 mod key;
-mod lookup;
 mod registration;
 mod set;
 
@@ -25,9 +25,9 @@ pub use builtin::send_descriptor;
 pub use builtin::send_key;
 pub use builtin::sync_descriptor;
 pub use builtin::sync_key;
+pub use capability_lookup::CapabilityLookup;
 pub use descriptor::CapabilityDescriptor;
 pub use key::CapabilityKey;
-pub use lookup::CapabilityLookup;
 pub use set::CapabilityConflict;
 pub use set::CapabilityConflictKind;
 pub use set::TypeCapabilities;
