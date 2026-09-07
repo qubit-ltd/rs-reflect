@@ -50,11 +50,7 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
 
 /// Converts generic declaration facts into the runtime generic descriptor
 /// model.
-pub(crate) fn generic_definition(
-    generics: &GenericsIr,
-    span: Span,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let environment = GenericEnvironment::from_generics(generics);
     let parameters = generics.params.iter().map(|parameter| {
         let name = LitStr::new(&parameter.name, parameter.span);
@@ -167,30 +163,45 @@ fn generic_bounds(
     environment: &GenericEnvironment,
     facade: &TokenStream,
 ) -> Vec<TokenStream> {
-    bounds.iter().filter_map(move |bound| match bound {
-        GenericBoundIr::Trait { path, lifetimes, modifier } => {
-            let path = path_type_expression(path, environment, facade);
-            let lifetimes = lifetimes.iter().map(|lifetime| lifetime_expression(lifetime, span, facade));
-            let modifier = match modifier {
-                crate::ir::TraitBoundModifierIr::None => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None),
-                crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe),
-            };
-            Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
-                #facade::__private::codegen_v3::expression::parameter(#subject),
-                Box::new([#path]),
-                Box::new([#modifier]),
-                Box::new([#(#lifetimes),*]),
-            )))
-        }
-        GenericBoundIr::Lifetime(lifetime) => {
-            let lifetime = lifetime_expression(lifetime, span, facade);
-            Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                ty: #facade::__private::codegen_v3::expression::parameter(#subject), lifetime: #lifetime,
-                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
-            }))
-        }
-        GenericBoundIr::Other(_) => None,
-    }).collect()
+    bounds
+        .iter()
+        .filter_map(move |bound| match bound {
+            GenericBoundIr::Trait {
+                path,
+                lifetimes,
+                modifier,
+            } => {
+                let path = path_type_expression(path, environment, facade);
+                let lifetimes = lifetimes
+                    .iter()
+                    .map(|lifetime| lifetime_expression(lifetime, span, facade));
+                let modifier = match modifier {
+                    crate::ir::TraitBoundModifierIr::None => {
+                        quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                    }
+                    crate::ir::TraitBoundModifierIr::Maybe => {
+                        quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                    }
+                };
+                Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
+                    #facade::__private::codegen_v3::expression::parameter(#subject),
+                    Box::new([#path]),
+                    Box::new([#modifier]),
+                    Box::new([#(#lifetimes),*]),
+                )))
+            }
+            GenericBoundIr::Lifetime(lifetime) => {
+                let lifetime = lifetime_expression(lifetime, span, facade);
+                Some(
+                    quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                        ty: #facade::__private::codegen_v3::expression::parameter(#subject), lifetime: #lifetime,
+                        diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                    }),
+                )
+            }
+            GenericBoundIr::Other(_) => None,
+        })
+        .collect()
 }
 
 /// Converts source lifetime syntax into the runtime lifetime expression model.
@@ -204,11 +215,7 @@ pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStre
 
 /// Converts the type forms required by trait item descriptors into runtime
 /// expressions.
-pub(crate) fn type_expression(
-    ty: &TypeIr,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => {
             quote!(#facade::__private::codegen_v3::expression::TypeExpression::Never)
@@ -270,9 +277,7 @@ pub(crate) fn type_expression(
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
-            let parameters = inputs
-                .iter()
-                .map(|value| type_expression(value, environment, facade));
+            let parameters = inputs.iter().map(|value| type_expression(value, environment, facade));
             let return_type = output
                 .as_deref()
                 .map(|value| type_expression(value, environment, facade))
@@ -333,8 +338,7 @@ fn path_expression(
     facade: &TokenStream,
 ) -> TokenStream {
     let diagnostic = LitStr::new(&ty.source, ty.span);
-    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
-    {
+    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self" {
         return quote!(#facade::__private::codegen_v3::expression::TypeExpression::SelfType);
     }
     if path.qualified_self.is_none()
@@ -568,17 +572,13 @@ fn bound_predicates(
                         quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
                     }
                 };
-                let lifetimes = lifetimes
-                    .iter()
-                    .map(|value| lifetime_expression(value, span, facade));
-                Some(
-                    quote!(#facade::__private::codegen_v3::expression::type_bound(
-                        #facade::__private::codegen_v3::expression::TypeExpression::SelfType,
-                        Box::new([#path]),
-                        Box::new([#modifier]),
-                        Box::new([#(#lifetimes),*]),
-                    )),
-                )
+                let lifetimes = lifetimes.iter().map(|value| lifetime_expression(value, span, facade));
+                Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
+                    #facade::__private::codegen_v3::expression::TypeExpression::SelfType,
+                    Box::new([#path]),
+                    Box::new([#modifier]),
+                    Box::new([#(#lifetimes),*]),
+                )))
             }
             GenericBoundIr::Lifetime(value) => {
                 let value = lifetime_expression(value, span, facade);
@@ -596,11 +596,7 @@ fn bound_predicates(
 }
 
 /// Converts a parsed const expression into structural runtime metadata.
-fn const_expression_value(
-    value: &TokenStream,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = parse2::<Ident>(value.clone()) {
         let name = LitStr::new(&identifier.to_string(), identifier.span());
@@ -676,16 +672,14 @@ pub(super) fn const_expression(
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => {
-            match expression.expr.as_ref() {
-                Expr::Lit(expression) => match &expression.lit {
-                    Lit::Int(value) => integer_const_expression(value, true, facade)
-                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
-                    _ => unsupported_const_default(value),
-                },
+        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => match expression.expr.as_ref() {
+            Expr::Lit(expression) => match &expression.lit {
+                Lit::Int(value) => integer_const_expression(value, true, facade)
+                    .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
                 _ => unsupported_const_default(value),
-            }
-        }
+            },
+            _ => unsupported_const_default(value),
+        },
         Expr::Path(path) if path.path.segments.len() == 1 => {
             let identifier = path.path.segments[0].ident.to_string();
             let name = LitStr::new(&identifier, path.path.segments[0].ident.span());
@@ -709,28 +703,16 @@ pub(super) fn const_expression(
 
 /// Converts an integer literal without relying on its whitespace-normalized
 /// token rendering.
-fn integer_const_expression(
-    value: &LitInt,
-    negative: bool,
-    facade: &TokenStream,
-) -> Option<TokenStream> {
+fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
-        let value = if negative {
-            magnitude.checked_neg()?
-        } else {
-            magnitude
-        };
-        Some(
-            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))),
-        )
+        let value = if negative { magnitude.checked_neg()? } else { magnitude };
+        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))))
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(
-            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))),
-        )
+        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))))
     }
 }
 
@@ -802,13 +784,8 @@ mod tests {
     #[test]
     fn test_const_expression_uses_explicit_generic_environment() {
         let environment = GenericEnvironment::new().with_const_parameter("limit");
-        let parameter =
-            const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
-        let item = const_expression_value(
-            &quote!(limits::DEFAULT),
-            &environment,
-            &quote!(qubit_reflect),
-        );
+        let parameter = const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
+        let item = const_expression_value(&quote!(limits::DEFAULT), &environment, &quote!(qubit_reflect));
 
         assert!(parameter.to_string().contains("const_parameter"));
         assert!(item.to_string().contains("const_path"));
@@ -837,8 +814,7 @@ mod tests {
     #[test]
     fn test_const_default_preserves_const_item_path() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);
-        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect))
-            .to_string();
+        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect)).to_string();
 
         assert!(rendered.contains("const_path"));
         assert!(rendered.contains("DEFAULT_LIMIT"));

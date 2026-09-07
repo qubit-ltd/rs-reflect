@@ -29,11 +29,7 @@ use crate::ir::TraitDeclarationIr;
 use crate::ir::TypeKindIr;
 
 /// Emits structural method, associated-item, and generic metadata.
-pub(super) fn build(
-    declaration: &TraitDeclarationIr,
-    trait_name: &LitStr,
-    facade: &TokenStream,
-) -> TraitMetadata {
+pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facade: &TokenStream) -> TraitMetadata {
     let trait_name_literal = trait_name;
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let methods: Vec<_> = declaration
@@ -147,48 +143,69 @@ pub(super) fn build(
         }
     })
     .collect();
-    let associated_types: Vec<_> = declaration.associated_types.iter().enumerate().map(|(index, item)| {
-    let name = LitStr::new(&item.name.to_string(), item.span);
-    let item_environment = environment.clone().with_generics(&item.generics);
-    let bounds = item.bounds.iter().filter_map(|bound| match bound {
-        GenericBoundIr::Trait { path, lifetimes, modifier } => {
-            let path = path_type_expression(path, &item_environment, facade);
-            let lifetimes = lifetimes
-                .iter()
-                .map(|lifetime| lifetime_expression(lifetime, item.span, facade));
-            let modifier = match modifier { crate::ir::TraitBoundModifierIr::None => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None), crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe) };
-            Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
-                #facade::__private::codegen_v3::expression::parameter(#name),
-                Box::new([#path]),
-                Box::new([#modifier]),
-                Box::new([#(#lifetimes),*]),
-            )))
-        }
-        GenericBoundIr::Lifetime(lifetime) => {
-            let lifetime = lifetime_expression(lifetime, item.span, facade);
-            Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                ty: #facade::__private::codegen_v3::expression::parameter(#name),
-                lifetime: #lifetime,
-                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
-            }))
-        }
-        _ => None,
-    });
-    let default = item
-        .value
-        .as_ref()
-        .map(|value| type_expression(value, &item_environment, facade));
-    let default = match default { Some(value) => quote!(Some(#value)), None => quote!(None) };
-    let generic_definition = generic_definition(&item.generics, item.span, facade);
-    quote!(#facade::__private::codegen_v3::descriptor::AssociatedTypeDescriptor::new_with_generic_definition(
-        #index,
-        #name,
-        #name,
-        Box::new([#(#bounds),*]),
-        #default,
-        #generic_definition,
-    ))
-}).collect();
+    let associated_types: Vec<_> = declaration
+        .associated_types
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let name = LitStr::new(&item.name.to_string(), item.span);
+            let item_environment = environment.clone().with_generics(&item.generics);
+            let bounds = item.bounds.iter().filter_map(|bound| match bound {
+                GenericBoundIr::Trait {
+                    path,
+                    lifetimes,
+                    modifier,
+                } => {
+                    let path = path_type_expression(path, &item_environment, facade);
+                    let lifetimes = lifetimes
+                        .iter()
+                        .map(|lifetime| lifetime_expression(lifetime, item.span, facade));
+                    let modifier = match modifier {
+                        crate::ir::TraitBoundModifierIr::None => {
+                            quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                        }
+                        crate::ir::TraitBoundModifierIr::Maybe => {
+                            quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                        }
+                    };
+                    Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
+                        #facade::__private::codegen_v3::expression::parameter(#name),
+                        Box::new([#path]),
+                        Box::new([#modifier]),
+                        Box::new([#(#lifetimes),*]),
+                    )))
+                }
+                GenericBoundIr::Lifetime(lifetime) => {
+                    let lifetime = lifetime_expression(lifetime, item.span, facade);
+                    Some(
+                        quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                            ty: #facade::__private::codegen_v3::expression::parameter(#name),
+                            lifetime: #lifetime,
+                            diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                        }),
+                    )
+                }
+                _ => None,
+            });
+            let default = item
+                .value
+                .as_ref()
+                .map(|value| type_expression(value, &item_environment, facade));
+            let default = match default {
+                Some(value) => quote!(Some(#value)),
+                None => quote!(None),
+            };
+            let generic_definition = generic_definition(&item.generics, item.span, facade);
+            quote!(#facade::__private::codegen_v3::descriptor::AssociatedTypeDescriptor::new_with_generic_definition(
+                #index,
+                #name,
+                #name,
+                Box::new([#(#bounds),*]),
+                #default,
+                #generic_definition,
+            ))
+        })
+        .collect();
     let associated_consts: Vec<_> = declaration
     .associated_consts
     .iter()
@@ -201,158 +218,174 @@ pub(super) fn build(
     })
     .collect();
     let parameters = declaration.generics.params.iter().map(|parameter| {
-    let name = LitStr::new(&parameter.name, declaration.span);
-    match parameter.kind {
-        GenericKindIr::Lifetime => {
-            let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
-                GenericBoundIr::Lifetime(lifetime) => Some(lifetime_expression(
-                    lifetime,
-                    declaration.span,
-                    facade,
-                )),
-                _ => None,
-            });
-            quote!(__qubit_reflect_codegen::expression::lifetime_parameter(
-                #name,
-                Box::new([#(#bounds),*]),
-                __qubit_reflect_codegen::expression::DiagnosticText::default(),
-            ))
-        }
-        GenericKindIr::Type => {
-            let subject = LitStr::new(&parameter.name, declaration.span);
-            let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
-                GenericBoundIr::Trait { path, lifetimes, modifier } => {
-                    let path = path_type_expression(path, &environment, facade);
-                    let lifetimes = lifetimes.iter().map(|lifetime| {
-                        lifetime_expression(lifetime, declaration.span, facade)
-                    });
-                    let modifier = match modifier {
-                        crate::ir::TraitBoundModifierIr::None => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None),
-                        crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe),
-                    };
-                    Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
-                        #facade::__private::codegen_v3::expression::parameter(#subject),
-                        Box::new([#path]),
-                        Box::new([#modifier]),
-                        Box::new([#(#lifetimes),*]),
-                    )))
-                }
-                GenericBoundIr::Lifetime(lifetime) => {
-                    let lifetime = lifetime_expression(lifetime, declaration.span, facade);
-                    Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                        ty: #facade::__private::codegen_v3::expression::parameter(#subject),
-                        lifetime: #lifetime,
-                        diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
-                    }))
-                }
-                _ => None,
-            });
-            let default = match parameter.default.as_ref() {
-                Some(crate::ir::GenericDefaultIr::Type(value)) => {
-                    let value = type_expression(value, &environment, facade);
-                    quote!(Some(#value))
-                }
-                _ => quote!(None),
-            };
-            quote!(__qubit_reflect_codegen::expression::type_parameter(
-                #name,
-                Box::new([#(#bounds),*]),
-                #default,
-                __qubit_reflect_codegen::expression::DiagnosticText::default(),
-            ))
-        }
-        GenericKindIr::Const => {
-            let const_type = parameter
-                .const_type
-                .as_ref()
-                .map(|value| value.source.as_str())
-                .unwrap_or("_");
-            let const_type = LitStr::new(const_type, declaration.span);
-            let default = match parameter.default.as_ref() {
-                Some(crate::ir::GenericDefaultIr::Const(value)) => {
-                    const_expression(value, &environment, facade)
-                }
-                _ => quote!(None),
-            };
-            quote! {
-                __qubit_reflect_codegen::expression::const_generic_parameter(
+        let name = LitStr::new(&parameter.name, declaration.span);
+        match parameter.kind {
+            GenericKindIr::Lifetime => {
+                let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
+                    GenericBoundIr::Lifetime(lifetime) => Some(lifetime_expression(lifetime, declaration.span, facade)),
+                    _ => None,
+                });
+                quote!(__qubit_reflect_codegen::expression::lifetime_parameter(
                     #name,
-                    __qubit_reflect_codegen::expression::TypeExpression::Concrete(
-                        __qubit_reflect_codegen::expression::concrete(
-                            vec![#const_type.into()].into_boxed_slice(),
-                            vec![].into_boxed_slice(),
-                            __qubit_reflect_codegen::expression::DiagnosticText::from(#const_type),
-                        ),
-                    ),
+                    Box::new([#(#bounds),*]),
+                    __qubit_reflect_codegen::expression::DiagnosticText::default(),
+                ))
+            }
+            GenericKindIr::Type => {
+                let subject = LitStr::new(&parameter.name, declaration.span);
+                let bounds = parameter.bounds.iter().filter_map(|bound| match bound {
+                    GenericBoundIr::Trait {
+                        path,
+                        lifetimes,
+                        modifier,
+                    } => {
+                        let path = path_type_expression(path, &environment, facade);
+                        let lifetimes = lifetimes
+                            .iter()
+                            .map(|lifetime| lifetime_expression(lifetime, declaration.span, facade));
+                        let modifier = match modifier {
+                            crate::ir::TraitBoundModifierIr::None => {
+                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                            }
+                            crate::ir::TraitBoundModifierIr::Maybe => {
+                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                            }
+                        };
+                        Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
+                            #facade::__private::codegen_v3::expression::parameter(#subject),
+                            Box::new([#path]),
+                            Box::new([#modifier]),
+                            Box::new([#(#lifetimes),*]),
+                        )))
+                    }
+                    GenericBoundIr::Lifetime(lifetime) => {
+                        let lifetime = lifetime_expression(lifetime, declaration.span, facade);
+                        Some(
+                            quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                                ty: #facade::__private::codegen_v3::expression::parameter(#subject),
+                                lifetime: #lifetime,
+                                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                            }),
+                        )
+                    }
+                    _ => None,
+                });
+                let default = match parameter.default.as_ref() {
+                    Some(crate::ir::GenericDefaultIr::Type(value)) => {
+                        let value = type_expression(value, &environment, facade);
+                        quote!(Some(#value))
+                    }
+                    _ => quote!(None),
+                };
+                quote!(__qubit_reflect_codegen::expression::type_parameter(
+                    #name,
+                    Box::new([#(#bounds),*]),
                     #default,
                     __qubit_reflect_codegen::expression::DiagnosticText::default(),
-                )
+                ))
+            }
+            GenericKindIr::Const => {
+                let const_type = parameter
+                    .const_type
+                    .as_ref()
+                    .map(|value| value.source.as_str())
+                    .unwrap_or("_");
+                let const_type = LitStr::new(const_type, declaration.span);
+                let default = match parameter.default.as_ref() {
+                    Some(crate::ir::GenericDefaultIr::Const(value)) => const_expression(value, &environment, facade),
+                    _ => quote!(None),
+                };
+                quote! {
+                    __qubit_reflect_codegen::expression::const_generic_parameter(
+                        #name,
+                        __qubit_reflect_codegen::expression::TypeExpression::Concrete(
+                            __qubit_reflect_codegen::expression::concrete(
+                                vec![#const_type.into()].into_boxed_slice(),
+                                vec![].into_boxed_slice(),
+                                __qubit_reflect_codegen::expression::DiagnosticText::from(#const_type),
+                            ),
+                        ),
+                        #default,
+                        __qubit_reflect_codegen::expression::DiagnosticText::default(),
+                    )
+                }
             }
         }
-    }
-});
-    let where_predicates = declaration.generics.where_predicates.iter().flat_map(|predicate| match predicate {
-    crate::ir::WherePredicateIr::Lifetime { lifetime, bounds, .. } => {
-        let lifetime = lifetime_expression(lifetime, declaration.span, facade);
-        let bounds: Vec<_> = bounds.iter().map(|bound| {
-            lifetime_expression(bound, declaration.span, facade)
-        }).collect();
-        vec![quote!(#facade::__private::codegen_v3::expression::lifetime_outlives(
-            #lifetime,
-            Box::new([#(#bounds),*]),
-        ))]
-    }
-    crate::ir::WherePredicateIr::Type {
-        bounded_type,
-        lifetimes,
-        bounds,
-        ..
-    } => {
-        let subject = type_expression(bounded_type, &environment, facade);
-        let higher_ranked_lifetimes: Vec<_> = lifetimes.iter().map(|lifetime| {
-            lifetime_expression(lifetime, declaration.span, facade)
-        }).collect();
-        let trait_bounds: Vec<_> = bounds.iter().filter_map(|bound| match bound {
-            GenericBoundIr::Trait { path, .. } => {
-                Some(path_type_expression(path, &environment, facade))
-            }
-            _ => None,
-        }).collect();
-        let bound_modifiers: Vec<_> = bounds.iter().filter_map(|bound| match bound {
-            GenericBoundIr::Trait { modifier, .. } => Some(match modifier {
-                crate::ir::TraitBoundModifierIr::None => {
-                    quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
-                }
-                crate::ir::TraitBoundModifierIr::Maybe => {
-                    quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
-                }
-            }),
-            _ => None,
-        }).collect();
-        let type_bound = (!trait_bounds.is_empty()).then(|| {
-            quote!(#facade::__private::codegen_v3::expression::type_bound(
-                #subject,
-                Box::new([#(#trait_bounds),*]),
-                Box::new([#(#bound_modifiers),*]),
-                Box::new([#(#higher_ranked_lifetimes),*]),
-            ))
-        });
-        let lifetime_bounds = bounds.iter().filter_map(|bound| match bound {
-            GenericBoundIr::Lifetime(lifetime) => {
+    });
+    let where_predicates = declaration
+        .generics
+        .where_predicates
+        .iter()
+        .flat_map(|predicate| match predicate {
+            crate::ir::WherePredicateIr::Lifetime { lifetime, bounds, .. } => {
                 let lifetime = lifetime_expression(lifetime, declaration.span, facade);
-                let subject = type_expression(bounded_type, &environment, facade);
-                Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                    ty: #subject,
-                    lifetime: #lifetime,
-                    diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
-                }))
+                let bounds: Vec<_> = bounds
+                    .iter()
+                    .map(|bound| lifetime_expression(bound, declaration.span, facade))
+                    .collect();
+                vec![quote!(#facade::__private::codegen_v3::expression::lifetime_outlives(
+                    #lifetime,
+                    Box::new([#(#bounds),*]),
+                ))]
             }
-            _ => None,
+            crate::ir::WherePredicateIr::Type {
+                bounded_type,
+                lifetimes,
+                bounds,
+                ..
+            } => {
+                let subject = type_expression(bounded_type, &environment, facade);
+                let higher_ranked_lifetimes: Vec<_> = lifetimes
+                    .iter()
+                    .map(|lifetime| lifetime_expression(lifetime, declaration.span, facade))
+                    .collect();
+                let trait_bounds: Vec<_> = bounds
+                    .iter()
+                    .filter_map(|bound| match bound {
+                        GenericBoundIr::Trait { path, .. } => Some(path_type_expression(path, &environment, facade)),
+                        _ => None,
+                    })
+                    .collect();
+                let bound_modifiers: Vec<_> = bounds
+                    .iter()
+                    .filter_map(|bound| match bound {
+                        GenericBoundIr::Trait { modifier, .. } => Some(match modifier {
+                            crate::ir::TraitBoundModifierIr::None => {
+                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                            }
+                            crate::ir::TraitBoundModifierIr::Maybe => {
+                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                            }
+                        }),
+                        _ => None,
+                    })
+                    .collect();
+                let type_bound = (!trait_bounds.is_empty()).then(|| {
+                    quote!(#facade::__private::codegen_v3::expression::type_bound(
+                        #subject,
+                        Box::new([#(#trait_bounds),*]),
+                        Box::new([#(#bound_modifiers),*]),
+                        Box::new([#(#higher_ranked_lifetimes),*]),
+                    ))
+                });
+                let lifetime_bounds = bounds.iter().filter_map(|bound| match bound {
+                    GenericBoundIr::Lifetime(lifetime) => {
+                        let lifetime = lifetime_expression(lifetime, declaration.span, facade);
+                        let subject = type_expression(bounded_type, &environment, facade);
+                        Some(
+                            quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                                ty: #subject,
+                                lifetime: #lifetime,
+                                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                            }),
+                        )
+                    }
+                    _ => None,
+                });
+                type_bound.into_iter().chain(lifetime_bounds).collect()
+            }
+            _ => Vec::new(),
         });
-        type_bound.into_iter().chain(lifetime_bounds).collect()
-    }
-    _ => Vec::new(),
-});
     TraitMetadata {
         methods,
         associated_types,

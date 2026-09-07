@@ -25,11 +25,7 @@ use crate::parse::parse_declaration;
 use crate::validate::validate_declaration;
 
 /// Parses and validates a declaration, failing the test with its diagnostic.
-fn parse_valid(
-    kind: MacroKind,
-    args: TokenStream,
-    input: TokenStream,
-) -> crate::ir::ValidatedDeclaration {
+fn parse_valid(kind: MacroKind, args: TokenStream, input: TokenStream) -> crate::ir::ValidatedDeclaration {
     let parsed = parse_declaration(kind, args, input).expect("the declaration should parse");
     validate_declaration(parsed).expect("the declaration should validate")
 }
@@ -118,12 +114,7 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     assert_eq!(reflected_trait.methods.len(), 2);
     assert_eq!(reflected_trait.associated_types.len(), 1);
     assert_eq!(reflected_trait.associated_consts.len(), 1);
-    assert!(
-        !reflected_trait
-            .retained_tokens
-            .to_string()
-            .contains("reflect")
-    );
+    assert!(!reflected_trait.retained_tokens.to_string().contains("reflect"));
 
     let reflected_impl = parse_valid(
         MacroKind::Impl,
@@ -144,12 +135,7 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     assert_eq!(reflected_impl.methods.len(), 1);
     assert_eq!(reflected_impl.target_type.source, "Packet < T >");
     assert!(reflected_impl.trait_path.is_some());
-    assert!(
-        !reflected_impl
-            .retained_tokens
-            .to_string()
-            .contains("reflect")
-    );
+    assert!(!reflected_impl.retained_tokens.to_string().contains("reflect"));
 }
 
 #[test]
@@ -285,9 +271,7 @@ fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
         },
     );
     assert!(names.contains("rename cannot be empty"));
-    assert!(names.contains(
-        "field query name `same` for Rust member `third` conflicts with Rust member `second`"
-    ));
+    assert!(names.contains("field query name `same` for Rust member `third` conflicts with Rust member `second`"));
 }
 
 #[test]
@@ -311,9 +295,7 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
         ),
     );
     assert!(mapping_diagnostics.contains("external trait path `Send` is mapped more than once"));
-    assert!(
-        mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once")
-    );
+    assert!(mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once"));
 
     let unused_mapping = parse_invalid(
         MacroKind::Trait,
@@ -322,10 +304,7 @@ fn test_validate_external_trait_ids_and_mapping_conflicts() {
             trait Invalid: Send {}
         },
     );
-    assert!(
-        unused_mapping
-            .contains("external trait mapping `NotABound` does not match a direct supertrait")
-    );
+    assert!(unused_mapping.contains("external trait mapping `NotABound` does not match a direct supertrait"));
 }
 
 #[test]
@@ -347,15 +326,9 @@ fn test_external_mappings_reject_non_supertrait_bounds() {
             }
         },
     );
-    assert!(
-        diagnostics.contains("external trait mapping `Send` does not match a direct supertrait")
-    );
-    assert!(
-        diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait")
-    );
-    assert!(diagnostics.contains(
-        "external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"
-    ));
+    assert!(diagnostics.contains("external trait mapping `Send` does not match a direct supertrait"));
+    assert!(diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait"));
+    assert!(diagnostics.contains("external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"));
 }
 
 #[test]
@@ -391,13 +364,8 @@ fn test_validate_specialization_parameter_completeness() {
             impl<T, const N: usize> Container<T, N> {}
         },
     );
-    assert!(
-        wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind")
-    );
-    assert!(
-        wrong_kinds
-            .contains("specialization value for `N` does not match its Const parameter kind")
-    );
+    assert!(wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind"));
+    assert!(wrong_kinds.contains("specialization value for `N` does not match its Const parameter kind"));
 }
 
 #[test]
@@ -514,19 +482,10 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
         declaration.generics.params[2].default,
         Some(GenericDefaultIr::Const(_))
     ));
-    assert!(
-        !declaration
-            .generics
-            .impl_declaration
-            .to_string()
-            .contains('=')
-    );
+    assert!(!declaration.generics.impl_declaration.to_string().contains('='));
     assert_eq!(declaration.generics.arguments.to_string(), "< 'a , T , N >");
     assert!(declaration.generics.where_clause.is_empty());
-    let TypeKindIr::Reference {
-        lifetime, element, ..
-    } = &declaration.fields[0].ty.kind
-    else {
+    let TypeKindIr::Reference { lifetime, element, .. } = &declaration.fields[0].ty.kind else {
         panic!("expected a reference type");
     };
     assert_eq!(lifetime.as_deref(), Some("'a"));
@@ -558,14 +517,8 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
     assert!(method.qualifiers.is_async);
     assert!(method.qualifiers.is_unsafe);
     assert_eq!(method.qualifiers.abi.as_deref(), Some("C"));
-    assert_eq!(
-        method.parameters[0].pattern.kind,
-        ParameterPatternKindIr::Wildcard
-    );
-    assert_eq!(
-        method.parameters[1].pattern.kind,
-        ParameterPatternKindIr::Destructure
-    );
+    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Wildcard);
+    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Destructure);
     assert!(
         matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if matches!(ty.kind, TypeKindIr::Never))
     );
@@ -633,15 +586,9 @@ fn test_parse_treats_identifier_at_subpattern_as_destructure() {
     let method = &declaration.methods[0];
 
     assert_eq!(method.parameters[0].name, None);
-    assert_eq!(
-        method.parameters[0].pattern.kind,
-        ParameterPatternKindIr::Destructure
-    );
+    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Destructure);
     assert_eq!(method.parameters[1].name.as_deref(), Some("simple"));
-    assert_eq!(
-        method.parameters[1].pattern.kind,
-        ParameterPatternKindIr::Identifier
-    );
+    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Identifier);
 }
 
 #[test]
@@ -702,20 +649,43 @@ fn test_trait_and_impl_accept_explicit_runtime_facade() {
     );
 }
 
-/// The versioned provider hook accepts only one caller-owned identifier on a generic type.
+/// The versioned provider hook accepts only one caller-owned identifier on a
+/// generic type.
 #[test]
 fn test_definition_provider_v2_validates_target_and_identifier() {
-    parse_valid(MacroKind::Derive, TokenStream::new(), quote! {
-        #[reflect(definition_provider_v2 = caller_provider)] struct Valid<T> { value: T }
-    });
+    parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            #[reflect(definition_provider_v2 = caller_provider)] struct Valid<T> { value: T }
+        },
+    );
     for (declaration, expected) in [
-        (quote! { #[reflect(definition_provider_v2 = provider)] struct Plain; }, "requires a generic type"),
-        (quote! { #[reflect(definition_provider_v2)] struct Missing<T>(T); }, "requires one function identifier"),
-        (quote! { #[reflect(definition_provider_v2 = module::provider)] struct Path<T>(T); }, "unexpected token"),
-        (quote! { #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)] struct Duplicate<T>(T); }, "duplicate"),
-        (quote! { struct Field<T> { #[reflect(definition_provider_v2 = provider)] value: T } }, "not valid on a field"),
+        (
+            quote! { #[reflect(definition_provider_v2 = provider)] struct Plain; },
+            "requires a generic type",
+        ),
+        (
+            quote! { #[reflect(definition_provider_v2)] struct Missing<T>(T); },
+            "requires one function identifier",
+        ),
+        (
+            quote! { #[reflect(definition_provider_v2 = module::provider)] struct Path<T>(T); },
+            "unexpected token",
+        ),
+        (
+            quote! { #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)] struct Duplicate<T>(T); },
+            "duplicate",
+        ),
+        (
+            quote! { struct Field<T> { #[reflect(definition_provider_v2 = provider)] value: T } },
+            "not valid on a field",
+        ),
     ] {
-        assert!(parse_invalid(MacroKind::Derive, TokenStream::new(), declaration).contains(expected), "expected diagnostic: {expected}");
+        assert!(
+            parse_invalid(MacroKind::Derive, TokenStream::new(), declaration).contains(expected),
+            "expected diagnostic: {expected}"
+        );
     }
 }
 
@@ -724,12 +694,29 @@ fn test_definition_provider_v2_validates_target_and_identifier() {
 fn test_empty_struct_ir_retains_source_field_shape() {
     use crate::ir::FieldShapeIr;
     for (input, expected) in [
-        (quote!(struct Unit;), FieldShapeIr::Unit),
-        (quote!(struct Named {}), FieldShapeIr::Named),
-        (quote!(struct Tuple();), FieldShapeIr::Unnamed),
+        (
+            quote!(
+                struct Unit;
+            ),
+            FieldShapeIr::Unit,
+        ),
+        (
+            quote!(
+                struct Named {}
+            ),
+            FieldShapeIr::Named,
+        ),
+        (
+            quote!(
+                struct Tuple();
+            ),
+            FieldShapeIr::Unnamed,
+        ),
     ] {
         let parsed = parse_valid(MacroKind::Derive, TokenStream::new(), input);
-        let DeclarationIr::Type(declaration) = parsed.declaration else { panic!("type declaration") };
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("type declaration")
+        };
         assert_eq!(declaration.field_shape, expected);
         assert!(declaration.fields.is_empty());
     }

@@ -121,11 +121,7 @@ pub(crate) fn parse_and_validate_declaration(
 }
 
 /// Runs only the syntax and IR conversion phase for one macro kind.
-fn parse_pipeline(
-    kind: MacroKind,
-    args: TokenStream,
-    input: TokenStream,
-) -> SynResult<ParsedPipeline> {
+fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
         MacroKind::Trait => parse_trait(args, input),
@@ -177,8 +173,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                 .iter()
                 .enumerate()
                 .map(|(index, variant)| {
-                    let attributes =
-                        parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
+                    let attributes = parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
                     let kind = match variant.fields {
                         Fields::Unit => VariantKindIr::Unit,
                         Fields::Unnamed(_) => VariantKindIr::Tuple,
@@ -227,10 +222,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
 fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Trait(mut item) = item else {
-        return Err(Error::new(
-            item.span(),
-            "`#[reflect]` can only be applied to a trait",
-        ));
+        return Err(Error::new(item.span(), "`#[reflect]` can only be applied to a trait"));
     };
     let mut errors = ErrorCollector::default();
     let attributes = parse_helper_tokens(args, HelperTarget::Trait, &mut errors);
@@ -354,11 +346,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     name: ty.ident.to_string(),
                     kind: GenericKindIr::Type,
                     bounds: ty.bounds.iter().map(convert_bound).collect(),
-                    default: ty
-                        .default
-                        .as_ref()
-                        .map(convert_type)
-                        .map(GenericDefaultIr::Type),
+                    default: ty.default.as_ref().map(convert_type).map(GenericDefaultIr::Type),
                     const_type: None,
                     declaration: ty.to_token_stream(),
                     span: ty.span(),
@@ -400,9 +388,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                         .iter()
                         .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                         .filter_map(|parameter| match parameter {
-                            GenericParam::Lifetime(lifetime) => {
-                                Some(lifetime.lifetime.to_token_stream().to_string())
-                            }
+                            GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
                             _ => None,
                         })
                         .collect(),
@@ -424,18 +410,10 @@ fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
     match visibility {
         Visibility::Public(_) => VisibilityIr::Public,
         Visibility::Inherited => VisibilityIr::Inherited,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => {
-            VisibilityIr::Crate
-        }
-        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => {
-            VisibilityIr::Super
-        }
-        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => {
-            VisibilityIr::SelfValue
-        }
-        Visibility::Restricted(restricted) => {
-            VisibilityIr::Restricted(convert_path(&restricted.path))
-        }
+        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => VisibilityIr::Crate,
+        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => VisibilityIr::Super,
+        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => VisibilityIr::SelfValue,
+        Visibility::Restricted(restricted) => VisibilityIr::Restricted(convert_path(&restricted.path)),
     }
 }
 
@@ -560,10 +538,9 @@ fn convert_method(
             FnArg::Typed(value) => {
                 let pattern_tokens = value.pat.to_token_stream();
                 let (name, kind) = match value.pat.as_ref() {
-                    Pat::Ident(identifier) if identifier.subpat.is_none() => (
-                        Some(identifier.ident.to_string()),
-                        ParameterPatternKindIr::Identifier,
-                    ),
+                    Pat::Ident(identifier) if identifier.subpat.is_none() => {
+                        (Some(identifier.ident.to_string()), ParameterPatternKindIr::Identifier)
+                    }
                     Pat::Ident(_) => (None, ParameterPatternKindIr::Destructure),
                     Pat::Wild(_) => (None, ParameterPatternKindIr::Wildcard),
                     _ => (None, ParameterPatternKindIr::Destructure),
@@ -593,11 +570,10 @@ fn convert_method(
         is_const: signature.constness.is_some(),
         is_async: signature.asyncness.is_some(),
         is_unsafe: signature.unsafety.is_some(),
-        abi: signature.abi.as_ref().map(|abi| {
-            abi.name
-                .as_ref()
-                .map_or_else(|| "C".to_owned(), LitStr::value)
-        }),
+        abi: signature
+            .abi
+            .as_ref()
+            .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), LitStr::value)),
         is_variadic: signature.variadic.is_some(),
     };
     MethodIr {

@@ -42,8 +42,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .iter()
         .any(|attribute| attribute.name == HelperName::ThreadSafe);
     let reflected_field_types = super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
         .generics
         .params
@@ -70,14 +69,10 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameter_names {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -294,8 +289,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         !declaration.generics.params.is_empty(),
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
-    let type_definition_provider =
-        super::generics::type_definition_provider(&declaration, &facade, fingerprint);
+    let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -418,14 +412,19 @@ fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> To
     }
 }
 
-/// Emits the runtime struct category shared by concrete and generic descriptors.
+/// Emits the runtime struct category shared by concrete and generic
+/// descriptors.
 pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     match declaration.field_shape {
         FieldShapeIr::Unit => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Unit),
-        FieldShapeIr::Named => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Named),
+        FieldShapeIr::Named => {
+            quote!(#facade::__private::codegen_v3::descriptor::StructKind::Named)
+        }
         FieldShapeIr::Unnamed if declaration.fields.len() == 1 => {
             quote!(#facade::__private::codegen_v3::descriptor::StructKind::Newtype)
         }
-        FieldShapeIr::Unnamed => quote!(#facade::__private::codegen_v3::descriptor::StructKind::Tuple),
+        FieldShapeIr::Unnamed => {
+            quote!(#facade::__private::codegen_v3::descriptor::StructKind::Tuple)
+        }
     }
 }

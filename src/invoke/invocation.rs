@@ -545,7 +545,9 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     {
         let adapter = match registry.capability(descriptor, crate::invoke::receiver_adapter_key::<R, M>()) {
             Ok(adapter) => adapter,
-            Err(error) => return Err(self.reject(method_identity, InvocationErrorKind::CapabilityResolution(error))),
+            Err(error) => {
+                return Err(self.reject(method_identity, InvocationErrorKind::CapabilityResolution(error)));
+            }
         };
         self.adapt_receiver(method_identity, adapter)
     }

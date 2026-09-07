@@ -37,13 +37,13 @@ mod tests {
         let registry = ReflectRegistry::initialize().expect("facade fragment registers");
         assert!(registry.get(descriptor.type_id()).is_some());
         assert!(descriptor.struct_construction().is_some());
-        assert!(FacadeEnvelope::<String>::type_descriptor()
-            .concrete_generic()
-            .is_some());
-        assert!(FacadeEvent::type_descriptor()
-            .variants()
-            .iter()
-            .all(|variant| variant.construction().is_some()));
+        assert!(FacadeEnvelope::<String>::type_descriptor().concrete_generic().is_some());
+        assert!(
+            FacadeEvent::type_descriptor()
+                .variants()
+                .iter()
+                .all(|variant| variant.construction().is_some())
+        );
         assert_eq!(FacadeUser { id: 7 }.label(), "facade");
     }
 }
