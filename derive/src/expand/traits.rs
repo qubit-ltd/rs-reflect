@@ -14,6 +14,8 @@
 mod default_invocation;
 mod default_method_expansion;
 mod dyn_trait_generics;
+mod associated_const;
+mod dyn_compatibility;
 mod metadata;
 mod token_rewrite;
 mod trait_metadata;
@@ -72,7 +74,7 @@ use crate::ir::WherePredicateIr;
 /// `Sized` probe. Rust method selection does not treat an unmet region
 /// obligation as an autoref fallback candidate, so lifetime uncertainty must
 /// not reach that probe.
-fn associated_const_type_has_proven_static_shape(ty: &TypeIr) -> bool {
+fn associated_const_type_has_proven_static_shape_impl(ty: &TypeIr) -> bool {
     associated_const_type_has_proven_static_shape_in(ty, &std::collections::HashSet::new(), false)
 }
 
@@ -571,7 +573,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let trait_arguments = &declaration.generics.arguments;
             let const_name = &item.name;
             let value_type = replace_self_with_owner(item.ty.tokens.clone(), &owner);
-            let has_proven_static_shape = associated_const_type_has_proven_static_shape(&item.ty);
+            let has_proven_static_shape = associated_const::has_proven_static_shape(&item.ty);
             let provider_item = quote! {
                 #[allow(non_camel_case_types)]
                 pub(super) struct #provider #provider_declaration {
@@ -632,7 +634,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         Ok(item) => item,
         Err(error) => return error.into_compile_error(),
     };
-    let generate_dyn_descriptor = is_provably_dyn_compatible(&trait_item, &declaration);
+    let generate_dyn_descriptor =
+        dyn_compatibility::is_provably_dyn_compatible(&trait_item, &declaration);
     let trait_ident = &declaration.name;
     let dyn_generics = dyn_trait_generics(&trait_item, &declaration, &facade);
     let dyn_impl_declaration = &dyn_generics.impl_declaration;
