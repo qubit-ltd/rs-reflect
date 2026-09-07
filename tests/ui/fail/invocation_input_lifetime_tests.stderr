@@ -1,17 +1,17 @@
 error[E0515]: cannot return value referencing local variable `receiver`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:11:5
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:19:5
    |
-11 |     method.invoke_local(registry, Invocation::borrowed(ReflectedRef::new(&receiver), [])).unwrap().unwrap()
+19 |     method.invoke_local(registry, Invocation::borrowed(ReflectedRef::new(&receiver), [])).unwrap().unwrap()
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^---------^^^^^^^^^^^^^^^^^^^^^^^^^
    |     |                                                                    |
    |     |                                                                    `receiver` is borrowed here
    |     returns a value referencing data owned by the current function
 
 error[E0515]: cannot return value referencing local variable `argument`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:16:5
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:24:5
    |
-16 | /     method.invoke_local(registry, Invocation::associated([
-17 | |         InvocationArg::Ref(ReflectedRef::new(&argument)),
+24 | /     method.invoke_local(registry, Invocation::associated([
+25 | |         InvocationArg::Ref(ReflectedRef::new(&argument)),
    | |                                              --------- `argument` is borrowed here
-18 | |     ])).unwrap().unwrap()
+26 | |     ])).unwrap().unwrap()
    | |_________________________^ returns a value referencing data owned by the current function

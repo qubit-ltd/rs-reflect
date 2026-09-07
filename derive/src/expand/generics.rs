@@ -705,12 +705,22 @@ fn type_is_parameter(ty: &TypeIr, parameter: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use proc_macro2::TokenStream;
     use quote::quote;
 
     use super::reflected_field_types;
+    use super::transparently_reflected_type_parameters;
+    use super::type_uses_const;
+    use super::type_uses_lifetime;
+    use super::type_uses_parameter;
     use crate::ir::DeclarationIr;
     use crate::ir::MacroKind;
     use crate::parse::parse_declaration;
+
+    fn parsed_type(tokens: TokenStream) -> crate::ir::TypeIr {
+        let ty = syn::parse2(tokens).expect("the fixture type must parse");
+        crate::parse::convert_type(&ty)
+    }
 
     #[test]
     fn test_const_and_lifetime_only_fields_receive_complete_reflect_bounds() {
@@ -735,5 +745,82 @@ mod tests {
             .collect();
 
         assert_eq!(field_types, ["& 'a str", "[u8 ; N]", "Conditional < N >"]);
+    }
+
+    #[test]
+    fn test_structured_generic_usage_detection_handles_nested_type_forms() {
+        let type_cases = [
+            (quote!(Vec<T>), true),
+            (quote!(<T as Iterator>::Item), true),
+            (quote!(Option<Result<Vec<T>, u8>>), true),
+            (quote!(fn(u8) -> T), true),
+            (quote!(dyn Iterator<Item = T>), true),
+            (quote!(impl Iterator<Item: Into<T>>), true),
+            (quote!(Wrapper<Unmatched>), false),
+        ];
+        for (tokens, expected) in type_cases {
+            assert_eq!(
+                type_uses_parameter(&parsed_type(tokens.clone()), "T"),
+                expected,
+                "type fixture: {tokens}",
+            );
+        }
+
+        let lifetime_cases = [
+            (quote!(&'a str), true),
+            (quote!(Wrapper<'a>), true),
+            (quote!(fn(&'a str) -> u8), true),
+            (quote!(for<'a> fn(&'a str) -> u8), false),
+            (quote!(Wrapper<'static>), false),
+        ];
+        for (tokens, expected) in lifetime_cases {
+            assert_eq!(
+                type_uses_lifetime(&parsed_type(tokens.clone()), "a"),
+                expected,
+                "lifetime fixture: {tokens}",
+            );
+        }
+
+        let const_cases = [
+            (quote!([u8; N]), true),
+            (quote!(Wrapper<N>), true),
+            (quote!(Wrapper<COUNT = N>), true),
+            (quote!([N; 1]), true),
+            (quote!(Wrapper<M>), false),
+        ];
+        for (tokens, expected) in const_cases {
+            assert_eq!(
+                type_uses_const(&parsed_type(tokens.clone()), "N"),
+                expected,
+                "const fixture: {tokens}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_transparent_reflect_bounds_only_follow_known_container_paths() {
+        let parsed = parse_declaration(
+            MacroKind::Derive,
+            quote!(),
+            quote! {
+                struct Transparent<T, U> {
+                    nested: std::vec::Vec<std::boxed::Box<T>>,
+                    custom: Custom<U>,
+                    #[reflect(opaque)]
+                    hidden: U,
+                }
+            },
+        )
+        .expect("the transparent container fixture must parse");
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("the fixture must parse as a type declaration");
+        };
+
+        let parameters: Vec<_> = transparently_reflected_type_parameters(&declaration)
+            .into_iter()
+            .map(|parameter| parameter.to_string())
+            .collect();
+
+        assert_eq!(parameters, ["T"]);
     }
 }

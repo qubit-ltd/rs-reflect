@@ -49,6 +49,21 @@
       "functions": 100,
       "lines": 100,
       "regions": 100
+    },
+    "derive/src/expand/generics.rs": {
+      "functions": 70,
+      "lines": 75,
+      "regions": 70
+    },
+    "derive/src/expand/impls/specialization_codegen.rs": {
+      "functions": 70,
+      "lines": 75,
+      "regions": 70
+    },
+    "derive/src/expand/invocation/lifetime.rs": {
+      "functions": 70,
+      "lines": 75,
+      "regions": 70
     }
   }
 }
