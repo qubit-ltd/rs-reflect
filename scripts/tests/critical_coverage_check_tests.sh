@@ -7,7 +7,7 @@ FIXTURE_DIR=$(mktemp -d /tmp/rs-reflect-critical-coverage-tests.XXXXXX)
 trap 'command rm -rf "$FIXTURE_DIR"' EXIT
 
 PROJECT_ROOT="$FIXTURE_DIR/project"
-mkdir -p "$PROJECT_ROOT/src"
+mkdir -p "$PROJECT_ROOT/src" "$PROJECT_ROOT/derive/src/expand"
 
 cat > "$FIXTURE_DIR/config.json" <<'JSON'
 {
@@ -16,23 +16,28 @@ cat > "$FIXTURE_DIR/config.json" <<'JSON'
       "functions": 80,
       "lines": 75,
       "regions": 70
+    },
+    "derive/src/expand/high_risk.rs": {
+      "functions": 70,
+      "lines": 75,
+      "regions": 70
     }
   }
 }
 JSON
 
 cat > "$FIXTURE_DIR/passing.json" <<JSON
-{"data":[{"files":[{"filename":"$PROJECT_ROOT/src/high_risk.rs","summary":{"functions":{"percent":80},"lines":{"percent":76},"regions":{"percent":70}}}]}]}
+{"data":[{"files":[{"filename":"$PROJECT_ROOT/src/high_risk.rs","summary":{"functions":{"percent":80},"lines":{"percent":76},"regions":{"percent":70}}},{"filename":"$PROJECT_ROOT/derive/src/expand/high_risk.rs","summary":{"functions":{"percent":70},"lines":{"percent":75},"regions":{"percent":70}}}]}]}
 JSON
 
 cat > "$FIXTURE_DIR/failing.json" <<JSON
-{"data":[{"files":[{"filename":"$PROJECT_ROOT/src/high_risk.rs","summary":{"functions":{"percent":80},"lines":{"percent":74},"regions":{"percent":70}}}]}]}
+{"data":[{"files":[{"filename":"$PROJECT_ROOT/src/high_risk.rs","summary":{"functions":{"percent":80},"lines":{"percent":76},"regions":{"percent":70}}},{"filename":"$PROJECT_ROOT/derive/src/expand/high_risk.rs","summary":{"functions":{"percent":70},"lines":{"percent":74},"regions":{"percent":70}}}]}]}
 JSON
 
 "$CHECKER" "$FIXTURE_DIR/passing.json" "$FIXTURE_DIR/config.json" "$PROJECT_ROOT"
 
 if "$CHECKER" "$FIXTURE_DIR/failing.json" "$FIXTURE_DIR/config.json" "$PROJECT_ROOT" >/dev/null 2>&1; then
-    echo "error: checker accepted coverage below the configured line threshold" >&2
+    echo "error: checker accepted derive coverage below the configured line threshold" >&2
     exit 1
 fi
 

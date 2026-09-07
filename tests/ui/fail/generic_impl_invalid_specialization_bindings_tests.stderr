@@ -1,0 +1,11 @@
+error: missing specialization argument `N`
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:18:16
+   |
+18 | #[reflect_impl(specialize(T = u8))]
+   |                ^^^^^^^^^^
+
+error: duplicate specialization argument `T`
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:25:35
+   |
+25 | #[reflect_impl(specialize(T = u8, T = u16, N = 4))]
+   |                                   ^

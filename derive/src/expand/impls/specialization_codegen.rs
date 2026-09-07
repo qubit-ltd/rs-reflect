@@ -478,3 +478,45 @@ fn specialization_const_argument(
         SpecializationValueIr::Type(_) => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    use super::substitute_type_syntax;
+
+    #[test]
+    fn test_substitute_type_syntax_rewrites_only_generic_type_and_const_paths() {
+        let replacements =
+            [(quote!(T), quote!(u8)), (quote!(N), quote!(4))].map(|(name, value)| {
+                (
+                    syn::parse2(name).expect("the replacement name must be an identifier"),
+                    value,
+                )
+            });
+        let cases: [(TokenStream, TokenStream); 6] = [
+            (quote!(Vec<T>), quote!(Vec<u8>)),
+            (
+                quote!(<T as Iterator>::Item),
+                quote!(<u8 as Iterator>::Item),
+            ),
+            (
+                quote!(Option<Result<T, Vec<T>>>),
+                quote!(Option<Result<u8, Vec<u8>>>),
+            ),
+            (quote!([T; N + 1]), quote!([u8; 4 + 1])),
+            (quote!(Wrapper<Unmatched>), quote!(Wrapper<Unmatched>)),
+            (quote!(T::T), quote!(u8::T)),
+        ];
+
+        for (input, expected) in cases {
+            let actual = substitute_type_syntax(&input, &replacements);
+            let actual: syn::Type =
+                syn::parse2(actual).expect("substitution must retain valid type syntax");
+            let expected: syn::Type =
+                syn::parse2(expected).expect("the expected result must be valid type syntax");
+            assert_eq!(actual, expected, "input: {input}");
+        }
+    }
+}
