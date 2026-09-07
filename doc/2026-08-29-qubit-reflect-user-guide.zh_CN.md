@@ -6,7 +6,7 @@
 
 ## 概念模型
 
-`qubit-reflect` 由四部分协作完成反射：
+`qubit-reflect` 由五部分协作完成反射：
 
 ```text
 Rust 声明 --宏--> TypeDescriptor / 成员描述符
@@ -476,5 +476,5 @@ tuple 与可移植函数指针 descriptor 支持 0 到 32 个元素或参数；3
 - 使用 `cargo doc --all-features` 在内部生成 API 文档
 - [中文详细设计](2026-09-03-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-03-qubit-reflect-design.md)
 - [中文演进历史](2026-09-07-qubit-reflect-evolution.zh_CN.md) 与 [Evolution history](2026-09-07-qubit-reflect-evolution.md)
-- [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
+- [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) 与 [追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
