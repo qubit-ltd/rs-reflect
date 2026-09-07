@@ -8,7 +8,11 @@
 
 //! Associated-constant shape analysis used by trait expansion.
 
-use crate::ir::{GenericBoundIr, PathArgumentIr, PathArgumentsIr, TypeIr, TypeKindIr};
+use crate::ir::GenericBoundIr;
+use crate::ir::PathArgumentIr;
+use crate::ir::PathArgumentsIr;
+use crate::ir::TypeIr;
+use crate::ir::TypeKindIr;
 
 /// Proves that an associated constant's type has no unresolved lifetime.
 pub(super) fn has_proven_static_shape(ty: &TypeIr) -> bool {

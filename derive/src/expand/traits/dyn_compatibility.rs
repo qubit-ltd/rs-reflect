@@ -8,16 +8,35 @@
 
 //! Conservative dyn-compatibility analysis helpers.
 
-use super::{SynPathArguments, SynWherePredicate, replace_declared_lifetimes_with_static};
-use crate::ir::{HelperName, HelperValueIr, TraitDeclarationIr};
-use proc_macro2::{Ident, TokenStream, TokenTree};
-use quote::{ToTokens, format_ident, quote};
+use proc_macro2::Ident;
+use proc_macro2::TokenStream;
+use proc_macro2::TokenTree;
+use quote::ToTokens;
+use quote::format_ident;
+use quote::quote;
+use syn::FnArg;
+use syn::GenericArgument;
+use syn::GenericParam;
+use syn::ItemTrait;
 use syn::LitStr;
-use syn::{
-    FnArg, GenericArgument, GenericParam, ItemTrait, Path, Receiver, TraitBoundModifier, TraitItem,
-    TraitItemFn, TraitItemType, Type, TypeParamBound, WhereClause,
-};
-use syn::{parse_quote, parse2};
+use syn::Path;
+use syn::Receiver;
+use syn::TraitBoundModifier;
+use syn::TraitItem;
+use syn::TraitItemFn;
+use syn::TraitItemType;
+use syn::Type;
+use syn::TypeParamBound;
+use syn::WhereClause;
+use syn::parse2;
+use syn::parse_quote;
+
+use super::SynPathArguments;
+use super::SynWherePredicate;
+use super::replace_declared_lifetimes_with_static;
+use crate::ir::HelperName;
+use crate::ir::HelperValueIr;
+use crate::ir::TraitDeclarationIr;
 
 /// Returns inherited associated types explicitly proven for a dyn root.
 pub(super) fn dyn_inherited_associated_types(
@@ -345,11 +364,13 @@ pub(super) fn tokens_contain_ident(tokens: TokenStream, expected: &str) -> bool 
 #[cfg(test)]
 mod tests {
     use quote::quote;
+    use syn::Path;
+    use syn::parse_str;
     #[test]
     fn inherited_binding_and_projection_are_analyzed_in_one_module() {
-        let supertrait = crate::parse::convert_path(&syn::parse_str::<syn::Path>("Base").unwrap());
+        let supertrait = crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
         let inherited =
-            crate::parse::convert_path(&syn::parse_str::<syn::Path>("Base::Assoc").unwrap());
+            crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
         assert!(super::inherited_belongs_to_supertrait(
             &inherited,
             &supertrait

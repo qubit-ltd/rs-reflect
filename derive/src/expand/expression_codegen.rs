@@ -747,6 +747,8 @@ fn unsupported_const_default(value: impl ToTokens) -> TokenStream {
 mod tests {
     use proc_macro2::TokenStream;
     use quote::quote;
+    use syn::Type;
+    use syn::parse_str;
 
     use super::const_expression;
     use super::const_expression_value;
@@ -756,7 +758,7 @@ mod tests {
 
     /// Converts one Rust type into generated structural metadata text.
     fn render_type(source: &str, environment: &GenericEnvironment) -> String {
-        let ty = syn::parse_str::<syn::Type>(source).expect("test type must parse");
+        let ty = parse_str::<Type>(source).expect("test type must parse");
         type_expression(&convert_type(&ty), environment, &quote!(qubit_reflect)).to_string()
     }
 

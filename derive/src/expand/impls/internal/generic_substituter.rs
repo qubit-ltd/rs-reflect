@@ -8,16 +8,29 @@
 
 //! AST-aware substitution of specialization type and const arguments.
 
-use proc_macro2::{Ident, TokenStream};
-use quote::{ToTokens, quote};
+use proc_macro2::Ident;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use quote::quote;
+use syn::Expr;
+use syn::GenericArgument;
+use syn::Path;
+use syn::PathArguments;
+use syn::Type;
+use syn::parse2;
 use syn::visit_mut::VisitMut;
+use syn::visit_mut::visit_expr_mut;
+use syn::visit_mut::visit_expr_path_mut;
+use syn::visit_mut::visit_generic_argument_mut;
+use syn::visit_mut::visit_type_mut;
+use syn::visit_mut::visit_type_path_mut;
 
 /// Substitutes generic symbols only in type and const expression positions.
 pub(in crate::expand::impls) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
 ) -> TokenStream {
-    let mut ty: syn::Type = syn::parse2(tokens.clone())
+    let mut ty: Type = parse2(tokens.clone())
         .expect("validated specialization target must remain valid type syntax");
     GenericSubstituter { replacements }.visit_type_mut(&mut ty);
     ty.into_token_stream()
@@ -25,9 +38,9 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
 
 /// Substitutes generic symbols in a validated path.
 pub(in crate::expand::impls) fn substitute_path_syntax(
-    path: &syn::Path,
+    path: &Path,
     replacements: &[(Ident, TokenStream)],
-) -> syn::Path {
+) -> Path {
     let mut path = path.clone();
     GenericSubstituter { replacements }.visit_path_mut(&mut path);
     path
@@ -46,34 +59,34 @@ impl GenericSubstituter<'_> {
 }
 
 impl VisitMut for GenericSubstituter<'_> {
-    fn visit_type_mut(&mut self, ty: &mut syn::Type) {
-        if let syn::Type::Path(path) = ty
+    fn visit_type_mut(&mut self, ty: &mut Type) {
+        if let Type::Path(path) = ty
             && path.qself.is_none()
             && path.path.leading_colon.is_none()
             && !path.path.segments.is_empty()
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && matches!(path.path.segments[0].arguments, PathArguments::None)
             && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
         {
             if path.path.segments.len() > 1 {
-                let tail = syn::Path {
+                    let tail = Path {
                     leading_colon: None,
                     segments: path.path.segments.iter().skip(1).cloned().collect(),
                 };
-                if let Ok(mut replacement) = syn::parse2::<syn::Type>(quote!(#replacement :: #tail))
+                if let Ok(mut replacement) = parse2::<Type>(quote!(#replacement :: #tail))
                 {
-                    syn::visit_mut::visit_type_mut(self, &mut replacement);
+                    visit_type_mut(self, &mut replacement);
                     *ty = replacement;
                     return;
                 }
             }
-            let Ok(replacement) = syn::parse2::<syn::Type>(replacement.clone()) else {
+            let Ok(replacement) = parse2::<Type>(replacement.clone()) else {
                 return;
             };
             if path.path.segments.len() == 1 {
                 *ty = replacement;
                 return;
             }
-            if let syn::Type::Path(replacement) = replacement
+            if let Type::Path(replacement) = replacement
                 && replacement.qself.is_none()
             {
                 let tail = path.path.segments.iter().skip(1).cloned();
@@ -81,41 +94,41 @@ impl VisitMut for GenericSubstituter<'_> {
                 segments.extend(tail);
                 path.path.leading_colon = replacement.path.leading_colon;
                 path.path.segments = segments;
-                syn::visit_mut::visit_type_path_mut(self, path);
+                visit_type_path_mut(self, path);
             }
             return;
         }
-        syn::visit_mut::visit_type_mut(self, ty);
+        visit_type_mut(self, ty);
     }
 
-    fn visit_expr_mut(&mut self, expression: &mut syn::Expr) {
-        if let syn::Expr::Path(path) = expression
+    fn visit_expr_mut(&mut self, expression: &mut Expr) {
+        if let Expr::Path(path) = expression
             && path.qself.is_none()
             && path.path.leading_colon.is_none()
             && !path.path.segments.is_empty()
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && matches!(path.path.segments[0].arguments, PathArguments::None)
             && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
         {
             if path.path.segments.len() > 1 {
-                let tail = syn::Path {
+                let tail = Path {
                     leading_colon: None,
                     segments: path.path.segments.iter().skip(1).cloned().collect(),
                 };
-                if let Ok(mut replacement) = syn::parse2::<syn::Expr>(quote!(#replacement :: #tail))
+                if let Ok(mut replacement) = parse2::<Expr>(quote!(#replacement :: #tail))
                 {
-                    syn::visit_mut::visit_expr_mut(self, &mut replacement);
+                    visit_expr_mut(self, &mut replacement);
                     *expression = replacement;
                     return;
                 }
             }
-            let Ok(replacement) = syn::parse2::<syn::Expr>(replacement.clone()) else {
+            let Ok(replacement) = parse2::<Expr>(replacement.clone()) else {
                 return;
             };
             if path.path.segments.len() == 1 {
                 *expression = replacement;
                 return;
             }
-            if let syn::Expr::Path(replacement) = replacement
+            if let Expr::Path(replacement) = replacement
                 && replacement.qself.is_none()
             {
                 let tail = path.path.segments.iter().skip(1).cloned();
@@ -123,26 +136,26 @@ impl VisitMut for GenericSubstituter<'_> {
                 segments.extend(tail);
                 path.path.leading_colon = replacement.path.leading_colon;
                 path.path.segments = segments;
-                syn::visit_mut::visit_expr_path_mut(self, path);
+                visit_expr_path_mut(self, path);
             }
             return;
         }
-        syn::visit_mut::visit_expr_mut(self, expression);
+        visit_expr_mut(self, expression);
     }
 
-    fn visit_generic_argument_mut(&mut self, argument: &mut syn::GenericArgument) {
-        if let syn::GenericArgument::Type(syn::Type::Path(path)) = argument
+    fn visit_generic_argument_mut(&mut self, argument: &mut GenericArgument) {
+        if let GenericArgument::Type(Type::Path(path)) = argument
             && path.qself.is_none()
             && path.path.leading_colon.is_none()
             && path.path.segments.len() == 1
-            && matches!(path.path.segments[0].arguments, syn::PathArguments::None)
+            && matches!(path.path.segments[0].arguments, PathArguments::None)
             && let Some(replacement) = self.replacement(&path.path.segments[0].ident)
-            && let Ok(expression) = syn::parse2::<syn::Expr>(replacement.clone())
-            && syn::parse2::<syn::Type>(replacement.clone()).is_err()
+            && let Ok(expression) = parse2::<Expr>(replacement.clone())
+            && parse2::<Type>(replacement.clone()).is_err()
         {
-            *argument = syn::GenericArgument::Const(expression);
+            *argument = GenericArgument::Const(expression);
             return;
         }
-        syn::visit_mut::visit_generic_argument_mut(self, argument);
+        visit_generic_argument_mut(self, argument);
     }
 }
