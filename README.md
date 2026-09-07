@@ -91,12 +91,12 @@ facts even where an operation is unavailable.
   caller-owned inputs in recovery objects.
 - Generated invocation adapters for supported methods, with local and
   explicitly requested thread-safe modes.
-- A deterministic registry assembled from linked inventory fragments. It is
+- A deterministic registry assembled from linked inventory or explicit facts. It is
   the only public resolver for effective concrete and definition capabilities,
   including typed `Clone` and `Default` adapters. Every registration path
-  enters this one validated fragment stream; callers may hold an explicit,
+  uses the same transactional validator; callers may hold an explicit,
   immutable registry snapshot instead of consulting the process-global result.
-- A versioned `__private::codegen_v2` protocol for derive/facade integration;
+- A versioned `__private::codegen_v3` protocol for derive/facade integration;
   downstream model code uses its own independent ABI v4.
 - Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
   field access and construction exist only for types whose generated code
@@ -122,67 +122,14 @@ Empty fields do not imply a unit struct: `struct A;`, `struct B {}`, and `struct
 retain Unit, Named, and Tuple shape and use the corresponding dynamic construction entry.
 See the user guide for migration and provider requirements.
 
-## Build an isolated snapshot
+## Choose an explicit snapshot
 
-Use `RegistrySnapshotBuilder` when a library or test owns an explicit subset of
-reflection facts. It never reads linker inventory or mutates the process-global
-registry. An empty builder produces an empty snapshot; type membership and
-capabilities are independent, so a capability-only snapshot does not make its
-target appear in `types()`.
-
-```rust
-use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-use qubit_reflect::TypeDescriptor;
-
-fn source(kind: &str, line: u32) -> FragmentIdentity {
-    FragmentIdentity::new("example", "config", line, 1, kind, u64::from(line))
-}
-
-fn main() -> Result<(), qubit_reflect::RegistryError> {
-    let target = TypeDescriptor::of::<u32>();
-    let key = CapabilityKey::<u32>::new(
-        CapabilityId::new("example.limit").expect("valid capability ID"),
-    );
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder
-        .add_type(target, source("type", 10))
-        .add_type_capabilities(
-            target,
-            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-            source("capability", 11),
-        );
-    let snapshot = builder.build()?;
-
-    assert!(snapshot.get(target.type_id()).is_some());
-    assert_eq!(
-        snapshot
-            .capability(target, key)
-            .expect("valid capability declarations"),
-        Some(&7),
-    );
-    assert!(target.methods_in(&snapshot).is_empty());
-    Ok(())
-}
-```
-
-For a capability-only snapshot, omit `add_type` and call
-`add_type_capabilities`; the target remains absent from `types()` while
-`capability` and `capability_by_id` still work. `add_definition`,
-`add_trait`, `add_impl_definition`, `add_impl`, and
-`add_definition_capabilities` cover the other typed fragment kinds. `build()`
-validates all identities and conflicts transactionally and returns a
-`RegistryError` without publishing partial state. Give every fragment a stable
-`FragmentIdentity`; duplicate or changed source identities are diagnosed.
-
-The builder is a runtime API and does not change the generated-code contracts:
-facades continue to expose `__private::codegen_v2`, while downstream model
-metadata continues to use its independent ABI v4. Intrinsic capability
-providers must depend only on static type facts and must not re-enter registry
-initialization. Capability conflicts preserve their kind, ID, adapter `TypeId`s,
-target, source fragments, and the original conflict through the registry error
-chain.
+Use `RegistrySnapshotBuilder` when a library or test owns a subset of reflection
+facts. Pass the chosen registry to both method lookup and invocation. Snapshots
+resolve receiver capabilities independently, even if global initialization fails;
+capability-only entries do not add type membership. See the
+[user guide](doc/2026-08-29-qubit-reflect-user-guide.md#build-an-isolated-registry-snapshot)
+for construction, recovery, and migration examples.
 
 ## Learn More
 
@@ -198,6 +145,9 @@ chain.
 - [简体中文 README](README.zh_CN.md)
 
 ## Testing
+
+Project CI uses Python 3.11 or newer to compile and execute each Rust Markdown
+example independently, including its assertions.
 
 ```bash
 # Run tests with the default feature set

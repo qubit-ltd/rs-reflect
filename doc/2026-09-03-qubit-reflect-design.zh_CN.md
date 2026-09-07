@@ -6,7 +6,7 @@
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
 - 适用仓库：`rs-reflect`
-- 对应协议：`qubit-reflect 0.1` / `__private::codegen_v2`
+- 对应协议：`qubit-reflect 0.1` / `__private::codegen_v3`
 
 ## 1. 目的与边界
 
@@ -81,7 +81,7 @@ src/
 ├── identity/                   # fragment、member、trait、visibility 身份
 ├── invoke/                     # 动态调用、future 与失败恢复
 ├── private/
-│   └── codegen_v2/             # 唯一生成协议入口
+│   └── codegen_v3/             # 唯一生成协议入口
 ├── registry/
 │   ├── registry_builder.rs     # 冲突检查与冻结前聚合
 │   ├── registry_snapshot_builder.rs      # 显式构建隔离 snapshot
@@ -151,7 +151,7 @@ trait 默认方法与 concrete impl 共用同一 invocation 分析和语义 emit
 生成代码只能通过以下版本化协议根访问 runtime 类型、工厂和注册钩子：
 
 ```text
-facade::__private::codegen_v2
+facade::__private::codegen_v3
 ```
 
 协议按领域精确暴露 `access`、`capability`、`construct`、`descriptor`、`error`、
@@ -159,7 +159,7 @@ facade::__private::codegen_v2
 这些是生成协议符号，不是供业务代码手写调用的 API；协议也不会重导出 runtime 的完整公开模块。
 根 `__private` 不平铺这些符号。协议发生不兼容变化时新增兄弟版本，而不是静默扩大 v1。
 
-下游 facade 为生成代码精确暴露 `__private::codegen_v2`，并独立逐项重导出它向业务代码承诺的公开符号。
+下游 facade 为生成代码精确暴露 `__private::codegen_v3`，并独立逐项重导出它向业务代码承诺的公开符号。
 不得使用 `pub use qubit_reflect::*`、`pub use qubit_reflect::__private::*`，也不应仅为满足宏展开而重导出
 runtime 的完整模块。
 
@@ -167,7 +167,7 @@ runtime 的完整模块。
 反射协议，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
 
 显式 snapshot builder 属于 runtime 公共 API，不会扩大任一生成代码协议。现有 derive 和 facade 继续使用
-`__private::codegen_v2`，下游模型代码继续使用独立的 v4 ABI。因此，下游 fixture 或库可以构建确定性的
+`__private::codegen_v3`，下游模型代码继续使用独立的 v4 ABI。因此，下游 fixture 或库可以构建确定性的
 事实子集，而不必把协议迁移与 registry 所有权绑定在一起。
 
 ## 泛型定义与 effective capability
@@ -191,7 +191,7 @@ provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 
 原始冲突也会作为错误 source 暴露。
 
 derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
-空字段数量不再决定结构形状。此内部修订不改变 `codegen_v2` 或模型 v4 协议。
+空字段数量不再决定结构形状。此内部修订不改变 `codegen_v3` 或模型 v4 协议。
 下游元数据和属性查询传播结构化错误，解析器附加根模型、完整路径、来源；
 一条基础失败不生成伪 MissingProperty/InvalidValueClosure，也不阻断独立错误收集。
 
@@ -227,7 +227,7 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 | all-features | 生态/Qubit 类型、workspace tests、Clippy、Rustdoc |
 | derive | parser/analysis 单元测试、trybuild pass/fail、invocation 集成 |
 | registry | 跨 crate 聚合、冲突、冻结、稳定排序、并发初始化 |
-| ABI/facade | 重命名依赖、显式 facade、`codegen_v2` 与模型 `v4` |
+| ABI/facade | 重命名依赖、显式 facade、`codegen_v3` 与模型 `v4` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
 覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
@@ -253,3 +253,32 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 - 下游泛型宏使用 `#[reflect(definition_provider_v2 = identifier)]` 选择自己拥有的访问函数名。v2 契约为无参数函数，返回 `&'static TypeDefinitionDescriptor`；不要求具体单态化，也不依赖反射宏默认生成名称。
 - `scripts/check-downstream.sh` 验证真实 `rs-model-metadata` workspace（包含 `derive/` 子项目）与 `rs-platform`。本地 `ci-check.sh` 和独立 GitHub Actions job 均执行该门禁；缺少相邻仓库会显式失败。baseline 通道使用清单记录的精确 SHA，head 通道使用各依赖仓库的 `main` 修订；两个通道都会显式记录实际 feature 选择，私有依赖可配置 `DEPENDENCY_TOKEN`。
 - descriptor 首次初始化由全新子进程测量，报告的时间不含进程启动；热路径和 1/4/8 线程查询单独测量。平台 benchmark 使用实际链接的模型，报告投影、关系校验耗时与分配请求数量/字节数。
+
+## 2026-09-07：显式调用快照与 codegen_v3
+
+当前调用协议在所有普通、catching、thread-safe、pinned 入口中显式接受 `&ReflectRegistry`。
+调用方先用 `methods_named_in(registry, ...)` 查找，再将同一个 registry 传给 `invoke_*(registry, invocation)`。
+函数指针采用独立的 `for<'registry, 'call>` 生命周期；输出、future 与 recovery 不保留 registry 借用，
+但仍受输入生命周期、Local/ThreadSafe 及 Pin 约束。没有隐式全局初始化或全局能力回退。
+
+可安全生成的特殊 receiver 总有静态适配器，不再扫描 inventory 决定入口是否存在。
+所选快照缺少、类型不匹配或只声明 fact 的 receiver capability 时，调用返回结构化
+`ReceiverAdapterUnavailable` 并按调用者顺序保留全部输入。adapter 主动拒绝与 intrinsic
+集合冲突分别保留自己的错误类别。静态不支持的签名仍无入口。
+
+`TypeDescriptor` 的 Debug 只输出结构信息，不查询能力或执行 provider；打印 descriptor 不会隐式重入。
+冻结成员、名称与方法索引查询不执行 provider；未注册具体类型的能力查询仍可惰性初始化 intrinsic facts。
+provider 只能依赖静态类型事实，禁止显式重入 capability 或 registry 初始化。
+下游可用自定义 capability/provider 承载模型元数据；reflect 不定义或解释领域语义。
+
+本次破坏性变更移除 `codegen_v2`，facade 必须精确迁移到 `codegen_v3`。
+模型 `__private::v4`、`definition_provider_v2` 各自独立且保持原契约；包版本仍为 0.1.0、未发布。
+此前日期章节记录历史整改；其中“不改变协议”的表述只适用于对应历史变更。
+
+Markdown 验收以独立 package 和进程执行每个 `rust` 程序；`rust,no_run` 只编译库，
+`rust,compile_fail` 必须编译失败，后二者须有正文解释。未知标记、空块和未闭合围栏均失败。
+临时 workspace 复制并核对 Cargo.lock，随后使用 `--locked`；运行限时 10 秒，失败保留日志与锁文件。
+覆盖率保留原六项门禁，新增四项阈值按 d929d96 基线函数/行/区域覆盖率向下取整：
+set 100/98/99、registry 98/98/98、registry_builder 100/97/96、snapshot_builder 100/100/100。
+有界 registry_snapshot fuzz 使用 4096 字节、32 fragment、16 来源、8 静态 ID、4 descriptor 上限，
+通过公开 API 验证顺序、冲突原子性、capability-only 成员与快照独立性。

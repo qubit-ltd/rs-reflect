@@ -69,8 +69,8 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 - 分别描述具体运行时类型与泛型源码定义，并描述 trait、impl 及支持的内置类型族。
 - 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；执行前校验失败时，恢复对象会保留调用方传入的 owned 值。
 - 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
-- 所有注册入口都汇入同一条经过校验的 inventory fragment 数据流，生成确定性的不可变注册表；它是解析具体类型与泛型定义 effective capability 的唯一公开入口，并提供类型安全的 `Clone`、`Default` adapter。
-- derive 与 facade 通过版本化的 `__private::codegen_v2` 协议集成；下游模型生成代码独立使用 ABI v4。
+- 链接 inventory 和显式 fragment 使用同一套事务性校验，生成确定性的不可变注册表；它是解析具体类型与泛型定义 effective capability 的唯一公开入口，并提供类型安全的 `Clone`、`Default` adapter。
+- derive 与 facade 通过版本化的 `__private::codegen_v3` 协议集成；下游模型生成代码独立使用 ABI v4。
 - 动态值明确区分 `Local` 与选择性启用的 `ThreadSafe` 边界；只有生成代码证明类型满足所需 `Send + Sync` 约束时，才会提供线程安全字段访问和构造。
 
 反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、descriptor 地址和 trait marker 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
@@ -86,62 +86,12 @@ tuple 和可移植函数指针 descriptor 支持 0 到 32 个元素或参数；3
 空字段不等于 unit：`struct A;`、`struct B {}`、`struct C();` 分别保留 Unit、Named、Tuple
 形状，并使用对应动态构造入口。详细迁移和 provider 约束见用户指南。
 
-## 构建隔离的 snapshot
+## 选择显式 snapshot
 
-当库或测试只拥有一组明确的反射事实时，可以使用
-`RegistrySnapshotBuilder`。它不会读取 linker inventory，也不会修改进程全局
-registry。空 builder 会生成空 snapshot；类型成员与 capability 相互独立，因此
-只有 capability 的 snapshot 不会让目标出现在 `types()` 中。
-
-```rust
-use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-use qubit_reflect::TypeDescriptor;
-
-fn source(kind: &str, line: u32) -> FragmentIdentity {
-    FragmentIdentity::new("example", "config", line, 1, kind, u64::from(line))
-}
-
-fn main() -> Result<(), qubit_reflect::RegistryError> {
-    let target = TypeDescriptor::of::<u32>();
-    let key = CapabilityKey::<u32>::new(
-        CapabilityId::new("example.limit").expect("合法的 capability ID"),
-    );
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder
-        .add_type(target, source("type", 10))
-        .add_type_capabilities(
-            target,
-            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-            source("capability", 11),
-        );
-    let snapshot = builder.build()?;
-
-    assert!(snapshot.get(target.type_id()).is_some());
-    assert_eq!(
-        snapshot
-            .capability(target, key)
-            .expect("capability 声明合法"),
-        Some(&7),
-    );
-    assert!(target.methods_in(&snapshot).is_empty());
-    Ok(())
-}
-```
-
-如果只需要 capability snapshot，可以省略 `add_type`，直接调用
-`add_type_capabilities`；目标仍不会出现在 `types()` 中，但
-`capability` 与 `capability_by_id` 仍然可查询。其他带类型的 fragment 可分别使用
-`add_definition`、`add_trait`、`add_impl_definition`、`add_impl` 和
-`add_definition_capabilities`。`build()` 会事务性校验所有 identity 与冲突，返回
-`RegistryError`，不会发布部分结果。每个 fragment 都应使用稳定的
-`FragmentIdentity`；重复或内容变化的来源 identity 会产生诊断。
-
-builder 属于 runtime 公共 API，不会改变生成代码协议：facade 继续暴露
-`__private::codegen_v2`，下游模型元数据继续使用独立的 ABI v4。intrinsic
-capability provider 只能依赖静态类型事实，不能重新进入 registry 初始化。能力冲突会在
-registry error 链中保留冲突类别、ID、adapter `TypeId`、target、来源 fragment 和原始冲突。
+当库或测试只拥有一组明确的反射事实时，使用 `RegistrySnapshotBuilder`，并将选定的
+registry 同时传给方法查找和调用。各 snapshot 独立解析 receiver capability，即便
+全局初始化失败也不受影响；仅注册 capability 不会增加类型成员。构建、恢复和迁移示例
+见[用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#构建隔离的-registry-snapshot)。
 
 ## 延伸阅读
 
@@ -157,6 +107,8 @@ registry error 链中保留冲突类别、ID、adapter `TypeId`、target、来�
 - [English README](README.md)
 
 ## 测试
+
+项目 CI 使用 Python 3.11 或更新版本，逐块独立编译并执行 Rust Markdown 示例，包含其中的断言。
 
 ```bash
 # 使用默认 feature 集运行测试

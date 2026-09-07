@@ -19,7 +19,7 @@ maps every identifier to current implementation and executable tests.
 - **REQ-SYS-005**: Querying a descriptor MUST NOT require constructing an instance of the described type.
 - **REQ-SYS-006**: Dynamic operations MUST preserve Rust type, ownership, borrowing, and thread-safety boundaries; mismatches MUST return errors and MUST NOT cause undefined behavior.
 - **REQ-SYS-007**: Errors decidable from one macro input MUST be diagnosed at compile time; only cross-declaration aggregation, runtime values, and dynamic arguments MAY fail at runtime.
-- **REQ-SYS-008**: Public descriptor APIs, errors, and macro behavior MUST have Rustdoc, and final user-guide examples MUST be acceptance inputs.
+- **REQ-SYS-008**: Public descriptor APIs, errors, and macro behavior MUST have Rustdoc, and final user-guide examples MUST be acceptance inputs. Each `rust` example MUST execute independently and check assertions; compile-only and expected-failure examples require explicit markers and explanations. Descriptor Debug MUST NOT execute providers.
 - **REQ-SYS-009**: Descriptor graphs MUST support recursive type relationships without unbounded traversal or formatting recursion.
 - **REQ-SYS-010**: Identical fragment sets MUST produce deterministic member order across compilation, linking, and querying; fields and variants use source order, while distributed impls MUST NOT use linker enumeration or first-query thread order.
 - **REQ-SYS-011**: The target API requires `std` and the manifest `rust-version`; `no_std`/`alloc` are out of scope. CI defines supported platforms, and platforms unable to support distributed static registration MUST fail explicitly at compile time.
@@ -178,8 +178,8 @@ maps every identifier to current implementation and executable tests.
 
 ## Invocation and Construction
 
-- **REQ-INV-001**: Receiverless functions, `&self`, `&mut self`, and `self` methods use distinct invocation input constraints.
-- **REQ-INV-002**: Argument count or type mismatch fails before user code executes.
+- **REQ-INV-001**: Receiverless functions, `&self`, `&mut self`, and `self` methods use distinct invocation input constraints. Every entry MUST accept an explicit registry and resolve receiver capabilities only there, without global fallback; outputs, futures, and recovery MUST NOT borrow the registry.
+- **REQ-INV-002**: Argument count or type mismatch fails before user code executes. Static adapter presence MUST NOT depend on inventory capabilities; missing, mistyped, or fact-only receiver capabilities report unavailable during invocation and recover caller-ordered inputs.
 - **REQ-INV-003**: `&mut self` requires an exclusive mutable borrow; `self` consumes an owned value.
 - **REQ-INV-004**: Outputs MAY be owned or borrow from receiver/arguments, and the API preserves that lifetime relationship in types.
 - **REQ-INV-005**: Ordinary invoke propagates user panics unchanged. Catching exists only for explicit `catch_unwind`, compile-time-validates unwind safety, returns separate `InvocationPanic` under unwind, reports unavailable under abort, and MUST NOT infer unwind safety through specialization.
@@ -251,7 +251,7 @@ maps every identifier to current implementation and executable tests.
 - **REQ-INT-008**: A generator using only `TypeDescriptor` guarantees Rust type, complete fields, and shape. Static domain constraints require `TypeMetadata`; contextual uniqueness, references, and external validation require higher layers.
 - **REQ-INT-009**: Domain attributes MUST NOT become built-in reflection semantics. A role macro MAY parse once and generate both reflection and model metadata without duplicate user annotations.
 - **REQ-INT-010**: `TypeDescriptor` cannot directly return model metadata; reverse lookup belongs in a model wrapper, extension trait, or registry to avoid a dependency cycle.
-- **REQ-INT-011**: Model crates implement structure through the public reflection contract. Role macros delegate to the facade's compatible `Reflect` derive, avoid duplicate structure generators, expose only hidden `codegen_v2` plus required derive paths, do not require full runtime module re-exports or terminal direct dependencies, and reject stacking explicit `Reflect` derive.
+- **REQ-INT-011**: Model crates implement structure through the public reflection contract. Role macros delegate to the facade's compatible `Reflect` derive, avoid duplicate structure generators, expose only hidden `codegen_v3` plus required derive paths, do not require full runtime module re-exports or terminal direct dependencies, and reject stacking explicit `Reflect` derive.
 - **REQ-INT-012**: This specification is authoritative across the three repositories for structure, dynamic operations, and dependency direction; conflicts are fixed downstream, never by adding domain concepts or compatibility forks to reflection.
 - **REQ-ERR-001**: Compile diagnostics point to the relevant declaration, field, variant, impl, or method rather than only the macro name.
 - **REQ-ERR-002**: Error messages state the violated rule and provide supported syntax when practical.
