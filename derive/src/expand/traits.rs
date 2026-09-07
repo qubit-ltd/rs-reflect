@@ -74,12 +74,16 @@ use crate::ir::WherePredicateIr;
 /// `Sized` probe. Rust method selection does not treat an unmet region
 /// obligation as an autoref fallback candidate, so lifetime uncertainty must
 /// not reach that probe.
+#[cfg(test)]
+#[allow(dead_code)]
 fn associated_const_type_has_proven_static_shape_impl(ty: &TypeIr) -> bool {
     associated_const_type_has_proven_static_shape_in(ty, &std::collections::HashSet::new(), false)
 }
 
 /// Recursively checks lifetime provenance while tracking higher-ranked
 /// lifetimes and callable elision scopes.
+#[cfg(test)]
+#[allow(dead_code)]
 fn associated_const_type_has_proven_static_shape_in(
     ty: &TypeIr,
     bound_lifetimes: &std::collections::HashSet<String>,
