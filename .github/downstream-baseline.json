@@ -4,12 +4,12 @@
     {
       "repository": "qubit-ltd/rs-model-metadata",
       "path": "rust-platform/rs-model-metadata",
-      "revision": "8adb1079b9a2dd0e1f4b31ad81b09ea1177add21"
+      "revision": "f88e1d0a9d223f42cc403a6bb8a798ab7b3da384"
     },
     {
       "repository": "qubit-ltd/rs-platform",
       "path": "rust-platform/rs-platform",
-      "revision": "21df3a9529fbc4814d2525bde0eda77640d4b3f6"
+      "revision": "dd0b60809ad5706af401fa4a4cb77b8a4eadf30c"
     },
     {
       "repository": "qubit-ltd/rs-id",
@@ -24,12 +24,12 @@
     {
       "repository": "qubit-ltd/rs-redact",
       "path": "rust-common/rs-redact",
-      "revision": "57a9a75dcc698ba6b2e0f03cb5d2400fadf80423"
+      "revision": "3b2979a8f24240d59a8c19d3d5b4418236c6e5c5"
     },
     {
       "repository": "qubit-ltd/rs-validator",
       "path": "rust-common/rs-validator",
-      "revision": "77382055bc3951a546e9f71f12a6d34315c99b6b"
+      "revision": "1444debeb43f358abbe57a685b1fc8a9584581ca"
     }
   ]
 }
