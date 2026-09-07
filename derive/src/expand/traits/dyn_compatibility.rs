@@ -52,4 +52,18 @@ mod tests {
         assert!(!super::contains_unprojected_self(quote!(Self::Assoc)));
         assert!(super::contains_unprojected_self(quote!(Option<Self>)));
     }
+
+    #[test]
+    fn recognizes_inherited_associated_bindings_on_direct_supertraits() {
+        let supertrait = crate::parse::convert_path(
+            &syn::parse_str::<syn::Path>("Base").expect("supertrait path must parse"),
+        );
+        let inherited = crate::parse::convert_path(
+            &syn::parse_str::<syn::Path>("Base::Assoc").expect("associated path must parse"),
+        );
+        assert!(super::super::inherited_belongs_to_supertrait(
+            &inherited,
+            &supertrait
+        ));
+    }
 }
