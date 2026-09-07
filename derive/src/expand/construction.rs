@@ -21,7 +21,10 @@ use crate::ir::VariantIr;
 use crate::ir::VariantKindIr;
 
 /// Emits generated local construction and update adapters for one struct.
-pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn struct_adapters(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     let local = struct_mode_adapters(declaration, facade, false);
     let thread_safe = declaration
         .attributes
@@ -31,7 +34,11 @@ pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStr
     quote!(#local #thread_safe)
 }
 
-fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
+fn struct_mode_adapters(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
@@ -107,10 +114,11 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
     });
     let literal = match declaration.field_shape {
         FieldShapeIr::Named => {
-            let assignments = declaration.fields.iter().zip(values).map(|(field, value)| {
-                let name = field.name.as_ref().expect("named struct field");
-                quote!(#name: #value)
-            });
+            let assignments =
+                declaration.fields.iter().zip(values).map(|(field, value)| {
+                    let name = field.name.as_ref().expect("named struct field");
+                    quote!(#name: #value)
+                });
             quote!(Self { #(#assignments),* })
         }
         FieldShapeIr::Unit => quote!(Self),
@@ -134,7 +142,8 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         }
     });
     let construct = format_ident!("__qubit_reflect_struct_constructor{suffix}");
-    let construct_adapter = format_ident!("__qubit_reflect_construct_struct{suffix}");
+    let construct_adapter =
+        format_ident!("__qubit_reflect_construct_struct{suffix}");
     let update = format_ident!("__qubit_reflect_struct_updater{suffix}");
     let update_adapter = format_ident!("__qubit_reflect_update_struct{suffix}");
     quote! {
@@ -183,7 +192,10 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
 
 /// Returns the descriptor expression linking a struct to its generated entry
 /// points.
-pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn struct_descriptor(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     let thread_safe = declaration
         .attributes
         .iter()
@@ -202,25 +214,36 @@ pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenS
 
 /// Emits a local constructor and its descriptor attachment for one enum
 /// variant.
-pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
+pub(crate) fn variant_adapters(
+    variant: &VariantIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
     let local = variant_adapters_for_mode(variant, facade, false);
-    let thread_safe_adapters = thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
+    let thread_safe_adapters =
+        thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
     quote!(#local #thread_safe_adapters)
 }
 
 /// Emits one mode-specific enum variant constructor.
-fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
-    if variant
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
-    {
+fn variant_adapters_for_mode(
+    variant: &VariantIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
+    if variant.attributes.iter().any(|attribute| {
+        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
+    }) {
         return TokenStream::new();
     }
     let variant_index = variant.index;
     let suffix = if thread_safe { "_thread_safe" } else { "" };
-    let constructor = format_ident!("__qubit_reflect_variant_constructor_{variant_index}{suffix}");
-    let adapter = format_ident!("__qubit_reflect_construct_variant_{variant_index}{suffix}");
+    let constructor = format_ident!(
+        "__qubit_reflect_variant_constructor_{variant_index}{suffix}"
+    );
+    let adapter = format_ident!(
+        "__qubit_reflect_construct_variant_{variant_index}{suffix}"
+    );
     let mode = if thread_safe {
         quote!(#facade::__private::codegen_v3::value::ThreadSafe)
     } else {
@@ -288,10 +311,12 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
         VariantKindIr::Unit => quote!(Self::#variant_name),
         VariantKindIr::Tuple => quote!(Self::#variant_name(#(#values),*)),
         VariantKindIr::Struct => {
-            let assignments = variant.fields.iter().zip(values).map(|(field, value)| {
-                let name = field.name.as_ref().expect("named variant field");
-                quote!(#name: #value)
-            });
+            let assignments =
+                variant.fields.iter().zip(values).map(|(field, value)| {
+                    let name =
+                        field.name.as_ref().expect("named variant field");
+                    quote!(#name: #value)
+                });
             quote!(Self::#variant_name { #(#assignments),* })
         }
     };
@@ -319,17 +344,23 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
 }
 
 /// Returns an optional descriptor attachment for one variant.
-pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
-    if variant
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct))
-    {
+pub(crate) fn variant_descriptor(
+    variant: &VariantIr,
+    facade: &TokenStream,
+    thread_safe: bool,
+) -> TokenStream {
+    if variant.attributes.iter().any(|attribute| {
+        matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
+    }) {
         return TokenStream::new();
     }
-    let constructor = format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
+    let constructor =
+        format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
     let thread_safe = thread_safe.then(|| {
-        let constructor = format_ident!("__qubit_reflect_variant_constructor_{}_thread_safe", variant.index);
+        let constructor = format_ident!(
+            "__qubit_reflect_variant_constructor_{}_thread_safe",
+            variant.index
+        );
         quote!(.with_thread_safe(Self::#constructor))
     });
     quote!(.with_construction(

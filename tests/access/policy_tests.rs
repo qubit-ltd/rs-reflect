@@ -33,26 +33,33 @@ fn policy_record_descriptor() -> &'static TypeDescriptor {
 }
 
 /// Reads the read-only field after descriptor-level validation.
-fn get_read_only<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
-    let record = target
-        .downcast::<PolicyRecord>()
-        .unwrap_or_else(|_| panic!("the descriptor must validate the adapter target type"));
+fn get_read_only<'a>(
+    target: ReflectedRef<'a>,
+) -> Result<ReflectedRef<'a>, FieldAccessError> {
+    let record = target.downcast::<PolicyRecord>().unwrap_or_else(|_| {
+        panic!("the descriptor must validate the adapter target type")
+    });
     Ok(ReflectedRef::new(&record.read_only))
 }
 
 /// Mutably borrows the read-only field if policy validation is bypassed.
-fn get_read_only_mut<'a>(target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, FieldAccessError> {
-    let record = target
-        .downcast::<PolicyRecord>()
-        .unwrap_or_else(|_| panic!("the descriptor must validate the adapter target type"));
+fn get_read_only_mut<'a>(
+    target: ReflectedMut<'a>,
+) -> Result<ReflectedMut<'a>, FieldAccessError> {
+    let record = target.downcast::<PolicyRecord>().unwrap_or_else(|_| {
+        panic!("the descriptor must validate the adapter target type")
+    });
     Ok(ReflectedMut::new(&mut record.read_only))
 }
 
 /// Replaces the read-only field if policy validation is bypassed.
-fn set_read_only(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldAccessError> {
-    let record = target
-        .downcast::<PolicyRecord>()
-        .unwrap_or_else(|_| panic!("the descriptor must validate the adapter target type"));
+fn set_read_only(
+    target: ReflectedMut<'_>,
+    value: ReflectedOwned,
+) -> Result<(), FieldAccessError> {
+    let record = target.downcast::<PolicyRecord>().unwrap_or_else(|_| {
+        panic!("the descriptor must validate the adapter target type")
+    });
     let value = match value.downcast::<u32>() {
         Ok(value) => value,
         Err(_) => panic!("the descriptor must validate the adapter value type"),
@@ -62,10 +69,12 @@ fn set_read_only(target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), 
 }
 
 /// Reads the skipped field if policy validation is bypassed.
-fn get_skipped<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
-    let record = target
-        .downcast::<PolicyRecord>()
-        .unwrap_or_else(|_| panic!("the descriptor must validate the adapter target type"));
+fn get_skipped<'a>(
+    target: ReflectedRef<'a>,
+) -> Result<ReflectedRef<'a>, FieldAccessError> {
+    let record = target.downcast::<PolicyRecord>().unwrap_or_else(|_| {
+        panic!("the descriptor must validate the adapter target type")
+    });
     Ok(ReflectedRef::new(&record.skipped))
 }
 
@@ -97,7 +106,11 @@ static POLICY_FIELDS: [FieldDescriptor; 2] = [
     .with_access(FieldAccessPolicy::Skipped, Some(get_skipped), None, None),
 ];
 static POLICY_RECORD_DESCRIPTOR: TypeDescriptor =
-    descriptor::struct_type::<PolicyRecord>("policy_tests::PolicyRecord", StructKind::Named, &POLICY_FIELDS);
+    descriptor::struct_type::<PolicyRecord>(
+        "policy_tests::PolicyRecord",
+        StructKind::Named,
+        &POLICY_FIELDS,
+    );
 
 /// Verifies read-only fields remain readable and described while all mutable
 /// entry points are rejected before their adapters can change the target.

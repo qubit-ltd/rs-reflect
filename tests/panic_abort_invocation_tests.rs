@@ -29,14 +29,22 @@ impl Worker {
 
 #[test]
 fn test_abort_configuration_reports_requested_catching_as_unavailable() {
-    let registry = ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
+    let registry = ReflectRegistry::initialize()
+        .expect("generated fragments must validate");
+    let implementations =
+        registry.implementations(Worker::type_descriptor().type_id());
     let MethodLookup::Unique(method) =
-        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "marked")
+        reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            MethodQualifier::Inherent,
+            "marked",
+        )
     else {
         panic!("the marked method must be discoverable")
     };
-    let adapter = method.adapter().expect("the normal adapter remains available");
+    let adapter = method
+        .adapter()
+        .expect("the normal adapter remains available");
     assert_eq!(
         adapter.catching_availability(),
         CatchingAvailability::UnavailablePanicAbort

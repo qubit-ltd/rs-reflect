@@ -122,7 +122,11 @@ enum VariantPolicyEvent {
 #[test]
 fn test_derive_reflect_variant_skip_and_no_construct_are_distinct() {
     let descriptor = TypeDescriptor::of::<VariantPolicyEvent>();
-    let indices: Vec<_> = descriptor.variants().iter().map(VariantDescriptor::index).collect();
+    let indices: Vec<_> = descriptor
+        .variants()
+        .iter()
+        .map(VariantDescriptor::index)
+        .collect();
 
     assert_eq!(indices, [0, 2, 3]);
     assert!(descriptor.variant("Hidden").is_none());
@@ -134,7 +138,9 @@ fn test_derive_reflect_variant_skip_and_no_construct_are_distinct() {
     assert!(disabled.construction().is_none());
     assert!(
         disabled
-            .is_active(ReflectedRef::new(&VariantPolicyEvent::ConstructionDisabled))
+            .is_active(ReflectedRef::new(
+                &VariantPolicyEvent::ConstructionDisabled
+            ))
             .expect("the retained variant must preserve access semantics")
     );
     assert!(
@@ -160,7 +166,10 @@ fn test_derive_reflect_generic_enum_interns_concrete_instances() {
             .len(),
         1
     );
-    assert!(std::ptr::eq(u8_descriptor, TypeDescriptor::of::<GenericEvent<u8>>()));
+    assert!(std::ptr::eq(
+        u8_descriptor,
+        TypeDescriptor::of::<GenericEvent<u8>>()
+    ));
     assert!(std::ptr::eq(
         u8_descriptor
             .variant("Value")
@@ -209,7 +218,11 @@ fn test_derive_reflect_enum_field_access_checks_active_variant() {
         .expect("tuple variant");
     let value = DerivedEvent::Number(7);
 
-    assert!(number.is_active(ReflectedRef::new(&value)).expect("enum target"));
+    assert!(
+        number
+            .is_active(ReflectedRef::new(&value))
+            .expect("enum target")
+    );
     assert_eq!(
         number
             .field_at(0)
@@ -247,16 +260,29 @@ fn test_derive_reflect_enum_field_set_recovers_inactive_variant_replacement() {
         )
         .expect_err("an inactive variant must reject field replacement");
 
-    assert!(matches!(failure.error(), FieldAccessError::InactiveVariant { .. }));
+    assert!(matches!(
+        failure.error(),
+        FieldAccessError::InactiveVariant { .. }
+    ));
     assert!(matches!(target, RecoverableEvent::Inactive));
-    assert_eq!(drops.get(), 0, "validation must not destroy the replacement");
+    assert_eq!(
+        drops.get(),
+        0,
+        "validation must not destroy the replacement"
+    );
     let replacement = failure
         .into_recovery()
-        .unwrap_or_else(|_| panic!("inactive-variant failure must contain recovery"))
+        .unwrap_or_else(|_| {
+            panic!("inactive-variant failure must contain recovery")
+        })
         .into_value_at(0)
-        .unwrap_or_else(|_| panic!("replacement must be recoverable by field index"))
+        .unwrap_or_else(|_| {
+            panic!("replacement must be recoverable by field index")
+        })
         .downcast::<VariantDropProbe>()
-        .unwrap_or_else(|_| panic!("recovery must preserve the replacement type"));
+        .unwrap_or_else(|_| {
+            panic!("recovery must preserve the replacement type")
+        });
     assert_eq!(drops.get(), 0, "taking recovery must preserve ownership");
     drop(replacement);
     assert_eq!(drops.get(), 1, "the caller controls final destruction");
@@ -266,7 +292,8 @@ fn test_derive_reflect_enum_field_set_recovers_inactive_variant_replacement() {
 /// registration.
 #[test]
 fn test_derive_reflect_registers_concrete_enum() {
-    let registry = ReflectRegistry::initialize().expect("derived enum fragments must validate");
+    let registry = ReflectRegistry::initialize()
+        .expect("derived enum fragments must validate");
 
     assert!(std::ptr::eq(
         registry
@@ -289,8 +316,14 @@ fn test_derive_reflect_records_and_reverse_looks_up_integer_discriminants() {
     assert!(format!("{first:?}").contains("VariantDescriptor"));
     assert_eq!(first.discriminant_origin(), DiscriminantOrigin::Explicit);
     assert_eq!(second.discriminant_origin(), DiscriminantOrigin::Implicit);
-    assert_eq!(first.numeric_discriminant(), Some(NumericDiscriminant::U8(3)));
-    assert_eq!(second.numeric_discriminant(), Some(NumericDiscriminant::U8(4)));
+    assert_eq!(
+        first.numeric_discriminant(),
+        Some(NumericDiscriminant::U8(3))
+    );
+    assert_eq!(
+        second.numeric_discriminant(),
+        Some(NumericDiscriminant::U8(4))
+    );
     assert_eq!(
         descriptor
             .variant_by_discriminant(NumericDiscriminant::U8(4))
@@ -357,7 +390,8 @@ fn test_derive_reflect_records_normalized_enum_representations() {
 /// Verifies non-integer and data-carrying enums do not manufacture numeric
 /// discriminant metadata.
 #[test]
-fn test_derive_reflect_limits_numeric_discriminants_to_fieldless_integer_repr_enums() {
+fn test_derive_reflect_limits_numeric_discriminants_to_fieldless_integer_repr_enums()
+ {
     let c_descriptor = TypeDescriptor::of::<CReprEvent>();
     assert!(
         c_descriptor
@@ -384,7 +418,8 @@ fn test_derive_reflect_limits_numeric_discriminants_to_fieldless_integer_repr_en
             .is_none()
     );
 
-    let CombinedReprEvent::Payload(payload) = CombinedReprEvent::Payload(13) else {
+    let CombinedReprEvent::Payload(payload) = CombinedReprEvent::Payload(13)
+    else {
         panic!("payload variant must remain constructible");
     };
     assert_eq!(payload, 13);

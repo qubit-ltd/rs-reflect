@@ -29,8 +29,13 @@ fn return_seven<'call>(
 fn return_eight<'call>(
     _registry: &ReflectRegistry,
     _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
+) -> Result<
+    InvocationOutput<'call, ThreadSafe>,
+    InvocationFailure<'call, ThreadSafe>,
+> {
+    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(
+        8_u8,
+    )))
 }
 
 fn catch_seven<'call>(
@@ -49,8 +54,12 @@ fn catch_eight<'call>(
 
 #[test]
 fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
-    let local = InvocationAdapter::local_with_catching(return_seven, catch_seven);
-    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
+    let local =
+        InvocationAdapter::local_with_catching(return_seven, catch_seven);
+    assert_eq!(
+        local.catching_availability(),
+        CatchingAvailability::Available
+    );
     assert!(
         local
             .invoke_catching_local(
@@ -62,8 +71,12 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
             .is_ok()
     );
 
-    let thread_safe = InvocationAdapter::thread_safe_with_catching(return_eight, catch_eight);
-    assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
+    let thread_safe =
+        InvocationAdapter::thread_safe_with_catching(return_eight, catch_eight);
+    assert_eq!(
+        thread_safe.catching_availability(),
+        CatchingAvailability::Available
+    );
     assert!(
         thread_safe
             .invoke_catching_thread_safe(
@@ -77,11 +90,16 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
 }
 
 #[test]
-fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catching() {
+fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catching()
+ {
     let unrequested = InvocationAdapter::local(return_seven);
-    assert_eq!(unrequested.catching_availability(), CatchingAvailability::NotRequested);
+    assert_eq!(
+        unrequested.catching_availability(),
+        CatchingAvailability::NotRequested
+    );
 
-    let unavailable = InvocationAdapter::local_with_unavailable_catching(return_seven);
+    let unavailable =
+        InvocationAdapter::local_with_unavailable_catching(return_seven);
     assert_eq!(
         unavailable.catching_availability(),
         CatchingAvailability::UnavailablePanicAbort

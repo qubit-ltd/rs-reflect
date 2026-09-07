@@ -29,32 +29,44 @@ fn descriptor_lookup(criterion: &mut Criterion) {
         });
     });
     for workers in [1_usize, 4, 8] {
-        criterion.bench_function(&format!("descriptor/concurrent_hot/{workers}"), |bench| {
-            bench.iter_custom(|iterations| {
-                let barrier = Barrier::new(workers);
-                std::thread::scope(|scope| {
-                    let handles: Vec<_> = (0..workers)
-                        .map(|_| {
-                            scope.spawn(|| {
-                                // Warm each thread before starting the timed batch.
-                                black_box(TypeDescriptor::of::<Vec<Option<String>>>());
-                                barrier.wait();
-                                let start = Instant::now();
-                                for _ in 0..iterations {
-                                    black_box(TypeDescriptor::of::<Vec<Option<String>>>());
-                                }
-                                start.elapsed()
+        criterion.bench_function(
+            &format!("descriptor/concurrent_hot/{workers}"),
+            |bench| {
+                bench.iter_custom(|iterations| {
+                    let barrier = Barrier::new(workers);
+                    std::thread::scope(|scope| {
+                        let handles: Vec<_> = (0..workers)
+                            .map(|_| {
+                                scope.spawn(|| {
+                                    // Warm each thread before starting the
+                                    // timed batch.
+                                    black_box(TypeDescriptor::of::<
+                                        Vec<Option<String>>,
+                                    >(
+                                    ));
+                                    barrier.wait();
+                                    let start = Instant::now();
+                                    for _ in 0..iterations {
+                                        black_box(TypeDescriptor::of::<
+                                            Vec<Option<String>>,
+                                        >(
+                                        ));
+                                    }
+                                    start.elapsed()
+                                })
                             })
-                        })
-                        .collect();
-                    handles
-                        .into_iter()
-                        .map(|handle| handle.join().expect("benchmark worker"))
-                        .max()
-                        .unwrap_or(Duration::ZERO)
-                })
-            });
-        });
+                            .collect();
+                        handles
+                            .into_iter()
+                            .map(|handle| {
+                                handle.join().expect("benchmark worker")
+                            })
+                            .max()
+                            .unwrap_or(Duration::ZERO)
+                    })
+                });
+            },
+        );
     }
 }
 

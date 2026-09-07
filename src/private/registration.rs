@@ -34,7 +34,9 @@ pub use crate::registry::fragment::StaticFragmentIdentity;
 /// fixtures. Ordinary applications should call [`ReflectRegistry::initialize`].
 /// Returns [`RegistryError`] only after checking the complete fragment set.
 #[doc(hidden)]
-pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
+pub fn build_registry(
+    fragments: &[&'static RegistrationFragment],
+) -> Result<ReflectRegistry, RegistryError> {
     crate::registry::build_registry(fragments)
 }
 
@@ -51,15 +53,21 @@ pub struct BenchmarkRegistryFacts(crate::registry::BenchmarkRegistryFacts);
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 #[must_use]
-pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
-    BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(fragment_count))
+pub fn prepare_benchmark_registry_facts(
+    fragment_count: usize,
+) -> BenchmarkRegistryFacts {
+    BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(
+        fragment_count,
+    ))
 }
 
 /// Runs production post-materialization validation, indexing, and freezing on
 /// prepared benchmark facts.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
-pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
+pub fn aggregate_benchmark_registry_facts(
+    facts: &BenchmarkRegistryFacts,
+) -> Result<ReflectRegistry, RegistryError> {
     let BenchmarkRegistryFacts(facts) = facts;
     crate::registry::aggregate_benchmark_registry_facts(facts)
 }

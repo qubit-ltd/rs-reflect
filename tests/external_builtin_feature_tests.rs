@@ -44,7 +44,9 @@ fn test_ecosystem_types_expose_opaque_reflection_roots() {
 #[cfg(feature = "qubit-types")]
 #[test]
 fn test_qubit_types_expose_opaque_reflection_roots() {
-    for descriptor in [TypeDescriptor::of::<Id>(), TypeDescriptor::of::<DataType>()] {
+    for descriptor in
+        [TypeDescriptor::of::<Id>(), TypeDescriptor::of::<DataType>()]
+    {
         assert!(descriptor.as_opaque().is_some());
     }
 }

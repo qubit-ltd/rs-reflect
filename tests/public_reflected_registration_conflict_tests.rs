@@ -32,8 +32,9 @@ register_reflected_type!(DuplicateReflectedType);
 /// Verifies duplicate public type registrations fail central initialization.
 #[test]
 fn test_duplicate_public_type_registration_returns_registry_error() {
-    let error =
-        ReflectRegistry::initialize().expect_err("duplicate public type registrations must invalidate the registry");
+    let error = ReflectRegistry::initialize().expect_err(
+        "duplicate public type registrations must invalidate the registry",
+    );
 
     assert_eq!(error.kind(), RegistryErrorKind::IdentityConflict);
 }

@@ -69,8 +69,8 @@ pub mod value;
 pub use access::FieldAccessError;
 /// A failed field replacement together with its recoverable inputs.
 pub use access::FieldSetFailure;
-/// The untouched replacement value and field identity retained after a failed
-/// field set.
+/// The untouched replacement value and field identity retained after a
+/// failed field set.
 pub use access::FieldSetRecovery;
 // Construction facade.
 /// A dynamic construction error.

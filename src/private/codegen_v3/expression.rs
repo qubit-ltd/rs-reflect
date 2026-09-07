@@ -55,19 +55,22 @@ pub use crate::expression::TypeExpression;
 #[doc(hidden)]
 #[must_use]
 pub fn parameter(name: impl Into<Box<str>>) -> TypeExpression {
-    TypeExpression::parameter(name).expect("generated type parameter names are non-empty")
+    TypeExpression::parameter(name)
+        .expect("generated type parameter names are non-empty")
 }
 
 /// Creates a named lifetime expression from generator-validated text.
 #[doc(hidden)]
 pub fn named_lifetime(name: impl Into<Box<str>>) -> LifetimeExpression {
-    LifetimeExpression::named(name).expect("generated lifetime names are non-empty")
+    LifetimeExpression::named(name)
+        .expect("generated lifetime names are non-empty")
 }
 
 /// Creates a named const-parameter expression from generator-validated text.
 #[doc(hidden)]
 pub fn const_parameter(name: impl Into<Box<str>>) -> ConstExpression {
-    ConstExpression::parameter(name).expect("generated const parameter names are non-empty")
+    ConstExpression::parameter(name)
+        .expect("generated const parameter names are non-empty")
 }
 
 /// Creates a const-item path from generator-validated segments.
@@ -77,24 +80,34 @@ where
     P: IntoIterator<Item = S>,
     S: Into<Box<str>>,
 {
-    ConstExpression::path(segments).expect("generated const paths are non-empty and contain no empty segments")
+    ConstExpression::path(segments).expect(
+        "generated const paths are non-empty and contain no empty segments",
+    )
 }
 
 /// Creates an associated-type equality argument from generator-validated text.
 #[doc(hidden)]
 #[must_use]
-pub fn associated_type(name: impl Into<Box<str>>, value: TypeExpression) -> GenericArgument {
+pub fn associated_type(
+    name: impl Into<Box<str>>,
+    value: TypeExpression,
+) -> GenericArgument {
     GenericArgument::AssociatedType {
-        name: crate::expression::ExpressionName::new(name).expect("generated associated type names are non-empty"),
+        name: crate::expression::ExpressionName::new(name)
+            .expect("generated associated type names are non-empty"),
         value: Box::new(value),
     }
 }
 
 /// Creates an associated-type bound argument from generator-validated text.
 #[doc(hidden)]
-pub fn associated_type_bound(name: impl Into<Box<str>>, bounds: Box<[PredicateDescriptor]>) -> GenericArgument {
+pub fn associated_type_bound(
+    name: impl Into<Box<str>>,
+    bounds: Box<[PredicateDescriptor]>,
+) -> GenericArgument {
     GenericArgument::AssociatedTypeBound {
-        name: crate::expression::ExpressionName::new(name).expect("generated associated type names are non-empty"),
+        name: crate::expression::ExpressionName::new(name)
+            .expect("generated associated type names are non-empty"),
         bounds,
     }
 }
@@ -107,7 +120,8 @@ pub fn lifetime_parameter(
     diagnostic: DiagnosticText,
 ) -> GenericParameterDescriptor {
     GenericParameterDescriptor::Lifetime {
-        name: crate::expression::ExpressionName::new(name).expect("generated lifetime parameter names are non-empty"),
+        name: crate::expression::ExpressionName::new(name)
+            .expect("generated lifetime parameter names are non-empty"),
         bounds,
         diagnostic,
     }
@@ -122,7 +136,8 @@ pub fn type_parameter(
     diagnostic: DiagnosticText,
 ) -> GenericParameterDescriptor {
     GenericParameterDescriptor::Type {
-        name: crate::expression::ExpressionName::new(name).expect("generated type parameter names are non-empty"),
+        name: crate::expression::ExpressionName::new(name)
+            .expect("generated type parameter names are non-empty"),
         bounds,
         default,
         diagnostic,
@@ -138,7 +153,8 @@ pub fn const_generic_parameter(
     diagnostic: DiagnosticText,
 ) -> GenericParameterDescriptor {
     GenericParameterDescriptor::Const {
-        name: crate::expression::ExpressionName::new(name).expect("generated const parameter names are non-empty"),
+        name: crate::expression::ExpressionName::new(name)
+            .expect("generated const parameter names are non-empty"),
         ty: Box::new(ty),
         default,
         diagnostic,
@@ -153,7 +169,8 @@ pub fn concrete(
     arguments: Box<[GenericArgument]>,
     diagnostic: DiagnosticText,
 ) -> ConcreteTypeExpression {
-    let mut expression = ConcreteTypeExpression::new(path, arguments).expect("generated concrete paths are non-empty");
+    let mut expression = ConcreteTypeExpression::new(path, arguments)
+        .expect("generated concrete paths are non-empty");
     expression.diagnostic = diagnostic;
     expression
 }
@@ -165,8 +182,8 @@ pub fn concrete_segments(
     segments: impl IntoIterator<Item = ConcretePathSegment>,
     diagnostic: DiagnosticText,
 ) -> ConcreteTypeExpression {
-    let mut expression =
-        ConcreteTypeExpression::from_segments(segments).expect("generated concrete paths are non-empty");
+    let mut expression = ConcreteTypeExpression::from_segments(segments)
+        .expect("generated concrete paths are non-empty");
     expression.diagnostic = diagnostic;
     expression
 }
@@ -184,14 +201,21 @@ pub fn const_argument(
 /// Creates an array type expression from generated structural inputs.
 #[doc(hidden)]
 #[must_use]
-pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpression {
+pub fn array(
+    element: TypeExpression,
+    length: ConstExpression,
+) -> ArrayTypeExpression {
     ArrayTypeExpression::new(element, length)
 }
 
 /// Creates a reference type expression from generated structural inputs.
 #[doc(hidden)]
 #[must_use]
-pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> ReferenceTypeExpression {
+pub fn reference(
+    lifetime: LifetimeExpression,
+    mutable: bool,
+    target: TypeExpression,
+) -> ReferenceTypeExpression {
     ReferenceTypeExpression::new(lifetime, mutable, target)
 }
 
@@ -205,15 +229,26 @@ pub fn type_bound(
     modifiers: Box<[TraitBoundModifier]>,
     higher_ranked_lifetimes: Box<[LifetimeExpression]>,
 ) -> PredicateDescriptor {
-    PredicateDescriptor::type_bound(subject, bounds, modifiers, higher_ranked_lifetimes)
-        .expect("generated type bounds are non-empty and have one modifier per bound")
+    PredicateDescriptor::type_bound(
+        subject,
+        bounds,
+        modifiers,
+        higher_ranked_lifetimes,
+    )
+    .expect(
+        "generated type bounds are non-empty and have one modifier per bound",
+    )
 }
 
 /// Creates a non-empty lifetime-outlives predicate from generator-validated
 /// inputs.
 #[doc(hidden)]
 #[must_use]
-pub fn lifetime_outlives(lifetime: LifetimeExpression, bounds: Box<[LifetimeExpression]>) -> PredicateDescriptor {
-    PredicateDescriptor::lifetime_outlives(lifetime, bounds)
-        .expect("generated lifetime-outlives predicates have at least one bound")
+pub fn lifetime_outlives(
+    lifetime: LifetimeExpression,
+    bounds: Box<[LifetimeExpression]>,
+) -> PredicateDescriptor {
+    PredicateDescriptor::lifetime_outlives(lifetime, bounds).expect(
+        "generated lifetime-outlives predicates have at least one bound",
+    )
 }

@@ -105,7 +105,12 @@ impl MethodDescriptor {
         query_name: &'static str,
         declaration_owner: MethodDeclarationOwner,
     ) -> MethodDescriptorBuilder {
-        MethodDescriptorBuilder::new(identity, rust_name, query_name, declaration_owner)
+        MethodDescriptorBuilder::new(
+            identity,
+            rust_name,
+            query_name,
+            declaration_owner,
+        )
     }
 
     /// Returns the stable composite member identity.
@@ -155,7 +160,9 @@ impl MethodDescriptor {
     /// `None` means no parameter has the requested identifier.
     #[must_use]
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
-        self.parameters.iter().find(|parameter| parameter.name() == Some(name))
+        self.parameters
+            .iter()
+            .find(|parameter| parameter.name() == Some(name))
     }
 
     /// Returns a non-receiver parameter by declaration index.
@@ -199,7 +206,9 @@ impl MethodDescriptor {
     /// `None` means this method is declared by an impl definition.
     #[must_use]
     #[inline(always)]
-    pub const fn declaring_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
+    pub const fn declaring_trait(
+        &self,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(descriptor) => Some(descriptor),
             MethodDeclarationOwner::Impl(_) => None,
@@ -211,7 +220,9 @@ impl MethodDescriptor {
     /// `None` means this method is declared by a trait definition.
     #[must_use]
     #[inline(always)]
-    pub const fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor> {
+    pub const fn declaring_impl(
+        &self,
+    ) -> Option<&'static ImplDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(_) => None,
             MethodDeclarationOwner::Impl(descriptor) => Some(descriptor),
@@ -220,10 +231,14 @@ impl MethodDescriptor {
 
     /// Applies concrete trait arguments to every signature relationship while
     /// preserving the declaration identity and source metadata.
-    pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
+    pub(crate) fn substituted_for_trait_application(
+        &self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> Self {
         let mut result = self.clone();
         for parameter in &mut result.parameters {
-            parameter.signature_type = substitutions.type_expression(&parameter.signature_type);
+            parameter.signature_type =
+                substitutions.type_expression(&parameter.signature_type);
         }
         result.return_value.signature_type = result
             .return_value
@@ -241,19 +256,21 @@ impl MethodDescriptor {
 
     /// Returns whether applying the substitutions changes any method-level
     /// signature or predicate fact.
-    pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
-        self.parameters
+    pub(crate) fn needs_trait_application_substitution(
+        &self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> bool {
+        self.parameters.iter().any(|parameter| {
+            substitutions.type_expression(&parameter.signature_type)
+                != parameter.signature_type
+        }) || self.return_value.signature_type.as_ref().is_some_and(
+            |expression| {
+                substitutions.type_expression(expression) != *expression
+            },
+        ) || self
+            .generic_definition
+            .predicates
             .iter()
-            .any(|parameter| substitutions.type_expression(&parameter.signature_type) != parameter.signature_type)
-            || self
-                .return_value
-                .signature_type
-                .as_ref()
-                .is_some_and(|expression| substitutions.type_expression(expression) != *expression)
-            || self
-                .generic_definition
-                .predicates
-                .iter()
-                .any(|predicate| substitutions.predicate(predicate) != *predicate)
+            .any(|predicate| substitutions.predicate(predicate) != *predicate)
     }
 }

@@ -38,24 +38,31 @@ impl BenchmarkRegistryFacts {
 }
 
 /// Prepares unique adapter-free capability facts outside benchmark timing.
-pub(crate) fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
+pub(crate) fn prepare_benchmark_registry_facts(
+    fragment_count: usize,
+) -> BenchmarkRegistryFacts {
     let fragments = (0..fragment_count)
         .rev()
         .map(|index| {
-            let capability_name = Box::leak(format!("benchmark.registry.fragment{index}").into_boxed_str());
-            let capability_id =
-                CapabilityId::new(capability_name).expect("generated benchmark capability ID must be valid");
+            let capability_name = Box::leak(
+                format!("benchmark.registry.fragment{index}").into_boxed_str(),
+            );
+            let capability_id = CapabilityId::new(capability_name)
+                .expect("generated benchmark capability ID must be valid");
             FactRow {
                 identity: FragmentIdentity::new(
                     "qubit-reflect-benchmark",
                     "synthetic",
-                    u32::try_from(index).expect("benchmark fragment index must fit u32"),
+                    u32::try_from(index)
+                        .expect("benchmark fragment index must fit u32"),
                     1,
                     "capability",
                     index as u64,
                 ),
                 target_type_id: TypeId::of::<BenchmarkTarget>(),
-                descriptor: CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(capability_id)),
+                descriptor: CapabilityDescriptor::without_adapter(
+                    CapabilityKey::<u8>::new(capability_id),
+                ),
             }
         })
         .collect();
@@ -70,18 +77,24 @@ pub(crate) fn aggregate_benchmark_registry_facts(
 }
 
 /// Materializes prepared facts for the benchmark-facing aggregation method.
-fn aggregate_prepared_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
+fn aggregate_prepared_facts(
+    facts: &BenchmarkRegistryFacts,
+) -> Result<ReflectRegistry, RegistryError> {
     let fragments = facts
         .fragments
         .iter()
         .map(|fact| MaterializedFragment {
             identity: fact.identity.clone(),
             declared_kind: FragmentKind::Capability,
-            declared_target: RuntimeIdentity::Capabilities(CapabilityTarget::Type(fact.target_type_id)),
-            payload: FragmentPayload::Capability(CapabilityRegistration::for_type_id(
-                fact.target_type_id,
-                vec![fact.descriptor.clone()],
-            )),
+            declared_target: RuntimeIdentity::Capabilities(
+                CapabilityTarget::Type(fact.target_type_id),
+            ),
+            payload: FragmentPayload::Capability(
+                CapabilityRegistration::for_type_id(
+                    fact.target_type_id,
+                    vec![fact.descriptor.clone()],
+                ),
+            ),
         })
         .collect();
     super::super::registry_builder::validate_and_freeze_materialized(fragments)

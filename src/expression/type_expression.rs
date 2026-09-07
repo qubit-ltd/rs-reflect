@@ -110,7 +110,9 @@ impl TypeExpression {
     /// # Errors
     ///
     /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
-    pub fn parameter(name: impl Into<Box<str>>) -> Result<Self, ExpressionError> {
+    pub fn parameter(
+        name: impl Into<Box<str>>,
+    ) -> Result<Self, ExpressionError> {
         ExpressionName::new(name).map(Self::Parameter)
     }
 }
@@ -131,7 +133,10 @@ pub struct ConcreteTypeExpression {
 
 impl ConcreteTypeExpression {
     /// Creates a concrete type expression from a non-empty path.
-    pub fn new<P, S>(path: P, arguments: impl IntoIterator<Item = GenericArgument>) -> Result<Self, ExpressionError>
+    pub fn new<P, S>(
+        path: P,
+        arguments: impl IntoIterator<Item = GenericArgument>,
+    ) -> Result<Self, ExpressionError>
     where
         P: IntoIterator<Item = S>,
         S: Into<Box<str>>,
@@ -140,7 +145,8 @@ impl ConcreteTypeExpression {
         if path.is_empty() {
             return Err(ExpressionError::EmptyConcretePath);
         }
-        if let Some(index) = path.iter().position(|segment| segment.is_empty()) {
+        if let Some(index) = path.iter().position(|segment| segment.is_empty())
+        {
             return Err(ExpressionError::EmptyPathSegment { index });
         }
         let arguments = arguments.into_iter().collect::<Box<[_]>>();
@@ -160,15 +166,22 @@ impl ConcreteTypeExpression {
     }
 
     /// Creates a concrete type expression from structural path segments.
-    pub fn from_segments(segments: impl IntoIterator<Item = ConcretePathSegment>) -> Result<Self, ExpressionError> {
+    pub fn from_segments(
+        segments: impl IntoIterator<Item = ConcretePathSegment>,
+    ) -> Result<Self, ExpressionError> {
         let segments = segments.into_iter().collect::<Box<[_]>>();
         if segments.is_empty() {
             return Err(ExpressionError::EmptyConcretePath);
         }
-        if let Some(index) = segments.iter().position(|segment| segment.name.is_empty()) {
+        if let Some(index) =
+            segments.iter().position(|segment| segment.name.is_empty())
+        {
             return Err(ExpressionError::EmptyPathSegment { index });
         }
-        let path = segments.iter().map(|segment| segment.name.clone()).collect();
+        let path = segments
+            .iter()
+            .map(|segment| segment.name.clone())
+            .collect();
         let arguments = segments
             .last()
             .map_or_else(Box::default, |segment| segment.arguments.clone());
@@ -224,7 +237,10 @@ pub struct ConcretePathSegment {
 
 impl ConcretePathSegment {
     /// Creates a structural concrete path segment.
-    pub fn new(name: impl Into<Box<str>>, arguments: impl Into<Box<[GenericArgument]>>) -> Self {
+    pub fn new(
+        name: impl Into<Box<str>>,
+        arguments: impl Into<Box<[GenericArgument]>>,
+    ) -> Self {
         Self {
             name: name.into(),
             arguments: arguments.into(),
@@ -334,7 +350,11 @@ pub struct ReferenceTypeExpression {
 impl ReferenceTypeExpression {
     /// Creates a reference expression.
     #[must_use]
-    pub fn new(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> Self {
+    pub fn new(
+        lifetime: LifetimeExpression,
+        mutable: bool,
+        target: TypeExpression,
+    ) -> Self {
         Self {
             lifetime,
             mutable,

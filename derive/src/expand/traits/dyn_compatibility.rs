@@ -53,11 +53,15 @@ pub(super) fn dyn_inherited_associated_types(
 }
 
 /// Adds explicit inherited bindings to one reflected dyn supertrait path.
-pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDeclarationIr) -> TokenStream {
-    let mut syntax: Path =
-        parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
-    for inherited in
-        dyn_inherited_associated_types(declaration).filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
+pub(super) fn dyn_reflected_supertrait_path(
+    path: &crate::ir::PathIr,
+    declaration: &TraitDeclarationIr,
+) -> TokenStream {
+    let mut syntax: Path = parse2(path.tokens.clone()).expect(
+        "validated reflected supertrait paths must parse as Rust paths",
+    );
+    for inherited in dyn_inherited_associated_types(declaration)
+        .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
     {
         let name = Ident::new(
             &inherited
@@ -74,9 +78,10 @@ pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaratio
             .expect("validated supertrait path has a segment");
         match &mut segment.arguments {
             SynPathArguments::None => {
-                segment.arguments = SynPathArguments::AngleBracketed(parse_quote!(
-                    <#name = #parameter>
-                ));
+                segment.arguments =
+                    SynPathArguments::AngleBracketed(parse_quote!(
+                        <#name = #parameter>
+                    ));
             }
             SynPathArguments::AngleBracketed(arguments) => {
                 arguments.args.push(parse_quote!(#name = #parameter));
@@ -124,7 +129,10 @@ pub(super) fn dyn_inherited_arguments_for_supertrait(
 }
 
 /// Returns whether `Supertrait::Item` names an item on this direct bound.
-pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, supertrait: &crate::ir::PathIr) -> bool {
+pub(super) fn inherited_belongs_to_supertrait(
+    inherited: &crate::ir::PathIr,
+    supertrait: &crate::ir::PathIr,
+) -> bool {
     inherited.segments.len() == supertrait.segments.len() + 1
         && inherited
             .segments
@@ -140,7 +148,10 @@ pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, sup
 /// define which concrete application a declaration-level macro should choose.
 /// Supertraits are limited to standard traits whose dyn compatibility is known
 /// without inspecting another macro expansion.
-pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
+pub(super) fn is_provably_dyn_compatible(
+    item: &ItemTrait,
+    declaration: &TraitDeclarationIr,
+) -> bool {
     if declaration
         .attributes
         .iter()
@@ -149,11 +160,9 @@ pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDe
         return true;
     }
     if where_clause_requires_sized_self(item.generics.where_clause.as_ref())
-        || item
-            .generics
-            .where_clause
-            .as_ref()
-            .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
+        || item.generics.where_clause.as_ref().is_some_and(|clause| {
+            tokens_contain_unprojected_self(clause.to_token_stream())
+        })
         || !item.supertraits.iter().all(is_known_dyn_compatible_bound)
     {
         return false;
@@ -162,7 +171,9 @@ pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDe
         TraitItem::Fn(method) => method_is_dyn_dispatchable(method),
         TraitItem::Type(associated) => {
             associated.generics.params.is_empty()
-                || where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
+                || where_clause_requires_sized_self(
+                    associated.generics.where_clause.as_ref(),
+                )
         }
         TraitItem::Const(_) => false,
         _ => false,
@@ -175,10 +186,13 @@ pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
     match bound {
         TypeParamBound::Lifetime(_) => true,
         TypeParamBound::Trait(bound) => {
-            if !matches!(bound.modifier, TraitBoundModifier::None) || tokens_contain_self(bound.to_token_stream()) {
+            if !matches!(bound.modifier, TraitBoundModifier::None)
+                || tokens_contain_self(bound.to_token_stream())
+            {
                 return false;
             }
-            let path = bound.path.to_token_stream().to_string().replace(' ', "");
+            let path =
+                bound.path.to_token_stream().to_string().replace(' ', "");
             if matches!(
                 path.as_str(),
                 "Sized"
@@ -219,14 +233,18 @@ pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
 
 /// Returns whether a dyn application must name a concrete binding for this
 /// associated type.
-pub(super) fn associated_type_requires_dyn_binding(associated: &TraitItemType) -> bool {
+pub(super) fn associated_type_requires_dyn_binding(
+    associated: &TraitItemType,
+) -> bool {
     !where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
 }
 
 /// Returns whether one method is dispatchable through a trait object or is
 /// explicitly excluded from the vtable by `Self: Sized`.
 pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
-    if where_clause_requires_sized_self(method.sig.generics.where_clause.as_ref()) {
+    if where_clause_requires_sized_self(
+        method.sig.generics.where_clause.as_ref(),
+    ) {
         return true;
     }
     if method.sig.asyncness.is_some()
@@ -244,7 +262,9 @@ pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
         .generics
         .where_clause
         .as_ref()
-        .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
+        .is_some_and(|clause| {
+            tokens_contain_unprojected_self(clause.to_token_stream())
+        })
     {
         return false;
     }
@@ -256,10 +276,12 @@ pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
     }
     method.sig.inputs.iter().skip(1).all(|input| {
         let tokens = input.to_token_stream();
-        !tokens_contain_unprojected_self(tokens.clone()) && !tokens_contain_ident(tokens, "impl")
+        !tokens_contain_unprojected_self(tokens.clone())
+            && !tokens_contain_ident(tokens, "impl")
     }) && {
         let output = method.sig.output.to_token_stream();
-        !tokens_contain_unprojected_self(output.clone()) && !tokens_contain_ident(output, "impl")
+        !tokens_contain_unprojected_self(output.clone())
+            && !tokens_contain_ident(output, "impl")
     }
 }
 
@@ -274,22 +296,34 @@ pub(super) fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
 /// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
 pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
     match ty {
-        Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
-        Type::Reference(reference) => receiver_type_is_dyn_dispatchable(&reference.elem),
+        Type::Path(path)
+            if path.qself.is_none() && path.path.is_ident("Self") =>
+        {
+            true
+        }
+        Type::Reference(reference) => {
+            receiver_type_is_dyn_dispatchable(&reference.elem)
+        }
         Type::Path(path) if path.qself.is_none() => {
             let Some(segment) = path.path.segments.last() else {
                 return false;
             };
-            if !matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc" | "Pin") {
+            if !matches!(
+                segment.ident.to_string().as_str(),
+                "Box" | "Rc" | "Arc" | "Pin"
+            ) {
                 return false;
             }
-            let SynPathArguments::AngleBracketed(arguments) = &segment.arguments else {
+            let SynPathArguments::AngleBracketed(arguments) =
+                &segment.arguments
+            else {
                 return false;
             };
-            let mut types = arguments.args.iter().filter_map(|argument| match argument {
-                GenericArgument::Type(ty) => Some(ty),
-                _ => None,
-            });
+            let mut types =
+                arguments.args.iter().filter_map(|argument| match argument {
+                    GenericArgument::Type(ty) => Some(ty),
+                    _ => None,
+                });
             let Some(inner) = types.next() else {
                 return false;
             };
@@ -303,7 +337,9 @@ pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
 pub(super) fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
     let tokens: Vec<_> = tokens.into_iter().collect();
     tokens.iter().enumerate().any(|(index, token)| match token {
-        TokenTree::Group(group) => tokens_contain_unprojected_self(group.stream()),
+        TokenTree::Group(group) => {
+            tokens_contain_unprojected_self(group.stream())
+        }
         TokenTree::Ident(identifier) if identifier == "Self" => !matches!(
             tokens.get(index + 1..index + 4),
             Some([
@@ -317,7 +353,9 @@ pub(super) fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
 }
 
 /// Returns whether a where clause contains a direct `Self: Sized` predicate.
-pub(super) fn where_clause_requires_sized_self(where_clause: Option<&WhereClause>) -> bool {
+pub(super) fn where_clause_requires_sized_self(
+    where_clause: Option<&WhereClause>,
+) -> bool {
     where_clause.is_some_and(|where_clause| {
         where_clause.predicates.iter().any(|predicate| {
             let SynWherePredicate::Type(predicate) = predicate else {
@@ -339,10 +377,15 @@ pub(super) fn tokens_contain_self(tokens: TokenStream) -> bool {
 }
 
 /// Returns whether a token stream contains one standalone identifier.
-pub(super) fn tokens_contain_ident(tokens: TokenStream, expected: &str) -> bool {
+pub(super) fn tokens_contain_ident(
+    tokens: TokenStream,
+    expected: &str,
+) -> bool {
     tokens.into_iter().any(|token| match token {
         TokenTree::Ident(identifier) => identifier == expected,
-        TokenTree::Group(group) => tokens_contain_ident(group.stream(), expected),
+        TokenTree::Group(group) => {
+            tokens_contain_ident(group.stream(), expected)
+        }
         TokenTree::Punct(_) | TokenTree::Literal(_) => false,
     })
 }
@@ -354,9 +397,15 @@ mod tests {
     use syn::parse_str;
     #[test]
     fn inherited_binding_and_projection_are_analyzed_in_one_module() {
-        let supertrait = crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
-        let inherited = crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
-        assert!(super::inherited_belongs_to_supertrait(&inherited, &supertrait));
+        let supertrait =
+            crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
+        let inherited = crate::parse::convert_path(
+            &parse_str::<Path>("Base::Assoc").unwrap(),
+        );
+        assert!(super::inherited_belongs_to_supertrait(
+            &inherited,
+            &supertrait
+        ));
         assert!(!super::tokens_contain_unprojected_self(quote!(Self::Assoc)));
     }
 }

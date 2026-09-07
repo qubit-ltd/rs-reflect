@@ -13,7 +13,11 @@ use qubit_id::Id;
 
 use crate::builtin::internal::reflected_opaque;
 
-reflected_opaque!(Id, ID_DESCRIPTOR, concat!(stringify!(qubit_id), "::", stringify!(Id)));
+reflected_opaque!(
+    Id,
+    ID_DESCRIPTOR,
+    concat!(stringify!(qubit_id), "::", stringify!(Id))
+);
 reflected_opaque!(
     DataType,
     DATA_TYPE_DESCRIPTOR,

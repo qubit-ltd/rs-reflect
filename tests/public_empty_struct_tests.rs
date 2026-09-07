@@ -33,7 +33,10 @@ fn test_empty_named_constructs_as_named() {
     let descriptor = TypeDescriptor::of::<EmptyNamed>();
     assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
     let output = descriptor
-        .construct_struct(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()))
+        .construct_struct(NamedConstructionInput::new(std::iter::empty::<(
+            &str,
+            ReflectedOwned,
+        )>()))
         .unwrap();
     assert!(output.downcast::<EmptyNamed>().is_ok());
 }
@@ -59,8 +62,12 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
     assert_eq!(descriptor.kind(), TypeKind::Struct(kind));
     let local = [
         descriptor.construct_unit(),
-        descriptor.construct_struct(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>())),
-        descriptor.construct_tuple(TupleConstructionInput::new(std::iter::empty::<ReflectedOwned>())),
+        descriptor.construct_struct(NamedConstructionInput::new(
+            std::iter::empty::<(&str, ReflectedOwned)>(),
+        )),
+        descriptor.construct_tuple(TupleConstructionInput::new(
+            std::iter::empty::<ReflectedOwned>(),
+        )),
     ];
     let constructor = descriptor
         .struct_construction()
@@ -69,10 +76,9 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
         .unwrap();
     let threaded = [
         constructor.construct_unit(),
-        constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(
-            &str,
-            DynamicOwned<ThreadSafe>,
-        )>())),
+        constructor.construct_named(NamedConstructionInput::new(
+            std::iter::empty::<(&str, DynamicOwned<ThreadSafe>)>(),
+        )),
         constructor.construct_tuple(TupleConstructionInput::new(
             std::iter::empty::<DynamicOwned<ThreadSafe>>(),
         )),
@@ -97,7 +103,10 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
                 .unwrap()
                 .update(StructUpdateInput::new(
                     result.unwrap(),
-                    NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()),
+                    NamedConstructionInput::new(std::iter::empty::<(
+                        &str,
+                        ReflectedOwned,
+                    )>()),
                 ))
                 .unwrap();
             assert!(updated.downcast::<T>().is_ok());
@@ -161,7 +170,11 @@ fn assert_generic_shape<T: Reflect, U: Reflect>(kind: StructKind) {
     );
     let definition = first.type_definition().unwrap();
     assert!(std::ptr::eq(definition, second.type_definition().unwrap()));
-    let TypeDefinitionData::Struct { kind: actual, fields } = definition.data() else {
+    let TypeDefinitionData::Struct {
+        kind: actual,
+        fields,
+    } = definition.data()
+    else {
         panic!("struct definition")
     };
     assert_eq!(*actual, kind);

@@ -38,7 +38,10 @@ impl CapabilityDescriptor {
     }
 
     /// Creates a capability fact carrying an adapter of the key's exact type.
-    pub fn with_adapter<A: Send + Sync + 'static>(key: CapabilityKey<A>, adapter: A) -> Self {
+    pub fn with_adapter<A: Send + Sync + 'static>(
+        key: CapabilityKey<A>,
+        adapter: A,
+    ) -> Self {
         Self {
             id: *key.id(),
             adapter_type: key.adapter_type(),

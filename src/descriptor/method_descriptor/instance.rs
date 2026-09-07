@@ -131,10 +131,18 @@ impl MethodInstanceDescriptor {
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
-    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
+    ) -> Option<
+        crate::invoke::CatchingInvocationResult<
+            'call,
+            crate::value::ThreadSafe,
+        >,
+    > {
         let entry_point = self.adapter?.catching_thread_safe?;
         Some(
-            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+            match invocation.bind_arguments(
+                self.effective_method().identity(),
+                self.effective_method().parameters(),
+            ) {
                 Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
@@ -152,19 +160,27 @@ impl MethodInstanceDescriptor {
         arguments: Box<[GenericArgument]>,
         unavailable_reasons: Box<[InvocationUnavailableReason]>,
     ) -> Result<Self, MethodInstanceBuildError> {
-        if implementation_source == MethodImplementationSource::Required && adapter.is_some() {
+        if implementation_source == MethodImplementationSource::Required
+            && adapter.is_some()
+        {
             return Err(MethodInstanceBuildError::RequiredMethodHasAdapter);
         }
         match implementation_source {
-            MethodImplementationSource::Declared if declaration.declaring_impl().is_none() => {
-                return Err(MethodInstanceBuildError::DeclaredMethodNotOwnedByImpl);
+            MethodImplementationSource::Declared
+                if declaration.declaring_impl().is_none() =>
+            {
+                return Err(
+                    MethodInstanceBuildError::DeclaredMethodNotOwnedByImpl,
+                );
             }
             MethodImplementationSource::Required
             | MethodImplementationSource::Defaulted
             | MethodImplementationSource::Overridden
                 if declaration.declaring_trait().is_none() =>
             {
-                return Err(MethodInstanceBuildError::TraitMethodNotOwnedByTrait);
+                return Err(
+                    MethodInstanceBuildError::TraitMethodNotOwnedByTrait,
+                );
             }
             _ => {}
         }
@@ -178,7 +194,9 @@ impl MethodInstanceDescriptor {
                 | MethodImplementationSource::Defaulted,
                 Some(_),
             ) => {
-                return Err(MethodInstanceBuildError::UnexpectedImplementationMethod);
+                return Err(
+                    MethodInstanceBuildError::UnexpectedImplementationMethod,
+                );
             }
             _ => {}
         }
@@ -186,7 +204,9 @@ impl MethodInstanceDescriptor {
             return Err(MethodInstanceBuildError::AdapterHasUnavailableReasons);
         }
         if adapter.is_none() && unavailable_reasons.is_empty() {
-            return Err(MethodInstanceBuildError::UnavailableMethodMissingReasons);
+            return Err(
+                MethodInstanceBuildError::UnavailableMethodMissingReasons,
+            );
         }
         Ok(Self {
             declaration,
@@ -210,7 +230,9 @@ impl MethodInstanceDescriptor {
     /// `None` means the instance is required or uses its trait default.
     #[must_use]
     #[inline(always)]
-    pub const fn implementation_method(&self) -> Option<&'static MethodDescriptor> {
+    pub const fn implementation_method(
+        &self,
+    ) -> Option<&'static MethodDescriptor> {
         self.implementation_method
     }
 
@@ -285,7 +307,10 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.local?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -316,7 +341,10 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.thread_safe?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -341,10 +369,15 @@ impl MethodInstanceDescriptor {
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
-    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
+    ) -> Option<
+        crate::invoke::CatchingInvocationResult<'call, crate::value::Local>,
+    > {
         let entry_point = self.adapter?.catching_local?;
         Some(
-            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+            match invocation.bind_arguments(
+                self.effective_method().identity(),
+                self.effective_method().parameters(),
+            ) {
                 Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
@@ -369,20 +402,34 @@ impl MethodInstanceDescriptor {
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
         registry: &crate::registry::ReflectRegistry,
-        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+        invocation: crate::invoke::PinnedRefInvocation<
+            'call,
+            T,
+            crate::value::Local,
+        >,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+            crate::invoke::PinnedRefInvocationFailure<
+                'call,
+                T,
+                crate::value::Local,
+            >,
         >,
     > {
         let entry_point = self
             .adapter?
             .pinned_ref_local?
-            .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()?;
+            .downcast_ref::<crate::invoke::PinnedRefAdapter<
+            T,
+            crate::value::Local,
+        >>()?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -405,20 +452,34 @@ impl MethodInstanceDescriptor {
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
         registry: &crate::registry::ReflectRegistry,
-        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+        invocation: crate::invoke::PinnedMutInvocation<
+            'call,
+            T,
+            crate::value::Local,
+        >,
     ) -> Option<
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
-            crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+            crate::invoke::PinnedMutInvocationFailure<
+                'call,
+                T,
+                crate::value::Local,
+            >,
         >,
     > {
         let entry_point = self
             .adapter?
             .pinned_mut_local?
-            .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()?;
+            .downcast_ref::<crate::invoke::PinnedMutAdapter<
+            T,
+            crate::value::Local,
+        >>()?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }

@@ -124,14 +124,23 @@ impl TraitDescriptorBuilder {
 
     /// Sets concrete associated-type equalities in declaration order.
     #[must_use]
-    pub fn associated_type_arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
+    pub fn associated_type_arguments(
+        mut self,
+        arguments: Vec<GenericArgument>,
+    ) -> Self {
         self.associated_type_arguments = arguments;
         self
     }
 
     /// Sets direct supertraits in source declaration order.
-    pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
-        self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
+    pub fn direct_supertraits<const N: usize>(
+        mut self,
+        direct_supertraits: [&'static TraitDescriptor; N],
+    ) -> Self {
+        self.direct_supertraits = direct_supertraits
+            .into_iter()
+            .map(TraitDescriptorRef::new)
+            .collect();
         self
     }
 
@@ -144,14 +153,20 @@ impl TraitDescriptorBuilder {
 
     /// Sets applied associated types in source order.
     #[must_use]
-    pub fn associated_types(mut self, associated_types: Vec<AssociatedTypeDescriptor>) -> Self {
+    pub fn associated_types(
+        mut self,
+        associated_types: Vec<AssociatedTypeDescriptor>,
+    ) -> Self {
         self.associated_types = associated_types;
         self
     }
 
     /// Sets applied associated constants in source order.
     #[must_use]
-    pub fn associated_consts(mut self, associated_consts: Vec<AssociatedConstDescriptor>) -> Self {
+    pub fn associated_consts(
+        mut self,
+        associated_consts: Vec<AssociatedConstDescriptor>,
+    ) -> Self {
         self.associated_consts = associated_consts;
         self
     }
@@ -170,12 +185,15 @@ impl TraitDescriptorBuilder {
         }) {
             return Err(TraitDescriptorBuildError::ForeignMethod);
         }
-        if self.definition.completeness() == TraitCompleteness::ExternalIncomplete
+        if self.definition.completeness()
+            == TraitCompleteness::ExternalIncomplete
             && (!self.direct_supertraits.is_empty()
                 || !self.associated_types.is_empty()
                 || !self.associated_consts.is_empty())
         {
-            return Err(TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts);
+            return Err(
+                TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts,
+            );
         }
 
         let mut all_supertraits = Vec::new();
@@ -191,22 +209,28 @@ impl TraitDescriptorBuilder {
         let trait_id = AppliedTraitId {
             definition: self.definition.trait_id().clone(),
             arguments: self.arguments.clone().into_boxed_slice(),
-            associated_type_arguments: self.associated_type_arguments.clone().into_boxed_slice(),
+            associated_type_arguments: self
+                .associated_type_arguments
+                .clone()
+                .into_boxed_slice(),
         };
-        let substitutions =
-            TraitApplicationSubstitutions::new(self.definition, &self.arguments, &self.associated_type_arguments);
+        let substitutions = TraitApplicationSubstitutions::new(
+            self.definition,
+            &self.arguments,
+            &self.associated_type_arguments,
+        );
         let methods = if substitutions.is_empty()
-            || !self
-                .methods
-                .iter()
-                .any(|method| method.needs_trait_application_substitution(&substitutions))
-        {
+            || !self.methods.iter().any(|method| {
+                method.needs_trait_application_substitution(&substitutions)
+            }) {
             self.methods
         } else {
             Box::leak(
                 self.methods
                     .iter()
-                    .map(|method| method.substituted_for_trait_application(&substitutions))
+                    .map(|method| {
+                        method.substituted_for_trait_application(&substitutions)
+                    })
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             )
@@ -225,7 +249,9 @@ impl TraitDescriptorBuilder {
             definition: self.definition,
             trait_id,
             arguments: self.arguments.into_boxed_slice(),
-            associated_type_arguments: self.associated_type_arguments.into_boxed_slice(),
+            associated_type_arguments: self
+                .associated_type_arguments
+                .into_boxed_slice(),
             direct_supertraits: self.direct_supertraits.into_boxed_slice(),
             all_supertraits: all_supertraits.into_boxed_slice(),
             methods,
@@ -248,7 +274,10 @@ impl TraitDescriptorBuilder {
                 rust_path: self.definition.rust_path(),
             });
         }
-        if closure.iter().any(|existing| existing.same_application(candidate)) {
+        if closure
+            .iter()
+            .any(|existing| existing.same_application(candidate))
+        {
             return Ok(());
         }
         closure.push(TraitDescriptorRef::new(candidate));
@@ -261,10 +290,16 @@ impl TraitDescriptorBuilder {
     /// Verifies every runtime identity parameter has one concrete argument of
     /// the matching generic kind.
     fn validate_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
-        if self.definition.completeness() == TraitCompleteness::ExternalIncomplete {
+        if self.definition.completeness()
+            == TraitCompleteness::ExternalIncomplete
+        {
             for (index, argument) in self.arguments.iter().enumerate() {
                 if !generic_argument_is_concrete(argument) {
-                    return Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index });
+                    return Err(
+                        TraitDescriptorBuildError::NonConcreteGenericArgument {
+                            index,
+                        },
+                    );
                 }
             }
             return Ok(());
@@ -274,7 +309,12 @@ impl TraitDescriptorBuilder {
             .generic_definition()
             .parameters
             .iter()
-            .filter(|parameter| !matches!(parameter, GenericParameterDescriptor::Lifetime { .. }))
+            .filter(|parameter| {
+                !matches!(
+                    parameter,
+                    GenericParameterDescriptor::Lifetime { .. }
+                )
+            })
             .collect();
         if parameters.len() != self.arguments.len() {
             return Err(TraitDescriptorBuildError::GenericArgumentCount {
@@ -282,17 +322,30 @@ impl TraitDescriptorBuilder {
                 actual: self.arguments.len(),
             });
         }
-        for (index, (parameter, argument)) in parameters.into_iter().zip(&self.arguments).enumerate() {
+        for (index, (parameter, argument)) in
+            parameters.into_iter().zip(&self.arguments).enumerate()
+        {
             let kind_matches = matches!(
                 (parameter, argument),
-                (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
-                    | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
+                (
+                    GenericParameterDescriptor::Type { .. },
+                    GenericArgument::Type(_)
+                ) | (
+                    GenericParameterDescriptor::Const { .. },
+                    GenericArgument::Const(_)
+                )
             );
             if !kind_matches {
-                return Err(TraitDescriptorBuildError::GenericArgumentKind { index });
+                return Err(TraitDescriptorBuildError::GenericArgumentKind {
+                    index,
+                });
             }
             if !generic_argument_is_concrete(argument) {
-                return Err(TraitDescriptorBuildError::NonConcreteGenericArgument { index });
+                return Err(
+                    TraitDescriptorBuildError::NonConcreteGenericArgument {
+                        index,
+                    },
+                );
             }
         }
         Ok(())
@@ -300,11 +353,16 @@ impl TraitDescriptorBuilder {
 
     /// Verifies associated-type equalities are concrete, unique, and declared
     /// by this trait or one of its direct supertraits.
-    fn validate_associated_type_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
+    fn validate_associated_type_arguments(
+        &self,
+    ) -> Result<(), TraitDescriptorBuildError> {
         let mut names = std::collections::HashSet::new();
         for argument in &self.associated_type_arguments {
-            let GenericArgument::AssociatedType { name, value } = argument else {
-                return Err(TraitDescriptorBuildError::InvalidAssociatedTypeArgument);
+            let GenericArgument::AssociatedType { name, value } = argument
+            else {
+                return Err(
+                    TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+                );
             };
             if !names.insert(name.as_ref())
                 || !(self
@@ -317,16 +375,21 @@ impl TraitDescriptorBuilder {
                             .associated_types()
                             .iter()
                             .any(|item| item.rust_name() == name.as_ref())
-                            || descriptor.all_supertraits().iter().any(|ancestor| {
-                                ancestor
-                                    .associated_types()
-                                    .iter()
-                                    .any(|item| item.rust_name() == name.as_ref())
-                            })
+                            || descriptor.all_supertraits().iter().any(
+                                |ancestor| {
+                                    ancestor.associated_types().iter().any(
+                                        |item| {
+                                            item.rust_name() == name.as_ref()
+                                        },
+                                    )
+                                },
+                            )
                     }))
                 || !type_expression_is_concrete(value)
             {
-                return Err(TraitDescriptorBuildError::InvalidAssociatedTypeArgument);
+                return Err(
+                    TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+                );
             }
         }
         Ok(())
@@ -334,12 +397,20 @@ impl TraitDescriptorBuilder {
 }
 
 /// Returns whether an argument contains only concrete runtime identity facts.
-pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
+pub(in crate::descriptor) fn generic_argument_is_concrete(
+    argument: &GenericArgument,
+) -> bool {
     match argument {
-        GenericArgument::Type(expression) => type_expression_is_concrete(expression),
-        GenericArgument::Const(argument) => !matches!(argument.value, ConstExpression::Parameter(_)),
+        GenericArgument::Type(expression) => {
+            type_expression_is_concrete(expression)
+        }
+        GenericArgument::Const(argument) => {
+            !matches!(argument.value, ConstExpression::Parameter(_))
+        }
         GenericArgument::Lifetime(_) => true,
-        GenericArgument::AssociatedType { value, .. } => type_expression_is_concrete(value),
+        GenericArgument::AssociatedType { value, .. } => {
+            type_expression_is_concrete(value)
+        }
         GenericArgument::AssociatedTypeBound { .. } => false,
     }
 }
@@ -347,14 +418,23 @@ pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgu
 /// Returns whether a substituted type expression contains no symbolic type.
 fn type_expression_is_concrete(expression: &TypeExpression) -> bool {
     match expression {
-        TypeExpression::Concrete(concrete) => concrete.arguments.iter().all(generic_argument_is_concrete),
-        TypeExpression::Reference(reference) => type_expression_is_concrete(&reference.target),
-        TypeExpression::RawPointer(pointer) => type_expression_is_concrete(&pointer.target),
+        TypeExpression::Concrete(concrete) => {
+            concrete.arguments.iter().all(generic_argument_is_concrete)
+        }
+        TypeExpression::Reference(reference) => {
+            type_expression_is_concrete(&reference.target)
+        }
+        TypeExpression::RawPointer(pointer) => {
+            type_expression_is_concrete(&pointer.target)
+        }
         TypeExpression::Slice(element) => type_expression_is_concrete(element),
         TypeExpression::Array(array) => {
-            type_expression_is_concrete(&array.element) && !matches!(array.length, ConstExpression::Parameter(_))
+            type_expression_is_concrete(&array.element)
+                && !matches!(array.length, ConstExpression::Parameter(_))
         }
-        TypeExpression::Tuple(elements) => elements.iter().all(type_expression_is_concrete),
+        TypeExpression::Tuple(elements) => {
+            elements.iter().all(type_expression_is_concrete)
+        }
         TypeExpression::FunctionPointer(function) => {
             function.parameters.iter().all(type_expression_is_concrete)
                 && type_expression_is_concrete(&function.return_type)
