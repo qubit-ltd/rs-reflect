@@ -85,7 +85,7 @@ mod tests {
     fn key_clone_and_debug_preserve_contract() {
         let id = CapabilityId::new("example.test.key").expect("valid capability ID");
         let key = CapabilityKey::<u32>::new(id);
-        let clone = key.clone();
+        let clone = key;
         assert_eq!(clone.id(), key.id());
         assert_eq!(clone.adapter_type(), key.adapter_type());
         assert!(format!("{key:?}").contains("CapabilityKey"));
