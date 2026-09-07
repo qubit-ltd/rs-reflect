@@ -143,7 +143,16 @@ fn expand_generic_impl_definition(
     let module = generic_impl_definition_module(declaration);
     let super_import = declaration.trait_path.as_ref().map(|path| {
         let path = &path.tokens;
-        quote!(use super::#path;)
+        let source = path.to_string();
+        if source.starts_with("::")
+            || source.starts_with("crate::")
+            || source.starts_with("self::")
+            || source.starts_with("super::")
+        {
+            quote!(use #path;)
+        } else {
+            quote!(use super::#path;)
+        }
     });
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let target = super::traits::type_expression(&declaration.target_type, &environment, facade);
