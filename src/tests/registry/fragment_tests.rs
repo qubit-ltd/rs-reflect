@@ -31,7 +31,10 @@ fn test_fragment_payload_reports_matching_kind_and_identity() {
     let descriptor = TypeDescriptor::of::<u8>();
     let payload = FragmentPayload::Type(descriptor);
     assert_eq!(payload.kind(), FragmentKind::Type);
-    assert_eq!(payload.runtime_identity(), RuntimeIdentity::Type(descriptor.type_id()));
+    assert_eq!(
+        payload.runtime_identity(),
+        RuntimeIdentity::Type(descriptor.type_id())
+    );
 }
 
 /// Verifies a static fragment materializes all deferred facts without changing
@@ -40,7 +43,14 @@ fn test_fragment_payload_reports_matching_kind_and_identity() {
 fn test_registration_fragment_materializes_declared_facts() {
     let fragment = RegistrationFragment::new(
         FragmentKind::Type,
-        StaticFragmentIdentity::new("fixture", "fixture::module", 7, 11, "type", 41),
+        StaticFragmentIdentity::new(
+            "fixture",
+            "fixture::module",
+            7,
+            11,
+            "type",
+            41,
+        ),
         fixture_runtime_identity,
         fixture_payload,
     );

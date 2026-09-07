@@ -14,7 +14,11 @@ use crate::ir::MacroKind;
 use crate::parse::parse_and_validate_declaration;
 
 /// Parses, validates, and expands one reflection macro invocation.
-pub(crate) fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
+pub(crate) fn process_macro(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
     match parse_and_validate_declaration(kind, args.into(), input.into()) {
         Ok(validated) => match crate::expand::dispatch(validated.declaration) {
             Ok(expanded) => expanded.into(),

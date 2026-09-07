@@ -58,11 +58,17 @@ impl RegistrySnapshotBuilder {
     /// Creates an empty snapshot builder.
     #[must_use]
     pub const fn new() -> Self {
-        Self { fragments: Vec::new() }
+        Self {
+            fragments: Vec::new(),
+        }
     }
 
     /// Adds one concrete reflected type as a snapshot member.
-    pub fn add_type(&mut self, descriptor: &'static TypeDescriptor, source: FragmentIdentity) -> &mut Self {
+    pub fn add_type(
+        &mut self,
+        descriptor: &'static TypeDescriptor,
+        source: FragmentIdentity,
+    ) -> &mut Self {
         self.push(FragmentPayload::Type(descriptor), source)
     }
 
@@ -76,7 +82,11 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one reflected or external trait declaration.
-    pub fn add_trait(&mut self, descriptor: &'static TraitDefinitionDescriptor, source: FragmentIdentity) -> &mut Self {
+    pub fn add_trait(
+        &mut self,
+        descriptor: &'static TraitDefinitionDescriptor,
+        source: FragmentIdentity,
+    ) -> &mut Self {
         self.push(FragmentPayload::Trait(descriptor), source)
     }
 
@@ -90,7 +100,11 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one concrete impl application without implicitly adding its type.
-    pub fn add_impl(&mut self, descriptor: &'static ImplDescriptor, source: FragmentIdentity) -> &mut Self {
+    pub fn add_impl(
+        &mut self,
+        descriptor: &'static ImplDescriptor,
+        source: FragmentIdentity,
+    ) -> &mut Self {
         self.push(FragmentPayload::Impl(descriptor), source)
     }
 
@@ -103,7 +117,10 @@ impl RegistrySnapshotBuilder {
         source: FragmentIdentity,
     ) -> &mut Self {
         self.push(
-            FragmentPayload::Capability(CapabilityRegistration::for_type(target, capabilities)),
+            FragmentPayload::Capability(CapabilityRegistration::for_type(
+                target,
+                capabilities,
+            )),
             source,
         )
     }
@@ -117,7 +134,9 @@ impl RegistrySnapshotBuilder {
         source: FragmentIdentity,
     ) -> &mut Self {
         self.push(
-            FragmentPayload::Capability(CapabilityRegistration::for_definition(target, capabilities)),
+            FragmentPayload::Capability(
+                CapabilityRegistration::for_definition(target, capabilities),
+            ),
             source,
         )
     }
@@ -140,11 +159,17 @@ impl RegistrySnapshotBuilder {
     /// converted into a registration error. Providers must not re-enter
     /// capability or registry initialization.
     pub fn build(self) -> Result<ReflectRegistry, RegistryError> {
-        super::registry_builder::validate_and_freeze_materialized(self.fragments)
+        super::registry_builder::validate_and_freeze_materialized(
+            self.fragments,
+        )
     }
 
     /// Records one typed payload together with its derived validation facts.
-    fn push(&mut self, payload: FragmentPayload, source: FragmentIdentity) -> &mut Self {
+    fn push(
+        &mut self,
+        payload: FragmentPayload,
+        source: FragmentIdentity,
+    ) -> &mut Self {
         let declared_kind = payload.kind();
         let declared_target = payload.runtime_identity();
         self.fragments.push(MaterializedFragment {

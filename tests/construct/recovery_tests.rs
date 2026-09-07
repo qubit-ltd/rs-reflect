@@ -28,7 +28,8 @@ fn test_named_construction_recovery_preserves_names_values_and_error() {
     assert_eq!(input.fields()[0].0.as_ref(), "first");
     assert!(format!("{input:?}").contains("first"));
 
-    let Err(recovery) = TypeDescriptor::of::<u8>().construct_struct(input) else {
+    let Err(recovery) = TypeDescriptor::of::<u8>().construct_struct(input)
+    else {
         panic!("primitive targets cannot construct named structs");
     };
     assert_eq!(recovery.error(), &ConstructionError::TargetUnavailable);
@@ -52,15 +53,20 @@ fn test_named_construction_recovery_preserves_names_values_and_error() {
 /// and empty recovery respectively.
 #[test]
 fn test_tuple_and_unit_construction_recovery_preserve_shape() {
-    let input = TupleConstructionInput::new([ReflectedOwned::new(11_u8), ReflectedOwned::new(12_u8)]);
+    let input = TupleConstructionInput::new([
+        ReflectedOwned::new(11_u8),
+        ReflectedOwned::new(12_u8),
+    ]);
     assert_eq!(input.values().len(), 2);
     assert!(format!("{input:?}").contains("value_count"));
 
-    let Err(recovery) = TypeDescriptor::of::<u8>().construct_tuple(input) else {
+    let Err(recovery) = TypeDescriptor::of::<u8>().construct_tuple(input)
+    else {
         panic!("primitive targets cannot construct tuple structs");
     };
     let values = recovery.into_values();
-    let RecoveredConstructionValue::Positional { index, value } = &values[1] else {
+    let RecoveredConstructionValue::Positional { index, value } = &values[1]
+    else {
         panic!("second recovery entry should be positional");
     };
     assert_eq!(*index, 1);

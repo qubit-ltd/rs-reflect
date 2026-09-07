@@ -34,7 +34,10 @@ impl ExpressionPath {
             if segment.is_empty() {
                 return Err(ExpressionError::EmptyPathSegment { index });
             }
-            validated.push(ExpressionName::new(segment).expect("an empty segment was rejected"));
+            validated.push(
+                ExpressionName::new(segment)
+                    .expect("an empty segment was rejected"),
+            );
         }
         if validated.is_empty() {
             return Err(ExpressionError::EmptyPath);

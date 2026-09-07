@@ -59,22 +59,37 @@ fn method_identity(index: usize) -> MemberId {
         "fixture::MethodTarget",
         "method",
         index,
-        FragmentIdentity::new("fixture", "method_descriptor_tests", 1, 1, "method", index as u64),
+        FragmentIdentity::new(
+            "fixture",
+            "method_descriptor_tests",
+            1,
+            1,
+            "method",
+            index as u64,
+        ),
     )
 }
 
 /// Returns an inherent impl owner for hand-written method declarations.
 fn impl_definition() -> &'static ImplDefinitionDescriptor {
-    static DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
-        ImplDefinitionDescriptor::new(
-            FragmentIdentity::new("fixture", "method_descriptor_tests", 1, 1, "impl", 1),
-            TypeExpression::Never,
-            ImplKind::Inherent,
-            None,
-            &EMPTY_GENERIC_DEFINITION,
-        )
-        .expect("the inherent fixture definition must be valid")
-    });
+    static DEFINITION: LazyLock<ImplDefinitionDescriptor> =
+        LazyLock::new(|| {
+            ImplDefinitionDescriptor::new(
+                FragmentIdentity::new(
+                    "fixture",
+                    "method_descriptor_tests",
+                    1,
+                    1,
+                    "impl",
+                    1,
+                ),
+                TypeExpression::Never,
+                ImplKind::Inherent,
+                None,
+                &EMPTY_GENERIC_DEFINITION,
+            )
+            .expect("the inherent fixture definition must be valid")
+        });
     &DEFINITION
 }
 
@@ -102,8 +117,13 @@ fn return_local<'call>(
 fn return_thread_safe<'call>(
     _registry: &ReflectRegistry,
     _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
+) -> Result<
+    InvocationOutput<'call, ThreadSafe>,
+    InvocationFailure<'call, ThreadSafe>,
+> {
+    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(
+        8_u8,
+    )))
 }
 
 /// Wraps the local fixture output in the catching contract.
@@ -213,19 +233,29 @@ fn test_method_descriptor_builder_preserves_parameter_and_debug_field_order() {
         "has_default:",
         "declaration_owner:",
     ] {
-        let offset = debug[cursor..]
-            .find(field)
-            .unwrap_or_else(|| panic!("Debug output must retain the `{field}` field"));
+        let offset = debug[cursor..].find(field).unwrap_or_else(|| {
+            panic!("Debug output must retain the `{field}` field")
+        });
         cursor += offset + field.len();
     }
 }
 
 #[test]
 fn test_invocation_adapter_mode_availability_remains_distinct() {
-    let registry = ReflectRegistry::initialize().expect("the fixture registry must initialize");
-    let local = InvocationAdapter::local_with_catching(return_local, catch_local);
-    assert!(local.invoke_local(registry, Invocation::associated([])).is_some());
-    assert!(local.invoke_thread_safe(registry, Invocation::associated([])).is_none());
+    let registry = ReflectRegistry::initialize()
+        .expect("the fixture registry must initialize");
+    let local =
+        InvocationAdapter::local_with_catching(return_local, catch_local);
+    assert!(
+        local
+            .invoke_local(registry, Invocation::associated([]))
+            .is_some()
+    );
+    assert!(
+        local
+            .invoke_thread_safe(registry, Invocation::associated([]))
+            .is_none()
+    );
     assert!(
         local
             .invoke_catching_local(registry, Invocation::associated([]))
@@ -236,10 +266,20 @@ fn test_invocation_adapter_mode_availability_remains_distinct() {
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
             .is_none()
     );
-    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
+    assert_eq!(
+        local.catching_availability(),
+        CatchingAvailability::Available
+    );
 
-    let thread_safe = InvocationAdapter::thread_safe_with_catching(return_thread_safe, catch_thread_safe);
-    assert!(thread_safe.invoke_local(registry, Invocation::associated([])).is_none());
+    let thread_safe = InvocationAdapter::thread_safe_with_catching(
+        return_thread_safe,
+        catch_thread_safe,
+    );
+    assert!(
+        thread_safe
+            .invoke_local(registry, Invocation::associated([]))
+            .is_none()
+    );
     assert!(
         thread_safe
             .invoke_thread_safe(registry, Invocation::associated([]))
@@ -255,7 +295,10 @@ fn test_invocation_adapter_mode_availability_remains_distinct() {
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
             .is_some()
     );
-    assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
+    assert_eq!(
+        thread_safe.catching_availability(),
+        CatchingAvailability::Available
+    );
 }
 
 #[test]
@@ -297,7 +340,8 @@ fn test_method_instance_build_error_messages_remain_stable() {
 
 #[test]
 fn test_method_instance_validation_failure_recovers_caller_order() {
-    static ADAPTER: InvocationAdapter = InvocationAdapter::local(validate_local_types);
+    static ADAPTER: InvocationAdapter =
+        InvocationAdapter::local(validate_local_types);
     let declaration = Box::leak(Box::new(
         MethodDescriptor::builder(
             method_identity(7),
@@ -320,18 +364,27 @@ fn test_method_instance_validation_failure_recovers_caller_order() {
         Box::new([]),
     )
     .expect("the fixture method instance must be valid");
-    let invocation = Invocation::associated_bindings([
-        InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32))),
-        InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(10_u8))),
-        InvocationBinding::named(
-            "second",
-            InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("wrong"))),
-        ),
-    ]);
+    let invocation =
+        Invocation::associated_bindings([
+            InvocationBinding::named(
+                "third",
+                InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32)),
+            ),
+            InvocationBinding::positional(InvocationArg::Owned(
+                DynamicOwned::<Local>::new(10_u8),
+            )),
+            InvocationBinding::named(
+                "second",
+                InvocationArg::Owned(DynamicOwned::<Local>::new(String::from(
+                    "wrong",
+                ))),
+            ),
+        ]);
 
     let result = instance
         .invoke_local(
-            ReflectRegistry::initialize().expect("the fixture registry must initialize"),
+            ReflectRegistry::initialize()
+                .expect("the fixture registry must initialize"),
             invocation,
         )
         .expect("the local adapter must be available");
@@ -351,6 +404,10 @@ fn test_method_instance_validation_failure_recovers_caller_order() {
             .iter()
             .map(InvocationArg::type_id)
             .collect::<Vec<TypeId>>(),
-        [TypeId::of::<u32>(), TypeId::of::<u8>(), TypeId::of::<String>()]
+        [
+            TypeId::of::<u32>(),
+            TypeId::of::<u8>(),
+            TypeId::of::<String>()
+        ]
     );
 }

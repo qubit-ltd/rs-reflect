@@ -105,7 +105,9 @@ pub(crate) fn parse_and_validate_declaration(
 ) -> SynResult<ValidatedDeclaration> {
     let pipeline = parse_pipeline(kind, args, input)?;
     let mut combined = pipeline.error;
-    if let Some(validation) = validation_error(&pipeline.declaration.declaration) {
+    if let Some(validation) =
+        validation_error(&pipeline.declaration.declaration)
+    {
         if let Some(error) = &mut combined {
             error.combine(validation);
         } else {
@@ -121,7 +123,11 @@ pub(crate) fn parse_and_validate_declaration(
 }
 
 /// Runs only the syntax and IR conversion phase for one macro kind.
-fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
+fn parse_pipeline(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> SynResult<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
         MacroKind::Trait => parse_trait(args, input),
@@ -130,7 +136,10 @@ fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> Syn
 }
 
 /// Parses a `Reflect` derive input.
-fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
+fn parse_derive(
+    args: TokenStream,
+    input: TokenStream,
+) -> SynResult<ParsedPipeline> {
     if !args.is_empty() {
         return Err(Error::new_spanned(
             args,
@@ -139,7 +148,8 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
     }
     let input: DeriveInput = parse2(input)?;
     let mut errors = ErrorCollector::default();
-    let attributes = parse_attributes(&input.attrs, HelperTarget::Type, &mut errors);
+    let attributes =
+        parse_attributes(&input.attrs, HelperTarget::Type, &mut errors);
     let generics = convert_generics(&input.generics);
     let visibility = convert_visibility(&input.vis);
     let retained_tokens = input.to_token_stream();
@@ -173,7 +183,11 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                 .iter()
                 .enumerate()
                 .map(|(index, variant)| {
-                    let attributes = parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
+                    let attributes = parse_attributes(
+                        &variant.attrs,
+                        HelperTarget::Variant,
+                        &mut errors,
+                    );
                     let kind = match variant.fields {
                         Fields::Unit => VariantKindIr::Unit,
                         Fields::Unnamed(_) => VariantKindIr::Tuple,
@@ -185,10 +199,9 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                         kind,
                         fields: convert_fields(&variant.fields, &mut errors),
                         attributes,
-                        discriminant: variant
-                            .discriminant
-                            .as_ref()
-                            .map(|(_, expression)| expression.to_token_stream()),
+                        discriminant: variant.discriminant.as_ref().map(
+                            |(_, expression)| expression.to_token_stream(),
+                        ),
                         span: variant.ident.span(),
                     }
                 })
@@ -203,7 +216,10 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             visibility,
             generics,
             attributes,
-            fields: convert_fields(&Fields::Named(data.fields.clone()), &mut errors),
+            fields: convert_fields(
+                &Fields::Named(data.fields.clone()),
+                &mut errors,
+            ),
             variants: Vec::new(),
             retained_tokens,
             span: input.ident.span(),
@@ -219,17 +235,26 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
 
 /// Parses a `#[reflect]` trait input and removes nested helpers from retained
 /// tokens.
-fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
+fn parse_trait(
+    args: TokenStream,
+    input: TokenStream,
+) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Trait(mut item) = item else {
-        return Err(Error::new(item.span(), "`#[reflect]` can only be applied to a trait"));
+        return Err(Error::new(
+            item.span(),
+            "`#[reflect]` can only be applied to a trait",
+        ));
     };
     let mut errors = ErrorCollector::default();
-    let attributes = parse_helper_tokens(args, HelperTarget::Trait, &mut errors);
+    let attributes =
+        parse_helper_tokens(args, HelperTarget::Trait, &mut errors);
     let external_traits = attributes
         .iter()
         .filter_map(|attribute| match &attribute.value {
-            crate::ir::HelperValueIr::ExternalTrait(value) => Some(value.clone()),
+            crate::ir::HelperValueIr::ExternalTrait(value) => {
+                Some(value.clone())
+            }
             _ => None,
         })
         .collect();
@@ -237,12 +262,15 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
         .iter()
         .filter(|attribute| attribute.name == crate::ir::HelperName::Supertrait)
         .filter_map(|attribute| match &attribute.value {
-            crate::ir::HelperValueIr::Paths(paths) => Some(paths.iter().cloned()),
+            crate::ir::HelperValueIr::Paths(paths) => {
+                Some(paths.iter().cloned())
+            }
             _ => None,
         })
         .flatten()
         .collect();
-    let (methods, associated_types, associated_consts) = convert_trait_items(&item, &mut errors);
+    let (methods, associated_types, associated_consts) =
+        convert_trait_items(&item, &mut errors);
     strip_trait_helpers(&mut item);
     Ok(ParsedPipeline {
         declaration: ParsedDeclaration {
@@ -250,7 +278,11 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
                 name: item.ident.clone(),
                 visibility: convert_visibility(&item.vis),
                 generics: convert_generics(&item.generics),
-                supertraits: item.supertraits.iter().map(convert_bound).collect(),
+                supertraits: item
+                    .supertraits
+                    .iter()
+                    .map(convert_bound)
+                    .collect(),
                 attributes,
                 external_traits,
                 reflected_supertraits,
@@ -267,7 +299,10 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
 
 /// Parses a `#[reflect_impl]` impl input and removes nested helpers from
 /// retained tokens.
-fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
+fn parse_impl(
+    args: TokenStream,
+    input: TokenStream,
+) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Impl(mut item) = item else {
         return Err(Error::new(
@@ -282,8 +317,10 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
         .filter_map(HelperAttributeIr::specialization)
         .cloned()
         .collect();
-    let (methods, associated_types, associated_consts) = convert_impl_items(&item, &mut errors);
-    let trait_path = item.trait_.as_ref().map(|(_, path, _)| convert_path(path));
+    let (methods, associated_types, associated_consts) =
+        convert_impl_items(&item, &mut errors);
+    let trait_path =
+        item.trait_.as_ref().map(|(_, path, _)| convert_path(path));
     let target_type = convert_type(&item.self_ty);
     strip_impl_helpers(&mut item);
     Ok(ParsedPipeline {
@@ -306,7 +343,10 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
 }
 
 /// Converts a field collection in source order.
-fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> {
+fn convert_fields(
+    fields: &Fields,
+    errors: &mut ErrorCollector,
+) -> Vec<FieldIr> {
     fields
         .iter()
         .enumerate()
@@ -315,7 +355,11 @@ fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> 
             index,
             visibility: convert_visibility(&field.vis),
             ty: convert_type(&field.ty),
-            attributes: parse_attributes(&field.attrs, HelperTarget::Field, errors),
+            attributes: parse_attributes(
+                &field.attrs,
+                HelperTarget::Field,
+                errors,
+            ),
             span: field.span(),
         })
         .collect()
@@ -335,7 +379,11 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     bounds: lifetime
                         .bounds
                         .iter()
-                        .map(|bound| GenericBoundIr::Lifetime(bound.to_token_stream().to_string()))
+                        .map(|bound| {
+                            GenericBoundIr::Lifetime(
+                                bound.to_token_stream().to_string(),
+                            )
+                        })
                         .collect(),
                     default: None,
                     const_type: None,
@@ -346,7 +394,11 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     name: ty.ident.to_string(),
                     kind: GenericKindIr::Type,
                     bounds: ty.bounds.iter().map(convert_bound).collect(),
-                    default: ty.default.as_ref().map(convert_type).map(GenericDefaultIr::Type),
+                    default: ty
+                        .default
+                        .as_ref()
+                        .map(convert_type)
+                        .map(GenericDefaultIr::Type),
                     const_type: None,
                     declaration: ty.to_token_stream(),
                     span: ty.span(),
@@ -371,16 +423,21 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
             .iter()
             .flat_map(|clause| clause.predicates.iter())
             .map(|predicate| match predicate {
-                SynWherePredicate::Lifetime(lifetime) => WherePredicateIr::Lifetime {
-                    lifetime: lifetime.lifetime.to_token_stream().to_string(),
-                    bounds: lifetime
-                        .bounds
-                        .iter()
-                        .map(ToTokens::to_token_stream)
-                        .map(|value| value.to_string())
-                        .collect(),
-                    declaration: lifetime.to_token_stream(),
-                },
+                SynWherePredicate::Lifetime(lifetime) => {
+                    WherePredicateIr::Lifetime {
+                        lifetime: lifetime
+                            .lifetime
+                            .to_token_stream()
+                            .to_string(),
+                        bounds: lifetime
+                            .bounds
+                            .iter()
+                            .map(ToTokens::to_token_stream)
+                            .map(|value| value.to_string())
+                            .collect(),
+                        declaration: lifetime.to_token_stream(),
+                    }
+                }
                 SynWherePredicate::Type(ty) => WherePredicateIr::Type {
                     bounded_type: convert_type(&ty.bounded_ty),
                     lifetimes: ty
@@ -388,7 +445,9 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                         .iter()
                         .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                         .filter_map(|parameter| match parameter {
-                            GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                            GenericParam::Lifetime(lifetime) => Some(
+                                lifetime.lifetime.to_token_stream().to_string(),
+                            ),
                             _ => None,
                         })
                         .collect(),
@@ -410,10 +469,24 @@ fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
     match visibility {
         Visibility::Public(_) => VisibilityIr::Public,
         Visibility::Inherited => VisibilityIr::Inherited,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => VisibilityIr::Crate,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => VisibilityIr::Super,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => VisibilityIr::SelfValue,
-        Visibility::Restricted(restricted) => VisibilityIr::Restricted(convert_path(&restricted.path)),
+        Visibility::Restricted(restricted)
+            if restricted.path.is_ident("crate") =>
+        {
+            VisibilityIr::Crate
+        }
+        Visibility::Restricted(restricted)
+            if restricted.path.is_ident("super") =>
+        {
+            VisibilityIr::Super
+        }
+        Visibility::Restricted(restricted)
+            if restricted.path.is_ident("self") =>
+        {
+            VisibilityIr::SelfValue
+        }
+        Visibility::Restricted(restricted) => {
+            VisibilityIr::Restricted(convert_path(&restricted.path))
+        }
     }
 }
 
@@ -440,20 +513,30 @@ fn convert_trait_items(
                 bounds: ty.bounds.iter().map(convert_bound).collect(),
                 value: ty.default.as_ref().map(|(_, ty)| convert_type(ty)),
                 declaration: ty.to_token_stream(),
-                attributes: parse_attributes(&ty.attrs, HelperTarget::AssociatedItem, errors),
+                attributes: parse_attributes(
+                    &ty.attrs,
+                    HelperTarget::AssociatedItem,
+                    errors,
+                ),
                 span: ty.ident.span(),
             }),
-            TraitItem::Const(constant) => associated_consts.push(AssociatedConstIr {
-                name: constant.ident.clone(),
-                ty: convert_type(&constant.ty),
-                value: constant
-                    .default
-                    .as_ref()
-                    .map(|(_, expression)| expression.to_token_stream()),
-                declaration: constant.to_token_stream(),
-                attributes: parse_attributes(&constant.attrs, HelperTarget::AssociatedItem, errors),
-                span: constant.ident.span(),
-            }),
+            TraitItem::Const(constant) => {
+                associated_consts.push(AssociatedConstIr {
+                    name: constant.ident.clone(),
+                    ty: convert_type(&constant.ty),
+                    value: constant
+                        .default
+                        .as_ref()
+                        .map(|(_, expression)| expression.to_token_stream()),
+                    declaration: constant.to_token_stream(),
+                    attributes: parse_attributes(
+                        &constant.attrs,
+                        HelperTarget::AssociatedItem,
+                        errors,
+                    ),
+                    span: constant.ident.span(),
+                })
+            }
             _ => {}
         }
     }
@@ -483,17 +566,27 @@ fn convert_impl_items(
                 bounds: Vec::new(),
                 value: Some(convert_type(&ty.ty)),
                 declaration: ty.to_token_stream(),
-                attributes: parse_attributes(&ty.attrs, HelperTarget::AssociatedItem, errors),
+                attributes: parse_attributes(
+                    &ty.attrs,
+                    HelperTarget::AssociatedItem,
+                    errors,
+                ),
                 span: ty.ident.span(),
             }),
-            ImplItem::Const(constant) => associated_consts.push(AssociatedConstIr {
-                name: constant.ident.clone(),
-                ty: convert_type(&constant.ty),
-                value: Some(constant.expr.to_token_stream()),
-                declaration: constant.to_token_stream(),
-                attributes: parse_attributes(&constant.attrs, HelperTarget::AssociatedItem, errors),
-                span: constant.ident.span(),
-            }),
+            ImplItem::Const(constant) => {
+                associated_consts.push(AssociatedConstIr {
+                    name: constant.ident.clone(),
+                    ty: convert_type(&constant.ty),
+                    value: Some(constant.expr.to_token_stream()),
+                    declaration: constant.to_token_stream(),
+                    attributes: parse_attributes(
+                        &constant.attrs,
+                        HelperTarget::AssociatedItem,
+                        errors,
+                    ),
+                    span: constant.ident.span(),
+                })
+            }
             _ => {}
         }
     }
@@ -508,7 +601,8 @@ fn convert_method(
     has_default: bool,
     errors: &mut ErrorCollector,
 ) -> MethodIr {
-    let helper_attributes = parse_attributes(attributes, HelperTarget::Method, errors);
+    let helper_attributes =
+        parse_attributes(attributes, HelperTarget::Method, errors);
     let specializations = helper_attributes
         .iter()
         .filter_map(HelperAttributeIr::specialization)
@@ -521,7 +615,9 @@ fn convert_method(
             FnArg::Receiver(value) => {
                 let kind = if value.colon_token.is_some() {
                     ReceiverKindIr::Typed
-                } else if value.reference.is_some() && value.mutability.is_some() {
+                } else if value.reference.is_some()
+                    && value.mutability.is_some()
+                {
                     ReceiverKindIr::MutableReference
                 } else if value.reference.is_some() {
                     ReceiverKindIr::SharedReference
@@ -538,10 +634,13 @@ fn convert_method(
             FnArg::Typed(value) => {
                 let pattern_tokens = value.pat.to_token_stream();
                 let (name, kind) = match value.pat.as_ref() {
-                    Pat::Ident(identifier) if identifier.subpat.is_none() => {
-                        (Some(identifier.ident.to_string()), ParameterPatternKindIr::Identifier)
+                    Pat::Ident(identifier) if identifier.subpat.is_none() => (
+                        Some(identifier.ident.to_string()),
+                        ParameterPatternKindIr::Identifier,
+                    ),
+                    Pat::Ident(_) => {
+                        (None, ParameterPatternKindIr::Destructure)
                     }
-                    Pat::Ident(_) => (None, ParameterPatternKindIr::Destructure),
                     Pat::Wild(_) => (None, ParameterPatternKindIr::Wildcard),
                     _ => (None, ParameterPatternKindIr::Destructure),
                 };
@@ -570,10 +669,11 @@ fn convert_method(
         is_const: signature.constness.is_some(),
         is_async: signature.asyncness.is_some(),
         is_unsafe: signature.unsafety.is_some(),
-        abi: signature
-            .abi
-            .as_ref()
-            .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), LitStr::value)),
+        abi: signature.abi.as_ref().map(|abi| {
+            abi.name
+                .as_ref()
+                .map_or_else(|| "C".to_owned(), LitStr::value)
+        }),
         is_variadic: signature.variadic.is_some(),
     };
     MethodIr {
@@ -596,9 +696,13 @@ fn strip_trait_helpers(item: &mut ItemTrait) {
     remove_reflect_attributes(&mut item.attrs);
     for trait_item in &mut item.items {
         match trait_item {
-            TraitItem::Fn(function) => remove_reflect_attributes(&mut function.attrs),
+            TraitItem::Fn(function) => {
+                remove_reflect_attributes(&mut function.attrs)
+            }
             TraitItem::Type(ty) => remove_reflect_attributes(&mut ty.attrs),
-            TraitItem::Const(constant) => remove_reflect_attributes(&mut constant.attrs),
+            TraitItem::Const(constant) => {
+                remove_reflect_attributes(&mut constant.attrs)
+            }
             _ => {}
         }
     }
@@ -609,9 +713,13 @@ fn strip_impl_helpers(item: &mut ItemImpl) {
     remove_reflect_attributes(&mut item.attrs);
     for impl_item in &mut item.items {
         match impl_item {
-            ImplItem::Fn(function) => remove_reflect_attributes(&mut function.attrs),
+            ImplItem::Fn(function) => {
+                remove_reflect_attributes(&mut function.attrs)
+            }
             ImplItem::Type(ty) => remove_reflect_attributes(&mut ty.attrs),
-            ImplItem::Const(constant) => remove_reflect_attributes(&mut constant.attrs),
+            ImplItem::Const(constant) => {
+                remove_reflect_attributes(&mut constant.attrs)
+            }
             _ => {}
         }
     }

@@ -34,10 +34,15 @@ mod tests {
         let descriptor = FacadeUser::type_descriptor();
         assert!(descriptor.type_name().ends_with("FacadeUser"));
 
-        let registry = ReflectRegistry::initialize().expect("facade fragment registers");
+        let registry =
+            ReflectRegistry::initialize().expect("facade fragment registers");
         assert!(registry.get(descriptor.type_id()).is_some());
         assert!(descriptor.struct_construction().is_some());
-        assert!(FacadeEnvelope::<String>::type_descriptor().concrete_generic().is_some());
+        assert!(
+            FacadeEnvelope::<String>::type_descriptor()
+                .concrete_generic()
+                .is_some()
+        );
         assert!(
             FacadeEvent::type_descriptor()
                 .variants()

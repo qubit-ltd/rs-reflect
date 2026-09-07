@@ -19,11 +19,13 @@ use crate::registry::ReflectRegistry;
 /// receiver, argument, output, or future borrows beyond a single invocation.
 /// The independent registry lifetime is used only during synchronous receiver
 /// resolution. Neither outputs, futures, nor recovery retain that borrow.
-pub type InvocationAdapter<M> =
-    for<'registry, 'call> fn(
-        &'registry ReflectRegistry,
-        Invocation<'call, M>,
-    ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>>;
+pub type InvocationAdapter<M> = for<'registry, 'call> fn(
+    &'registry ReflectRegistry,
+    Invocation<'call, M>,
+) -> Result<
+    InvocationOutput<'call, M>,
+    InvocationFailure<'call, M>,
+>;
 
 /// A mode-specific adapter that captures a user panic after validation.
 ///
@@ -32,8 +34,13 @@ pub type InvocationAdapter<M> =
 /// Receiver capabilities resolve only in the supplied registry. Its borrow
 /// ends before the returned output or recovery is used.
 pub type CatchingInvocationAdapter<M> =
-    for<'registry, 'call> fn(&'registry ReflectRegistry, Invocation<'call, M>) -> CatchingInvocationResult<'call, M>;
+    for<'registry, 'call> fn(
+        &'registry ReflectRegistry,
+        Invocation<'call, M>,
+    ) -> CatchingInvocationResult<'call, M>;
 
 /// Result of an explicit catching invocation.
-pub type CatchingInvocationResult<'call, M> =
-    Result<Result<InvocationOutput<'call, M>, crate::invoke::InvocationPanic>, InvocationFailure<'call, M>>;
+pub type CatchingInvocationResult<'call, M> = Result<
+    Result<InvocationOutput<'call, M>, crate::invoke::InvocationPanic>,
+    InvocationFailure<'call, M>,
+>;

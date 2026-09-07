@@ -21,10 +21,13 @@ pub struct StructConstructionDescriptor {
     local_updater: Option<fn() -> &'static StructUpdater<Local>>,
     cached_local_constructor: OnceLock<&'static StructConstructor<Local>>,
     cached_local_updater: OnceLock<Option<&'static StructUpdater<Local>>>,
-    thread_safe_constructor: Option<fn() -> &'static StructConstructor<ThreadSafe>>,
+    thread_safe_constructor:
+        Option<fn() -> &'static StructConstructor<ThreadSafe>>,
     thread_safe_updater: Option<fn() -> &'static StructUpdater<ThreadSafe>>,
-    cached_thread_safe_constructor: OnceLock<Option<&'static StructConstructor<ThreadSafe>>>,
-    cached_thread_safe_updater: OnceLock<Option<&'static StructUpdater<ThreadSafe>>>,
+    cached_thread_safe_constructor:
+        OnceLock<Option<&'static StructConstructor<ThreadSafe>>>,
+    cached_thread_safe_updater:
+        OnceLock<Option<&'static StructUpdater<ThreadSafe>>>,
 }
 
 impl StructConstructionDescriptor {
@@ -63,7 +66,8 @@ impl StructConstructionDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn local_constructor(&self) -> &'static StructConstructor<Local> {
-        self.cached_local_constructor.get_or_init(self.local_constructor)
+        self.cached_local_constructor
+            .get_or_init(self.local_constructor)
     }
 
     /// Returns the local owned whole-field updater when generated.
@@ -78,15 +82,19 @@ impl StructConstructionDescriptor {
     /// Returns the thread-safe constructor when the derive declaration opted
     /// into thread-safe adapters and satisfied their bounds.
     #[must_use]
-    pub fn thread_safe_constructor(&self) -> Option<&'static StructConstructor<ThreadSafe>> {
-        *self
-            .cached_thread_safe_constructor
-            .get_or_init(|| self.thread_safe_constructor.map(|factory| factory()))
+    pub fn thread_safe_constructor(
+        &self,
+    ) -> Option<&'static StructConstructor<ThreadSafe>> {
+        *self.cached_thread_safe_constructor.get_or_init(|| {
+            self.thread_safe_constructor.map(|factory| factory())
+        })
     }
 
     /// Returns the thread-safe updater when generated.
     #[must_use]
-    pub fn thread_safe_updater(&self) -> Option<&'static StructUpdater<ThreadSafe>> {
+    pub fn thread_safe_updater(
+        &self,
+    ) -> Option<&'static StructUpdater<ThreadSafe>> {
         *self
             .cached_thread_safe_updater
             .get_or_init(|| self.thread_safe_updater.map(|factory| factory()))

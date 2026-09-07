@@ -49,7 +49,9 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(invocation.argument_name(0), None);
     let validated: PinnedValidatedRefInvocation<'_, u8, Local> = invocation
         .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
-        .unwrap_or_else(|_| panic!("matching pinned shared invocation should validate"));
+        .unwrap_or_else(|_| {
+            panic!("matching pinned shared invocation should validate")
+        });
     let (validated_receiver, arguments) = validated.into_parts();
     assert_eq!(*validated_receiver, 7);
     assert_eq!(arguments.len(), 1);
@@ -62,7 +64,10 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
         )],
     );
     assert_eq!(invocation.argument_name(0), Some("value"));
-    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<String>()]) else {
+    let Err(failure) = invocation.validate(
+        &method_identity(),
+        &[ArgumentExpectation::owned::<String>()],
+    ) else {
         panic!("mismatched pinned shared argument should fail");
     };
     assert!(format!("{failure:?}").contains("PinnedRefInvocationFailure"));
@@ -71,7 +76,8 @@ fn test_pinned_ref_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(*failure.recovery().receiver(), 7);
     assert_eq!(failure.recovery().arguments().len(), 1);
     assert_eq!(failure.recovery().argument_name(0), Some("value"));
-    let recovery: PinnedRefInvocationRecovery<'_, u8, Local> = failure.into_recovery();
+    let recovery: PinnedRefInvocationRecovery<'_, u8, Local> =
+        failure.into_recovery();
     let recovered = recovery.into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
@@ -89,8 +95,13 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(invocation.argument_name(0), None);
     {
         let validated: PinnedValidatedMutInvocation<'_, u8, Local> = invocation
-            .validate(&method_identity(), &[ArgumentExpectation::owned::<u16>()])
-            .unwrap_or_else(|_| panic!("matching pinned mutable invocation should validate"));
+            .validate(
+                &method_identity(),
+                &[ArgumentExpectation::owned::<u16>()],
+            )
+            .unwrap_or_else(|_| {
+                panic!("matching pinned mutable invocation should validate")
+            });
         let (mut validated_receiver, arguments) = validated.into_parts();
         *validated_receiver.as_mut().get_mut() = 23;
         assert_eq!(arguments.len(), 1);
@@ -105,7 +116,10 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
         )],
     );
     assert_eq!(invocation.argument_name(0), Some("value"));
-    let Err(mut failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<String>()]) else {
+    let Err(mut failure) = invocation.validate(
+        &method_identity(),
+        &[ArgumentExpectation::owned::<String>()],
+    ) else {
         panic!("mismatched pinned mutable argument should fail");
     };
     assert!(format!("{failure:?}").contains("PinnedMutInvocationFailure"));
@@ -114,7 +128,8 @@ fn test_pinned_mut_invocation_preserves_pin_arguments_and_recovery() {
     assert_eq!(*failure.recovery_mut().receiver(), 23);
     assert_eq!(failure.recovery().arguments().len(), 1);
     assert_eq!(failure.recovery().argument_name(0), Some("value"));
-    let recovery: PinnedMutInvocationRecovery<'_, u8, Local> = failure.into_recovery();
+    let recovery: PinnedMutInvocationRecovery<'_, u8, Local> =
+        failure.into_recovery();
     let recovered = recovery.into_invocation();
     assert_eq!(recovered.argument_name(0), Some("value"));
 }
@@ -128,7 +143,9 @@ fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
         Pin::new(&value),
         [InvocationArg::Owned(DynamicOwned::<Local>::new(43_u16))],
     );
-    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()]) else {
+    let Err(failure) = invocation
+        .validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()])
+    else {
         panic!("wrong argument type must fail");
     };
     assert_eq!(failure.error().method_identity(), &method_identity());
@@ -142,16 +159,24 @@ fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
     };
     let (receiver, arguments) = validated.into_parts();
     assert!(std::ptr::eq(receiver.get_ref(), &value));
-    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap()
+    else {
         panic!("owned input")
     };
-    assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 43);
+    assert_eq!(
+        argument
+            .downcast::<u16>()
+            .unwrap_or_else(|_| panic!("exact type")),
+        43
+    );
 
     let invocation = PinnedMutInvocation::<u8, Local>::new(
         Pin::new(&mut value),
         [InvocationArg::Owned(DynamicOwned::<Local>::new(47_u16))],
     );
-    let Err(failure) = invocation.validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()]) else {
+    let Err(failure) = invocation
+        .validate(&method_identity(), &[ArgumentExpectation::owned::<u8>()])
+    else {
         panic!("wrong mutable argument type must fail");
     };
     let (error, recovery) = failure.into_parts();
@@ -164,9 +189,15 @@ fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
     };
     let (mut receiver, arguments) = validated.into_parts();
     *receiver.as_mut().get_mut() = 53;
-    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap()
+    else {
         panic!("owned input")
     };
-    assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 47);
+    assert_eq!(
+        argument
+            .downcast::<u16>()
+            .unwrap_or_else(|_| panic!("exact type")),
+        47
+    );
     assert_eq!(value, 53);
 }

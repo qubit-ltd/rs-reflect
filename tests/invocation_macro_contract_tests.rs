@@ -82,10 +82,16 @@ impl Worker {
 }
 
 fn method(name: &str) -> &'static MethodInstanceDescriptor {
-    let registry = ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
+    let registry = ReflectRegistry::initialize()
+        .expect("generated fragments must validate");
+    let implementations =
+        registry.implementations(Worker::type_descriptor().type_id());
     let MethodLookup::Unique(method) =
-        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, name)
+        reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            MethodQualifier::Inherent,
+            name,
+        )
     else {
         panic!("method `{name}` must be uniquely discoverable")
     };
@@ -116,8 +122,13 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
-    assert_eq!(LOCAL_POLLS.with(Cell::get), 0, "the framework must not poll implicitly");
-    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future) else {
+    assert_eq!(
+        LOCAL_POLLS.with(Cell::get),
+        0,
+        "the framework must not poll implicitly"
+    );
+    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future)
+    else {
         panic!("the future must complete on its first explicit poll")
     };
     assert_eq!(LOCAL_POLLS.with(Cell::get), 1);
@@ -132,14 +143,17 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
     let output = method("non_send_local")
         .invoke_local(
             ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(6_u8))]),
+            Invocation::associated([InvocationArg::Owned(
+                DynamicOwned::<Local>::new(6_u8),
+            )]),
         )
         .expect("the default local adapter must exist")
         .expect("owned validation must succeed");
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
-    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future) else {
+    let Poll::Ready(InvocationOutput::Owned(value)) = poll_once(&mut future)
+    else {
         panic!("the future must complete on its first explicit poll")
     };
     let Ok(value) = DynamicOwned::<Local>::downcast::<u8>(value) else {
@@ -149,14 +163,17 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
 }
 
 #[test]
-fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability() {
+fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability()
+ {
     let polls = Arc::new(AtomicUsize::new(0));
     let output = method("send_future")
         .invoke_thread_safe(
             ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([InvocationArg::Owned(DynamicOwned::<ThreadSafe>::new(Arc::clone(
-                &polls,
-            )))]),
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<
+                ThreadSafe,
+            >::new(
+                Arc::clone(&polls),
+            ))]),
         )
         .expect("the explicit thread-safe adapter must exist")
         .expect("owned validation must succeed");
@@ -226,7 +243,10 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         }
         Err(payload) => payload,
     };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"ordinary panic payload"));
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"ordinary panic payload")
+    );
 
     let catching = method("catching_panic");
     assert_eq!(
@@ -247,7 +267,10 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         }
         Err(payload) => payload,
     };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"caught panic payload"));
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"caught panic payload")
+    );
     let panic = match catching
         .invoke_catching_local(
             ReflectRegistry::initialize().expect("valid fixture registry"),
@@ -259,7 +282,10 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
         Ok(_) => panic!("the user panic must be captured"),
         Err(panic) => panic,
     };
-    assert_eq!(panic.payload().downcast_ref::<&str>(), Some(&"caught panic payload"));
+    assert_eq!(
+        panic.payload().downcast_ref::<&str>(),
+        Some(&"caught panic payload")
+    );
 }
 
 #[test]

@@ -114,8 +114,9 @@ mod nested_impl {
 /// Verifies explicit providers resolve every generic trait implementation.
 #[test]
 fn test_generic_impl_definition_resolves_explicit_trait_providers() {
-    let registry =
-        ReflectRegistry::initialize().expect("qualified generic trait impl definitions must resolve uniquely");
+    let registry = ReflectRegistry::initialize().expect(
+        "qualified generic trait impl definitions must resolve uniquely",
+    );
     let mut resolved = registry
         .impl_definitions()
         .iter()

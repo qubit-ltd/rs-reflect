@@ -51,7 +51,10 @@ enum GenericEnum<T> {
 
 /// Returns the typed declaration capability used by this fixture.
 fn definition_key() -> CapabilityKey<u32> {
-    CapabilityKey::new(CapabilityId::new("example.generic_definition").expect("valid capability ID"))
+    CapabilityKey::new(
+        CapabilityId::new("example.generic_definition")
+            .expect("valid capability ID"),
+    )
 }
 
 /// Declares one capability fragment targeting the generic definition itself.
@@ -104,12 +107,17 @@ mod definition_capability_registration {
 /// concrete monomorph as a root.
 #[test]
 fn test_registry_registers_generic_type_definition() {
-    let registry = ReflectRegistry::initialize().expect("generic definitions must register");
+    let registry = ReflectRegistry::initialize()
+        .expect("generic definitions must register");
     let concrete = TypeDescriptor::of::<GenericRecord<u8>>();
-    let definition = concrete.type_definition().expect("generic source definition");
+    let definition = concrete
+        .type_definition()
+        .expect("generic source definition");
 
     assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
+        registry
+            .definition(definition.id())
+            .expect("registered definition"),
         definition,
     ));
     assert_eq!(definition.query_name(), "GenericRecord");
@@ -127,7 +135,10 @@ fn test_registry_registers_generic_type_definition() {
     );
     assert!(
         registry
-            .definition_capability_by_id(definition.id(), "example.generic_definition")
+            .definition_capability_by_id(
+                definition.id(),
+                "example.generic_definition"
+            )
             .is_some()
     );
     assert!(
@@ -181,7 +192,9 @@ fn test_generic_enum_definition_exposes_source_structure() {
         GenericEnum::Struct { value: 2_u8 },
     ];
     let descriptor = TypeDescriptor::of::<GenericEnum<u8>>();
-    let definition = descriptor.type_definition().expect("generic enum definition");
+    let definition = descriptor
+        .type_definition()
+        .expect("generic enum definition");
     let variants = definition.variants().expect("enum variants");
 
     assert!(matches!(definition.data(), TypeDefinitionData::Enum { .. }));
@@ -206,8 +219,10 @@ fn test_generic_enum_definition_exposes_source_structure() {
     let _declared_type = tuple_field.ty();
     assert_eq!(tuple_field.visibility().kind(), VisibilityKind::Private);
 
-    let registry = ReflectRegistry::initialize().expect("generic enum must register");
-    let candidates = registry.find_definitions_by_rust_path(definition.rust_path());
+    let registry =
+        ReflectRegistry::initialize().expect("generic enum must register");
+    let candidates =
+        registry.find_definitions_by_rust_path(definition.rust_path());
     assert_eq!(candidates.len(), 1);
     assert!(!candidates.is_empty());
     assert_eq!(candidates.iter().count(), 1);
@@ -217,8 +232,17 @@ fn test_generic_enum_definition_exposes_source_structure() {
     ));
     let missing = TypeDefinitionId::of::<MissingDefinition>();
     assert!(registry.definition(missing).is_none());
-    assert!(registry.definition_capabilities(missing).descriptors().is_empty());
-    assert!(registry.definition_capability(missing, definition_key()).is_none());
+    assert!(
+        registry
+            .definition_capabilities(missing)
+            .descriptors()
+            .is_empty()
+    );
+    assert!(
+        registry
+            .definition_capability(missing, definition_key())
+            .is_none()
+    );
     assert!(
         registry
             .definition_capability_by_id(missing, "example.generic_definition")
@@ -231,7 +255,8 @@ struct MissingDefinition;
 /// Verifies all declaration constructors preserve their kind-specific shape.
 #[test]
 fn test_type_definition_constructors_preserve_declared_shape() {
-    let generics = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
+    let generics =
+        Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
     let opaque = TypeDefinitionDescriptor::opaque(
         TypeDefinitionId::of::<OpaqueMarker>(),
         "example::Opaque",
@@ -281,16 +306,25 @@ enum CapabilityEnum<T: Clone> {
 
 /// Returns the exact concrete identity through a custom typed adapter.
 fn concrete_provider<T: 'static>() -> CapabilityDescriptor {
-    CapabilityDescriptor::with_adapter(concrete_key(), std::any::TypeId::of::<T> as fn() -> std::any::TypeId)
+    CapabilityDescriptor::with_adapter(
+        concrete_key(),
+        std::any::TypeId::of::<T> as fn() -> std::any::TypeId,
+    )
 }
 
 /// Identifies the custom provider contract shared by all concrete instances.
 fn concrete_key() -> CapabilityKey<fn() -> std::any::TypeId> {
-    CapabilityKey::new(CapabilityId::new("example.concrete_identity").expect("valid capability ID"))
+    CapabilityKey::new(
+        CapabilityId::new("example.concrete_identity")
+            .expect("valid capability ID"),
+    )
 }
 
 /// Executes adapters instead of merely checking that capability IDs exist.
-fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &ReflectRegistry) {
+fn assert_concrete_capabilities<T: Reflect + Clone>(
+    value: T,
+    registry: &ReflectRegistry,
+) {
     let descriptor = TypeDescriptor::of::<T>();
     let owned = ReflectedOwned::new(value);
     let cloned = registry
@@ -329,13 +363,22 @@ fn test_generic_capabilities_preserve_each_monomorph() {
         },
         registry,
     );
-    assert_concrete_capabilities(CapabilityEnum::Value(String::from("first")), registry);
+    assert_concrete_capabilities(
+        CapabilityEnum::Value(String::from("first")),
+        registry,
+    );
     assert_concrete_capabilities(CapabilityEnum::Value(9_u32), registry);
     std::thread::scope(|scope| {
         for _ in 0..8 {
             scope.spawn(|| {
-                assert_concrete_capabilities(CapabilityRecord { value: 3_u64 }, registry);
-                assert_concrete_capabilities(CapabilityRecord { value: false }, registry);
+                assert_concrete_capabilities(
+                    CapabilityRecord { value: 3_u64 },
+                    registry,
+                );
+                assert_concrete_capabilities(
+                    CapabilityRecord { value: false },
+                    registry,
+                );
             });
         }
     });
@@ -353,7 +396,9 @@ fn test_explicit_definition_provider_needs_no_monomorph() {
     let registry = ReflectRegistry::initialize().expect("valid definitions");
     let definition = domain_definition();
     assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
+        registry
+            .definition(definition.id())
+            .expect("registered definition"),
         definition
     ));
     assert_eq!(definition.query_name(), "DomainDefinition");
