@@ -1,9 +1,10 @@
 # `qubit-reflect` Design
 
 - Date: 2026-09-03
-- Last reviewed: 2026-09-03
+- Last reviewed: 2026-09-07
 - Status: breaking boundary redesign implemented; internal-repository consumption only, with release intentionally deferred
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`
 - Protocol: `qubit-reflect 0.1` / `__private::codegen_v3`
@@ -217,6 +218,15 @@ conflict kind, ID, adapter `TypeId`s, target, and source fragments through
 `RegistryError`, including the original conflict as its error source where a
 downstream layer wraps it.
 
+`ImplDefinitionDescriptor::implemented_trait()` exposes only declaration-known
+links. Symbolic links resolve through `implemented_trait_in(&registry)` or
+`ReflectRegistry::impl_definition_trait`, and the resolved links belong to
+snapshot indexes; failed builds and other snapshots cannot mutate shared
+declarations. Facade macros select an owned provider name with
+`#[reflect(definition_provider_v2 = identifier)]`; the v2 provider is a
+parameterless function returning `&'static TypeDefinitionDescriptor`, without
+requiring a concrete monomorphization or an inferred generated name.
+
 Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
 definitions, and construction expansion. Empty field counts no longer determine source shape.
 This internal change does not change `codegen_v3` or model v4. Downstream metadata/property queries
@@ -240,6 +250,22 @@ Generated type-level ThreadSafe support covers field adapters, struct/variant
 construction, struct update, owned-to-borrow bridges, and method invocation as
 one mode contract. Tuple and portable function-pointer built-ins deliberately
 stop at arity 32; arity 33 has no `Reflect` implementation.
+
+Every ordinary, catching, thread-safe, and pinned invocation entry explicitly
+accepts `&ReflectRegistry`. Callers look up methods with
+`methods_named_in(registry, ...)` and pass that same registry to
+`invoke_*(registry, invocation)`. Function pointers quantify independent
+`for<'registry, 'call>` lifetimes; outputs, futures, and recovery do not retain
+the registry borrow, while input lifetimes, Local/ThreadSafe, and Pin
+constraints remain. Invocation never initializes the global registry or falls
+back to global capabilities.
+
+Safely generated special receivers always have static adapters. A missing,
+mistyped, or fact-only receiver capability in the selected snapshot returns
+`ReceiverAdapterUnavailable` with all caller-ordered inputs; adapter rejection
+and intrinsic conflicts retain distinct structured causes. Statically
+unsupported signatures still have no entry point. `TypeDescriptor` debug output
+prints structural facts without capability queries or provider execution.
 
 ## 7. Errors and diagnostics
 
@@ -265,9 +291,29 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
 `.rs-ci-critical-coverage.json`, so well-covered simple modules cannot mask regressions in critical paths.
 
+Markdown acceptance executes each `rust` program in an independent package and
+process. `rust,no_run` compiles a library and `rust,compile_fail` must fail;
+both require an explanation. Unknown markers, empty blocks, and unclosed
+fences fail. A temporary workspace verifies `Cargo.lock` before `--locked`
+builds; each run times out after 10 seconds and retains failure logs and lock
+files. The original six coverage gates remain, with four thresholds floored
+from baseline d929d96: `set` 100/98/99, `registry` 98/98/98,
+`registry_builder` 100/97/96, and `snapshot_builder` 100/100/100.
+Bounded `registry_snapshot` fuzzing limits inputs to 4096 bytes, 32 fragments,
+16 sources, eight static IDs, and four descriptors, and verifies ordering,
+conflict atomicity, capability-only membership, and snapshot independence
+through public APIs.
+
 `.rs-ci-cargo-matrix.json` is the executable source of truth for supported feature combinations. The
 [requirements traceability matrix](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) keeps all 284
 requirement IDs mapped one-to-one and validates every referenced code and test path.
+
+The downstream gate validates the real `rs-model-metadata` workspace,
+including its `derive/` member, and `rs-platform`; missing sibling checkouts
+are errors. The baseline channel uses the manifest's exact recorded SHA,
+while the head channel uses each dependency's `main` revision. Both channels
+record their feature selection, and private repositories may use
+`DEPENDENCY_TOKEN`.
 
 ## 9. Explicit non-goals
 
@@ -277,49 +323,3 @@ requirement IDs mapped one-to-one and validates every referenced code and test p
 - No public-field compatibility, flattened `__private`, or deprecated shim.
 - No one-use helpers or one-type-per-file fragmentation created solely to reduce line counts.
 - No `no_std` promise; the runtime currently depends on `std`.
-
-## Review corrections, 2026-09-05
-
-- Type-dependent capabilities are cached by concrete `TypeId`. Factories execute outside the cache map lock. Regressions execute adapters for multiple struct/enum monomorphs and custom model providers, including concurrent calls.
-- `ImplDefinitionDescriptor::implemented_trait()` exposes only declaration-known links. Resolve symbolic links through `implemented_trait_in(&registry)` or `ReflectRegistry::impl_definition_trait`. Links belong to snapshot indexes; failed builds and other snapshots never mutate shared declarations.
-- Facade macros select an owned provider name with `#[reflect(definition_provider_v2 = identifier)]`. The v2 contract is a parameterless function returning `&'static TypeDefinitionDescriptor`, available without a concrete monomorph. Consumers must not infer reflect's default generated names.
-- `scripts/check-downstream.sh` validates the real model metadata workspace (including its `derive/` member) and platform repository. Local `ci-check.sh` and a dedicated GitHub Actions job both run this gate. Missing sibling checkouts are errors. The baseline channel checks the exact SHA recorded in the manifest, while the head channel checks each dependency's `main` revision; both channels record their feature selection explicitly. Private repositories may use `DEPENDENCY_TOKEN`.
-- First descriptor initialization is sampled in fresh child processes, excluding process startup. Warm lookup and 1/4/8-thread lookup are measured separately. The platform benchmark measures projection and relationship validation over the actual linked models, including allocation request counts and requested bytes.
-
-## 2026-09-07: Explicit invocation snapshots and codegen_v3
-
-Every ordinary, catching, thread-safe, and pinned entry explicitly accepts `&ReflectRegistry`.
-Callers look up methods with `methods_named_in(registry, ...)`, then invoke with
-`invoke_*(registry, invocation)` using the same registry. Function pointers quantify
-independent `for<'registry, 'call>` lifetimes. Outputs, futures, and recovery retain no
-registry borrow, while input lifetimes, Local/ThreadSafe, and Pin constraints remain.
-Invocation neither initializes the global registry nor falls back to global capabilities.
-
-Safely generated special receivers always have static adapters; inventory probing no
-longer determines entry availability. Missing, mistyped, and fact-only receiver capabilities
-in the selected snapshot yield `ReceiverAdapterUnavailable` with all original caller-ordered
-inputs. Adapter rejection and intrinsic conflicts retain distinct structured causes.
-Statically unsupported signatures still have no entry point.
-
-`TypeDescriptor` Debug prints structural facts without capability queries or provider
-execution. Frozen member, name, and method indexes do not execute providers; capability
-queries for unregistered concrete types may still lazily initialize intrinsic facts.
-Providers depend only on static type facts and must not explicitly re-enter capability or
-registry initialization. Downstream custom capabilities/providers may carry model metadata;
-reflect does not define or interpret domain semantics.
-
-This breaking change removes `codegen_v2`; facades must expose exactly `codegen_v3`.
-Model `__private::v4` and `definition_provider_v2` retain their independent contracts.
-Package version remains 0.1.0 and unpublished. Earlier dated sections describe historical
-changes; their statements about preserving protocols apply only to those changes.
-
-Markdown acceptance runs each `rust` program in an independent package and process.
-`rust,no_run` compiles a library; `rust,compile_fail` must fail compilation; both require
-an explanation. Unknown markers, empty blocks, and unclosed fences fail. A temporary
-workspace copies and verifies Cargo.lock before `--locked` builds. Runs time out after
-10 seconds; failures retain commands, output, and lockfiles.
-The original six coverage gates remain. Four new function/line/region gates are floored
-from baseline d929d96: set 100/98/99, registry 98/98/98, registry_builder 100/97/96,
-snapshot_builder 100/100/100. Bounded registry_snapshot fuzz limits inputs to 4096 bytes,
-32 fragments, 16 sources, eight static IDs, and four descriptors; it verifies ordering,
-conflict atomicity, capability-only membership, and independent snapshots through public APIs.

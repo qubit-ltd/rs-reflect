@@ -572,6 +572,21 @@ do not choose an executor or poll it, and async methods cannot use
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
 | A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v3`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
 
+### Explicit invocation migration and troubleshooting
+
+Every `invoke_*` entry now requires a registry. If lookup succeeds but
+invocation returns `ReceiverAdapterUnavailable`, check the selected snapshot
+for the exact receiver capability and invocation mode. A static entry does not
+guarantee that capability exists. The same key may select different adapters in
+two snapshots without cross-contamination; global failure does not affect
+valid local calls. Outputs and futures do not borrow the registry, but remain
+constrained by input lifetimes.
+
+Old `codegen_v2` facades fail compilation: migrate the exact export to
+`codegen_v3`. Model v4 and `definition_provider_v2` remain independent. Debug
+prints structural facts without running providers; providers themselves must
+not re-enter initialization.
+
 ## Limitations and Best Practices
 
 Keep reflection attributes close to the declaration that owns the contract.
@@ -590,11 +605,6 @@ Arity 33 and above is intentionally unsupported and has no `Reflect` impl.
 - [简体中文用户指南](2026-08-29-qubit-reflect-user-guide.zh_CN.md)
 - API documentation generated internally with `cargo doc --all-features`
 - [English design](2026-09-03-qubit-reflect-design.md) and [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- [Evolution history](2026-09-07-qubit-reflect-evolution.md) and [中文演进历史](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
 - [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) and [追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
-
-### Explicit invocation migration and troubleshooting
-
-Every `invoke_*` entry now requires a registry. If lookup succeeds but invocation returns `ReceiverAdapterUnavailable`, check the selected snapshot for the exact receiver capability and invocation mode. A static entry does not guarantee that capability exists. The same key may select different adapters in two snapshots without cross-contamination; global failure does not affect valid local calls. Outputs and futures do not borrow the registry, but remain constrained by input lifetimes.
-
-Old `codegen_v2` facades fail compilation: migrate the exact export to `codegen_v3`. Model v4 and `definition_provider_v2` remain independent. Debug prints structural facts without running providers; providers themselves must not re-enter initialization.
