@@ -23,6 +23,7 @@ mod expression_tests;
 #[cfg(feature = "derive")]
 mod generic_tests;
 mod identity_tests;
+mod method_descriptor_tests;
 #[cfg(feature = "derive")]
 mod reflect_impl_tests;
 #[cfg(feature = "derive")]

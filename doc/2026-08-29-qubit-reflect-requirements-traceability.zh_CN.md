@@ -1,6 +1,6 @@
 # qubit-reflect 需求追踪矩阵
 
-本矩阵逐项对应最终需求规范中的全部 284 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个真实实现文件和至少一个真实测试文件；所有路径均按 2026-09-01 完成破坏性边界重构后的仓库结构核验。
+本矩阵逐项对应最终需求规范中的全部 285 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个真实实现文件和至少一个真实测试文件；所有路径均按 2026-09-01 完成破坏性边界重构后的仓库结构核验。
 
 表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v3`，唯一的 registry resolver 是 `ReflectRegistry`；公共 `RegistrySnapshotBuilder` 为明确拥有的 fragment 提供隔离且事务性的构建入口。
 
@@ -11,9 +11,9 @@ rg -o 'REQ-[A-Z]+-[0-9]+' doc/2026-08-28-qubit-reflect-requirements.zh_CN.md | s
 rg '^\| REQ-[A-Z]+-[0-9]+ \|' doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md \
   | sed -E 's/^\| (REQ-[A-Z]+-[0-9]+).*/\1/' > /tmp/reflect-traceability-rows
 sort -u /tmp/reflect-traceability-rows > /tmp/reflect-traceability
-test "$(wc -l < /tmp/reflect-requirements)" -eq 284
-test "$(wc -l < /tmp/reflect-traceability-rows)" -eq 284
-test "$(wc -l < /tmp/reflect-traceability)" -eq 284
+test "$(wc -l < /tmp/reflect-requirements)" -eq 285
+test "$(wc -l < /tmp/reflect-traceability-rows)" -eq 285
+test "$(wc -l < /tmp/reflect-traceability)" -eq 285
 diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 ```
 
@@ -281,6 +281,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-TYPE-027 | T06、T12 | `src/registry/interner.rs`、`src/registry/registry.rs`、`src/registry/registry_builder.rs` | `tests/builtin_registry_freeze_tests.rs`、`tests/descriptor/builtin_tests.rs` |
 | REQ-TYPE-028 | T05、T14、T15、T20 | `src/descriptor/type_ref.rs`、`src/private/lazy_type_ref.rs`、`derive/src/expand/structs.rs`、`src/construct/validated.rs` | `tests/descriptor/type_descriptor_tests.rs`、`tests/descriptor/derive_struct_tests.rs`、`tests/access/field_tests.rs` |
 | REQ-TYPE-029 | T05、T07、T14、T15、T19 | `derive/src/expand/structs.rs`、`derive/src/expand/enums.rs`、`src/private/descriptor.rs` | `tests/descriptor/derive_struct_tests.rs`、`tests/ui/pass/opaque_generic_tests.rs`、`tests/descriptor/capability_tests.rs` |
+| REQ-TYPE-030 | T01、T02、T10 | `src/capability/capability_lookup.rs`、`src/capability/set.rs`、`src/registry/registry.rs` | `tests/public_generic_capability_conflict_tests.rs`、`tests/descriptor/capability_tests.rs` |
 | REQ-VAL-001 | T04、T22 | `src/value/dynamic_owned.rs`、`src/value/dynamic_ref.rs`、`src/value/dynamic_mut.rs` | `tests/value/dynamic_owned_tests.rs`、`tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-002 | T04、T22 | `src/value/dynamic_ref.rs`、`src/value/dynamic_mut.rs` | `src/value/mode.rs`、`tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-003 | T04、T22 | `src/value/dynamic_owned.rs` | `tests/value/dynamic_owned_tests.rs`、`tests/value/thread_mode_tests.rs` |

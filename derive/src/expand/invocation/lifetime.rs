@@ -94,3 +94,59 @@ fn bound_contains_non_static_lifetime(bound: &GenericBoundIr) -> bool {
         GenericBoundIr::Other(_) => true,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    use super::return_contains_non_static_lifetime;
+    use super::type_contains_non_static_lifetime;
+    use crate::ir::ReturnTypeIr;
+
+    fn parsed_type(tokens: TokenStream) -> crate::ir::TypeIr {
+        let ty = syn::parse2(tokens).expect("the fixture type must parse");
+        crate::parse::convert_type(&ty)
+    }
+
+    #[test]
+    fn test_non_static_lifetime_detection_covers_nested_type_forms() {
+        let cases = [
+            (quote!(Plain), false),
+            (quote!(Wrapper<'static>), false),
+            (quote!(Wrapper<'a>), true),
+            (quote!(<Wrapper<'a> as Iterator>::Item), true),
+            (quote!((&'static str, u8)), true),
+            (quote!([Wrapper<'a>; 1]), true),
+            (quote!(*const Wrapper<'a>), true),
+            (quote!(fn() -> Wrapper<'a>), true),
+            (quote!(for<'a> fn() -> u8), true),
+            (quote!(dyn Send + 'static), false),
+            (quote!(dyn Send + 'a), true),
+            (quote!(impl Send + 'a), true),
+            (quote!(dyn Fn(Wrapper<'a>) -> u8), true),
+            (quote!(!), false),
+            (quote!(_), true),
+            (quote!(fixture!()), true),
+        ];
+
+        for (tokens, expected) in cases {
+            assert_eq!(
+                type_contains_non_static_lifetime(&parsed_type(tokens.clone())),
+                expected,
+                "type fixture: {tokens}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_return_lifetime_detection_accepts_default_and_owned_outputs() {
+        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Unit));
+        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Type(
+            parsed_type(quote!(String)),
+        )));
+        assert!(return_contains_non_static_lifetime(&ReturnTypeIr::Type(
+            parsed_type(quote!(Wrapper<'a>)),
+        )));
+    }
+}

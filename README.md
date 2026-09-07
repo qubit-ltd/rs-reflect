@@ -1,6 +1,7 @@
 # qubit-reflect
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
@@ -21,6 +22,8 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 The crate is currently consumed only from Qubit's internal workspace or an
 approved internal Git revision. It is not published to crates.io. Keep the
 runtime and derive crate on the same repository revision.
+
+<!-- A crates.io badge is intentionally omitted while publish = false; it would create a dead link. -->
 
 The default `derive` feature exports `#[derive(Reflect)]`, `#[reflect]`, and
 `#[reflect_impl]`. Disabling default features keeps the runtime and handwritten
@@ -138,6 +141,7 @@ for construction, recovery, and migration examples.
 - API documentation generated internally with `cargo doc --all-features`
 - [English design](doc/2026-09-03-qubit-reflect-design.md)
 - [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
+- [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md) · [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)
 - [English traceability matrix](doc/2026-09-03-qubit-reflect-requirements-traceability.md)
