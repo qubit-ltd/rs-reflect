@@ -84,18 +84,12 @@ fn reject<'call>(
 }
 
 /// Builds an impl-only snapshot with optional receiver capabilities.
-fn snapshot(
-    adapter: Option<ReceiverAdapter<Pin<Rc<Counter>>, Local>>,
-) -> ReflectRegistry {
-    let global =
-        ReflectRegistry::initialize().expect("valid global declarations");
+fn snapshot(adapter: Option<ReceiverAdapter<Pin<Rc<Counter>>, Local>>) -> ReflectRegistry {
+    let global = ReflectRegistry::initialize().expect("valid global declarations");
     let descriptor = TypeDescriptor::of::<Counter>();
     let mut builder = RegistrySnapshotBuilder::new();
     for implementation in global.implementations(descriptor.type_id()) {
-        builder.add_impl(
-            implementation,
-            implementation.definition().fragment_identity().clone(),
-        );
+        builder.add_impl(implementation, implementation.definition().fragment_identity().clone());
     }
     if let Some(adapter) = adapter {
         builder.add_type_capabilities(
@@ -104,14 +98,7 @@ fn snapshot(
                 receiver_adapter_key::<Pin<Rc<Counter>>, Local>(),
                 adapter,
             )],
-            FragmentIdentity::new(
-                "snapshot-call-test",
-                "receiver",
-                1,
-                1,
-                "capability",
-                1,
-            ),
+            FragmentIdentity::new("snapshot-call-test", "receiver", 1, 1, "capability", 1),
         );
     }
     builder.build().expect("valid isolated snapshot")
@@ -119,17 +106,12 @@ fn snapshot(
 
 /// Supplies an owned pinned receiver without global capability registration.
 fn invocation() -> Invocation<'static, Local> {
-    Invocation::owned(
-        ReflectedOwned::new(Pin::new(Rc::new(Counter { value: 1 }))),
-        [],
-    )
+    Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Counter { value: 1 }))), [])
 }
 
 /// Executes the generated method using the same snapshot used for lookup.
 fn call(registry: &ReflectRegistry) -> u32 {
-    let MethodLookup::Unique(method) =
-        TypeDescriptor::of::<Counter>().methods_named_in(registry, "read")
-    else {
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(registry, "read") else {
         panic!("the snapshot must contain the generated method")
     };
     let output = method
@@ -139,9 +121,7 @@ fn call(registry: &ReflectRegistry) -> u32 {
     let InvocationOutput::Owned(value) = output else {
         panic!("owned u32 output")
     };
-    value
-        .downcast::<u32>()
-        .unwrap_or_else(|_| panic!("exact output type"))
+    value.downcast::<u32>().unwrap_or_else(|_| panic!("exact output type"))
 }
 
 #[test]
@@ -164,9 +144,7 @@ fn test_generated_receiver_uses_each_snapshot_without_global_registration() {
 #[test]
 fn test_missing_snapshot_capability_recovers_the_original_receiver() {
     let registry = snapshot(None);
-    let MethodLookup::Unique(method) =
-        TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read")
-    else {
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
         panic!("generated method exists")
     };
     let failure = method
@@ -192,9 +170,7 @@ fn test_missing_snapshot_capability_recovers_the_original_receiver() {
 #[test]
 fn test_snapshot_receiver_rejection_preserves_input() {
     let registry = snapshot(Some(reject));
-    let MethodLookup::Unique(method) =
-        TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read")
-    else {
+    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
         panic!("generated method exists")
     };
     let failure = method
@@ -216,34 +192,22 @@ fn test_snapshot_receiver_rejection_preserves_input() {
 fn test_owned_output_and_local_future_outlive_the_selected_registry() {
     let output = {
         let registry = snapshot(Some(first));
-        let MethodLookup::Unique(method) =
-            TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read")
-        else {
+        let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
             panic!("generated method")
         };
-        method
-            .invoke_local(&registry, invocation())
-            .unwrap()
-            .unwrap()
+        method.invoke_local(&registry, invocation()).unwrap().unwrap()
     };
     let InvocationOutput::Owned(value) = output else {
         panic!("owned output")
     };
-    assert_eq!(
-        value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")),
-        11
-    );
+    assert_eq!(value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")), 11);
     let output = {
         let registry = snapshot(Some(second));
-        let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>()
-            .methods_named_in(&registry, "read_async")
+        let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read_async")
         else {
             panic!("generated async method")
         };
-        method
-            .invoke_local(&registry, invocation())
-            .unwrap()
-            .unwrap()
+        method.invoke_local(&registry, invocation()).unwrap().unwrap()
     };
     let InvocationOutput::Future(future) = output else {
         panic!("local future")
@@ -255,10 +219,7 @@ fn test_owned_output_and_local_future_outlive_the_selected_registry() {
     else {
         panic!("future resolves independently of the dropped snapshot")
     };
-    assert_eq!(
-        value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")),
-        22
-    );
+    assert_eq!(value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")), 22);
 }
 
 #[test]
@@ -272,51 +233,29 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
     ] {
         let seed = snapshot(None);
         let mut builder = RegistrySnapshotBuilder::new();
-        for implementation in
-            seed.implementations(TypeDescriptor::of::<Counter>().type_id())
-        {
-            builder.add_impl(
-                implementation,
-                implementation.definition().fragment_identity().clone(),
-            );
+        for implementation in seed.implementations(TypeDescriptor::of::<Counter>().type_id()) {
+            builder.add_impl(implementation, implementation.definition().fragment_identity().clone());
         }
         builder.add_type_capabilities(
             TypeDescriptor::of::<Counter>(),
             capability.into_iter().collect(),
-            FragmentIdentity::new(
-                "snapshot-call-test",
-                "wrong",
-                1,
-                1,
-                "capability",
-                1,
-            ),
+            FragmentIdentity::new("snapshot-call-test", "wrong", 1, 1, "capability", 1),
         );
         let registry = builder.build().unwrap();
-        let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>()
-            .methods_named_in(&registry, "read_inputs")
+        let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read_inputs")
         else {
             panic!("generated method")
         };
         let invocation = Invocation::from_bindings(
-            Some(InvocationReceiver::Owned(ReflectedOwned::new(Pin::new(
-                Rc::new(Counter { value: 1 }),
-            )))),
+            Some(InvocationReceiver::Owned(ReflectedOwned::new(Pin::new(Rc::new(
+                Counter { value: 1 },
+            ))))),
             [
-                InvocationBinding::named(
-                    "second",
-                    InvocationArg::Owned(ReflectedOwned::new(22_u16)),
-                ),
-                InvocationBinding::positional(InvocationArg::Owned(
-                    ReflectedOwned::new(11_u8),
-                )),
+                InvocationBinding::named("second", InvocationArg::Owned(ReflectedOwned::new(22_u16))),
+                InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
             ],
         );
-        let failure = method
-            .invoke_local(&registry, invocation)
-            .unwrap()
-            .err()
-            .unwrap();
+        let failure = method.invoke_local(&registry, invocation).unwrap().err().unwrap();
         assert!(matches!(
             failure.error().kind(),
             InvocationErrorKind::ReceiverAdapterUnavailable { .. }
@@ -331,10 +270,7 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
         let Some(InvocationArg::Owned(first)) = arguments.next() else {
             panic!("first")
         };
-        assert_eq!(
-            second.downcast::<u16>().unwrap_or_else(|_| panic!("u16")),
-            22
-        );
+        assert_eq!(second.downcast::<u16>().unwrap_or_else(|_| panic!("u16")), 22);
         assert_eq!(first.downcast::<u8>().unwrap_or_else(|_| panic!("u8")), 11);
         let Some(InvocationReceiver::Owned(value)) = receiver else {
             panic!("owned receiver")

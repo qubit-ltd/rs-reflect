@@ -54,8 +54,7 @@ impl TraitDefinitionDescriptor {
     /// Returns whether two declarations can be merged for one external trait
     /// ID.
     pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
-        self.completeness() == other.completeness()
-            && self.generic_definition() == other.generic_definition()
+        self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
     }
 
     /// Creates immutable trait definition facts.
@@ -150,18 +149,14 @@ impl TraitDefinitionDescriptor {
     /// Returns generic parameters and predicates in source order.
     #[must_use]
     #[inline(always)]
-    pub const fn generic_definition(
-        &self,
-    ) -> &'static GenericDefinitionDescriptor {
+    pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
     }
 
     /// Returns methods declared by this trait in source order.
     #[must_use]
     pub fn methods(&self) -> &[MethodDescriptor] {
-        self.members
-            .get()
-            .map_or(&[], |members| members.methods.as_ref())
+        self.members.get().map_or(&[], |members| members.methods.as_ref())
     }
 
     /// Returns associated types declared by this trait in source order.
@@ -195,8 +190,7 @@ impl TraitDefinitionDescriptor {
         ),
     ) {
         self.members.get_or_init(|| {
-            let (methods, associated_types, associated_consts) =
-                initialize(self);
+            let (methods, associated_types, associated_consts) = initialize(self);
             TraitDefinitionMembers {
                 methods,
                 associated_types,
@@ -291,12 +285,11 @@ impl AssociatedTypeDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn generic_definition(&self) -> &GenericDefinitionDescriptor {
-        static EMPTY: LazyLock<GenericDefinitionDescriptor> =
-            LazyLock::new(|| GenericDefinitionDescriptor {
-                parameters: Box::new([]),
-                predicates: Box::new([]),
-                diagnostic: crate::expression::DiagnosticText::default(),
-            });
+        static EMPTY: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
+            parameters: Box::new([]),
+            predicates: Box::new([]),
+            diagnostic: crate::expression::DiagnosticText::default(),
+        });
         self.generic_definition.as_deref().unwrap_or(&EMPTY)
     }
 
@@ -310,10 +303,7 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
-    pub(super) fn substituted(
-        self,
-        substitutions: &TraitApplicationSubstitutions,
-    ) -> Self {
+    pub(super) fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
         Self {
             bounds: self
                 .bounds
@@ -324,11 +314,10 @@ impl AssociatedTypeDescriptor {
                 .default
                 .as_ref()
                 .map(|expression| substitutions.type_expression(expression)),
-            generic_definition: self.generic_definition.as_ref().map(
-                |definition| {
-                    Box::new(substitutions.generic_definition(definition))
-                },
-            ),
+            generic_definition: self
+                .generic_definition
+                .as_ref()
+                .map(|definition| Box::new(substitutions.generic_definition(definition))),
             ..self
         }
     }
@@ -400,10 +389,7 @@ impl AssociatedConstDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
-    pub(super) fn substituted(
-        self,
-        substitutions: &TraitApplicationSubstitutions,
-    ) -> Self {
+    pub(super) fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
         Self {
             declared_type: substitutions.type_expression(&self.declared_type),
             ..self

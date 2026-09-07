@@ -35,16 +35,14 @@ pub fn external_supertrait<T: ?Sized + 'static>(
     rust_path: &'static str,
     arguments: Vec<GenericArgument>,
 ) -> &'static TraitDescriptor {
-    let external_id = ExternalTraitId::new(id).expect(
-        "the macro validator must only emit valid external trait identifiers",
-    );
+    let external_id =
+        ExternalTraitId::new(id).expect("the macro validator must only emit valid external trait identifiers");
     let key = (
         TypeId::of::<T>(),
         external_id.clone(),
         arguments.clone().into_boxed_slice(),
     );
-    let cell =
-        crate::descriptor::internal::trait_cache::external_supertrait_cell(key);
+    let cell = crate::descriptor::internal::trait_cache::external_supertrait_cell(key);
     cell.get_or_init(|| {
         let definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
             TraitId::External(external_id),
@@ -73,11 +71,8 @@ pub fn external_supertrait<T: ?Sized + 'static>(
 pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
     build: impl FnOnce() -> TraitDescriptor,
 ) -> &'static TraitDescriptor {
-    static CACHE: LazyLock<Mutex<DynTraitCache>> =
-        LazyLock::new(|| Mutex::new(HashMap::new()));
-    let mut cache = CACHE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    static CACHE: LazyLock<Mutex<DynTraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+    let mut cache = CACHE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let cell = *cache
         .entry(TypeId::of::<T>())
         .or_insert_with(|| Box::leak(Box::new(OnceLock::new())));
@@ -127,9 +122,7 @@ impl<'a> SupertraitClosure<'a> {
     #[must_use]
     #[inline(always)]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
-        self.descriptors
-            .iter()
-            .map(|descriptor| descriptor.descriptor())
+        self.descriptors.iter().map(|descriptor| descriptor.descriptor())
     }
 
     /// Returns the number of distinct transitive supertraits.

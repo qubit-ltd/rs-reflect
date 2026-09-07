@@ -54,23 +54,15 @@ fn test_capability_key_lookup_is_allocation_free() {
     assert_copy::<CapabilityId>();
     assert_copy::<CapabilityKey<u32>>();
 
-    let id = CapabilityId::new("example.allocation_free")
-        .expect("valid capability ID");
+    let id = CapabilityId::new("example.allocation_free").expect("valid capability ID");
     let key = CapabilityKey::new(id);
     let capabilities =
-        TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(
-            key, 7_u32,
-        )])
-        .expect("unique capability");
+        TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(key, 7_u32)]).expect("unique capability");
 
     ALLOCATIONS.with(|count| count.set(Some(0)));
     drop(std::hint::black_box(Box::new(7_u32)));
-    let control = ALLOCATIONS
-        .with(|count| count.replace(None).expect("control counting is active"));
-    assert!(
-        control > 0,
-        "allocations on the measured thread must be counted"
-    );
+    let control = ALLOCATIONS.with(|count| count.replace(None).expect("control counting is active"));
+    assert!(control > 0, "allocations on the measured thread must be counted");
 
     // Background work must not be charged to this thread's lookup contract.
     static START_BACKGROUND: AtomicBool = AtomicBool::new(false);
@@ -86,21 +78,15 @@ fn test_capability_key_lookup_is_allocation_free() {
     ALLOCATIONS.with(|count| count.set(Some(0)));
     START_BACKGROUND.store(true, Ordering::Release);
     for _ in 0..1_000 {
-        let key = CapabilityKey::new(
-            CapabilityId::new("example.allocation_free")
-                .expect("valid capability ID"),
-        );
+        let key = CapabilityKey::new(CapabilityId::new("example.allocation_free").expect("valid capability ID"));
         assert!(capabilities.contains(key));
         assert_eq!(capabilities.get(key), Some(&7_u32));
     }
     while !BACKGROUND_DONE.load(Ordering::Acquire) {
         std::thread::yield_now();
     }
-    let allocations = ALLOCATIONS
-        .with(|count| count.replace(None).expect("counting is active"));
-    background
-        .join()
-        .expect("background allocation must complete");
+    let allocations = ALLOCATIONS.with(|count| count.replace(None).expect("counting is active"));
+    background.join().expect("background allocation must complete");
 
     assert_eq!(allocations, 0);
 }

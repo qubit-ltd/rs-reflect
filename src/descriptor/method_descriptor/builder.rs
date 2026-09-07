@@ -100,10 +100,7 @@ impl MethodDescriptorBuilder {
 
     /// Copies the method's generic declaration and preserves source order.
     #[must_use]
-    pub fn generic_definition(
-        mut self,
-        generic_definition: &GenericDefinitionDescriptor,
-    ) -> Self {
+    pub fn generic_definition(mut self, generic_definition: &GenericDefinitionDescriptor) -> Self {
         self.generic_definition = generic_definition.clone();
         self
     }

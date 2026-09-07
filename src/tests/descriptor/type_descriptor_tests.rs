@@ -41,47 +41,22 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
     let parameters = Box::leak(vec![element.clone()].into_boxed_slice());
     let abi = Box::leak(Box::new(FunctionAbi::Rust));
 
-    let primitive =
-        TypeDescriptor::new_primitive::<u8>("number", PrimitiveKind::U8);
+    let primitive = TypeDescriptor::new_primitive::<u8>("number", PrimitiveKind::U8);
     let text = TypeDescriptor::new_text::<String>("text", TextKind::String);
-    let structure =
-        TypeDescriptor::new_struct::<()>("record", StructKind::Unit, &[]);
+    let structure = TypeDescriptor::new_struct::<()>("record", StructKind::Unit, &[]);
     let enumeration = TypeDescriptor::new_enum::<()>("choice", &[]);
     let tuple = TypeDescriptor::new_tuple::<()>("tuple", parameters);
     let array = TypeDescriptor::new_array::<()>("array", element, 3);
     let optional = TypeDescriptor::new_optional::<()>("optional", element);
-    let sequence = TypeDescriptor::new_sequence::<()>(
-        "sequence",
-        SequenceKind::Vec,
-        element,
-    );
+    let sequence = TypeDescriptor::new_sequence::<()>("sequence", SequenceKind::Vec, element);
     let set = TypeDescriptor::new_set::<()>("set", SetKind::BTreeSet, element);
-    let map =
-        TypeDescriptor::new_map::<()>("map", MapKind::BTreeMap, element, value);
-    let smart_pointer = TypeDescriptor::new_smart_pointer::<()>(
-        "pointer",
-        SmartPointerKind::Arc,
-        element,
-    );
-    let reference = TypeDescriptor::new_reference::<()>(
-        "reference",
-        ReferenceKind::Mutable,
-        element,
-    );
+    let map = TypeDescriptor::new_map::<()>("map", MapKind::BTreeMap, element, value);
+    let smart_pointer = TypeDescriptor::new_smart_pointer::<()>("pointer", SmartPointerKind::Arc, element);
+    let reference = TypeDescriptor::new_reference::<()>("reference", ReferenceKind::Mutable, element);
     let slice = TypeDescriptor::new_slice::<()>("slice", element);
-    let raw_pointer = TypeDescriptor::new_raw_pointer::<()>(
-        "raw",
-        Mutability::Const,
-        element,
-    );
-    let function = TypeDescriptor::new_function::<()>(
-        "function",
-        FunctionPointerKind::Unsafe,
-        abi,
-        true,
-        parameters,
-        value,
-    );
+    let raw_pointer = TypeDescriptor::new_raw_pointer::<()>("raw", Mutability::Const, element);
+    let function =
+        TypeDescriptor::new_function::<()>("function", FunctionPointerKind::Unsafe, abi, true, parameters, value);
     let opaque = TypeDescriptor::new_opaque::<()>("opaque");
 
     assert_eq!(
@@ -89,44 +64,20 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
         PrimitiveKind::U8
     );
     assert_eq!(text.as_text().expect("text view").kind(), TextKind::String);
-    assert_eq!(
-        structure.as_struct().expect("struct view").kind(),
-        StructKind::Unit
-    );
-    assert!(
-        enumeration
-            .as_enum()
-            .expect("enum view")
-            .representations()
-            .is_empty()
-    );
+    assert_eq!(structure.as_struct().expect("struct view").kind(), StructKind::Unit);
+    assert!(enumeration.as_enum().expect("enum view").representations().is_empty());
     assert_eq!(tuple.as_tuple().expect("tuple view").elements().len(), 1);
     assert_eq!(array.as_array().expect("array view").length(), 3);
     assert!(std::ptr::eq(
-        optional
-            .as_optional()
-            .expect("optional view")
-            .element_type(),
+        optional.as_optional().expect("optional view").element_type(),
         element,
     ));
-    assert_eq!(
-        sequence.as_sequence().expect("sequence view").kind(),
-        SequenceKind::Vec,
-    );
+    assert_eq!(sequence.as_sequence().expect("sequence view").kind(), SequenceKind::Vec,);
     assert_eq!(set.as_set().expect("set view").kind(), SetKind::BTreeSet);
-    assert!(std::ptr::eq(
-        map.as_map().expect("map view").key_type(),
-        element
-    ));
-    assert!(std::ptr::eq(
-        map.as_map().expect("map view").value_type(),
-        value
-    ));
+    assert!(std::ptr::eq(map.as_map().expect("map view").key_type(), element));
+    assert!(std::ptr::eq(map.as_map().expect("map view").value_type(), value));
     assert_eq!(
-        smart_pointer
-            .as_smart_pointer()
-            .expect("smart pointer view")
-            .kind(),
+        smart_pointer.as_smart_pointer().expect("smart pointer view").kind(),
         SmartPointerKind::Arc,
     );
     assert_eq!(
@@ -138,10 +89,7 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
         element
     ));
     assert_eq!(
-        raw_pointer
-            .as_raw_pointer()
-            .expect("raw pointer view")
-            .mutability(),
+        raw_pointer.as_raw_pointer().expect("raw pointer view").mutability(),
         Mutability::Const,
     );
     let function_view = function.as_function().expect("function view");

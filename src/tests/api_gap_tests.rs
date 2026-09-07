@@ -63,12 +63,11 @@ use crate::value::DynamicRef;
 use crate::value::Local;
 use crate::value::ReflectedOwned;
 
-static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::new([]),
-        predicates: Box::new([]),
-        diagnostic: DiagnosticText::default(),
-    });
+static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
+    parameters: Box::new([]),
+    predicates: Box::new([]),
+    diagnostic: DiagnosticText::default(),
+});
 
 fn fragment(fingerprint: u64) -> FragmentIdentity {
     FragmentIdentity::new("crate", "crate::module", 10, 4, "field", fingerprint)
@@ -93,18 +92,10 @@ fn test_small_identity_and_error_accessors_preserve_input_facts() {
 
     let direct = FieldIdentity::new(TypeId::of::<u8>(), "u8", 0, Some("value"));
     assert_eq!(direct.rust_name(), Some("value"));
-    let variant = FieldIdentity::new_variant(
-        TypeId::of::<u8>(),
-        "u8",
-        0,
-        None,
-        2,
-        "Ready",
-    );
+    let variant = FieldIdentity::new_variant(TypeId::of::<u8>(), "u8", 0, None, 2, "Ready");
     assert_eq!(variant.variant_rust_name(), Some("Ready"));
 
-    let mismatch = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>())
-        .with_diagnostic_names("u8", "u16");
+    let mismatch = TypeMismatch::new(TypeId::of::<u8>(), TypeId::of::<u16>()).with_diagnostic_names("u8", "u16");
     assert_eq!(mismatch.expected(), TypeId::of::<u8>());
     assert_eq!(mismatch.actual(), TypeId::of::<u16>());
     assert_eq!(mismatch.expected_name(), Some("u8"));
@@ -118,18 +109,12 @@ fn test_small_identity_and_error_accessors_preserve_input_facts() {
 fn test_expression_constructors_preserve_navigable_structural_facts() {
     let concrete = ConcreteTypeExpression::new(
         ["core", "option", "Option"],
-        [crate::expression::GenericArgument::Type(
-            TypeExpression::SelfType,
-        )],
+        [crate::expression::GenericArgument::Type(TypeExpression::SelfType)],
     )
     .expect("the concrete path is non-empty")
     .with_diagnostic("Option<Self>");
     assert_eq!(
-        concrete
-            .path()
-            .iter()
-            .map(AsRef::as_ref)
-            .collect::<Vec<_>>(),
+        concrete.path().iter().map(AsRef::as_ref).collect::<Vec<_>>(),
         ["core", "option", "Option"]
     );
     assert_eq!(concrete.arguments().len(), 1);
@@ -142,10 +127,7 @@ fn test_expression_constructors_preserve_navigable_structural_facts() {
         Box::<[crate::expression::GenericArgument]>::default(),
     )
     .with_diagnostic("<T as Iterator>::Item");
-    assert_eq!(
-        associated.self_type(),
-        &TypeExpression::Parameter("T".into())
-    );
+    assert_eq!(associated.self_type(), &TypeExpression::Parameter("T".into()));
     assert_eq!(
         associated.trait_path(),
         Some(&TypeExpression::Parameter("Iterator".into()))
@@ -154,28 +136,20 @@ fn test_expression_constructors_preserve_navigable_structural_facts() {
     assert!(associated.arguments().is_empty());
     assert_eq!(associated.diagnostic(), Some("<T as Iterator>::Item"));
 
-    let reference = ReferenceTypeExpression::new(
-        LifetimeExpression::Named("a".into()),
-        true,
-        TypeExpression::SelfType,
-    )
-    .with_diagnostic("&'a mut Self");
+    let reference = ReferenceTypeExpression::new(LifetimeExpression::Named("a".into()), true, TypeExpression::SelfType)
+        .with_diagnostic("&'a mut Self");
     assert_eq!(reference.lifetime(), &LifetimeExpression::Named("a".into()));
     assert!(reference.is_mutable());
     assert_eq!(reference.target(), &TypeExpression::SelfType);
     assert_eq!(reference.diagnostic(), Some("&'a mut Self"));
 
-    let raw = RawPointerTypeExpression::new(false, TypeExpression::SelfType)
-        .with_diagnostic("*const Self");
+    let raw = RawPointerTypeExpression::new(false, TypeExpression::SelfType).with_diagnostic("*const Self");
     assert!(!raw.is_mutable());
     assert_eq!(raw.target(), &TypeExpression::SelfType);
     assert_eq!(raw.diagnostic(), Some("*const Self"));
 
-    let array = ArrayTypeExpression::new(
-        TypeExpression::SelfType,
-        ConstExpression::UnsignedInteger(3),
-    )
-    .with_diagnostic("[Self; 3]");
+    let array = ArrayTypeExpression::new(TypeExpression::SelfType, ConstExpression::UnsignedInteger(3))
+        .with_diagnostic("[Self; 3]");
     assert_eq!(array.element(), &TypeExpression::SelfType);
     assert_eq!(array.length(), &ConstExpression::UnsignedInteger(3));
     assert_eq!(array.diagnostic(), Some("[Self; 3]"));
@@ -198,10 +172,7 @@ fn test_expression_constructors_preserve_navigable_structural_facts() {
     );
     assert_eq!(function.parameters(), &[TypeExpression::SelfType]);
     assert_eq!(function.return_type(), &TypeExpression::Never);
-    assert_eq!(
-        function.diagnostic(),
-        Some("unsafe extern C fn(Self, ...) -> !")
-    );
+    assert_eq!(function.diagnostic(), Some("unsafe extern C fn(Self, ...) -> !"));
 
     let predicate = PredicateDescriptor::type_bound(
         TypeExpression::Parameter("T".into()),
@@ -212,18 +183,14 @@ fn test_expression_constructors_preserve_navigable_structural_facts() {
     .expect("one modifier is supplied for the non-empty bound")
     .with_diagnostic("T: Display");
     assert_eq!(predicate.diagnostic(), Some("T: Display"));
-    let outlives = PredicateDescriptor::lifetime_outlives(
-        LifetimeExpression::Named("a".into()),
-        [LifetimeExpression::Static],
-    )
-    .expect("the lifetime bound is non-empty");
+    let outlives =
+        PredicateDescriptor::lifetime_outlives(LifetimeExpression::Named("a".into()), [LifetimeExpression::Static])
+            .expect("the lifetime bound is non-empty");
 
-    let trait_object = TraitObjectExpression::new([predicate.clone()])
-        .with_diagnostic("dyn Display");
+    let trait_object = TraitObjectExpression::new([predicate.clone()]).with_diagnostic("dyn Display");
     assert_eq!(trait_object.bounds(), std::slice::from_ref(&predicate));
     assert_eq!(trait_object.diagnostic(), Some("dyn Display"));
-    let opaque = OpaqueTypeExpression::new([predicate.clone()])
-        .with_diagnostic("impl Display");
+    let opaque = OpaqueTypeExpression::new([predicate.clone()]).with_diagnostic("impl Display");
     assert_eq!(opaque.bounds(), std::slice::from_ref(&predicate));
     assert_eq!(opaque.diagnostic(), Some("impl Display"));
 
@@ -250,10 +217,7 @@ fn test_small_generic_and_invocation_accessors_preserve_input_facts() {
     assert!(std::ptr::eq(generic.definition(), &*EMPTY_GENERIC));
     assert!(generic.arguments().is_empty());
 
-    let binding = InvocationBinding::<Local>::named(
-        "value",
-        InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)),
-    );
+    let binding = InvocationBinding::<Local>::named("value", InvocationArg::Owned(DynamicOwned::<Local>::new(3_u8)));
     assert_eq!(binding.name(), Some("value"));
     assert!(matches!(binding.argument(), InvocationArg::Owned(_)));
 
@@ -271,8 +235,7 @@ fn test_small_generic_and_invocation_accessors_preserve_input_facts() {
 }
 
 fn rejected_field_value(value: u8) -> FieldSetFailure {
-    let field =
-        FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
+    let field = FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
     FieldSetFailure::before_execution(
         FieldAccessError::Unavailable {
             field: field.clone(),
@@ -293,8 +256,7 @@ fn owned_u8(value: ReflectedOwned) -> u8 {
 
 #[test]
 fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
-    let direct =
-        FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
+    let direct = FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
     assert_eq!(direct.declaring_type(), TypeId::of::<u16>());
     assert_eq!(direct.declaring_type_name(), "u16");
     assert_eq!(direct.index(), 3);
@@ -302,14 +264,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
     assert_eq!(direct.to_string(), "u16::value");
     assert_eq!(FieldAccessOperation::Set.to_string(), "set");
 
-    let variant = FieldIdentity::new_variant(
-        TypeId::of::<u16>(),
-        "u16",
-        3,
-        None,
-        2,
-        "Ready",
-    );
+    let variant = FieldIdentity::new_variant(TypeId::of::<u16>(), "u16", 3, None, 2, "Ready");
     assert_eq!(variant.variant_index(), Some(2));
     assert_eq!(variant.to_string(), "u16::Ready field #3");
     let inactive = FieldAccessError::inactive_variant(variant.clone());
@@ -317,9 +272,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
 
     let failure = rejected_field_value(7);
     assert_eq!(failure.error().field(), &direct);
-    let recovery = failure
-        .recovery()
-        .expect("validation failures retain input");
+    let recovery = failure.recovery().expect("validation failures retain input");
     assert_eq!(recovery.field(), &direct);
     assert_eq!(recovery.query_name(), Some("value"));
     assert_eq!(recovery.value().downcast_ref::<u8>(), Some(&7));
@@ -330,9 +283,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
         Some(&7)
     );
     assert_eq!(
-        recovery
-            .value_at(3)
-            .and_then(|value| value.downcast_ref::<u8>()),
+        recovery.value_at(3).and_then(|value| value.downcast_ref::<u8>()),
         Some(&7)
     );
     assert!(recovery.value_by_name("other").is_none());
@@ -345,11 +296,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
     let (error, recovery) = rejected_field_value(8).into_parts();
     assert_eq!(error.field(), &direct);
     assert_eq!(
-        owned_u8(
-            recovery
-                .expect("recovery must survive decomposition")
-                .into_value()
-        ),
+        owned_u8(recovery.expect("recovery must survive decomposition").into_value()),
         8
     );
     let recovery = rejected_field_value(9)
@@ -375,11 +322,7 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
         Err(recovery) => recovery,
     };
     assert_eq!(
-        owned_u8(
-            recovery
-                .into_value_at(3)
-                .expect("matching index extracts value")
-        ),
+        owned_u8(recovery.into_value_at(3).expect("matching index extracts value")),
         10
     );
 
@@ -387,18 +330,14 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
         field: direct,
         operation: FieldAccessOperation::Set,
     };
-    let failure: FieldSetFailure<crate::value::Local> =
-        FieldSetFailure::after_execution(adapter_error.clone());
+    let failure: FieldSetFailure<crate::value::Local> = FieldSetFailure::after_execution(adapter_error.clone());
     assert!(failure.recovery().is_none());
     match failure.into_recovery() {
         Ok(_) => panic!("an adapter failure must not synthesize recovery"),
         Err(error) => assert_eq!(error, adapter_error),
     }
     assert_eq!(
-        FieldSetFailure::<crate::value::Local>::after_execution(
-            adapter_error.clone()
-        )
-        .into_error(),
+        FieldSetFailure::<crate::value::Local>::after_execution(adapter_error.clone()).into_error(),
         adapter_error
     );
 }
@@ -407,16 +346,12 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
 fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
     let shared = 7_u8;
     assert_eq!(
-        crate::access::field_adapter::dynamic_ref_type_id(
-            &DynamicRef::<Local>::new(&shared)
-        ),
+        crate::access::field_adapter::dynamic_ref_type_id(&DynamicRef::<Local>::new(&shared)),
         TypeId::of::<u8>(),
     );
     let mut mutable = 8_u16;
     assert_eq!(
-        crate::access::field_adapter::dynamic_mut_type_id(
-            &DynamicMut::<Local>::new(&mut mutable)
-        ),
+        crate::access::field_adapter::dynamic_mut_type_id(&DynamicMut::<Local>::new(&mut mutable)),
         TypeId::of::<u16>(),
     );
     let owned = DynamicOwned::<Local>::new(9_u32);
@@ -434,40 +369,22 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
     .expect("distinct built-in capabilities form a valid set");
     assert!(capabilities.contains(send_key()));
     assert!(capabilities.contains(sync_key()));
-    let clone_adapter = capabilities
-        .get(clone_key())
-        .expect("clone adapter is registered");
+    let clone_adapter = capabilities.get(clone_key()).expect("clone adapter is registered");
     let source = DynamicOwned::<Local>::new(String::from("value"));
     let cloned = clone_adapter
         .clone_owned(&source)
         .expect("exact source type can be cloned");
-    assert_eq!(
-        cloned.downcast_ref::<String>().map(String::as_str),
-        Some("value")
-    );
-    assert!(
-        clone_adapter
-            .clone_owned(&DynamicOwned::<Local>::new(1_u8))
-            .is_err()
-    );
+    assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("value"));
+    assert!(clone_adapter.clone_owned(&DynamicOwned::<Local>::new(1_u8)).is_err());
     let defaulted = capabilities
         .get(default_key())
         .expect("default adapter is registered")
         .create();
-    assert_eq!(
-        defaulted.downcast_ref::<String>().map(String::as_str),
-        Some("")
-    );
-    assert!(
-        format!("{:?}", capabilities.descriptors()[0])
-            .contains("CapabilityDescriptor")
-    );
+    assert_eq!(defaulted.downcast_ref::<String>().map(String::as_str), Some(""));
+    assert!(format!("{:?}", capabilities.descriptors()[0]).contains("CapabilityDescriptor"));
 
-    let duplicate = TypeCapabilities::try_new(vec![
-        send_descriptor::<u8>(),
-        send_descriptor::<u16>(),
-    ])
-    .expect_err("one stable capability ID cannot be declared twice");
+    let duplicate = TypeCapabilities::try_new(vec![send_descriptor::<u8>(), send_descriptor::<u16>()])
+        .expect_err("one stable capability ID cannot be declared twice");
     assert_eq!(duplicate.kind(), CapabilityConflictKind::DuplicateId);
     assert_eq!(duplicate.id(), send_key().id());
     assert_eq!(duplicate.first_adapter_type(), TypeId::of::<()>());
@@ -476,8 +393,7 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
 
 #[test]
 fn test_registry_query_views_preserve_empty_and_exact_lookup_contracts() {
-    let registry = ReflectRegistry::initialize()
-        .expect("the linked unit-test inventory is valid");
+    let registry = ReflectRegistry::initialize().expect("the linked unit-test inventory is valid");
     let u8_descriptor = registry
         .get(TypeId::of::<u8>())
         .expect("built-in integer registration is linked");
@@ -500,8 +416,7 @@ fn test_registry_query_views_preserve_empty_and_exact_lookup_contracts() {
     );
     assert!(registry.find_by_query_name("missing::query").is_empty());
 
-    let definitions =
-        registry.find_impl_definitions_by_target(&TypeExpression::Never);
+    let definitions = registry.find_impl_definitions_by_target(&TypeExpression::Never);
     assert!(definitions.is_empty());
     assert_eq!(definitions.len(), definitions.iter().count());
     assert_eq!(definitions.into_iter().count(), 0);
@@ -513,17 +428,8 @@ fn test_registry_query_views_preserve_empty_and_exact_lookup_contracts() {
             .any(|candidate| std::ptr::eq(candidate, *definition))
     }));
 
-    assert!(
-        registry
-            .effective_view(TypeId::of::<u8>())
-            .methods()
-            .is_empty()
-    );
-    assert!(
-        registry
-            .trait_definition_by_path("missing::Trait")
-            .is_none()
-    );
+    assert!(registry.effective_view(TypeId::of::<u8>()).methods().is_empty());
+    assert!(registry.trait_definition_by_path("missing::Trait").is_none());
     let traits = registry.find_trait_definitions_by_path("missing::Trait");
     assert!(traits.is_empty());
     assert_eq!(traits.len(), 0);
@@ -556,9 +462,6 @@ fn test_missing_receiver_and_owned_unit_keep_distinct_validation_facts() {
     assert_eq!(failure.error().method_identity(), &identity);
     let recovered = failure.into_recovery().into_invocation();
     assert!(recovered.validate(&identity, absent, &[]).is_ok());
-    let invocation = Invocation::<Local>::new(
-        Some(InvocationReceiver::Owned(ReflectedOwned::new(()))),
-        [],
-    );
+    let invocation = Invocation::<Local>::new(Some(InvocationReceiver::Owned(ReflectedOwned::new(()))), []);
     assert!(invocation.validate(&identity, unit, &[]).is_ok());
 }

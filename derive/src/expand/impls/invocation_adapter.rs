@@ -29,16 +29,7 @@ pub(super) fn definition(
     target_source: &str,
     facade: &TokenStream,
 ) -> Option<TokenStream> {
-    definition_for_call(
-        method,
-        index,
-        target,
-        trait_call_path,
-        target_source,
-        facade,
-        &[],
-        None,
-    )
+    definition_for_call(method, index, target, trait_call_path, target_source, facade, &[], None)
 }
 
 /// Generates an adapter for a concrete method specialization through the same
@@ -67,13 +58,8 @@ pub(super) fn specialization_definition(
 
 /// Returns the static descriptor name shared by specialization emission and
 /// registration.
-pub(super) fn specialization_descriptor_name(
-    method_index: usize,
-    specialization_index: usize,
-) -> Ident {
-    format_ident!(
-        "__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}"
-    )
+pub(super) fn specialization_descriptor_name(method_index: usize, specialization_index: usize) -> Ident {
+    format_ident!("__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -87,74 +73,46 @@ fn definition_for_call(
     generic_arguments: &[TokenStream],
     specialization_index: Option<usize>,
 ) -> Option<TokenStream> {
-    let adapter_suffix = specialization_index
-        .map_or_else(|| index.to_string(), |value| format!("{index}_{value}"));
+    let adapter_suffix = specialization_index.map_or_else(|| index.to_string(), |value| format!("{index}_{value}"));
     let descriptor_name = specialization_index.map_or_else(
         || format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}"),
         |value| specialization_descriptor_name(index, value),
     );
-    let generic_call = (!generic_arguments.is_empty())
-        .then(|| quote!(::<#(#generic_arguments),*>));
+    let generic_call = (!generic_arguments.is_empty()).then(|| quote!(::<#(#generic_arguments),*>));
     let typed_extension_receiver = method
         .receiver
         .as_ref()
         .and_then(|receiver| typed_extension_receiver_type(receiver, target));
-    let mut method_context =
-        crate::expand::invocation::analysis::MethodContext::implementation(
-            target,
-        );
+    let mut method_context = crate::expand::invocation::analysis::MethodContext::implementation(target);
     method_context.extension_receiver = typed_extension_receiver.clone();
-    let invocation_plan = crate::expand::invocation::analysis::analyze_method(
-        method,
-        method_context,
-    )
-    .expect("validated method analysis is infallible");
-    debug_assert_eq!(
-        invocation_plan.parameter_count(),
-        method.parameters.len()
-    );
+    let invocation_plan = crate::expand::invocation::analysis::analyze_method(method, method_context)
+        .expect("validated method analysis is infallible");
+    debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
     let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
-    let typed_extension_receiver =
-        invocation_plan.extension_receiver_type().cloned();
+    let typed_extension_receiver = invocation_plan.extension_receiver_type().cloned();
     let is_safe_invocation = invocation_plan.is_executable();
     let pinned_receiver_mutable = invocation_plan.pinned_receiver_mutability();
     if let Some(pinned_mutable) = pinned_receiver_mutable {
         let is_safe_pinned_invocation = invocation_plan.is_executable();
         if is_safe_pinned_invocation {
             let method_name = &method.name;
-            let adapter_name =
-                format_ident!("__qubit_reflect_invoke_pinned_{adapter_suffix}");
-            let adapter_token_name = format_ident!(
-                "__QUBIT_REFLECT_PINNED_ADAPTER_{adapter_suffix}"
-            );
+            let adapter_name = format_ident!("__qubit_reflect_invoke_pinned_{adapter_suffix}");
+            let adapter_token_name = format_ident!("__QUBIT_REFLECT_PINNED_ADAPTER_{adapter_suffix}");
             let parameter_expectations: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| {
-                    crate::expand::invocation::emit::argument_expectation(
-                        parameter, facade,
-                    )
-                })
+                .map(|parameter| crate::expand::invocation::emit::argument_expectation(parameter, facade))
                 .collect();
             let mode = quote!(#facade::__private::codegen_v3::value::Local);
             let argument_bindings: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| {
-                    crate::expand::invocation::emit::argument_binding(
-                        parameter, facade, &mode,
-                    )
-                })
+                .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
                 .collect();
             let call_arguments: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| {
-                    format_ident!(
-                        "__qubit_reflect_argument_{}",
-                        parameter.index
-                    )
-                })
+                .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
                 .collect();
             let invocation_type = if pinned_mutable {
                 quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocation<'call, #target, #facade::__private::codegen_v3::value::Local>)
@@ -242,8 +200,7 @@ fn definition_for_call(
     }
     let method_name = &method.name;
     let adapter_name = format_ident!("__qubit_reflect_invoke_{adapter_suffix}");
-    let catching_adapter_name =
-        format_ident!("__qubit_reflect_invoke_catching_{adapter_suffix}");
+    let catching_adapter_name = format_ident!("__qubit_reflect_invoke_catching_{adapter_suffix}");
     let thread_safe = invocation_plan.modes.thread_safe;
     let catching_requested = invocation_plan.modes.catching;
     let mode = if thread_safe {
@@ -323,9 +280,7 @@ fn definition_for_call(
     } else {
         quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::none())
     };
-    let receiver_binding = if let Some(receiver_type) =
-        &typed_extension_receiver
-    {
+    let receiver_binding = if let Some(receiver_type) = &typed_extension_receiver {
         quote! {
             let (receiver, arguments) = validated.adapt_receiver_in::<#receiver_type>(
                 _registry,
@@ -390,11 +345,7 @@ fn definition_for_call(
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_expectation(
-                parameter, facade,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_expectation(parameter, facade))
         .collect();
     let invocation_validation = if typed_extension_receiver.is_some() {
         quote!(invocation.validate_arguments(&identity, &[#(#parameter_expectations),*])?)
@@ -408,18 +359,12 @@ fn definition_for_call(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_binding(
-                parameter, facade, &mode,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            format_ident!("__qubit_reflect_argument_{}", parameter.index)
-        })
+        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
         .collect();
     let argument_bindings = &argument_bindings;
     let call_arguments = &call_arguments;
@@ -472,9 +417,7 @@ fn definition_for_call(
                 ..
             }),
         ) => {
-            let value = if crate::expand::invocation::analysis::is_str_type(
-                element,
-            ) {
+            let value = if crate::expand::invocation::analysis::is_str_type(element) {
                 quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
             } else {
                 quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
@@ -492,18 +435,13 @@ fn definition_for_call(
         (
             false,
             ReturnTypeIr::Type(TypeIr {
-                kind:
-                    TypeKindIr::Reference {
-                        mutable: true,
-                        element,
-                        ..
-                    },
+                kind: TypeKindIr::Reference {
+                    mutable: true, element, ..
+                },
                 ..
             }),
         ) => {
-            let value = if crate::expand::invocation::analysis::is_str_type(
-                element,
-            ) {
+            let value = if crate::expand::invocation::analysis::is_str_type(element) {
                 quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
             } else {
                 quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))
@@ -593,9 +531,7 @@ fn definition_for_call(
                     },
                 ..
             }) => {
-                let value = if crate::expand::invocation::analysis::is_str_type(
-                    element,
-                ) {
+                let value = if crate::expand::invocation::analysis::is_str_type(element) {
                     quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
                 } else {
                     quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
@@ -608,17 +544,12 @@ fn definition_for_call(
                 }
             }
             ReturnTypeIr::Type(TypeIr {
-                kind:
-                    TypeKindIr::Reference {
-                        mutable: true,
-                        element,
-                        ..
-                    },
+                kind: TypeKindIr::Reference {
+                    mutable: true, element, ..
+                },
                 ..
             }) => {
-                let value = if crate::expand::invocation::analysis::is_str_type(
-                    element,
-                ) {
+                let value = if crate::expand::invocation::analysis::is_str_type(element) {
                     quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
                 } else {
                     quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))

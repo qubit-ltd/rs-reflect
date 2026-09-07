@@ -26,11 +26,7 @@ pub struct FieldSetRecovery<M: Mode = Local> {
 
 impl<M: Mode> FieldSetRecovery<M> {
     /// Creates recovery for one field replacement value.
-    pub(crate) const fn new(
-        field: FieldIdentity,
-        query_name: Option<&'static str>,
-        value: DynamicOwned<M>,
-    ) -> Self {
+    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: DynamicOwned<M>) -> Self {
         Self {
             field,
             query_name,
@@ -87,10 +83,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     ///
     /// Returns the intact recovery when `name` does not match or the field is
     /// positional.
-    pub fn into_value_by_name(
-        self,
-        name: &str,
-    ) -> Result<DynamicOwned<M>, Self> {
+    pub fn into_value_by_name(self, name: &str) -> Result<DynamicOwned<M>, Self> {
         if self.query_name == Some(name) {
             Ok(self.value)
         } else {
@@ -144,9 +137,7 @@ impl<M: Mode> FieldSetFailure<M> {
     ) -> Self {
         Self {
             error: Box::new(error),
-            recovery: Some(Box::new(FieldSetRecovery::new(
-                field, query_name, value,
-            ))),
+            recovery: Some(Box::new(FieldSetRecovery::new(field, query_name, value))),
         }
     }
 
@@ -186,9 +177,7 @@ impl<M: Mode> FieldSetFailure<M> {
     ///
     /// Returns the structured adapter error when execution already accepted
     /// ownership and recovery is therefore unavailable.
-    pub fn into_recovery(
-        self,
-    ) -> Result<FieldSetRecovery<M>, FieldAccessError> {
+    pub fn into_recovery(self) -> Result<FieldSetRecovery<M>, FieldAccessError> {
         match self.recovery {
             Some(recovery) => Ok(*recovery),
             None => Err(*self.error),

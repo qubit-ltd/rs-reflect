@@ -55,10 +55,7 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
     /// The binding selects the next unoccupied declaration-order parameter
     /// when a method descriptor validates the invocation.
     pub fn positional(argument: InvocationArg<'call, M>) -> Self {
-        Self {
-            name: None,
-            argument,
-        }
+        Self { name: None, argument }
     }
 
     /// Creates a named binding without validating the supplied name.
@@ -91,9 +88,7 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
     }
 
     /// Splits the binding into its optional name and untouched argument.
-    pub(crate) fn into_parts(
-        self,
-    ) -> (Option<Box<str>>, InvocationArg<'call, M>) {
+    pub(crate) fn into_parts(self) -> (Option<Box<str>>, InvocationArg<'call, M>) {
         (self.name, self.argument)
     }
 }

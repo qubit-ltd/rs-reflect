@@ -83,9 +83,7 @@ fn test_unregistered_generic_conflict_is_not_absence() {
     reason = "derive capability providers receive the concrete type parameter"
 )]
 fn different_contract<T: 'static>() -> CapabilityDescriptor {
-    let key = CapabilityKey::new(
-        CapabilityId::new("example.generic_conflict").unwrap(),
-    );
+    let key = CapabilityKey::new(CapabilityId::new("example.generic_conflict").unwrap());
     CapabilityDescriptor::with_adapter(key, 17_usize)
 }
 
@@ -117,12 +115,10 @@ fn counted<T: 'static>() -> CapabilityDescriptor {
     *counts.entry(std::any::TypeId::of::<T>()).or_default() += 1;
     CapabilityDescriptor::with_adapter(key(), adapter as fn())
 }
-static FAIL_COUNTS: std::sync::Mutex<
-    std::collections::BTreeMap<std::any::TypeId, usize>,
-> = std::sync::Mutex::new(std::collections::BTreeMap::new());
-static COUNTS: std::sync::Mutex<
-    std::collections::BTreeMap<std::any::TypeId, usize>,
-> = std::sync::Mutex::new(std::collections::BTreeMap::new());
+static FAIL_COUNTS: std::sync::Mutex<std::collections::BTreeMap<std::any::TypeId, usize>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
+static COUNTS: std::sync::Mutex<std::collections::BTreeMap<std::any::TypeId, usize>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
 
 #[derive(Reflect)]
 #[reflect(capabilities(counted, fact))]
@@ -131,8 +127,7 @@ struct Counted<T> {
 }
 
 #[test]
-fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_absent()
- {
+fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_absent() {
     let registry = ReflectRegistry::initialize().unwrap();
     let before = registry.types().len();
     std::thread::scope(|scope| {
@@ -140,17 +135,8 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
             scope.spawn(|| {
                 for _ in 0..20 {
                     let descriptor = TypeDescriptor::of::<Counted<u32>>();
-                    assert!(
-                        registry
-                            .capability(descriptor, key())
-                            .unwrap()
-                            .is_some()
-                    );
-                    assert!(
-                        registry
-                            .capabilities(TypeDescriptor::of::<Conflict<u64>>())
-                            .is_err()
-                    );
+                    assert!(registry.capability(descriptor, key()).unwrap().is_some());
+                    assert!(registry.capabilities(TypeDescriptor::of::<Conflict<u64>>()).is_err());
                 }
             });
         }
@@ -165,23 +151,11 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
     let other = TypeDescriptor::of::<Counted<String>>();
     assert!(registry.capability(other, key()).unwrap().is_some());
     let counts = COUNTS.lock().unwrap();
-    assert_eq!(
-        counts.get(&std::any::TypeId::of::<Counted<u32>>()),
-        Some(&1)
-    );
-    assert_eq!(
-        counts.get(&std::any::TypeId::of::<Counted<String>>()),
-        Some(&1)
-    );
-    let missing: CapabilityKey<fn()> =
-        CapabilityKey::new(CapabilityId::new("example.absent").unwrap());
+    assert_eq!(counts.get(&std::any::TypeId::of::<Counted<u32>>()), Some(&1));
+    assert_eq!(counts.get(&std::any::TypeId::of::<Counted<String>>()), Some(&1));
+    let missing: CapabilityKey<fn()> = CapabilityKey::new(CapabilityId::new("example.absent").unwrap());
     assert!(registry.capability(other, missing).unwrap().is_none());
-    assert!(
-        registry
-            .capability_by_id(other, "invalid!")
-            .unwrap()
-            .is_none()
-    );
+    assert!(registry.capability_by_id(other, "invalid!").unwrap().is_none());
     let wrong: CapabilityKey<usize> = CapabilityKey::new(*key().id());
     assert!(registry.capability(other, wrong).unwrap().is_none());
     assert!(matches!(
@@ -217,14 +191,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
         "example::Receiver",
         "method",
         1,
-        FragmentIdentity::new(
-            "example",
-            "example::Receiver",
-            1,
-            1,
-            "method",
-            1,
-        ),
+        FragmentIdentity::new("example", "example::Receiver", 1, 1, "method", 1),
     );
     let absent = ReceiverExpectation::none();
     let unit = ReceiverExpectation::owned::<()>();
@@ -232,9 +199,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
     assert_eq!(absent.type_name(), None);
     assert_eq!(unit.type_id(), Some(std::any::TypeId::of::<()>()));
     assert_eq!(unit.type_name(), Some(std::any::type_name::<()>()));
-    let invocation = Invocation::associated([InvocationArg::Owned(
-        ReflectedOwned::new(7_u8),
-    )]);
+    let invocation = Invocation::associated([InvocationArg::Owned(ReflectedOwned::new(7_u8))]);
     let validated = invocation
         .validate(
             &identity,
@@ -242,11 +207,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
             &[ArgumentExpectation::owned::<u8>()],
         )
         .unwrap();
-    let failure = match validated.adapt_receiver_in::<()>(
-        &registry,
-        &identity,
-        TypeDescriptor::of::<Conflict<u16>>(),
-    ) {
+    let failure = match validated.adapt_receiver_in::<()>(&registry, &identity, TypeDescriptor::of::<Conflict<u16>>()) {
         Err(failure) => failure,
         Ok(_) => panic!("invalid capabilities must reject adaptation"),
     };
@@ -255,14 +216,11 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
         InvocationErrorKind::CapabilityResolution(_)
     ));
     let (_, arguments) = failure.into_recovery().into_parts();
-    let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap()
-    else {
+    let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap() else {
         panic!("owned argument")
     };
     assert_eq!(
-        value
-            .downcast::<u8>()
-            .unwrap_or_else(|_| panic!("exact argument type")),
+        value.downcast::<u8>().unwrap_or_else(|_| panic!("exact argument type")),
         7
     );
 }

@@ -98,15 +98,9 @@ fn test_const_argument_factories_cover_supported_primitives() {
         ConstExpression::Character('x')
     );
     assert_eq!(descriptor::const_argument_diagnostic(7_i8).as_ref(), "7");
-    assert_eq!(
-        descriptor::const_argument_diagnostic(false).as_ref(),
-        "false"
-    );
+    assert_eq!(descriptor::const_argument_diagnostic(false).as_ref(), "false");
     assert_eq!(descriptor::const_argument_diagnostic('x').as_ref(), "'x'");
-    assert_eq!(
-        descriptor::const_argument_owned(9_u8).downcast_ref::<u8>(),
-        Some(&9)
-    );
+    assert_eq!(descriptor::const_argument_owned(9_u8).downcast_ref::<u8>(), Some(&9));
 
     let reader = descriptor::associated_const_reader(constant_value);
     assert_eq!(reader.read().downcast_ref::<u8>(), Some(&41));
@@ -124,22 +118,14 @@ fn test_codegen_v3_expression_factories_preserve_structural_inputs() {
             Box::<str>::from("Vec"),
         ]
         .into_boxed_slice(),
-        vec![GenericArgument::Type(TypeExpression::SelfType)]
-            .into_boxed_slice(),
+        vec![GenericArgument::Type(TypeExpression::SelfType)].into_boxed_slice(),
         "std::vec::Vec<Self>".into(),
     );
     assert_eq!(
-        concrete
-            .path()
-            .iter()
-            .map(AsRef::as_ref)
-            .collect::<Vec<_>>(),
+        concrete.path().iter().map(AsRef::as_ref).collect::<Vec<_>>(),
         ["std", "vec", "Vec"]
     );
-    assert_eq!(
-        concrete.arguments(),
-        &[GenericArgument::Type(TypeExpression::SelfType)]
-    );
+    assert_eq!(concrete.arguments(), &[GenericArgument::Type(TypeExpression::SelfType)]);
     assert_eq!(concrete.diagnostic(), Some("std::vec::Vec<Self>"));
 
     let const_argument = codegen_expression::const_argument(
@@ -147,25 +133,16 @@ fn test_codegen_v3_expression_factories_preserve_structural_inputs() {
         ConstExpression::UnsignedInteger(4),
         "4",
     );
-    assert!(matches!(
-        const_argument.declared_type(),
-        TypeExpression::Concrete(_)
-    ));
+    assert!(matches!(const_argument.declared_type(), TypeExpression::Concrete(_)));
     assert_eq!(const_argument.value(), &ConstExpression::UnsignedInteger(4));
     assert_eq!(const_argument.normalized_diagnostic(), "4");
 
-    let array = codegen_expression::array(
-        TypeExpression::SelfType,
-        ConstExpression::Parameter("N".into()),
-    );
+    let array = codegen_expression::array(TypeExpression::SelfType, ConstExpression::Parameter("N".into()));
     assert_eq!(array.element(), &TypeExpression::SelfType);
     assert_eq!(array.length(), &ConstExpression::Parameter("N".into()));
 
-    let reference = codegen_expression::reference(
-        LifetimeExpression::Named("a".into()),
-        true,
-        TypeExpression::SelfType,
-    );
+    let reference =
+        codegen_expression::reference(LifetimeExpression::Named("a".into()), true, TypeExpression::SelfType);
     assert_eq!(reference.lifetime(), &LifetimeExpression::Named("a".into()));
     assert!(reference.is_mutable());
     assert_eq!(reference.target(), &TypeExpression::SelfType);
@@ -195,71 +172,35 @@ fn test_codegen_v3_expression_factories_preserve_structural_inputs() {
 /// output without exposing another public construction API.
 #[test]
 fn test_descriptor_factories_preserve_typed_categories() {
-    let element =
-        Box::leak(Box::new(TypeRef::Resolved(TypeDescriptor::of::<u8>())));
-    let value =
-        Box::leak(Box::new(TypeRef::Resolved(TypeDescriptor::of::<String>())));
+    let element = Box::leak(Box::new(TypeRef::Resolved(TypeDescriptor::of::<u8>())));
+    let value = Box::leak(Box::new(TypeRef::Resolved(TypeDescriptor::of::<String>())));
     let parameters = Box::leak(vec![element.clone()].into_boxed_slice());
     let abi = Box::leak(Box::new(FunctionAbi::Rust));
 
     let primitive = descriptor::primitive::<u8>("primitive", PrimitiveKind::U8);
-    let primitive_caps = descriptor::primitive_with_capabilities::<u8>(
-        "primitive-caps",
-        PrimitiveKind::U8,
-        empty_capabilities,
-    );
+    let primitive_caps =
+        descriptor::primitive_with_capabilities::<u8>("primitive-caps", PrimitiveKind::U8, empty_capabilities);
     let text = descriptor::text::<String>("text", TextKind::String);
-    let text_caps = descriptor::text_with_capabilities::<String>(
-        "text-caps",
-        TextKind::String,
-        empty_capabilities,
-    );
-    let structure =
-        descriptor::struct_type::<()>("struct", StructKind::Unit, &[]);
+    let text_caps = descriptor::text_with_capabilities::<String>("text-caps", TextKind::String, empty_capabilities);
+    let structure = descriptor::struct_type::<()>("struct", StructKind::Unit, &[]);
     let enumeration = descriptor::enum_type::<()>("enum", &[]);
-    let represented =
-        descriptor::enum_type_with_repr::<()>("repr", &[], &[EnumRepr::C]);
+    let represented = descriptor::enum_type_with_repr::<()>("repr", &[], &[EnumRepr::C]);
     let tuple = descriptor::tuple::<()>("tuple", parameters);
     let array = descriptor::array::<()>("array", element, 2);
     let optional = descriptor::optional::<()>("optional", element);
-    let sequence =
-        descriptor::sequence::<()>("sequence", SequenceKind::Vec, element);
+    let sequence = descriptor::sequence::<()>("sequence", SequenceKind::Vec, element);
     let set = descriptor::set::<()>("set", SetKind::HashSet, element);
     let map = descriptor::map::<()>("map", MapKind::HashMap, element, value);
-    let smart = descriptor::smart_pointer::<()>(
-        "smart",
-        SmartPointerKind::Box,
-        element,
-    );
-    let reference = descriptor::reference::<()>(
-        "reference",
-        ReferenceKind::Shared,
-        element,
-    );
+    let smart = descriptor::smart_pointer::<()>("smart", SmartPointerKind::Box, element);
+    let reference = descriptor::reference::<()>("reference", ReferenceKind::Shared, element);
     let slice = descriptor::slice::<()>("slice", element);
-    let raw =
-        descriptor::raw_pointer::<()>("raw", Mutability::Mutable, element);
-    let function = descriptor::function::<()>(
-        "function",
-        FunctionPointerKind::Safe,
-        abi,
-        false,
-        parameters,
-        value,
-    );
-    let trait_object = descriptor::trait_object::<dyn std::fmt::Debug>(
-        "debug",
-        debug_trait_descriptor,
-    );
+    let raw = descriptor::raw_pointer::<()>("raw", Mutability::Mutable, element);
+    let function = descriptor::function::<()>("function", FunctionPointerKind::Safe, abi, false, parameters, value);
+    let trait_object = descriptor::trait_object::<dyn std::fmt::Debug>("debug", debug_trait_descriptor);
     let opaque = descriptor::opaque_root::<()>("opaque");
-    let opaque_caps = descriptor::opaque_root_with_capabilities::<()>(
-        "opaque-caps",
-        empty_capabilities,
-    );
-    let attached_caps = descriptor::with_capabilities(
-        descriptor::opaque_root::<()>("attached-caps"),
-        empty_capabilities,
-    );
+    let opaque_caps = descriptor::opaque_root_with_capabilities::<()>("opaque-caps", empty_capabilities);
+    let attached_caps =
+        descriptor::with_capabilities(descriptor::opaque_root::<()>("attached-caps"), empty_capabilities);
 
     assert!(primitive.as_primitive().is_some());
     assert!(primitive_caps.as_primitive().is_some());
@@ -268,10 +209,7 @@ fn test_descriptor_factories_preserve_typed_categories() {
     assert!(structure.as_struct().is_some());
     assert!(enumeration.as_enum().is_some());
     assert_eq!(
-        represented
-            .as_enum()
-            .expect("represented enum")
-            .representations(),
+        represented.as_enum().expect("represented enum").representations(),
         &[EnumRepr::C],
     );
     assert_eq!(tuple.as_tuple().expect("tuple").arity(), 1);
@@ -281,16 +219,10 @@ fn test_descriptor_factories_preserve_typed_categories() {
         sequence.as_sequence().expect("sequence").element_type(),
         element,
     ));
-    assert!(std::ptr::eq(
-        set.as_set().expect("set").element_type(),
-        element
-    ));
+    assert!(std::ptr::eq(set.as_set().expect("set").element_type(), element));
     assert!(map.as_map().is_some());
     assert!(std::ptr::eq(
-        smart
-            .as_smart_pointer()
-            .expect("smart pointer")
-            .pointee_type(),
+        smart.as_smart_pointer().expect("smart pointer").pointee_type(),
         element,
     ));
     assert!(std::ptr::eq(
@@ -304,13 +236,7 @@ fn test_descriptor_factories_preserve_typed_categories() {
     ));
     assert!(function.as_function().is_some());
     assert!(trait_object.as_trait_object().is_some());
-    assert!(
-        format!(
-            "{:?}",
-            trait_object.as_trait_object().expect("trait object")
-        )
-        .contains("Debug")
-    );
+    assert!(format!("{:?}", trait_object.as_trait_object().expect("trait object")).contains("Debug"));
     assert!(opaque.as_opaque().is_some());
     assert!(opaque_caps.as_opaque().is_some());
     assert!(
@@ -366,9 +292,7 @@ fn test_relation_and_member_factories_preserve_navigation() {
     );
     assert_eq!(variant.rust_name(), "Value");
 
-    let first =
-        descriptor::intern_type::<InternedFixture>(build_interned_fixture);
-    let second =
-        descriptor::intern_type::<InternedFixture>(build_interned_fixture);
+    let first = descriptor::intern_type::<InternedFixture>(build_interned_fixture);
+    let second = descriptor::intern_type::<InternedFixture>(build_interned_fixture);
     assert!(std::ptr::eq(first, second));
 }

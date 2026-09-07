@@ -45,10 +45,7 @@ pub(super) fn default_method_invocation_adapter(
         );
     let invocation_plan = crate::expand::invocation::analysis::analyze_method(
         method,
-        crate::expand::invocation::analysis::MethodContext::trait_default(
-            &target,
-            has_unproven_associated_type,
-        ),
+        crate::expand::invocation::analysis::MethodContext::trait_default(&target, has_unproven_associated_type),
     )
     .expect("validated method analysis is infallible");
     let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
@@ -69,13 +66,9 @@ pub(super) fn default_method_invocation_adapter(
         return None;
     }
 
-    let adapter_name =
-        format_ident!("__qubit_reflect_invoke_default_{suffix}_{index}");
+    let adapter_name = format_ident!("__qubit_reflect_invoke_default_{suffix}_{index}");
     let method_name = &method.name;
-    debug_assert_eq!(
-        invocation_plan.parameter_count(),
-        method.parameters.len()
-    );
+    debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
     let thread_safe = invocation_plan.modes.thread_safe;
     let catching_requested = invocation_plan.modes.catching;
     let mode = if thread_safe {
@@ -84,20 +77,10 @@ pub(super) fn default_method_invocation_adapter(
         quote!(#facade::__private::codegen_v3::value::Local)
     };
     let thread_safe_assertions = thread_safe.then(|| {
-        crate::expand::invocation::emit::thread_safe_assertions(
-            method,
-            &target,
-            typed_owned_receiver.as_ref(),
-            None,
-        )
+        crate::expand::invocation::emit::thread_safe_assertions(method, &target, typed_owned_receiver.as_ref(), None)
     });
     let catching_assertions = catching_requested.then(|| {
-        crate::expand::invocation::emit::catching_assertions(
-            method,
-            &target,
-            typed_owned_receiver.as_ref(),
-            None,
-        )
+        crate::expand::invocation::emit::catching_assertions(method, &target, typed_owned_receiver.as_ref(), None)
     });
     let receiver_expectation = if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
@@ -123,11 +106,7 @@ pub(super) fn default_method_invocation_adapter(
             }
         }
     };
-    let receiver_binding = match method
-        .receiver
-        .as_ref()
-        .map(|receiver| receiver.kind)
-    {
+    let receiver_binding = match method.receiver.as_ref().map(|receiver| receiver.kind) {
         Some(ReceiverKindIr::Value) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver: Self = match receiver {
@@ -138,8 +117,7 @@ pub(super) fn default_method_invocation_adapter(
             };
         },
         Some(ReceiverKindIr::Typed) if typed_owned_receiver.is_some() => {
-            let receiver_type =
-                typed_owned_receiver.as_ref().expect("checked above");
+            let receiver_type = typed_owned_receiver.as_ref().expect("checked above");
             quote! {
                 let (receiver, arguments) = validated.into_parts();
                 let receiver: #receiver_type = match receiver {
@@ -181,27 +159,17 @@ pub(super) fn default_method_invocation_adapter(
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_expectation(
-                parameter, facade,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_expectation(parameter, facade))
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_binding(
-                parameter, facade, &mode,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            format_ident!("__qubit_reflect_argument_{}", parameter.index)
-        })
+        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
         .collect();
     let call = if method.receiver.is_some() {
         quote!(Self::#method_name(receiver, #(#call_arguments),*))
@@ -246,9 +214,7 @@ pub(super) fn default_method_invocation_adapter(
                 ..
             }),
         ) => {
-            let value = if crate::expand::invocation::analysis::is_str_type(
-                element,
-            ) {
+            let value = if crate::expand::invocation::analysis::is_str_type(element) {
                 quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
             } else {
                 quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
@@ -266,18 +232,13 @@ pub(super) fn default_method_invocation_adapter(
         (
             false,
             ReturnTypeIr::Type(TypeIr {
-                kind:
-                    TypeKindIr::Reference {
-                        mutable: true,
-                        element,
-                        ..
-                    },
+                kind: TypeKindIr::Reference {
+                    mutable: true, element, ..
+                },
                 ..
             }),
         ) => {
-            let value = if crate::expand::invocation::analysis::is_str_type(
-                element,
-            ) {
+            let value = if crate::expand::invocation::analysis::is_str_type(element) {
                 quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
             } else {
                 quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))
@@ -367,9 +328,7 @@ pub(super) fn default_method_invocation_adapter(
                     },
                 ..
             }) => {
-                let value = if crate::expand::invocation::analysis::is_str_type(
-                    element,
-                ) {
+                let value = if crate::expand::invocation::analysis::is_str_type(element) {
                     quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
                 } else {
                     quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
@@ -382,17 +341,12 @@ pub(super) fn default_method_invocation_adapter(
                 }
             }
             ReturnTypeIr::Type(TypeIr {
-                kind:
-                    TypeKindIr::Reference {
-                        mutable: true,
-                        element,
-                        ..
-                    },
+                kind: TypeKindIr::Reference {
+                    mutable: true, element, ..
+                },
                 ..
             }) => {
-                let value = if crate::expand::invocation::analysis::is_str_type(
-                    element,
-                ) {
+                let value = if crate::expand::invocation::analysis::is_str_type(element) {
                     quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
                 } else {
                     quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))
@@ -548,34 +502,23 @@ fn default_pinned_method_invocation_adapter(
     facade: &TokenStream,
     pinned_mutable: bool,
 ) -> (TokenStream, TokenStream) {
-    let adapter_name =
-        format_ident!("__qubit_reflect_invoke_default_pinned_{suffix}_{index}");
+    let adapter_name = format_ident!("__qubit_reflect_invoke_default_pinned_{suffix}_{index}");
     let method_name = &method.name;
     let mode = quote!(#facade::__private::codegen_v3::value::Local);
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_expectation(
-                parameter, facade,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_expectation(parameter, facade))
         .collect();
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            crate::expand::invocation::emit::argument_binding(
-                parameter, facade, &mode,
-            )
-        })
+        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| {
-            format_ident!("__qubit_reflect_argument_{}", parameter.index)
-        })
+        .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
         .collect();
     let invocation_type = if pinned_mutable {
         quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocation<'call, Self, #mode>)
@@ -668,23 +611,16 @@ fn default_pinned_method_invocation_adapter(
 pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_associated_type(path),
-        TypeKindIr::Reference { element, .. }
-        | TypeKindIr::Slice(element)
-        | TypeKindIr::Pointer { element, .. } => {
+        TypeKindIr::Reference { element, .. } | TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
             type_contains_associated_type(element)
         }
-        TypeKindIr::Tuple(elements) => {
-            elements.iter().any(type_contains_associated_type)
-        }
-        TypeKindIr::Array { element, .. } => {
-            type_contains_associated_type(element)
-        }
+        TypeKindIr::Tuple(elements) => elements.iter().any(type_contains_associated_type),
+        TypeKindIr::Array { element, .. } => type_contains_associated_type(element),
         TypeKindIr::BareFunction { inputs, output, .. } => {
             inputs.iter().any(type_contains_associated_type)
                 || output.as_deref().is_some_and(type_contains_associated_type)
         }
-        TypeKindIr::TraitObject { bounds, .. }
-        | TypeKindIr::ImplTrait { bounds } => {
+        TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
             bounds.iter().any(bound_contains_associated_type)
         }
         TypeKindIr::Never => false,
@@ -696,41 +632,29 @@ pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
 fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
     path.qualified_self.is_some()
         || (path.segments.len() > 1 && path.segments[0].name == "Self")
-        || path
-            .segments
-            .iter()
-            .any(|segment| match &segment.arguments {
-                PathArgumentsIr::None => false,
-                PathArgumentsIr::AngleBracketed(arguments) => {
-                    arguments.iter().any(|argument| match argument {
-                        PathArgumentIr::Type(ty)
-                        | PathArgumentIr::AssociatedType { ty, .. } => {
-                            type_contains_associated_type(ty)
-                        }
-                        PathArgumentIr::Constraint { bounds, .. } => {
-                            bounds.iter().any(bound_contains_associated_type)
-                        }
-                        PathArgumentIr::Other(_) => true,
-                        PathArgumentIr::Lifetime(_)
-                        | PathArgumentIr::Const(_)
-                        | PathArgumentIr::AssociatedConst { .. } => false,
-                    })
+        || path.segments.iter().any(|segment| match &segment.arguments {
+            PathArgumentsIr::None => false,
+            PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
+                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                    type_contains_associated_type(ty)
                 }
-                PathArgumentsIr::Parenthesized { inputs, output } => {
-                    inputs.iter().any(type_contains_associated_type)
-                        || output
-                            .as_deref()
-                            .is_some_and(type_contains_associated_type)
+                PathArgumentIr::Constraint { bounds, .. } => bounds.iter().any(bound_contains_associated_type),
+                PathArgumentIr::Other(_) => true,
+                PathArgumentIr::Lifetime(_) | PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } => {
+                    false
                 }
-            })
+            }),
+            PathArgumentsIr::Parenthesized { inputs, output } => {
+                inputs.iter().any(type_contains_associated_type)
+                    || output.as_deref().is_some_and(type_contains_associated_type)
+            }
+        })
 }
 
 /// Checks whether one trait or lifetime bound contains an associated binding.
 fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
     match bound {
-        GenericBoundIr::Trait { path, .. } => {
-            path_contains_associated_type(path)
-        }
+        GenericBoundIr::Trait { path, .. } => path_contains_associated_type(path),
         GenericBoundIr::Lifetime(_) => false,
         GenericBoundIr::Other(_) => true,
     }

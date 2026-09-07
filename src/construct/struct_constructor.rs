@@ -27,8 +27,7 @@ use crate::value::Mode;
 use crate::value::ThreadSafe;
 
 /// A mode-specific safe adapter generated inside the declaring struct module.
-pub type StructConstructionAdapter<M> =
-    fn(ValidatedConstructionInput<M>) -> DynamicOwned<M>;
+pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> DynamicOwned<M>;
 
 /// A descriptor-bound two-phase constructor for one concrete struct root.
 pub struct StructConstructor<M: Mode + 'static> {
@@ -81,9 +80,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
         match self
             .descriptor
             .as_struct()
-            .unwrap_or_else(|| {
-                panic!("a StructConstructor requires a struct descriptor")
-            })
+            .unwrap_or_else(|| panic!("a StructConstructor requires a struct descriptor"))
             .kind()
         {
             StructKind::Named => ConstructionShape::Named,
@@ -105,11 +102,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Named,
             }));
         }
-        let validated = crate::construct::validated::validate_named(
-            input,
-            self.fields,
-            value_type_id,
-        )?;
+        let validated = crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -126,11 +119,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Tuple,
             }));
         }
-        let validated = crate::construct::validated::validate_tuple(
-            input,
-            self.fields,
-            value_type_id,
-        )?;
+        let validated = crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -180,9 +169,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
             self.fields.len(),
             "construction policy must cover every direct struct field"
         );
-        for (descriptor_field, construction_field) in
-            self.descriptor.fields().iter().zip(self.fields)
-        {
+        for (descriptor_field, construction_field) in self.descriptor.fields().iter().zip(self.fields) {
             assert!(
                 std::ptr::eq(descriptor_field, construction_field.descriptor()),
                 "construction policy fields must be the descriptor's own fields"
@@ -209,9 +196,7 @@ impl StructConstructor<Local> {
     }
 
     /// Validates and constructs a local unit struct.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
+    pub fn construct_unit(&self) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
         self.construct_unit_with(local_type_id)
     }
 }
@@ -221,8 +206,7 @@ impl StructConstructor<ThreadSafe> {
     pub fn construct_named(
         &self,
         input: NamedConstructionInput<ThreadSafe>,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>>
-    {
+    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
         self.construct_named_with(input, thread_safe_type_id)
     }
 
@@ -230,16 +214,12 @@ impl StructConstructor<ThreadSafe> {
     pub fn construct_tuple(
         &self,
         input: TupleConstructionInput<ThreadSafe>,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>>
-    {
+    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
         self.construct_tuple_with(input, thread_safe_type_id)
     }
 
     /// Validates and constructs a thread-safe unit struct.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>>
-    {
+    pub fn construct_unit(&self) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
         self.construct_unit_with(thread_safe_type_id)
     }
 }
@@ -261,9 +241,7 @@ pub(crate) fn local_type_id(value: &DynamicOwned<Local>) -> TypeId {
     value
         .as_any()
         .map(std::any::Any::type_id)
-        .unwrap_or_else(|| {
-            unreachable!("owned local values are Any-compatible")
-        })
+        .unwrap_or_else(|| unreachable!("owned local values are Any-compatible"))
 }
 
 /// Returns the exact thread-safe erased value type identity.
@@ -271,7 +249,5 @@ pub(crate) fn thread_safe_type_id(value: &DynamicOwned<ThreadSafe>) -> TypeId {
     value
         .as_any()
         .map(std::any::Any::type_id)
-        .unwrap_or_else(|| {
-            unreachable!("owned thread-safe values are Any-compatible")
-        })
+        .unwrap_or_else(|| unreachable!("owned thread-safe values are Any-compatible"))
 }

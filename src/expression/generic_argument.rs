@@ -134,9 +134,7 @@ impl ConstExpression {
     /// # Errors
     ///
     /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
-    pub fn parameter(
-        name: impl Into<Box<str>>,
-    ) -> Result<Self, ExpressionError> {
+    pub fn parameter(name: impl Into<Box<str>>) -> Result<Self, ExpressionError> {
         ExpressionName::new(name).map(Self::Parameter)
     }
 

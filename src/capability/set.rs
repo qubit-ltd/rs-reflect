@@ -39,10 +39,7 @@ pub struct CapabilityConflict {
 impl CapabilityConflict {
     /// Classifies two descriptors already known to claim the same capability
     /// ID while preserving their input contract order.
-    pub(crate) fn from_same_id(
-        first: &CapabilityDescriptor,
-        second: &CapabilityDescriptor,
-    ) -> Self {
+    pub(crate) fn from_same_id(first: &CapabilityDescriptor, second: &CapabilityDescriptor) -> Self {
         debug_assert_eq!(first.id(), second.id());
         let kind = if first.adapter_type() == second.adapter_type() {
             CapabilityConflictKind::DuplicateId
@@ -108,9 +105,7 @@ impl TypeCapabilities {
     ///
     /// Returns [`CapabilityConflict`] when an ID occurs more than once. A
     /// different adapter type is reported separately from an exact duplicate.
-    pub fn try_new(
-        mut descriptors: Vec<CapabilityDescriptor>,
-    ) -> Result<Self, CapabilityConflict> {
+    pub fn try_new(mut descriptors: Vec<CapabilityDescriptor>) -> Result<Self, CapabilityConflict> {
         descriptors.sort_by(|left, right| {
             left.id()
                 .cmp(right.id())
@@ -141,9 +136,8 @@ impl TypeCapabilities {
     /// contract.
     #[must_use]
     pub fn contains<A: 'static>(&self, key: CapabilityKey<A>) -> bool {
-        self.find(key.id()).is_some_and(|descriptor| {
-            descriptor.adapter_type() == key.adapter_type()
-        })
+        self.find(key.id())
+            .is_some_and(|descriptor| descriptor.adapter_type() == key.adapter_type())
     }
 
     /// Retrieves a capability adapter through its typed key.
@@ -158,10 +152,7 @@ impl TypeCapabilities {
     /// Looks up a capability while preserving absence, fact-only, and adapter
     /// contract mismatch states.
     #[must_use]
-    pub fn lookup<A: 'static>(
-        &self,
-        key: CapabilityKey<A>,
-    ) -> CapabilityLookup<'_, A> {
+    pub fn lookup<A: 'static>(&self, key: CapabilityKey<A>) -> CapabilityLookup<'_, A> {
         let Some(descriptor) = self.find(key.id()) else {
             return CapabilityLookup::Missing;
         };
@@ -174,11 +165,7 @@ impl TypeCapabilities {
         if !descriptor.has_adapter() {
             return CapabilityLookup::FactOnly(descriptor);
         }
-        CapabilityLookup::Found(
-            descriptor
-                .get(&key)
-                .expect("declared adapter contract must downcast"),
-        )
+        CapabilityLookup::Found(descriptor.get(&key).expect("declared adapter contract must downcast"))
     }
 
     /// Finds a capability descriptor by its stable textual ID without
@@ -219,5 +206,4 @@ pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
 }
 
 /// A lazily initialized capability set or its structural conflict.
-pub type TypeCapabilitiesResult =
-    Result<&'static TypeCapabilities, CapabilityConflict>;
+pub type TypeCapabilitiesResult = Result<&'static TypeCapabilities, CapabilityConflict>;

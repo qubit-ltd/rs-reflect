@@ -94,12 +94,8 @@ impl fmt::Debug for TypeRef {
                 .debug_tuple("Resolved")
                 .field(&descriptor.type_name())
                 .finish(),
-            Self::Opaque(descriptor) => {
-                formatter.debug_tuple("Opaque").field(descriptor).finish()
-            }
-            Self::Symbolic(expression) => {
-                formatter.debug_tuple("Symbolic").field(expression).finish()
-            }
+            Self::Opaque(descriptor) => formatter.debug_tuple("Opaque").field(descriptor).finish(),
+            Self::Symbolic(expression) => formatter.debug_tuple("Symbolic").field(expression).finish(),
         }
     }
 }

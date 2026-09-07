@@ -25,19 +25,14 @@ use crate::ir::VisibilityIr;
 
 /// Expands a concrete struct into a static root descriptor and safe field
 /// adapters.
-pub(crate) fn expand(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
     let facade = context.facade().clone();
     let name = declaration.name.clone();
-    let fingerprint =
-        context.fingerprint(&declaration.retained_tokens.to_string());
-    let registration_module =
-        format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
+    let registration_module = format_ident!("__qubit_reflect_type_registration_{fingerprint:016x}");
     let opaque_root = declaration
         .attributes
         .iter()
@@ -46,10 +41,8 @@ pub(crate) fn expand(
         .attributes
         .iter()
         .any(|attribute| attribute.name == HelperName::ThreadSafe);
-    let reflected_field_types =
-        super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let reflected_field_types = super::generics::reflected_field_types(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
         .generics
         .params
@@ -57,15 +50,12 @@ pub(crate) fn expand(
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics =
-        match syn::parse2(declaration.generics.declaration.clone()) {
-            Ok(generics) => generics,
-            Err(_) => return TokenStream::new(),
-        };
+    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
+        Ok(generics) => generics,
+        Err(_) => return TokenStream::new(),
+    };
     if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) =
-            syn::parse2(declaration.generics.where_clause.clone())
-        else {
+        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
             return TokenStream::new();
         };
         generics.where_clause = Some(where_clause);
@@ -78,18 +68,11 @@ pub(crate) fn expand(
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
-            let lifetime = syn::Lifetime::new(
-                &format!("'{}", parameter.name),
-                parameter.span,
-            );
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameter_names {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -103,8 +86,7 @@ pub(crate) fn expand(
                 .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v3::Reflect));
         }
     }
-    let (impl_generics, type_generics, where_clause) =
-        generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let self_type = quote!(#name #type_generics);
     let query_name = declaration
         .attributes
@@ -112,11 +94,9 @@ pub(crate) fn expand(
         .find_map(|attribute| attribute.rename())
         .unwrap_or(&name.to_string())
         .to_owned();
-    let capability_function =
-        format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
+    let capability_function = format_ident!("__qubit_reflect_capabilities_{fingerprint:016x}");
     let capability_resolver = quote!(<#self_type>::#capability_function);
-    let capability_definition =
-        capabilities(&declaration, &facade, &capability_function);
+    let capability_definition = capabilities(&declaration, &facade, &capability_function);
     let adapter_definitions: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -202,8 +182,7 @@ pub(crate) fn expand(
     } else {
         super::construction::struct_adapters(&declaration, &facade)
     };
-    let construction_descriptor =
-        super::construction::struct_descriptor(&declaration, &facade);
+    let construction_descriptor = super::construction::struct_descriptor(&declaration, &facade);
     let fields: Vec<_> = if opaque_root {
         Vec::new()
     } else {
@@ -292,10 +271,8 @@ pub(crate) fn expand(
     let descriptor = if declaration.generics.params.is_empty() {
         root_descriptor
     } else {
-        let generic =
-            super::generics::concrete_descriptor(&declaration, &facade);
-        let definition =
-            super::generics::type_definition_provider_name(&declaration);
+        let generic = super::generics::concrete_descriptor(&declaration, &facade);
+        let definition = super::generics::type_definition_provider_name(&declaration);
         quote!(#facade::__private::codegen_v3::descriptor::with_type_definition(
             #facade::__private::codegen_v3::descriptor::with_concrete_generic(
                 { #root_descriptor },
@@ -311,13 +288,8 @@ pub(crate) fn expand(
         fingerprint,
         !declaration.generics.params.is_empty(),
     );
-    let generic_definition_provider =
-        super::generics::definition_provider(&declaration, &facade);
-    let type_definition_provider = super::generics::type_definition_provider(
-        &declaration,
-        &facade,
-        fingerprint,
-    );
+    let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
+    let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
@@ -423,11 +395,7 @@ fn registration(
 }
 
 /// Expands a normalized source visibility into its public runtime form.
-fn visibility(
-    visibility: &VisibilityIr,
-    facade: &TokenStream,
-    span: Span,
-) -> TokenStream {
+fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => {
             quote!(#facade::__private::codegen_v3::identity::Visibility::Public)
@@ -450,10 +418,7 @@ fn visibility(
 
 /// Emits the runtime struct category shared by concrete and generic
 /// descriptors.
-pub(crate) fn kind_tokens(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     match declaration.field_shape {
         FieldShapeIr::Unit => {
             quote!(#facade::__private::codegen_v3::descriptor::StructKind::Unit)

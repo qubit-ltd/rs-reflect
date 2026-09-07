@@ -65,8 +65,7 @@ impl From<&str> for ExpressionName {
     /// Panics when `value` is empty. User-controlled text should use
     /// [`ExpressionName::new`] to receive a structured error instead.
     fn from(value: &str) -> Self {
-        Self::new(value)
-            .expect("expression names converted with From must not be empty")
+        Self::new(value).expect("expression names converted with From must not be empty")
     }
 }
 
@@ -78,8 +77,7 @@ impl From<String> for ExpressionName {
     /// Panics when `value` is empty. User-controlled text should use
     /// [`ExpressionName::new`] to receive a structured error instead.
     fn from(value: String) -> Self {
-        Self::new(value)
-            .expect("expression names converted with From must not be empty")
+        Self::new(value).expect("expression names converted with From must not be empty")
     }
 }
 
@@ -91,7 +89,6 @@ impl From<Box<str>> for ExpressionName {
     /// Panics when `value` is empty. User-controlled text should use
     /// [`ExpressionName::new`] to receive a structured error instead.
     fn from(value: Box<str>) -> Self {
-        Self::new(value)
-            .expect("expression names converted with From must not be empty")
+        Self::new(value).expect("expression names converted with From must not be empty")
     }
 }

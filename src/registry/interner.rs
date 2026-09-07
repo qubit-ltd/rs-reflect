@@ -17,8 +17,7 @@ use crate::descriptor::TypeDescriptor;
 
 type DescriptorCell = OnceLock<TypeDescriptor>;
 
-static INTERNER: OnceLock<Mutex<HashMap<TypeId, &'static DescriptorCell>>> =
-    OnceLock::new();
+static INTERNER: OnceLock<Mutex<HashMap<TypeId, &'static DescriptorCell>>> = OnceLock::new();
 
 /// Interns the descriptor built for `T` and returns its unique root.
 ///
@@ -26,9 +25,7 @@ static INTERNER: OnceLock<Mutex<HashMap<TypeId, &'static DescriptorCell>>> =
 /// descriptors. A factory panic propagates unchanged and leaves the cell
 /// uninitialized for a later retry. Descriptor cells are intentionally leaked
 /// because descriptors are process-lifetime immutable data.
-pub(crate) fn intern<T: ?Sized + 'static>(
-    build: fn() -> TypeDescriptor,
-) -> &'static TypeDescriptor {
+pub(crate) fn intern<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'static TypeDescriptor {
     let interner = INTERNER.get_or_init(|| Mutex::new(HashMap::new()));
     let mut descriptors = match interner.lock() {
         Ok(descriptors) => descriptors,

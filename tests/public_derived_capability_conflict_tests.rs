@@ -22,9 +22,8 @@ register_type_capabilities!(DuplicateDerivedCapability: Clone);
 /// Verifies derived and explicit facts share one conflict authority.
 #[test]
 fn test_derived_and_explicit_capability_conflict_returns_registry_error() {
-    let error = ReflectRegistry::initialize().expect_err(
-        "duplicate derived and explicit facts must invalidate the registry",
-    );
+    let error =
+        ReflectRegistry::initialize().expect_err("duplicate derived and explicit facts must invalidate the registry");
 
     assert_eq!(error.kind(), RegistryErrorKind::CapabilityConflict);
 }

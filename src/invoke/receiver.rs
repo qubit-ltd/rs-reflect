@@ -66,10 +66,7 @@ impl<M: InvocationMode> InvocationReceiver<'_, M> {
 /// not possible. This lets generated invocation code preserve the complete
 /// input in [`crate::invoke::InvocationRecovery`] rather than losing an owned
 /// container during a failed conversion.
-pub type ReceiverAdapter<R, M> =
-    for<'call> fn(
-        InvocationReceiver<'call, M>,
-    ) -> Result<R, InvocationReceiver<'call, M>>;
+pub type ReceiverAdapter<R, M> = for<'call> fn(InvocationReceiver<'call, M>) -> Result<R, InvocationReceiver<'call, M>>;
 
 /// Returns the reserved typed capability key for an explicit receiver type.
 ///
@@ -77,8 +74,7 @@ pub type ReceiverAdapter<R, M> =
 /// [`crate::register_type_capabilities`] to opt an arbitrary self type into
 /// safe dynamic invocation.
 #[must_use]
-pub fn receiver_adapter_key<R: 'static, M: InvocationMode>()
--> CapabilityKey<ReceiverAdapter<R, M>> {
+pub fn receiver_adapter_key<R: 'static, M: InvocationMode>() -> CapabilityKey<ReceiverAdapter<R, M>> {
     CapabilityKey::new_core("qubit.reflect.receiver_adapter")
 }
 
@@ -163,9 +159,7 @@ impl ReceiverExpectation {
     pub const fn type_id(self) -> Option<TypeId> {
         match self {
             Self::None => None,
-            Self::Owned { type_id, .. }
-            | Self::Ref { type_id, .. }
-            | Self::Mut { type_id, .. } => Some(type_id),
+            Self::Owned { type_id, .. } | Self::Ref { type_id, .. } | Self::Mut { type_id, .. } => Some(type_id),
         }
     }
 
@@ -175,9 +169,9 @@ impl ReceiverExpectation {
     pub const fn type_name(self) -> Option<&'static str> {
         match self {
             Self::None => None,
-            Self::Owned { type_name, .. }
-            | Self::Ref { type_name, .. }
-            | Self::Mut { type_name, .. } => Some(type_name),
+            Self::Owned { type_name, .. } | Self::Ref { type_name, .. } | Self::Mut { type_name, .. } => {
+                Some(type_name)
+            }
         }
     }
 }

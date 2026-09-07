@@ -37,22 +37,19 @@ fn registry_independent_shape_descriptor() -> &'static TypeDescriptor {
     &REGISTRY_INDEPENDENT_SHAPE
 }
 
-static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::opaque_member::<u8>();
+static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v3::descriptor::opaque_member::<u8>();
 static VALUE_TYPE: TypeRef = TypeRef::Opaque(&VALUE_TYPE_DESCRIPTOR);
-static FIELDS: [FieldDescriptor; 1] =
-    [reflect::__private::codegen_v3::descriptor::field(
-        registry_independent_shape_descriptor,
-        0,
-        Some("value"),
-        Some("value"),
-        &VALUE_TYPE,
-        Visibility::Private,
-    )];
-static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::struct_type::<
-        RegistryIndependentShape,
-    >("RegistryIndependentShape", StructKind::Named, &FIELDS);
+static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descriptor::field(
+    registry_independent_shape_descriptor,
+    0,
+    Some("value"),
+    Some("value"),
+    &VALUE_TYPE,
+    Visibility::Private,
+)];
+static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<
+    RegistryIndependentShape,
+>("RegistryIndependentShape", StructKind::Named, &FIELDS);
 
 impl Reflect for RegistryIndependentShape {
     /// Returns a structurally valid root that does not initialize the global
@@ -63,14 +60,7 @@ impl Reflect for RegistryIndependentShape {
 }
 
 const CONFLICTING_IDENTITY: StaticFragmentIdentity =
-    StaticFragmentIdentity::new(
-        "type-descriptor-registry-failure-fixture",
-        "conflict",
-        1,
-        1,
-        "type",
-        1,
-    );
+    StaticFragmentIdentity::new("type-descriptor-registry-failure-fixture", "conflict", 1, 1, "type", 1);
 
 /// Returns the first conflicting fragment target.
 fn first_target_identity() -> RuntimeIdentity {
@@ -116,9 +106,9 @@ reflect::__private::codegen_v3::inventory::submit! {
 fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
     let value = RegistryIndependentShape { value: 7 };
     let descriptor = TypeDescriptor::of::<RegistryIndependentShape>();
-    let first = descriptor.impls().expect_err(
-        "duplicate registration fragments must fail initialization",
-    );
+    let first = descriptor
+        .impls()
+        .expect_err("duplicate registration fragments must fail initialization");
     let second = descriptor
         .methods()
         .expect_err("method aggregation must propagate the cached error");
@@ -130,10 +120,7 @@ fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
     assert_eq!(first.kind(), RegistryErrorKind::DuplicateFragment);
     assert_eq!(second.kind(), first.kind());
     assert_eq!(third.kind(), first.kind());
-    assert_eq!(
-        second.conflicting_fragments(),
-        first.conflicting_fragments()
-    );
+    assert_eq!(second.conflicting_fragments(), first.conflicting_fragments());
     assert_eq!(third.conflicting_fragments(), first.conflicting_fragments());
     assert_eq!(descriptor.fields().len(), 1);
     assert_eq!(
@@ -144,8 +131,7 @@ fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
         0
     );
 
-    let isolated =
-        build_registry(&[]).expect("an empty explicit snapshot is valid");
+    let isolated = build_registry(&[]).expect("an empty explicit snapshot is valid");
     assert!(descriptor.impls_in(&isolated).is_empty());
     assert!(descriptor.methods_in(&isolated).is_empty());
     assert!(matches!(

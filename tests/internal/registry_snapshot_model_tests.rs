@@ -20,8 +20,7 @@ const MAX_INPUT_BYTES: usize = 4_096;
 const MAX_FRAGMENTS: usize = 32;
 const MAX_SOURCES: u8 = 16;
 const IDS: [&str; 8] = [
-    "fuzz.a", "fuzz.b", "fuzz.c", "fuzz.d", "fuzz.e", "fuzz.f", "fuzz.g",
-    "fuzz.h",
+    "fuzz.a", "fuzz.b", "fuzz.c", "fuzz.d", "fuzz.e", "fuzz.f", "fuzz.g", "fuzz.h",
 ];
 
 /// Selects from a fixed universe without per-input interning or leaked strings.
@@ -36,9 +35,7 @@ fn descriptor(index: u8) -> &'static TypeDescriptor {
 
 /// Creates one of eight static adapter keys.
 fn key(index: u8) -> CapabilityKey<u32> {
-    CapabilityKey::new(
-        CapabilityId::new(IDS[usize::from(index) % IDS.len()]).unwrap(),
-    )
+    CapabilityKey::new(CapabilityId::new(IDS[usize::from(index) % IDS.len()]).unwrap())
 }
 
 /// Creates one of sixteen fixed source identities.
@@ -55,9 +52,7 @@ fn source(index: u8) -> FragmentIdentity {
 }
 
 /// Reconstructs facts in either order without duplicating validator logic.
-fn build<'a>(
-    operations: impl Iterator<Item = &'a [u8]>,
-) -> Result<ReflectRegistry, RegistryError> {
+fn build<'a>(operations: impl Iterator<Item = &'a [u8]>) -> Result<ReflectRegistry, RegistryError> {
     let mut builder = RegistrySnapshotBuilder::new();
     for operation in operations {
         let target = descriptor(operation[1]);
@@ -85,9 +80,7 @@ fn observations(registry: &ReflectRegistry) -> Vec<(bool, Vec<Option<u32>>)> {
             (
                 registry.get(target.type_id()).is_some(),
                 (0..8)
-                    .map(|id| {
-                        registry.capability(target, key(id)).unwrap().copied()
-                    })
+                    .map(|id| registry.capability(target, key(id)).unwrap().copied())
                     .collect(),
             )
         })
@@ -140,12 +133,6 @@ pub fn check(unbounded: &[u8]) {
     }
     assert!(conflicting.build().is_err());
     assert_eq!(observations(&first), before);
-    assert_eq!(
-        first.capability(descriptor(0), key(0)).unwrap(),
-        Some(&value)
-    );
-    assert_eq!(
-        second.capability(descriptor(0), key(0)).unwrap(),
-        Some(&(value + 1))
-    );
+    assert_eq!(first.capability(descriptor(0), key(0)).unwrap(), Some(&value));
+    assert_eq!(second.capability(descriptor(0), key(0)).unwrap(), Some(&(value + 1)));
 }
