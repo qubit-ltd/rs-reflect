@@ -23,6 +23,16 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
     ty.into_token_stream()
 }
 
+/// Substitutes generic symbols in a validated path.
+pub(in crate::expand::impls) fn substitute_path_syntax(
+    path: &syn::Path,
+    replacements: &[(Ident, TokenStream)],
+) -> syn::Path {
+    let mut path = path.clone();
+    GenericSubstituter { replacements }.visit_path_mut(&mut path);
+    path
+}
+
 struct GenericSubstituter<'a> {
     replacements: &'a [(Ident, TokenStream)],
 }
