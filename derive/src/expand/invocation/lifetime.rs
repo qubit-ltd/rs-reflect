@@ -128,11 +128,11 @@ mod tests {
     #[test]
     fn test_return_lifetime_detection_accepts_default_and_owned_outputs() {
         assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Unit));
-        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Type(
-            parsed_type(quote!(String)),
-        )));
-        assert!(return_contains_non_static_lifetime(&ReturnTypeIr::Type(
-            parsed_type(quote!(Wrapper<'a>)),
-        )));
+        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(
+            quote!(String)
+        ),)));
+        assert!(return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(
+            quote!(Wrapper<'a>)
+        ),)));
     }
 }

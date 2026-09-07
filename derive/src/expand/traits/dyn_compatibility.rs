@@ -53,14 +53,11 @@ pub(super) fn dyn_inherited_associated_types(
 }
 
 /// Adds explicit inherited bindings to one reflected dyn supertrait path.
-pub(super) fn dyn_reflected_supertrait_path(
-    path: &crate::ir::PathIr,
-    declaration: &TraitDeclarationIr,
-) -> TokenStream {
-    let mut syntax: Path = parse2(path.tokens.clone())
-        .expect("validated reflected supertrait paths must parse as Rust paths");
-    for inherited in dyn_inherited_associated_types(declaration)
-        .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
+pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDeclarationIr) -> TokenStream {
+    let mut syntax: Path =
+        parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
+    for inherited in
+        dyn_inherited_associated_types(declaration).filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
     {
         let name = Ident::new(
             &inherited
@@ -127,10 +124,7 @@ pub(super) fn dyn_inherited_arguments_for_supertrait(
 }
 
 /// Returns whether `Supertrait::Item` names an item on this direct bound.
-pub(super) fn inherited_belongs_to_supertrait(
-    inherited: &crate::ir::PathIr,
-    supertrait: &crate::ir::PathIr,
-) -> bool {
+pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, supertrait: &crate::ir::PathIr) -> bool {
     inherited.segments.len() == supertrait.segments.len() + 1
         && inherited
             .segments
@@ -146,10 +140,7 @@ pub(super) fn inherited_belongs_to_supertrait(
 /// define which concrete application a declaration-level macro should choose.
 /// Supertraits are limited to standard traits whose dyn compatibility is known
 /// without inspecting another macro expansion.
-pub(super) fn is_provably_dyn_compatible(
-    item: &ItemTrait,
-    declaration: &TraitDeclarationIr,
-) -> bool {
+pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
     if declaration
         .attributes
         .iter()
@@ -184,9 +175,7 @@ pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
     match bound {
         TypeParamBound::Lifetime(_) => true,
         TypeParamBound::Trait(bound) => {
-            if !matches!(bound.modifier, TraitBoundModifier::None)
-                || tokens_contain_self(bound.to_token_stream())
-            {
+            if !matches!(bound.modifier, TraitBoundModifier::None) || tokens_contain_self(bound.to_token_stream()) {
                 return false;
             }
             let path = bound.path.to_token_stream().to_string().replace(' ', "");
@@ -291,10 +280,7 @@ pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
             let Some(segment) = path.path.segments.last() else {
                 return false;
             };
-            if !matches!(
-                segment.ident.to_string().as_str(),
-                "Box" | "Rc" | "Arc" | "Pin"
-            ) {
+            if !matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc" | "Pin") {
                 return false;
             }
             let SynPathArguments::AngleBracketed(arguments) = &segment.arguments else {
@@ -370,10 +356,7 @@ mod tests {
     fn inherited_binding_and_projection_are_analyzed_in_one_module() {
         let supertrait = crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
         let inherited = crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
-        assert!(super::inherited_belongs_to_supertrait(
-            &inherited,
-            &supertrait
-        ));
+        assert!(super::inherited_belongs_to_supertrait(&inherited, &supertrait));
         assert!(!super::tokens_contain_unprojected_self(quote!(Self::Assoc)));
     }
 }
