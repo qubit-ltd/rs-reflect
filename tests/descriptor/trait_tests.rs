@@ -78,6 +78,9 @@ struct GenericMarker;
 struct OtherMarker;
 struct PayloadCacheMarker;
 struct TraitObjectCacheMarker;
+struct PublicPathMarker;
+struct PublicPathObjectMarker;
+struct DefinitionOrderMarker;
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
     LazyLock::new(|| GenericDefinitionDescriptor::new(Vec::new(), Vec::new()));
@@ -204,6 +207,137 @@ fn read_limit() -> ReflectedOwned {
 static ASSOCIATED_CONST_READER: AssociatedConstReader = AssociatedConstReader::new(read_limit);
 
 #[test]
+fn test_trait_descriptor_public_paths_remain_available() {
+    fn assert_public_type<T>() {}
+
+    assert_public_type::<reflect::descriptor::AppliedTraitId>();
+    assert_public_type::<reflect::descriptor::AssociatedConstDescriptor>();
+    assert_public_type::<reflect::descriptor::AssociatedTypeDescriptor>();
+    assert_public_type::<reflect::descriptor::SupertraitClosure<'static>>();
+    assert_public_type::<reflect::descriptor::TraitCompleteness>();
+    assert_public_type::<reflect::descriptor::TraitDefinitionDescriptor>();
+    assert_public_type::<reflect::descriptor::TraitDescriptor>();
+    assert_public_type::<reflect::descriptor::TraitDescriptorBuildError>();
+    assert_public_type::<reflect::descriptor::TraitDescriptorBuilder>();
+    assert_public_type::<reflect::descriptor::TraitDescriptorRef>();
+    assert_public_type::<reflect::descriptor::TraitId>();
+    assert_public_type::<reflect::descriptor::TraitImplPayload>();
+
+    let external = reflect::descriptor::external_supertrait::<PublicPathMarker>(
+        "test.external.public.path",
+        "fixture::PublicPath",
+        Vec::new(),
+    );
+    assert_eq!(external.rust_path(), "fixture::PublicPath");
+
+    let cached = reflect::descriptor::cached_trait_object_descriptor::<PublicPathObjectMarker>(|| {
+        TraitDescriptor::builder(&ROOT_DEFINITION)
+            .build()
+            .expect("the public cache fixture must build")
+    });
+    assert_eq!(cached.rust_path(), "fixture::Root");
+}
+
+#[test]
+fn test_trait_definition_and_applied_members_preserve_declaration_order() {
+    let definition = Box::leak(Box::new(TraitDefinitionDescriptor::new(
+        TraitId::Reflected(TypeId::of::<DefinitionOrderMarker>()),
+        "Ordered",
+        "fixture::Ordered",
+        "ordered",
+        TraitCompleteness::Complete,
+        &EMPTY_GENERIC_DEFINITION,
+    )));
+    definition.initialize_members(|definition| {
+        let methods = vec![
+            MethodDescriptor::builder(
+                member_id("ordered_method", 0),
+                "first_method",
+                "first_method",
+                MethodDeclarationOwner::Trait(definition),
+            )
+            .build(),
+            MethodDescriptor::builder(
+                member_id("ordered_method", 1),
+                "second_method",
+                "second_method",
+                MethodDeclarationOwner::Trait(definition),
+            )
+            .build(),
+        ];
+        let associated_types = vec![
+            AssociatedTypeDescriptor::new(0, "FirstType", "first_type", Box::new([]), None),
+            AssociatedTypeDescriptor::new(1, "SecondType", "second_type", Box::new([]), None),
+        ];
+        let associated_consts = vec![
+            AssociatedConstDescriptor::new(0, "FIRST", "first", TypeExpression::Never, false),
+            AssociatedConstDescriptor::new(1, "SECOND", "second", TypeExpression::Never, true),
+        ];
+        (
+            methods.into_boxed_slice(),
+            associated_types.into_boxed_slice(),
+            associated_consts.into_boxed_slice(),
+        )
+    });
+
+    assert_eq!(
+        definition
+            .methods()
+            .iter()
+            .map(MethodDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["first_method", "second_method"]
+    );
+    assert_eq!(
+        definition
+            .associated_types()
+            .iter()
+            .map(AssociatedTypeDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["FirstType", "SecondType"]
+    );
+    assert_eq!(
+        definition
+            .associated_consts()
+            .iter()
+            .map(AssociatedConstDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["FIRST", "SECOND"]
+    );
+
+    let applied = TraitDescriptor::builder(definition)
+        .methods(definition.methods())
+        .associated_types(definition.associated_types().to_vec())
+        .associated_consts(definition.associated_consts().to_vec())
+        .build()
+        .expect("ordered declaration members must build");
+    assert_eq!(
+        applied
+            .methods()
+            .iter()
+            .map(MethodDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["first_method", "second_method"]
+    );
+    assert_eq!(
+        applied
+            .associated_types()
+            .iter()
+            .map(AssociatedTypeDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["FirstType", "SecondType"]
+    );
+    assert_eq!(
+        applied
+            .associated_consts()
+            .iter()
+            .map(AssociatedConstDescriptor::rust_name)
+            .collect::<Vec<_>>(),
+        ["FIRST", "SECOND"]
+    );
+}
+
+#[test]
 fn test_trait_descriptor_navigation_preserves_direct_order_and_builds_sorted_transitive_closure() {
     let leaf = TraitDescriptor::builder(&LEAF_DEFINITION)
         .direct_supertraits([*ROOT_TRAIT, *MIDDLE_TRAIT])
@@ -223,6 +357,23 @@ fn test_trait_descriptor_navigation_preserves_direct_order_and_builds_sorted_tra
         .map(|descriptor| descriptor.rust_path())
         .collect();
     assert_eq!(all_paths, ["fixture::Middle", "fixture::Root"]);
+
+    let debug = format!("{leaf:?}");
+    for expected_field in [
+        "TraitDescriptor",
+        "definition",
+        "arguments: []",
+        "direct_supertrait_count: 2",
+        "all_supertrait_count: 2",
+        "method_count: 0",
+        "associated_type_count: 0",
+        "associated_const_count: 0",
+    ] {
+        assert!(
+            debug.contains(expected_field),
+            "TraitDescriptor Debug output must retain `{expected_field}`: {debug}"
+        );
+    }
 }
 
 /// Verifies concurrent first access publishes one external supertrait instance
@@ -377,18 +528,39 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     assert!(associated_const.has_default());
 
     let errors = [
-        TraitDescriptorBuildError::RecursiveSupertrait {
-            rust_path: "fixture::Root",
-        },
-        TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts,
-        TraitDescriptorBuildError::GenericArgumentCount { expected: 1, actual: 0 },
-        TraitDescriptorBuildError::GenericArgumentKind { index: 0 },
-        TraitDescriptorBuildError::NonConcreteGenericArgument { index: 0 },
-        TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
-        TraitDescriptorBuildError::ForeignMethod,
+        (
+            TraitDescriptorBuildError::RecursiveSupertrait {
+                rust_path: "fixture::Root",
+            },
+            "recursive supertrait application: fixture::Root",
+        ),
+        (
+            TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts,
+            "an external incomplete trait cannot claim supertraits or associated items",
+        ),
+        (
+            TraitDescriptorBuildError::GenericArgumentCount { expected: 1, actual: 0 },
+            "trait application requires 1 concrete arguments but received 0",
+        ),
+        (
+            TraitDescriptorBuildError::GenericArgumentKind { index: 0 },
+            "trait argument 0 has the wrong generic kind",
+        ),
+        (
+            TraitDescriptorBuildError::NonConcreteGenericArgument { index: 0 },
+            "trait argument 0 is not concrete",
+        ),
+        (
+            TraitDescriptorBuildError::InvalidAssociatedTypeArgument,
+            "an associated-type argument must name one declared item and have a concrete value",
+        ),
+        (
+            TraitDescriptorBuildError::ForeignMethod,
+            "applied trait contains a foreign method declaration",
+        ),
     ];
-    for error in errors {
-        assert!(!error.to_string().is_empty());
+    for (error, expected_message) in errors {
+        assert_eq!(error.to_string(), expected_message);
     }
 
     for error in [
