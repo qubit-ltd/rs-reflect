@@ -28,8 +28,8 @@ use syn::TraitItemType;
 use syn::Type;
 use syn::TypeParamBound;
 use syn::WhereClause;
-use syn::parse2;
 use syn::parse_quote;
+use syn::parse2;
 
 use super::SynPathArguments;
 use super::SynWherePredicate;
@@ -369,8 +369,7 @@ mod tests {
     #[test]
     fn inherited_binding_and_projection_are_analyzed_in_one_module() {
         let supertrait = crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
-        let inherited =
-            crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
+        let inherited = crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
         assert!(super::inherited_belongs_to_supertrait(
             &inherited,
             &supertrait
