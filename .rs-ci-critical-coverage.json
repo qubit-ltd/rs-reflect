@@ -29,6 +29,26 @@
       "functions": 95,
       "lines": 95,
       "regions": 95
+    },
+    "src/capability/set.rs": {
+      "functions": 100,
+      "lines": 98,
+      "regions": 99
+    },
+    "src/registry/registry.rs": {
+      "functions": 98,
+      "lines": 98,
+      "regions": 98
+    },
+    "src/registry/registry_builder.rs": {
+      "functions": 100,
+      "lines": 97,
+      "regions": 96
+    },
+    "src/registry/registry_snapshot_builder.rs": {
+      "functions": 100,
+      "lines": 100,
+      "regions": 100
     }
   }
 }

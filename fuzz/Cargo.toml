@@ -40,3 +40,10 @@ path = "fuzz_targets/dynamic_operations.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "registry_snapshot"
+path = "fuzz_targets/registry_snapshot.rs"
+test = false
+doc = false
+bench = false
