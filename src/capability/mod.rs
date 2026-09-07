@@ -11,6 +11,7 @@
 mod builtin;
 mod descriptor;
 mod key;
+mod lookup;
 mod registration;
 mod set;
 
@@ -26,6 +27,7 @@ pub use builtin::sync_descriptor;
 pub use builtin::sync_key;
 pub use descriptor::CapabilityDescriptor;
 pub use key::CapabilityKey;
+pub use lookup::CapabilityLookup;
 pub use set::CapabilityConflict;
 pub use set::CapabilityConflictKind;
 pub use set::TypeCapabilities;

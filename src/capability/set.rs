@@ -14,6 +14,7 @@ use std::sync::OnceLock;
 
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
+use crate::capability::CapabilityLookup;
 use crate::identity::CapabilityId;
 
 /// The machine-readable reason a capability set could not be formed.
@@ -145,7 +146,30 @@ impl TypeCapabilities {
     /// represents a fact without an executable adapter.
     #[must_use]
     pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
-        self.find(key.id())?.get(&key)
+        self.lookup(key).found()
+    }
+
+    /// Looks up a capability while preserving absence, fact-only, and adapter
+    /// contract mismatch states.
+    #[must_use]
+    pub fn lookup<A: 'static>(&self, key: CapabilityKey<A>) -> CapabilityLookup<'_, A> {
+        let Some(descriptor) = self.find(key.id()) else {
+            return CapabilityLookup::Missing;
+        };
+        if descriptor.adapter_type() != key.adapter_type() {
+            return CapabilityLookup::AdapterTypeMismatch {
+                descriptor,
+                expected: key.adapter_type(),
+            };
+        }
+        if !descriptor.has_adapter() {
+            return CapabilityLookup::FactOnly(descriptor);
+        }
+        CapabilityLookup::Found(
+            descriptor
+                .get(&key)
+                .expect("declared adapter contract must downcast"),
+        )
     }
 
     /// Finds a capability descriptor by its stable textual ID without
