@@ -82,3 +82,6 @@ external/
 *.tar.gz
 *.rar
 *.7z
+
+# Python Markdown checker caches
+__pycache__/

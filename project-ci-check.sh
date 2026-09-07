@@ -6,6 +6,7 @@ PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$PROJECT_ROOT/.rs-ci/toolchains.sh"
 configure_rs_ci_toolchains
 
+python3 -m unittest discover -s "$PROJECT_ROOT/scripts/tests" -p check_markdown_examples_tests.py
 "$PROJECT_ROOT/scripts/check-markdown-examples.sh"
 "$PROJECT_ROOT/scripts/check-requirements-traceability.sh"
 RUSTFLAGS="${RUSTFLAGS:-} -C panic=abort" \
