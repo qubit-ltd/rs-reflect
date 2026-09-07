@@ -11,7 +11,7 @@ current process.
 
 ## Conceptual Model
 
-The crate has four cooperating parts:
+The crate has five cooperating parts:
 
 ```text
 Rust declaration --macro--> TypeDescriptor / member descriptors
