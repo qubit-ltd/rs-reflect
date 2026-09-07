@@ -60,6 +60,11 @@
       "lines": 75,
       "regions": 70
     },
+    "derive/src/expand/impls/internal/generic_substituter.rs": {
+      "functions": 70,
+      "lines": 75,
+      "regions": 70
+    },
     "derive/src/expand/invocation/lifetime.rs": {
       "functions": 70,
       "lines": 75,
