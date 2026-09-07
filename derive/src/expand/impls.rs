@@ -12,6 +12,7 @@
 
 mod concrete_emission;
 mod concrete_impl_emission;
+mod internal;
 mod invocation_adapter;
 mod specialization_codegen;
 
@@ -24,9 +25,9 @@ use specialization_codegen::substitute_impl_associated_item_types;
 use specialization_codegen::substitute_impl_lifetimes;
 use specialization_codegen::substitute_impl_method_types;
 use specialization_codegen::substitute_trait_path_tokens;
-use specialization_codegen::substitute_type_syntax;
 use specialization_codegen::substitute_type_tokens;
 use specialization_codegen::typed_extension_receiver_type;
+use internal::generic_substituter::substitute_type_syntax;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;

@@ -12,7 +12,6 @@ use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
-use quote::ToTokens;
 use quote::quote;
 use syn::visit_mut::VisitMut;
 
@@ -103,10 +102,7 @@ pub(super) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
 ) -> TokenStream {
-    let mut ty: syn::Type = syn::parse2(tokens.clone())
-        .expect("validated specialization target must remain valid type syntax");
-    GenericSubstituter { replacements }.visit_type_mut(&mut ty);
-    ty.into_token_stream()
+    super::internal::generic_substituter::substitute_type_syntax(tokens, replacements)
 }
 
 struct GenericSubstituter<'a> {
