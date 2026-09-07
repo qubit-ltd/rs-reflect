@@ -11,11 +11,11 @@
 // qubit-style: allow multiple-public-types
 // qubit-style: allow explicit-imports
 
+mod associated_const;
 mod default_invocation;
 mod default_method_expansion;
-mod dyn_trait_generics;
-mod associated_const;
 mod dyn_compatibility;
+mod dyn_trait_generics;
 mod metadata;
 mod token_rewrite;
 mod trait_metadata;
@@ -29,25 +29,14 @@ use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
 use syn::Error;
-use syn::FnArg;
-use syn::GenericArgument;
 use syn::GenericParam;
 use syn::ItemFn;
 use syn::ItemTrait;
 use syn::Lifetime;
 use syn::LitStr;
-use syn::Path;
 use syn::PathArguments as SynPathArguments;
-use syn::Receiver;
-use syn::TraitBoundModifier;
 use syn::TraitItem;
-use syn::TraitItemFn;
-use syn::TraitItemType;
-use syn::Type;
-use syn::TypeParamBound;
-use syn::WhereClause;
 use syn::WherePredicate as SynWherePredicate;
-use syn::parse_quote;
 use syn::parse_quote_spanned;
 use syn::parse2;
 use token_rewrite::replace_self_with_owner;
@@ -60,8 +49,6 @@ pub(crate) use super::expression_codegen::type_expression;
 use crate::expand::ExpansionContext;
 use crate::ir::GenericBoundIr;
 use crate::ir::GenericKindIr;
-use crate::ir::HelperName;
-use crate::ir::HelperValueIr;
 use crate::ir::PathArgumentIr;
 use crate::ir::PathArgumentsIr;
 use crate::ir::ReturnTypeIr;
@@ -460,7 +447,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         declaration.span,
     );
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
-    let definition_provider = format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
+    let definition_provider =
+        format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
     let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
     let generic_factory = Ident::new(
         &format!("__qubit_reflect_trait_generics_{suffix}"),
@@ -1116,324 +1104,8 @@ fn replace_self_associated_types(
     output
 }
 
-/// Returns inherited associated types explicitly proven for a dyn root.
-fn dyn_inherited_associated_types(
-    declaration: &TraitDeclarationIr,
-) -> impl Iterator<Item = &crate::ir::PathIr> {
-    declaration
-        .attributes
-        .iter()
-        .filter_map(|attribute| match &attribute.value {
-            HelperValueIr::DynCompatible(paths) => Some(paths.iter()),
-            _ => None,
-        })
-        .flatten()
-}
-
-/// Adds explicit inherited bindings to one reflected dyn supertrait path.
-fn dyn_reflected_supertrait_path(
-    path: &crate::ir::PathIr,
-    declaration: &TraitDeclarationIr,
-) -> TokenStream {
-    let mut syntax: Path = parse2(path.tokens.clone())
-        .expect("validated reflected supertrait paths must parse as Rust paths");
-    for inherited in dyn_inherited_associated_types(declaration)
-        .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
-    {
-        let name = Ident::new(
-            &inherited
-                .segments
-                .last()
-                .expect("validated inherited associated path has an item")
-                .name,
-            declaration.span,
-        );
-        let parameter = format_ident!("__QubitReflectAssociated{}", name);
-        let segment = syntax
-            .segments
-            .last_mut()
-            .expect("validated supertrait path has a segment");
-        match &mut segment.arguments {
-            SynPathArguments::None => {
-                segment.arguments = SynPathArguments::AngleBracketed(parse_quote!(
-                    <#name = #parameter>
-                ));
-            }
-            SynPathArguments::AngleBracketed(arguments) => {
-                arguments.args.push(parse_quote!(#name = #parameter));
-            }
-            SynPathArguments::Parenthesized(_) => {}
-        }
-    }
-    let syntax = if syntax.leading_colon.is_some() {
-        quote!(#syntax)
-    } else {
-        quote!(super::#syntax)
-    };
-    replace_declared_lifetimes_with_static(syntax, declaration)
-}
-
-/// Builds inherited associated bindings for an external supertrait identity.
-fn dyn_inherited_arguments_for_supertrait(
-    path: &crate::ir::PathIr,
-    declaration: &TraitDeclarationIr,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
-    dyn_inherited_associated_types(declaration)
-        .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
-        .map(|inherited| {
-            let name = inherited
-                .segments
-                .last()
-                .expect("validated inherited associated path has an item")
-                .name
-                .clone();
-            let name_literal = LitStr::new(&name, declaration.span);
-            let parameter = format_ident!("__QubitReflectAssociated{name}");
-            quote!(#facade::__private::codegen_v3::expression::associated_type(
-                #name_literal,
-                #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v3::expression::concrete(
-                        vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
-                        vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v3::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
-                    ),
-                ),
-            ))
-        })
-        .collect()
-}
-
-/// Returns whether `Supertrait::Item` names an item on this direct bound.
-fn inherited_belongs_to_supertrait(
-    inherited: &crate::ir::PathIr,
-    supertrait: &crate::ir::PathIr,
-) -> bool {
-    inherited.segments.len() == supertrait.segments.len() + 1
-        && inherited
-            .segments
-            .iter()
-            .zip(&supertrait.segments)
-            .all(|(left, right)| left.name == right.name)
-}
-
-/// Returns whether the declaration is syntactically proven to admit a bare
-/// `'static` trait object.
-///
-/// Generic traits are deliberately excluded because the requirements do not
-/// define which concrete application a declaration-level macro should choose.
-/// Supertraits are limited to standard traits whose dyn compatibility is known
-/// without inspecting another macro expansion.
-fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
-    if declaration
-        .attributes
-        .iter()
-        .any(|attribute| attribute.name == HelperName::DynCompatible)
-    {
-        return true;
-    }
-    if where_clause_requires_sized_self(item.generics.where_clause.as_ref())
-        || item
-            .generics
-            .where_clause
-            .as_ref()
-            .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
-        || !item.supertraits.iter().all(is_known_dyn_compatible_bound)
-    {
-        return false;
-    }
-    item.items.iter().all(|trait_item| match trait_item {
-        TraitItem::Fn(method) => method_is_dyn_dispatchable(method),
-        TraitItem::Type(associated) => {
-            associated.generics.params.is_empty()
-                || where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
-        }
-        TraitItem::Const(_) => false,
-        _ => false,
-    })
-}
-
-/// Returns whether one supertrait bound is known locally to preserve dyn
-/// compatibility.
-fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
-    match bound {
-        TypeParamBound::Lifetime(_) => true,
-        TypeParamBound::Trait(bound) => {
-            if !matches!(bound.modifier, TraitBoundModifier::None)
-                || tokens_contain_self(bound.to_token_stream())
-            {
-                return false;
-            }
-            let path = bound.path.to_token_stream().to_string().replace(' ', "");
-            if matches!(
-                path.as_str(),
-                "Sized"
-                    | "std::marker::Sized"
-                    | "core::marker::Sized"
-                    | "::std::marker::Sized"
-                    | "::core::marker::Sized"
-            ) {
-                return false;
-            }
-            matches!(
-                path.as_str(),
-                "::std::fmt::Debug"
-                    | "::core::fmt::Debug"
-                    | "std::fmt::Debug"
-                    | "core::fmt::Debug"
-                    | "::std::fmt::Display"
-                    | "::core::fmt::Display"
-                    | "std::fmt::Display"
-                    | "core::fmt::Display"
-                    | "::std::marker::Send"
-                    | "::core::marker::Send"
-                    | "std::marker::Send"
-                    | "core::marker::Send"
-                    | "::std::marker::Sync"
-                    | "::core::marker::Sync"
-                    | "std::marker::Sync"
-                    | "core::marker::Sync"
-                    | "::std::marker::Unpin"
-                    | "::core::marker::Unpin"
-                    | "std::marker::Unpin"
-                    | "core::marker::Unpin"
-            )
-        }
-        _ => false,
-    }
-}
-
-/// Returns whether a dyn application must name a concrete binding for this
-/// associated type.
-fn associated_type_requires_dyn_binding(associated: &TraitItemType) -> bool {
-    !where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
-}
-
-/// Returns whether one method is dispatchable through a trait object or is
-/// explicitly excluded from the vtable by `Self: Sized`.
-fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
-    if where_clause_requires_sized_self(method.sig.generics.where_clause.as_ref()) {
-        return true;
-    }
-    if method.sig.asyncness.is_some()
-        || method
-            .sig
-            .generics
-            .params
-            .iter()
-            .any(|parameter| !matches!(parameter, GenericParam::Lifetime(_)))
-    {
-        return false;
-    }
-    if method
-        .sig
-        .generics
-        .where_clause
-        .as_ref()
-        .is_some_and(|clause| tokens_contain_unprojected_self(clause.to_token_stream()))
-    {
-        return false;
-    }
-    let Some(FnArg::Receiver(receiver)) = method.sig.inputs.first() else {
-        return false;
-    };
-    if !receiver_is_dyn_dispatchable(receiver) {
-        return false;
-    }
-    method.sig.inputs.iter().skip(1).all(|input| {
-        let tokens = input.to_token_stream();
-        !tokens_contain_unprojected_self(tokens.clone()) && !tokens_contain_ident(tokens, "impl")
-    }) && {
-        let output = method.sig.output.to_token_stream();
-        !tokens_contain_unprojected_self(output.clone()) && !tokens_contain_ident(output, "impl")
-    }
-}
-
-/// Returns whether a method receiver is one of Rust's dyn-dispatchable forms.
-fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
-    if receiver.colon_token.is_none() {
-        return true;
-    }
-    receiver_type_is_dyn_dispatchable(&receiver.ty)
-}
-
-/// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
-fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
-    match ty {
-        Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
-        Type::Reference(reference) => receiver_type_is_dyn_dispatchable(&reference.elem),
-        Type::Path(path) if path.qself.is_none() => {
-            let Some(segment) = path.path.segments.last() else {
-                return false;
-            };
-            if !matches!(
-                segment.ident.to_string().as_str(),
-                "Box" | "Rc" | "Arc" | "Pin"
-            ) {
-                return false;
-            }
-            let SynPathArguments::AngleBracketed(arguments) = &segment.arguments else {
-                return false;
-            };
-            let mut types = arguments.args.iter().filter_map(|argument| match argument {
-                GenericArgument::Type(ty) => Some(ty),
-                _ => None,
-            });
-            let Some(inner) = types.next() else {
-                return false;
-            };
-            types.next().is_none() && receiver_type_is_dyn_dispatchable(inner)
-        }
-        _ => false,
-    }
-}
-
-/// Returns whether `Self` occurs outside an associated-type projection.
-fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
-    let tokens: Vec<_> = tokens.into_iter().collect();
-    tokens.iter().enumerate().any(|(index, token)| match token {
-        TokenTree::Group(group) => tokens_contain_unprojected_self(group.stream()),
-        TokenTree::Ident(identifier) if identifier == "Self" => !matches!(
-            tokens.get(index + 1..index + 4),
-            Some([
-                TokenTree::Punct(first),
-                TokenTree::Punct(second),
-                TokenTree::Ident(_),
-            ]) if first.as_char() == ':' && second.as_char() == ':'
-        ),
-        _ => false,
-    })
-}
-
-/// Returns whether a where clause contains a direct `Self: Sized` predicate.
-fn where_clause_requires_sized_self(where_clause: Option<&WhereClause>) -> bool {
-    where_clause.is_some_and(|where_clause| {
-        where_clause.predicates.iter().any(|predicate| {
-            let SynWherePredicate::Type(predicate) = predicate else {
-                return false;
-            };
-            matches!(predicate.bounded_ty, Type::Path(ref path) if path.qself.is_none() && path.path.is_ident("Self"))
-                && predicate.bounds.iter().any(|bound| {
-                    matches!(bound, TypeParamBound::Trait(bound)
-                        if matches!(bound.modifier, TraitBoundModifier::None)
-                            && bound.path.is_ident("Sized"))
-                })
-        })
-    })
-}
-
-/// Returns whether a token stream contains the standalone `Self` type name.
-fn tokens_contain_self(tokens: TokenStream) -> bool {
-    tokens_contain_ident(tokens, "Self")
-}
-
-/// Returns whether a token stream contains one standalone identifier.
-fn tokens_contain_ident(tokens: TokenStream, expected: &str) -> bool {
-    tokens.into_iter().any(|token| match token {
-        TokenTree::Ident(identifier) => identifier == expected,
-        TokenTree::Group(group) => tokens_contain_ident(group.stream(), expected),
-        TokenTree::Punct(_) | TokenTree::Literal(_) => false,
-    })
-}
-
+use dyn_compatibility::{
+    associated_type_requires_dyn_binding, dyn_inherited_arguments_for_supertrait,
+    dyn_inherited_associated_types, dyn_reflected_supertrait_path,
+};
 // Expression generation lives in `expand::expression_codegen`.
