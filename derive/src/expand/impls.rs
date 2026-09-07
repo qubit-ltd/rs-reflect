@@ -141,25 +141,6 @@ fn expand_generic_impl_definition(
     let line = location.line as u32;
     let column = location.column as u32;
     let module = generic_impl_definition_module(declaration);
-    let super_import = declaration.trait_path.as_ref().map(|path| {
-        let mut import: syn::Path = syn::parse2(path.tokens.clone())
-            .expect("validated trait paths must parse for generated imports");
-        for segment in &mut import.segments {
-            segment.arguments = syn::PathArguments::None;
-        }
-        let first = import
-            .segments
-            .first()
-            .expect("validated trait paths have a first segment")
-            .ident
-            .to_string();
-        if !import.leading_colon.is_some()
-            && !matches!(first.as_str(), "crate" | "self" | "super")
-        {
-            import.segments.insert(0, syn::parse_quote!(super));
-        }
-        quote!(use #import;)
-    });
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let target = super::traits::type_expression(&declaration.target_type, &environment, facade);
     let generics =
@@ -301,7 +282,6 @@ fn expand_generic_impl_definition(
     quote! {
         #[doc(hidden)]
         mod #module {
-            #super_import
             #reflected_provider_import
 
             fn fragment_identity() -> #facade::__private::codegen_v3::identity::FragmentIdentity {

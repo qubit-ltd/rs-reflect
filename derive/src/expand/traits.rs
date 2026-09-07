@@ -443,9 +443,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         .iter()
         .map(|(provider, _)| provider);
     let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
-        let trait_ident = &declaration.name;
         quote! {
-            use super::#trait_ident;
+            use super::*;
         }
     });
     let associated_const_reader_entries =
