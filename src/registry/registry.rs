@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
+use crate::capability::CapabilityLookup;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
@@ -401,7 +402,22 @@ impl ReflectRegistry {
         descriptor: &'registry TypeDescriptor,
         key: CapabilityKey<A>,
     ) -> Result<Option<&'registry A>, CapabilityConflict> {
-        Ok(self.capabilities(descriptor)?.get(key))
+        self.capability_lookup(descriptor, key)
+            .map(CapabilityLookup::found)
+    }
+
+    /// Looks up one effective typed capability without collapsing diagnostic
+    /// states into absence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an intrinsic conflict for an invalid unregistered descriptor.
+    pub fn capability_lookup<'registry, A: 'static>(
+        &'registry self,
+        descriptor: &'registry TypeDescriptor,
+        key: CapabilityKey<A>,
+    ) -> Result<CapabilityLookup<'registry, A>, CapabilityConflict> {
+        Ok(self.capabilities(descriptor)?.lookup(key))
     }
 
     /// Finds an effective concrete capability by textual ID.
