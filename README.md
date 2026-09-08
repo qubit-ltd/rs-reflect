@@ -7,11 +7,21 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-`qubit-reflect` gives framework and library authors opt-in, macro-generated
-reflection on stable Rust. It turns declared Rust types into immutable
-descriptors and exposes checked dynamic field access, construction, method
-invocation, capabilities, and process-local registry discovery—without source
-parsing, private-layout inspection, compiler-private APIs, or `unsafe`.
+`qubit-reflect` lets Rust programs inspect type structure, access fields, and
+invoke methods by name at runtime. It is for authors of configuration editors,
+frameworks, and libraries that need to work with multiple types without keeping
+a separate field table or method map. Reflection macros generate the required
+code at the declaration site and work on stable Rust.
+
+For example, an editor receiving the field name `"name"` can read a `User`'s
+current name and replace it with a `String`. A type mismatch returns an error
+and preserves inputs that have not been consumed. The application continues
+to own the original `User` value.
+
+If application code already knows the field, access `user.name` directly.
+Reflection is useful when the target is chosen at runtime or a framework must
+inspect different types uniformly. This crate does not convert form text into
+Rust values, serialize objects, or supply business validation rules.
 
 ## Installation
 
@@ -20,25 +30,16 @@ parsing, private-layout inspection, compiler-private APIs, or `unsafe`.
 qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
 
+Requires Rust 1.94 or later. Adjust `path` relative to your application's
+`Cargo.toml`.
+
 The crate is currently consumed only from Qubit's internal workspace or an
 approved internal Git revision. It is not published to crates.io. Keep the
 runtime and derive crate on the same repository revision.
 
-The default `derive` feature exports `#[derive(Reflect)]`, `#[reflect]`, and
-`#[reflect_impl]`. Disabling default features keeps the runtime and handwritten
-registration APIs, but does not re-export those macros.
-
-External type implementations are opt-in:
-
-| Feature | Adds `Reflect` implementations for |
-| --- | --- |
-| `derive` (default) | The three reflection macros; no external type dependency |
-| `ecosystem-types` | `BigDecimal`, `DateTime<Utc>`, `NaiveDate`, `NaiveTime`, and `Uuid` |
-| `qubit-types` | `qubit_id::Id` and `qubit_datatype::DataType` |
-
-For a runtime-only dependency, use
-`qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }`. Enable only
-the external type families that cross your reflection boundary.
+The reflection macros are enabled by default; the example below needs no extra
+features. For runtime-only use or third-party type implementations, see the
+[dependency profiles](doc/2026-08-29-qubit-reflect-user-guide.md#choose-dependency-features) in the guide.
 
 ## Quick Start
 
@@ -74,6 +75,10 @@ fn main() {
 }
 ```
 
+Save the example as `src/main.rs` in a binary crate using the dependency above,
+then run `cargo run`. It exits successfully after checking that the name changes
+from `Ada` to `Grace`.
+
 ## Why This Project Exists
 
 Rust deliberately does not offer unrestricted runtime reflection. Frameworks
@@ -98,8 +103,6 @@ facts even where an operation is unavailable.
   including typed `Clone` and `Default` adapters. Every registration path
   uses the same transactional validator; callers may hold an explicit,
   immutable registry snapshot instead of consulting the process-global result.
-- A versioned `__private::codegen_v3` protocol for derive/facade integration;
-  downstream model code uses its own independent ABI v4.
 - Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
   field access and construction exist only for types whose generated code
   proves the required `Send + Sync` bounds.
@@ -112,32 +115,17 @@ operations remain visible as descriptors with structured unavailable reasons.
 Tuple and portable function-pointer descriptors support arities 0 through 32;
 arity 33 and above are unsupported and intentionally have no `Reflect` impl.
 
-## Lookup failures and declaration shape
-
-`ReflectRegistry::capabilities`, `capability`, and `capability_by_id` return `Result`.
-`Ok(None)` means a valid capability set has no matching adapter; `Err(CapabilityConflict)`
-means the declarations conflict. Registered-target queries and enumeration read frozen
-indexes only. Queries for unregistered generic instances may lazily initialize their
-capabilities; successes and conflicts are cached per concrete type without changing registry membership.
-
-Empty fields do not imply a unit struct: `struct A;`, `struct B {}`, and `struct C();`
-retain Unit, Named, and Tuple shape and use the corresponding dynamic construction entry.
-See the user guide for migration and provider requirements.
-
-## Choose an explicit snapshot
-
-Use `RegistrySnapshotBuilder` when a library or test owns a subset of reflection
-facts. Pass the chosen registry to both method lookup and invocation. Snapshots
-resolve receiver capabilities independently, even if global initialization fails;
-capability-only entries do not add type membership. See the
-[user guide](doc/2026-08-29-qubit-reflect-user-guide.md#build-an-isolated-registry-snapshot)
-for construction, recovery, and migration examples.
+Use `RegistrySnapshotBuilder` when a library or test needs an explicit set of
+registrations. The guide covers [isolated snapshots](doc/2026-08-29-qubit-reflect-user-guide.md#build-an-isolated-registry-snapshot),
+[capability conflicts](doc/2026-08-29-qubit-reflect-user-guide.md#migrating-effective-capability-queries),
+and [empty struct construction](doc/2026-08-29-qubit-reflect-user-guide.md#constructing-empty-structs).
 
 ## Learn More
 
 - [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
 - [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- API documentation generated internally with `cargo doc --all-features`
+- [API overview in Rustdoc source](src/lib.rs); generate and open the full reference
+  from the repository root with `cargo doc --all-features --no-deps --open`
 - [English design](doc/2026-09-03-qubit-reflect-design.md)
 - [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
 - [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md) · [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md)
