@@ -1,58 +1,76 @@
 # qubit-reflect User Guide
 
-[简体中文](2026-08-29-qubit-reflect-user-guide.zh_CN.md) · [README](../README.md) · API documentation: `cargo doc --all-features`
+[简体中文](2026-08-29-qubit-reflect-user-guide.zh_CN.md) · [README](../README.md)
 
-This guide targets framework and library authors using `qubit-reflect` 0.1 on
-Rust 1.94 or later. It explains how to expose a Rust declaration to a
-schema-driven tool without giving that tool unrestricted access to values or
-layout. `qubit-reflect` is opt-in: macros generate ordinary safe Rust code at
-the declaration site, and its immutable descriptors are valid only within the
-current process.
+This guide is for Rust developers using `qubit-reflect` for the first time.
+It covers version 0.1.0 in this checkout and requires Rust 1.94 or later.
+You will build the core of a configuration editor: read and update an object
+by field name, handle invalid input, then add construction and method calls
+as needed.
 
-## Conceptual Model
+## Decide whether you need reflection
 
-The crate has five cooperating parts:
+Ordinary application code knows the type and field and can access `user.name`
+directly. An editor or general-purpose framework often receives only a field
+name and cannot maintain a branch for every object type. `qubit-reflect` lets
+types provide structure and access code at their declarations, so frameworks
+can use a common interface instead of maintaining a second schema.
 
-```text
-Rust declaration --macro--> TypeDescriptor / member descriptors
-                                  |
-application value --dynamic wrapper--> checked adapter --> result or recovery
-                                  |
-linked registration fragments --> ReflectRegistry --> effective type view
-```
+It does not make arbitrary Rust types reflectable automatically. Custom types
+must opt in by deriving or implementing `Reflect`. It does not parse form
+text, validate business rules, or serialize values. Perform those steps in the
+application, then pass correctly typed values to reflection operations.
 
-- `TypeDescriptor` is the unique immutable root for a concrete reflected type.
-  It exposes structural views, fields, variants, and construction. Effective
-  capabilities are resolved by `ReflectRegistry`.
-- `TypeDefinitionDescriptor` is the non-executable root for one generic source
-  declaration; concrete instances link to it and retain resolved arguments.
-- `ReflectedRef`, `ReflectedMut`, and `ReflectedOwned` carry a shared borrow,
-  mutable borrow, or owned value across a checked dynamic boundary.
-- Field, construction, and invocation adapters validate policy and exact
-  `TypeId` before user code runs.
-- `ReflectRegistry` joins statically linked inventory fragments once. It either
-  publishes one frozen registry or returns a structured initialization error.
+## Reading path
 
-The reflection metadata is not a replacement for a domain model. It does not
-infer validation rules, persistence IDs, codecs, relations, or wire formats.
-Likewise, query names, `TypeId`, descriptor addresses, and reflected trait
-markers are not portable identifiers.
+| Your task | Start here |
+| --- | --- |
+| Set up and run your first example | [Installation](#installation-and-minimal-configuration) → [Core workflow](#core-workflow) |
+| Call a business method by name | [Invoke methods](#invoke-methods) |
+| Discover linked types or control registrations | [Discover types and extension capabilities](#discover-types-and-extension-capabilities) |
+| Use external types, limit structural access, or cross threads | [Choose features and access boundaries](#choose-features-and-access-boundaries) |
+| Diagnose a failure | [Errors and diagnostics](#errors-and-diagnostics) → [Troubleshooting](#troubleshooting) |
+| Build a facade or upgrade an older integration | [Facade integration and migration](#facade-integration-and-migration) |
 
-## Scenario
+## Scenario and three basic concepts
 
-Consider a configuration editor. A host application owns a `User` value. The
-editor receives the field name `"name"`, must show its current value, and may
-replace it only with another `String`. Success means that the host observes the
-new name; an incorrect target, policy, or replacement must fail before a field
-is changed.
+The host owns a `User { id: 7, name: String::from("Ada") }`. An editor receives `"name"`,
+shows the current name, changes it to `"Grace"`, and rejects `9_u64` as a
+replacement. Success means the name changes correctly, the invalid input is
+returned intact, and the failed operation leaves the object unchanged.
+
+You need only three concepts to begin:
+
+- **Descriptor:** `TypeDescriptor::of::<User>()` returns type metadata;
+  `field("name")` finds field metadata. It describes a type, not a particular
+  `User` instance.
+- **Dynamic value wrapper:** `ReflectedRef` borrows for reading, `ReflectedMut`
+  borrows exclusively for modification, and `ReflectedOwned` takes ownership.
+  These wrappers let a common interface check exact types and borrowing modes.
+- **Checked operation:** a field descriptor's `get` or `set` connects metadata
+  to an actual object and returns a result or structured error. The caller
+  still needs to interpret the concrete value, such as recognizing a name as
+  a `String`.
+
+Direct field access and construction for a known type need no registry
+initialization. Method lookup and extension capabilities use `ReflectRegistry`,
+introduced later.
 
 ## Installation and Minimal Configuration
 
-Add the crate with its default features to use the macros:
+Create an example application alongside the `rs-reflect` checkout:
+
+```bash
+cargo new reflect-editor
+cd reflect-editor
+```
+
+Add this dependency to the generated `Cargo.toml`, keeping the default features
+to use the macros:
 
 ```toml
 [dependencies]
-qubit-reflect = { path = "../rs-reflect" }
+qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
 
 This crate is currently an internal Qubit dependency and is not published to
@@ -64,26 +82,20 @@ The default `derive` feature re-exports `Reflect`, `reflect`, and
 `reflect_impl` macros. `default-features = false` keeps the runtime and
 handwritten registration APIs, but no longer re-exports those macros.
 
-Choose the narrowest dependency profile that matches the integration:
+### Run the examples
 
-```toml
-# Runtime descriptors, dynamic values, and handwritten registration only.
-qubit-reflect = { path = "../rs-reflect", default-features = false }
+Prepare Rust 1.94 or later and matching internal repository revisions. The
+`path` is relative to your application's `Cargo.toml`. The repository manifest
+also references `../../rust-common/rs-id` and `../../rust-common/rs-datatype`;
+preserve that layout in your local checkout.
 
-# Macros plus BigDecimal, chrono, and UUID reflection implementations.
-qubit-reflect = { path = "../rs-reflect", features = ["ecosystem-types"] }
-
-# Macros plus Qubit DataType and Id reflection implementations.
-qubit-reflect = { path = "../rs-reflect", features = ["qubit-types"] }
-```
-
-`ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
-the default feature set, so a runtime-only consumer does not compile those
-dependency families or silently acquire their trait implementations.
-If a facade or metadata crate generates descriptors for one of these external
-types, that crate must enable the matching feature on its own
-`qubit-reflect` dependency; re-exporting the macros does not enable type-family
-implementations by itself.
+In a binary crate with the default dependency above, save each example with a
+`main` function separately as `src/main.rs` and run `cargo run`. Each is an
+independent program; do not concatenate them. Successful runs print no
+application output: assertions check the results. Step 2 verifies that the name
+becomes `Grace` and that the rejected `9_u64` is returned intact. The facade
+example marked `rust,no_run` belongs in a library's `src/lib.rs`; check it with
+`cargo check`.
 
 ## Core Workflow
 
@@ -108,10 +120,9 @@ fn main() {
 queries of the same concrete type. Recursive relationships are resolved lazily,
 so a path such as `Node -> Vec<Node>` does not recursively initialize forever.
 
-`#[derive(Reflect)]` supports structs and enums. It retains source order for
-fields and variants, and records generic definitions separately from their
-concrete arguments. `TypeRef` navigation is resolved only when generated Rust
-code has static proof; it never guesses a type from a string name.
+`#[derive(Reflect)]` supports structs and enums and retains source order for
+fields and variants. For now, check that you can obtain the `User` descriptor;
+generic definitions and type navigation are explained with registries below.
 
 ### 2. Read and replace one field
 
@@ -148,6 +159,7 @@ fn main() {
         .downcast::<u64>()
         .unwrap_or_else(|_| unreachable!("the original type is retained"));
     assert_eq!(recovered, 9);
+    assert_eq!(user.name, "Grace");
 }
 ```
 
@@ -195,58 +207,29 @@ policy, and exact types before it consumes owned values. On failure,
 updater follows the same all-or-nothing validation rule, including for types
 that implement `Drop`.
 
-## Advanced Usage
+The editor can now read a name, apply a valid replacement, recover invalid
+input, and construct a new object. Continue with “Invoke a service and recover
+invalid input” for dynamic method calls, or “Build an isolated registry
+snapshot” to control which registrations are available.
 
-### Integrate through a downstream facade or macro
+### Constructing empty structs
 
-A facade that directly hosts `qubit-reflect` derives exposes the versioned
-generated-code protocol under the path expected by the derive. Public
-application exports are an independent choice; this minimal example exports
-the two types used by its callers. This is library code without a program entry point, so it is compiled without execution:
+| Declaration | Descriptor shape | Construction entry |
+| --- | --- | --- |
+| `struct A;` | `StructKind::Unit` | `construct_unit()` |
+| `struct B {}` | `StructKind::Named` | `construct_struct(NamedConstructionInput::new([]))` |
+| `struct C();` | `StructKind::Tuple` | `construct_tuple(TupleConstructionInput::new([]))` |
 
-```rust,no_run
-pub use qubit_reflect::Reflect;
-pub use qubit_reflect::TypeDescriptor;
+The distinction also applies to empty const-generic structs. A wrong shape returns a construction
+error, never a value of a different type or an internal assertion failure.
 
-#[doc(hidden)]
-pub mod __private {
-    pub use qubit_reflect::__private::codegen_v3;
-}
-```
+## Invoke methods
 
-Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
-only the `codegen_v3` export; the facade does not need to re-export runtime
-modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
-`qubit_reflect` or its `__private` module: that turns unrelated implementation
-details into the facade's API. A downstream procedural macro may give the same
-module through exact item re-exports. `codegen_v3` is a
-compiler-to-runtime protocol, not a supported handwritten construction API; a
-future incompatible protocol receives a new versioned module.
-
-### Declare traits and callable implementations
-
-- `#[reflect]` reflects a trait declaration, including supertraits, default
-  methods, associated types, and associated constants.
-- `#[reflect_impl]` reflects an inherent or trait implementation and generates
-  invocation adapters for methods whose receiver, parameters, ABI, and output
-  can safely cross the dynamic boundary.
-- `#[reflect(rename = "...")]` changes the lookup name only; `rust_name()`
-  preserves the original source identity. `skip`, `read_only`, `no_construct`,
-  `no_invoke`, and `opaque` preserve the applicable structural fact while
-  disabling or limiting the associated dynamic operation.
-
-Look up a `MethodInstanceDescriptor` through the registry or an effective type
-view, then call `invoke_local(registry, invocation)` with the same explicit registry. Positional arguments are
-the canonical form. The runtime validates receiver, argument count, passing
-mode, and exact types in that order; a failure before user code returns the
-complete `InvocationRecovery`.
-
-Generic and blanket implementations register definition metadata. To make a
-finite concrete generic case callable or effective, declare
-`#[reflect(specialize(...))]`. `#[reflect(thread_safe)]` requests a
-thread-safe adapter and is accepted only when the generated Rust bounds prove
-the receiver, inputs, owned output, and future boundary. A thread-safe value
-can be downgraded to local mode, never upgraded by a runtime flag.
+When the editor must trigger a business operation, use `#[reflect_impl]` to
+generate method metadata, then use the same registry for lookup and invocation.
+The independent counter example below adds `2` to `1`, producing `3`. Passing
+the string `"2"` fails, returns that string, and leaves the counter at `3`.
+Converting UI input to `u64` remains the application's responsibility.
 
 ### Invoke a service and recover invalid input
 
@@ -301,6 +284,31 @@ fn main() {
 }
 ```
 
+### Declare traits and callable implementations
+
+- `#[reflect]` reflects a trait declaration, including supertraits, default
+  methods, associated types, and associated constants.
+- `#[reflect_impl]` reflects an inherent or trait implementation and generates
+  invocation adapters for methods whose receiver, parameters, ABI, and output
+  can safely cross the dynamic boundary.
+- `#[reflect(rename = "...")]` changes the lookup name only; `rust_name()`
+  preserves the original source identity. `skip`, `read_only`, `no_construct`,
+  `no_invoke`, and `opaque` preserve the applicable structural fact while
+  disabling or limiting the associated dynamic operation.
+
+Look up a `MethodInstanceDescriptor` through the registry or an effective type
+view, then call `invoke_local(registry, invocation)` with the same explicit registry. Positional arguments are
+the canonical form. The runtime validates receiver, argument count, passing
+mode, and exact types in that order; a failure before user code returns the
+complete `InvocationRecovery`.
+
+Generic and blanket implementations register definition metadata. To make a
+finite concrete generic case callable or effective, declare
+`#[reflect(specialize(...))]`. `#[reflect(thread_safe)]` requests a
+thread-safe adapter and is accepted only when the generated Rust bounds prove
+the receiver, inputs, owned output, and future boundary. A thread-safe value
+can be downgraded to local mode, never upgraded by a runtime flag.
+
 ### Explicit generic specialization
 
 Register a finite concrete impl for `Service<u8>`, then look up and invoke it through that concrete type.
@@ -326,6 +334,19 @@ fn main() {
     assert_eq!(value.downcast::<u8>().unwrap_or_else(|_| panic!("u8")), 42);
 }
 ```
+
+## Discover types and extension capabilities
+
+When you know the type, obtain its descriptor directly. Use a registry to
+discover linked types, find methods, or resolve extension operations for a
+type. A registry holds type and operation metadata, not application objects;
+it does not load dynamic plugins.
+
+Normally, `ReflectRegistry::initialize()` collects registrations already linked
+into the program. Build an isolated snapshot only when a library or test needs
+an explicit fact set. A capability is a type extension, such as a typed `Clone`
+or `Default` operation. Resolving capabilities and registering type membership
+are separate concerns.
 
 ### Capabilities and registry discovery
 
@@ -362,8 +383,11 @@ initialization never exposes a partially built registry.
 `snapshot.definitions()` enumerates generic declarations even when no concrete
 instance is registered. Query them by `TypeDefinitionId`, Rust path, or query
 name, and use `definition_capability` or `definition_capability_by_id` for
-definition-level extensions. Definition fields contain `TypeExpression`
-values and intentionally provide no value-access adapters.
+definition-level extensions. `TypeDefinitionDescriptor` describes a generic declaration; concrete instances
+retain resolved type arguments. Definition fields contain `TypeExpression`
+values and provide no value-access adapters. `TypeRef` resolves a target only
+when generated Rust code can prove the concrete type; it never guesses from
+a string name.
 
 `Clone` and `Default` are typed capabilities. Register them only where their
 Rust bounds hold, then query with `clone_key()` or `default_key()`. Other
@@ -436,49 +460,41 @@ identities are diagnosable. For a conflict, inspect
 `capability_id()`. Intrinsic provider failures remain available through
 `intrinsic_conflict()` and `Error::source()`.
 
-This API does not change the generated-code protocols. Existing facades keep
-exposing `__private::codegen_v3`, and `qubit-model-metadata` keeps its separate
-model ABI v4. Intrinsic capability providers must use static type facts only;
-they must not depend on a snapshot or re-enter registry initialization. The
-provider runs outside the capability cache lock, and its panic is not converted
-into absence or `CapabilityConflict`.
+## Choose features and access boundaries
 
-### Migrating effective capability queries
+### Choose dependency features
 
-The existing query names now return `Result`; no error-swallowing compatibility entry remains.
-`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`; typed/textual single
-queries return `Result<Option<_>, CapabilityConflict>`. Handle failure before testing for absence.
-Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
-the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
+| Feature | Provides |
+| --- | --- |
+| `derive` (default) | The `Reflect`, `reflect`, and `reflect_impl` macros. |
+| `ecosystem-types` | Reflection implementations for `BigDecimal`, `DateTime<Utc>`, `NaiveDate`, `NaiveTime`, and `Uuid`. |
+| `qubit-types` | Reflection implementations for `qubit_id::Id` and `qubit_datatype::DataType`. |
 
-`Ok(None)` can mean an absent ID, a typed key with a different adapter type, or a fact-only descriptor.
-These are distinct from an invalid set. `types_with_capability` and definition queries read frozen
-indexes without executing factories and do not gain `Result`. Effective queries for unregistered
-concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
+Choose one of the following alternatives for the `qubit-reflect` entry in
+`[dependencies]`; do not paste all three into one manifest:
 
-Providers must depend only on static type facts, never on snapshots, time, or mutable external
-configuration, and must not re-enter registry initialization. Generic intrinsic factories run outside
-the cache-map lock; successes and conflicts are cached by concrete `TypeId` and shared by concurrent
-queries. Provider panics still propagate; they do not become absence or `CapabilityConflict`.
-Generated invocation adapters preserve receiver-capability resolution failures as structured
-invocation errors and restore the receiver, values, names, and original caller ordering.
-Invocation itself does not initialize a registry.
+```toml
+# Runtime descriptors, dynamic values, and handwritten registration only.
+qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }
+```
 
-Downstream `ModelRegistry::metadata_for` similarly returns `Result<Option<_>, ModelMetadataError>`.
-Property queries propagate `PropertyResolutionError`; resolver diagnostics retain the original
-`cause()` and path context. `qubit-platform-testkit::link_all::validate_all_models` returns
-`ModelRegistryError` and validates registration availability only.
+```toml
+# Macros plus BigDecimal, chrono, and UUID reflection implementations.
+qubit-reflect = { version = "0.1", path = "../rs-reflect", features = ["ecosystem-types"] }
+```
 
-### Constructing empty structs
+```toml
+# Macros plus Qubit DataType and Id reflection implementations.
+qubit-reflect = { version = "0.1", path = "../rs-reflect", features = ["qubit-types"] }
+```
 
-| Declaration | Descriptor shape | Construction entry |
-| --- | --- | --- |
-| `struct A;` | `StructKind::Unit` | `construct_unit()` |
-| `struct B {}` | `StructKind::Named` | `construct_struct(NamedConstructionInput::new([]))` |
-| `struct C();` | `StructKind::Tuple` | `construct_tuple(TupleConstructionInput::new([]))` |
-
-The distinction also applies to empty const-generic structs. A wrong shape returns a construction
-error, never a value of a different type or an internal assertion failure.
+`ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
+the default feature set, so a runtime-only consumer does not compile those
+dependency families or silently acquire their trait implementations.
+If a facade or metadata crate generates descriptors for one of these external
+types, that crate must enable the matching feature on its own
+`qubit-reflect` dependency; re-exporting the macros does not enable type-family
+implementations by itself.
 
 ### Choose transparent, opaque, and thread-safe boundaries
 
@@ -498,8 +514,9 @@ metadata through downstream-owned custom capabilities and providers.
 `qubit-reflect` neither defines nor interprets those domain semantics. This preserves the dependency direction from model
 crates to `qubit-reflect`.
 
-For a type-level thread-safe contract, the same mode covers owned-to-borrow
-bridges, field access, construction, updates, and generated method adapters:
+The type-level `#[reflect(thread_safe)]` below generates thread-safe field
+access support. Thread-safe method adapters must be requested on the relevant
+methods; wrapping a value in `SendReflected*` alone is not sufficient:
 
 ```rust
 use qubit_reflect::Reflect;
@@ -572,6 +589,83 @@ do not choose an executor or poll it, and async methods cannot use
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary; these implementations are not enabled by default. |
 | A facade-based derive cannot resolve generated helpers | Preserve the facade path passed to `#[reflect(crate = ...)]`, expose exactly the matching `__private::codegen_v3`, and ensure the facade and derive use compatible `qubit-reflect` protocol versions. |
 
+## Limitations and Best Practices
+
+Keep reflection attributes close to the declaration that owns the contract.
+Use opaque boundaries for types whose internals should not be traversed, and
+treat descriptors as immutable process-local metadata. Query names, `TypeId`,
+descriptor addresses, and trait markers are not serialization or cross-process
+identifiers. Do not use reflection to infer domain rules or bypass Rust
+ownership, type, or thread-safety checks. Unsafe functions, unsupported ABIs, variadics, unsafely erasable
+unsized values, unspecialized generics, and opaque `impl Trait` returns may be
+described, but are not dynamically callable.
+Tuple and portable function-pointer descriptors support arities 0 through 32.
+Arity 33 and above is intentionally unsupported and has no `Reflect` impl.
+
+Descriptors and capabilities cached per concrete type remain in the process;
+they are not temporary objects freed after each call. Initialization and first
+resolution can allocate memory, so do not assume reflection is allocation-free.
+Measure the paths your application uses if overhead matters. Generated access
+code can expose private fields, so reflection policies do not replace
+application authorization checks.
+
+## Facade integration and migration
+
+This section is for maintainers of dependency facades, procedural macros, or
+older integrations. Applications using derives directly do not need to
+configure the generated-code protocol.
+
+### Integrate through a downstream facade or macro
+
+A facade that directly hosts `qubit-reflect` derives exposes the versioned
+generated-code protocol under the path expected by the derive. Public
+application exports are an independent choice; this minimal example exports
+the two types used by its callers. This is library code without a program entry point, so it is compiled without execution:
+
+```rust,no_run
+pub use qubit_reflect::Reflect;
+pub use qubit_reflect::TypeDescriptor;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use qubit_reflect::__private::codegen_v3;
+}
+```
+
+Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
+only the `codegen_v3` export; the facade does not need to re-export runtime
+modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
+`qubit_reflect` or its `__private` module: that turns unrelated implementation
+details into the facade's API. A downstream procedural macro may give the same
+module through exact item re-exports. `codegen_v3` is a
+compiler-to-runtime protocol, not a supported handwritten construction API; a
+future incompatible protocol receives a new versioned module.
+
+Explicit snapshots do not change the generated-code protocol. Facades still
+expose `__private::codegen_v3`; downstream `qubit-model-metadata` uses its
+independent model ABI v4.
+
+### Migrating effective capability queries
+
+The existing query names now return `Result`; no error-swallowing compatibility entry remains.
+`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`; typed/textual single
+queries return `Result<Option<_>, CapabilityConflict>`. Handle failure before testing for absence.
+Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
+the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
+
+`Ok(None)` can mean an absent ID, a typed key with a different adapter type, or a fact-only descriptor.
+These are distinct from an invalid set. `types_with_capability` and definition queries read frozen
+indexes without executing factories and do not gain `Result`. Effective queries for unregistered
+concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
+
+Providers must depend only on static type facts, never on snapshots, time, or mutable external
+configuration, and must not re-enter registry initialization. Generic intrinsic factories run outside
+the cache-map lock; successes and conflicts are cached by concrete `TypeId` and shared by concurrent
+queries. Provider panics still propagate; they do not become absence or `CapabilityConflict`.
+Generated invocation adapters preserve receiver-capability resolution failures as structured
+invocation errors and restore the receiver, values, names, and original caller ordering.
+Invocation itself does not initialize a registry.
+
 ### Explicit invocation migration and troubleshooting
 
 Every `invoke_*` entry now requires a registry. If lookup succeeds but
@@ -587,23 +681,25 @@ Old `codegen_v2` facades fail compilation: migrate the exact export to
 prints structural facts without running providers; providers themselves must
 not re-enter initialization.
 
-## Limitations and Best Practices
+## Terminology reference
 
-Keep reflection attributes close to the declaration that owns the contract.
-Use opaque boundaries for types whose internals should not be traversed, and
-treat descriptors as immutable process-local metadata. Do not use reflection to
-infer domain rules or to bypass Rust ownership, privacy, type, or thread-safety
-checks. Unsafe functions, unsupported ABIs, variadics, unsafely erasable
-unsized values, unspecialized generics, and opaque `impl Trait` returns may be
-described, but are not dynamically callable.
-Tuple and portable function-pointer descriptors support arities 0 through 32.
-Arity 33 and above is intentionally unsupported and has no `Reflect` impl.
+| Term | Meaning in this guide |
+| --- | --- |
+| Descriptor | Immutable metadata for a type or member. |
+| Fragment / snapshot | A fragment supplies registration facts; a snapshot is the immutable registry produced after validation. |
+| Effective capability | An extension capability resolved for a target type by the registry. |
+| Provider / adapter | A provider produces capability facts; an adapter executes a registered operation. |
+| Receiver | The `self` value or borrow used by a method invocation. |
+| Owned value / recovery | An owned value transfers ownership into a call; recovery returns inputs after a pre-execution failure. |
+| Facade / specialization | A facade provides a common dependency entry point; specialization generates support for finite concrete generic instances. |
+| Opaque | Preserves type identity while limiting reflection into internal structure. |
 
 ## Further Reading
 
 - [README](../README.md) and [简体中文 README](../README.zh_CN.md)
 - [简体中文用户指南](2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- API documentation generated internally with `cargo doc --all-features`
+- [API overview in Rustdoc source](../src/lib.rs); generate and open the full
+  reference from the repository root with `cargo doc --all-features --no-deps --open`
 - [English design](2026-09-03-qubit-reflect-design.md) and [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - [Evolution history](2026-09-07-qubit-reflect-evolution.md) and [中文演进历史](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
