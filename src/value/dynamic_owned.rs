@@ -47,6 +47,12 @@ pub struct DynamicOwned<M: Mode> {
 }
 
 impl DynamicOwned<Local> {
+    /// Returns the exact identity of the owned value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<()>, std::any::Any::type_id)
+    }
     /// Wraps `value` as a local owned dynamic value.
     ///
     /// The value must be `'static` so it can participate in `Any` downcasts.
@@ -138,6 +144,11 @@ impl DynamicOwned<Local> {
 }
 
 impl DynamicOwned<ThreadSafe> {
+    /// Returns the exact identity of the owned value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any().expect("owned values are Any-compatible").type_id()
+    }
     /// Wraps `value` as a thread-safe owned dynamic value.
     ///
     /// The value must be `'static + Send + Sync` so the wrapper can retain its

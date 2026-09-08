@@ -10,6 +10,7 @@
 
 use std::any::TypeId;
 
+use crate::capability::CapabilityAccessError;
 use crate::capability::CapabilityDescriptor;
 
 /// The result of looking up one typed capability contract by stable ID.
@@ -34,10 +35,19 @@ impl<'a, A: 'static> CapabilityLookup<'a, A> {
     /// Returns the executable adapter, degrading every diagnostic state to
     /// absence.
     #[must_use]
-    pub const fn found(self) -> Option<&'a A> {
+    pub const fn into_adapter(self) -> Result<Option<&'a A>, CapabilityAccessError> {
         match self {
-            Self::Found(value) => Some(value),
-            Self::Missing | Self::FactOnly(_) | Self::AdapterTypeMismatch { .. } => None,
+            Self::Found(value) => Ok(Some(value)),
+            Self::Missing => Ok(None),
+            Self::FactOnly(descriptor) => Err(CapabilityAccessError::FactOnly {
+                id: *descriptor.id(),
+                adapter_type: descriptor.adapter_type(),
+            }),
+            Self::AdapterTypeMismatch { descriptor, expected } => Err(CapabilityAccessError::AdapterTypeMismatch {
+                id: *descriptor.id(),
+                expected,
+                actual: descriptor.adapter_type(),
+            }),
         }
     }
 }

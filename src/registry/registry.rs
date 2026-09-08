@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityAccessError;
 use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
@@ -401,8 +402,10 @@ impl ReflectRegistry {
         &'registry self,
         descriptor: &'registry TypeDescriptor,
         key: CapabilityKey<A>,
-    ) -> Result<Option<&'registry A>, CapabilityConflict> {
-        self.capability_lookup(descriptor, key).map(CapabilityLookup::found)
+    ) -> Result<Option<&'registry A>, CapabilityAccessError> {
+        self.capability_lookup(descriptor, key)
+            .map_err(CapabilityAccessError::IntrinsicConflict)?
+            .into_adapter()
     }
 
     /// Looks up one effective typed capability without collapsing diagnostic
@@ -442,7 +445,11 @@ impl ReflectRegistry {
 
     /// Retrieves one effective typed capability for a generic declaration.
     #[must_use]
-    pub fn definition_capability<A: 'static>(&self, id: TypeDefinitionId, key: CapabilityKey<A>) -> Option<&A> {
+    pub fn definition_capability<A: 'static>(
+        &self,
+        id: TypeDefinitionId,
+        key: CapabilityKey<A>,
+    ) -> Result<Option<&A>, CapabilityAccessError> {
         self.definition_capabilities(id).get(key)
     }
 

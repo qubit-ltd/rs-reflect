@@ -369,7 +369,10 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
     .expect("distinct built-in capabilities form a valid set");
     assert!(capabilities.contains(send_key()));
     assert!(capabilities.contains(sync_key()));
-    let clone_adapter = capabilities.get(clone_key()).expect("clone adapter is registered");
+    let clone_adapter = capabilities
+        .get(clone_key())
+        .unwrap()
+        .expect("clone adapter is registered");
     let source = DynamicOwned::<Local>::new(String::from("value"));
     let cloned = clone_adapter
         .clone_owned(&source)
@@ -378,6 +381,7 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
     assert!(clone_adapter.clone_owned(&DynamicOwned::<Local>::new(1_u8)).is_err());
     let defaulted = capabilities
         .get(default_key())
+        .unwrap()
         .expect("default adapter is registered")
         .create();
     assert_eq!(defaulted.downcast_ref::<String>().map(String::as_str), Some(""));

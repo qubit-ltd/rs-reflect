@@ -543,8 +543,13 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     where
         M: 'static,
     {
-        let adapter = match registry.capability(descriptor, crate::invoke::receiver_adapter_key::<R, M>()) {
-            Ok(adapter) => adapter,
+        let adapter = match registry.capability_lookup(descriptor, crate::invoke::receiver_adapter_key::<R, M>()) {
+            Ok(crate::capability::CapabilityLookup::Found(adapter)) => Some(adapter),
+            Ok(
+                crate::capability::CapabilityLookup::Missing
+                | crate::capability::CapabilityLookup::FactOnly(_)
+                | crate::capability::CapabilityLookup::AdapterTypeMismatch { .. },
+            ) => None,
             Err(error) => {
                 return Err(self.reject(method_identity, InvocationErrorKind::CapabilityResolution(error)));
             }

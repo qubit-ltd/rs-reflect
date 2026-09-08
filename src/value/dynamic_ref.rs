@@ -46,6 +46,12 @@ pub struct DynamicRef<'a, M: Mode> {
 }
 
 impl<'a> DynamicRef<'a, Local> {
+    /// Returns the exact identity of the borrowed value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
+    }
     /// Reuses an existing local erased borrow.
     pub(crate) fn from_any(value: &'a dyn Any) -> Self {
         Self {
@@ -163,6 +169,12 @@ impl Clone for DynamicRef<'_, Local> {
 }
 
 impl<'a> DynamicRef<'a, ThreadSafe> {
+    /// Returns the exact identity of the borrowed value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
+    }
     /// Reuses an existing thread-safe erased borrow.
     pub(crate) fn from_any(value: &'a (dyn Any + Send + Sync)) -> Self {
         Self {

@@ -65,7 +65,7 @@ fn test_unregistered_generic_conflict_is_not_absence() {
     let registry = ReflectRegistry::initialize().unwrap();
     let descriptor = TypeDescriptor::of::<Conflict<u32>>();
     assert!(registry.get(descriptor.type_id()).is_none());
-    let error = registry.capability(descriptor, key()).unwrap_err();
+    let error = registry.capability_lookup(descriptor, key()).unwrap_err();
     assert_eq!(error.kind(), CapabilityConflictKind::DuplicateId);
     assert_eq!(error.id().as_str(), "example.generic_conflict");
     assert_eq!(registry.capabilities(descriptor).unwrap_err(), error);
@@ -157,7 +157,7 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
     assert!(registry.capability(other, missing).unwrap().is_none());
     assert!(registry.capability_by_id(other, "invalid!").unwrap().is_none());
     let wrong: CapabilityKey<usize> = CapabilityKey::new(*key().id());
-    assert!(registry.capability(other, wrong).unwrap().is_none());
+    assert!(registry.capability(other, wrong).is_err());
     assert!(matches!(
         registry.capability_lookup(other, missing).unwrap(),
         CapabilityLookup::Missing

@@ -169,6 +169,48 @@ macro_rules! register_type_capabilities {
     };
 }
 
+/// Registers typed capabilities for a generic definition without adding it as
+/// a registry definition member.
+#[macro_export]
+macro_rules! register_definition_capabilities {
+    (
+        definition = $definition:path,
+        capabilities = [$($key:expr => $adapter:expr),+ $(,)?],
+        source = ($declaring_crate:expr, $module_path:expr, $line:expr, $column:expr, $member_kind:expr, $fingerprint:expr $(,)?),
+    ) => {
+        const _: () = {
+            fn __qubit_reflect_definition() -> &'static $crate::descriptor::TypeDefinitionDescriptor { $definition() }
+            fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
+                $crate::__private::codegen_v3::registration::RuntimeIdentity::Capabilities(
+                    $crate::__private::codegen_v3::registration::CapabilityTarget::TypeDefinition(__qubit_reflect_definition().id()))
+            }
+            fn __qubit_reflect_payload() -> $crate::__private::codegen_v3::registration::FragmentPayload {
+                $crate::__private::codegen_v3::registration::FragmentPayload::Capability(
+                    $crate::__private::codegen_v3::registration::CapabilityRegistration::for_definition(
+                        __qubit_reflect_definition(),
+                        ::std::vec![$($crate::capability::CapabilityDescriptor::with_adapter($key, $adapter)),+]))
+            }
+            $crate::__private::codegen_v3::inventory::submit! {
+                $crate::__private::codegen_v3::registration::RegistrationFragment::new(
+                    $crate::__private::codegen_v3::registration::FragmentKind::Capability,
+                    $crate::__private::codegen_v3::registration::StaticFragmentIdentity::new(
+                        $declaring_crate, $module_path, $line, $column, $member_kind, $fingerprint),
+                    __qubit_reflect_runtime_identity, __qubit_reflect_payload)
+            }
+        };
+    };
+    (
+        definition = $definition:path,
+        capabilities = [$($key:expr => $adapter:expr),+ $(,)?],
+    ) => {
+        $crate::register_definition_capabilities! {
+            definition = $definition,
+            capabilities = [$($key => $adapter),+],
+            source = (env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "definition-capability", 0_u64),
+        }
+    };
+}
+
 /// Registers an existing [`Reflect`](crate::descriptor::Reflect) descriptor
 /// root.
 ///
