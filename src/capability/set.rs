@@ -145,7 +145,6 @@ impl TypeCapabilities {
     ///
     /// `None` means the ID is absent, the contract differs, or the descriptor
     /// represents a fact without an executable adapter.
-    #[must_use]
     pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Result<Option<&A>, CapabilityAccessError> {
         self.lookup(key).into_adapter()
     }

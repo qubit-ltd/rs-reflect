@@ -444,7 +444,6 @@ impl ReflectRegistry {
     }
 
     /// Retrieves one effective typed capability for a generic declaration.
-    #[must_use]
     pub fn definition_capability<A: 'static>(
         &self,
         id: TypeDefinitionId,
