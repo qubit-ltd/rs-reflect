@@ -72,6 +72,8 @@ pub use access::FieldSetFailure;
 /// The untouched replacement value and field identity retained after a
 /// failed field set.
 pub use access::FieldSetRecovery;
+/// A typed capability contract error.
+pub use capability::CapabilityAccessError;
 // Construction facade.
 /// A dynamic construction error.
 pub use construct::ConstructionError;

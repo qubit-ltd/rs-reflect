@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::sync::OnceLock;
 
+use crate::capability::CapabilityAccessError;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
 use crate::capability::CapabilityLookup;
@@ -145,8 +146,8 @@ impl TypeCapabilities {
     /// `None` means the ID is absent, the contract differs, or the descriptor
     /// represents a fact without an executable adapter.
     #[must_use]
-    pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Option<&A> {
-        self.lookup(key).found()
+    pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Result<Option<&A>, CapabilityAccessError> {
+        self.lookup(key).into_adapter()
     }
 
     /// Looks up a capability while preserving absence, fact-only, and adapter

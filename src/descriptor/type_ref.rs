@@ -47,6 +47,15 @@ pub enum TypeRef {
 }
 
 impl TypeRef {
+    /// Returns the exact identity for a concrete reference.
+    #[must_use]
+    pub fn concrete_type_id(&self) -> Option<TypeId> {
+        match self {
+            Self::Resolved(value) => Some(value.type_id()),
+            Self::Opaque(value) => Some(value.type_id()),
+            Self::Symbolic(_) => None,
+        }
+    }
     /// Returns the root descriptor for a resolved reference.
     ///
     /// `None` means this reference is explicitly opaque or still symbolic.

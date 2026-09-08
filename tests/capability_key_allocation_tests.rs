@@ -80,7 +80,7 @@ fn test_capability_key_lookup_is_allocation_free() {
     for _ in 0..1_000 {
         let key = CapabilityKey::new(CapabilityId::new("example.allocation_free").expect("valid capability ID"));
         assert!(capabilities.contains(key));
-        assert_eq!(capabilities.get(key), Some(&7_u32));
+        assert_eq!(capabilities.get(key).unwrap(), Some(&7_u32));
     }
     while !BACKGROUND_DONE.load(Ordering::Acquire) {
         std::thread::yield_now();

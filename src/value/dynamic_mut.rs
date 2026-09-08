@@ -47,6 +47,12 @@ pub struct DynamicMut<'a, M: Mode> {
 }
 
 impl<'a> DynamicMut<'a, Local> {
+    /// Returns the exact identity of the mutably borrowed value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
+    }
     /// Reuses an existing local erased mutable borrow.
     pub(crate) fn from_any(value: &'a mut dyn Any) -> Self {
         Self {
@@ -185,6 +191,12 @@ impl<'a> DynamicMut<'a, Local> {
 }
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
+    /// Returns the exact identity of the mutably borrowed value.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
+    }
     /// Reuses an existing thread-safe erased mutable borrow.
     pub(crate) fn from_any(value: &'a mut (dyn Any + Send + Sync)) -> Self {
         Self {

@@ -125,8 +125,8 @@ fn test_type_capabilities_preserve_unknown_capabilities_in_stable_order() {
     assert_eq!(capabilities.descriptors()[1].adapter_type(), zeta_key.adapter_type());
     assert!(format!("{:?}", capabilities.descriptors()[1].clone()).contains("CapabilityDescriptor"));
     assert!(format!("{zeta_key:?}").contains("CapabilityKey"));
-    assert_eq!(capabilities.get(zeta_key), Some(&TextAdapter("zeta")));
-    assert_eq!(capabilities.get(alpha_key), None);
+    assert_eq!(capabilities.get(zeta_key).unwrap(), Some(&TextAdapter("zeta")));
+    assert!(capabilities.get(alpha_key).is_err());
 }
 
 /// Confirms one stable ID cannot silently acquire a different adapter contract.
@@ -170,6 +170,7 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
 
     let clone_adapter = capabilities
         .get(clone_key())
+        .unwrap()
         .expect("the clone adapter must be present");
     let cloned = clone_adapter
         .clone_owned(&ReflectedOwned::new(String::from("clone me")))
@@ -185,6 +186,7 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
 
     let defaulted = capabilities
         .get(default_key())
+        .unwrap()
         .expect("the default adapter must be present")
         .create();
     assert_eq!(defaulted.downcast_ref::<String>().map(String::as_str), Some(""));
@@ -244,7 +246,8 @@ fn test_derive_descriptor_includes_explicit_extension_registration() {
         registry
             .capabilities(descriptor)
             .expect("valid capability declarations")
-            .get(extension_key()),
+            .get(extension_key())
+            .unwrap(),
         Some(&ExtensionAdapter("derived"))
     );
 }
@@ -301,8 +304,8 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
         .capabilities(TypeDescriptor::of::<LocalOnly>())
         .expect("valid capability declarations");
 
-    assert!(capabilities.get(clone_key()).is_some());
-    assert!(capabilities.get(default_key()).is_some());
+    assert!(capabilities.get(clone_key()).unwrap().is_some());
+    assert!(capabilities.get(default_key()).unwrap().is_some());
     assert!(!capabilities.contains(send_key()));
     assert!(!capabilities.contains(sync_key()));
 
@@ -311,6 +314,7 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
     };
     let cloned = capabilities
         .get(clone_key())
+        .unwrap()
         .expect("the clone registration carries its operation adapter")
         .clone_owned(&ReflectedOwned::new(source.clone()))
         .expect("the registered local concrete type must clone dynamically");
@@ -327,8 +331,8 @@ fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotio
 
     assert!(capabilities.contains(send_key()));
     assert!(capabilities.contains(sync_key()));
-    assert_eq!(capabilities.get(send_key()), None);
-    assert_eq!(capabilities.get(sync_key()), None);
+    assert!(capabilities.get(send_key()).is_err());
+    assert!(capabilities.get(sync_key()).is_err());
 }
 
 /// Confirms macro registration accepts a third-party typed key and adapter.
@@ -339,7 +343,10 @@ fn test_concrete_registration_accepts_third_party_typed_adapter() {
         .capabilities(TypeDescriptor::of::<ExtensionRegistration>())
         .expect("valid capability declarations");
 
-    assert_eq!(capabilities.get(extension_key()), Some(&ExtensionAdapter("registered")));
+    assert_eq!(
+        capabilities.get(extension_key()).unwrap(),
+        Some(&ExtensionAdapter("registered"))
+    );
 }
 
 /// Confirms reflected-type registration returns the existing descriptor root.

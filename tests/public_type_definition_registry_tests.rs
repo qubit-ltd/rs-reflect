@@ -123,7 +123,7 @@ fn test_registry_registers_generic_type_definition() {
     );
     assert_eq!(
         registry.definition_capability(definition.id(), definition_key()),
-        Some(&7_u32),
+        Ok(Some(&7_u32)),
     );
     assert!(
         registry
@@ -218,7 +218,12 @@ fn test_generic_enum_definition_exposes_source_structure() {
     let missing = TypeDefinitionId::of::<MissingDefinition>();
     assert!(registry.definition(missing).is_none());
     assert!(registry.definition_capabilities(missing).descriptors().is_empty());
-    assert!(registry.definition_capability(missing, definition_key()).is_none());
+    assert!(
+        registry
+            .definition_capability(missing, definition_key())
+            .unwrap()
+            .is_none()
+    );
     assert!(
         registry
             .definition_capability_by_id(missing, "example.generic_definition")

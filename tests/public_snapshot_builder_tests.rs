@@ -272,7 +272,7 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
     assert!(capability_only.definitions().is_empty());
     assert_eq!(
         capability_only.definition_capability(DEFINITION.id(), capability_key),
-        Some(&17),
+        Ok(Some(&17)),
     );
 }
 

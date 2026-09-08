@@ -8,6 +8,7 @@
 
 //! Typed, immutable capabilities attached to reflected concrete types.
 
+mod access_error;
 mod builtin;
 mod capability_lookup;
 mod descriptor;
@@ -15,6 +16,7 @@ mod key;
 mod registration;
 mod set;
 
+pub use access_error::CapabilityAccessError;
 pub use builtin::CloneAdapter;
 pub use builtin::DefaultAdapter;
 pub use builtin::clone_descriptor;
