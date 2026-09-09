@@ -180,7 +180,9 @@ fn unavailable_reasons(
     if matches!(output_plan(&method.return_type), OutputPlan::Opaque) {
         reasons.push(UnavailableReasonPlan::OpaqueReturn);
     }
-    if parameters.iter().any(|plan| plan.unsupported_unsized) {
+    if parameters.iter().any(|plan| plan.unsupported_unsized)
+        || matches!(&method.return_type, ReturnTypeIr::Type(ty) if has_unsupported_unsized_parameter(ty))
+    {
         reasons.push(UnavailableReasonPlan::UnsupportedUnsizedValue);
     }
     if unproven_default_constraint {
@@ -252,6 +254,7 @@ fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
 pub(crate) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
     match return_type {
         ReturnTypeIr::Unit => true,
+        ReturnTypeIr::Type(ty) if has_unsupported_unsized_parameter(ty) => false,
         ReturnTypeIr::Type(ty) => {
             matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) || supports_owned_dynamic_type(ty)
         }
@@ -440,6 +443,20 @@ mod tests {
         assert!(plan.is_executable());
         assert_eq!(plan.output, OutputPlan::Owned);
         assert!(matches!(plan.receiver, Some(ReceiverPlan::SharedReference)));
+    }
+
+    /// Unsized slices remain described without an invalid Sized adapter.
+    #[test]
+    fn slice_return_is_described_only() {
+        let method = impl_method(quote! {
+            impl Service {
+                fn values(&self) -> &[String] { unreachable!() }
+            }
+        });
+        assert_eq!(
+            reasons(&plan(&method)),
+            &[UnavailableReasonPlan::UnsupportedUnsizedValue]
+        );
     }
 
     #[test]

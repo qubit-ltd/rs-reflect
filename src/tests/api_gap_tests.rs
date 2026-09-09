@@ -469,3 +469,55 @@ fn test_missing_receiver_and_owned_unit_keep_distinct_validation_facts() {
     let invocation = Invocation::<Local>::new(Some(InvocationReceiver::Owned(ReflectedOwned::new(()))), []);
     assert!(invocation.validate(&identity, unit, &[]).is_ok());
 }
+
+#[cfg(feature = "derive")]
+#[derive(crate::Reflect)]
+#[reflect(crate = crate)]
+struct BorrowedSignature;
+
+#[cfg(feature = "derive")]
+#[crate::reflect_impl(crate = crate)]
+impl BorrowedSignature {
+    pub fn values(input: &[u8]) -> &[u8] {
+        input
+    }
+}
+
+/// Generated borrowed-slice methods remain discoverable without a dynamic
+/// adapter, including their parameter and return declaration facts.
+#[cfg(feature = "derive")]
+#[test]
+fn test_described_borrowed_signature_keeps_parameter_and_return_facts() {
+    use crate::descriptor::ImplDescriptor;
+    use crate::descriptor::InvocationUnavailableReason;
+    use crate::descriptor::MethodLookup;
+    use crate::descriptor::MethodQualifier;
+    use crate::descriptor::ParameterPassingMode;
+    use crate::descriptor::ReturnKind;
+
+    let input = [3, 4];
+    assert!(std::ptr::eq(BorrowedSignature::values(&input), &input[..]));
+    let registry = ReflectRegistry::initialize().expect("registry");
+    let implementations = registry.implementations(TypeId::of::<BorrowedSignature>());
+    let MethodLookup::Unique(instance) =
+        ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "values")
+    else {
+        panic!("described-only method remains discoverable")
+    };
+    assert!(instance.adapter().is_none());
+    assert_eq!(
+        instance.unavailable_reasons(),
+        [InvocationUnavailableReason::UnsupportedUnsizedValue]
+    );
+    let method = instance.declaration();
+    let parameter = method.parameter_at(0).expect("slice parameter");
+    assert_eq!(parameter.index(), 0);
+    assert_eq!(parameter.name(), Some("input"));
+    assert_eq!(parameter.passing_mode(), ParameterPassingMode::SharedBorrow);
+    assert!(matches!(parameter.signature_type(), TypeExpression::Reference(_)));
+    assert!(parameter.concrete_type().is_none());
+    let output = method.return_value();
+    assert_eq!(output.kind(), ReturnKind::Reference);
+    assert!(matches!(output.signature_type(), Some(TypeExpression::Reference(_))));
+    assert!(output.concrete_type().is_none());
+}

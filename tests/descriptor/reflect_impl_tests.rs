@@ -20,8 +20,15 @@ use std::task::Poll;
 
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
+use qubit_reflect::descriptor::ImplDescriptor;
+use qubit_reflect::descriptor::InvocationUnavailableReason;
+use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::descriptor::MethodVisibility;
+use qubit_reflect::descriptor::ParameterPassingMode;
 use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::expression::TypeExpression;
+use qubit_reflect::identity::Visibility;
 use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationArg;
 use qubit_reflect::invoke::InvocationOutput;
@@ -2318,4 +2325,63 @@ fn poll_once<F: Future + Unpin>(future: &mut F) -> Poll<F::Output> {
     let waker = std::task::Waker::noop();
     let mut context = Context::from_waker(waker);
     Pin::new(future).poll(&mut context)
+}
+
+#[reflect_impl]
+impl Sample {
+    /// Returns a slice whose borrow must remain descriptive without an adapter.
+    pub fn reflected_slice_output(values: &[u8]) -> &[u8] {
+        values
+    }
+}
+
+/// Unsupported borrowed outputs retain complete declaration and parameter
+/// facts.
+#[test]
+fn test_slice_output_retains_described_signature() {
+    let values = [1, 2];
+    assert!(std::ptr::eq(
+        Sample::reflected_slice_output(&values).as_ptr(),
+        values.as_ptr()
+    ));
+    let registry = ReflectRegistry::initialize().expect("reflection registry");
+    let implementations = registry.implementations(Sample::type_descriptor().type_id());
+    let MethodLookup::Unique(instance) =
+        ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "reflected_slice_output")
+    else {
+        panic!("slice method remains discoverable")
+    };
+    assert!(instance.adapter().is_none());
+    assert!(instance.arguments().is_empty());
+    assert_eq!(
+        instance.unavailable_reasons(),
+        [InvocationUnavailableReason::UnsupportedUnsizedValue]
+    );
+    let implementation = implementations
+        .iter()
+        .find(|implementation| implementation.method("reflected_slice_output").is_some())
+        .expect("owning implementation");
+    let definition = implementation.definition();
+    assert!(definition.implemented_trait_path().is_none());
+    assert!(definition.associated_consts().is_empty());
+    assert!(
+        implementation
+            .implementation_methods()
+            .iter()
+            .any(|method| method.rust_name() == "reflected_slice_output")
+    );
+    let method = instance.declaration();
+    assert!(!method.has_default());
+    assert_eq!(method.rust_name(), "reflected_slice_output");
+    assert!(matches!(
+        method.visibility(),
+        MethodVisibility::Declared(Visibility::Public)
+    ));
+    let parameter = method.parameter_at(0).expect("slice parameter");
+    assert_eq!(parameter.index(), 0);
+    assert!(parameter.concrete_type().is_none());
+    assert_eq!(parameter.passing_mode(), ParameterPassingMode::SharedBorrow);
+    assert!(matches!(parameter.signature_type(), TypeExpression::Reference { .. }));
+    assert!(method.return_value().signature_type().is_some());
+    assert!(method.return_value().concrete_type().is_none());
 }
