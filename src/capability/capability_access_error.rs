@@ -26,9 +26,7 @@ pub enum CapabilityAccessError {
         adapter_type: TypeId,
     },
     /// The requested adapter contract differs from the declared contract.
-    #[error(
-        "capability {id} adapter mismatch: expected {expected:?}, actual {actual:?}"
-    )]
+    #[error("capability {id} adapter mismatch: expected {expected:?}, actual {actual:?}")]
     AdapterTypeMismatch {
         /// The stable ID of the capability.
         id: CapabilityId,
