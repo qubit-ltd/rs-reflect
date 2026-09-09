@@ -109,17 +109,22 @@ if [[ ! -f "$PLATFORM_ROOT/rs-model-metadata/derive/Cargo.toml" ]]; then
     exit 1
 fi
 
+# Canonical paths keep Cargo and trybuild diagnostics stable when sibling
+# checkouts are symlinks to isolated worktrees.
+MODEL_ROOT=$(cd "$PLATFORM_ROOT/rs-model-metadata" && pwd -P)
+DOWNSTREAM_ROOT=$(cd "$PLATFORM_ROOT/rs-platform" && pwd -P)
+
 if [[ -n "$EVIDENCE_DIR" ]]; then
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
-        --manifest-path "$PLATFORM_ROOT/rs-model-metadata/Cargo.toml" \
+        --manifest-path "$MODEL_ROOT/Cargo.toml" \
         --workspace --lib --tests
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
-        --manifest-path "$PLATFORM_ROOT/rs-platform/Cargo.toml" --workspace
+        --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
-        --manifest-path "$PLATFORM_ROOT/rs-platform/Cargo.toml" \
+        --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" \
         -p qubit-platform-testkit
 else
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$PLATFORM_ROOT/rs-model-metadata/Cargo.toml" --workspace --lib --tests
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$PLATFORM_ROOT/rs-platform/Cargo.toml" --workspace
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$PLATFORM_ROOT/rs-platform/Cargo.toml" -p qubit-platform-testkit
+    cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$MODEL_ROOT/Cargo.toml" --workspace --lib --tests
+    cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
+    cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" -p qubit-platform-testkit
 fi
