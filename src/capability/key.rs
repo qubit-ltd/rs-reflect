@@ -21,7 +21,10 @@ use crate::identity::CapabilityId;
 pub struct CapabilityKey<A: 'static> {
     id: CapabilityId,
     adapter_type: TypeId,
-    marker: PhantomData<fn() -> A>,
+    // Keep the key invariant over its adapter type. A covariant marker would
+    // allow lifetime subtyping to change `A` while retaining this key's
+    // original `TypeId`, which could make a lookup downcast panic.
+    marker: PhantomData<fn(A) -> A>,
 }
 
 impl<A: 'static> CapabilityKey<A> {
