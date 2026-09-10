@@ -475,7 +475,7 @@ pub mod __private {
 
 从旧版本迁移时，原有能力查询需要处理 `Result`，没有忽略错误的兼容入口。`capabilities` 返回 `Result<&TypeCapabilities, CapabilityConflict>`；按类型键或文本 ID 的单项查询返回 `Result<Option<_>, CapabilityConflict>`。先处理冲突，再判断能力是否存在。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可通过 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 读取原始原因。
 
-`Ok(None)` 表示 ID 不存在、类型键与适配器类型不匹配，或描述符只记录事实而没有适配器。这些情况都不等于能力集合冲突。`types_with_capability` 及定义级查询只读取冻结索引，不执行能力工厂，其返回类型不增加 `Result`。对尚未注册的具体实例查询有效能力时，可以执行该类型自身的能力工厂，但不会把实例加入快照。
+便捷的 `capability` 查询会把 ID 缺失、类型键的适配器类型不匹配，以及只有事实没有适配器的描述符统一折叠为 `Ok(None)`。需要保留诊断信息时，应使用 `capability_lookup`，它区分四种状态：`Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`。这些状态与能力集合冲突是两回事。`capability_origin` 返回 `CapabilityOrigin::Intrinsic` 或 `CapabilityOrigin::Registered { source }`，`capability_source` 则在能力来自注册时返回贡献它的 `FragmentIdentity`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`types_with_capability` 及定义级查询只读取冻结索引，不执行能力工厂，其返回类型不增加 `Result`。对尚未注册的具体实例查询有效能力时，可以执行该类型自身的能力工厂，但不会把实例加入快照。
 
 类型自身的能力提供器只能依赖静态类型信息，不能依赖快照、时间或外部可变配置，也不能重入注册表初始化。泛型能力工厂在缓存锁外执行，成功或冲突按具体 `TypeId` 缓存，并发查询共享结果。提供器发生 panic 时仍向外传播，不转换为能力缺失或 `CapabilityConflict`。
 

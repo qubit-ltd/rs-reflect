@@ -324,7 +324,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 
 | Acceptance scope | Regression evidence |
 | --- | --- |
-| Query states, conflict caching, receiver recovery | `tests/public_generic_capability_conflict_tests.rs`, `tests/public_receiver_resolution_failure_tests.rs` |
+| Four capability lookup states, origin retention, conflict caching, receiver recovery | `tests/public_generic_capability_conflict_tests.rs`, `tests/public_snapshot_builder_tests.rs`, `tests/public_receiver_resolution_failure_tests.rs` |
 | Frozen provider boundary | `tests/public_frozen_capability_tests.rs` |
 | Struct shape fidelity | `tests/public_empty_struct_tests.rs`, derive parser unit tests |
 | Downstream error chain | rs-model-metadata `metadata_resolution_error_tests`, `metadata_path_error_tests`, rs-platform `registry_failure_tests` |

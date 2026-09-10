@@ -210,6 +210,12 @@ providers. The cache retains successes and conflicts per concrete TypeId; factor
 the cache-map lock. Providers must be snapshot-independent and must not re-enter initialization;
 the contract does not catch provider panics.
 
+Typed `capability_lookup` preserves four outcomes: `Missing`, `FactOnly`,
+`AdapterTypeMismatch`, and `Found`. The convenience `capability` method may
+collapse the first three to `Ok(None)`. Effective facts retain
+`CapabilityOrigin::Intrinsic` or `CapabilityOrigin::Registered { source }`;
+the registry exposes both the origin and the contributing `FragmentIdentity`.
+
 The same provider boundary applies to `RegistrySnapshotBuilder` consumers:
 providers may depend on static type facts only. They must not consult a
 snapshot, mutable external state, or registry initialization, and a provider

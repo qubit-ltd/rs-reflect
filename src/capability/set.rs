@@ -149,8 +149,8 @@ impl TypeCapabilities {
         self.lookup(key).into_adapter()
     }
 
-    /// Looks up a capability while preserving absence, fact-only, and adapter
-    /// contract mismatch states.
+    /// Looks up a capability while preserving all four states: missing ID,
+    /// fact-only descriptor, adapter contract mismatch, and executable adapter.
     #[must_use]
     pub fn lookup<A: 'static>(&self, key: CapabilityKey<A>) -> CapabilityLookup<'_, A> {
         let Some(descriptor) = self.find(key.id()) else {

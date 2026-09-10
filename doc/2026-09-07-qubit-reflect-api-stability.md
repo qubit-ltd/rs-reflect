@@ -26,5 +26,7 @@ generated token stream must be reviewed at the corresponding higher boundary.
 
 The requirements and traceability matrices record the executable evidence for
 these boundaries. In particular, `REQ-TYPE-030` requires strict capability
-lookups to preserve missing, fact-only, adapter-mismatch, and found states;
-legacy `Option` convenience methods may still intentionally collapse them.
+lookups to preserve `Missing`, `FactOnly`, `AdapterTypeMismatch`, and `Found`;
+legacy `Option` convenience methods may still intentionally collapse them. The
+registry's `capability_origin` and `capability_source` APIs preserve whether a
+fact is intrinsic or came from a registration fragment.
