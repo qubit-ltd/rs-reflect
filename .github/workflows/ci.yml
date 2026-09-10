@@ -32,8 +32,24 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
+          path: rust-platform/rs-reflect
+      - name: Checkout fuzz path dependencies
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-id
+          ref: main
+          path: rust-common/rs-id
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - name: Checkout fuzz path dependencies
+        uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-datatype
+          ref: main
+          path: rust-common/rs-datatype
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
       - name: Load toolchain contract
         run: |
+          cd rust-platform/rs-reflect
           source .rs-ci/toolchains.sh
           configure_rs_ci_toolchains
           echo "RS_CI_FUZZ_TOOLCHAIN=$RS_CI_FUZZ_TOOLCHAIN" >> "$GITHUB_ENV"
@@ -43,13 +59,17 @@ jobs:
           rustup toolchain install "$RS_CI_FUZZ_TOOLCHAIN" --profile minimal
           cargo install --locked cargo-fuzz --version "$CARGO_FUZZ_VERSION"
       - name: Run fuzz smoke checks
-        run: RS_CI_PROJECT_ROOT="$PWD" scripts/cargo-fuzz-check.sh
+        run: |
+          cd rust-platform/rs-reflect
+          python3 scripts/check_dependency_layout.py \
+            --layout-root "$GITHUB_WORKSPACE" --project "$PWD/fuzz"
+          RS_CI_PROJECT_ROOT="$PWD" scripts/cargo-fuzz-check.sh
       - name: Upload fuzz crash artifacts
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: fuzz-artifacts-${{ github.sha }}
-          path: fuzz/artifacts
+          path: rust-platform/rs-reflect/fuzz/artifacts
           if-no-files-found: ignore
           retention-days: 14
 
@@ -113,9 +133,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-platform
@@ -124,9 +144,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-id
@@ -135,9 +155,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-datatype
@@ -146,9 +166,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-redact
@@ -157,9 +177,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-validator
@@ -168,9 +188,20 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-validation-rules
+        id: validation_rules
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Record baseline checkout results
@@ -184,6 +215,7 @@ jobs:
           DATATYPE_RESULT: ${{ steps.datatype.outcome }}
           REDACT_RESULT: ${{ steps.redact.outcome }}
           VALIDATOR_RESULT: ${{ steps.validator.outcome }}
+          VALIDATION_RULES_RESULT: ${{ steps.validation_rules.outcome }}
         run: |
           results="$EVIDENCE_DIR/checkout-results.txt"
           missing="$EVIDENCE_DIR/missing-repositories.txt"
@@ -210,6 +242,7 @@ jobs:
           record rs-datatype rust-common/rs-datatype "$DATATYPE_RESULT"
           record rs-redact rust-common/rs-redact "$REDACT_RESULT"
           record rs-validator rust-common/rs-validator "$VALIDATOR_RESULT"
+          record rs-validation-rules rust-common/rs-validation-rules "$VALIDATION_RULES_RESULT"
           find rust-platform rust-common -name Cargo.lock -type f -print0 2>/dev/null \
             | sort -z | xargs -0 -r sha256sum > "$EVIDENCE_DIR/checkout-lock-sha256.txt"
           exit "$failed"
@@ -279,9 +312,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[0].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-platform
@@ -290,9 +323,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[1].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-id
@@ -301,9 +334,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[2].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-datatype
@@ -312,9 +345,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[3].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-redact
@@ -323,9 +356,9 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[4].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Checkout rs-validator
@@ -334,9 +367,20 @@ jobs:
         continue-on-error: true
         uses: actions/checkout@v6
         with:
-          repository: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].repository }}
-          ref: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].revision }}
-          path: ${{ fromJSON(steps.resolve.outputs.matrix).include[5].path }}
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.path }}
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+          submodules: recursive
+      - name: Checkout rs-validation-rules
+        id: validation_rules
+        if: steps.resolve.outcome == 'success'
+        continue-on-error: true
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.repository }}
+          ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.revision }}
+          path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
           submodules: recursive
       - name: Record head checkout results
@@ -350,6 +394,7 @@ jobs:
           DATATYPE_RESULT: ${{ steps.datatype.outcome }}
           REDACT_RESULT: ${{ steps.redact.outcome }}
           VALIDATOR_RESULT: ${{ steps.validator.outcome }}
+          VALIDATION_RULES_RESULT: ${{ steps.validation_rules.outcome }}
         run: |
           results="$EVIDENCE_DIR/checkout-results.txt"
           missing="$EVIDENCE_DIR/missing-repositories.txt"
@@ -376,6 +421,7 @@ jobs:
           record rs-datatype rust-common/rs-datatype "$DATATYPE_RESULT"
           record rs-redact rust-common/rs-redact "$REDACT_RESULT"
           record rs-validator rust-common/rs-validator "$VALIDATOR_RESULT"
+          record rs-validation-rules rust-common/rs-validation-rules "$VALIDATION_RULES_RESULT"
           find rust-platform rust-common -name Cargo.lock -type f -print0 2>/dev/null \
             | sort -z | xargs -0 -r sha256sum > "$EVIDENCE_DIR/checkout-lock-sha256.txt"
           exit "$failed"

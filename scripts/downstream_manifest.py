@@ -17,6 +17,7 @@ REPOSITORIES = (
     ("qubit-ltd/rs-datatype", Path("rust-common/rs-datatype")),
     ("qubit-ltd/rs-redact", Path("rust-common/rs-redact")),
     ("qubit-ltd/rs-validator", Path("rust-common/rs-validator")),
+    ("qubit-ltd/rs-validation-rules", Path("rust-common/rs-validation-rules")),
 )
 EXPECTED_BY_REPOSITORY = dict(REPOSITORIES)
 SHA_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
@@ -95,7 +96,9 @@ def _validate_manifest(value):
     if missing_repositories:
         raise ManifestError(f"manifest.repositories: missing repository {missing_repositories[0]}")
     if len(validated) != len(REPOSITORIES):
-        raise ManifestError("manifest.repositories: expected exactly six repositories")
+        raise ManifestError(
+            f"manifest.repositories: expected exactly {len(REPOSITORIES)} repositories"
+        )
     return [validated[repository] for repository, _ in REPOSITORIES]
 
 
@@ -131,8 +134,8 @@ def _matrix(entries, mode):
         else {}
     )
     return {
-        "include": [
-            {
+        "repositories": {
+            _repository_key(repository): {
                 "repository": repository,
                 "path": relative_path.as_posix(),
                 "revision": (
@@ -140,8 +143,13 @@ def _matrix(entries, mode):
                 ),
             }
             for repository, relative_path in REPOSITORIES
-        ]
+        }
     }
+
+
+def _repository_key(repository):
+    """Return a stable expression-safe key for a GitHub Actions output."""
+    return repository.rsplit("/", 1)[-1].replace("-", "_")
 
 
 def _collect(layout_root):

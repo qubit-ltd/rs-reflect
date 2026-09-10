@@ -26,8 +26,9 @@ REPOSITORIES = [
     ("qubit-ltd/rs-datatype", "rust-common/rs-datatype"),
     ("qubit-ltd/rs-redact", "rust-common/rs-redact"),
     ("qubit-ltd/rs-validator", "rust-common/rs-validator"),
+    ("qubit-ltd/rs-validation-rules", "rust-common/rs-validation-rules"),
 ]
-REVISIONS = [character * 40 for character in "123456"]
+REVISIONS = [character * 40 for character in "1234567"]
 
 
 class DownstreamManifestTests(unittest.TestCase):
@@ -136,14 +137,14 @@ class DownstreamManifestTests(unittest.TestCase):
         self.assertEqual(
             json.loads(stdout),
             {
-                "include": [
-                    {
+                "repositories": {
+                    repository.rsplit("/", 1)[-1].replace("-", "_"): {
                         "repository": repository,
                         "path": path,
                         "revision": revision,
                     }
                     for (repository, path), revision in zip(REPOSITORIES, REVISIONS)
-                ]
+                }
             },
         )
 
@@ -153,7 +154,8 @@ class DownstreamManifestTests(unittest.TestCase):
         )
         self.assertEqual(return_code, 0, stderr)
         self.assertEqual(
-            {entry["revision"] for entry in json.loads(stdout)["include"]}, {"main"}
+            {entry["revision"] for entry in json.loads(stdout)["repositories"].values()},
+            {"main"},
         )
 
     def test_workflow_caches_are_channel_and_input_scoped(self):
