@@ -461,7 +461,9 @@ impl ReflectRegistry {
             .get(&(target, *capability.id()))
             .cloned()
             .or_else(|| {
-                (!self.indexes.types_by_id.contains_key(&descriptor.type_id())).then_some(CapabilityOrigin::Intrinsic)
+                (!self.indexes.types_by_id.contains_key(&descriptor.type_id())).then_some(CapabilityOrigin::Intrinsic {
+                    type_id: descriptor.type_id(),
+                })
             })
             .expect("every effective capability has a retained origin");
         Ok(Some(origin))

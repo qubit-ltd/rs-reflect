@@ -153,7 +153,9 @@ impl RegistryBuilder {
                 CapabilityTarget::Type(descriptor.type_id()),
                 capability.clone(),
                 identity,
-                CapabilityOrigin::Intrinsic,
+                CapabilityOrigin::Intrinsic {
+                    type_id: descriptor.type_id(),
+                },
             )?;
         }
         Ok(())
