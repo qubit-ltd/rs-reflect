@@ -65,7 +65,7 @@ pub mod registry;
 /// Dynamic value APIs.
 pub mod value;
 
-// Field access facade.
+/// A structured error raised while reading or writing a reflected field.
 pub use access::FieldAccessError;
 /// A failed field replacement together with its recoverable inputs.
 pub use access::FieldSetFailure;
@@ -123,10 +123,13 @@ pub use invoke::InvocationOutput;
 /// The receiver and arguments retained after pre-execution validation
 /// fails.
 pub use invoke::InvocationRecovery;
+/// Derives the static reflection implementation for a Rust type.
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::Reflect;
+/// Adds reflection metadata to a Rust trait declaration.
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::reflect;
+/// Adds reflection metadata to a Rust inherent or trait implementation.
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::reflect_impl;
 // Registry facade.
