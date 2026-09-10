@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect as DeriveReflect;
 use qubit_reflect::capability::CapabilityConflictKind;
+use qubit_reflect::capability::CapabilityAccessError;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::capability::TypeCapabilities;
@@ -159,6 +160,43 @@ fn test_type_capabilities_reject_duplicate_ids() {
     .expect_err("duplicate capability IDs must not be silently coalesced");
 
     assert_eq!(error.kind(), CapabilityConflictKind::DuplicateId);
+}
+
+/// Confirms typed lookup preserves missing, fact-only, mismatch, and found
+/// outcomes through the public capability API.
+#[test]
+fn test_typed_capability_lookup_reports_all_contract_states() {
+    type BorrowedAdapter = fn(&str);
+    type StaticAdapter = fn(&'static str);
+
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<CapabilityKey<Rc<()>>>();
+
+    fn borrow_adapter(_: &str) {}
+    let borrowed_adapter: BorrowedAdapter = borrow_adapter;
+
+    let found_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.found"));
+    let fact_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.fact.only"));
+    let mismatch_key = CapabilityKey::<StaticAdapter>::new(external_id("example.capability.mismatch"));
+    let declared_mismatch_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.mismatch"));
+    let missing_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.missing"));
+    let capabilities = TypeCapabilities::try_new(vec![
+        CapabilityDescriptor::with_adapter(found_key, borrowed_adapter),
+        CapabilityDescriptor::without_adapter(fact_key),
+        CapabilityDescriptor::without_adapter(declared_mismatch_key),
+    ])
+    .expect("distinct capability IDs must be accepted");
+
+    assert!(capabilities.get(missing_key).expect("missing lookup is valid").is_none());
+    assert!(matches!(
+        capabilities.get(fact_key),
+        Err(CapabilityAccessError::FactOnly { id, .. }) if id.as_str() == "example.capability.fact.only"
+    ));
+    assert!(matches!(
+        capabilities.get(mismatch_key),
+        Err(CapabilityAccessError::AdapterTypeMismatch { id, .. }) if id.as_str() == "example.capability.mismatch"
+    ));
+    assert!(capabilities.get(found_key).expect("found lookup is valid").is_some());
 }
 
 /// Confirms built-in clone and default adapters retain exact dynamic type
