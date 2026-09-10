@@ -698,6 +698,9 @@ not re-enter initialization.
 | Owned value / recovery | An owned value transfers ownership into a call; recovery returns inputs after a pre-execution failure. |
 | Facade / specialization | A facade provides a common dependency entry point; specialization generates support for finite concrete generic instances. |
 | Opaque | Preserves type identity while limiting reflection into internal structure. |
+| Checked operation | A descriptor operation validates the receiver, policy, and exact types before it performs a dynamic read, update, construction, or invocation. |
+| Structured error / diagnostic | Structured errors describe a failed operation; inspect their category, unavailable reason, and recovery payload instead of parsing display text. |
+| Boundary / limitation | A boundary limits which dynamic operation is exposed; unsupported operations remain unavailable rather than bypassing Rust ownership, type, or thread-safety rules. |
 
 ## Further Reading
 

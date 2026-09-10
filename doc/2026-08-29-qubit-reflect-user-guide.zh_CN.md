@@ -499,6 +499,9 @@ pub mod __private {
 | 自有值（owned value）与恢复对象（recovery） | 自有值随调用转移所有权；恢复对象在执行前失败时返还输入。 |
 | 外观库（facade）与特化（specialization） | 外观库统一提供依赖入口；特化为有限的具体泛型实例生成支持。 |
 | 不透明（opaque） | 保留类型身份，但限制内部结构的反射访问。 |
+| 受检操作（checked operation） | 描述符操作会在执行动态读取、修改、构造或调用前，校验接收者、策略和精确类型。 |
+| 结构化错误（structured error）与诊断（diagnostic） | 结构化错误说明操作为何失败；应检查错误分类、不可用原因和恢复对象，而不要解析 `Display` 文本。 |
+| 边界（boundary）与限制（limitation） | 边界决定开放哪些动态操作；不受支持的操作会保持不可用，不会绕过 Rust 的所有权、类型或线程安全规则。 |
 
 ## 延伸阅读
 
@@ -509,4 +512,4 @@ pub mod __private {
 - [中文详细设计](2026-09-03-qubit-reflect-design.zh_CN.md) 与 [English design](2026-09-03-qubit-reflect-design.md)
 - [中文演进历史](2026-09-07-qubit-reflect-evolution.zh_CN.md) 与 [Evolution history](2026-09-07-qubit-reflect-evolution.md)
 - [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md) 与 [追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
-- [English requirements](2026-09-03-qubit-reflect-requirements.md) and [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
+- [English requirements](2026-09-03-qubit-reflect-requirements.md) 和 [traceability matrix](2026-09-03-qubit-reflect-requirements-traceability.md)
