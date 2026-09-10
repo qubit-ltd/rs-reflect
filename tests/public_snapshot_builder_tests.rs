@@ -177,7 +177,7 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     assert_eq!(
         intrinsic.capability_origin(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
         Ok(Some(CapabilityOrigin::Intrinsic {
-            type_id: target.type_id(),
+            type_id: TypeId::of::<IntrinsicTarget>(),
         })),
     );
     assert_eq!(
