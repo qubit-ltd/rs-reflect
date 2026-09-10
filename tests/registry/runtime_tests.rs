@@ -32,6 +32,7 @@ use qubit_reflect::descriptor::TraitCompleteness;
 use qubit_reflect::descriptor::TraitDefinitionDescriptor;
 use qubit_reflect::descriptor::TraitDescriptor;
 use qubit_reflect::descriptor::TraitId;
+use qubit_reflect::descriptor::TypeDefinitionId;
 use qubit_reflect::descriptor::TypeDescriptor;
 use qubit_reflect::error::RegistryErrorKind;
 use qubit_reflect::expression::DiagnosticText;
@@ -509,6 +510,59 @@ fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
         .collect();
     assert_eq!(query_matches, [TypeId::of::<EarlyType>(), TypeId::of::<LateType>()]);
     assert!(registry.find_by_query_name("missing").is_empty());
+}
+
+/// Exercises the public candidate views and empty registry indexes so their
+/// iterator, cardinality, and ambiguity contracts remain covered together.
+#[test]
+fn test_registry_runtime_candidate_views_preserve_empty_and_ambiguous_states() {
+    let registry = ReflectRegistry::initialize().expect("valid linked fragments must initialize");
+
+    let type_candidates = registry.find_by_type_name("missing");
+    assert_eq!(type_candidates.len(), 0);
+    assert!(type_candidates.is_empty());
+    assert_eq!(type_candidates.iter().count(), 0);
+    assert_eq!(type_candidates.into_iter().count(), 0);
+
+    let definition_candidates = registry.find_definitions_by_query_name("missing");
+    assert_eq!(definition_candidates.len(), 0);
+    assert!(definition_candidates.is_empty());
+    assert_eq!(definition_candidates.iter().count(), 0);
+    assert!(definition_candidates.only().is_none());
+    assert_eq!(definition_candidates.into_iter().count(), 0);
+
+    let trait_candidates = registry.find_trait_definitions_by_path("missing");
+    assert_eq!(trait_candidates.len(), 0);
+    assert!(trait_candidates.is_empty());
+    assert_eq!(trait_candidates.iter().count(), 0);
+    assert!(trait_candidates.only().is_none());
+    assert_eq!(trait_candidates.into_iter().count(), 0);
+
+    let impl_candidates = registry.find_impl_definitions_by_target(&TypeExpression::Parameter("Missing".into()));
+    assert_eq!(impl_candidates.len(), 0);
+    assert!(impl_candidates.is_empty());
+    assert_eq!(impl_candidates.iter().count(), 0);
+    assert_eq!(impl_candidates.into_iter().count(), 0);
+
+    assert!(
+        registry
+            .definition(TypeDefinitionId::of::<CapabilityTarget>())
+            .is_none()
+    );
+    assert!(
+        registry
+            .definition_source(TypeDefinitionId::of::<CapabilityTarget>())
+            .is_none()
+    );
+    assert!(registry.type_source(TypeId::of::<CapabilityTarget>()).is_none());
+    assert!(registry.implementations(TypeId::of::<CapabilityTarget>()).is_empty());
+    assert!(
+        registry
+            .trait_definition(&TraitId::External(shared_external_trait_id()))
+            .is_none()
+    );
+    assert!(registry.trait_definition_by_path("missing").is_none());
+    assert!(registry.impl_definition_trait(&IMPL_DEFINITION).is_none());
 }
 
 /// Verifies simultaneous first access publishes exactly one immutable snapshot.

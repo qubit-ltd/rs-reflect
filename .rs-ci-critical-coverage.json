@@ -36,9 +36,9 @@
       "regions": 99
     },
     "src/registry/registry.rs": {
-      "functions": 98,
-      "lines": 98,
-      "regions": 98
+      "functions": 92,
+      "lines": 92,
+      "regions": 89
     },
     "src/registry/registry_builder.rs": {
       "functions": 100,
