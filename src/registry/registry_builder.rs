@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 
 use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
+use crate::capability::CapabilityOrigin;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::AppliedTraitId;
 use crate::descriptor::ImplDefinitionDescriptor;
@@ -55,6 +56,7 @@ struct RegistryBuilder {
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
     capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
+    capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
     loaded_intrinsic_capabilities: HashSet<TypeId>,
     fragment_identities: Vec<FragmentIdentity>,
 }
@@ -147,10 +149,11 @@ impl RegistryBuilder {
             )
         })?;
         for capability in capabilities.descriptors() {
-            self.push_capability(
+            self.push_capability_with_origin(
                 CapabilityTarget::Type(descriptor.type_id()),
                 capability.clone(),
                 identity,
+                CapabilityOrigin::Intrinsic,
             )?;
         }
         Ok(())
@@ -163,6 +166,24 @@ impl RegistryBuilder {
         descriptor: CapabilityDescriptor,
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
+        self.push_capability_with_origin(
+            target,
+            descriptor,
+            identity,
+            CapabilityOrigin::Registered {
+                source: identity.clone(),
+            },
+        )
+    }
+
+    /// Adds one capability while retaining its source and semantic origin.
+    fn push_capability_with_origin(
+        &mut self,
+        target: CapabilityTarget,
+        descriptor: CapabilityDescriptor,
+        identity: &FragmentIdentity,
+        origin: CapabilityOrigin,
+    ) -> Result<(), RegistryError> {
         let key = (target, *descriptor.id());
         if let Some((first_descriptor, first_identity)) = self.capabilities.get(&key) {
             let conflict = CapabilityConflict::from_same_id(first_descriptor, &descriptor);
@@ -174,6 +195,7 @@ impl RegistryBuilder {
             ));
         }
         self.capabilities.insert(key, (descriptor, identity.clone()));
+        self.capability_origins.insert(key, origin);
         Ok(())
     }
 
@@ -358,6 +380,7 @@ impl RegistryBuilder {
             capabilities_by_target,
             capabilities_by_definition,
             capability_fragments,
+            capability_origins: self.capability_origins,
             fragment_identities: self.fragment_identities.into_boxed_slice(),
         };
         ReflectRegistry {

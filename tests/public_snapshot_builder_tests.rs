@@ -18,6 +18,7 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
+use qubit_reflect::capability::CapabilityOrigin;
 use qubit_reflect::capability::TypeCapabilities;
 use qubit_reflect::capability::TypeCapabilitiesResult;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
@@ -97,9 +98,24 @@ static PROVIDER_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(TypeCap
 static PROVIDER_DESCRIPTOR: TypeDescriptor =
     opaque_root_with_capabilities::<ProviderTarget>("ProviderTarget", intrinsic_capabilities);
 
+struct IntrinsicTarget;
+static INTRINSIC_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(|| {
+    TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(
+        key("example.intrinsic"),
+        11_u32,
+    )])
+    .expect("valid intrinsic capability")
+});
+static INTRINSIC_DESCRIPTOR: TypeDescriptor =
+    opaque_root_with_capabilities::<IntrinsicTarget>("IntrinsicTarget", intrinsic_capabilities_for_test);
+
 fn intrinsic_capabilities() -> TypeCapabilitiesResult {
     PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(&PROVIDER_CAPABILITIES)
+}
+
+fn intrinsic_capabilities_for_test() -> TypeCapabilitiesResult {
+    Ok(&INTRINSIC_CAPABILITIES)
 }
 
 fn u64_descriptor() -> &'static TypeDescriptor {
@@ -150,6 +166,51 @@ fn test_capability_only_snapshots_do_not_register_or_share_members() {
     assert_eq!(second.capability(descriptor, capability_key).unwrap(), Some(&9));
     assert!(first.types().is_empty());
     assert!(second.get(descriptor.type_id()).is_none());
+}
+
+#[test]
+fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts() {
+    let intrinsic_key = key::<u32>("example.intrinsic");
+    let mut intrinsic_builder = RegistrySnapshotBuilder::new();
+    intrinsic_builder.add_type(&INTRINSIC_DESCRIPTOR, source(3, "type", 3));
+    let intrinsic = intrinsic_builder.build().expect("intrinsic snapshot");
+    assert_eq!(
+        intrinsic.capability_origin(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Ok(Some(CapabilityOrigin::Intrinsic)),
+    );
+    assert_eq!(
+        intrinsic.capability(&INTRINSIC_DESCRIPTOR, intrinsic_key),
+        Ok(Some(&11_u32))
+    );
+
+    let target = TypeDescriptor::of::<u32>();
+    let registered_key = key::<u32>("example.registered");
+    let first_source = source(4, "capability", 4);
+    let second_source = source(5, "capability", 5);
+    let mut first_builder = RegistrySnapshotBuilder::new();
+    first_builder.add_type_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(registered_key, 7_u32)],
+        first_source.clone(),
+    );
+    let first = first_builder.build().expect("first registered snapshot");
+    assert_eq!(
+        first.capability_origin(target, "example.registered"),
+        Ok(Some(CapabilityOrigin::Registered { source: first_source })),
+    );
+
+    let mut second_builder = RegistrySnapshotBuilder::new();
+    second_builder.add_type_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(registered_key, 9_u32)],
+        second_source.clone(),
+    );
+    let second = second_builder.build().expect("second registered snapshot");
+    assert_eq!(
+        second.capability_origin(target, "example.registered"),
+        Ok(Some(CapabilityOrigin::Registered { source: second_source })),
+    );
+    assert_eq!(first.capability_origin(target, "missing"), Ok(None));
 }
 
 #[test]
@@ -273,6 +334,12 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
     assert_eq!(
         capability_only.definition_capability(DEFINITION.id(), capability_key),
         Ok(Some(&17)),
+    );
+    assert_eq!(
+        capability_only.definition_capability_origin(DEFINITION.id(), "example.snapshot.definition"),
+        Some(CapabilityOrigin::Registered {
+            source: source(51, "definition-capability", 51),
+        }),
     );
 }
 
