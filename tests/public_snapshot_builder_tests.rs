@@ -176,7 +176,9 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     let intrinsic = intrinsic_builder.build().expect("intrinsic snapshot");
     assert_eq!(
         intrinsic.capability_origin(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
-        Ok(Some(CapabilityOrigin::Intrinsic)),
+        Ok(Some(CapabilityOrigin::Intrinsic {
+            type_id: target.type_id(),
+        })),
     );
     assert_eq!(
         intrinsic.capability(&INTRINSIC_DESCRIPTOR, intrinsic_key),
