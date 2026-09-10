@@ -447,7 +447,6 @@ impl ReflectRegistry {
     ///
     /// Returns the intrinsic capability conflict when the descriptor's
     /// provider cannot produce a valid capability set.
-    #[must_use]
     pub fn capability_origin(
         &self,
         descriptor: &TypeDescriptor,
