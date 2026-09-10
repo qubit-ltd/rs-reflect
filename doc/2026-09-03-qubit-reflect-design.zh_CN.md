@@ -188,7 +188,7 @@ provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 
 
 类型化的 `capability_lookup` 保留四种结果：`Missing`、`FactOnly`、
 `AdapterTypeMismatch` 和 `Found`。便捷的 `capability` 方法可以把前三种折叠成
-`Ok(None)`。有效事实还会保留 `CapabilityOrigin::Intrinsic` 或
+`Ok(None)`。有效事实还会保留 `CapabilityOrigin::Intrinsic { type_id }` 或
 `CapabilityOrigin::Registered { source }`，注册表同时提供来源和贡献该事实的
 `FragmentIdentity`。
 

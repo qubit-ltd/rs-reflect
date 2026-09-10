@@ -213,7 +213,7 @@ the contract does not catch provider panics.
 Typed `capability_lookup` preserves four outcomes: `Missing`, `FactOnly`,
 `AdapterTypeMismatch`, and `Found`. The convenience `capability` method may
 collapse the first three to `Ok(None)`. Effective facts retain
-`CapabilityOrigin::Intrinsic` or `CapabilityOrigin::Registered { source }`;
+`CapabilityOrigin::Intrinsic { type_id }` or `CapabilityOrigin::Registered { source }`;
 the registry exposes both the origin and the contributing `FragmentIdentity`.
 
 The same provider boundary applies to `RegistrySnapshotBuilder` consumers:
