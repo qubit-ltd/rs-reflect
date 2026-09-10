@@ -14,8 +14,8 @@ use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect as DeriveReflect;
-use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityAccessError;
+use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::capability::TypeCapabilities;
@@ -187,7 +187,12 @@ fn test_typed_capability_lookup_reports_all_contract_states() {
     ])
     .expect("distinct capability IDs must be accepted");
 
-    assert!(capabilities.get(missing_key).expect("missing lookup is valid").is_none());
+    assert!(
+        capabilities
+            .get(missing_key)
+            .expect("missing lookup is valid")
+            .is_none()
+    );
     assert!(matches!(
         capabilities.get(fact_key),
         Err(CapabilityAccessError::FactOnly { id, .. }) if id.as_str() == "example.capability.fact.only"

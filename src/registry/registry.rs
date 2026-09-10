@@ -17,6 +17,7 @@ use crate::capability::CapabilityConflict;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
 use crate::capability::CapabilityLookup;
+use crate::capability::CapabilityOrigin;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
@@ -432,6 +433,74 @@ impl ReflectRegistry {
         id: &str,
     ) -> Result<Option<&'registry CapabilityDescriptor>, CapabilityConflict> {
         Ok(self.capabilities(descriptor)?.descriptor(id))
+    }
+
+    /// Returns the owned origin of an effective capability by textual ID.
+    ///
+    /// Unregistered descriptors may initialize their intrinsic capability
+    /// provider while this method resolves the effective set.
+    ///
+    /// # Errors
+    ///
+    /// Returns the intrinsic capability conflict when the descriptor's
+    /// provider cannot produce a valid capability set.
+    #[must_use]
+    pub fn capability_origin(
+        &self,
+        descriptor: &TypeDescriptor,
+        capability_id: &str,
+    ) -> Result<Option<CapabilityOrigin>, CapabilityConflict> {
+        let capabilities = self.capabilities(descriptor)?;
+        let Some(capability) = capabilities.descriptor(capability_id) else {
+            return Ok(None);
+        };
+        let target = crate::registry::fragment::CapabilityTarget::Type(descriptor.type_id());
+        let origin = self
+            .indexes
+            .capability_origins
+            .get(&(target, *capability.id()))
+            .cloned()
+            .or_else(|| {
+                (!self.indexes.types_by_id.contains_key(&descriptor.type_id())).then_some(CapabilityOrigin::Intrinsic)
+            })
+            .expect("every effective capability has a retained origin");
+        Ok(Some(origin))
+    }
+
+    /// Returns the registration fragment that contributed a capability.
+    #[must_use]
+    pub fn capability_source(&self, descriptor: &TypeDescriptor, capability_id: &str) -> Option<&FragmentIdentity> {
+        self.indexes.capability_fragments.iter().find_map(|((target, id), source)| {
+            (matches!(target, crate::registry::fragment::CapabilityTarget::Type(type_id) if *type_id == descriptor.type_id())
+                && id.as_str() == capability_id)
+                .then_some(source)
+        })
+    }
+
+    /// Returns the owned origin of a generic declaration capability by
+    /// textual ID. Definition capabilities are always retained in the
+    /// snapshot and therefore do not execute a provider here.
+    #[must_use]
+    pub fn definition_capability_origin(&self, id: TypeDefinitionId, capability_id: &str) -> Option<CapabilityOrigin> {
+        let capability = self.definition_capability_by_id(id, capability_id)?;
+        let target = crate::registry::fragment::CapabilityTarget::TypeDefinition(id);
+        Some(
+            self.indexes
+                .capability_origins
+                .get(&(target, *capability.id()))
+                .cloned()
+                .expect("every effective definition capability has a retained origin"),
+        )
+    }
+
+    /// Returns the registration fragment that contributed a generic capability.
+    #[must_use]
+    pub fn definition_capability_source(&self, id: TypeDefinitionId, capability_id: &str) -> Option<&FragmentIdentity> {
+        self.indexes.capability_fragments.iter().find_map(|((target, capability), source)| {
+            (matches!(target, crate::registry::fragment::CapabilityTarget::TypeDefinition(definition_id) if *definition_id == id)
+                && capability.as_str() == capability_id)
+                .then_some(source)
+        })
     }
 
     /// Returns the effective capabilities of one generic declaration.

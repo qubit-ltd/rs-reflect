@@ -11,6 +11,7 @@
 mod builtin;
 mod capability_access_error;
 mod capability_lookup;
+mod capability_origin;
 mod descriptor;
 mod key;
 mod registration;
@@ -28,6 +29,7 @@ pub use builtin::sync_descriptor;
 pub use builtin::sync_key;
 pub use capability_access_error::CapabilityAccessError;
 pub use capability_lookup::CapabilityLookup;
+pub use capability_origin::CapabilityOrigin;
 pub use descriptor::CapabilityDescriptor;
 pub use key::CapabilityKey;
 pub use set::CapabilityConflict;

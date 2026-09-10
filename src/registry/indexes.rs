@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 
+use crate::capability::CapabilityOrigin;
 use crate::capability::TypeCapabilities;
 use crate::descriptor::ImplDescriptor;
 use crate::descriptor::TraitDefinitionDescriptor;
@@ -46,6 +47,7 @@ pub(super) struct RegistryIndexes {
     pub(super) capabilities_by_definition: HashMap<TypeDefinitionId, TypeCapabilities>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
     pub(super) capability_fragments: HashMap<(CapabilityTarget, CapabilityId), FragmentIdentity>,
+    pub(super) capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
     #[allow(dead_code, reason = "retained for registry conflict auditing")]
     pub(super) fragment_identities: Box<[FragmentIdentity]>,
 }
