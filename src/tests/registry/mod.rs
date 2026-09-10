@@ -9,3 +9,4 @@
 //! Crate-internal registry protocol tests.
 
 mod fragment_tests;
+mod registry_tests;
