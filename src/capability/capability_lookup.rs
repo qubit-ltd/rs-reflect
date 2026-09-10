@@ -14,6 +14,9 @@ use crate::capability::CapabilityAccessError;
 use crate::capability::CapabilityDescriptor;
 
 /// The result of looking up one typed capability contract by stable ID.
+///
+/// The four variants deliberately distinguish an absent ID, a fact without an
+/// executable adapter, a contract mismatch, and an adapter that can run.
 #[derive(Debug)]
 pub enum CapabilityLookup<'a, A: 'static> {
     /// No descriptor carries the requested stable capability ID.

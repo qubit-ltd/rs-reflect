@@ -380,8 +380,11 @@ impl ReflectRegistry {
 
     /// Retrieves an effective adapter matching the exact typed key.
     ///
-    /// `Ok(None)` means no executable adapter matches the key. Intrinsic
-    /// declaration conflicts return `Err`, never an absent capability.
+    /// `Ok(None)` means no executable adapter matches the key and intentionally
+    /// collapses the diagnostic lookup states. Use [`Self::capability_lookup`]
+    /// when missing, fact-only, and adapter-contract mismatch must remain
+    /// distinguishable. Intrinsic declaration conflicts return `Err`, never
+    /// an absent capability.
     ///
     /// # Errors
     ///

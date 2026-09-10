@@ -186,6 +186,12 @@ effective capability 解析入口，并支持无需分配 capability identity �
 不执行 provider。缓存继续按具体 TypeId 保存成功或冲突，factory 在缓存表锁外执行；
 provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 不在本契约捕获范围。
 
+类型化的 `capability_lookup` 保留四种结果：`Missing`、`FactOnly`、
+`AdapterTypeMismatch` 和 `Found`。便捷的 `capability` 方法可以把前三种折叠成
+`Ok(None)`。有效事实还会保留 `CapabilityOrigin::Intrinsic` 或
+`CapabilityOrigin::Registered { source }`，注册表同时提供来源和贡献该事实的
+`FragmentIdentity`。
+
 这一 provider 边界同样适用于 `RegistrySnapshotBuilder` 的调用方：provider 只能依赖静态类型事实，不能
 查询 snapshot、可变外部状态或 registry 初始化；provider panic 不会被转换成能力缺失。详细 capability
 失败会通过 `RegistryError` 保留冲突类别、ID、adapter `TypeId`、target 和来源 fragment；下游包装时，

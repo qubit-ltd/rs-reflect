@@ -316,7 +316,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 
 | 验收范围 | 回归证据 |
 | --- | --- |
-| 查询三态、冲突缓存、receiver 恢复 | `tests/public_generic_capability_conflict_tests.rs`、`tests/public_receiver_resolution_failure_tests.rs` |
+| 四态能力查询、来源保留、冲突缓存、receiver 恢复 | `tests/public_generic_capability_conflict_tests.rs`、`tests/public_snapshot_builder_tests.rs`、`tests/public_receiver_resolution_failure_tests.rs` |
 | 冻结 provider 边界 | `tests/public_frozen_capability_tests.rs` |
 | struct 形状保真 | `tests/public_empty_struct_tests.rs`、derive parser 单元测试 |
 | 下游错误链 | rs-model-metadata `metadata_resolution_error_tests`、`metadata_path_error_tests`、rs-platform `registry_failure_tests` |

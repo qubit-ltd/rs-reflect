@@ -23,5 +23,6 @@ runtime/derive 版本变更。Internal 名称可以自由变化，但如果变�
 路径或生成 token stream，就必须按对应的更高稳定级别审查。
 
 需求规范和追踪矩阵记录这些边界的可执行证据。特别是，`REQ-TYPE-030`
-要求严格 capability 查询保留 missing、fact-only、adapter mismatch 和 found
-四种状态；旧的 `Option` 便利方法仍可以有意折叠这些状态。
+要求严格 capability 查询保留 `Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`
+四种状态；旧的 `Option` 便利方法仍可以有意折叠这些状态。注册表的
+`capability_origin` 与 `capability_source` 另外保留能力来自 intrinsic 还是注册片段的来源信息。

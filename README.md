@@ -103,6 +103,10 @@ facts even where an operation is unavailable.
   including typed `Clone` and `Default` adapters. Every registration path
   uses the same transactional validator; callers may hold an explicit,
   immutable registry snapshot instead of consulting the process-global result.
+- Strict typed capability lookup preserves four states: `Missing`, `FactOnly`,
+  `AdapterTypeMismatch`, and `Found`. When provenance matters, the registry also
+  reports whether an effective capability is `Intrinsic` or `Registered` and can
+  return the contributing `FragmentIdentity`.
 - Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
   field access and construction exist only for types whose generated code
   proves the required `Send + Sync` bounds.

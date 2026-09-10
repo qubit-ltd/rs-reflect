@@ -653,8 +653,13 @@ queries return `Result<Option<_>, CapabilityConflict>`. Handle failure before te
 Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
 the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
 
-`Ok(None)` can mean an absent ID, a typed key with a different adapter type, or a fact-only descriptor.
-These are distinct from an invalid set. `types_with_capability` and definition queries read frozen
+The convenience `capability` query collapses an absent ID, a typed key with a different adapter type, and a
+fact-only descriptor into `Ok(None)`. Use `capability_lookup` when these four states must remain distinct:
+`Missing`, `FactOnly`, `AdapterTypeMismatch`, and `Found`. These are distinct from an invalid set.
+`capability_origin` reports `CapabilityOrigin::Intrinsic` or `CapabilityOrigin::Registered { source }`, while
+`capability_source` returns the contributing `FragmentIdentity` when one is registered. The corresponding
+`definition_capability_origin` and `definition_capability_source` methods apply to generic declarations.
+`types_with_capability` and definition queries read frozen
 indexes without executing factories and do not gain `Result`. Effective queries for unregistered
 concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
 
