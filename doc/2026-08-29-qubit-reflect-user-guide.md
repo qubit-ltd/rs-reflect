@@ -656,7 +656,7 @@ the original conflict through `RegistryError::intrinsic_conflict()` and `Error::
 The convenience `capability` query collapses an absent ID, a typed key with a different adapter type, and a
 fact-only descriptor into `Ok(None)`. Use `capability_lookup` when these four states must remain distinct:
 `Missing`, `FactOnly`, `AdapterTypeMismatch`, and `Found`. These are distinct from an invalid set.
-`capability_origin` reports `CapabilityOrigin::Intrinsic` or `CapabilityOrigin::Registered { source }`, while
+`capability_origin` reports `CapabilityOrigin::Intrinsic { type_id }` or `CapabilityOrigin::Registered { source }`, while
 `capability_source` returns the contributing `FragmentIdentity` when one is registered. The corresponding
 `definition_capability_origin` and `definition_capability_source` methods apply to generic declarations.
 `types_with_capability` and definition queries read frozen
