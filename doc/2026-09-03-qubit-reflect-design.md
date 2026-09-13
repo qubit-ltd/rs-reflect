@@ -295,7 +295,7 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
-`.rs-ci-critical-coverage.json`, so well-covered simple modules cannot mask regressions in critical paths.
+`.infra/ci/critical-coverage.json`, so well-covered simple modules cannot mask regressions in critical paths.
 
 Markdown acceptance executes each `rust` program in an independent package and
 process. `rust,no_run` compiles a library and `rust,compile_fail` must fail;
@@ -314,7 +314,7 @@ Bounded `registry_snapshot` fuzzing limits inputs to 4096 bytes, 32 fragments,
 conflict atomicity, capability-only membership, and snapshot independence
 through public APIs.
 
-`.rs-ci-cargo-matrix.json` is the executable source of truth for supported feature combinations. The
+`.infra/ci/cargo-matrix.json` is the executable source of truth for supported feature combinations. The
 [requirements traceability matrix](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) keeps all 285
 requirement IDs mapped one-to-one and validates every referenced code and test path.
 

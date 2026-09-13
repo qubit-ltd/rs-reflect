@@ -256,7 +256,7 @@ capability，也不执行 provider。
 | ABI/facade | 重命名依赖、显式 facade、`codegen_v3` 与模型 `v4` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
-覆盖率验证同时执行 crate 全局阈值和 `.rs-ci-critical-coverage.json` 中的高风险逐文件阈值；后者防止
+覆盖率验证同时执行 crate 全局阈值和 `.infra/ci/critical-coverage.json` 中的高风险逐文件阈值；后者防止
 关键路径被高覆盖率的简单模块掩盖。
 
 Markdown 验收以独立 package 和进程执行每个 `rust` 程序。`rust,no_run` 只编译库，
@@ -269,7 +269,7 @@ Markdown 验收以独立 package 和进程执行每个 `rust` 程序。`rust,no_
 有界 `registry_snapshot` fuzz 将输入限制为 4096 字节、32 个 fragment、16 个来源、8 个静态 ID
 和 4 个 descriptor，并通过公开 API 验证排序、冲突原子性、capability-only 成员和 snapshot 独立性。
 
-仓库的 `.rs-ci-cargo-matrix.json` 是 feature 支持矩阵的机器可执行来源。
+仓库的 `.infra/ci/cargo-matrix.json` 是 feature 支持矩阵的机器可执行来源。
 [需求追踪矩阵](2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md) 保持 285 个需求 ID 一一对应，
 并验证其中引用的代码与测试路径存在。
 

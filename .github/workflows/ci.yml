@@ -50,7 +50,7 @@ jobs:
       - name: Load toolchain contract
         run: |
           cd rust-platform/rs-reflect
-          source .rs-ci/toolchains.sh
+          source .infra/tools/rs-ci/toolchains.sh
           configure_rs_ci_toolchains
           echo "RS_CI_FUZZ_TOOLCHAIN=$RS_CI_FUZZ_TOOLCHAIN" >> "$GITHUB_ENV"
           echo "CARGO_FUZZ_VERSION=$CARGO_FUZZ_VERSION" >> "$GITHUB_ENV"
@@ -92,7 +92,7 @@ jobs:
         run: |
           scripts/critical-coverage-check.sh \
             coverage-reports/coverage.json \
-            .rs-ci-critical-coverage.json \
+            .infra/ci/critical-coverage.json \
             "$PWD"
 
   downstream-baseline:
