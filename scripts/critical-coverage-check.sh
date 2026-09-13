@@ -8,7 +8,7 @@ fi
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 COVERAGE_JSON="$1"
-CONFIG_JSON="${2:-$SCRIPT_DIR/../.rs-ci-critical-coverage.json}"
+CONFIG_JSON="${2:-$SCRIPT_DIR/../.infra/ci/critical-coverage.json}"
 PROJECT_ROOT_INPUT="${3:-$SCRIPT_DIR/..}"
 
 if ! PROJECT_ROOT=$(cd "$PROJECT_ROOT_INPUT" 2>/dev/null && pwd -P); then

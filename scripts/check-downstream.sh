@@ -94,7 +94,7 @@ if [[ -n "$EVIDENCE_DIR" ]]; then
     trap on_exit EXIT
 fi
 
-source "$REFLECT_ROOT/.rs-ci/toolchains.sh"
+source "$REFLECT_ROOT/.infra/tools/rs-ci/toolchains.sh"
 configure_rs_ci_toolchains
 
 for repository in rs-model-metadata rs-platform; do
