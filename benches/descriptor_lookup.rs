@@ -8,12 +8,12 @@
 
 //! Criterion benchmarks for descriptor lookup.
 
+use std::hint::black_box;
 use std::sync::Barrier;
 use std::time::Duration;
 use std::time::Instant;
 
 use criterion::Criterion;
-use criterion::black_box;
 use criterion::criterion_group;
 use qubit_reflect::TypeDescriptor;
 
