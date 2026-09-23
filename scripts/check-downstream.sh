@@ -94,8 +94,7 @@ if [[ -n "$EVIDENCE_DIR" ]]; then
     trap on_exit EXIT
 fi
 
-source "$REFLECT_ROOT/.infra/tools/rs-ci/toolchains.sh"
-configure_rs_ci_toolchains
+RS_CI_BUILD_TOOLCHAIN="${RS_CI_BUILD_TOOLCHAIN:-1.94.0}"
 
 for repository in rs-model-metadata rs-platform; do
     if [[ ! -f "$PLATFORM_ROOT/$repository/Cargo.toml" ]]; then

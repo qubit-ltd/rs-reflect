@@ -8,7 +8,6 @@ license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-reflect"
 description = "Macro-based structural and executable reflection for Rust"
 homepage = "https://github.com/qubit-ltd/rs-reflect"
-publish = false
 readme = "README.md"
 keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
 categories = ["development-tools"]

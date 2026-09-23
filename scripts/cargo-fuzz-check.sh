@@ -2,9 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${RS_CI_PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-# shellcheck source=../.infra/tools/rs-ci/toolchains.sh
-source "$PROJECT_ROOT/.infra/tools/rs-ci/toolchains.sh"
-configure_rs_ci_toolchains
+RS_CI_FUZZ_TOOLCHAIN="${RS_CI_FUZZ_TOOLCHAIN:-nightly-2026-06-05}"
 
 MODE="${RS_CI_FUZZ_MODE:-smoke}"
 SECONDS_PER_TARGET="${RS_CI_FUZZ_SECONDS_PER_TARGET:-10}"
