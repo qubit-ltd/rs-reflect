@@ -45,9 +45,9 @@ ecosystem-types = ["dep:bigdecimal", "dep:chrono", "dep:uuid"]
 qubit-types = ["dep:qubit-datatype", "dep:qubit-id"]
 
 [dependencies]
-bigdecimal = { version = "0.4", optional = true }
-chrono = { version = "0.4", default-features = false, features = ["std"], optional = true }
-inventory = "0.3"
+bigdecimal = { version = "^0.4", optional = true }
+chrono = { version = "^0.4", default-features = false, features = ["std"], optional = true }
+inventory = "^0.3"
 qubit-datatype = { version = "0.14.0", path = "../../rust-common/rs-datatype", optional = true }
 qubit-id = { version = "0.6.0", path = "../../rust-common/rs-id", optional = true }
 thiserror = "^2.0"
