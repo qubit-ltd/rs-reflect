@@ -1,5 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-exec env RS_CI_PROJECT_ROOT="$PROJECT_ROOT" "$PROJECT_ROOT/.infra/tools/rs-ci/coverage.sh" "$@"
+project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source "$project_root/.infra/tools/cleanup-build-artifacts.sh"
+"$project_root/.infra/tools/prepare-local-path-dependencies.sh"
+"$project_root/.infra/tools/infra-tool.sh" rs-infra-coverage --project "$project_root" collect "$@"
+"$project_root/.infra/tools/coverage-report.sh"

@@ -1,26 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=.infra/tools/rs-ci/toolchains.sh
-source "$PROJECT_ROOT/.infra/tools/rs-ci/toolchains.sh"
-configure_rs_ci_toolchains
-
-bash "$PROJECT_ROOT/scripts/tests/critical_coverage_check_tests.sh"
-CARGO_TARGET_DIR="$PROJECT_ROOT/target/rs-ci" \
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" llvm-cov clean
-# Keep the coverage JSON available for the project-specific critical coverage
-# gate, which runs immediately after the shared CI pipeline.
-env RS_CI_PROJECT_ROOT="$PROJECT_ROOT" RS_CI_ARTIFACT_CLEANUP_MODE=never \
-    "$PROJECT_ROOT/.infra/tools/rs-ci/ci-check.sh" "$@"
-"$PROJECT_ROOT/scripts/critical-coverage-check.sh" \
-    "$PROJECT_ROOT/target/llvm-cov/coverage.json" \
-    "$PROJECT_ROOT/.infra/ci/critical-coverage.json" \
-    "$PROJECT_ROOT"
-
-"$PROJECT_ROOT/scripts/check-downstream.sh"
-
-# The shared pipeline preserves artifacts above so the critical gate can read
-# them; clean the LLVM coverage directory once all consumers have finished.
-CARGO_TARGET_DIR="$PROJECT_ROOT/target/rs-ci" \
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" llvm-cov clean
+project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source "$project_root/.infra/tools/cleanup-build-artifacts.sh"
+export RS_INFRA_STYLE_TOOLCHAIN="${RS_INFRA_STYLE_TOOLCHAIN:-nightly-2026-06-05}"
+if [ -f "$project_root/.infra/style/rustfmt.toml" ]; then
+    export RS_INFRA_STYLE_RUSTFMT_CONFIG="$project_root/.infra/style/rustfmt.toml"
+elif [ -f "$project_root/rustfmt.toml" ]; then
+    export RS_INFRA_STYLE_RUSTFMT_CONFIG="$project_root/rustfmt.toml"
+fi
+"$project_root/.infra/tools/prepare-local-path-dependencies.sh"
+"$project_root/.infra/tools/infra-tool.sh" rs-infra-ci --project "$project_root" "$@" check

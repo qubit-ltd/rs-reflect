@@ -18,19 +18,135 @@ jobs:
     name: Dependency policy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@v6
         with:
-          submodules: recursive
-      - uses: qubit-ltd/rs-dependency-policy/.github/actions/check@39895c60b725068b7a72dc14d0ae18ee60c30e46
+          path: rust-platform/rs-reflect
+          submodules: false
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-id
+          ref: main
+          path: rust-common/rs-id
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-datatype
+          ref: main
+          path: rust-common/rs-datatype
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - run: ./dependency-update.sh --check
+        working-directory: rust-platform/rs-reflect
 
   rust-ci:
-    uses: qubit-ltd/rs-ci/.github/workflows/rust-ci.yml@7bca0de02da250cdfcf70345a1e313e39e389c15
-    with:
-      coverage_enforce_thresholds: "1"
-      cargo_fuzz_mode: disabled
-      run_windows_tests: true
-      run_macos_tests: true
-    secrets: inherit
+    name: rs-infra CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust-platform/rs-reflect
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          path: rust-platform/rs-reflect
+          submodules: false
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-id
+          ref: main
+          path: rust-common/rs-id
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-datatype
+          ref: main
+          path: rust-common/rs-datatype
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - name: Install Rust toolchains
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal
+          rustup toolchain install nightly-2026-06-05 --profile minimal --component rustfmt --component clippy
+      - run: ./style-check.sh
+      - name: Install coverage and audit tools
+        run: |
+          rustup component add llvm-tools-preview --toolchain 1.94.0
+          cargo install --locked cargo-llvm-cov --version 0.8.6
+          cargo install --locked cargo-audit
+      - run: RS_INFRA_ARTIFACT_CLEANUP=0 ./ci-check.sh
+      - run: ./.infra/tools/coverage-report.sh
+      - name: Comment coverage on pull request
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- rs-ci-coverage-report -->';
+            const body = `${marker}\n${fs.readFileSync('coverage-summary.md', 'utf8')}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const previous = comments.find((comment) => comment.user.type === 'Bot' && comment.body && comment.body.includes(marker));
+            if (previous) await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+      - name: Build project (release)
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) }}
+        run: cargo +1.94.0 build --release --verbose
+      - name: Build Pages site
+        if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        run: ./.infra/tools/infra-tool.sh rs-infra-pages --project "$PWD" build
+      - name: Configure GitHub Pages
+        if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        uses: actions/configure-pages@v6
+      - name: Upload GitHub Pages artifact
+        if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: public
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-reports
+          path: |
+            rust-platform/rs-reflect/coverage.json
+            rust-platform/rs-reflect/lcov.info
+            rust-platform/rs-reflect/coverage.txt
+            rust-platform/rs-reflect/coverage-badge.json
+            rust-platform/rs-reflect/coverage-summary.md
+            rust-platform/rs-reflect/target/llvm-cov/html
+            rust-platform/rs-reflect/target/llvm-cov/cobertura.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  cross-platform-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: rust-platform/rs-reflect
+          submodules: false
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-id
+          ref: main
+          path: rust-common/rs-id
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - uses: actions/checkout@v6
+        with:
+          repository: qubit-ltd/rs-datatype
+          ref: main
+          path: rust-common/rs-datatype
+          token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.94.0
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: rust-platform/rs-reflect
+      - run: cargo test --all-features --verbose
+        working-directory: rust-platform/rs-reflect
 
   fuzz-smoke:
     name: Project cargo-fuzz smoke check
@@ -40,7 +156,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
-          submodules: recursive
+          submodules: false
           path: rust-platform/rs-reflect
       - name: Checkout fuzz path dependencies
         uses: actions/checkout@v6
@@ -56,17 +172,10 @@ jobs:
           ref: main
           path: rust-common/rs-datatype
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-      - name: Load toolchain contract
-        run: |
-          cd rust-platform/rs-reflect
-          source .infra/tools/rs-ci/toolchains.sh
-          configure_rs_ci_toolchains
-          echo "RS_CI_FUZZ_TOOLCHAIN=$RS_CI_FUZZ_TOOLCHAIN" >> "$GITHUB_ENV"
-          echo "CARGO_FUZZ_VERSION=$CARGO_FUZZ_VERSION" >> "$GITHUB_ENV"
       - name: Install cargo-fuzz
         run: |
-          rustup toolchain install "$RS_CI_FUZZ_TOOLCHAIN" --profile minimal
-          cargo install --locked cargo-fuzz --version "$CARGO_FUZZ_VERSION"
+          rustup toolchain install nightly-2026-06-05 --profile minimal
+          cargo install --locked cargo-fuzz --version 0.13.2
       - name: Run fuzz smoke checks
         run: |
           cd rust-platform/rs-reflect
@@ -91,7 +200,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
-          submodules: recursive
+          submodules: false
       - name: Download coverage report
         uses: actions/download-artifact@v8
         with:
@@ -121,7 +230,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: rust-platform/rs-reflect
-          submodules: recursive
+          submodules: false
       - name: Validate and resolve baseline revisions
         id: resolve
         if: steps.reflect.outcome == 'success'
@@ -146,7 +255,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-platform
         id: platform
         if: steps.resolve.outcome == 'success'
@@ -157,7 +266,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-id
         id: id
         if: steps.resolve.outcome == 'success'
@@ -168,7 +277,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-datatype
         id: datatype
         if: steps.resolve.outcome == 'success'
@@ -179,7 +288,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-redact
         id: redact
         if: steps.resolve.outcome == 'success'
@@ -190,7 +299,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-validator
         id: validator
         if: steps.resolve.outcome == 'success'
@@ -201,7 +310,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-validation-rules
         id: validation_rules
         if: steps.resolve.outcome == 'success'
@@ -212,7 +321,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Record baseline checkout results
         id: checkout-results
         if: always()
@@ -303,7 +412,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: rust-platform/rs-reflect
-          submodules: recursive
+          submodules: false
       - name: Resolve head revisions
         id: resolve
         if: steps.reflect.outcome == 'success'
@@ -325,7 +434,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_model_metadata.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-platform
         id: platform
         if: steps.resolve.outcome == 'success'
@@ -336,7 +445,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_platform.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-id
         id: id
         if: steps.resolve.outcome == 'success'
@@ -347,7 +456,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_id.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-datatype
         id: datatype
         if: steps.resolve.outcome == 'success'
@@ -358,7 +467,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_datatype.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-redact
         id: redact
         if: steps.resolve.outcome == 'success'
@@ -369,7 +478,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_redact.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-validator
         id: validator
         if: steps.resolve.outcome == 'success'
@@ -380,7 +489,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validator.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Checkout rs-validation-rules
         id: validation_rules
         if: steps.resolve.outcome == 'success'
@@ -391,7 +500,7 @@ jobs:
           ref: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.revision }}
           path: ${{ fromJSON(steps.resolve.outputs.matrix).repositories.rs_validation_rules.path }}
           token: ${{ secrets.DEPENDENCY_TOKEN || github.token }}
-          submodules: recursive
+          submodules: false
       - name: Record head checkout results
         id: checkout-results
         if: always()
@@ -460,3 +569,14 @@ jobs:
           path: downstream-evidence/head
           if-no-files-found: error
           retention-days: 14
+
+  deploy-pages:
+    if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: rust-ci
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
