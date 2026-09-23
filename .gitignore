@@ -85,3 +85,12 @@ external/
 
 # Python Markdown checker caches
 __pycache__/
+# rs-infra generated tools and reports
+/.infra/tools/bin/
+/public/
+/coverage.json
+/lcov.info
+/coverage.txt
+/coverage-badge.json
+/coverage-summary.md
+/ci-summary.json

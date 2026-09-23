@@ -1,0 +1,41 @@
+format = 1
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/pinned.rs"
+reason = "Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/private/descriptor.rs"
+reason = "Generated-code probes and descriptor factories form one hidden macro protocol."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/expand/invocation/plan.rs"
+reason = "Invocation plan facts form one closed analysis-to-emission protocol."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/ir/attribute.rs"
+reason = "Attribute keys, values, and specialization records share one helper-grammar invariant."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/ir/declaration.rs"
+reason = "Declaration nodes form one closed semantic tree consumed as a unit by validation and expansion."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/ir/type_ir.rs"
+reason = "Type and path nodes form one recursive syn-independent type representation."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/expand/traits.rs"
+reason = "Trait expansion records and emits one closed declaration protocol."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "derive/src/parse/attributes.rs"
+reason = "Helper parser syntax nodes share one grammar and are consumed together."
