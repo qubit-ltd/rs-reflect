@@ -1,26 +1,31 @@
 # `qubit-reflect` API Stability
 
 - Date: 2026-09-07
-- Status: normative internal compatibility policy
+- Status: current internal compatibility policy for unreleased `0.1`; coordinated breaking changes are allowed before a public stable release
 - Scope: the reflection runtime, derive output, extension capabilities, and implementation details
 
 This policy makes compatibility expectations explicit for the four audiences that
-consume or extend `qubit-reflect`. A path in the table is representative: the
-stated boundary, rather than a filename alone, determines whether an item is
-stable.
+consume or extend `qubit-reflect`. The crate is currently used internally at
+`0.1` and has no public stable release. Before one, coordinated changes may
+break the boundaries below, provided the runtime, derive crate, downstream
+facades, and their contract tests are updated together. A path in the table is
+representative: the stated boundary, rather than a filename alone, determines
+the intended stability level. A migration window or continued support for an
+old protocol is promised only when the policy for a future stable release line
+explicitly announces it.
 
 | Layer | Representative paths | Compatibility promise | Allowed changes | Migration requirement |
 | --- | --- | --- | --- | --- |
-| Stable Application | `src/lib.rs`, `src/descriptor/`, `src/value/`, `tests/descriptor/` | Public descriptors, typed views, checked operations, structured error categories, and documented macro entry points remain source-compatible within a minor release line. Stable identities are process-local unless the API explicitly says otherwise. | Additive public APIs, new typed views, new error detail, and bug fixes that preserve safety and existing valid results. | Applications must match on public categories rather than Display text, keep `type_name()`/`TypeId` out of persisted protocols, and adopt deprecations before the next breaking line. |
-| Extension Author | `src/capability/`, `src/identity/capability_id.rs`, `tests/descriptor/capability_tests.rs` | Namespaced `CapabilityId`, typed `CapabilityKey`, adapter contracts, and deterministic capability enumeration are the extension boundary. An extension never receives unchecked access to private descriptor state. | Add new namespaced capabilities and safe adapters; add diagnostics and opt-in helpers without changing existing IDs or adapter contracts. | Keep IDs permanently owned by the extension, preserve adapter type contracts, and publish a compatibility note when an adapter or capability is superseded. |
-| Versioned Codegen | `derive/src/`, `src/private/codegen_v3/`, `derive/tests/`, `test-crates/model-facade-app/` | Generated code and its private protocol are versioned together. A protocol such as `__private::codegen_v3` is compatible only with the runtime generation that declares it; public macro behavior remains covered by compile-pass/fail tests. | Introduce a new private protocol generation, improve diagnostics, and add generated metadata while retaining an old generation for an announced migration window. | Re-run derive and downstream facade tests, update the pinned runtime/derive pair, and migrate generated artifacts when the protocol generation changes. |
+| Stable Application | `src/lib.rs`, `src/descriptor/`, `src/value/`, `tests/descriptor/` | In an announced stable release line, public descriptors, typed views, checked operations, structured error categories, and documented macro entry points remain source-compatible within a minor release line. Stable identities are process-local unless the API explicitly says otherwise. | Before a public stable release, coordinated breaking changes are allowed; in a stable line, additive public APIs, new typed views, new error detail, and bug fixes must preserve safety and existing valid results. | Applications must match on public categories rather than Display text, keep `type_name()`/`TypeId` out of persisted protocols, and adopt deprecations before the next breaking line. |
+| Extension Author | `src/capability/`, `src/identity/capability_id.rs`, `tests/descriptor/capability_tests.rs` | Namespaced `CapabilityId`, typed `CapabilityKey`, adapter contracts, and deterministic capability enumeration are the extension boundary. An extension never receives unchecked access to private descriptor state. | Before a public stable release, coordinate changes to existing IDs or adapter contracts with downstream users; in a stable line, add new namespaced capabilities, safe adapters, diagnostics, and opt-in helpers without changing existing contracts. | Keep IDs owned by the extension, preserve adapter type contracts within an announced stable line, and publish a compatibility note when an adapter or capability is superseded. |
+| Versioned Codegen | `derive/src/`, `src/private/codegen_v3/`, `derive/tests/`, `test-crates/model-facade-app/` | Generated code and its private protocol are versioned together. A protocol such as `__private::codegen_v3` is compatible only with the runtime generation that declares it; public macro behavior remains covered by compile-pass/fail tests. | Before a public stable release, a coordinated change may replace or remove an old generated-code protocol without a compatibility shim. Retain an old generation for a migration window only when the release policy explicitly announces one. | Update the runtime, derive crate, downstream `rs-model-metadata` facade, and their contract tests together; re-run derive and downstream facade tests, update the pinned runtime/derive pair, and migrate generated artifacts when the protocol generation changes. |
 | Internal | `src/private/`, `src/registry/interner.rs`, `tests/internal/`, `benches/` | Internal caches, interning, registration plumbing, benchmark layout, and test-only helpers carry no downstream compatibility promise. They must still preserve documented public safety and determinism. | Refactor, split, replace, or remove internals when public behavior and safety contracts remain intact. | No consumer migration is required; maintainers must update internal tests, benchmarks, and traceability evidence in the same change. |
 
 ## Reading this policy
 
 The Stable Application boundary is the default for users. Extension authors
 must treat capability IDs and adapter types as their own compatibility surface,
-while Versioned Codegen explicitly permits a coordinated runtime/derive break.
+while Versioned Codegen explicitly permits a coordinated runtime/derive/facade break.
 Internal names may change freely, but a change that leaks into a public path or
 generated token stream must be reviewed at the corresponding higher boundary.
 
