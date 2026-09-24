@@ -649,8 +649,11 @@ checkout. This is separate from the reflection `codegen_v3` protocol.
 ### Migrating effective capability queries
 
 The existing query names now return `Result`; no error-swallowing compatibility entry remains.
-`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`; typed/textual single
-queries return `Result<Option<_>, CapabilityConflict>`. Handle failure before testing for absence.
+`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`. The typed `capability`
+query returns `Result<Option<&A>, CapabilityAccessError>`, while `capability_by_id` returns
+`Result<Option<&CapabilityDescriptor>, CapabilityConflict>`. Handle errors before testing for
+absence. Typed access errors distinguish `FactOnly` and `AdapterTypeMismatch`; intrinsic
+declaration conflicts are wrapped as `CapabilityAccessError::IntrinsicConflict`.
 Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
 the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
 
