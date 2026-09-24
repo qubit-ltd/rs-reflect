@@ -147,6 +147,34 @@ fn test_type_capabilities_reject_same_id_with_different_adapter_types() {
     assert_ne!(error.first_adapter_type(), error.second_adapter_type());
 }
 
+/// Confirms conflicting adapter contracts are reported in declaration order.
+#[test]
+fn test_type_capabilities_conflict_preserves_input_order() {
+    let id = external_id("example.capability.ordered_conflict");
+    let u64_fact = CapabilityDescriptor::without_adapter(CapabilityKey::<u64>::new(id));
+    let u32_fact = CapabilityDescriptor::without_adapter(CapabilityKey::<u32>::new(id));
+
+    for (inputs, first_type, second_type) in [
+        (
+            vec![u64_fact.clone(), u32_fact.clone()],
+            TypeId::of::<u64>(),
+            TypeId::of::<u32>(),
+        ),
+        (
+            vec![u32_fact, u64_fact],
+            TypeId::of::<u32>(),
+            TypeId::of::<u64>(),
+        ),
+    ] {
+        let error = TypeCapabilities::try_new(inputs).expect_err("duplicate ID");
+
+        assert_eq!(error.id().as_str(), "example.capability.ordered_conflict");
+        assert_eq!(error.kind(), CapabilityConflictKind::AdapterTypeMismatch);
+        assert_eq!(error.first_adapter_type(), first_type);
+        assert_eq!(error.second_adapter_type(), second_type);
+    }
+}
+
 /// Confirms duplicate descriptors are rejected even when their contracts match.
 #[test]
 fn test_type_capabilities_reject_duplicate_ids() {
