@@ -160,11 +160,7 @@ fn test_type_capabilities_conflict_preserves_input_order() {
             TypeId::of::<u64>(),
             TypeId::of::<u32>(),
         ),
-        (
-            vec![u32_fact, u64_fact],
-            TypeId::of::<u32>(),
-            TypeId::of::<u64>(),
-        ),
+        (vec![u32_fact, u64_fact], TypeId::of::<u32>(), TypeId::of::<u64>()),
     ] {
         let error = TypeCapabilities::try_new(inputs).expect_err("duplicate ID");
 
