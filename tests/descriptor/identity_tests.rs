@@ -76,12 +76,30 @@ fn test_member_id_is_a_composite_identity() {
 /// Verifies source visibilities normalize to their stable categories.
 #[test]
 fn test_visibility_normalizes_source_forms() {
-    assert_eq!(Visibility::from_source("pub").kind(), VisibilityKind::Public);
-    assert_eq!(Visibility::from_source("  pub  ").kind(), VisibilityKind::Public);
-    assert_eq!(Visibility::from_source("pub(crate)").kind(), VisibilityKind::Crate);
-    assert_eq!(Visibility::from_source("pub(super)").kind(), VisibilityKind::Super);
-    assert_eq!(Visibility::from_source("pub(self)").kind(), VisibilityKind::Private);
-    assert_eq!(Visibility::from_source("protected").kind(), VisibilityKind::Private);
+    assert_eq!(
+        Visibility::from_source("pub").kind(),
+        VisibilityKind::Public
+    );
+    assert_eq!(
+        Visibility::from_source("  pub  ").kind(),
+        VisibilityKind::Public
+    );
+    assert_eq!(
+        Visibility::from_source("pub(crate)").kind(),
+        VisibilityKind::Crate
+    );
+    assert_eq!(
+        Visibility::from_source("pub(super)").kind(),
+        VisibilityKind::Super
+    );
+    assert_eq!(
+        Visibility::from_source("pub(self)").kind(),
+        VisibilityKind::Private
+    );
+    assert_eq!(
+        Visibility::from_source("protected").kind(),
+        VisibilityKind::Private
+    );
     assert_eq!(Visibility::Private.restricted_path(), None);
 }
 
