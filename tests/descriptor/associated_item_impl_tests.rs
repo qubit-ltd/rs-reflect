@@ -77,10 +77,7 @@ trait SymbolicAssociatedConstContract<T: Projection + 'static> {
 }
 
 #[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_SymbolicAssociatedConstContract, specialize(T = u8))]
-impl<T> SymbolicAssociatedConstContract<T> for GenericAssociatedItemTarget<T> where
-    T: Projection + 'static
-{
-}
+impl<T> SymbolicAssociatedConstContract<T> for GenericAssociatedItemTarget<T> where T: Projection + 'static {}
 
 #[derive(Reflect)]
 struct AliasedBoundTarget;
@@ -261,13 +258,8 @@ fn test_reflect_impl_records_associated_const_sources_and_safe_readers() {
 
 #[test]
 fn test_unproven_generic_const_projection_keeps_a_structured_unavailable_reason() {
-    assert!(
-        <GenericAssociatedItemTarget<u8> as SymbolicAssociatedConstContract<u8>>::PROJECTED
-            .is_empty()
-    );
-    let implementation = reflected_implementation::<GenericAssociatedItemTarget<u8>>(
-        "SymbolicAssociatedConstContract",
-    );
+    assert!(<GenericAssociatedItemTarget<u8> as SymbolicAssociatedConstContract<u8>>::PROJECTED.is_empty());
+    let implementation = reflected_implementation::<GenericAssociatedItemTarget<u8>>("SymbolicAssociatedConstContract");
     let [binding] = implementation.associated_consts() else {
         panic!("the symbolic associated constant binding must be recorded")
     };
@@ -281,8 +273,7 @@ fn test_unproven_generic_const_projection_keeps_a_structured_unavailable_reason(
 
 #[test]
 fn test_reflect_impl_preserves_unresolved_generic_associated_type_expression() {
-    let implementation =
-        reflected_implementation::<GenericAssociatedItemTarget<u8>>("SymbolicAssociatedContract");
+    let implementation = reflected_implementation::<GenericAssociatedItemTarget<u8>>("SymbolicAssociatedContract");
     let [binding] = implementation.associated_types() else {
         panic!("the symbolic associated type binding must be recorded")
     };
@@ -330,13 +321,9 @@ fn test_impl_specialization_bound_proves_associated_type_navigation() {
 
 #[test]
 fn test_owned_const_reader_uses_rust_type_proof_for_function_and_boxed_dyn_shapes() {
-    assert_eq!(
-        (<OwnedConstShapeTarget as OwnedConstShapeContract>::CALLBACK)(2),
-        3,
-    );
+    assert_eq!((<OwnedConstShapeTarget as OwnedConstShapeContract>::CALLBACK)(2), 3,);
     assert!(<OwnedConstShapeTarget as OwnedConstShapeContract>::BOXED_DYN.is_none());
-    let implementation =
-        reflected_implementation::<OwnedConstShapeTarget>("OwnedConstShapeContract");
+    let implementation = reflected_implementation::<OwnedConstShapeTarget>("OwnedConstShapeContract");
     let [callback, boxed] = implementation.associated_consts() else {
         panic!("both owned associated constants must be described")
     };
@@ -357,9 +344,7 @@ fn test_owned_const_reader_uses_rust_type_proof_for_function_and_boxed_dyn_shape
 #[test]
 fn test_owned_const_reader_accepts_hrtb_and_elided_callable_lifetimes() {
     let implementation = reflected_implementation::<HrtbConstShapeTarget>("HrtbConstShapeContract");
-    let [bound_function, elided_function, bound_dyn, elided_dyn] =
-        implementation.associated_consts()
-    else {
+    let [bound_function, elided_function, bound_dyn, elided_dyn] = implementation.associated_consts() else {
         panic!("all HRTB associated constants must be recorded")
     };
 

@@ -228,18 +228,12 @@ macro_rules! register_reflected_type {
                 $crate::descriptor::TypeDescriptor::of::<$target>()
             }
 
-            fn __qubit_reflect_runtime_identity()
-            -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
-                $crate::__private::codegen_v3::registration::RuntimeIdentity::Type(
-                    __qubit_reflect_target_type_id(),
-                )
+            fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
+                $crate::__private::codegen_v3::registration::RuntimeIdentity::Type(__qubit_reflect_target_type_id())
             }
 
-            fn __qubit_reflect_payload()
-            -> $crate::__private::codegen_v3::registration::FragmentPayload {
-                $crate::__private::codegen_v3::registration::FragmentPayload::Type(
-                    __qubit_reflect_descriptor(),
-                )
+            fn __qubit_reflect_payload() -> $crate::__private::codegen_v3::registration::FragmentPayload {
+                $crate::__private::codegen_v3::registration::FragmentPayload::Type(__qubit_reflect_descriptor())
             }
 
             $crate::__private::codegen_v3::inventory::submit! {

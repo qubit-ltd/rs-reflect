@@ -44,14 +44,7 @@ fn key<A: 'static>(id: &'static str) -> CapabilityKey<A> {
 }
 
 fn source(declaring_crate: &'static str, line: u32) -> FragmentIdentity {
-    FragmentIdentity::new(
-        declaring_crate,
-        "diagnostics",
-        line,
-        1,
-        "capability",
-        u64::from(line),
-    )
+    FragmentIdentity::new(declaring_crate, "diagnostics", line, 1, "capability", u64::from(line))
 }
 
 fn concrete_identity() -> RuntimeIdentity {
@@ -61,20 +54,14 @@ fn concrete_identity() -> RuntimeIdentity {
 fn mismatch_left_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.contract"),
-            7_u32,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.contract"), 7_u32)],
     ))
 }
 
 fn mismatch_right_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.contract"),
-            9_u64,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.contract"), 9_u64)],
     ))
 }
 
@@ -94,20 +81,14 @@ static MISMATCH_RIGHT: RegistrationFragment = RegistrationFragment::new(
 fn duplicate_left_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.duplicate"),
-            1_u32,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.duplicate"), 1_u32)],
     ))
 }
 
 fn duplicate_right_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.duplicate"),
-            2_u32,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.duplicate"), 2_u32)],
     ))
 }
 
@@ -127,19 +108,14 @@ static DUPLICATE_RIGHT: RegistrationFragment = RegistrationFragment::new(
 fn fact_left_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::without_adapter(key::<u32>(
-            "example.fact",
-        ))],
+        vec![CapabilityDescriptor::without_adapter(key::<u32>("example.fact"))],
     ))
 }
 
 fn executable_right_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<ConcreteTarget>(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.fact"),
-            3_u32,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.fact"), 3_u32)],
     ))
 }
 
@@ -178,20 +154,14 @@ fn definition_identity() -> RuntimeIdentity {
 fn definition_left_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_definition(
         definition(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.definition"),
-            5_u32,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.definition"), 5_u32)],
     ))
 }
 
 fn definition_right_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_definition(
         definition(),
-        vec![CapabilityDescriptor::with_adapter(
-            key("example.definition"),
-            8_u64,
-        )],
+        vec![CapabilityDescriptor::with_adapter(key("example.definition"), 8_u64)],
     ))
 }
 
@@ -223,8 +193,8 @@ fn intrinsic_capabilities() -> Result<&'static TypeCapabilities, CapabilityConfl
 
 impl Reflect for IntrinsicTarget {
     fn type_descriptor() -> &'static TypeDescriptor {
-        static DESCRIPTOR: TypeDescriptor = opaque_root::<IntrinsicTarget>("IntrinsicTarget")
-            .with_capabilities(intrinsic_capabilities);
+        static DESCRIPTOR: TypeDescriptor =
+            opaque_root::<IntrinsicTarget>("IntrinsicTarget").with_capabilities(intrinsic_capabilities);
         &DESCRIPTOR
     }
 }
@@ -286,8 +256,7 @@ fn test_cross_fragment_duplicate_and_fact_conflicts_share_classification() {
 
 #[test]
 fn test_definition_target_is_reported_with_both_contracts() {
-    let error =
-        build_registry(&[&DEFINITION_RIGHT, &DEFINITION_LEFT]).expect_err("definition conflict");
+    let error = build_registry(&[&DEFINITION_RIGHT, &DEFINITION_LEFT]).expect_err("definition conflict");
 
     assert_eq!(
         error.capability_target(),
@@ -314,12 +283,10 @@ fn test_intrinsic_conflict_retains_target_source_and_error_chain() {
     assert_eq!(detail.first_adapter_type(), TypeId::of::<u16>());
     assert_eq!(detail.second_adapter_type(), TypeId::of::<u16>());
     assert_eq!(error.intrinsic_conflict(), Some(detail));
-    let intrinsic_source =
-        FragmentIdentity::new("intrinsic-source", "diagnostics", 90, 1, "type", 90);
+    let intrinsic_source = FragmentIdentity::new("intrinsic-source", "diagnostics", 90, 1, "type", 90);
     assert_eq!(error.fragment_identity(), Some(&intrinsic_source));
     assert_eq!(
-        std::error::Error::source(&error)
-            .and_then(|cause| cause.downcast_ref::<CapabilityConflict>()),
+        std::error::Error::source(&error).and_then(|cause| cause.downcast_ref::<CapabilityConflict>()),
         Some(detail)
     );
 }
@@ -347,8 +314,7 @@ fn test_legacy_constructors_remain_usable_without_inventing_context() {
         CapabilityDescriptor::without_adapter(key::<u8>("example.legacy")),
     ])
     .expect_err("fixture conflict");
-    let intrinsic =
-        RegistryError::intrinsic_capability_conflict(source("legacy", 120), conflict.clone());
+    let intrinsic = RegistryError::intrinsic_capability_conflict(source("legacy", 120), conflict.clone());
     assert_eq!(intrinsic.capability_details(), Some(&conflict));
     assert_eq!(intrinsic.intrinsic_conflict(), Some(&conflict));
     assert!(intrinsic.capability_target().is_none());

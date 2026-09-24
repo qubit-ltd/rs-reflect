@@ -37,11 +37,7 @@ impl TypeMismatch {
     /// Adds diagnostic type names without changing the type IDs used for
     /// matching.
     #[must_use]
-    pub const fn with_diagnostic_names(
-        mut self,
-        expected_name: &'static str,
-        actual_name: &'static str,
-    ) -> Self {
+    pub const fn with_diagnostic_names(mut self, expected_name: &'static str, actual_name: &'static str) -> Self {
         self.expected_name = Some(expected_name);
         self.actual_name = Some(actual_name);
         self

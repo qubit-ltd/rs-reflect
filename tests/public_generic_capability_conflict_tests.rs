@@ -136,11 +136,7 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
                 for _ in 0..20 {
                     let descriptor = TypeDescriptor::of::<Counted<u32>>();
                     assert!(registry.capability(descriptor, key()).unwrap().is_some());
-                    assert!(
-                        registry
-                            .capabilities(TypeDescriptor::of::<Conflict<u64>>())
-                            .is_err()
-                    );
+                    assert!(registry.capabilities(TypeDescriptor::of::<Conflict<u64>>()).is_err());
                 }
             });
         }
@@ -155,23 +151,11 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
     let other = TypeDescriptor::of::<Counted<String>>();
     assert!(registry.capability(other, key()).unwrap().is_some());
     let counts = COUNTS.lock().unwrap();
-    assert_eq!(
-        counts.get(&std::any::TypeId::of::<Counted<u32>>()),
-        Some(&1)
-    );
-    assert_eq!(
-        counts.get(&std::any::TypeId::of::<Counted<String>>()),
-        Some(&1)
-    );
-    let missing: CapabilityKey<fn()> =
-        CapabilityKey::new(CapabilityId::new("example.absent").unwrap());
+    assert_eq!(counts.get(&std::any::TypeId::of::<Counted<u32>>()), Some(&1));
+    assert_eq!(counts.get(&std::any::TypeId::of::<Counted<String>>()), Some(&1));
+    let missing: CapabilityKey<fn()> = CapabilityKey::new(CapabilityId::new("example.absent").unwrap());
     assert!(registry.capability(other, missing).unwrap().is_none());
-    assert!(
-        registry
-            .capability_by_id(other, "invalid!")
-            .unwrap()
-            .is_none()
-    );
+    assert!(registry.capability_by_id(other, "invalid!").unwrap().is_none());
     let wrong: CapabilityKey<usize> = CapabilityKey::new(*key().id());
     assert!(registry.capability(other, wrong).is_err());
     assert!(matches!(
@@ -223,11 +207,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
             &[ArgumentExpectation::owned::<u8>()],
         )
         .unwrap();
-    let failure = match validated.adapt_receiver_in::<()>(
-        &registry,
-        &identity,
-        TypeDescriptor::of::<Conflict<u16>>(),
-    ) {
+    let failure = match validated.adapt_receiver_in::<()>(&registry, &identity, TypeDescriptor::of::<Conflict<u16>>()) {
         Err(failure) => failure,
         Ok(_) => panic!("invalid capabilities must reject adaptation"),
     };
@@ -240,9 +220,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
         panic!("owned argument")
     };
     assert_eq!(
-        value
-            .downcast::<u8>()
-            .unwrap_or_else(|_| panic!("exact argument type")),
+        value.downcast::<u8>().unwrap_or_else(|_| panic!("exact argument type")),
         7
     );
 }

@@ -186,20 +186,15 @@ fn invocation_adapter_token() {}
 fn local_invocation_entry<'call>(
     _registry: &ReflectRegistry,
     _: reflect::invoke::Invocation<'call, Local>,
-) -> Result<
-    reflect::invoke::InvocationOutput<'call, Local>,
-    reflect::invoke::InvocationFailure<'call, Local>,
-> {
+) -> Result<reflect::invoke::InvocationOutput<'call, Local>, reflect::invoke::InvocationFailure<'call, Local>> {
     Ok(reflect::invoke::InvocationOutput::Unit)
 }
 
 fn thread_safe_invocation_entry<'call>(
     _registry: &ReflectRegistry,
     _: reflect::invoke::Invocation<'call, ThreadSafe>,
-) -> Result<
-    reflect::invoke::InvocationOutput<'call, ThreadSafe>,
-    reflect::invoke::InvocationFailure<'call, ThreadSafe>,
-> {
+) -> Result<reflect::invoke::InvocationOutput<'call, ThreadSafe>, reflect::invoke::InvocationFailure<'call, ThreadSafe>>
+{
     Ok(reflect::invoke::InvocationOutput::Unit)
 }
 
@@ -235,12 +230,11 @@ fn test_trait_descriptor_public_paths_remain_available() {
     );
     assert_eq!(external.rust_path(), "fixture::PublicPath");
 
-    let cached =
-        reflect::descriptor::cached_trait_object_descriptor::<PublicPathObjectMarker>(|| {
-            TraitDescriptor::builder(&ROOT_DEFINITION)
-                .build()
-                .expect("the public cache fixture must build")
-        });
+    let cached = reflect::descriptor::cached_trait_object_descriptor::<PublicPathObjectMarker>(|| {
+        TraitDescriptor::builder(&ROOT_DEFINITION)
+            .build()
+            .expect("the public cache fixture must build")
+    });
     assert_eq!(cached.rust_path(), "fixture::Root");
 }
 
@@ -424,11 +418,7 @@ fn test_trait_payload_and_object_caches_reuse_initialized_values() {
     let first = TraitImplPayload::cached_with_arguments::<PayloadCacheMarker>(
         &ROOT_DEFINITION,
         Vec::new(),
-        |arguments| {
-            TraitDescriptor::builder(&ROOT_DEFINITION)
-                .arguments(arguments)
-                .build()
-        },
+        |arguments| TraitDescriptor::builder(&ROOT_DEFINITION).arguments(arguments).build(),
         Vec::new,
         Vec::new,
         Vec::new,
@@ -445,16 +435,16 @@ fn test_trait_payload_and_object_caches_reuse_initialized_values() {
     );
     assert!(std::ptr::eq(first.applied(), second.applied()));
 
-    let first = reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<
-        TraitObjectCacheMarker,
-    >(|| {
-        TraitDescriptor::builder(&ROOT_DEFINITION)
-            .build()
-            .expect("the cached trait object fixture must build")
-    });
-    let second = reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<
-        TraitObjectCacheMarker,
-    >(|| panic!("a hot trait-object lookup must not rebuild its descriptor"));
+    let first =
+        reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+            TraitDescriptor::builder(&ROOT_DEFINITION)
+                .build()
+                .expect("the cached trait object fixture must build")
+        });
+    let second =
+        reflect::__private::codegen_v3::descriptor::cached_trait_object_descriptor::<TraitObjectCacheMarker>(|| {
+            panic!("a hot trait-object lookup must not rebuild its descriptor")
+        });
     assert!(std::ptr::eq(first, second));
 }
 
@@ -490,8 +480,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
         local_adapter.catching_availability(),
         CatchingAvailability::NotRequested
     );
-    let thread_safe_adapter =
-        InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_invocation_entry);
+    let thread_safe_adapter = InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_invocation_entry);
     assert!(
         thread_safe_adapter
             .invoke_thread_safe(
@@ -513,8 +502,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     assert!(payload.associated_type_resolvers().is_empty());
     assert!(payload.associated_const_readers().is_empty());
 
-    let associated_type =
-        AssociatedTypeDescriptor::new(3, "Item", "item", Box::new([]), Some(TypeExpression::Never));
+    let associated_type = AssociatedTypeDescriptor::new(3, "Item", "item", Box::new([]), Some(TypeExpression::Never));
     assert_eq!(associated_type.index(), 3);
     assert_eq!(associated_type.rust_name(), "Item");
     assert_eq!(associated_type.query_name(), "item");
@@ -532,8 +520,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     assert_eq!(gat.index(), 5);
     assert!(gat.generic_definition().parameters().is_empty());
 
-    let associated_const =
-        AssociatedConstDescriptor::new(4, "LIMIT", "limit", TypeExpression::Never, true);
+    let associated_const = AssociatedConstDescriptor::new(4, "LIMIT", "limit", TypeExpression::Never, true);
     assert_eq!(associated_const.index(), 4);
     assert_eq!(associated_const.rust_name(), "LIMIT");
     assert_eq!(associated_const.query_name(), "limit");
@@ -552,10 +539,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
             "an external incomplete trait cannot claim supertraits or associated items",
         ),
         (
-            TraitDescriptorBuildError::GenericArgumentCount {
-                expected: 1,
-                actual: 0,
-            },
+            TraitDescriptorBuildError::GenericArgumentCount { expected: 1, actual: 0 },
             "trait application requires 1 concrete arguments but received 0",
         ),
         (
@@ -654,8 +638,7 @@ fn test_trait_descriptor_builder_rejects_recursive_identity_and_unproven_externa
 
     let external_definition = TraitDefinitionDescriptor::new(
         TraitId::External(
-            ExternalTraitId::new("fixture.external.display")
-                .expect("fixture external trait ID must be valid"),
+            ExternalTraitId::new("fixture.external.display").expect("fixture external trait ID must be valid"),
         ),
         "Display",
         "std::fmt::Display",
@@ -703,18 +686,10 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
 
     assert_eq!(method.rust_name(), "apply");
     assert_eq!(method.query_name(), "run");
-    assert_eq!(
-        method.visibility(),
-        &MethodVisibility::Declared(Visibility::Crate)
-    );
+    assert_eq!(method.visibility(), &MethodVisibility::Declared(Visibility::Crate));
     assert_eq!(method.receiver(), Some(&ReceiverDescriptor::Shared));
-    assert_eq!(
-        method.parameter("value").map(ParameterDescriptor::index),
-        Some(0)
-    );
-    let parameter = method
-        .parameter_at(0)
-        .expect("method parameter should exist");
+    assert_eq!(method.parameter("value").map(ParameterDescriptor::index), Some(0));
+    let parameter = method.parameter_at(0).expect("method parameter should exist");
     assert_eq!(parameter.index(), 0);
     assert_eq!(parameter.passing_mode(), ParameterPassingMode::Owned);
     assert_eq!(
@@ -730,18 +705,13 @@ fn test_trait_descriptor_method_preserves_signature_visibility_and_generic_facts
     );
     assert_eq!(method.return_value().kind(), ReturnKind::Concrete);
     assert_eq!(
-        method
-            .return_value()
-            .concrete_type()
-            .map(TypeDescriptor::type_id),
+        method.return_value().concrete_type().map(TypeDescriptor::type_id),
         Some(target_type().type_id()),
     );
     assert!(method.qualifiers().is_async());
     assert_eq!(method.generic_definition().parameters().len(), 1);
     assert_eq!(
-        method
-            .declaring_trait()
-            .map(TraitDefinitionDescriptor::rust_path),
+        method.declaring_trait().map(TraitDefinitionDescriptor::rust_path),
         Some("fixture::Generic")
     );
 }
@@ -755,9 +725,7 @@ fn test_trait_descriptor_rejects_non_concrete_or_incomplete_applications() {
     ));
 
     let symbolic = TraitDescriptor::builder(&GENERIC_DEFINITION)
-        .arguments(vec![GenericArgument::Type(TypeExpression::Parameter(
-            "T".into(),
-        ))])
+        .arguments(vec![GenericArgument::Type(TypeExpression::Parameter("T".into()))])
         .build();
     assert!(matches!(
         symbolic,
@@ -765,12 +733,9 @@ fn test_trait_descriptor_rejects_non_concrete_or_incomplete_applications() {
     ));
 
     let concrete_with_lifetime = TypeExpression::Concrete(
-        ConcreteTypeExpression::new(
-            ["Cow"],
-            vec![GenericArgument::Lifetime(LifetimeExpression::Static)],
-        )
-        .expect("test path is non-empty")
-        .with_diagnostic("Cow<'static, str>"),
+        ConcreteTypeExpression::new(["Cow"], vec![GenericArgument::Lifetime(LifetimeExpression::Static)])
+            .expect("test path is non-empty")
+            .with_diagnostic("Cow<'static, str>"),
     );
     assert!(
         TraitDescriptor::builder(&GENERIC_DEFINITION)
@@ -783,15 +748,9 @@ fn test_trait_descriptor_rejects_non_concrete_or_incomplete_applications() {
 #[test]
 fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_lookup() {
     let arguments = vec![GenericArgument::Type(concrete_u32_expression())];
-    let associated_type = AssociatedTypeDescriptor::new(
-        0,
-        "Item",
-        "item",
-        Box::<[PredicateDescriptor]>::default(),
-        None,
-    );
-    let associated_const =
-        AssociatedConstDescriptor::new(0, "LIMIT", "limit", concrete_u32_expression(), true);
+    let associated_type =
+        AssociatedTypeDescriptor::new(0, "Item", "item", Box::<[PredicateDescriptor]>::default(), None);
+    let associated_const = AssociatedConstDescriptor::new(0, "LIMIT", "limit", concrete_u32_expression(), true);
     let methods: &'static [MethodDescriptor] = Box::leak(
         vec![
             MethodDescriptor::builder(
@@ -819,20 +778,13 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
 
     assert_eq!(applied.definition().rust_path(), "fixture::Generic");
     assert_eq!(applied.arguments(), arguments);
+    assert_eq!(applied.method("same").map(MethodDescriptor::rust_name), Some("same"));
     assert_eq!(
-        applied.method("same").map(MethodDescriptor::rust_name),
-        Some("same")
-    );
-    assert_eq!(
-        applied
-            .associated_type("item")
-            .map(AssociatedTypeDescriptor::index),
+        applied.associated_type("item").map(AssociatedTypeDescriptor::index),
         Some(0)
     );
     assert_eq!(
-        applied
-            .associated_const("limit")
-            .map(AssociatedConstDescriptor::index),
+        applied.associated_const("limit").map(AssociatedConstDescriptor::index),
         Some(0)
     );
     let associated_type = &applied.associated_types()[0];
@@ -962,10 +914,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
         .expect("second trait impl must build"),
     ));
 
-    let impls = [
-        generic_impl as &ImplDescriptor,
-        other_impl as &ImplDescriptor,
-    ];
+    let impls = [generic_impl as &ImplDescriptor, other_impl as &ImplDescriptor];
     assert!(matches!(
         ImplDescriptor::lookup_method(&impls, MethodQualifier::Any, "same"),
         MethodLookup::Ambiguous
@@ -974,14 +923,9 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     let MethodLookup::Unique(instance) = lookup else {
         panic!("qualified lookup must select the generic trait method");
     };
+    assert_eq!(instance.implementation_source(), MethodImplementationSource::Overridden);
     assert_eq!(
-        instance.implementation_source(),
-        MethodImplementationSource::Overridden
-    );
-    assert_eq!(
-        instance
-            .implementation_method()
-            .map(MethodDescriptor::rust_name),
+        instance.implementation_method().map(MethodDescriptor::rust_name),
         Some("same")
     );
     assert_eq!(
@@ -1001,14 +945,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
         panic!("the reader must preserve the declared type");
     };
     assert_eq!(value, 32);
-    assert_eq!(
-        generic_impl
-            .definition()
-            .generic_definition()
-            .parameters()
-            .len(),
-        1
-    );
+    assert_eq!(generic_impl.definition().generic_definition().parameters().len(), 1);
     assert_eq!(generic_impl.arguments(), arguments);
     assert_eq!(generic_impl.implementation_methods().len(), 1);
     assert_eq!(
@@ -1019,10 +956,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     assert!(format!("{generic_impl:?}").contains("ImplDescriptor"));
     assert!(format!("{ASSOCIATED_CONST_READER:?}").contains("AssociatedConstReader"));
     assert!(generic_impl.associated_consts()[0].is_readable());
-    assert_eq!(
-        generic_impl.associated_consts()[0].read_unavailable_reason(),
-        None
-    );
+    assert_eq!(generic_impl.associated_consts()[0].read_unavailable_reason(), None);
     assert!(instance.adapter().is_some());
     assert!(instance.arguments().is_empty());
     assert!(
@@ -1069,10 +1003,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     else {
         panic!("qualified lookup must select the second trait method");
     };
-    assert_eq!(
-        defaulted.implementation_source(),
-        MethodImplementationSource::Defaulted
-    );
+    assert_eq!(defaulted.implementation_source(), MethodImplementationSource::Defaulted);
 
     let contradictory = MethodInstanceDescriptor::new(
         declaration,
@@ -1160,11 +1091,7 @@ fn test_impl_associated_items_initialize_once_as_one_atomic_pair() {
                     INITIALIZATIONS.fetch_add(1, Ordering::SeqCst);
                     (
                         vec![ImplAssociatedTypeDescriptor::new("Item")].into_boxed_slice(),
-                        vec![ImplAssociatedConstDescriptor::new(
-                            "LIMIT",
-                            concrete_u32_expression(),
-                        )]
-                        .into_boxed_slice(),
+                        vec![ImplAssociatedConstDescriptor::new("LIMIT", concrete_u32_expression())].into_boxed_slice(),
                     )
                 });
             })

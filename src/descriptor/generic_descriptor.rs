@@ -37,10 +37,7 @@ impl ConcreteGenericDescriptor {
     /// only supplies structural arguments.
     #[doc(hidden)]
     #[must_use]
-    pub const fn new(
-        definition: &'static GenericDefinitionDescriptor,
-        arguments: &'static [GenericArgument],
-    ) -> Self {
+    pub const fn new(definition: &'static GenericDefinitionDescriptor, arguments: &'static [GenericArgument]) -> Self {
         Self {
             definition,
             arguments,
@@ -159,10 +156,7 @@ impl ConcreteGenericDescriptor {
     /// `None` has the same meaning as [`Self::type_argument`] and also covers
     /// lifetime and const definition parameters.
     #[must_use]
-    pub fn type_argument_for_definition(
-        &self,
-        definition_index: usize,
-    ) -> Option<&'static TypeDescriptor> {
+    pub fn type_argument_for_definition(&self, definition_index: usize) -> Option<&'static TypeDescriptor> {
         self.argument_index(definition_index)
             .and_then(|argument_index| self.type_argument(argument_index))
     }
@@ -192,10 +186,7 @@ impl ConcreteGenericDescriptor {
     /// `None` has the same meaning as [`Self::const_argument_value`] and also
     /// covers lifetime and type definition parameters.
     #[must_use]
-    pub fn const_argument_value_for_definition(
-        &self,
-        definition_index: usize,
-    ) -> Option<ReflectedOwned> {
+    pub fn const_argument_value_for_definition(&self, definition_index: usize) -> Option<ReflectedOwned> {
         self.argument_index(definition_index)
             .and_then(|argument_index| self.const_argument_value(argument_index))
     }

@@ -151,23 +151,20 @@ pub(crate) fn validate_named<M: Mode>(
     };
 
     for (index, field) in fields.iter().enumerate() {
-        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required)
-        {
+        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required) {
             return Err(input.into_recovery(ConstructionError::MissingField {
                 field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
             }));
         }
     }
 
-    let mut defaults: Vec<Option<DynamicOwned<M>>> =
-        std::iter::repeat_with(|| None).take(fields.len()).collect();
+    let mut defaults: Vec<Option<DynamicOwned<M>>> = std::iter::repeat_with(|| None).take(fields.len()).collect();
     for (index, field) in fields.iter().enumerate() {
         if positions[index].is_some() {
             continue;
         }
         match field.policy() {
-            ConstructionFieldPolicy::Default(provider)
-            | ConstructionFieldPolicy::ProviderOnly(provider) => {
+            ConstructionFieldPolicy::Default(provider) | ConstructionFieldPolicy::ProviderOnly(provider) => {
                 let value = provider();
                 if let Err(error) = validate_value(field.descriptor(), &value, value_type_id) {
                     return Err(input.into_recovery(error));
@@ -183,11 +180,7 @@ pub(crate) fn validate_named<M: Mode>(
         }
     }
 
-    let mut raw = input
-        .into_fields()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = input.into_fields().into_iter().map(Some).collect::<Vec<_>>();
     let mut values = Vec::with_capacity(fields.len());
     for index in 0..fields.len() {
         if let Some(input_index) = positions[index] {
@@ -197,9 +190,9 @@ pub(crate) fn validate_named<M: Mode>(
             values.push(value);
         } else {
             values.push(
-                defaults[index].take().unwrap_or_else(|| {
-                    unreachable!("every omitted field has a validated provider")
-                }),
+                defaults[index]
+                    .take()
+                    .unwrap_or_else(|| unreachable!("every omitted field has a validated provider")),
             );
         }
     }
@@ -231,9 +224,7 @@ pub(crate) fn validate_tuple<M: Mode>(
         }));
     }
     let mut positions = vec![None; fields.len()];
-    for (input_index, (&field_index, value)) in
-        caller_field_indices.iter().zip(input.values()).enumerate()
-    {
+    for (input_index, (&field_index, value)) in caller_field_indices.iter().zip(input.values()).enumerate() {
         let field = &fields[field_index];
         if let Err(error) = validate_value(field.descriptor(), value, value_type_id) {
             return Err(input.into_recovery(error));
@@ -242,23 +233,20 @@ pub(crate) fn validate_tuple<M: Mode>(
     }
 
     for (index, field) in fields.iter().enumerate() {
-        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required)
-        {
+        if positions[index].is_none() && matches!(field.policy(), ConstructionFieldPolicy::Required) {
             return Err(input.into_recovery(ConstructionError::MissingField {
                 field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
             }));
         }
     }
 
-    let mut defaults: Vec<Option<DynamicOwned<M>>> =
-        std::iter::repeat_with(|| None).take(fields.len()).collect();
+    let mut defaults: Vec<Option<DynamicOwned<M>>> = std::iter::repeat_with(|| None).take(fields.len()).collect();
     for (index, field) in fields.iter().enumerate() {
         if positions[index].is_some() {
             continue;
         }
         match field.policy() {
-            ConstructionFieldPolicy::Default(provider)
-            | ConstructionFieldPolicy::ProviderOnly(provider) => {
+            ConstructionFieldPolicy::Default(provider) | ConstructionFieldPolicy::ProviderOnly(provider) => {
                 let value = provider();
                 if let Err(error) = validate_value(field.descriptor(), &value, value_type_id) {
                     return Err(input.into_recovery(error));
@@ -274,11 +262,7 @@ pub(crate) fn validate_tuple<M: Mode>(
         }
     }
 
-    let mut raw = input
-        .into_values()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = input.into_values().into_iter().map(Some).collect::<Vec<_>>();
     let mut values = Vec::with_capacity(fields.len());
     for index in 0..fields.len() {
         if let Some(input_index) = positions[index] {
@@ -289,9 +273,9 @@ pub(crate) fn validate_tuple<M: Mode>(
             );
         } else {
             values.push(
-                defaults[index].take().unwrap_or_else(|| {
-                    unreachable!("every omitted field has a validated provider")
-                }),
+                defaults[index]
+                    .take()
+                    .unwrap_or_else(|| unreachable!("every omitted field has a validated provider")),
             );
         }
     }
@@ -313,9 +297,7 @@ pub(crate) fn validate_unit<M: Mode>(
             field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
         });
     }
-    Ok(ValidatedConstructionInput {
-        values: Box::new([]),
-    })
+    Ok(ValidatedConstructionInput { values: Box::new([]) })
 }
 
 /// Validates an exact update base and every supplied override atomically.
@@ -333,18 +315,13 @@ pub(crate) fn validate_update<M: Mode>(
         }));
     }
 
-    let positions =
-        match validate_update_bindings(input.overrides().fields(), fields, value_type_id) {
-            Ok(positions) => positions,
-            Err(error) => return Err(input.into_recovery(error)),
-        };
+    let positions = match validate_update_bindings(input.overrides().fields(), fields, value_type_id) {
+        Ok(positions) => positions,
+        Err(error) => return Err(input.into_recovery(error)),
+    };
 
     let (base, overrides) = input.into_parts();
-    let mut raw = overrides
-        .into_fields()
-        .into_iter()
-        .map(Some)
-        .collect::<Vec<_>>();
+    let mut raw = overrides.into_fields().into_iter().map(Some).collect::<Vec<_>>();
     let mut validated = Vec::with_capacity(raw.len());
     for (index, position) in positions.into_iter().enumerate() {
         if let Some(position) = position {
@@ -427,9 +404,7 @@ fn validate_construction_bindings<M: Mode>(
 
 /// Returns the first field whose policy makes from-zero construction
 /// unavailable.
-fn unavailable_constructor_field<M: Mode>(
-    fields: &[ConstructionField<M>],
-) -> Option<ConstructionError> {
+fn unavailable_constructor_field<M: Mode>(fields: &[ConstructionField<M>]) -> Option<ConstructionError> {
     fields.iter().find_map(|field| match field.policy() {
         ConstructionFieldPolicy::Unavailable(reason) => Some(ConstructionError::Unavailable {
             field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),

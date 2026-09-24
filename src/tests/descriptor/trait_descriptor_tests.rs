@@ -27,12 +27,11 @@ struct UnitTraitMarker;
 struct UnitChildMarker;
 struct UnitAlternateMarker;
 
-static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> =
-    LazyLock::new(|| GenericDefinitionDescriptor {
-        parameters: Box::new([]),
-        predicates: Box::new([]),
-        diagnostic: DiagnosticText::default(),
-    });
+static EMPTY_GENERIC: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
+    parameters: Box::new([]),
+    predicates: Box::new([]),
+    diagnostic: DiagnosticText::default(),
+});
 
 static UNIT_DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
     TraitDefinitionDescriptor::new_with_visibility(
@@ -126,13 +125,11 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
     assert_eq!(root.associated_consts().len(), 1);
     assert!(root.method("missing").is_none());
     assert_eq!(
-        root.associated_type("item")
-            .map(AssociatedTypeDescriptor::index),
+        root.associated_type("item").map(AssociatedTypeDescriptor::index),
         Some(0)
     );
     assert_eq!(
-        root.associated_const("limit")
-            .map(AssociatedConstDescriptor::index),
+        root.associated_const("limit").map(AssociatedConstDescriptor::index),
         Some(0),
     );
     let associated_type = root.associated_type("item").expect("associated type");
@@ -152,10 +149,7 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
     assert_eq!(direct.len(), 1);
     assert!(!direct.is_empty());
     assert_eq!(
-        direct
-            .iter()
-            .next()
-            .map(|descriptor| descriptor.rust_name()),
+        direct.iter().next().map(|descriptor| descriptor.rust_name()),
         Some("UnitTrait")
     );
     assert_eq!(child.all_supertraits().len(), 1);
@@ -167,10 +161,7 @@ fn test_trait_descriptor_views_expose_all_local_facts() {
             .expect("alternate trait facts must build"),
     ));
     let sorted = TraitDescriptor::builder(&CHILD_DEFINITION)
-        .direct_supertraits([
-            root as &'static TraitDescriptor,
-            alternate as &'static TraitDescriptor,
-        ])
+        .direct_supertraits([root as &'static TraitDescriptor, alternate as &'static TraitDescriptor])
         .build()
         .expect("same-path supertraits must use query names as a stable tie-breaker");
     let sorted_names = sorted

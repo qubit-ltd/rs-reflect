@@ -106,10 +106,8 @@ static INTRINSIC_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(|| {
     )])
     .expect("valid intrinsic capability")
 });
-static INTRINSIC_DESCRIPTOR: TypeDescriptor = opaque_root_with_capabilities::<IntrinsicTarget>(
-    "IntrinsicTarget",
-    intrinsic_capabilities_for_test,
-);
+static INTRINSIC_DESCRIPTOR: TypeDescriptor =
+    opaque_root_with_capabilities::<IntrinsicTarget>("IntrinsicTarget", intrinsic_capabilities_for_test);
 
 fn intrinsic_capabilities() -> TypeCapabilitiesResult {
     PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
@@ -134,9 +132,7 @@ fn key<A: 'static>(id: &'static str) -> CapabilityKey<A> {
 
 #[test]
 fn test_empty_snapshots_do_not_import_global_inventory() {
-    let first = RegistrySnapshotBuilder::new()
-        .build()
-        .expect("empty snapshot");
+    let first = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
     let second = RegistrySnapshotBuilder::default()
         .build()
         .expect("default empty snapshot");
@@ -166,14 +162,8 @@ fn test_capability_only_snapshots_do_not_register_or_share_members() {
     );
     let second = second.build().expect("second snapshot");
 
-    assert_eq!(
-        first.capability(descriptor, capability_key).unwrap(),
-        Some(&7)
-    );
-    assert_eq!(
-        second.capability(descriptor, capability_key).unwrap(),
-        Some(&9)
-    );
+    assert_eq!(first.capability(descriptor, capability_key).unwrap(), Some(&7));
+    assert_eq!(second.capability(descriptor, capability_key).unwrap(), Some(&9));
     assert!(first.types().is_empty());
     assert!(second.get(descriptor.type_id()).is_none());
 }
@@ -208,9 +198,7 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     let first = first_builder.build().expect("first registered snapshot");
     assert_eq!(
         first.capability_origin(target, "example.registered"),
-        Ok(Some(CapabilityOrigin::Registered {
-            source: first_source
-        })),
+        Ok(Some(CapabilityOrigin::Registered { source: first_source })),
     );
 
     let mut second_builder = RegistrySnapshotBuilder::new();
@@ -222,9 +210,7 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     let second = second_builder.build().expect("second registered snapshot");
     assert_eq!(
         second.capability_origin(target, "example.registered"),
-        Ok(Some(CapabilityOrigin::Registered {
-            source: second_source
-        })),
+        Ok(Some(CapabilityOrigin::Registered { source: second_source })),
     );
     assert_eq!(first.capability_origin(target, "missing"), Ok(None));
 }
@@ -233,11 +219,7 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
 fn test_add_only_collects_payloads_until_build() {
     let calls_before = PROVIDER_CALLS.load(Ordering::SeqCst);
     let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_type_capabilities(
-        &PROVIDER_DESCRIPTOR,
-        Vec::new(),
-        source(10, "capability", 10),
-    );
+    builder.add_type_capabilities(&PROVIDER_DESCRIPTOR, Vec::new(), source(10, "capability", 10));
     assert_eq!(PROVIDER_CALLS.load(Ordering::SeqCst), calls_before);
 
     let registry = builder.build().expect("valid capability-only snapshot");
@@ -259,10 +241,7 @@ fn test_type_membership_and_duplicate_type_validation_are_explicit() {
         .add_type(descriptor, source(21, "type", 21))
         .add_type(descriptor, source(22, "type", 22));
     assert_eq!(
-        duplicate
-            .build()
-            .expect_err("duplicate TypeId must fail")
-            .kind(),
+        duplicate.build().expect_err("duplicate TypeId must fail").kind(),
         RegistryErrorKind::IdentityConflict,
     );
 }
@@ -275,10 +254,7 @@ fn test_duplicate_and_changed_source_identities_use_registry_validation() {
         .add_type(TypeDescriptor::of::<u8>(), exact.clone())
         .add_type(TypeDescriptor::of::<u16>(), exact);
     assert_eq!(
-        duplicate
-            .build()
-            .expect_err("duplicate source must fail")
-            .kind(),
+        duplicate.build().expect_err("duplicate source must fail").kind(),
         RegistryErrorKind::DuplicateFragment,
     );
 
@@ -287,10 +263,7 @@ fn test_duplicate_and_changed_source_identities_use_registry_validation() {
         .add_type(TypeDescriptor::of::<u8>(), source(31, "type", 1))
         .add_type(TypeDescriptor::of::<u16>(), source(31, "type", 2));
     assert_eq!(
-        changed
-            .build()
-            .expect_err("changed source must fail")
-            .kind(),
+        changed.build().expect_err("changed source must fail").kind(),
         RegistryErrorKind::IdentityConflict,
     );
 }
@@ -311,9 +284,7 @@ fn test_capability_conflicts_preserve_duplicate_and_adapter_mismatch_details() {
             vec![CapabilityDescriptor::with_adapter(duplicate_key, 2_u32)],
             source(41, "capability", 41),
         );
-    let duplicate = duplicate
-        .build()
-        .expect_err("duplicate capability must fail");
+    let duplicate = duplicate.build().expect_err("duplicate capability must fail");
     assert_eq!(duplicate.kind(), RegistryErrorKind::CapabilityConflict);
     assert_eq!(
         duplicate.capability_details().map(|detail| detail.kind()),
@@ -360,17 +331,14 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
         vec![CapabilityDescriptor::with_adapter(capability_key, 17_u32)],
         source(51, "definition-capability", 51),
     );
-    let capability_only = capability_only
-        .build()
-        .expect("definition capability snapshot");
+    let capability_only = capability_only.build().expect("definition capability snapshot");
     assert!(capability_only.definitions().is_empty());
     assert_eq!(
         capability_only.definition_capability(DEFINITION.id(), capability_key),
         Ok(Some(&17)),
     );
     assert_eq!(
-        capability_only
-            .definition_capability_origin(DEFINITION.id(), "example.snapshot.definition"),
+        capability_only.definition_capability_origin(DEFINITION.id(), "example.snapshot.definition"),
         Some(CapabilityOrigin::Registered {
             source: source(51, "definition-capability", 51),
         }),
@@ -408,21 +376,12 @@ fn test_trait_and_impl_definition_link_only_with_an_explicit_trait_member() {
 #[test]
 fn test_impl_and_unregistered_monomorph_queries_do_not_add_type_members() {
     let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_impl(
-        &INHERENT_IMPL,
-        INHERENT_IMPL_DEFINITION.fragment_identity().clone(),
-    );
+    builder.add_impl(&INHERENT_IMPL, INHERENT_IMPL_DEFINITION.fragment_identity().clone());
     let registry = builder.build().expect("impl-only snapshot");
 
     assert!(registry.types().is_empty());
     assert_eq!(registry.implementations(TypeId::of::<u64>()).len(), 1);
-    assert_eq!(
-        registry
-            .effective_view(TypeId::of::<u64>())
-            .implementations()
-            .len(),
-        1
-    );
+    assert_eq!(registry.effective_view(TypeId::of::<u64>()).implementations().len(), 1);
     assert!(registry.get(TypeId::of::<u64>()).is_none());
 }
 
@@ -433,9 +392,7 @@ fn test_failed_global_initialization_does_not_poison_explicit_builder() {
     let descriptor = TypeDescriptor::of::<u128>();
     let mut builder = RegistrySnapshotBuilder::new();
     builder.add_type(descriptor, source(70, "type", 70));
-    let registry = builder
-        .build()
-        .expect("explicit snapshot remains independent");
+    let registry = builder.build().expect("explicit snapshot remains independent");
     assert_eq!(registry.types().len(), 1);
     assert!(std::ptr::eq(registry.types()[0], descriptor));
 }

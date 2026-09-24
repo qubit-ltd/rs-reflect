@@ -41,10 +41,7 @@ pub struct CapabilityConflict {
 impl CapabilityConflict {
     /// Classifies two descriptors already known to claim the same capability
     /// ID while preserving their input contract order.
-    pub(crate) fn from_same_id(
-        first: &CapabilityDescriptor,
-        second: &CapabilityDescriptor,
-    ) -> Self {
+    pub(crate) fn from_same_id(first: &CapabilityDescriptor, second: &CapabilityDescriptor) -> Self {
         debug_assert_eq!(first.id(), second.id());
         let kind = if first.adapter_type() == second.adapter_type() {
             CapabilityConflictKind::DuplicateId
@@ -169,10 +166,7 @@ impl TypeCapabilities {
     /// Returns [`CapabilityAccessError::FactOnly`] when the ID names a
     /// non-executable fact and [`CapabilityAccessError::AdapterTypeMismatch`]
     /// when the ID is present with a different adapter contract.
-    pub fn get<A: 'static>(
-        &self,
-        key: CapabilityKey<A>,
-    ) -> Result<Option<&A>, CapabilityAccessError> {
+    pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Result<Option<&A>, CapabilityAccessError> {
         self.lookup(key).into_adapter()
     }
 
@@ -192,11 +186,7 @@ impl TypeCapabilities {
         if !descriptor.has_adapter() {
             return CapabilityLookup::FactOnly(descriptor);
         }
-        CapabilityLookup::Found(
-            descriptor
-                .get(&key)
-                .expect("declared adapter contract must downcast"),
-        )
+        CapabilityLookup::Found(descriptor.get(&key).expect("declared adapter contract must downcast"))
     }
 
     /// Finds a capability descriptor by its stable textual ID without

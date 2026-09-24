@@ -133,12 +133,6 @@ pub fn check(unbounded: &[u8]) {
     }
     assert!(conflicting.build().is_err());
     assert_eq!(observations(&first), before);
-    assert_eq!(
-        first.capability(descriptor(0), key(0)).unwrap(),
-        Some(&value)
-    );
-    assert_eq!(
-        second.capability(descriptor(0), key(0)).unwrap(),
-        Some(&(value + 1))
-    );
+    assert_eq!(first.capability(descriptor(0), key(0)).unwrap(), Some(&value));
+    assert_eq!(second.capability(descriptor(0), key(0)).unwrap(), Some(&(value + 1)));
 }

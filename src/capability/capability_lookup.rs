@@ -45,10 +45,7 @@ impl<'a, A: 'static> CapabilityLookup<'a, A> {
                 id: *descriptor.id(),
                 adapter_type: descriptor.adapter_type(),
             }),
-            Self::AdapterTypeMismatch {
-                descriptor,
-                expected,
-            } => Err(CapabilityAccessError::AdapterTypeMismatch {
+            Self::AdapterTypeMismatch { descriptor, expected } => Err(CapabilityAccessError::AdapterTypeMismatch {
                 id: *descriptor.id(),
                 expected,
                 actual: descriptor.adapter_type(),

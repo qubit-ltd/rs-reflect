@@ -80,9 +80,7 @@ pub enum InvocationErrorKind {
         parameter_indices: Box<[usize]>,
     },
     /// A name refers to a wildcard or destructuring parameter.
-    #[error(
-        "invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`"
-    )]
+    #[error("invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`")]
     NamedArgumentUnavailable {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,

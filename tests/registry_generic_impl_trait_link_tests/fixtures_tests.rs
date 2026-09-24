@@ -60,9 +60,7 @@ use self::path_traits::__qubit_reflect_trait_definition_ImportedAliasTrait;
 use self::path_traits::__qubit_reflect_trait_definition_RelativeQualifiedTrait;
 
 #[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_CrateQualifiedTrait)]
-impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait
-    for CrateQualifiedTarget<T>
-{
+impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait for CrateQualifiedTarget<T> {
     /// Returns the crate-qualified fixture value.
     fn crate_qualified_value(&self) -> usize {
         1
@@ -116,8 +114,8 @@ mod nested_impl {
 /// Verifies explicit providers resolve every generic trait implementation.
 #[test]
 fn test_generic_impl_definition_resolves_explicit_trait_providers() {
-    let registry = ReflectRegistry::initialize()
-        .expect("qualified generic trait impl definitions must resolve uniquely");
+    let registry =
+        ReflectRegistry::initialize().expect("qualified generic trait impl definitions must resolve uniquely");
     let mut resolved = registry
         .impl_definitions()
         .iter()

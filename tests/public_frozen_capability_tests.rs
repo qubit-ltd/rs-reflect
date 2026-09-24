@@ -41,9 +41,7 @@ fn empty() -> Result<&'static TypeCapabilities, CapabilityConflict> {
 fn populated() -> Result<&'static TypeCapabilities, CapabilityConflict> {
     POPULATED_CALLS.fetch_add(1, Ordering::SeqCst);
     static SET: OnceLock<TypeCapabilities> = OnceLock::new();
-    Ok(SET.get_or_init(|| {
-        TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(key(), 3)]).unwrap()
-    }))
+    Ok(SET.get_or_init(|| TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(key(), 3)]).unwrap()))
 }
 
 impl Reflect for Empty {
@@ -55,8 +53,7 @@ impl Reflect for Empty {
 
 impl Reflect for Populated {
     fn type_descriptor() -> &'static TypeDescriptor {
-        static DESCRIPTOR: TypeDescriptor =
-            opaque_root::<Populated>("Populated").with_capabilities(populated);
+        static DESCRIPTOR: TypeDescriptor = opaque_root::<Populated>("Populated").with_capabilities(populated);
         &DESCRIPTOR
     }
 }
@@ -76,9 +73,7 @@ fn test_frozen_empty_and_populated_queries_never_execute_factories() {
         for descriptor in [Empty::type_descriptor(), Populated::type_descriptor()] {
             let _ = registry.capabilities(descriptor).unwrap();
             let _ = registry.capability(descriptor, key()).unwrap();
-            let _ = registry
-                .capability_by_id(descriptor, "example.frozen")
-                .unwrap();
+            let _ = registry.capability_by_id(descriptor, "example.frozen").unwrap();
         }
         assert_eq!(registry.types_with_capability(key()).count(), 1);
     }

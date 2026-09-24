@@ -84,8 +84,7 @@ impl<'a> DynamicRef<'a, Local> {
     /// Returns `false` for the dedicated `str` variant.
     #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
-        self.as_any()
-            .is_some_and(|value| (value as &dyn Any).is::<T>())
+        self.as_any().is_some_and(|value| (value as &dyn Any).is::<T>())
     }
 
     /// Returns the stored `Any` value as `T` when its exact type matches.
@@ -98,8 +97,7 @@ impl<'a> DynamicRef<'a, Local> {
     /// either unavailable case.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-        self.as_any()
-            .and_then(|value| (value as &dyn Any).downcast_ref::<T>())
+        self.as_any().and_then(|value| (value as &dyn Any).downcast_ref::<T>())
     }
 
     /// Consumes this wrapper and returns the original shared borrow when its
@@ -120,9 +118,9 @@ impl<'a> DynamicRef<'a, Local> {
     pub fn downcast<T: 'static>(self) -> Result<&'a T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            LocalRefStorage::Any(value) if value.is::<T>() => Ok(value
-                .downcast_ref::<T>()
-                .expect("the exact type ID was checked")),
+            LocalRefStorage::Any(value) if value.is::<T>() => {
+                Ok(value.downcast_ref::<T>().expect("the exact type ID was checked"))
+            }
             LocalRefStorage::Any(value) => Err(Self {
                 storage: LocalRefStorage::Any(value),
                 marker,
@@ -242,8 +240,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns `false` for the dedicated `str` variant.
     #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
-        self.as_any()
-            .is_some_and(|value| (value as &dyn Any).is::<T>())
+        self.as_any().is_some_and(|value| (value as &dyn Any).is::<T>())
     }
 
     /// Returns the stored `Any` value as `T` when its exact type matches.
@@ -256,8 +253,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// either unavailable case.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-        self.as_any()
-            .and_then(|value| (value as &dyn Any).downcast_ref::<T>())
+        self.as_any().and_then(|value| (value as &dyn Any).downcast_ref::<T>())
     }
 
     /// Consumes this wrapper and returns the original thread-safe shared borrow
@@ -278,8 +274,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     pub fn downcast<T: 'static>(self) -> Result<&'a T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            ThreadSafeRefStorage::Any(value) if (value as &dyn Any).is::<T>() => Ok((value
-                as &dyn Any)
+            ThreadSafeRefStorage::Any(value) if (value as &dyn Any).is::<T>() => Ok((value as &dyn Any)
                 .downcast_ref::<T>()
                 .expect("the exact type ID was checked")),
             ThreadSafeRefStorage::Any(value) => Err(Self {

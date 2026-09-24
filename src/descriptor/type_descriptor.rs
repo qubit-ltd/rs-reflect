@@ -232,9 +232,7 @@ impl TypeDescriptor {
     ///
     /// Returns the construction error if validation fails or this descriptor
     /// has no constructor.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
@@ -246,10 +244,7 @@ impl TypeDescriptor {
 
     /// Creates a primitive root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_primitive<T: ?Sized + 'static>(
-        query_name: &'static str,
-        kind: PrimitiveKind,
-    ) -> Self {
+    pub(crate) const fn new_primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Primitive(PrimitiveTypeDescriptor::new(kind)),
@@ -260,10 +255,7 @@ impl TypeDescriptor {
 
     /// Creates a text root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_text<T: ?Sized + 'static>(
-        query_name: &'static str,
-        kind: TextKind,
-    ) -> Self {
+    pub(crate) const fn new_text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Text(TextTypeDescriptor::new(kind)),
@@ -296,10 +288,7 @@ impl TypeDescriptor {
 
     /// Attaches generic declaration and concrete-instance facts to this root.
     #[doc(hidden)]
-    pub const fn with_concrete_generic(
-        mut self,
-        generic: &'static ConcreteGenericDescriptor,
-    ) -> Self {
+    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
         self.generic = Some(generic);
         self
     }
@@ -307,10 +296,7 @@ impl TypeDescriptor {
     /// Links this concrete descriptor to its source-level generic declaration.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_type_definition(
-        mut self,
-        definition: fn() -> &'static TypeDefinitionDescriptor,
-    ) -> Self {
+    pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
         self.definition = Some(definition);
         self
     }
@@ -342,10 +328,7 @@ impl TypeDescriptor {
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
     /// data.
     #[doc(hidden)]
-    pub(crate) const fn new_tuple<T: ?Sized + 'static>(
-        query_name: &'static str,
-        elements: &'static [TypeRef],
-    ) -> Self {
+    pub(crate) const fn new_tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Tuple(TupleTypeDescriptor::new(elements)),
@@ -402,10 +385,7 @@ impl TypeDescriptor {
 
     /// Creates an optional root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_optional<T: ?Sized + 'static>(
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Optional(OptionalTypeDescriptor::new(element)),
@@ -588,10 +568,7 @@ impl TypeDescriptor {
 
     /// Creates a slice root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_slice<T: ?Sized + 'static>(
-        query_name: &'static str,
-        element: &'static TypeRef,
-    ) -> Self {
+    pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Slice(SliceTypeDescriptor::new(element)),
@@ -712,12 +689,7 @@ impl TypeDescriptor {
     /// Creates an intentionally opaque root for generated descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_opaque<T: ?Sized + 'static>(query_name: &'static str) -> Self {
-        Self::new::<T>(
-            query_name,
-            TypeDescriptorData::Opaque(OpaqueTypeView),
-            &[],
-            &[],
-        )
+        Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
     }
 
     /// Creates an opaque root with an explicit static capability resolver.
@@ -1049,9 +1021,7 @@ impl TypeDescriptor {
     /// `None` means the root has no direct field with that lookup name.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields
-            .iter()
-            .find(|field| field.query_name() == Some(name))
+        self.fields.iter().find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a direct field by source index.
@@ -1076,9 +1046,7 @@ impl TypeDescriptor {
     /// `None` means the root has no variant with that lookup name.
     #[must_use]
     pub fn variant(&self, name: &str) -> Option<&VariantDescriptor> {
-        self.variants
-            .iter()
-            .find(|variant| variant.query_name() == name)
+        self.variants.iter().find(|variant| variant.query_name() == name)
     }
 
     /// Returns a variant by source index.
@@ -1086,9 +1054,7 @@ impl TypeDescriptor {
     /// `None` means no visible variant has the source declaration index.
     #[must_use]
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor> {
-        self.variants
-            .iter()
-            .find(|variant| variant.index() == index)
+        self.variants.iter().find(|variant| variant.index() == index)
     }
 
     /// Finds the fieldless integer-`repr` variant with the exact numeric value.
@@ -1126,10 +1092,7 @@ impl TypeDescriptor {
     /// Returns implementations from an explicitly supplied immutable registry
     /// snapshot without consulting process-wide initialization.
     #[must_use]
-    pub fn impls_in<'registry>(
-        &self,
-        registry: &'registry ReflectRegistry,
-    ) -> &'registry [&'static ImplDescriptor] {
+    pub fn impls_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [&'static ImplDescriptor] {
         registry.implementations(self.type_id())
     }
 
