@@ -401,7 +401,11 @@ impl ReflectRegistry {
     ///
     /// # Errors
     ///
-    /// Returns an intrinsic conflict for an invalid unregistered descriptor.
+    /// Returns [`CapabilityAccessError::FactOnly`] when the descriptor has
+    /// facts but no adapter for the requested capability, or
+    /// [`CapabilityAccessError::AdapterTypeMismatch`] when the adapter type
+    /// does not match the typed key. Returns an intrinsic conflict for an
+    /// invalid unregistered descriptor.
     ///
     /// # Returns
     ///
