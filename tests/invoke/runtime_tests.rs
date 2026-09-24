@@ -135,21 +135,16 @@ mod invocation_runtime {
     }
 
     /// Returns one concrete reflected instance from the named-binding fixture.
-    fn named_invocation_method_by_name(
-        name: &str,
-    ) -> &'static reflect::descriptor::MethodInstanceDescriptor {
-        let registry = reflect::registry::ReflectRegistry::initialize()
-            .expect("the named invocation fixture must register");
-        let implementations = registry.implementations(
-            <NamedInvocationTarget as reflect::Reflect>::type_descriptor().type_id(),
-        );
-        let reflect::descriptor::MethodLookup::Unique(instance) =
-            reflect::descriptor::ImplDescriptor::lookup_method(
-                implementations,
-                reflect::descriptor::MethodQualifier::Inherent,
-                name,
-            )
-        else {
+    fn named_invocation_method_by_name(name: &str) -> &'static reflect::descriptor::MethodInstanceDescriptor {
+        let registry =
+            reflect::registry::ReflectRegistry::initialize().expect("the named invocation fixture must register");
+        let implementations =
+            registry.implementations(<NamedInvocationTarget as reflect::Reflect>::type_descriptor().type_id());
+        let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            reflect::descriptor::MethodQualifier::Inherent,
+            name,
+        ) else {
             panic!("the named invocation method must be uniquely discoverable")
         };
         instance
@@ -215,17 +210,17 @@ mod invocation_runtime {
         let suffix = argument
             .downcast_ref::<String>()
             .unwrap_or_else(|| unreachable!("validation guarantees argument type"));
-        Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(
-            format!("{}{}", counter.value, suffix),
-        )))
+        Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(format!(
+            "{}{}",
+            counter.value, suffix
+        ))))
     }
 
     /// Panics after validation to prove user panic propagation stays distinct.
     fn invoke_panicking<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let _validated =
-            invocation.validate(&method_identity(2), ReceiverExpectation::none(), &[])?;
+        let _validated = invocation.validate(&method_identity(2), ReceiverExpectation::none(), &[])?;
         panic!("user panic payload")
     }
 
@@ -234,11 +229,7 @@ mod invocation_runtime {
     fn invoke_label<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(3),
-            ReceiverExpectation::borrowed::<Counter>(),
-            &[],
-        )?;
+        let validated = invocation.validate(&method_identity(3), ReceiverExpectation::borrowed::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Ref(receiver)) = receiver else {
@@ -257,11 +248,8 @@ mod invocation_runtime {
     fn invoke_value_mut<'call>(
         invocation: Invocation<'call, Local>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(4),
-            ReceiverExpectation::borrowed_mut::<Counter>(),
-            &[],
-        )?;
+        let validated =
+            invocation.validate(&method_identity(4), ReceiverExpectation::borrowed_mut::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Mut(receiver)) = receiver else {
@@ -306,11 +294,7 @@ mod invocation_runtime {
         invocation: Invocation<'call, Local>,
         polls: Rc<Cell<usize>>,
     ) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-        let validated = invocation.validate(
-            &method_identity(6),
-            ReceiverExpectation::borrowed::<Counter>(),
-            &[],
-        )?;
+        let validated = invocation.validate(&method_identity(6), ReceiverExpectation::borrowed::<Counter>(), &[])?;
         let (receiver, arguments) = validated.into_parts();
         assert!(arguments.is_empty());
         let Some(InvocationReceiver::Ref(receiver)) = receiver else {
@@ -325,9 +309,7 @@ mod invocation_runtime {
                 origins: [BorrowOrigin::Receiver].into(),
             }
         };
-        Ok(InvocationOutput::Future(ReflectedFuture::<Local>::new(
-            future,
-        )))
+        Ok(InvocationOutput::Future(ReflectedFuture::<Local>::new(future)))
     }
 
     /// Polls one future exactly once without selecting an executor.
@@ -365,15 +347,13 @@ mod invocation_runtime {
             [InvocationArg::Mut(DynamicMut::<Local>::new(&mut suffix))],
         );
 
-        let output =
-            invoke_read(invocation).expect("mutable inputs may be read through shared borrows");
+        let output = invoke_read(invocation).expect("mutable inputs may be read through shared borrows");
 
         let InvocationOutput::Owned(value) = output else {
             panic!("the adapter should return an owned value")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<String>(value)
-                .unwrap_or_else(|_| panic!("output should be String")),
+            DynamicOwned::<Local>::downcast::<String>(value).unwrap_or_else(|_| panic!("output should be String")),
             "4 items"
         );
     }
@@ -401,8 +381,7 @@ mod invocation_runtime {
         let mut counter = Counter { value: 13 };
         let invocation = Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut counter), []);
 
-        let output =
-            invoke_value_mut(invocation).expect("mutable output should retain call lifetime");
+        let output = invoke_value_mut(invocation).expect("mutable output should retain call lifetime");
 
         let InvocationOutput::Mut { mut value, origin } = output else {
             panic!("adapter should return a mutable output")
@@ -419,12 +398,9 @@ mod invocation_runtime {
     #[test]
     fn test_validated_str_argument_can_produce_a_borrowed_str_output() {
         let text = String::from("borrowed text");
-        let invocation = Invocation::associated([InvocationArg::Ref(
-            DynamicRef::<Local>::new_str(text.as_str()),
-        )]);
+        let invocation = Invocation::associated([InvocationArg::Ref(DynamicRef::<Local>::new_str(text.as_str()))]);
 
-        let output = invoke_str_identity(invocation)
-            .expect("dedicated str input should preserve the call lifetime");
+        let output = invoke_str_identity(invocation).expect("dedicated str input should preserve the call lifetime");
 
         let InvocationOutput::Ref { value, origins } = output else {
             panic!("adapter should return a shared str output")
@@ -441,8 +417,8 @@ mod invocation_runtime {
         let polls = Rc::new(Cell::new(0));
         let invocation = Invocation::borrowed(DynamicRef::<Local>::new(&counter), []);
 
-        let output = invoke_label_async(invocation, Rc::clone(&polls))
-            .expect("async adapter should retain receiver borrow");
+        let output =
+            invoke_label_async(invocation, Rc::clone(&polls)).expect("async adapter should retain receiver borrow");
 
         assert_eq!(polls.get(), 0);
         let InvocationOutput::Future(mut future) = output else {
@@ -460,9 +436,8 @@ mod invocation_runtime {
     /// parameters.
     #[test]
     fn test_owned_input_is_not_implicitly_borrowed() {
-        let invocation = Invocation::associated([InvocationArg::Owned(
-            DynamicOwned::<Local>::new(String::from("owned")),
-        )]);
+        let invocation =
+            Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("owned")))]);
 
         let identity = method_identity(7);
         let failure = invocation
@@ -482,15 +457,14 @@ mod invocation_runtime {
             }
         ));
         let (_, arguments) = failure.into_recovery().into_parts();
-        let [InvocationArg::Owned(value)] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 1],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("recovery should preserve the argument")) else {
+        let [InvocationArg::Owned(value)] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 1]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("recovery should preserve the argument"))
+        else {
             panic!("recovery should preserve owned mode")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<String>(value)
-                .unwrap_or_else(|_| panic!("owned value should be intact")),
+            DynamicOwned::<Local>::downcast::<String>(value).unwrap_or_else(|_| panic!("owned value should be intact")),
             "owned"
         );
     }
@@ -502,15 +476,9 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(3_u32)),
-            ),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(3_u32))),
             InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(1_u8))),
-            InvocationBinding::named(
-                "second",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(2_u16)),
-            ),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(2_u16))),
         ]);
 
         let output = named_invocation_method()
@@ -538,15 +506,9 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(4_u8)),
-            ),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(4_u8))),
             InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(5_u16))),
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(6_u32)),
-            ),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(6_u32))),
         ]);
 
         let output = named_invocation_method()
@@ -574,18 +536,9 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8)),
-            ),
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(8_u8)),
-            ),
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(9_u32)),
-            ),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(8_u8))),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(9_u32))),
         ]);
 
         let result = named_invocation_method()
@@ -605,8 +558,8 @@ mod invocation_runtime {
                 parameter_index: 0,
             }
         ));
-        let failure_source = std::error::Error::source(&failure)
-            .expect("an invocation failure must expose its structured error");
+        let failure_source =
+            std::error::Error::source(&failure).expect("an invocation failure must expose its structured error");
         let invocation_error = failure_source
             .downcast_ref::<reflect::invoke::InvocationError>()
             .expect("the first source must be InvocationError");
@@ -621,10 +574,9 @@ mod invocation_runtime {
         assert_eq!(failure.recovery().argument_name(1), Some("first"));
         assert_eq!(failure.recovery().argument_name(2), Some("third"));
         let (_, arguments) = failure.into_recovery().into_parts();
-        let [first, second, third] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 3],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
+        let [first, second, third] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
         let InvocationArg::Owned(first) = first else {
             panic!("the first argument must remain owned")
         };
@@ -635,18 +587,15 @@ mod invocation_runtime {
             panic!("the third argument must remain owned")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u8>(first)
-                .unwrap_or_else(|_| panic!("the first value must be intact")),
+            DynamicOwned::<Local>::downcast::<u8>(first).unwrap_or_else(|_| panic!("the first value must be intact")),
             7
         );
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u8>(second)
-                .unwrap_or_else(|_| panic!("the second value must be intact")),
+            DynamicOwned::<Local>::downcast::<u8>(second).unwrap_or_else(|_| panic!("the second value must be intact")),
             8
         );
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u32>(third)
-                .unwrap_or_else(|_| panic!("the third value must be intact")),
+            DynamicOwned::<Local>::downcast::<u32>(third).unwrap_or_else(|_| panic!("the third value must be intact")),
             9
         );
     }
@@ -657,10 +606,7 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32)),
-            ),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32))),
             InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(10_u8))),
             InvocationBinding::named(
                 "second",
@@ -687,10 +633,9 @@ mod invocation_runtime {
         assert_eq!(failure.recovery().argument_name(1), None);
         assert_eq!(failure.recovery().argument_name(2), Some("second"));
         let (_, arguments) = failure.into_recovery().into_parts();
-        let [third, first, second] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 3],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
+        let [third, first, second] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all original arguments must be recovered"));
         let InvocationArg::Owned(third) = third else {
             panic!("the first caller argument must remain owned")
         };
@@ -725,19 +670,11 @@ mod invocation_runtime {
         let method = named_invocation_method_by_name("encode_patterns");
         assert_eq!(method.effective_method().parameters()[0].name(), None);
         assert_eq!(method.effective_method().parameters()[1].name(), None);
-        assert_eq!(
-            method.effective_method().parameters()[2].name(),
-            Some("named")
-        );
+        assert_eq!(method.effective_method().parameters()[2].name(), Some("named"));
         let invocation = Invocation::associated_bindings([
             InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(0_u8))),
-            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((
-                13_u16, 14_u16,
-            )))),
-            InvocationBinding::named(
-                "named",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(15_u32)),
-            ),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((13_u16, 14_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(15_u32))),
         ]);
 
         let output = method
@@ -766,13 +703,8 @@ mod invocation_runtime {
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
             InvocationBinding::named("_", InvocationArg::Owned(DynamicOwned::<Local>::new(16_u8))),
-            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((
-                17_u16, 18_u16,
-            )))),
-            InvocationBinding::named(
-                "named",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(19_u32)),
-            ),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((17_u16, 18_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(19_u32))),
         ]);
 
         let result = named_invocation_method_by_name("encode_patterns")
@@ -801,14 +733,8 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(20_u8)),
-            ),
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(22_u32)),
-            ),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(20_u8))),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(22_u32))),
         ]);
 
         let result = named_invocation_method()
@@ -838,18 +764,9 @@ mod invocation_runtime {
         let _guard = lock_named_invocation_fixture();
         NAMED_INVOCATION_CALLS.store(0, Ordering::SeqCst);
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "third",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(25_u32)),
-            ),
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(23_u8)),
-            ),
-            InvocationBinding::named(
-                "second",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(24_u16)),
-            ),
+            InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(25_u32))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(23_u8))),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(24_u16))),
         ]);
 
         let output = named_invocation_method_by_name("encode_catching")
@@ -881,18 +798,9 @@ mod invocation_runtime {
         let invocation = reflect::invoke::PinnedRefInvocation::from_bindings(
             target.as_ref(),
             [
-                InvocationBinding::named(
-                    "third",
-                    InvocationArg::Owned(DynamicOwned::<Local>::new(28_u32)),
-                ),
-                InvocationBinding::named(
-                    "first",
-                    InvocationArg::Owned(DynamicOwned::<Local>::new(26_u8)),
-                ),
-                InvocationBinding::named(
-                    "second",
-                    InvocationArg::Owned(DynamicOwned::<Local>::new(27_u16)),
-                ),
+                InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(28_u32))),
+                InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(26_u8))),
+                InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(27_u16))),
             ],
         );
 
@@ -924,14 +832,8 @@ mod invocation_runtime {
         let invocation = reflect::invoke::PinnedMutInvocation::from_bindings(
             target.as_mut(),
             [
-                InvocationBinding::named(
-                    "third",
-                    InvocationArg::Owned(DynamicOwned::<Local>::new(31_u32)),
-                ),
-                InvocationBinding::named(
-                    "first",
-                    InvocationArg::Owned(DynamicOwned::<Local>::new(29_u8)),
-                ),
+                InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(31_u32))),
+                InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(29_u8))),
                 InvocationBinding::named(
                     "second",
                     InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("wrong"))),
@@ -980,14 +882,8 @@ mod invocation_runtime {
             .adapter()
             .expect("the same-typed fixture must have a generated adapter");
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::named(
-                "second",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(34_u8)),
-            ),
-            InvocationBinding::named(
-                "first",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(33_u8)),
-            ),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(34_u8))),
+            InvocationBinding::named("first", InvocationArg::Owned(DynamicOwned::<Local>::new(33_u8))),
         ]);
 
         let result = adapter
@@ -1024,13 +920,8 @@ mod invocation_runtime {
             reflect::descriptor::ParameterPatternDescriptor::Destructure(_)
         ));
         let invocation = Invocation::associated_bindings([
-            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((
-                35_u16, 36_u16,
-            )))),
-            InvocationBinding::named(
-                "named",
-                InvocationArg::Owned(DynamicOwned::<Local>::new(37_u32)),
-            ),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new((35_u16, 36_u16)))),
+            InvocationBinding::named("named", InvocationArg::Owned(DynamicOwned::<Local>::new(37_u32))),
         ]);
 
         let output = method
@@ -1101,10 +992,9 @@ mod invocation_runtime {
                 .unwrap_or_else(|_| panic!("receiver should remain intact")),
             Counter { value: 9 }
         );
-        let [first, second, third] = <Vec<InvocationArg<'_, Local>> as TryInto<
-            [InvocationArg<'_, Local>; 3],
-        >>::try_into(arguments.into_vec())
-        .unwrap_or_else(|_| panic!("all arguments should be recovered"));
+        let [first, second, third] =
+            <Vec<InvocationArg<'_, Local>> as TryInto<[InvocationArg<'_, Local>; 3]>>::try_into(arguments.into_vec())
+                .unwrap_or_else(|_| panic!("all arguments should be recovered"));
         let InvocationArg::Owned(first) = first else {
             panic!("first argument should remain owned")
         };
@@ -1115,8 +1005,7 @@ mod invocation_runtime {
             panic!("third argument should remain owned")
         };
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u8>(first)
-                .unwrap_or_else(|_| panic!("first value should be intact")),
+            DynamicOwned::<Local>::downcast::<u8>(first).unwrap_or_else(|_| panic!("first value should be intact")),
             11
         );
         assert_eq!(
@@ -1125,8 +1014,7 @@ mod invocation_runtime {
             "second"
         );
         assert_eq!(
-            DynamicOwned::<Local>::downcast::<u32>(third)
-                .unwrap_or_else(|_| panic!("third value should be intact")),
+            DynamicOwned::<Local>::downcast::<u32>(third).unwrap_or_else(|_| panic!("third value should be intact")),
             33
         );
     }
@@ -1159,10 +1047,7 @@ mod invocation_runtime {
             .expect_err("one positional argument is required");
         assert!(matches!(
             failure.error().kind(),
-            InvocationErrorKind::ArgumentCountMismatch {
-                expected: 1,
-                actual: 0
-            }
+            InvocationErrorKind::ArgumentCountMismatch { expected: 1, actual: 0 }
         ));
     }
 
@@ -1185,10 +1070,7 @@ mod invocation_runtime {
             panic!("shared output should retain its variant")
         };
         assert_eq!(value.downcast_ref::<String>(), Some(&text));
-        assert_eq!(
-            origins.as_ref(),
-            &[BorrowOrigin::Receiver, BorrowOrigin::Parameter(1)]
-        );
+        assert_eq!(origins.as_ref(), &[BorrowOrigin::Receiver, BorrowOrigin::Parameter(1)]);
         let InvocationOutput::Mut { mut value, origin } = mutable else {
             panic!("mutable output should retain its variant")
         };
@@ -1216,8 +1098,7 @@ mod invocation_runtime {
         let mut reflected = ReflectedFuture::<Local>::new(future);
 
         assert_eq!(polls.get(), 0);
-        let Poll::Ready(InvocationOutput::Ref { value, origins }) = poll_once(&mut reflected)
-        else {
+        let Poll::Ready(InvocationOutput::Ref { value, origins }) = poll_once(&mut reflected) else {
             panic!("the simple future should complete on its first poll")
         };
         assert_eq!(
@@ -1252,8 +1133,7 @@ mod invocation_runtime {
             panic!("thread-safe future should complete")
         };
         assert_eq!(
-            DynamicOwned::<ThreadSafe>::downcast::<u32>(value)
-                .unwrap_or_else(|_| panic!("output should be u32")),
+            DynamicOwned::<ThreadSafe>::downcast::<u32>(value).unwrap_or_else(|_| panic!("output should be u32")),
             17
         );
     }
@@ -1271,14 +1151,8 @@ mod invocation_runtime {
             <Local as InvocationMode>::owned_type_id(&local_owned),
             TypeId::of::<u8>()
         );
-        assert_eq!(
-            <Local as InvocationMode>::ref_type_id(&local_ref),
-            TypeId::of::<u16>()
-        );
-        assert_eq!(
-            <Local as InvocationMode>::mut_type_id(&local_mut),
-            TypeId::of::<u32>()
-        );
+        assert_eq!(<Local as InvocationMode>::ref_type_id(&local_ref), TypeId::of::<u16>());
+        assert_eq!(<Local as InvocationMode>::mut_type_id(&local_mut), TypeId::of::<u32>());
         assert_eq!(
             <Local as InvocationMode>::ref_type_id(&DynamicRef::<Local>::new_str("text")),
             TypeId::of::<str>(),
@@ -1323,14 +1197,10 @@ mod invocation_runtime {
             0,
             FragmentIdentity::new("qubit-reflect", "invoke::runtime_tests", 1, 1, "method", 7),
         );
-        let caught =
-            InvocationPanic::new(method_identity.clone(), Box::new(String::from("caught")));
+        let caught = InvocationPanic::new(method_identity.clone(), Box::new(String::from("caught")));
         assert_eq!(caught.method_identity(), &method_identity);
         assert_eq!(
-            caught
-                .payload()
-                .downcast_ref::<String>()
-                .map(String::as_str),
+            caught.payload().downcast_ref::<String>().map(String::as_str),
             Some("caught")
         );
         assert_eq!(

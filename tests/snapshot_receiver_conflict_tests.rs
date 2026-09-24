@@ -73,9 +73,7 @@ fn global_adapter<'call>(
     receiver: InvocationReceiver<'call, Local>,
 ) -> Result<Pin<Rc<Global>>, InvocationReceiver<'call, Local>> {
     match receiver {
-        InvocationReceiver::Owned(value) => value
-            .downcast::<Pin<Rc<Global>>>()
-            .map_err(InvocationReceiver::Owned),
+        InvocationReceiver::Owned(value) => value.downcast::<Pin<Rc<Global>>>().map_err(InvocationReceiver::Owned),
         receiver => Err(receiver),
     }
 }
@@ -89,10 +87,7 @@ fn isolated(target: &'static TypeDescriptor) -> ReflectRegistry {
     let global = ReflectRegistry::initialize().unwrap();
     let mut builder = RegistrySnapshotBuilder::new();
     for implementation in global.implementations(target.type_id()) {
-        builder.add_impl(
-            implementation,
-            implementation.definition().fragment_identity().clone(),
-        );
+        builder.add_impl(implementation, implementation.definition().fragment_identity().clone());
     }
     builder.build().unwrap()
 }
@@ -105,15 +100,8 @@ fn test_intrinsic_conflict_survives_generated_snapshot_invocation() {
     let MethodLookup::Unique(method) = target.methods_named_in(&registry, "read") else {
         panic!("method")
     };
-    let input = Invocation::owned(
-        ReflectedOwned::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))),
-        [],
-    );
-    let failure = method
-        .invoke_local(&registry, input)
-        .unwrap()
-        .err()
-        .unwrap();
+    let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))), []);
+    let failure = method.invoke_local(&registry, input).unwrap().err().unwrap();
     let InvocationErrorKind::CapabilityResolution(actual) = failure.error().kind() else {
         panic!("original conflict")
     };
@@ -147,11 +135,7 @@ fn test_missing_local_capability_does_not_use_a_valid_global_adapter() {
         panic!("method")
     };
     let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Global))), []);
-    let failure = method
-        .invoke_local(&registry, input)
-        .unwrap()
-        .err()
-        .unwrap();
+    let failure = method.invoke_local(&registry, input).unwrap().err().unwrap();
     assert!(matches!(
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterUnavailable { .. }

@@ -24,9 +24,7 @@ use qubit_reflect::registry::ReflectRegistry;
 struct ExplicitRegistration;
 
 static EXPLICIT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::opaque_root::<ExplicitRegistration>(
-        "explicit_registration",
-    );
+    reflect::__private::codegen_v3::descriptor::opaque_root::<ExplicitRegistration>("explicit_registration");
 
 impl Reflect for ExplicitRegistration {
     /// Returns the exact root submitted by the explicit registration fixture.
@@ -91,8 +89,7 @@ fn expected_builtin_roots() -> [&'static TypeDescriptor; 20] {
 /// preserves exact root identity across all public indexes.
 #[test]
 fn test_builtin_registry_initializes_without_caller_prequery() {
-    let registry =
-        ReflectRegistry::initialize().expect("static built-in fragments must initialize");
+    let registry = ReflectRegistry::initialize().expect("static built-in fragments must initialize");
     let expected = expected_builtin_roots();
 
     assert_eq!(registry.types().len(), expected.len() + 1);
@@ -103,10 +100,7 @@ fn test_builtin_registry_initializes_without_caller_prequery() {
                 .expect("every required built-in must be indexed by TypeId"),
             descriptor,
         ));
-        let type_name_matches: Vec<_> = registry
-            .find_by_type_name(descriptor.type_name())
-            .into_iter()
-            .collect();
+        let type_name_matches: Vec<_> = registry.find_by_type_name(descriptor.type_name()).into_iter().collect();
         assert_eq!(type_name_matches.len(), 1);
         assert!(std::ptr::eq(type_name_matches[0], descriptor));
         let query_name_matches: Vec<_> = registry
@@ -144,8 +138,7 @@ fn test_builtin_registry_initializes_without_caller_prequery() {
 fn test_builtin_registry_remains_frozen_after_composite_queries() {
     type Composite = Option<Vec<ExplicitRegistration>>;
 
-    let registry =
-        ReflectRegistry::initialize().expect("static built-in fragments must initialize");
+    let registry = ReflectRegistry::initialize().expect("static built-in fragments must initialize");
     let public_surface = |registry: &'static ReflectRegistry| {
         registry
             .types()
@@ -165,13 +158,7 @@ fn test_builtin_registry_remains_frozen_after_composite_queries() {
                     .into_iter()
                     .map(|candidate| candidate as *const TypeDescriptor as usize)
                     .collect();
-                (
-                    descriptor.type_id(),
-                    address,
-                    by_id,
-                    by_type_name,
-                    by_query_name,
-                )
+                (descriptor.type_id(), address, by_id, by_type_name, by_query_name)
             })
             .collect::<Vec<_>>()
     };

@@ -26,11 +26,7 @@ pub struct FieldSetRecovery<M: Mode = Local> {
 
 impl<M: Mode> FieldSetRecovery<M> {
     /// Creates recovery for one field replacement value.
-    pub(crate) const fn new(
-        field: FieldIdentity,
-        query_name: Option<&'static str>,
-        value: DynamicOwned<M>,
-    ) -> Self {
+    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: DynamicOwned<M>) -> Self {
         Self {
             field,
             query_name,

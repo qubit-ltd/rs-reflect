@@ -137,10 +137,7 @@ impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
     #[doc(hidden)]
     #[must_use]
-    pub const fn for_type(
-        target: &'static TypeDescriptor,
-        descriptors: Vec<CapabilityDescriptor>,
-    ) -> Self {
+    pub const fn for_type(target: &'static TypeDescriptor, descriptors: Vec<CapabilityDescriptor>) -> Self {
         Self {
             target: CapabilityRegistrationTarget::Type(target),
             descriptors,
@@ -174,9 +171,7 @@ impl CapabilityRegistration {
     #[inline(always)]
     pub fn target(&self) -> CapabilityTarget {
         match self.target {
-            CapabilityRegistrationTarget::Type(descriptor) => {
-                CapabilityTarget::Type(descriptor.type_id())
-            }
+            CapabilityRegistrationTarget::Type(descriptor) => CapabilityTarget::Type(descriptor.type_id()),
             CapabilityRegistrationTarget::TypeId(type_id) => CapabilityTarget::Type(type_id),
             CapabilityRegistrationTarget::TypeDefinition(descriptor) => {
                 CapabilityTarget::TypeDefinition(descriptor.id())
@@ -190,8 +185,7 @@ impl CapabilityRegistration {
     pub(crate) const fn type_descriptor(&self) -> Option<&'static TypeDescriptor> {
         match self.target {
             CapabilityRegistrationTarget::Type(descriptor) => Some(descriptor),
-            CapabilityRegistrationTarget::TypeId(_)
-            | CapabilityRegistrationTarget::TypeDefinition(_) => None,
+            CapabilityRegistrationTarget::TypeId(_) | CapabilityRegistrationTarget::TypeDefinition(_) => None,
         }
     }
 
@@ -244,9 +238,7 @@ impl FragmentPayload {
             Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
             Self::TypeDefinition(descriptor) => RuntimeIdentity::TypeDefinition(descriptor.id()),
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
-            Self::ImplDefinition(descriptor) => {
-                RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone())
-            }
+            Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
             Self::Capability(registration) => RuntimeIdentity::Capabilities(registration.target()),
         }

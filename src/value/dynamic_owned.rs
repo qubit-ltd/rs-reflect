@@ -95,8 +95,7 @@ impl DynamicOwned<Local> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its local `Any` boundary.
@@ -148,9 +147,7 @@ impl DynamicOwned<ThreadSafe> {
     /// Returns the exact identity of the owned value.
     #[must_use]
     pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any()
-            .expect("owned values are Any-compatible")
-            .type_id()
+        self.as_any().expect("owned values are Any-compatible").type_id()
     }
     /// Wraps `value` as a thread-safe owned dynamic value.
     ///
@@ -195,8 +192,7 @@ impl DynamicOwned<ThreadSafe> {
     ///
     /// Returns `None` when the requested type differs from the stored type.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut()
-            .and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Returns the stored value through its thread-safe `Any` boundary.

@@ -114,8 +114,7 @@ fn test_type_capabilities_preserve_unknown_capabilities_in_stable_order() {
         CapabilityDescriptor::without_adapter(alpha_key),
     ];
 
-    let capabilities =
-        TypeCapabilities::try_new(descriptors).expect("distinct capability IDs must be accepted");
+    let capabilities = TypeCapabilities::try_new(descriptors).expect("distinct capability IDs must be accepted");
 
     let ids: Vec<_> = capabilities
         .descriptors()
@@ -124,18 +123,10 @@ fn test_type_capabilities_preserve_unknown_capabilities_in_stable_order() {
         .collect();
     assert_eq!(ids, ["example.capability.alpha", "example.capability.zeta"]);
     assert!(!capabilities.descriptors()[0].has_adapter());
-    assert_eq!(
-        capabilities.descriptors()[1].adapter_type(),
-        zeta_key.adapter_type()
-    );
-    assert!(
-        format!("{:?}", capabilities.descriptors()[1].clone()).contains("CapabilityDescriptor")
-    );
+    assert_eq!(capabilities.descriptors()[1].adapter_type(), zeta_key.adapter_type());
+    assert!(format!("{:?}", capabilities.descriptors()[1].clone()).contains("CapabilityDescriptor"));
     assert!(format!("{zeta_key:?}").contains("CapabilityKey"));
-    assert_eq!(
-        capabilities.get(zeta_key).unwrap(),
-        Some(&TextAdapter("zeta"))
-    );
+    assert_eq!(capabilities.get(zeta_key).unwrap(), Some(&TextAdapter("zeta")));
     assert!(capabilities.get(alpha_key).is_err());
 }
 
@@ -185,14 +176,10 @@ fn test_typed_capability_lookup_reports_all_contract_states() {
     let borrowed_adapter: BorrowedAdapter = borrow_adapter;
 
     let found_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.found"));
-    let fact_key =
-        CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.fact.only"));
-    let mismatch_key =
-        CapabilityKey::<StaticAdapter>::new(external_id("example.capability.mismatch"));
-    let declared_mismatch_key =
-        CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.mismatch"));
-    let missing_key =
-        CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.missing"));
+    let fact_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.fact.only"));
+    let mismatch_key = CapabilityKey::<StaticAdapter>::new(external_id("example.capability.mismatch"));
+    let declared_mismatch_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.mismatch"));
+    let missing_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.missing"));
     let capabilities = TypeCapabilities::try_new(vec![
         CapabilityDescriptor::with_adapter(found_key, borrowed_adapter),
         CapabilityDescriptor::without_adapter(fact_key),
@@ -214,23 +201,15 @@ fn test_typed_capability_lookup_reports_all_contract_states() {
         capabilities.get(mismatch_key),
         Err(CapabilityAccessError::AdapterTypeMismatch { id, .. }) if id.as_str() == "example.capability.mismatch"
     ));
-    assert!(
-        capabilities
-            .get(found_key)
-            .expect("found lookup is valid")
-            .is_some()
-    );
+    assert!(capabilities.get(found_key).expect("found lookup is valid").is_some());
 }
 
 /// Confirms built-in clone and default adapters retain exact dynamic type
 /// checks.
 #[test]
 fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
-    let capabilities = TypeCapabilities::try_new(vec![
-        clone_descriptor::<String>(),
-        default_descriptor::<String>(),
-    ])
-    .expect("the built-in capability IDs are distinct");
+    let capabilities = TypeCapabilities::try_new(vec![clone_descriptor::<String>(), default_descriptor::<String>()])
+        .expect("the built-in capability IDs are distinct");
 
     let clone_adapter = capabilities
         .get(clone_key())
@@ -239,10 +218,7 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
     let cloned = clone_adapter
         .clone_owned(&ReflectedOwned::new(String::from("clone me")))
         .expect("the dynamic value has the registered type");
-    assert_eq!(
-        cloned.downcast_ref::<String>().map(String::as_str),
-        Some("clone me")
-    );
+    assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("clone me"));
 
     let mismatch = match clone_adapter.clone_owned(&ReflectedOwned::new(17_u32)) {
         Ok(_) => panic!("an adapter must reject a different concrete type"),
@@ -256,10 +232,7 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
         .unwrap()
         .expect("the default adapter must be present")
         .create();
-    assert_eq!(
-        defaulted.downcast_ref::<String>().map(String::as_str),
-        Some("")
-    );
+    assert_eq!(defaulted.downcast_ref::<String>().map(String::as_str), Some(""));
 }
 
 /// Confirms the registry resolves intrinsic descriptor capabilities.
@@ -427,8 +400,5 @@ fn test_reflected_type_registration_preserves_descriptor_root_identity() {
         .get(TypeId::of::<ReflectedRoot>())
         .expect("the exact concrete reflected type must be registered");
 
-    assert!(std::ptr::eq(
-        registered,
-        TypeDescriptor::of::<ReflectedRoot>()
-    ));
+    assert!(std::ptr::eq(registered, TypeDescriptor::of::<ReflectedRoot>()));
 }

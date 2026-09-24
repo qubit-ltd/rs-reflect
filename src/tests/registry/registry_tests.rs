@@ -22,9 +22,7 @@ use crate::registry::RegistrySnapshotBuilder;
 /// states across every public registry view.
 #[test]
 fn test_empty_snapshot_exercises_public_lookup_views() {
-    let registry = RegistrySnapshotBuilder::new()
-        .build()
-        .expect("empty snapshot is valid");
+    let registry = RegistrySnapshotBuilder::new().build().expect("empty snapshot is valid");
     let descriptor = TypeDescriptor::of::<u8>();
 
     assert!(registry.get(TypeId::of::<u8>()).is_none());
@@ -33,23 +31,9 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
     assert!(registry.types().is_empty());
     assert!(registry.definitions().is_empty());
     assert!(registry.definition(TypeDefinitionId::of::<u8>()).is_none());
-    assert!(
-        registry
-            .find_definitions_by_rust_path("u8")
-            .only()
-            .is_none()
-    );
-    assert!(
-        registry
-            .find_definitions_by_query_name("u8")
-            .only()
-            .is_none()
-    );
-    assert!(
-        registry
-            .definition_source(TypeDefinitionId::of::<u8>())
-            .is_none()
-    );
+    assert!(registry.find_definitions_by_rust_path("u8").only().is_none());
+    assert!(registry.find_definitions_by_query_name("u8").only().is_none());
+    assert!(registry.definition_source(TypeDefinitionId::of::<u8>()).is_none());
     assert_eq!(registry.definitions_with_identity().count(), 0);
     assert_eq!(registry.types_with_identity().count(), 0);
     assert!(registry.type_source(TypeId::of::<u8>()).is_none());
@@ -86,9 +70,7 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .is_none()
     );
     assert_eq!(
-        registry
-            .types_with_capability(crate::capability::clone_key())
-            .count(),
+        registry.types_with_capability(crate::capability::clone_key()).count(),
         0
     );
     assert_eq!(
@@ -105,12 +87,7 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .find_impl_definitions_by_target(&TypeExpression::Parameter("T".into()))
             .is_empty()
     );
-    assert!(
-        registry
-            .effective_view(TypeId::of::<u8>())
-            .implementations()
-            .is_empty()
-    );
+    assert!(registry.effective_view(TypeId::of::<u8>()).implementations().is_empty());
     assert!(
         registry
             .impl_definition_trait(&ImplDefinitionDescriptor::new_unresolved_trait(
@@ -118,9 +95,7 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
                 TypeExpression::Parameter("T".into()),
                 "Trait",
                 None,
-                Box::leak(Box::new(
-                    crate::expression::GenericDefinitionDescriptor::new([], [])
-                )),
+                Box::leak(Box::new(crate::expression::GenericDefinitionDescriptor::new([], []))),
             ))
             .is_none()
     );
@@ -132,10 +107,5 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .is_none()
     );
     assert!(registry.trait_definition_by_path("missing").is_none());
-    assert!(
-        registry
-            .find_trait_definitions_by_path("missing")
-            .only()
-            .is_none()
-    );
+    assert!(registry.find_trait_definitions_by_path("missing").only().is_none());
 }

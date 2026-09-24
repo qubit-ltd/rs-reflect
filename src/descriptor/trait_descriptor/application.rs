@@ -94,10 +94,7 @@ pub struct TraitImplPayload {
 impl TraitImplPayload {
     /// Creates a payload for one reflected trait declaration.
     #[doc(hidden)]
-    pub const fn new(
-        definition: &'static TraitDefinitionDescriptor,
-        applied: &'static TraitDescriptor,
-    ) -> Self {
+    pub const fn new(definition: &'static TraitDefinitionDescriptor, applied: &'static TraitDescriptor) -> Self {
         Self {
             definition,
             applied,
@@ -133,9 +130,7 @@ impl TraitImplPayload {
     /// order.
     #[doc(hidden)]
     #[must_use]
-    pub const fn default_method_unavailable_reasons(
-        self,
-    ) -> &'static [&'static [InvocationUnavailableReason]] {
+    pub const fn default_method_unavailable_reasons(self) -> &'static [&'static [InvocationUnavailableReason]] {
         self.default_method_unavailable_reasons
     }
 
@@ -149,9 +144,7 @@ impl TraitImplPayload {
     /// Returns safe associated-constant readers in declaration order.
     #[doc(hidden)]
     #[must_use]
-    pub const fn associated_const_readers(
-        self,
-    ) -> &'static [Option<&'static AssociatedConstReader>] {
+    pub const fn associated_const_readers(self) -> &'static [Option<&'static AssociatedConstReader>] {
         self.associated_const_readers
     }
 
@@ -163,40 +156,29 @@ impl TraitImplPayload {
         arguments: Vec<GenericArgument>,
         build: impl FnOnce(Vec<GenericArgument>) -> Result<TraitDescriptor, TraitDescriptorBuildError>,
         build_default_method_adapters: impl FnOnce() -> Vec<Option<&'static InvocationAdapter>>,
-        build_default_method_unavailable_reasons: impl FnOnce() -> Vec<
-            &'static [InvocationUnavailableReason],
-        >,
+        build_default_method_unavailable_reasons: impl FnOnce() -> Vec<&'static [InvocationUnavailableReason]>,
         build_associated_type_resolvers: impl FnOnce() -> Vec<Option<TypeDescriptorResolver>>,
         build_associated_const_readers: impl FnOnce() -> Vec<Option<&'static AssociatedConstReader>>,
     ) -> Self {
-        static CACHE: LazyLock<Mutex<AppliedTraitCache>> =
-            LazyLock::new(|| Mutex::new(HashMap::new()));
+        static CACHE: LazyLock<Mutex<AppliedTraitCache>> = LazyLock::new(|| Mutex::new(HashMap::new()));
         let identity = AppliedTraitId {
             definition: definition.trait_id().clone(),
             arguments: arguments.clone().into_boxed_slice(),
             associated_type_arguments: Box::new([]),
         };
         let key = (TypeId::of::<T>(), identity);
-        let mut cache = CACHE
-            .lock()
-            .expect("trait payload cache mutex must not be poisoned");
-        let cell = cache
-            .entry(key)
-            .or_insert_with(|| Arc::new(OnceLock::new()))
-            .clone();
+        let mut cache = CACHE.lock().expect("trait payload cache mutex must not be poisoned");
+        let cell = cache.entry(key).or_insert_with(|| Arc::new(OnceLock::new())).clone();
         drop(cache);
         *cell.get_or_init(|| {
             let applied = Box::leak(Box::new(
                 build(arguments).expect("a reflected trait must build a valid applied descriptor"),
             ));
-            let default_method_adapters =
-                Box::leak(build_default_method_adapters().into_boxed_slice());
+            let default_method_adapters = Box::leak(build_default_method_adapters().into_boxed_slice());
             let default_method_unavailable_reasons =
                 Box::leak(build_default_method_unavailable_reasons().into_boxed_slice());
-            let associated_type_resolvers =
-                Box::leak(build_associated_type_resolvers().into_boxed_slice());
-            let associated_const_readers =
-                Box::leak(build_associated_const_readers().into_boxed_slice());
+            let associated_type_resolvers = Box::leak(build_associated_type_resolvers().into_boxed_slice());
+            let associated_const_readers = Box::leak(build_associated_const_readers().into_boxed_slice());
             Self {
                 definition,
                 applied,
@@ -249,9 +231,7 @@ impl TraitApplicationSubstitutions {
         let associated_types = associated_type_arguments
             .iter()
             .filter_map(|argument| match argument {
-                GenericArgument::AssociatedType { name, value } => {
-                    Some((name.clone(), value.as_ref().clone()))
-                }
+                GenericArgument::AssociatedType { name, value } => Some((name.clone(), value.as_ref().clone())),
                 _ => None,
             })
             .collect();
@@ -265,18 +245,12 @@ impl TraitApplicationSubstitutions {
 
     /// Returns whether this application carries no substitutions.
     pub(super) fn is_empty(&self) -> bool {
-        self.types.is_empty()
-            && self.consts.is_empty()
-            && self.lifetimes.is_empty()
-            && self.associated_types.is_empty()
+        self.types.is_empty() && self.consts.is_empty() && self.lifetimes.is_empty() && self.associated_types.is_empty()
     }
 
     /// Applies outer trait arguments inside a nested item generic definition
     /// while preserving names shadowed by the item's own parameters.
-    pub(super) fn generic_definition(
-        &self,
-        definition: &GenericDefinitionDescriptor,
-    ) -> GenericDefinitionDescriptor {
+    pub(super) fn generic_definition(&self, definition: &GenericDefinitionDescriptor) -> GenericDefinitionDescriptor {
         let mut scoped = self.clone();
         for parameter in &definition.parameters {
             match parameter {
@@ -349,8 +323,7 @@ impl TraitApplicationSubstitutions {
                 .cloned()
                 .unwrap_or_else(|| expression.clone()),
             TypeExpression::Concrete(concrete)
-                if concrete.path.len() == 1
-                    && self.types.contains_key(concrete.path[0].as_ref()) =>
+                if concrete.path.len() == 1 && self.types.contains_key(concrete.path[0].as_ref()) =>
             {
                 self.types
                     .get(concrete.path[0].as_ref())
@@ -360,9 +333,7 @@ impl TraitApplicationSubstitutions {
             TypeExpression::Concrete(concrete)
                 if concrete.path.len() == 2
                     && concrete.path[0].as_ref() == "Self"
-                    && self
-                        .associated_types
-                        .contains_key(concrete.path[1].as_ref()) =>
+                    && self.associated_types.contains_key(concrete.path[1].as_ref()) =>
             {
                 self.associated_types
                     .get(concrete.path[1].as_ref())
@@ -412,10 +383,7 @@ impl TraitApplicationSubstitutions {
                         array.length = self.const_expression(&array.length);
                     }
                     TypeExpression::Tuple(elements) => {
-                        *elements = elements
-                            .iter()
-                            .map(|element| self.type_expression(element))
-                            .collect();
+                        *elements = elements.iter().map(|element| self.type_expression(element)).collect();
                     }
                     TypeExpression::FunctionPointer(function) => {
                         function.parameters = function
@@ -439,9 +407,7 @@ impl TraitApplicationSubstitutions {
                             .map(|predicate| self.predicate(predicate))
                             .collect();
                     }
-                    TypeExpression::Parameter(_)
-                    | TypeExpression::SelfType
-                    | TypeExpression::Never => {}
+                    TypeExpression::Parameter(_) | TypeExpression::SelfType | TypeExpression::Never => {}
                 }
                 result
             }
@@ -463,15 +429,10 @@ impl TraitApplicationSubstitutions {
                 name: name.clone(),
                 value: Box::new(self.type_expression(value)),
             },
-            GenericArgument::AssociatedTypeBound { name, bounds } => {
-                GenericArgument::AssociatedTypeBound {
-                    name: name.clone(),
-                    bounds: bounds
-                        .iter()
-                        .map(|predicate| self.predicate(predicate))
-                        .collect(),
-                }
-            }
+            GenericArgument::AssociatedTypeBound { name, bounds } => GenericArgument::AssociatedTypeBound {
+                name: name.clone(),
+                bounds: bounds.iter().map(|predicate| self.predicate(predicate)).collect(),
+            },
         }
     }
 
@@ -489,14 +450,9 @@ impl TraitApplicationSubstitutions {
 
     /// Maps declaration lifetimes to the only lifetime supported by a
     /// `'static` trait-object root.
-    fn lifetime(
-        &self,
-        lifetime: &crate::expression::LifetimeExpression,
-    ) -> crate::expression::LifetimeExpression {
+    fn lifetime(&self, lifetime: &crate::expression::LifetimeExpression) -> crate::expression::LifetimeExpression {
         match lifetime {
-            crate::expression::LifetimeExpression::Named(name)
-                if self.lifetimes.contains(name.as_str()) =>
-            {
+            crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name.as_str()) => {
                 crate::expression::LifetimeExpression::Static
             }
             _ => lifetime.clone(),
@@ -507,18 +463,11 @@ impl TraitApplicationSubstitutions {
     pub(crate) fn predicate(&self, predicate: &PredicateDescriptor) -> PredicateDescriptor {
         let mut result = predicate.clone();
         match &mut result {
-            PredicateDescriptor::TypeBound {
-                subject, bounds, ..
-            } => {
+            PredicateDescriptor::TypeBound { subject, bounds, .. } => {
                 *subject = self.type_expression(subject);
-                *bounds = bounds
-                    .iter()
-                    .map(|bound| self.type_expression(bound))
-                    .collect();
+                *bounds = bounds.iter().map(|bound| self.type_expression(bound)).collect();
             }
-            PredicateDescriptor::LifetimeOutlives {
-                lifetime, bounds, ..
-            } => {
+            PredicateDescriptor::LifetimeOutlives { lifetime, bounds, .. } => {
                 *lifetime = self.lifetime(lifetime);
                 *bounds = bounds.iter().map(|bound| self.lifetime(bound)).collect();
             }

@@ -54,8 +54,7 @@ impl TraitDefinitionDescriptor {
     /// Returns whether two declarations can be merged for one external trait
     /// ID.
     pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
-        self.completeness() == other.completeness()
-            && self.generic_definition() == other.generic_definition()
+        self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
     }
 
     /// Creates immutable trait definition facts.
@@ -157,9 +156,7 @@ impl TraitDefinitionDescriptor {
     /// Returns methods declared by this trait in source order.
     #[must_use]
     pub fn methods(&self) -> &[MethodDescriptor] {
-        self.members
-            .get()
-            .map_or(&[], |members| members.methods.as_ref())
+        self.members.get().map_or(&[], |members| members.methods.as_ref())
     }
 
     /// Returns associated types declared by this trait in source order.
@@ -288,12 +285,11 @@ impl AssociatedTypeDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn generic_definition(&self) -> &GenericDefinitionDescriptor {
-        static EMPTY: LazyLock<GenericDefinitionDescriptor> =
-            LazyLock::new(|| GenericDefinitionDescriptor {
-                parameters: Box::new([]),
-                predicates: Box::new([]),
-                diagnostic: crate::expression::DiagnosticText::default(),
-            });
+        static EMPTY: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
+            parameters: Box::new([]),
+            predicates: Box::new([]),
+            diagnostic: crate::expression::DiagnosticText::default(),
+        });
         self.generic_definition.as_deref().unwrap_or(&EMPTY)
     }
 

@@ -103,26 +103,24 @@ fn stress_capability_id() -> CapabilityId {
 }
 
 fn capability_runtime_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Capabilities(RegistrationCapabilityTarget::Type(TypeId::of::<
-        CapabilityTarget,
-    >()))
+    RuntimeIdentity::Capabilities(RegistrationCapabilityTarget::Type(TypeId::of::<CapabilityTarget>()))
 }
 
 fn capability_u8_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
-        vec![CapabilityDescriptor::without_adapter(
-            CapabilityKey::<u8>::new(stress_capability_id()),
-        )],
+        vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u8>::new(
+            stress_capability_id(),
+        ))],
     ))
 }
 
 fn capability_u16_payload() -> FragmentPayload {
     FragmentPayload::Capability(CapabilityRegistration::for_type_id(
         TypeId::of::<CapabilityTarget>(),
-        vec![CapabilityDescriptor::without_adapter(
-            CapabilityKey::<u16>::new(stress_capability_id()),
-        )],
+        vec![CapabilityDescriptor::without_adapter(CapabilityKey::<u16>::new(
+            stress_capability_id(),
+        ))],
     ))
 }
 
@@ -192,8 +190,7 @@ fn test_stress_concurrent_generic_descriptor_and_registry_initialization() {
                 let recursive_root = TypeDescriptor::of::<RecursiveStressNode>();
                 let recursive_target = recursive_sequence_target();
                 assert!(std::ptr::eq(recursive_root, recursive_target));
-                let registry =
-                    ReflectRegistry::initialize().expect("registry must initialize once");
+                let registry = ReflectRegistry::initialize().expect("registry must initialize once");
                 (
                     descriptors.map(|descriptor| descriptor as *const TypeDescriptor as usize),
                     descriptors.map(TypeDescriptor::type_id),
@@ -208,18 +205,9 @@ fn test_stress_concurrent_generic_descriptor_and_registry_initialization() {
         .collect();
 
     for result in &results[1..] {
-        assert_eq!(
-            result.0, results[0].0,
-            "one TypeId must intern to one pointer"
-        );
-        assert_eq!(
-            result.1, results[0].1,
-            "concrete arguments must remain stable"
-        );
-        assert_eq!(
-            result.2, results[0].2,
-            "registry snapshot must be immutable"
-        );
+        assert_eq!(result.0, results[0].0, "one TypeId must intern to one pointer");
+        assert_eq!(result.1, results[0].1, "concrete arguments must remain stable");
+        assert_eq!(result.2, results[0].2, "registry snapshot must be immutable");
     }
     for left in 0..results[0].1.len() {
         for right in (left + 1)..results[0].1.len() {
@@ -278,10 +266,7 @@ fn test_stress_registry_matches_reference_model_for_order_and_conflicts() {
             .map(|operation| fragments[usize::from(*operation)])
             .collect::<Vec<_>>();
 
-        match (
-            reference_model(&operations),
-            build_registry(&actual_fragments),
-        ) {
+        match (reference_model(&operations), build_registry(&actual_fragments)) {
             (Ok(expected_names), Ok(registry)) => {
                 observed_success = true;
                 let actual_names = registry
@@ -335,9 +320,6 @@ fn test_stress_field_failure_recovery_drops_each_input_exactly_once() {
         drop(recovered);
     }
 
-    assert_eq!(
-        target.value, 7,
-        "failed replacement must not mutate the target"
-    );
+    assert_eq!(target.value, 7, "failed replacement must not mutate the target");
     assert_eq!(drops.load(Ordering::SeqCst), ATTEMPTS);
 }

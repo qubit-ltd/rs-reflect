@@ -48,10 +48,7 @@ fn test_invocation_error_kinds_format_complete_context() {
         InvocationErrorKind::ReceiverAdapterRejected {
             expected_name: "Receiver",
         },
-        InvocationErrorKind::ArgumentCountMismatch {
-            expected: 2,
-            actual: 1,
-        },
+        InvocationErrorKind::ArgumentCountMismatch { expected: 2, actual: 1 },
         InvocationErrorKind::UnknownArgumentName {
             input_index: 0,
             name: "unknown".into(),
@@ -97,11 +94,7 @@ fn test_invocation_error_kinds_format_complete_context() {
         let error = InvocationError::new(method_identity(), kind.clone());
         assert_eq!(error.method_identity(), &method_identity());
         assert_eq!(error.kind(), &kind);
-        assert!(
-            error
-                .to_string()
-                .contains("failed to invoke method at index 2")
-        );
+        assert!(error.to_string().contains("failed to invoke method at index 2"));
         assert!(error.source().is_some());
     }
 }

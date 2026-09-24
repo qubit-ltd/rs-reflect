@@ -54,14 +54,8 @@ impl fmt::Debug for LazyTypeRef {
     /// Formats cached state without forcing relation resolution.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.resolved.get() {
-            Some(reference) => formatter
-                .debug_tuple("LazyTypeRef")
-                .field(reference)
-                .finish(),
-            None => formatter
-                .debug_tuple("LazyTypeRef")
-                .field(&"<unresolved>")
-                .finish(),
+            Some(reference) => formatter.debug_tuple("LazyTypeRef").field(reference).finish(),
+            None => formatter.debug_tuple("LazyTypeRef").field(&"<unresolved>").finish(),
         }
     }
 }

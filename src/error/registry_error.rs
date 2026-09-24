@@ -78,10 +78,7 @@ impl RegistryError {
 
     /// Creates an error for an invalid intrinsic capability declaration.
     #[must_use]
-    pub fn intrinsic_capability_conflict(
-        fragment: FragmentIdentity,
-        conflict: CapabilityConflict,
-    ) -> Self {
+    pub fn intrinsic_capability_conflict(fragment: FragmentIdentity, conflict: CapabilityConflict) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::CapabilityConflict,
             left: Some(fragment),
@@ -192,9 +189,7 @@ impl RegistryError {
     #[inline(always)]
     pub fn capability_id(&self) -> Option<CapabilityId> {
         let Self(data) = self;
-        data.capability_details
-            .as_ref()
-            .map(|conflict| *conflict.id())
+        data.capability_details.as_ref().map(|conflict| *conflict.id())
     }
 
     /// Returns the complete capability conflict details retained by registry
@@ -242,12 +237,7 @@ impl std::fmt::Display for RegistryError {
         let Self(data) = self;
         write!(formatter, "reflection registry error: {:?}", data.kind)?;
         if let Some(conflict) = &data.capability_details {
-            write!(
-                formatter,
-                " for capability `{}` ({:?})",
-                conflict.id(),
-                conflict.kind(),
-            )?;
+            write!(formatter, " for capability `{}` ({:?})", conflict.id(), conflict.kind(),)?;
         }
         if let Some(target) = data.capability_target {
             write!(formatter, " on {target:?}")?;

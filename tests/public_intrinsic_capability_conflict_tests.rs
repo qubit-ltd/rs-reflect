@@ -20,9 +20,7 @@ use qubit_reflect::registry::ReflectRegistry;
 
 /// Returns the shared ID intentionally claimed by both fixture providers.
 fn conflicting_key() -> CapabilityKey<fn()> {
-    CapabilityKey::new(
-        CapabilityId::new("example.intrinsic_conflict").expect("fixture ID is valid"),
-    )
+    CapabilityKey::new(CapabilityId::new("example.intrinsic_conflict").expect("fixture ID is valid"))
 }
 
 /// Provides the first conflicting capability declaration.
@@ -41,10 +39,7 @@ fn first_adapter() {}
 fn second_adapter() {}
 
 #[cfg_attr(feature = "derive", derive(Reflect))]
-#[cfg_attr(
-    feature = "derive",
-    reflect(capabilities(first_provider, second_provider))
-)]
+#[cfg_attr(feature = "derive", reflect(capabilities(first_provider, second_provider)))]
 struct IntrinsicConflict;
 
 // Runtime-only builds exercise the same invalid set through handwritten
@@ -79,8 +74,7 @@ mod runtime_only {
     impl Reflect for IntrinsicConflict {
         fn type_descriptor() -> &'static TypeDescriptor {
             static DESCRIPTOR: TypeDescriptor =
-                opaque_root::<IntrinsicConflict>("IntrinsicConflict")
-                    .with_capabilities(capabilities);
+                opaque_root::<IntrinsicConflict>("IntrinsicConflict").with_capabilities(capabilities);
             &DESCRIPTOR
         }
     }
@@ -98,9 +92,7 @@ fn test_intrinsic_capability_conflict_is_a_registry_error() {
         .expect_err("conflicting intrinsic capability IDs must fail registry construction");
 
     assert_eq!(error.kind(), RegistryErrorKind::CapabilityConflict);
-    let conflict = error
-        .intrinsic_conflict()
-        .expect("complete conflict retained");
+    let conflict = error.intrinsic_conflict().expect("complete conflict retained");
     assert_eq!(conflict.kind(), CapabilityConflictKind::DuplicateId);
     assert!(
         std::error::Error::source(&error)
@@ -110,9 +102,7 @@ fn test_intrinsic_capability_conflict_is_a_registry_error() {
     );
     let isolated = build_registry(&[]).unwrap();
     assert_eq!(
-        isolated
-            .capabilities(IntrinsicConflict::type_descriptor())
-            .unwrap_err(),
+        isolated.capabilities(IntrinsicConflict::type_descriptor()).unwrap_err(),
         *conflict
     );
     assert_eq!(

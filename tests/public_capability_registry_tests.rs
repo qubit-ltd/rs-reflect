@@ -21,8 +21,7 @@ use qubit_reflect::registry::ReflectRegistry;
 #[derive(Clone)]
 struct RegisteredCapability;
 
-static REGISTERED_CAPABILITY_DESCRIPTOR: TypeDescriptor =
-    opaque_root::<RegisteredCapability>("RegisteredCapability");
+static REGISTERED_CAPABILITY_DESCRIPTOR: TypeDescriptor = opaque_root::<RegisteredCapability>("RegisteredCapability");
 
 impl Reflect for RegisteredCapability {
     fn type_descriptor() -> &'static TypeDescriptor {
@@ -44,10 +43,7 @@ fn test_registry_projects_typed_capabilities() {
     assert!(capabilities.contains(clone_key()));
     assert!(
         registry
-            .capability_by_id(
-                RegisteredCapability::type_descriptor(),
-                "qubit.reflect.clone",
-            )
+            .capability_by_id(RegisteredCapability::type_descriptor(), "qubit.reflect.clone",)
             .expect("valid capability declarations")
             .is_some()
     );
@@ -63,13 +59,6 @@ fn test_registry_projects_typed_capabilities() {
             .iter()
             .any(|descriptor| std::ptr::eq(*descriptor, RegisteredCapability::type_descriptor()))
     );
-    assert!(
-        registry
-            .type_source(TypeId::of::<RegisteredCapability>())
-            .is_some()
-    );
-    assert_eq!(
-        registry.types_with_identity().count(),
-        registry.types().len()
-    );
+    assert!(registry.type_source(TypeId::of::<RegisteredCapability>()).is_some());
+    assert_eq!(registry.types_with_identity().count(), registry.types().len());
 }

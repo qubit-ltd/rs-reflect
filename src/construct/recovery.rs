@@ -63,10 +63,7 @@ pub struct ConstructionRecovery<M: Mode> {
 
 impl<M: Mode> ConstructionRecovery<M> {
     /// Creates recovery from one structured error and ordered owned values.
-    pub(crate) fn new(
-        error: ConstructionError,
-        values: Vec<RecoveredConstructionValue<M>>,
-    ) -> Self {
+    pub(crate) fn new(error: ConstructionError, values: Vec<RecoveredConstructionValue<M>>) -> Self {
         Self {
             error: Box::new(error),
             values,

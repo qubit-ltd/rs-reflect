@@ -381,11 +381,7 @@ impl MapTypeDescriptor {
 
     /// Creates a map view whose key and value resolve independently on first
     /// navigation.
-    pub(crate) const fn new_lazy(
-        kind: MapKind,
-        key: &'static LazyTypeRef,
-        value: &'static LazyTypeRef,
-    ) -> Self {
+    pub(crate) const fn new_lazy(kind: MapKind, key: &'static LazyTypeRef, value: &'static LazyTypeRef) -> Self {
         Self {
             kind,
             key: TypeRefSource::Lazy(key),

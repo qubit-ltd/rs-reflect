@@ -144,11 +144,7 @@ impl VariantDescriptor {
     /// Records source discriminant facts supplied by generated enum metadata.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_discriminant(
-        mut self,
-        origin: DiscriminantOrigin,
-        numeric: Option<NumericDiscriminant>,
-    ) -> Self {
+    pub const fn with_discriminant(mut self, origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
         self
@@ -220,9 +216,7 @@ impl VariantDescriptor {
     ///
     /// Returns the construction error if validation fails or this variant has
     /// no constructor.
-    pub fn construct_unit(
-        &self,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.construction() {
             Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
@@ -293,9 +287,7 @@ impl VariantDescriptor {
     /// `None` means the variant has no field with that lookup name.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields
-            .iter()
-            .find(|field| field.query_name() == Some(name))
+        self.fields.iter().find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a field by source index.
@@ -324,8 +316,7 @@ impl VariantDescriptor {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(&value);
         if actual != expected {
-            return Err(TypeMismatch::new(expected, actual)
-                .with_expected_name(self.declaring_type().type_name()));
+            return Err(TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()));
         }
         (self.active_test)(value)
     }

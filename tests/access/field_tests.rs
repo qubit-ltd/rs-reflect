@@ -196,11 +196,8 @@ static RECOVERY_FIELDS: [FieldDescriptor; 6] = [
     )
     .with_access(FieldAccessPolicy::ReadWrite, None, None, Some(reject_probe)),
 ];
-static RECOVERY_RECORD_DESCRIPTOR: TypeDescriptor = descriptor::struct_type::<RecoveryRecord>(
-    "field_tests::RecoveryRecord",
-    StructKind::Named,
-    &RECOVERY_FIELDS,
-);
+static RECOVERY_RECORD_DESCRIPTOR: TypeDescriptor =
+    descriptor::struct_type::<RecoveryRecord>("field_tests::RecoveryRecord", StructKind::Named, &RECOVERY_FIELDS);
 
 /// Creates a replacement probe and its shared destructor counter.
 fn create_drop_probe() -> (Rc<Cell<usize>>, ReflectedOwned) {
@@ -213,11 +210,7 @@ fn create_drop_probe() -> (Rc<Cell<usize>>, ReflectedOwned) {
 
 /// Extracts and destroys a named recovered probe after checking it was kept
 /// alive throughout error inspection.
-fn assert_named_probe_recovered(
-    failure: reflect::access::FieldSetFailure,
-    drops: &Rc<Cell<usize>>,
-    name: &str,
-) {
+fn assert_named_probe_recovered(failure: reflect::access::FieldSetFailure, drops: &Rc<Cell<usize>>, name: &str) {
     assert_eq!(drops.get(), 0, "the failed set must retain the replacement");
     assert!(
         failure
@@ -237,11 +230,7 @@ fn assert_named_probe_recovered(
         .unwrap_or_else(|_| panic!("recovery must preserve the exact replacement type"));
     assert_eq!(drops.get(), 0, "taking recovery must not destroy the value");
     drop(probe);
-    assert_eq!(
-        drops.get(),
-        1,
-        "the caller should control final destruction"
-    );
+    assert_eq!(drops.get(), 1, "the caller should control final destruction");
 }
 
 /// Verifies shared, mutable, and owned replacement adapters can safely access a
@@ -263,10 +252,7 @@ fn test_field_descriptor_reads_and_writes_private_field() {
     let borrowed = field
         .get(ReflectedRef::new(&account))
         .expect("shared access should succeed");
-    assert_eq!(
-        borrowed.downcast_ref::<String>().map(String::as_str),
-        Some("initial")
-    );
+    assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("initial"));
 
     {
         let mut borrowed = field
@@ -336,10 +322,7 @@ fn test_field_set_target_mismatch_recovers_replacement_without_dropping() {
         .set(ReflectedMut::new(&mut target), value)
         .expect_err("an unrelated target must be rejected");
 
-    assert!(matches!(
-        failure.error(),
-        FieldAccessError::TargetTypeMismatch { .. }
-    ));
+    assert!(matches!(failure.error(), FieldAccessError::TargetTypeMismatch { .. }));
     assert_named_probe_recovered(failure, &drops, "value");
 }
 
@@ -378,10 +361,7 @@ fn test_field_set_value_mismatch_recovers_replacement_without_dropping() {
         .set(ReflectedMut::new(&mut target), value)
         .expect_err("a non-String replacement must be rejected");
 
-    assert!(matches!(
-        failure.error(),
-        FieldAccessError::ValueTypeMismatch { .. }
-    ));
+    assert!(matches!(failure.error(), FieldAccessError::ValueTypeMismatch { .. }));
     assert_eq!(target.secret, "unchanged");
     assert_named_probe_recovered(failure, &drops, "secret");
 }
@@ -402,10 +382,7 @@ fn test_field_set_missing_adapter_recovers_replacement_without_dropping() {
         .set(ReflectedMut::new(&mut target), value)
         .expect_err("a descriptor without a set adapter must reject replacement");
 
-    assert!(matches!(
-        failure.error(),
-        FieldAccessError::Unavailable { .. }
-    ));
+    assert!(matches!(failure.error(), FieldAccessError::Unavailable { .. }));
     assert_eq!(drops.get(), 0);
     assert!(
         failure
@@ -469,10 +446,7 @@ fn test_field_set_symbolic_type_recovers_replacement_without_dropping() {
         .set(ReflectedMut::new(&mut target), value)
         .expect_err("a symbolic field must reject replacement");
 
-    assert!(matches!(
-        failure.error(),
-        FieldAccessError::Unavailable { .. }
-    ));
+    assert!(matches!(failure.error(), FieldAccessError::Unavailable { .. }));
     assert_named_probe_recovered(failure, &drops, "value");
     drop(target);
     assert_eq!(drops_in_target.get(), 1);
@@ -501,10 +475,7 @@ fn test_field_set_recovery_inspection_and_consuming_paths() {
     let recovery = failure
         .into_recovery()
         .unwrap_or_else(|_| panic!("pre-execution failure should retain recovery"));
-    assert_eq!(
-        recovery.field().declaring_type(),
-        TypeId::of::<RecoveryRecord>()
-    );
+    assert_eq!(recovery.field().declaring_type(), TypeId::of::<RecoveryRecord>());
     assert_eq!(
         recovery.field().declaring_type_name(),
         std::any::type_name::<RecoveryRecord>()
@@ -549,10 +520,7 @@ fn test_field_set_recovery_inspection_and_consuming_paths() {
     let failure = field
         .set(ReflectedMut::new(&mut target), value)
         .expect_err("missing adapter should fail before execution");
-    assert!(matches!(
-        failure.into_error(),
-        FieldAccessError::Unavailable { .. }
-    ));
+    assert!(matches!(failure.into_error(), FieldAccessError::Unavailable { .. }));
     drop(target);
     assert_eq!(drops_in_target.get(), 1);
 }
@@ -563,16 +531,8 @@ fn test_field_set_recovery_inspection_and_consuming_paths() {
 fn test_field_identity_preserves_all_source_forms() {
     let named = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, Some("secret"));
     let positional = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, None);
-    let variant_named = FieldIdentity::new_variant(
-        TypeId::of::<Account>(),
-        "Account",
-        1,
-        Some("value"),
-        3,
-        "Data",
-    );
-    let variant_positional =
-        FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, None, 3, "Data");
+    let variant_named = FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, Some("value"), 3, "Data");
+    let variant_positional = FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, None, 3, "Data");
 
     assert_eq!(named.to_string(), "Account::secret");
     assert_eq!(positional.to_string(), "Account field #2");
