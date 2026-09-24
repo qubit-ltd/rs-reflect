@@ -28,6 +28,7 @@ pub enum CapabilityConflictKind {
 }
 
 /// A conflict between two descriptors claiming one stable capability ID.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("conflicting reflection capability `{id}`: {kind:?}")]
 pub struct CapabilityConflict {
@@ -40,7 +41,10 @@ pub struct CapabilityConflict {
 impl CapabilityConflict {
     /// Classifies two descriptors already known to claim the same capability
     /// ID while preserving their input contract order.
-    pub(crate) fn from_same_id(first: &CapabilityDescriptor, second: &CapabilityDescriptor) -> Self {
+    pub(crate) fn from_same_id(
+        first: &CapabilityDescriptor,
+        second: &CapabilityDescriptor,
+    ) -> Self {
         debug_assert_eq!(first.id(), second.id());
         let kind = if first.adapter_type() == second.adapter_type() {
             CapabilityConflictKind::DuplicateId
@@ -106,6 +110,15 @@ impl TypeCapabilities {
     ///
     /// Returns [`CapabilityConflict`] when an ID occurs more than once. A
     /// different adapter type is reported separately from an exact duplicate.
+    ///
+    /// # Returns
+    ///
+    /// Returns a capability set sorted by stable ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns the conflicting ID and adapter contracts when an ID occurs
+    /// more than once.
     pub fn try_new(mut descriptors: Vec<CapabilityDescriptor>) -> Result<Self, CapabilityConflict> {
         descriptors.sort_by(|left, right| {
             left.id()
@@ -145,7 +158,21 @@ impl TypeCapabilities {
     ///
     /// `None` means the ID is absent, the contract differs, or the descriptor
     /// represents a fact without an executable adapter.
-    pub fn get<A: 'static>(&self, key: CapabilityKey<A>) -> Result<Option<&A>, CapabilityAccessError> {
+    ///
+    /// # Returns
+    ///
+    /// Returns the typed adapter when its ID and contract match, or `None` for
+    /// each of the three non-executable lookup states.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CapabilityAccessError::FactOnly`] when the ID names a
+    /// non-executable fact and [`CapabilityAccessError::AdapterTypeMismatch`]
+    /// when the ID is present with a different adapter contract.
+    pub fn get<A: 'static>(
+        &self,
+        key: CapabilityKey<A>,
+    ) -> Result<Option<&A>, CapabilityAccessError> {
         self.lookup(key).into_adapter()
     }
 
@@ -165,7 +192,11 @@ impl TypeCapabilities {
         if !descriptor.has_adapter() {
             return CapabilityLookup::FactOnly(descriptor);
         }
-        CapabilityLookup::Found(descriptor.get(&key).expect("declared adapter contract must downcast"))
+        CapabilityLookup::Found(
+            descriptor
+                .get(&key)
+                .expect("declared adapter contract must downcast"),
+        )
     }
 
     /// Finds a capability descriptor by its stable textual ID without

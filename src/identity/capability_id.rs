@@ -18,6 +18,15 @@ pub struct CapabilityId(&'static str);
 impl CapabilityId {
     /// Validates a potentially dynamic external capability name without
     /// promoting it to a static ABI identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` when `value` is a valid external capability ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IdError`] when the name is malformed or uses the reserved
+    /// `qubit.reflect` namespace.
     pub fn validate(value: &str) -> Result<(), IdError> {
         validate(value, IdAuthority::EXTERNAL)
     }
@@ -26,6 +35,14 @@ impl CapabilityId {
     ///
     /// Returns [`IdError`] when `value` is malformed or uses the reserved
     /// `qubit.reflect` namespace.
+    ///
+    /// # Returns
+    ///
+    /// Returns the static external capability ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IdError`] when the name is malformed or reserved.
     pub fn new(value: &'static str) -> Result<Self, IdError> {
         Self::validate(value)?;
         Ok(Self(value))
@@ -36,7 +53,10 @@ impl CapabilityId {
     /// Returns [`IdError`] when `value` is malformed. This crate-private
     /// constructor is reserved for future built-in `qubit.reflect.*`
     /// registrations and must not become a downstream API.
-    #[allow(dead_code, reason = "reserved for future built-in capability registrations")]
+    #[allow(
+        dead_code,
+        reason = "reserved for future built-in capability registrations"
+    )]
     pub(crate) fn new_core(value: &'static str) -> Result<Self, IdError> {
         validate(value, IdAuthority::CORE)?;
         Ok(Self(value))
@@ -82,8 +102,12 @@ impl IdAuthority {
 /// Validates a namespaced ID according to its owning authority.
 pub(crate) fn validate(value: &str, authority: IdAuthority) -> Result<(), IdError> {
     validate_segments(value)?;
-    if authority != IdAuthority::CORE && (value == "qubit.reflect" || value.starts_with("qubit.reflect.")) {
-        return Err(IdError::ReservedNamespace { value: value.into() });
+    if authority != IdAuthority::CORE
+        && (value == "qubit.reflect" || value.starts_with("qubit.reflect."))
+    {
+        return Err(IdError::ReservedNamespace {
+            value: value.into(),
+        });
     }
     Ok(())
 }
@@ -94,11 +118,14 @@ fn validate_segments(value: &str) -> Result<(), IdError> {
         || value.split('.').any(|segment| {
             segment.is_empty()
                 || !segment.bytes().enumerate().all(|(index, byte)| {
-                    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_') || (index > 0 && byte.is_ascii_digit())
+                    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_')
+                        || (index > 0 && byte.is_ascii_digit())
                 })
         })
     {
-        return Err(IdError::InvalidFormat { value: value.into() });
+        return Err(IdError::InvalidFormat {
+            value: value.into(),
+        });
     }
     Ok(())
 }

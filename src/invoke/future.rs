@@ -56,7 +56,8 @@ pub trait InvocationMode: Mode + sealed::Sealed + Sized {
 impl sealed::Sealed for Local {}
 
 impl InvocationMode for Local {
-    type FutureStorage<'call> = Pin<Box<dyn Future<Output = InvocationOutput<'call, Self>> + 'call>>;
+    type FutureStorage<'call> =
+        Pin<Box<dyn Future<Output = InvocationOutput<'call, Self>> + 'call>>;
 
     /// Reads the `Any` identity from local owned storage.
     fn owned_type_id(value: &DynamicOwned<Self>) -> TypeId {
@@ -68,19 +69,24 @@ impl InvocationMode for Local {
 
     /// Reads either the `Any` identity or the dedicated `str` identity.
     fn ref_type_id(value: &DynamicRef<'_, Self>) -> TypeId {
-        value.as_any().map_or_else(TypeId::of::<str>, std::any::Any::type_id)
+        value
+            .as_any()
+            .map_or_else(TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Reads either the `Any` identity or the dedicated `str` identity.
     fn mut_type_id(value: &DynamicMut<'_, Self>) -> TypeId {
-        value.as_any().map_or_else(TypeId::of::<str>, std::any::Any::type_id)
+        value
+            .as_any()
+            .map_or_else(TypeId::of::<str>, std::any::Any::type_id)
     }
 }
 
 impl sealed::Sealed for ThreadSafe {}
 
 impl InvocationMode for ThreadSafe {
-    type FutureStorage<'call> = Pin<Box<dyn Future<Output = InvocationOutput<'call, Self>> + Send + 'call>>;
+    type FutureStorage<'call> =
+        Pin<Box<dyn Future<Output = InvocationOutput<'call, Self>> + Send + 'call>>;
 
     /// Reads the `Any` identity from thread-safe owned storage.
     fn owned_type_id(value: &DynamicOwned<Self>) -> TypeId {
@@ -92,12 +98,16 @@ impl InvocationMode for ThreadSafe {
 
     /// Reads either the `Any` identity or the dedicated `str` identity.
     fn ref_type_id(value: &DynamicRef<'_, Self>) -> TypeId {
-        value.as_any().map_or_else(TypeId::of::<str>, std::any::Any::type_id)
+        value
+            .as_any()
+            .map_or_else(TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Reads either the `Any` identity or the dedicated `str` identity.
     fn mut_type_id(value: &DynamicMut<'_, Self>) -> TypeId {
-        value.as_any().map_or_else(TypeId::of::<str>, std::any::Any::type_id)
+        value
+            .as_any()
+            .map_or_else(TypeId::of::<str>, std::any::Any::type_id)
     }
 }
 

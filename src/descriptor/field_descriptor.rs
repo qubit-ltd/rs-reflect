@@ -194,7 +194,10 @@ impl FieldDescriptor {
     /// while the replacement remains recoverable by the descriptor.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_set_preflight(mut self, set_preflight: Option<FieldSetPreflightAdapter>) -> Self {
+    pub const fn with_set_preflight(
+        mut self,
+        set_preflight: Option<FieldSetPreflightAdapter>,
+    ) -> Self {
         self.set_preflight = set_preflight;
         self
     }
@@ -232,7 +235,11 @@ impl FieldDescriptor {
     /// remain distinct.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_variant(mut self, variant_index: usize, variant_rust_name: &'static str) -> Self {
+    pub const fn with_variant(
+        mut self,
+        variant_index: usize,
+        variant_rust_name: &'static str,
+    ) -> Self {
         self.variant_index = Some(variant_index);
         self.variant_rust_name = Some(variant_rust_name);
         self
@@ -315,10 +322,22 @@ impl FieldDescriptor {
     /// invoking generated code. An enum-field adapter may additionally report
     /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot
     /// outlive `target`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a shared dynamic borrow of the field.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FieldAccessError`] if the target has the wrong type, access
+    /// is disabled, no adapter is available, or the containing enum variant is
+    /// inactive.
     pub fn get<'a>(&self, target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
         self.validate_shared_target(&target)?;
         self.validate_policy(FieldAccessOperation::Get)?;
-        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        let adapter = self
+            .get
+            .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
         adapter(target)
     }
 
@@ -327,7 +346,20 @@ impl FieldDescriptor {
     /// Returns a target mismatch, read-only/skipped policy, or unavailable-
     /// adapter error before invoking generated code. The returned exclusive
     /// borrow cannot outlive `target`.
-    pub fn get_mut<'a>(&self, target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, FieldAccessError> {
+    ///
+    /// # Returns
+    ///
+    /// Returns an exclusive dynamic borrow of the field.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FieldAccessError`] if the target has the wrong type, the
+    /// policy forbids mutation, no mutable adapter is available, or the
+    /// containing enum variant is inactive.
+    pub fn get_mut<'a>(
+        &self,
+        target: ReflectedMut<'a>,
+    ) -> Result<ReflectedMut<'a>, FieldAccessError> {
         self.validate_mutable_target(&target)?;
         self.validate_policy(FieldAccessOperation::GetMut)?;
         let adapter = self
@@ -345,7 +377,20 @@ impl FieldDescriptor {
     /// [`FieldSetFailure::recovery`]. A symbolic definition-level field has no
     /// exact runtime identity and therefore reports
     /// [`FieldAccessError::Unavailable`].
-    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldSetFailure> {
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after the adapter replaces the field.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FieldSetFailure`] containing the error and, when validation
+    /// failed before adapter execution, the original replacement value.
+    pub fn set(
+        &self,
+        target: ReflectedMut<'_>,
+        value: ReflectedOwned,
+    ) -> Result<(), FieldSetFailure> {
         if let Err(error) = self.validate_mutable_target(&target) {
             return Err(self.set_failure(error, value));
         }
@@ -360,13 +405,13 @@ impl FieldDescriptor {
         };
         let actual = dynamic_owned_type_id(&value);
         if actual != expected {
-            let error = FieldAccessError::ValueTypeMismatch {
-                field: self.identity(),
-                mismatch: Box::new(
-                    TypeMismatch::new(expected, actual)
-                        .with_expected_name(self.concrete_field_identity().expect("checked above").1),
-                ),
-            };
+            let error =
+                FieldAccessError::ValueTypeMismatch {
+                    field: self.identity(),
+                    mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(
+                        self.concrete_field_identity().expect("checked above").1,
+                    )),
+                };
             return Err(self.set_failure(error, value));
         }
         let adapter = match self.set {
@@ -388,7 +433,10 @@ impl FieldDescriptor {
         &self,
         target: DynamicRef<'a, ThreadSafe>,
     ) -> Result<DynamicRef<'a, ThreadSafe>, FieldAccessError> {
-        self.validate_target_identity(self.declaring_type().type_id(), thread_safe_ref_type_id(&target))?;
+        self.validate_target_identity(
+            self.declaring_type().type_id(),
+            thread_safe_ref_type_id(&target),
+        )?;
         self.validate_policy(FieldAccessOperation::Get)?;
         self.thread_safe_get
             .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?(target)
@@ -399,7 +447,10 @@ impl FieldDescriptor {
         &self,
         target: DynamicMut<'a, ThreadSafe>,
     ) -> Result<DynamicMut<'a, ThreadSafe>, FieldAccessError> {
-        self.validate_target_identity(self.declaring_type().type_id(), thread_safe_mut_type_id(&target))?;
+        self.validate_target_identity(
+            self.declaring_type().type_id(),
+            thread_safe_mut_type_id(&target),
+        )?;
         self.validate_policy(FieldAccessOperation::GetMut)?;
         self.thread_safe_get_mut
             .ok_or_else(|| self.unavailable(FieldAccessOperation::GetMut))?(target)
@@ -412,10 +463,13 @@ impl FieldDescriptor {
         value: DynamicOwned<ThreadSafe>,
     ) -> Result<(), FieldSetFailure<ThreadSafe>> {
         let field = self.identity();
-        let failure = |error, value| FieldSetFailure::before_execution(error, field.clone(), self.query_name, value);
-        if let Err(error) =
-            self.validate_target_identity(self.declaring_type().type_id(), thread_safe_mut_type_id(&target))
-        {
+        let failure = |error, value| {
+            FieldSetFailure::before_execution(error, field.clone(), self.query_name, value)
+        };
+        if let Err(error) = self.validate_target_identity(
+            self.declaring_type().type_id(),
+            thread_safe_mut_type_id(&target),
+        ) {
             return Err(failure(error, value));
         }
         if let Err(error) = self.validate_policy(FieldAccessOperation::Set) {
@@ -429,7 +483,9 @@ impl FieldDescriptor {
             return Err(failure(
                 FieldAccessError::ValueTypeMismatch {
                     field: field.clone(),
-                    mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(expected_name)),
+                    mismatch: Box::new(
+                        TypeMismatch::new(expected, actual).with_expected_name(expected_name),
+                    ),
                 },
                 value,
             ));
@@ -472,7 +528,8 @@ impl FieldDescriptor {
             Err(FieldAccessError::TargetTypeMismatch {
                 field: self.identity(),
                 mismatch: Box::new(
-                    TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()),
+                    TypeMismatch::new(expected, actual)
+                        .with_expected_name(self.declaring_type().type_name()),
                 ),
             })
         }
@@ -485,12 +542,13 @@ impl FieldDescriptor {
                 field: self.identity(),
                 operation,
             }),
-            (FieldAccessPolicy::ReadOnly, FieldAccessOperation::GetMut | FieldAccessOperation::Set) => {
-                Err(FieldAccessError::ReadOnly {
-                    field: self.identity(),
-                    operation,
-                })
-            }
+            (
+                FieldAccessPolicy::ReadOnly,
+                FieldAccessOperation::GetMut | FieldAccessOperation::Set,
+            ) => Err(FieldAccessError::ReadOnly {
+                field: self.identity(),
+                operation,
+            }),
             (FieldAccessPolicy::ReadWrite | FieldAccessPolicy::ReadOnly, _) => Ok(()),
         }
     }
@@ -509,15 +567,17 @@ impl FieldDescriptor {
     fn identity(&self) -> FieldIdentity {
         let declaring_type = self.declaring_type();
         match (self.variant_index, self.variant_rust_name) {
-            (Some(variant_index), Some(variant_rust_name)) => FieldIdentity::new_variant_with_query_name(
-                declaring_type.type_id(),
-                declaring_type.type_name(),
-                self.index,
-                self.rust_name,
-                self.query_name,
-                variant_index,
-                variant_rust_name,
-            ),
+            (Some(variant_index), Some(variant_rust_name)) => {
+                FieldIdentity::new_variant_with_query_name(
+                    declaring_type.type_id(),
+                    declaring_type.type_name(),
+                    self.index,
+                    self.rust_name,
+                    self.query_name,
+                    variant_index,
+                    variant_rust_name,
+                )
+            }
             (None, None) => FieldIdentity::new_with_query_name(
                 declaring_type.type_id(),
                 declaring_type.type_name(),
@@ -563,7 +623,10 @@ impl fmt::Debug for FieldDescriptor {
             .field("has_set", &self.set.is_some())
             .field("has_set_preflight", &self.set_preflight.is_some())
             .field("has_thread_safe_get", &self.thread_safe_get.is_some())
-            .field("has_thread_safe_get_mut", &self.thread_safe_get_mut.is_some())
+            .field(
+                "has_thread_safe_get_mut",
+                &self.thread_safe_get_mut.is_some(),
+            )
             .field("has_thread_safe_set", &self.thread_safe_set.is_some())
             .finish()
     }

@@ -11,6 +11,7 @@
 // qubit-style: allow type-file-name
 
 /// An invariant violation in a structural expression.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ExpressionError {

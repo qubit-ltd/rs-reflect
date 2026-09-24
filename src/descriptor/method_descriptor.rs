@@ -155,7 +155,9 @@ impl MethodDescriptor {
     /// `None` means no parameter has the requested identifier.
     #[must_use]
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
-        self.parameters.iter().find(|parameter| parameter.name() == Some(name))
+        self.parameters
+            .iter()
+            .find(|parameter| parameter.name() == Some(name))
     }
 
     /// Returns a non-receiver parameter by declaration index.
@@ -220,7 +222,10 @@ impl MethodDescriptor {
 
     /// Applies concrete trait arguments to every signature relationship while
     /// preserving the declaration identity and source metadata.
-    pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
+    pub(crate) fn substituted_for_trait_application(
+        &self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> Self {
         let mut result = self.clone();
         for parameter in &mut result.parameters {
             parameter.signature_type = substitutions.type_expression(&parameter.signature_type);
@@ -241,15 +246,17 @@ impl MethodDescriptor {
 
     /// Returns whether applying the substitutions changes any method-level
     /// signature or predicate fact.
-    pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
-        self.parameters
-            .iter()
-            .any(|parameter| substitutions.type_expression(&parameter.signature_type) != parameter.signature_type)
-            || self
-                .return_value
-                .signature_type
-                .as_ref()
-                .is_some_and(|expression| substitutions.type_expression(expression) != *expression)
+    pub(crate) fn needs_trait_application_substitution(
+        &self,
+        substitutions: &TraitApplicationSubstitutions,
+    ) -> bool {
+        self.parameters.iter().any(|parameter| {
+            substitutions.type_expression(&parameter.signature_type) != parameter.signature_type
+        }) || self
+            .return_value
+            .signature_type
+            .as_ref()
+            .is_some_and(|expression| substitutions.type_expression(expression) != *expression)
             || self
                 .generic_definition
                 .predicates

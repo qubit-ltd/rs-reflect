@@ -26,6 +26,7 @@ use crate::expression::GenericParameterDescriptor;
 use crate::expression::TypeExpression;
 
 /// An invalid applied trait graph or incomplete external declaration.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TraitDescriptorBuildError {
     /// A supertrait resolves to the application currently being built.
@@ -66,23 +67,28 @@ impl fmt::Display for TraitDescriptorBuildError {
             Self::RecursiveSupertrait { rust_path } => {
                 write!(formatter, "recursive supertrait application: {rust_path}")
             }
-            Self::ExternalTraitHasUnprovenFacts => {
-                formatter.write_str("an external incomplete trait cannot claim supertraits or associated items")
-            }
+            Self::ExternalTraitHasUnprovenFacts => formatter.write_str(
+                "an external incomplete trait cannot claim supertraits or associated items",
+            ),
             Self::GenericArgumentCount { expected, actual } => write!(
                 formatter,
                 "trait application requires {expected} concrete arguments but received {actual}"
             ),
             Self::GenericArgumentKind { index } => {
-                write!(formatter, "trait argument {index} has the wrong generic kind")
+                write!(
+                    formatter,
+                    "trait argument {index} has the wrong generic kind"
+                )
             }
             Self::NonConcreteGenericArgument { index } => {
                 write!(formatter, "trait argument {index} is not concrete")
             }
-            Self::InvalidAssociatedTypeArgument => {
-                formatter.write_str("an associated-type argument must name one declared item and have a concrete value")
+            Self::InvalidAssociatedTypeArgument => formatter.write_str(
+                "an associated-type argument must name one declared item and have a concrete value",
+            ),
+            Self::ForeignMethod => {
+                formatter.write_str("applied trait contains a foreign method declaration")
             }
-            Self::ForeignMethod => formatter.write_str("applied trait contains a foreign method declaration"),
         }
     }
 }
@@ -130,8 +136,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets direct supertraits in source declaration order.
-    pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
-        self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
+    pub fn direct_supertraits<const N: usize>(
+        mut self,
+        direct_supertraits: [&'static TraitDescriptor; N],
+    ) -> Self {
+        self.direct_supertraits = direct_supertraits
+            .into_iter()
+            .map(TraitDescriptorRef::new)
+            .collect();
         self
     }
 
@@ -160,6 +172,15 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns [`TraitDescriptorBuildError`] for recursive supertraits or when
     /// an incomplete external trait claims supertraits or associated items.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated applied trait descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TraitDescriptorBuildError`] when the graph or external-trait
+    /// facts violate the declaration contract.
     pub fn build(self) -> Result<TraitDescriptor, TraitDescriptorBuildError> {
         self.validate_arguments()?;
         self.validate_associated_type_arguments()?;
@@ -193,8 +214,11 @@ impl TraitDescriptorBuilder {
             arguments: self.arguments.clone().into_boxed_slice(),
             associated_type_arguments: self.associated_type_arguments.clone().into_boxed_slice(),
         };
-        let substitutions =
-            TraitApplicationSubstitutions::new(self.definition, &self.arguments, &self.associated_type_arguments);
+        let substitutions = TraitApplicationSubstitutions::new(
+            self.definition,
+            &self.arguments,
+            &self.associated_type_arguments,
+        );
         let methods = if substitutions.is_empty()
             || !self
                 .methods
@@ -248,7 +272,10 @@ impl TraitDescriptorBuilder {
                 rust_path: self.definition.rust_path(),
             });
         }
-        if closure.iter().any(|existing| existing.same_application(candidate)) {
+        if closure
+            .iter()
+            .any(|existing| existing.same_application(candidate))
+        {
             return Ok(());
         }
         closure.push(TraitDescriptorRef::new(candidate));
@@ -282,11 +309,18 @@ impl TraitDescriptorBuilder {
                 actual: self.arguments.len(),
             });
         }
-        for (index, (parameter, argument)) in parameters.into_iter().zip(&self.arguments).enumerate() {
+        for (index, (parameter, argument)) in
+            parameters.into_iter().zip(&self.arguments).enumerate()
+        {
             let kind_matches = matches!(
                 (parameter, argument),
-                (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
-                    | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
+                (
+                    GenericParameterDescriptor::Type { .. },
+                    GenericArgument::Type(_)
+                ) | (
+                    GenericParameterDescriptor::Const { .. },
+                    GenericArgument::Const(_)
+                )
             );
             if !kind_matches {
                 return Err(TraitDescriptorBuildError::GenericArgumentKind { index });
@@ -337,7 +371,9 @@ impl TraitDescriptorBuilder {
 pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
     match argument {
         GenericArgument::Type(expression) => type_expression_is_concrete(expression),
-        GenericArgument::Const(argument) => !matches!(argument.value, ConstExpression::Parameter(_)),
+        GenericArgument::Const(argument) => {
+            !matches!(argument.value, ConstExpression::Parameter(_))
+        }
         GenericArgument::Lifetime(_) => true,
         GenericArgument::AssociatedType { value, .. } => type_expression_is_concrete(value),
         GenericArgument::AssociatedTypeBound { .. } => false,
@@ -347,12 +383,15 @@ pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgu
 /// Returns whether a substituted type expression contains no symbolic type.
 fn type_expression_is_concrete(expression: &TypeExpression) -> bool {
     match expression {
-        TypeExpression::Concrete(concrete) => concrete.arguments.iter().all(generic_argument_is_concrete),
+        TypeExpression::Concrete(concrete) => {
+            concrete.arguments.iter().all(generic_argument_is_concrete)
+        }
         TypeExpression::Reference(reference) => type_expression_is_concrete(&reference.target),
         TypeExpression::RawPointer(pointer) => type_expression_is_concrete(&pointer.target),
         TypeExpression::Slice(element) => type_expression_is_concrete(element),
         TypeExpression::Array(array) => {
-            type_expression_is_concrete(&array.element) && !matches!(array.length, ConstExpression::Parameter(_))
+            type_expression_is_concrete(&array.element)
+                && !matches!(array.length, ConstExpression::Parameter(_))
         }
         TypeExpression::Tuple(elements) => elements.iter().all(type_expression_is_concrete),
         TypeExpression::FunctionPointer(function) => {

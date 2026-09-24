@@ -15,6 +15,7 @@ use crate::access::FieldIdentity;
 use crate::error::TypeMismatch;
 
 /// A checked field access failed before producing or changing a field value.
+#[must_use]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum FieldAccessError {
     /// The dynamic target is not the field's declaring root type.

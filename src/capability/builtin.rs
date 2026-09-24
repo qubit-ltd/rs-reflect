@@ -42,7 +42,19 @@ impl CloneAdapter {
     ///
     /// Returns [`TypeMismatch`] without changing `value` when its concrete type
     /// differs from the type captured by this adapter.
-    pub fn clone_owned(&self, value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
+    ///
+    /// # Returns
+    ///
+    /// Returns an owned clone of the exact registered type.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeMismatch`] when `value` does not contain the adapter's
+    /// registered type.
+    pub fn clone_owned(
+        &self,
+        value: &DynamicOwned<Local>,
+    ) -> Result<DynamicOwned<Local>, TypeMismatch> {
         (self.clone_owned)(value)
     }
 }
@@ -120,7 +132,9 @@ pub fn default_descriptor<T: Default + 'static>() -> CapabilityDescriptor {
 }
 
 /// Clones one exact dynamic concrete type after checking its runtime identity.
-fn clone_owned<T: Clone + 'static>(value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
+fn clone_owned<T: Clone + 'static>(
+    value: &DynamicOwned<Local>,
+) -> Result<DynamicOwned<Local>, TypeMismatch> {
     let Some(value) = value.downcast_ref::<T>() else {
         let actual = value
             .as_any()

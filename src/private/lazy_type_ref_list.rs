@@ -58,7 +58,10 @@ impl fmt::Debug for LazyTypeRefList {
     /// Formats cached state without forcing any relationship to resolve.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.resolved.get() {
-            Some(references) => formatter.debug_tuple("LazyTypeRefList").field(references).finish(),
+            Some(references) => formatter
+                .debug_tuple("LazyTypeRefList")
+                .field(references)
+                .finish(),
             None => formatter
                 .debug_struct("LazyTypeRefList")
                 .field("length", &self.references.len())

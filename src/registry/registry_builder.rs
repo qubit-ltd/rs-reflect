@@ -47,15 +47,18 @@ struct RegistryBuilder {
     types: Vec<&'static TypeDescriptor>,
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
     definitions: Vec<&'static TypeDefinitionDescriptor>,
-    definitions_by_id: HashMap<TypeDefinitionId, (&'static TypeDefinitionDescriptor, FragmentIdentity)>,
+    definitions_by_id:
+        HashMap<TypeDefinitionId, (&'static TypeDefinitionDescriptor, FragmentIdentity)>,
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
-    external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
+    external_traits:
+        HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
     impl_definition_traits: HashMap<FragmentIdentity, &'static TraitDefinitionDescriptor>,
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
-    capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
+    capabilities:
+        HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
     loaded_intrinsic_capabilities: HashSet<TypeId>,
     fragment_identities: Vec<FragmentIdentity>,
@@ -66,7 +69,9 @@ impl RegistryBuilder {
     fn push(&mut self, built: BuiltFragment) -> Result<(), RegistryError> {
         match built.payload {
             FragmentPayload::Type(descriptor) => self.push_type(descriptor, &built.identity)?,
-            FragmentPayload::TypeDefinition(descriptor) => self.push_definition(descriptor, &built.identity)?,
+            FragmentPayload::TypeDefinition(descriptor) => {
+                self.push_definition(descriptor, &built.identity)?
+            }
             FragmentPayload::Trait(descriptor) => self.push_trait(descriptor, &built.identity)?,
             FragmentPayload::ImplDefinition(descriptor) => {
                 if descriptor.fragment_identity() != &built.identity {
@@ -93,7 +98,10 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         if let Some((_, first)) = self.definitions_by_id.get(&descriptor.id()) {
-            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
+            return Err(RegistryError::identity_conflict(
+                first.clone(),
+                identity.clone(),
+            ));
         }
         self.definitions.push(descriptor);
         self.definitions_by_id
@@ -108,7 +116,10 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         if let Some((_, first)) = self.types_by_id.get(&descriptor.type_id()) {
-            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
+            return Err(RegistryError::identity_conflict(
+                first.clone(),
+                identity.clone(),
+            ));
         }
         self.types.push(descriptor);
         self.types_by_id
@@ -138,7 +149,10 @@ impl RegistryBuilder {
         descriptor: &'static TypeDescriptor,
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
-        if !self.loaded_intrinsic_capabilities.insert(descriptor.type_id()) {
+        if !self
+            .loaded_intrinsic_capabilities
+            .insert(descriptor.type_id())
+        {
             return Ok(());
         }
         let capabilities = descriptor.declared_capabilities().map_err(|error| {
@@ -196,7 +210,8 @@ impl RegistryBuilder {
                 conflict,
             ));
         }
-        self.capabilities.insert(key, (descriptor, identity.clone()));
+        self.capabilities
+            .insert(key, (descriptor, identity.clone()));
         self.capability_origins.insert(key, origin);
         Ok(())
     }
@@ -209,7 +224,8 @@ impl RegistryBuilder {
     ) -> Result<(), RegistryError> {
         let definition_id = descriptor.trait_id().clone();
         if let TraitId::External(external_id) = &definition_id {
-            if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id) {
+            if let Some((first_descriptor, first_identity)) = self.external_traits.get(external_id)
+            {
                 if !descriptor.is_compatible_with(first_descriptor) {
                     return Err(RegistryError::external_trait_id_conflict(
                         first_identity.clone(),
@@ -221,9 +237,13 @@ impl RegistryBuilder {
                     .insert(external_id.clone(), (descriptor, identity.clone()));
             }
         } else if let Some(first) = self.trait_fragments.get(&definition_id) {
-            return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
+            return Err(RegistryError::identity_conflict(
+                first.clone(),
+                identity.clone(),
+            ));
         }
-        self.trait_fragments.insert(definition_id.clone(), identity.clone());
+        self.trait_fragments
+            .insert(definition_id.clone(), identity.clone());
         self.traits_by_id.entry(definition_id).or_insert(descriptor);
         Ok(())
     }
@@ -247,11 +267,17 @@ impl RegistryBuilder {
         if let Some(implemented_trait) = descriptor.implemented_trait() {
             let key = (target_type_id, implemented_trait.trait_id().clone());
             if let Some(first) = self.trait_impls.get(&key) {
-                return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
+                return Err(RegistryError::identity_conflict(
+                    first.clone(),
+                    identity.clone(),
+                ));
             }
             self.trait_impls.insert(key, identity.clone());
         }
-        self.impls_by_target.entry(target_type_id).or_default().push(descriptor);
+        self.impls_by_target
+            .entry(target_type_id)
+            .or_default()
+            .push(descriptor);
         Ok(())
     }
 
@@ -293,8 +319,10 @@ impl RegistryBuilder {
 
         let types_by_type_name = group_types(&self.types, TypeDescriptor::type_name);
         let types_by_query_name = group_types(&self.types, TypeDescriptor::query_name);
-        let definitions_by_rust_path = group_definitions(&self.definitions, TypeDefinitionDescriptor::rust_path);
-        let definitions_by_query_name = group_definitions(&self.definitions, TypeDefinitionDescriptor::query_name);
+        let definitions_by_rust_path =
+            group_definitions(&self.definitions, TypeDefinitionDescriptor::rust_path);
+        let definitions_by_query_name =
+            group_definitions(&self.definitions, TypeDefinitionDescriptor::query_name);
         let mut trait_definitions: Vec<_> = self.traits_by_id.into_iter().collect();
         trait_definitions.sort_by(|(left_id, _), (right_id, _)| {
             self.trait_fragments
@@ -331,14 +359,20 @@ impl RegistryBuilder {
             .iter()
             .map(|(type_id, implementations)| (*type_id, EffectiveTypeView::new(implementations)))
             .collect();
-        let mut type_capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> = HashMap::new();
-        let mut definition_capability_descriptors: HashMap<TypeDefinitionId, Vec<CapabilityDescriptor>> =
+        let mut type_capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> =
             HashMap::new();
+        let mut definition_capability_descriptors: HashMap<
+            TypeDefinitionId,
+            Vec<CapabilityDescriptor>,
+        > = HashMap::new();
         let mut capability_fragments = HashMap::new();
         for ((target, capability_id), (descriptor, identity)) in self.capabilities {
             match target {
                 CapabilityTarget::Type(type_id) => {
-                    type_capability_descriptors.entry(type_id).or_default().push(descriptor);
+                    type_capability_descriptors
+                        .entry(type_id)
+                        .or_default()
+                        .push(descriptor);
                 }
                 CapabilityTarget::TypeDefinition(definition_id) => {
                     definition_capability_descriptors
@@ -403,7 +437,10 @@ fn group_definitions(
 ) -> HashMap<&'static str, Box<[&'static TypeDefinitionDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for descriptor in definitions {
-        groups.entry(name(descriptor)).or_default().push(*descriptor);
+        groups
+            .entry(name(descriptor))
+            .or_default()
+            .push(*descriptor);
     }
     groups
         .into_iter()
@@ -417,7 +454,9 @@ pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryErro
 }
 
 /// Builds a registry from an explicit static fragment slice.
-pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
+pub(crate) fn build_registry(
+    fragments: &[&'static RegistrationFragment],
+) -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(fragments.iter().copied())
 }
 
@@ -509,10 +548,16 @@ fn validate_identities<'identity>(
     };
     for right in identities {
         if left == right {
-            return Err(RegistryError::duplicate_fragment(left.clone(), right.clone()));
+            return Err(RegistryError::duplicate_fragment(
+                left.clone(),
+                right.clone(),
+            ));
         }
         if left.same_source_identity(right) {
-            return Err(RegistryError::identity_conflict(left.clone(), right.clone()));
+            return Err(RegistryError::identity_conflict(
+                left.clone(),
+                right.clone(),
+            ));
         }
         left = right;
     }
@@ -526,7 +571,10 @@ fn group_types(
 ) -> HashMap<&'static str, Box<[&'static TypeDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for descriptor in types {
-        groups.entry(name(descriptor)).or_default().push(*descriptor);
+        groups
+            .entry(name(descriptor))
+            .or_default()
+            .push(*descriptor);
     }
     groups
         .into_iter()
@@ -541,7 +589,10 @@ fn group_traits(
 ) -> HashMap<&'static str, Box<[&'static TraitDefinitionDescriptor]>> {
     let mut groups: HashMap<_, Vec<_>> = HashMap::new();
     for (_, descriptor) in traits {
-        groups.entry(descriptor.rust_path()).or_default().push(*descriptor);
+        groups
+            .entry(descriptor.rust_path())
+            .or_default()
+            .push(*descriptor);
     }
     groups
         .into_iter()

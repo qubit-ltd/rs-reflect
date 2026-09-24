@@ -131,7 +131,10 @@ pub struct ConcreteTypeExpression {
 
 impl ConcreteTypeExpression {
     /// Creates a concrete type expression from a non-empty path.
-    pub fn new<P, S>(path: P, arguments: impl IntoIterator<Item = GenericArgument>) -> Result<Self, ExpressionError>
+    pub fn new<P, S>(
+        path: P,
+        arguments: impl IntoIterator<Item = GenericArgument>,
+    ) -> Result<Self, ExpressionError>
     where
         P: IntoIterator<Item = S>,
         S: Into<Box<str>>,
@@ -160,7 +163,9 @@ impl ConcreteTypeExpression {
     }
 
     /// Creates a concrete type expression from structural path segments.
-    pub fn from_segments(segments: impl IntoIterator<Item = ConcretePathSegment>) -> Result<Self, ExpressionError> {
+    pub fn from_segments(
+        segments: impl IntoIterator<Item = ConcretePathSegment>,
+    ) -> Result<Self, ExpressionError> {
         let segments = segments.into_iter().collect::<Box<[_]>>();
         if segments.is_empty() {
             return Err(ExpressionError::EmptyConcretePath);
@@ -168,7 +173,10 @@ impl ConcreteTypeExpression {
         if let Some(index) = segments.iter().position(|segment| segment.name.is_empty()) {
             return Err(ExpressionError::EmptyPathSegment { index });
         }
-        let path = segments.iter().map(|segment| segment.name.clone()).collect();
+        let path = segments
+            .iter()
+            .map(|segment| segment.name.clone())
+            .collect();
         let arguments = segments
             .last()
             .map_or_else(Box::default, |segment| segment.arguments.clone());
