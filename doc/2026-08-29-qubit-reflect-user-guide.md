@@ -643,7 +643,8 @@ future incompatible protocol receives a new versioned module.
 
 Explicit snapshots do not change the generated-code protocol. Facades still
 expose `__private::codegen_v3`; downstream `qubit-model-metadata` uses its
-independent model ABI v4.
+independent model metadata ABI `v7` in the current `qubit-model-metadata`
+checkout. This is separate from the reflection `codegen_v3` protocol.
 
 ### Migrating effective capability queries
 
@@ -682,9 +683,9 @@ valid local calls. Outputs and futures do not borrow the registry, but remain
 constrained by input lifetimes.
 
 Old `codegen_v2` facades fail compilation: migrate the exact export to
-`codegen_v3`. Model v4 and `definition_provider_v2` remain independent. Debug
-prints structural facts without running providers; providers themselves must
-not re-enter initialization.
+`codegen_v3`. Model metadata ABI `v7` and `definition_provider_v2` remain
+independent. Debug prints structural facts without running providers; providers
+themselves must not re-enter initialization.
 
 ## Terminology reference
 

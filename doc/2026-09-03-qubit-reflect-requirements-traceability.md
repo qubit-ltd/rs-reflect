@@ -8,8 +8,8 @@ breaking boundary redesign.
 
 `T01` through `T26` are historical task identifiers retained as decision
 provenance; they do not imply unfinished work. The generated-code protocol is
-`__private::codegen_v3`, model metadata uses ABI v4, and the sole registry
-resolver is `ReflectRegistry`. The public `RegistrySnapshotBuilder` provides
+`__private::codegen_v3`, current model metadata uses ABI `v7`, and the sole
+registry resolver is `ReflectRegistry`. The public `RegistrySnapshotBuilder` provides
 an isolated, transactional construction path for explicitly owned fragments.
 
 ## Verification

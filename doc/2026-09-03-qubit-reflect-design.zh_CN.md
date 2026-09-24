@@ -1,7 +1,7 @@
 # `qubit-reflect` 详细设计
 
 - 日期：2026-09-03
-- 最近审核：2026-09-07
+- 最近审核：2026-09-24
 - 状态：破坏性边界重构已实现；当前只供内部仓库使用，发布流程明确暂缓
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
 - 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
@@ -164,11 +164,11 @@ facade::__private::codegen_v3
 不得使用 `pub use qubit_reflect::*`、`pub use qubit_reflect::__private::*`，也不应仅为满足宏展开而重导出
 runtime 的完整模块。
 
-`qubit-model-metadata` 另外维护自己的 `__private::v4` 模型元数据 ABI，并只在该精确私有模块中消费
+当前下游 `qubit-model-metadata` 另外维护自己的 `__private::v7` 模型元数据 ABI，并只在该精确私有模块中消费
 反射协议，使模型 ABI 与反射 ABI 的所有权、版本号和迁移原因保持正交。
 
 显式 snapshot builder 属于 runtime 公共 API，不会扩大任一生成代码协议。现有 derive 和 facade 继续使用
-`__private::codegen_v3`，下游模型代码继续使用独立的 v4 ABI。因此，下游 fixture 或库可以构建确定性的
+`__private::codegen_v3`，下游模型代码继续使用独立的 v7 ABI。因此，下游 fixture 或库可以构建确定性的
 事实子集，而不必把协议迁移与 registry 所有权绑定在一起。
 
 ## 泛型定义与 effective capability
@@ -204,7 +204,7 @@ snapshot 索引，构建失败和其他 snapshot 不会修改共享声明。faca
 无参数函数，返回 `&'static TypeDefinitionDescriptor`，不要求具体单态化，也不推断生成名称。
 
 derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
-空字段数量不再决定结构形状。此内部修订不改变 `codegen_v3` 或模型 v4 协议。
+空字段数量不再决定结构形状。此内部修订不改变 `codegen_v3` 或当前模型 ABI v7 协议。
 下游元数据和属性查询传播结构化错误，解析器附加根模型、完整路径、来源；
 一条基础失败不生成伪 MissingProperty/InvalidValueClosure，也不阻断独立错误收集。
 
@@ -253,7 +253,7 @@ capability，也不执行 provider。
 | all-features | 生态/Qubit 类型、workspace tests、Clippy、Rustdoc |
 | derive | parser/analysis 单元测试、trybuild pass/fail、invocation 集成 |
 | registry | 跨 crate 聚合、冲突、冻结、稳定排序、并发初始化 |
-| ABI/facade | 重命名依赖、显式 facade、`codegen_v3` 与模型 `v4` |
+| ABI/facade | 重命名依赖、显式 facade、`codegen_v3` 与当前模型 ABI `v7` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
 覆盖率验证同时执行 crate 全局阈值和 `.infra/ci/critical-coverage.json` 中的高风险逐文件阈值；后者防止

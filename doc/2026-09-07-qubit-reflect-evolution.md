@@ -7,6 +7,12 @@ This record preserves dated implementation and review notes. The current
 contracts are maintained in the design document; this page explains how the
 September changes reached that contract.
 
+As of 2026-09-24, the downstream `qubit-model-metadata` checkout uses its
+independent `__private::v7` metadata ABI. The `v4` references below record the
+ABI that existed when the 2026-09-07 change was made; they are historical, not
+the current downstream version. The reflection derive protocol remains
+`__private::codegen_v3`.
+
 ## 2026-09-05 review corrections
 
 - Type-dependent capabilities are cached by concrete `TypeId`. Factories run

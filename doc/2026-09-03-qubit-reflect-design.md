@@ -1,7 +1,7 @@
 # `qubit-reflect` Design
 
 - Date: 2026-09-03
-- Last reviewed: 2026-09-07
+- Last reviewed: 2026-09-24
 - Status: breaking boundary redesign implemented; internal-repository consumption only, with release intentionally deferred
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
@@ -181,13 +181,14 @@ and independently re-exports each public application symbol it promises. It
 must not use `pub use qubit_reflect::*`, `pub use qubit_reflect::__private::*`,
 or re-export whole runtime modules merely to satisfy macro expansion.
 
-`qubit-model-metadata` separately owns its `__private::v4` model-metadata ABI. It consumes the reflection protocol only
-inside that exact private module, keeping ownership, versioning, and migration reasons orthogonal.
+`qubit-model-metadata` separately owns its current `__private::v7`
+model-metadata ABI. It consumes the reflection protocol only inside that exact
+private module, keeping ownership, versioning, and migration reasons orthogonal.
 
 The explicit snapshot builder is a runtime API and does not widen either
 generated-code protocol. Existing derives and facades continue to use
 `__private::codegen_v3`; downstream model code continues to use its independent
-v4 ABI. This lets a downstream fixture or library assemble a deterministic
+v7 ABI. This lets a downstream fixture or library assemble a deterministic
 subset of facts without coupling protocol migration to registry ownership.
 
 ## Generic definitions and effective capabilities
@@ -235,7 +236,7 @@ requiring a concrete monomorphization or an inferred generated name.
 
 Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
 definitions, and construction expansion. Empty field counts no longer determine source shape.
-This internal change does not change `codegen_v3` or model v4. Downstream metadata/property queries
+This internal change does not change `codegen_v3` or model ABI v7. Downstream metadata/property queries
 propagate structured errors; resolution adds root model, full path, and provenance. An underlying
 failure must not create synthetic MissingProperty/InvalidValueClosure errors or suppress independent failures.
 
@@ -291,7 +292,7 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | all features | ecosystem/Qubit types, workspace tests, Clippy, Rustdoc |
 | derive | parser/analysis unit tests, trybuild pass/fail, invocation integration |
 | registry | cross-crate aggregation, conflicts, freeze, stable ordering, concurrent initialization |
-| ABI/facade | renamed dependencies, explicit facade, `codegen_v3`, and model `v4` |
+| ABI/facade | renamed dependencies, explicit facade, `codegen_v3`, and current model ABI `v7` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
 Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
