@@ -60,6 +60,50 @@ registry-dependent trait links and model properties remain snapshot-local.
 Future optimization should compare end-to-end model workloads and allocation
 costs, not only a synthetic repeated descriptor lookup.
 
+## 2026-09-24 effective method view baseline
+
+The downstream application source contains 22 `#[ModelImpl]` blocks declaring
+46 methods, with a mean of about 2.1 methods per block and a maximum of 9. The
+per-block source counts are: 13 blocks with 1 method, 5 with 2, 2 with 4, 1
+with 6, and 1 with 9. Counts were derived from the method declarations inside
+macro-annotated impl blocks in `rs-platform`, excluding the test-only fixture.
+They are a source-level workload estimate, not counts read from a successfully
+linked runtime registry; trait defaults or method overrides may change the
+effective-view count. The attempted downstream
+`ci-check.sh` is currently blocked by an unrelated exhaustive-match error in
+`modules/core/src/mixin/validation_violation.rs` for the non-exhaustive
+`qubit_validator::PathSegment` enum.
+
+Run the isolated effective-view construction benchmark in rs-reflect:
+
+```bash
+cargo +1.94.0 bench --locked --features bench-internals --bench registry_init -- --quick
+```
+
+Criterion runs on the same Rust 1.94.0 x86_64 Linux Intel Core i5-9600K machine
+described above. The group constructs distinct synthetic inherent method
+instances before timing and times only `EffectiveTypeView::new` through a
+benchmark-only hook. The four sizes are the zero-method baseline, the
+downstream mean rounded to 2, the observed maximum of 9, and twice that maximum.
+Quick mode is diagnostic and the estimates are not a controlled-runner
+regression baseline.
+
+| Effective method instances | Estimate | Quick-mode interval |
+| ---: | ---: | ---: |
+| 0 | 11.87 ns | 11.85–11.91 ns |
+| 2 | 116.50 ns | 116.45–116.52 ns |
+| 9 | 565.71 ns | 562.94–576.81 ns |
+| 18 | 1.431 µs | 1.429–1.438 µs |
+
+The method view at the observed maximum is below one microsecond in this
+synthetic isolated measurement. The 18-method exploratory case is about 1.4 µs.
+These measurements do not meet the design decision gate of 1 ms, and the
+downstream runtime registry could not be profiled because its build is blocked.
+There is no evidence that duplicate search dominates cold registry startup, so
+keep the current implementation. Revisit only if a working downstream build
+and profile show method-view construction reaches 10% of cold registry
+construction or 1 ms at a real workload size.
+
 ## 2026-09-06 contract-refactoring measurements
 
 The following measurements were taken after the capability-error and struct-shape

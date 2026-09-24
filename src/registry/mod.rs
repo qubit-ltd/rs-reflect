@@ -21,6 +21,8 @@ mod registry_builder;
 mod registry_snapshot_builder;
 
 pub use effective_type_view::EffectiveTypeView;
+#[cfg(feature = "bench-internals")]
+pub(crate) use effective_type_view::build_benchmark_effective_type_view;
 pub use fragment::CapabilityTarget;
 #[cfg(feature = "bench-internals")]
 pub(crate) use internal::benchmark_registry_facts::BenchmarkRegistryFacts;

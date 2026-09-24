@@ -28,16 +28,93 @@ use reflect::__private::codegen_v3::registration::RegistrationFragment;
 use reflect::__private::codegen_v3::registration::RuntimeIdentity;
 use reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use reflect::__private::testing::aggregate_benchmark_registry_facts;
+use reflect::__private::testing::build_benchmark_effective_type_view;
 use reflect::__private::testing::prepare_benchmark_registry_facts;
 use reflect::TypeDescriptor;
+use reflect::descriptor::ImplDefinitionDescriptor;
+use reflect::descriptor::ImplDescriptor;
+use reflect::descriptor::ImplKind;
+use reflect::descriptor::InvocationUnavailableReason;
+use reflect::descriptor::MethodDeclarationOwner;
+use reflect::descriptor::MethodDescriptor;
+use reflect::descriptor::MethodImplementationSource;
+use reflect::descriptor::MethodInstanceDescriptor;
+use reflect::expression::GenericDefinitionDescriptor;
+use reflect::expression::TypeExpression;
+use reflect::identity::FragmentIdentity;
+use reflect::identity::MemberId;
 use reflect::registry::ReflectRegistry;
 
 struct RegistryBenchmarkType;
 
 static REGISTRY_BENCHMARK_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::opaque_root::<RegistryBenchmarkType>(
-        "registry-benchmark",
-    );
+    reflect::__private::codegen_v3::descriptor::opaque_root::<RegistryBenchmarkType>("registry-benchmark");
+
+/// Resolves the benchmark target used by synthetic method implementations.
+fn benchmark_target_type() -> &'static TypeDescriptor {
+    &REGISTRY_BENCHMARK_DESCRIPTOR
+}
+
+/// Creates distinct inherent method implementations for a synthetic type.
+fn prepare_effective_method_facts(method_count: usize) -> Vec<&'static ImplDescriptor> {
+    let generic_definition = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
+    (0..method_count)
+        .map(|index| {
+            let impl_identity = FragmentIdentity::new(
+                "registry-bench",
+                "effective_view",
+                index as u32 + 1,
+                1,
+                "impl",
+                index as u64 + 1,
+            );
+            let definition = Box::leak(Box::new(
+                ImplDefinitionDescriptor::new(
+                    impl_identity.clone(),
+                    TypeExpression::Parameter("Self".into()),
+                    ImplKind::Inherent,
+                    None,
+                    generic_definition,
+                )
+                .expect("synthetic inherent impl definition must build"),
+            ));
+            let method_identity = FragmentIdentity::new(
+                "registry-bench",
+                "effective_view",
+                index as u32 + 1,
+                2,
+                "method",
+                index as u64 + 1,
+            );
+            let method_name = Box::leak(format!("method_{index}").into_boxed_str());
+            let method = Box::leak(Box::new(
+                MethodDescriptor::builder(
+                    MemberId::new("registry-bench::effective_view", "method", index, method_identity),
+                    method_name,
+                    method_name,
+                    MethodDeclarationOwner::Impl(definition),
+                )
+                .build(),
+            ));
+            let instance = MethodInstanceDescriptor::with_arguments(
+                method,
+                None,
+                MethodImplementationSource::Declared,
+                None,
+                Box::new([]),
+                Box::new([InvocationUnavailableReason::DisabledByPolicy]),
+            )
+            .expect("synthetic method instance must build");
+            Box::leak(Box::new(
+                ImplDescriptor::builder(definition, benchmark_target_type)
+                    .methods(std::slice::from_ref(method))
+                    .method_instances(vec![instance])
+                    .build()
+                    .expect("synthetic inherent impl must build"),
+            )) as &'static ImplDescriptor
+        })
+        .collect()
+}
 
 /// Returns the runtime identity used by the benchmark fixture.
 fn benchmark_runtime_identity() -> RuntimeIdentity {
@@ -65,21 +142,15 @@ fn registry_operations(criterion: &mut Criterion) {
     let one_fragment = prepare_benchmark_registry_facts(1);
     let one_hundred_fragments = prepare_benchmark_registry_facts(100);
     let ten_thousand_fragments = prepare_benchmark_registry_facts(10_000);
-    aggregate_benchmark_registry_facts(&one_fragment)
-        .expect("one-fragment aggregation setup must succeed");
-    aggregate_benchmark_registry_facts(&one_hundred_fragments)
-        .expect("100-fragment aggregation setup must succeed");
+    aggregate_benchmark_registry_facts(&one_fragment).expect("one-fragment aggregation setup must succeed");
+    aggregate_benchmark_registry_facts(&one_hundred_fragments).expect("100-fragment aggregation setup must succeed");
     aggregate_benchmark_registry_facts(&ten_thousand_fragments)
         .expect("10,000-fragment aggregation setup must succeed");
 
     let mut aggregation = criterion.benchmark_group("registry/aggregation");
-    aggregation.bench_with_input(
-        BenchmarkId::from_parameter(1),
-        &one_fragment,
-        |bench, facts| {
-            bench.iter(|| black_box(aggregate_benchmark_registry_facts(facts)));
-        },
-    );
+    aggregation.bench_with_input(BenchmarkId::from_parameter(1), &one_fragment, |bench, facts| {
+        bench.iter(|| black_box(aggregate_benchmark_registry_facts(facts)));
+    });
     aggregation.bench_with_input(
         BenchmarkId::from_parameter(100),
         &one_hundred_fragments,
@@ -99,22 +170,35 @@ fn registry_operations(criterion: &mut Criterion) {
 
     let mut lookup = criterion.benchmark_group("registry/frozen_lookup_batch");
     for batch_size in [1_usize, 100, 10_000] {
-        lookup.bench_with_input(
-            BenchmarkId::from_parameter(batch_size),
-            &batch_size,
-            |bench, size| {
-                bench.iter(|| {
-                    for _ in 0..*size {
-                        black_box((
-                            registry.get(TypeId::of::<RegistryBenchmarkType>()),
-                            registry.find_by_query_name("registry-benchmark").len(),
-                        ));
-                    }
-                });
+        lookup.bench_with_input(BenchmarkId::from_parameter(batch_size), &batch_size, |bench, size| {
+            bench.iter(|| {
+                for _ in 0..*size {
+                    black_box((
+                        registry.get(TypeId::of::<RegistryBenchmarkType>()),
+                        registry.find_by_query_name("registry-benchmark").len(),
+                    ));
+                }
+            });
+        });
+    }
+    lookup.finish();
+
+    let mut effective_view = criterion.benchmark_group("registry/effective_view_build");
+    for method_count in [0_usize, 2, 9, 18] {
+        let implementations = prepare_effective_method_facts(method_count);
+        assert_eq!(
+            build_benchmark_effective_type_view(&implementations).methods().len(),
+            method_count,
+        );
+        effective_view.bench_with_input(
+            BenchmarkId::from_parameter(method_count),
+            &implementations,
+            |bench, implementations| {
+                bench.iter(|| black_box(build_benchmark_effective_type_view(implementations)));
             },
         );
     }
-    lookup.finish();
+    effective_view.finish();
 }
 
 criterion_group!(benches, registry_operations);
