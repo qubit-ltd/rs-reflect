@@ -104,10 +104,14 @@ fn test_derive_struct_constructor_and_updater_are_descriptor_queryable() {
         }
     );
 
-    let updater = construction.local_updater().expect("derived structs expose updates");
+    let updater = construction
+        .local_updater()
+        .expect("derived structs expose updates");
     assert!(std::ptr::eq(
         updater,
-        construction.local_updater().expect("derived structs cache updates"),
+        construction
+            .local_updater()
+            .expect("derived structs cache updates"),
     ));
     let updated = updater
         .update(StructUpdateInput::new(
@@ -146,7 +150,10 @@ fn test_derive_thread_safe_struct_constructor_and_updater_are_queryable() {
     let mut value = updater
         .update(StructUpdateInput::new(
             value,
-            NamedConstructionInput::new([("label", SendReflectedOwned::new(String::from("updated")))]),
+            NamedConstructionInput::new([(
+                "label",
+                SendReflectedOwned::new(String::from("updated")),
+            )]),
         ))
         .expect("thread-safe overrides must update the struct")
         .downcast::<ConcurrentProfile>()
@@ -159,7 +166,10 @@ fn test_derive_thread_safe_struct_constructor_and_updater_are_queryable() {
     let borrowed = label
         .get_thread_safe(SendReflectedRef::new(&value))
         .expect("thread-safe shared field access");
-    assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("updated"));
+    assert_eq!(
+        borrowed.downcast_ref::<String>().map(String::as_str),
+        Some("updated")
+    );
     label
         .set_thread_safe(
             SendReflectedMut::new(&mut value),
@@ -172,7 +182,10 @@ fn test_derive_thread_safe_struct_constructor_and_updater_are_queryable() {
 #[test]
 fn test_derive_construction_honors_defaults_and_enum_shapes() {
     let defaults = Defaults::type_descriptor()
-        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(9_u32))]))
+        .construct_struct(NamedConstructionInput::new([(
+            "id",
+            ReflectedOwned::new(9_u32),
+        )]))
         .expect("an explicit default policy supplies an omitted field")
         .downcast::<Defaults>()
         .unwrap_or_else(|_| panic!("the adapter returns the declared root type"));
@@ -210,7 +223,10 @@ fn test_derive_construction_honors_defaults_and_enum_shapes() {
     );
 
     let defaulted = event_descriptor.variants()[2]
-        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(4_u32))]))
+        .construct_struct(NamedConstructionInput::new([(
+            "id",
+            ReflectedOwned::new(4_u32),
+        )]))
         .expect("variant field defaults are explicit and usable")
         .downcast::<Event>()
         .unwrap_or_else(|_| panic!("the variant adapter returns the enum root"));
@@ -243,7 +259,10 @@ fn test_derive_thread_safe_enum_constructor_and_field_access_are_queryable() {
         .thread_safe_constructor()
         .expect("thread-safe variant constructor");
     let mut value = constructor
-        .construct_named(NamedConstructionInput::new([("code", SendReflectedOwned::new(7_u32))]))
+        .construct_named(NamedConstructionInput::new([(
+            "code",
+            SendReflectedOwned::new(7_u32),
+        )]))
         .expect("thread-safe variant construction")
         .downcast::<ConcurrentEvent>()
         .unwrap_or_else(|_| panic!("constructor retains enum type"));
@@ -254,8 +273,11 @@ fn test_derive_thread_safe_enum_constructor_and_field_access_are_queryable() {
             .downcast_ref::<u32>(),
         Some(&7),
     );
-    code.set_thread_safe(SendReflectedMut::new(&mut value), SendReflectedOwned::new(9_u32))
-        .expect("thread-safe enum field set");
+    code.set_thread_safe(
+        SendReflectedMut::new(&mut value),
+        SendReflectedOwned::new(9_u32),
+    )
+    .expect("thread-safe enum field set");
     assert_eq!(value, ConcurrentEvent::Value { code: 9 });
 }
 
@@ -269,7 +291,10 @@ fn test_derive_no_construct_without_provider_recovers_every_input() {
         Ok(_) => panic!("a no-construct field without a provider disables construction"),
         Err(recovery) => recovery,
     };
-    assert!(matches!(recovery.error(), ConstructionError::Unavailable { .. }));
+    assert!(matches!(
+        recovery.error(),
+        ConstructionError::Unavailable { .. }
+    ));
     let values = recovery.into_values();
     assert_eq!(values.len(), 2);
 }

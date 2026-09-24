@@ -6,13 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Compile-time contracts for public reflection macros.
+//! Shared support used by public integration tests.
 
-#![cfg(feature = "derive")]
-
-#[test]
-fn test_reflection_macro_ui_contracts() {
-    let cases = trybuild::TestCases::new();
-    cases.pass("tests/ui/pass/*.rs");
-    cases.compile_fail("tests/ui/fail/*.rs");
-}
+pub(crate) mod registry_snapshot_model_tests;

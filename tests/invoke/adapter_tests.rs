@@ -49,7 +49,9 @@ fn return_eight<'call>(
     _registry: &ReflectRegistry,
     _invocation: Invocation<'call, ThreadSafe>,
 ) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
+    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(
+        8_u8,
+    )))
 }
 
 #[test]

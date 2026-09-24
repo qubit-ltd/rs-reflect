@@ -96,8 +96,11 @@ static POLICY_FIELDS: [FieldDescriptor; 2] = [
     )
     .with_access(FieldAccessPolicy::Skipped, Some(get_skipped), None, None),
 ];
-static POLICY_RECORD_DESCRIPTOR: TypeDescriptor =
-    descriptor::struct_type::<PolicyRecord>("policy_tests::PolicyRecord", StructKind::Named, &POLICY_FIELDS);
+static POLICY_RECORD_DESCRIPTOR: TypeDescriptor = descriptor::struct_type::<PolicyRecord>(
+    "policy_tests::PolicyRecord",
+    StructKind::Named,
+    &POLICY_FIELDS,
+);
 
 /// Verifies read-only fields remain readable and described while all mutable
 /// entry points are rejected before their adapters can change the target.

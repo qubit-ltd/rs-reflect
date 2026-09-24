@@ -38,7 +38,7 @@ use qubit_reflect::expression::TraitObjectExpression;
 use qubit_reflect::expression::TypeExpression;
 
 #[test]
-fn concrete_type_rejects_an_empty_path() {
+fn test_concrete_type_rejects_an_empty_path() {
     assert_eq!(
         ConcreteTypeExpression::new(Vec::<Box<str>>::new(), Box::<[GenericArgument]>::default(),),
         Err(ExpressionError::EmptyConcretePath),
@@ -46,7 +46,7 @@ fn concrete_type_rejects_an_empty_path() {
 }
 
 #[test]
-fn concrete_type_rejects_an_empty_segment() {
+fn test_concrete_type_rejects_an_empty_segment() {
     assert_eq!(
         ConcreteTypeExpression::new(["std", "", "Vec"], Vec::new()),
         Err(ExpressionError::EmptyPathSegment { index: 1 }),
@@ -55,7 +55,7 @@ fn concrete_type_rejects_an_empty_segment() {
 
 /// Verifies each concrete path segment retains its own generic arguments.
 #[test]
-fn concrete_type_preserves_arguments_on_each_path_segment() {
+fn test_concrete_type_preserves_arguments_on_each_path_segment() {
     let outer_argument = GenericArgument::Type(TypeExpression::Parameter("T".into()));
     let inner_argument = GenericArgument::Type(TypeExpression::Parameter("U".into()));
     let expression = ConcreteTypeExpression::from_segments([
@@ -72,12 +72,12 @@ fn concrete_type_preserves_arguments_on_each_path_segment() {
 }
 
 #[test]
-fn expression_name_rejects_empty_text() {
+fn test_expression_name_rejects_empty_text() {
     assert_eq!(ExpressionName::new(""), Err(ExpressionError::EmptyName));
 }
 
 #[test]
-fn expression_names_and_paths_preserve_validated_text() {
+fn test_expression_names_and_paths_preserve_validated_text() {
     let borrowed = ExpressionName::from("borrowed");
     let owned = ExpressionName::from(String::from("owned"));
     let boxed = ExpressionName::from(Box::<str>::from("boxed"));
@@ -85,15 +85,19 @@ fn expression_names_and_paths_preserve_validated_text() {
     assert_eq!(owned.as_ref(), "owned");
     assert_eq!(boxed.as_str(), "boxed");
 
-    let path = ExpressionPath::new(["std", "vec", "Vec"]).expect("a non-empty path with non-empty segments is valid");
+    let path = ExpressionPath::new(["std", "vec", "Vec"])
+        .expect("a non-empty path with non-empty segments is valid");
     assert_eq!(
-        path.segments().iter().map(ExpressionName::as_str).collect::<Vec<_>>(),
+        path.segments()
+            .iter()
+            .map(ExpressionName::as_str)
+            .collect::<Vec<_>>(),
         ["std", "vec", "Vec"],
     );
 }
 
 #[test]
-fn expression_path_rejects_empty_paths_and_segments() {
+fn test_expression_path_rejects_empty_paths_and_segments() {
     assert_eq!(
         ExpressionPath::new(Vec::<Box<str>>::new()),
         Err(ExpressionError::EmptyPath),
@@ -105,18 +109,27 @@ fn expression_path_rejects_empty_paths_and_segments() {
 }
 
 #[test]
-fn expression_leaf_constructors_reject_empty_names_and_paths() {
-    assert_eq!(TypeExpression::parameter(""), Err(ExpressionError::EmptyName));
-    assert_eq!(ConstExpression::parameter(""), Err(ExpressionError::EmptyName));
+fn test_expression_leaf_constructors_reject_empty_names_and_paths() {
+    assert_eq!(
+        TypeExpression::parameter(""),
+        Err(ExpressionError::EmptyName)
+    );
+    assert_eq!(
+        ConstExpression::parameter(""),
+        Err(ExpressionError::EmptyName)
+    );
     assert_eq!(
         ConstExpression::path(Vec::<Box<str>>::new()),
         Err(ExpressionError::EmptyPath)
     );
-    assert_eq!(LifetimeExpression::named(""), Err(ExpressionError::EmptyName));
+    assert_eq!(
+        LifetimeExpression::named(""),
+        Err(ExpressionError::EmptyName)
+    );
 }
 
 #[test]
-fn type_bound_rejects_mismatched_modifiers() {
+fn test_type_bound_rejects_mismatched_modifiers() {
     assert_eq!(
         PredicateDescriptor::type_bound(
             TypeExpression::SelfType,
@@ -132,7 +145,7 @@ fn type_bound_rejects_mismatched_modifiers() {
 }
 
 #[test]
-fn type_bound_rejects_empty_bounds() {
+fn test_type_bound_rejects_empty_bounds() {
     assert_eq!(
         PredicateDescriptor::type_bound(
             TypeExpression::SelfType,
@@ -145,7 +158,7 @@ fn type_bound_rejects_empty_bounds() {
 }
 
 #[test]
-fn lifetime_outlives_rejects_empty_bounds() {
+fn test_lifetime_outlives_rejects_empty_bounds() {
     assert_eq!(
         PredicateDescriptor::lifetime_outlives(
             LifetimeExpression::Named("a".into()),
@@ -156,7 +169,7 @@ fn lifetime_outlives_rejects_empty_bounds() {
 }
 
 #[test]
-fn type_bound_preserves_higher_ranked_lifetime_order() {
+fn test_type_bound_preserves_higher_ranked_lifetime_order() {
     let predicate = PredicateDescriptor::type_bound(
         TypeExpression::SelfType,
         vec![concrete(&["Fn"], Vec::new())].into_boxed_slice(),
@@ -189,7 +202,8 @@ fn type_bound_preserves_higher_ranked_lifetime_order() {
 /// types.
 fn concrete(path: &[&str], arguments: Vec<GenericArgument>) -> TypeExpression {
     TypeExpression::Concrete(
-        ConcreteTypeExpression::new(path.iter().copied(), arguments).expect("test paths are non-empty"),
+        ConcreteTypeExpression::new(path.iter().copied(), arguments)
+            .expect("test paths are non-empty"),
     )
 }
 
@@ -419,7 +433,10 @@ fn test_generic_argument_navigates_typed_const_value() {
     ));
 
     assert_eq!(argument, alternate_diagnostic);
-    assert_eq!(identity_hash(&argument), identity_hash(&alternate_diagnostic));
+    assert_eq!(
+        identity_hash(&argument),
+        identity_hash(&alternate_diagnostic)
+    );
 
     let GenericArgument::Const(argument) = argument else {
         panic!("expected a const generic argument");
@@ -446,7 +463,9 @@ fn test_type_expression_navigates_qualified_associated_type() {
         TypeExpression::Parameter("T".into()),
         Some(concrete(
             &["core", "iter", "Iterator"],
-            vec![GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))],
+            vec![GenericArgument::Lifetime(LifetimeExpression::Named(
+                "a".into(),
+            ))],
         )),
         "Item",
         vec![GenericArgument::Type(TypeExpression::Parameter("U".into()))].into_boxed_slice(),
@@ -455,14 +474,22 @@ fn test_type_expression_navigates_qualified_associated_type() {
     let TypeExpression::Associated(associated) = expression else {
         panic!("expected an associated type projection");
     };
-    assert_eq!(associated.self_type(), &TypeExpression::Parameter("T".into()));
+    assert_eq!(
+        associated.self_type(),
+        &TypeExpression::Parameter("T".into())
+    );
     let Some(TypeExpression::Concrete(trait_path)) = associated.trait_path() else {
         panic!("expected a concrete trait path");
     };
-    assert_eq!(trait_path.path(), &["core".into(), "iter".into(), "Iterator".into()]);
+    assert_eq!(
+        trait_path.path(),
+        &["core".into(), "iter".into(), "Iterator".into()]
+    );
     assert_eq!(
         trait_path.arguments(),
-        &[GenericArgument::Lifetime(LifetimeExpression::Named("a".into()))]
+        &[GenericArgument::Lifetime(LifetimeExpression::Named(
+            "a".into()
+        ))]
     );
     assert_eq!(associated.item(), "Item");
     assert_eq!(
@@ -505,7 +532,10 @@ fn test_type_expression_navigates_raw_pointer() {
 /// Verifies that tuple element order and nested forms remain navigable.
 #[test]
 fn test_type_expression_navigates_tuple() {
-    let expression = TypeExpression::Tuple(Box::new([TypeExpression::Parameter("T".into()), TypeExpression::Never]));
+    let expression = TypeExpression::Tuple(Box::new([
+        TypeExpression::Parameter("T".into()),
+        TypeExpression::Never,
+    ]));
 
     let TypeExpression::Tuple(elements) = expression else {
         panic!("expected a tuple expression");
@@ -569,7 +599,10 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
         diagnostic: "T: 'a".into(),
     };
     assert_eq!(plain_predicate, annotated_predicate);
-    assert_eq!(identity_hash(&plain_predicate), identity_hash(&annotated_predicate));
+    assert_eq!(
+        identity_hash(&plain_predicate),
+        identity_hash(&annotated_predicate)
+    );
 
     let plain_definition = GenericDefinitionDescriptor::new(
         vec![GenericParameterDescriptor::Lifetime {
@@ -591,7 +624,10 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
     )
     .with_diagnostic("<'a>");
     assert_eq!(plain_definition, annotated_definition);
-    assert_eq!(identity_hash(&plain_definition), identity_hash(&annotated_definition));
+    assert_eq!(
+        identity_hash(&plain_definition),
+        identity_hash(&annotated_definition)
+    );
 }
 
 /// Verifies every diagnostic-bearing type-expression node pairs equality and
@@ -600,7 +636,8 @@ fn test_descriptor_diagnostic_text_does_not_affect_identity() {
 fn test_all_diagnostic_type_nodes_use_structural_identity() {
     let concrete_plain = ConcreteTypeExpression::new(["u8"], Vec::new()).expect("non-empty path");
     let concrete_annotated = concrete_plain.clone().with_diagnostic("u8");
-    let concrete_different = ConcreteTypeExpression::new(["u16"], Vec::new()).expect("non-empty path");
+    let concrete_different =
+        ConcreteTypeExpression::new(["u16"], Vec::new()).expect("non-empty path");
     assert_identity_contract(&concrete_plain, &concrete_annotated, &concrete_different);
 
     let associated_plain = AssociatedTypeExpression::new(
@@ -616,7 +653,11 @@ fn test_all_diagnostic_type_nodes_use_structural_identity() {
         "Output",
         Box::<[GenericArgument]>::default(),
     );
-    assert_identity_contract(&associated_plain, &associated_annotated, &associated_different);
+    assert_identity_contract(
+        &associated_plain,
+        &associated_annotated,
+        &associated_different,
+    );
 
     let reference_plain = ReferenceTypeExpression::new(
         LifetimeExpression::Named("a".into()),
@@ -633,7 +674,8 @@ fn test_all_diagnostic_type_nodes_use_structural_identity() {
 
     let pointer_plain = RawPointerTypeExpression::new(false, TypeExpression::Parameter("T".into()));
     let pointer_annotated = pointer_plain.clone().with_diagnostic("*const T");
-    let pointer_different = RawPointerTypeExpression::new(true, TypeExpression::Parameter("T".into()));
+    let pointer_different =
+        RawPointerTypeExpression::new(true, TypeExpression::Parameter("T".into()));
     assert_identity_contract(&pointer_plain, &pointer_annotated, &pointer_different);
 
     let array_plain = ArrayTypeExpression::new(

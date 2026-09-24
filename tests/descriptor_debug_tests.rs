@@ -13,7 +13,10 @@ use qubit_reflect::TypeDescriptor;
 #[test]
 fn test_debug_reports_structure_without_a_synthetic_capability_count() {
     let output = format!("{:?}", TypeDescriptor::of::<u32>());
-    assert!(output.contains("type_name"), "the diagnostic must retain type facts");
+    assert!(
+        output.contains("type_name"),
+        "the diagnostic must retain type facts"
+    );
     assert!(
         !output.contains("intrinsic_capability_count"),
         "Debug must not report an unqueried capability count"
@@ -91,11 +94,17 @@ mod derived {
     fn test_provider_can_format_its_own_descriptor() {
         const CHILD: &str = "QUBIT_REFLECT_DEBUG_REENTRY_CHILD";
         if std::env::var_os(CHILD).is_some() {
-            let snapshot = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+            let snapshot = RegistrySnapshotBuilder::new()
+                .build()
+                .expect("empty snapshot");
             let descriptor = TypeDescriptor::of::<Logging<u32>>();
             assert!(snapshot.capabilities(descriptor).is_ok());
             assert!(snapshot.capabilities(descriptor).is_ok());
-            assert_eq!(CALLS.load(Ordering::SeqCst), 1, "provider must initialize exactly once");
+            assert_eq!(
+                CALLS.load(Ordering::SeqCst),
+                1,
+                "provider must initialize exactly once"
+            );
             return;
         }
         let mut child = Command::new(std::env::current_exe().expect("test executable"))
@@ -148,8 +157,15 @@ mod derived {
     fn test_debug_does_not_trigger_a_panicking_provider() {
         let descriptor = TypeDescriptor::of::<Panicking<u32>>();
         assert!(format!("{descriptor:?}").contains("Panicking"));
-        let snapshot = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
-        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| snapshot.capabilities(descriptor))).is_err());
+        let snapshot = RegistrySnapshotBuilder::new()
+            .build()
+            .expect("empty snapshot");
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                || snapshot.capabilities(descriptor)
+            ))
+            .is_err()
+        );
     }
 
     /// Declares the same capability twice to exercise structured conflict
@@ -175,7 +191,9 @@ mod derived {
         let descriptor = TypeDescriptor::of::<Conflict<u32>>();
         let output = format!("{descriptor:?}");
         assert!(!output.contains("intrinsic_capability_count"));
-        let snapshot = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+        let snapshot = RegistrySnapshotBuilder::new()
+            .build()
+            .expect("empty snapshot");
         let error = snapshot
             .capabilities(descriptor)
             .expect_err("duplicate declarations must remain a conflict");

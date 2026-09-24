@@ -37,7 +37,8 @@ fn registry_independent_shape_descriptor() -> &'static TypeDescriptor {
     &REGISTRY_INDEPENDENT_SHAPE
 }
 
-static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v3::descriptor::opaque_member::<u8>();
+static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor =
+    reflect::__private::codegen_v3::descriptor::opaque_member::<u8>();
 static VALUE_TYPE: TypeRef = TypeRef::Opaque(&VALUE_TYPE_DESCRIPTOR);
 static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descriptor::field(
     registry_independent_shape_descriptor,
@@ -47,9 +48,12 @@ static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descripto
     &VALUE_TYPE,
     Visibility::Private,
 )];
-static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<
-    RegistryIndependentShape,
->("RegistryIndependentShape", StructKind::Named, &FIELDS);
+static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor =
+    reflect::__private::codegen_v3::descriptor::struct_type::<RegistryIndependentShape>(
+        "RegistryIndependentShape",
+        StructKind::Named,
+        &FIELDS,
+    );
 
 impl Reflect for RegistryIndependentShape {
     /// Returns a structurally valid root that does not initialize the global
@@ -59,8 +63,14 @@ impl Reflect for RegistryIndependentShape {
     }
 }
 
-const CONFLICTING_IDENTITY: StaticFragmentIdentity =
-    StaticFragmentIdentity::new("type-descriptor-registry-failure-fixture", "conflict", 1, 1, "type", 1);
+const CONFLICTING_IDENTITY: StaticFragmentIdentity = StaticFragmentIdentity::new(
+    "type-descriptor-registry-failure-fixture",
+    "conflict",
+    1,
+    1,
+    "type",
+    1,
+);
 
 /// Returns the first conflicting fragment target.
 fn first_target_identity() -> RuntimeIdentity {
@@ -120,7 +130,10 @@ fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
     assert_eq!(first.kind(), RegistryErrorKind::DuplicateFragment);
     assert_eq!(second.kind(), first.kind());
     assert_eq!(third.kind(), first.kind());
-    assert_eq!(second.conflicting_fragments(), first.conflicting_fragments());
+    assert_eq!(
+        second.conflicting_fragments(),
+        first.conflicting_fragments()
+    );
     assert_eq!(third.conflicting_fragments(), first.conflicting_fragments());
     assert_eq!(descriptor.fields().len(), 1);
     assert_eq!(

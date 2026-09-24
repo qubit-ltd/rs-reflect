@@ -65,7 +65,10 @@ fn test_invocation_recovery_inspection_preserves_bindings() {
 #[test]
 fn test_validated_invocation_inspection_supports_both_modes() {
     let mutable_expectation = ArgumentExpectation::borrowed_mut::<u32>();
-    assert_eq!(mutable_expectation.type_name(), std::any::type_name::<u32>());
+    assert_eq!(
+        mutable_expectation.type_name(),
+        std::any::type_name::<u32>()
+    );
 
     let local = Invocation::<Local>::associated([])
         .validate(&method_identity(), ReceiverExpectation::none(), &[])

@@ -30,6 +30,7 @@ impl<T> EmptyAlias for EmptyTarget<T> {}
 /// Verifies an alias without declaration facts cannot become marker identity.
 #[test]
 fn test_generic_impl_definition_rejects_fact_free_alias() {
-    let error = ReflectRegistry::initialize().expect_err("a fact-free alias must not infer a reflected marker");
+    let error = ReflectRegistry::initialize()
+        .expect_err("a fact-free alias must not infer a reflected marker");
     assert_eq!(error.kind(), RegistryErrorKind::ImplTraitResolution);
 }

@@ -51,7 +51,9 @@ enum GenericEnum<T> {
 
 /// Returns the typed declaration capability used by this fixture.
 fn definition_key() -> CapabilityKey<u32> {
-    CapabilityKey::new(CapabilityId::new("example.generic_definition").expect("valid capability ID"))
+    CapabilityKey::new(
+        CapabilityId::new("example.generic_definition").expect("valid capability ID"),
+    )
 }
 
 /// Declares one capability fragment targeting the generic definition itself.
@@ -106,10 +108,14 @@ mod definition_capability_registration {
 fn test_registry_registers_generic_type_definition() {
     let registry = ReflectRegistry::initialize().expect("generic definitions must register");
     let concrete = TypeDescriptor::of::<GenericRecord<u8>>();
-    let definition = concrete.type_definition().expect("generic source definition");
+    let definition = concrete
+        .type_definition()
+        .expect("generic source definition");
 
     assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
+        registry
+            .definition(definition.id())
+            .expect("registered definition"),
         definition,
     ));
     assert_eq!(definition.query_name(), "GenericRecord");
@@ -181,7 +187,9 @@ fn test_generic_enum_definition_exposes_source_structure() {
         GenericEnum::Struct { value: 2_u8 },
     ];
     let descriptor = TypeDescriptor::of::<GenericEnum<u8>>();
-    let definition = descriptor.type_definition().expect("generic enum definition");
+    let definition = descriptor
+        .type_definition()
+        .expect("generic enum definition");
     let variants = definition.variants().expect("enum variants");
 
     assert!(matches!(definition.data(), TypeDefinitionData::Enum { .. }));
@@ -217,7 +225,12 @@ fn test_generic_enum_definition_exposes_source_structure() {
     ));
     let missing = TypeDefinitionId::of::<MissingDefinition>();
     assert!(registry.definition(missing).is_none());
-    assert!(registry.definition_capabilities(missing).descriptors().is_empty());
+    assert!(
+        registry
+            .definition_capabilities(missing)
+            .descriptors()
+            .is_empty()
+    );
     assert!(
         registry
             .definition_capability(missing, definition_key())
@@ -286,7 +299,10 @@ enum CapabilityEnum<T: Clone> {
 
 /// Returns the exact concrete identity through a custom typed adapter.
 fn concrete_provider<T: 'static>() -> CapabilityDescriptor {
-    CapabilityDescriptor::with_adapter(concrete_key(), std::any::TypeId::of::<T> as fn() -> std::any::TypeId)
+    CapabilityDescriptor::with_adapter(
+        concrete_key(),
+        std::any::TypeId::of::<T> as fn() -> std::any::TypeId,
+    )
 }
 
 /// Identifies the custom provider contract shared by all concrete instances.
@@ -358,7 +374,9 @@ fn test_explicit_definition_provider_needs_no_monomorph() {
     let registry = ReflectRegistry::initialize().expect("valid definitions");
     let definition = domain_definition();
     assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
+        registry
+            .definition(definition.id())
+            .expect("registered definition"),
         definition
     ));
     assert_eq!(definition.query_name(), "DomainDefinition");

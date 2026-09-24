@@ -96,7 +96,8 @@ struct RecursiveCompositeNode {
 /// Runs one exact integration test in a child process and fails after a
 /// bounded wait if descriptor initialization deadlocks.
 fn assert_isolated_test_completes(test_name: &str, marker: &str) {
-    let executable = std::env::current_exe().expect("integration-test executable should be available");
+    let executable =
+        std::env::current_exe().expect("integration-test executable should be available");
     let mut child = Command::new(executable)
         .arg("--exact")
         .arg(test_name)
@@ -110,14 +111,22 @@ fn assert_isolated_test_completes(test_name: &str, marker: &str) {
     let deadline = Instant::now() + Duration::from_secs(5);
 
     loop {
-        match child.try_wait().expect("isolated test status should be readable") {
+        match child
+            .try_wait()
+            .expect("isolated test status should be readable")
+        {
             Some(status) => {
-                assert!(status.success(), "isolated recursive-descriptor test failed: {status}");
+                assert!(
+                    status.success(),
+                    "isolated recursive-descriptor test failed: {status}"
+                );
                 return;
             }
             None if Instant::now() < deadline => thread::sleep(Duration::from_millis(10)),
             None => {
-                child.kill().expect("deadlocked isolated test should be terminated");
+                child
+                    .kill()
+                    .expect("deadlocked isolated test should be terminated");
                 let _ = child.wait();
                 panic!("recursive descriptor initialization did not complete within five seconds");
             }
@@ -162,7 +171,10 @@ fn sequence_element(descriptor: &'static TypeDescriptor) -> &'static TypeDescrip
 }
 
 /// Returns the resolved type descriptor of a field at `index`.
-fn resolved_field_type_at(descriptor: &'static TypeDescriptor, index: usize) -> &'static TypeDescriptor {
+fn resolved_field_type_at(
+    descriptor: &'static TypeDescriptor,
+    index: usize,
+) -> &'static TypeDescriptor {
     descriptor
         .field_at(index)
         .expect("recursive descriptor should retain every field")
@@ -203,7 +215,9 @@ fn test_derive_reflect_initializes_direct_recursive_descriptor_without_deadlock(
     for worker in threads {
         assert!(std::ptr::eq(
             root,
-            worker.join().expect("recursive descriptor worker should complete"),
+            worker
+                .join()
+                .expect("recursive descriptor worker should complete"),
         ));
     }
 
@@ -234,12 +248,18 @@ fn test_derive_reflect_initializes_indirect_recursive_descriptors_without_deadlo
                 if index % 2 == 0 {
                     let left = TypeDescriptor::of::<IndirectRecursiveLeft>();
                     let right = optional_box_pointee(resolved_field_type(left));
-                    assert!(std::ptr::eq(optional_box_pointee(resolved_field_type(right)), left,));
+                    assert!(std::ptr::eq(
+                        optional_box_pointee(resolved_field_type(right)),
+                        left,
+                    ));
                     left.type_id()
                 } else {
                     let right = TypeDescriptor::of::<IndirectRecursiveRight>();
                     let left = optional_box_pointee(resolved_field_type(right));
-                    assert!(std::ptr::eq(optional_box_pointee(resolved_field_type(left)), right,));
+                    assert!(std::ptr::eq(
+                        optional_box_pointee(resolved_field_type(left)),
+                        right,
+                    ));
                     right.type_id()
                 }
             })
@@ -251,11 +271,16 @@ fn test_derive_reflect_initializes_indirect_recursive_descriptors_without_deadlo
     let returned_left = optional_box_pointee(resolved_field_type(right));
 
     for worker in threads {
-        let identity = worker.join().expect("indirect recursive worker should complete");
+        let identity = worker
+            .join()
+            .expect("indirect recursive worker should complete");
         assert!(identity == left.type_id() || identity == right.type_id());
     }
 
-    assert!(std::ptr::eq(right, TypeDescriptor::of::<IndirectRecursiveRight>()));
+    assert!(std::ptr::eq(
+        right,
+        TypeDescriptor::of::<IndirectRecursiveRight>()
+    ));
     assert!(std::ptr::eq(returned_left, left));
     assert_eq!(left.fields().len(), 1);
     assert_eq!(right.fields().len(), 1);
@@ -383,9 +408,18 @@ fn test_derive_reflect_preserves_non_named_struct_shapes() {
     let newtype = TypeDescriptor::of::<DerivedNewtype>();
     let unit = TypeDescriptor::of::<DerivedUnit>();
 
-    assert_eq!(tuple.as_struct().expect("tuple view").kind(), StructKind::Tuple);
-    assert_eq!(newtype.as_struct().expect("newtype view").kind(), StructKind::Newtype);
-    assert_eq!(unit.as_struct().expect("unit view").kind(), StructKind::Unit);
+    assert_eq!(
+        tuple.as_struct().expect("tuple view").kind(),
+        StructKind::Tuple
+    );
+    assert_eq!(
+        newtype.as_struct().expect("newtype view").kind(),
+        StructKind::Newtype
+    );
+    assert_eq!(
+        unit.as_struct().expect("unit view").kind(),
+        StructKind::Unit
+    );
     assert_eq!(tuple.field_at(0).expect("tuple field").rust_name(), None);
     assert_eq!(tuple.field_at(1).expect("tuple field").query_name(), None);
 }
@@ -474,7 +508,13 @@ fn test_derive_reflect_honors_field_names_visibility_and_access_policies() {
         payload.visibility().as_declared(),
         Some(&reflect::identity::Visibility::Crate)
     );
-    assert_eq!(payload.access_policy(), reflect::access::FieldAccessPolicy::ReadOnly);
-    assert_eq!(skipped.access_policy(), reflect::access::FieldAccessPolicy::Skipped);
+    assert_eq!(
+        payload.access_policy(),
+        reflect::access::FieldAccessPolicy::ReadOnly
+    );
+    assert_eq!(
+        skipped.access_policy(),
+        reflect::access::FieldAccessPolicy::Skipped
+    );
     assert_eq!(values.skipped, "hidden");
 }

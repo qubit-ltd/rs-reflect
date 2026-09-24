@@ -128,7 +128,10 @@ trait DefaultInvocationMatrix {
     }
 
     #[allow(dead_code, improper_ctypes_definitions)]
-    unsafe extern "C" fn default_all_blockers<T>((left, right): (T, T), _: &[u8]) -> impl Iterator<Item = T> {
+    unsafe extern "C" fn default_all_blockers<T>(
+        (left, right): (T, T),
+        _: &[u8],
+    ) -> impl Iterator<Item = T> {
         [left, right].into_iter()
     }
 }
@@ -157,26 +160,32 @@ fn default_method<'a>(
     registry: &'a ReflectRegistry,
     method_name: &str,
 ) -> &'a reflect::descriptor::MethodInstanceDescriptor {
-    let implementations = registry.implementations(DefaultInvocationSample::type_descriptor().type_id());
+    let implementations =
+        registry.implementations(DefaultInvocationSample::type_descriptor().type_id());
     let reflected_trait = implementations
         .iter()
         .find_map(|implementation| {
-            implementation
-                .implemented_trait()
-                .filter(|descriptor| descriptor.definition().rust_name() == "DefaultInvocationMatrix")
+            implementation.implemented_trait().filter(|descriptor| {
+                descriptor.definition().rust_name() == "DefaultInvocationMatrix"
+            })
         })
         .expect("default invocation trait implementation must be registered");
-    let reflect::descriptor::MethodLookup::Unique(instance) = reflect::descriptor::ImplDescriptor::lookup_method(
-        implementations,
-        MethodQualifier::Trait(reflected_trait),
-        method_name,
-    ) else {
+    let reflect::descriptor::MethodLookup::Unique(instance) =
+        reflect::descriptor::ImplDescriptor::lookup_method(
+            implementations,
+            MethodQualifier::Trait(reflected_trait),
+            method_name,
+        )
+    else {
         panic!("default trait method must remain discoverable");
     };
     instance
 }
 
-fn invoke_default_owned(registry: &ReflectRegistry, method_name: &str) -> DynamicOwned<reflect::value::Local> {
+fn invoke_default_owned(
+    registry: &ReflectRegistry,
+    method_name: &str,
+) -> DynamicOwned<reflect::value::Local> {
     let output = default_method(registry, method_name)
         .adapter()
         .expect("safe default output shape needs an adapter")
@@ -215,7 +224,8 @@ fn test_default_trait_adapter_supports_safe_owned_non_path_outputs_and_never() {
     assert_eq!(pointer, &DEFAULT_RAW_VALUE);
 
     let function = invoke_default_owned(registry, "default_function_pointer_output");
-    let Ok(function) = DynamicOwned::<reflect::value::Local>::downcast::<fn(u8) -> u8>(function) else {
+    let Ok(function) = DynamicOwned::<reflect::value::Local>::downcast::<fn(u8) -> u8>(function)
+    else {
         panic!("function pointer output type must be retained");
     };
     assert_eq!(function(23), 24);
@@ -233,9 +243,9 @@ fn test_default_trait_adapter_preserves_the_dedicated_str_variant_and_origin() {
         .expect("shared str default method needs an adapter")
         .invoke_local(
             ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([reflect::invoke::InvocationArg::Ref(reflect::value::DynamicRef::<
-                reflect::value::Local,
-            >::new_str("default"))]),
+            Invocation::associated([reflect::invoke::InvocationArg::Ref(
+                reflect::value::DynamicRef::<reflect::value::Local>::new_str("default"),
+            )]),
         )
         .expect("local default adapter must be present")
         .expect("shared str default invocation must validate");
@@ -246,7 +256,10 @@ fn test_default_trait_adapter_preserves_the_dedicated_str_variant_and_origin() {
         panic!("shared str default output must retain the str variant");
     };
     assert_eq!(value, "default");
-    assert_eq!(origins.as_ref(), [reflect::invoke::BorrowOrigin::Parameter(0)]);
+    assert_eq!(
+        origins.as_ref(),
+        [reflect::invoke::BorrowOrigin::Parameter(0)]
+    );
 }
 
 #[test]
@@ -346,7 +359,9 @@ fn test_default_trait_adapter_supports_thread_safe_mode() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let instance = default_method(registry, "default_thread_safe");
     assert!(instance.unavailable_reasons().is_empty());
-    let adapter = instance.adapter().expect("thread-safe default method needs an adapter");
+    let adapter = instance
+        .adapter()
+        .expect("thread-safe default method needs an adapter");
     assert!(
         adapter
             .invoke_local(
@@ -358,16 +373,18 @@ fn test_default_trait_adapter_supports_thread_safe_mode() {
     let output = adapter
         .invoke_thread_safe(
             ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([reflect::invoke::InvocationArg::Owned(reflect::value::DynamicOwned::<
-                reflect::value::ThreadSafe,
-            >::new(51_u8))]),
+            Invocation::associated([reflect::invoke::InvocationArg::Owned(
+                reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::new(51_u8),
+            )]),
         )
         .expect("thread-safe default entry point must be present")
         .expect("thread-safe default invocation must validate");
     let InvocationOutput::Owned(value) = output else {
         panic!("thread-safe default output must be owned");
     };
-    let Ok(value) = reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::downcast::<u8>(value) else {
+    let Ok(value) =
+        reflect::value::DynamicOwned::<reflect::value::ThreadSafe>::downcast::<u8>(value)
+    else {
         panic!("thread-safe default output type must be retained");
     };
     assert_eq!(value, 53);
@@ -379,8 +396,13 @@ fn test_default_trait_adapter_supports_catching_and_thread_safe_composition() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
     let local = default_method(registry, "default_catching");
     assert!(local.unavailable_reasons().is_empty());
-    let local = local.adapter().expect("catching default method needs an adapter");
-    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
+    let local = local
+        .adapter()
+        .expect("catching default method needs an adapter");
+    assert_eq!(
+        local.catching_availability(),
+        CatchingAvailability::Available
+    );
     let panic = match local
         .invoke_catching_local(
             ReflectRegistry::initialize().expect("valid fixture registry"),
@@ -402,7 +424,10 @@ fn test_default_trait_adapter_supports_catching_and_thread_safe_composition() {
     let combined = combined
         .adapter()
         .expect("thread-safe catching default method needs an adapter");
-    assert_eq!(combined.catching_availability(), CatchingAvailability::Available);
+    assert_eq!(
+        combined.catching_availability(),
+        CatchingAvailability::Available
+    );
     assert!(
         combined
             .invoke_catching_local(
@@ -472,10 +497,15 @@ fn test_default_trait_adapter_reports_precise_complete_unavailable_reasons() {
 #[test]
 fn test_positional_patterns_are_not_invocation_blockers() {
     let registry = ReflectRegistry::initialize().expect("generated impl fragments must validate");
-    let implementations = registry.implementations(PatternReasonSample::type_descriptor().type_id());
+    let implementations =
+        registry.implementations(PatternReasonSample::type_descriptor().type_id());
     for method_name in ["wildcard_pattern", "destructure_pattern"] {
         let reflect::descriptor::MethodLookup::Unique(instance) =
-            reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, method_name)
+            reflect::descriptor::ImplDescriptor::lookup_method(
+                implementations,
+                MethodQualifier::Inherent,
+                method_name,
+            )
         else {
             panic!("pattern method must remain discoverable");
         };

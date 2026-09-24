@@ -52,7 +52,8 @@ fn test_named_construction_recovery_preserves_names_values_and_error() {
 /// and empty recovery respectively.
 #[test]
 fn test_tuple_and_unit_construction_recovery_preserve_shape() {
-    let input = TupleConstructionInput::new([ReflectedOwned::new(11_u8), ReflectedOwned::new(12_u8)]);
+    let input =
+        TupleConstructionInput::new([ReflectedOwned::new(11_u8), ReflectedOwned::new(12_u8)]);
     assert_eq!(input.values().len(), 2);
     assert!(format!("{input:?}").contains("value_count"));
 
