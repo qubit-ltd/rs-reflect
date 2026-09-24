@@ -473,7 +473,7 @@ pub mod __private {
 
 ### 迁移 effective capability 查询
 
-从旧版本迁移时，原有能力查询需要处理 `Result`，没有忽略错误的兼容入口。`capabilities` 返回 `Result<&TypeCapabilities, CapabilityConflict>`；按类型键或文本 ID 的单项查询返回 `Result<Option<_>, CapabilityConflict>`。先处理冲突，再判断能力是否存在。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可通过 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 读取原始原因。
+从旧版本迁移时，原有能力查询需要处理 `Result`，没有忽略错误的兼容入口。`capabilities` 返回 `Result<&TypeCapabilities, CapabilityConflict>`；类型键查询 `capability` 返回 `Result<Option<&A>, CapabilityAccessError>`，按文本 ID 查询 `capability_by_id` 返回 `Result<Option<&CapabilityDescriptor>, CapabilityConflict>`。先处理错误，再判断能力是否存在。类型访问错误区分 `FactOnly` 和 `AdapterTypeMismatch`；intrinsic 声明冲突包装为 `CapabilityAccessError::IntrinsicConflict`。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可通过 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 读取原始原因。
 
 便捷的 `capability` 查询将 `Found` 映射为 `Ok(Some(adapter))`，将 `Missing` 映射为 `Ok(None)`。只有事实、没有适配器的描述符返回 `FactOnly` 错误；类型键的适配器类型不匹配则返回 `AdapterTypeMismatch` 错误。需要直接检查四种状态时，应使用 `capability_lookup`：`Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`。无效的 intrinsic 能力集合返回冲突错误。`capability_origin` 返回 `CapabilityOrigin::Intrinsic { type_id }` 或 `CapabilityOrigin::Registered { source }`，`capability_source` 则在能力来自注册时返回贡献它的 `FragmentIdentity`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`types_with_capability` 及定义级查询只读取冻结索引，不执行能力工厂，其返回类型不增加 `Result`。对尚未注册的具体实例查询有效能力时，可以执行该类型自身的能力工厂，但不会把实例加入快照。
 
