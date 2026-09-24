@@ -103,6 +103,24 @@ fn test_visibility_rejects_empty_restricted_path() {
     assert_eq!(visibility.restricted_path(), None);
 }
 
+/// Verifies whitespace alone does not form a restricted visibility path.
+#[test]
+fn test_visibility_rejects_whitespace_only_restricted_path() {
+    for source in ["pub(in  )", "pub(in \t )"] {
+        let visibility = Visibility::from_source(source);
+        assert_eq!(visibility.kind(), VisibilityKind::Private, "{source}");
+        assert_eq!(visibility.restricted_path(), None, "{source}");
+    }
+}
+
+/// Verifies surrounding whitespace is omitted from a restricted path.
+#[test]
+fn test_visibility_trims_restricted_path() {
+    let visibility = Visibility::from_source("pub(in  crate::model  )");
+    assert_eq!(visibility.kind(), VisibilityKind::Restricted);
+    assert_eq!(visibility.restricted_path(), Some("crate::model"));
+}
+
 /// Verifies registry errors retain their machine-readable kind after
 /// inexpensive cloning.
 #[test]

@@ -41,7 +41,8 @@ pub enum Visibility {
 
 impl Visibility {
     /// Normalizes a Rust source visibility spelling while retaining restricted
-    /// paths.
+    /// paths without surrounding whitespace. An empty restricted path is
+    /// treated as private.
     ///
     /// Unknown spellings are treated as private because they do not grant a
     /// recognized outward visibility.
@@ -53,7 +54,7 @@ impl Visibility {
             "pub(super)" => Self::Super,
             "pub(self)" | "" => Self::Private,
             value if value.starts_with("pub(in ") && value.ends_with(')') => {
-                let path = &value[7..value.len() - 1];
+                let path = value[7..value.len() - 1].trim();
                 if path.is_empty() {
                     Self::Private
                 } else {
@@ -66,7 +67,7 @@ impl Visibility {
 
     /// Returns this visibility's stable category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> VisibilityKind {
         match self {
             Self::Public => VisibilityKind::Public,
@@ -80,7 +81,7 @@ impl Visibility {
     /// Returns the retained restricted path, or `None` for other visibility
     /// kinds.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn restricted_path(&self) -> Option<&str> {
         match self {
             Self::Restricted(path) => Some(path),
