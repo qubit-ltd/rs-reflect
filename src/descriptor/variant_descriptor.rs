@@ -144,7 +144,11 @@ impl VariantDescriptor {
     /// Records source discriminant facts supplied by generated enum metadata.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_discriminant(mut self, origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
+    pub const fn with_discriminant(
+        mut self,
+        origin: DiscriminantOrigin,
+        numeric: Option<NumericDiscriminant>,
+    ) -> Self {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
         self
@@ -167,6 +171,15 @@ impl VariantDescriptor {
     }
 
     /// Constructs a named variant through its generated local adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed enum value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error and recoverable input values if
+    /// validation fails or this variant has no constructor.
     pub fn construct_struct(
         &self,
         input: NamedConstructionInput<crate::value::Local>,
@@ -178,6 +191,15 @@ impl VariantDescriptor {
     }
 
     /// Constructs a tuple variant through its generated local adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed enum value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error and recoverable input values if
+    /// validation fails or this variant has no constructor.
     pub fn construct_tuple(
         &self,
         input: TupleConstructionInput<crate::value::Local>,
@@ -189,7 +211,18 @@ impl VariantDescriptor {
     }
 
     /// Constructs a unit variant through its generated local adapter.
-    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed enum value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error if validation fails or this variant has
+    /// no constructor.
+    pub fn construct_unit(
+        &self,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.construction() {
             Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
@@ -260,7 +293,9 @@ impl VariantDescriptor {
     /// `None` means the variant has no field with that lookup name.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields.iter().find(|field| field.query_name() == Some(name))
+        self.fields
+            .iter()
+            .find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a field by source index.
@@ -276,11 +311,21 @@ impl VariantDescriptor {
     ///
     /// A target of another type returns [`TypeMismatch`] without invoking the
     /// generated adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether this variant is active for `value`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeMismatch`] if `value` does not contain the declaring enum
+    /// type.
     pub fn is_active(&self, value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(&value);
         if actual != expected {
-            return Err(TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()));
+            return Err(TypeMismatch::new(expected, actual)
+                .with_expected_name(self.declaring_type().type_name()));
         }
         (self.active_test)(value)
     }

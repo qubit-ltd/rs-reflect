@@ -28,7 +28,10 @@ static UPDATE_FIELDS: [UpdateField; 1] = [UpdateField::allowed(&FIXTURE_FIELDS[0
 
 /// Reads the exact local erased-value type identity.
 fn local_type_id(value: &DynamicOwned<Local>) -> TypeId {
-    value.as_any().expect("local owned values use Any storage").type_id()
+    value
+        .as_any()
+        .expect("local owned values use Any storage")
+        .type_id()
 }
 
 /// Reads the exact thread-safe erased-value type identity.
@@ -48,7 +51,8 @@ fn test_validated_unit_input_inspection_supports_both_modes() {
     assert!(format!("{local:?}").contains("value_count: 0"));
     assert!(local.into_values().is_empty());
 
-    let thread_safe = validate_unit::<ThreadSafe>(&[]).expect("an empty unit contract must validate");
+    let thread_safe =
+        validate_unit::<ThreadSafe>(&[]).expect("an empty unit contract must validate");
     assert!(thread_safe.values().is_empty());
     assert!(format!("{thread_safe:?}").contains("value_count: 0"));
     assert!(thread_safe.into_values().is_empty());
@@ -82,11 +86,19 @@ fn test_validated_update_input_inspection_supports_both_modes() {
         DynamicOwned::<ThreadSafe>::new(11_u8),
         NamedConstructionInput::<ThreadSafe>::new(Vec::<(&str, DynamicOwned<ThreadSafe>)>::new()),
     );
-    assert_eq!(thread_safe_type_id(thread_safe_input.base()), TypeId::of::<u8>());
+    assert_eq!(
+        thread_safe_type_id(thread_safe_input.base()),
+        TypeId::of::<u8>()
+    );
     assert!(thread_safe_input.overrides().fields().is_empty());
     assert!(format!("{thread_safe_input:?}").contains("override_count: 0"));
-    let thread_safe = validate_update(thread_safe_input, TypeId::of::<u8>(), &[], thread_safe_type_id)
-        .expect("an exact thread-safe base with no overrides must validate");
+    let thread_safe = validate_update(
+        thread_safe_input,
+        TypeId::of::<u8>(),
+        &[],
+        thread_safe_type_id,
+    )
+    .expect("an exact thread-safe base with no overrides must validate");
     assert_eq!(thread_safe_type_id(thread_safe.base()), TypeId::of::<u8>());
     assert!(thread_safe.overrides().is_empty());
     assert!(format!("{thread_safe:?}").contains("override_count: 0"));
@@ -101,7 +113,9 @@ fn test_validated_update_input_inspection_supports_both_modes() {
     let failure = validate_update(
         StructUpdateInput::new(
             DynamicOwned::<ThreadSafe>::new(12_u16),
-            NamedConstructionInput::<ThreadSafe>::new(Vec::<(&str, DynamicOwned<ThreadSafe>)>::new()),
+            NamedConstructionInput::<ThreadSafe>::new(
+                Vec::<(&str, DynamicOwned<ThreadSafe>)>::new(),
+            ),
         ),
         TypeId::of::<u8>(),
         &[],
@@ -147,8 +161,14 @@ fn test_validated_override_inspection_supports_both_modes() {
     assert_eq!(allowed.descriptor().index(), 0);
     assert_eq!(allowed.policy(), UpdateFieldPolicy::Allowed);
     assert!(format!("{allowed:?}").contains("UpdateField"));
-    let unavailable = UpdateField::unavailable(&FIXTURE_FIELDS[0], ConstructionUnavailableReason::UpdateForbidden);
-    assert!(matches!(unavailable.policy(), UpdateFieldPolicy::Unavailable(_)));
+    let unavailable = UpdateField::unavailable(
+        &FIXTURE_FIELDS[0],
+        ConstructionUnavailableReason::UpdateForbidden,
+    );
+    assert!(matches!(
+        unavailable.policy(),
+        UpdateFieldPolicy::Unavailable(_)
+    ));
 
     let local = validate_update(
         StructUpdateInput::new(
@@ -179,7 +199,10 @@ fn test_validated_override_inspection_supports_both_modes() {
     )
     .expect("an exact thread-safe override must validate");
     assert_eq!(thread_safe.overrides()[0].index(), 0);
-    assert_eq!(thread_safe.overrides()[0].value().downcast_ref::<u8>(), Some(&10));
+    assert_eq!(
+        thread_safe.overrides()[0].value().downcast_ref::<u8>(),
+        Some(&10)
+    );
     assert!(format!("{:?}", thread_safe.overrides()[0]).contains("ValidatedOverride"));
     let (_, overrides) = thread_safe.into_parts();
     let (index, value) = overrides.into_vec().remove(0).into_parts();

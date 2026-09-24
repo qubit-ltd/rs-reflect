@@ -182,7 +182,9 @@ impl TraitDescriptor {
     /// `None` means this applied trait has no method with the requested name.
     #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
-        self.methods.iter().find(|method| method.query_name() == name)
+        self.methods
+            .iter()
+            .find(|method| method.query_name() == name)
     }
 
     /// Returns associated type declarations in source order.
@@ -197,7 +199,9 @@ impl TraitDescriptor {
     /// `None` means no associated type has the requested name.
     #[must_use]
     pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
-        self.associated_types.iter().find(|item| item.query_name() == name)
+        self.associated_types
+            .iter()
+            .find(|item| item.query_name() == name)
     }
 
     /// Returns associated constant declarations in source order.
@@ -212,7 +216,9 @@ impl TraitDescriptor {
     /// `None` means no associated constant has the requested name.
     #[must_use]
     pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
-        self.associated_consts.iter().find(|item| item.query_name() == name)
+        self.associated_consts
+            .iter()
+            .find(|item| item.query_name() == name)
     }
 
     /// Returns whether two descriptors are the same concrete trait application.

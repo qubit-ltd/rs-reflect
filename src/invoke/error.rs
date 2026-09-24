@@ -80,7 +80,9 @@ pub enum InvocationErrorKind {
         parameter_indices: Box<[usize]>,
     },
     /// A name refers to a wildcard or destructuring parameter.
-    #[error("invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`")]
+    #[error(
+        "invocation argument {input_index} cannot bind parameter {parameter_index} by name `{name}`"
+    )]
     NamedArgumentUnavailable {
         /// Zero-based index in the caller's original binding order.
         input_index: usize,
@@ -147,6 +149,7 @@ pub enum InvocationErrorKind {
 ///
 /// Every error is produced before any owned receiver or argument is extracted.
 /// The enclosing invocation failure therefore carries complete recovery input.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InvocationError {
     method_identity: Box<MemberId>,
@@ -204,6 +207,7 @@ impl std::error::Error for InvocationError {
 /// Ordinary invocation does not construct this type and propagates panic
 /// unchanged. The structured member identity remains available independently
 /// of the panic payload's unstable diagnostic text.
+#[must_use]
 pub struct InvocationPanic {
     method_identity: Box<MemberId>,
     payload: Box<dyn Any + Send>,

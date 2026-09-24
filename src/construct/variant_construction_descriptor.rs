@@ -37,7 +37,10 @@ impl VariantConstructionDescriptor {
     /// Attaches a generated thread-safe constructor for this variant.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_thread_safe(mut self, constructor: fn() -> &'static VariantConstructor<ThreadSafe>) -> Self {
+    pub const fn with_thread_safe(
+        mut self,
+        constructor: fn() -> &'static VariantConstructor<ThreadSafe>,
+    ) -> Self {
         self.thread_safe_constructor = Some(constructor);
         self
     }
@@ -46,7 +49,8 @@ impl VariantConstructionDescriptor {
     #[must_use]
     #[inline(always)]
     pub fn local_constructor(&self) -> &'static VariantConstructor<Local> {
-        self.cached_local_constructor.get_or_init(self.local_constructor)
+        self.cached_local_constructor
+            .get_or_init(self.local_constructor)
     }
 
     /// Returns the thread-safe constructor when the declaring enum opted in.

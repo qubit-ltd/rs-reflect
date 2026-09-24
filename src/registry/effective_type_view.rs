@@ -52,10 +52,18 @@ impl EffectiveTypeView {
         for implementation in implementations {
             for candidate in implementation.method_instances() {
                 let duplicate = methods.iter().enumerate().position(|(index, current)| {
-                    same_method_application(method_implementations[index], current, implementation, candidate)
+                    same_method_application(
+                        method_implementations[index],
+                        current,
+                        implementation,
+                        candidate,
+                    )
                 });
                 match duplicate {
-                    Some(index) if candidate.implementation_source() == MethodImplementationSource::Overridden => {
+                    Some(index)
+                        if candidate.implementation_source()
+                            == MethodImplementationSource::Overridden =>
+                    {
                         method_implementations[index] = *implementation;
                         methods[index] = candidate;
                     }
@@ -91,10 +99,16 @@ impl EffectiveTypeView {
 
     /// Looks up one of the same frozen effective entries returned by
     /// [`Self::methods`].
-    pub fn lookup_method<'a>(&'a self, qualifier: MethodQualifier<'_>, name: &str) -> MethodLookup<'a> {
+    pub fn lookup_method<'a>(
+        &'a self,
+        qualifier: MethodQualifier<'_>,
+        name: &str,
+    ) -> MethodLookup<'a> {
         let mut found = None;
         for (implementation, instance) in self.method_implementations.iter().zip(&self.methods) {
-            if !implementation.matches_qualifier(qualifier) || instance.declaration().query_name() != name {
+            if !implementation.matches_qualifier(qualifier)
+                || instance.declaration().query_name() != name
+            {
                 continue;
             }
             if found.is_some() {
@@ -125,7 +139,9 @@ fn same_method_application(
         candidate_implementation.implemented_trait(),
     ) {
         (None, None) => true,
-        (Some(current_trait), Some(candidate_trait)) => current_trait.same_application(candidate_trait),
+        (Some(current_trait), Some(candidate_trait)) => {
+            current_trait.same_application(candidate_trait)
+        }
         _ => false,
     }
 }
@@ -165,7 +181,8 @@ mod tests {
 
     /// Returns the exact reflected target shared by view fixtures.
     fn target_type() -> &'static TypeDescriptor {
-        static TARGET: TypeDescriptor = crate::__private::descriptor::primitive::<Target>("Target", PrimitiveKind::U8);
+        static TARGET: TypeDescriptor =
+            crate::__private::descriptor::primitive::<Target>("Target", PrimitiveKind::U8);
         &TARGET
     }
 

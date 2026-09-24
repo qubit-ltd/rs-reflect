@@ -54,7 +54,9 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
 
     /// Returns candidates in stable fragment order.
     #[must_use]
-    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDefinitionDescriptor> + 'registry {
+    pub fn iter(
+        self,
+    ) -> impl ExactSizeIterator<Item = &'static TypeDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
@@ -80,7 +82,8 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
 
 impl<'registry> IntoIterator for TypeDefinitionCandidates<'registry> {
     type Item = &'static TypeDefinitionDescriptor;
-    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDefinitionDescriptor>>;
+    type IntoIter =
+        std::iter::Copied<std::slice::Iter<'registry, &'static TypeDefinitionDescriptor>>;
 
     /// Iterates over declarations in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -142,7 +145,9 @@ impl<'registry> TraitCandidates<'registry> {
     /// Returns candidates in stable fragment order.
     #[must_use]
     #[inline(always)]
-    pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
+    pub fn iter(
+        self,
+    ) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
@@ -170,7 +175,8 @@ impl<'registry> TraitCandidates<'registry> {
 
 impl<'registry> IntoIterator for TraitCandidates<'registry> {
     type Item = &'static TraitDefinitionDescriptor;
-    type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>>;
+    type IntoIter =
+        std::iter::Copied<std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
     fn into_iter(self) -> Self::IntoIter {
@@ -252,6 +258,15 @@ impl ReflectRegistry {
     /// All linked fragments are sorted, materialized, and validated before a
     /// snapshot is published. Both success and [`RegistryError`] are cached;
     /// concurrent callers therefore observe the same immutable result.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-wide immutable registry snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cached fragment validation error if linked registrations
+    /// conflict or cannot be materialized consistently.
     pub fn initialize() -> Result<&'static Self, RegistryError> {
         static REGISTRY: OnceLock<Result<ReflectRegistry, RegistryError>> = OnceLock::new();
         initialize_cached(&REGISTRY, build_inventory_registry)
@@ -270,7 +285,12 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_type_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(self.indexes.types_by_type_name.get(name).map_or(&[], Box::as_ref))
+        TypeCandidates::new(
+            self.indexes
+                .types_by_type_name
+                .get(name)
+                .map_or(&[], Box::as_ref),
+        )
     }
 
     /// Finds every descriptor with the reflection query name `name`.
@@ -278,7 +298,12 @@ impl ReflectRegistry {
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
     pub fn find_by_query_name(&self, name: &str) -> TypeCandidates<'_> {
-        TypeCandidates::new(self.indexes.types_by_query_name.get(name).map_or(&[], Box::as_ref))
+        TypeCandidates::new(
+            self.indexes
+                .types_by_query_name
+                .get(name)
+                .map_or(&[], Box::as_ref),
+        )
     }
 
     /// Enumerates all statically registered roots in stable fragment order.
@@ -302,7 +327,12 @@ impl ReflectRegistry {
 
     /// Finds generic declarations with the exact Rust source path.
     pub fn find_definitions_by_rust_path(&self, path: &str) -> TypeDefinitionCandidates<'_> {
-        TypeDefinitionCandidates::new(self.indexes.definitions_by_rust_path.get(path).map_or(&[], Box::as_ref))
+        TypeDefinitionCandidates::new(
+            self.indexes
+                .definitions_by_rust_path
+                .get(path)
+                .map_or(&[], Box::as_ref),
+        )
     }
 
     /// Finds generic declarations with the exact reflection query name.
@@ -324,7 +354,8 @@ impl ReflectRegistry {
     /// Enumerates generic declarations together with their source fragments.
     pub fn definitions_with_identity(
         &self,
-    ) -> impl ExactSizeIterator<Item = (&'static TypeDefinitionDescriptor, &FragmentIdentity)> + '_ {
+    ) -> impl ExactSizeIterator<Item = (&'static TypeDefinitionDescriptor, &FragmentIdentity)> + '_
+    {
         self.definitions.iter().map(|definition| {
             let identity = self
                 .indexes
@@ -360,6 +391,10 @@ impl ReflectRegistry {
     /// Registered targets borrow frozen facts without executing a provider.
     /// Unregistered monomorphs may initialize their intrinsic capability set.
     ///
+    /// # Returns
+    ///
+    /// Returns the effective capability set for `descriptor`.
+    ///
     /// # Errors
     ///
     /// Returns the complete conflict if intrinsic capability declarations use
@@ -390,6 +425,11 @@ impl ReflectRegistry {
     ///
     /// Returns an intrinsic conflict for an invalid unregistered descriptor.
     ///
+    /// # Returns
+    ///
+    /// Returns the matching executable adapter, or `None` when no executable
+    /// adapter is registered for `key`.
+    ///
     /// # Examples
     ///
     /// ```
@@ -418,6 +458,10 @@ impl ReflectRegistry {
     /// # Errors
     ///
     /// Returns an intrinsic conflict for an invalid unregistered descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns the diagnostic lookup state for `key`.
     pub fn capability_lookup<'registry, A: 'static>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -430,6 +474,16 @@ impl ReflectRegistry {
     ///
     /// Returns `Ok(None)` for unmatched IDs, including invalid textual IDs,
     /// and `Err` when the intrinsic capability set cannot be formed.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching descriptor, or `None` when no descriptor has
+    /// `id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the intrinsic capability conflict if the descriptor's provider
+    /// cannot produce a valid capability set.
     pub fn capability_by_id<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -442,6 +496,11 @@ impl ReflectRegistry {
     ///
     /// Unregistered descriptors may initialize their intrinsic capability
     /// provider while this method resolves the effective set.
+    ///
+    /// # Returns
+    ///
+    /// Returns the capability origin, or `None` when no capability has
+    /// `capability_id`.
     ///
     /// # Errors
     ///
@@ -463,9 +522,11 @@ impl ReflectRegistry {
             .get(&(target, *capability.id()))
             .cloned()
             .or_else(|| {
-                (!self.indexes.types_by_id.contains_key(&descriptor.type_id())).then_some(CapabilityOrigin::Intrinsic {
-                    type_id: descriptor.type_id(),
-                })
+                (!self.indexes.types_by_id.contains_key(&descriptor.type_id())).then_some(
+                    CapabilityOrigin::Intrinsic {
+                        type_id: descriptor.type_id(),
+                    },
+                )
             })
             .expect("every effective capability has a retained origin");
         Ok(Some(origin))
@@ -473,7 +534,11 @@ impl ReflectRegistry {
 
     /// Returns the registration fragment that contributed a capability.
     #[must_use]
-    pub fn capability_source(&self, descriptor: &TypeDescriptor, capability_id: &str) -> Option<&FragmentIdentity> {
+    pub fn capability_source(
+        &self,
+        descriptor: &TypeDescriptor,
+        capability_id: &str,
+    ) -> Option<&FragmentIdentity> {
         self.indexes.capability_fragments.iter().find_map(|((target, id), source)| {
             (matches!(target, crate::registry::fragment::CapabilityTarget::Type(type_id) if *type_id == descriptor.type_id())
                 && id.as_str() == capability_id)
@@ -485,7 +550,11 @@ impl ReflectRegistry {
     /// textual ID. Definition capabilities are always retained in the
     /// snapshot and therefore do not execute a provider here.
     #[must_use]
-    pub fn definition_capability_origin(&self, id: TypeDefinitionId, capability_id: &str) -> Option<CapabilityOrigin> {
+    pub fn definition_capability_origin(
+        &self,
+        id: TypeDefinitionId,
+        capability_id: &str,
+    ) -> Option<CapabilityOrigin> {
         let capability = self.definition_capability_by_id(id, capability_id)?;
         let target = crate::registry::fragment::CapabilityTarget::TypeDefinition(id);
         Some(
@@ -499,7 +568,11 @@ impl ReflectRegistry {
 
     /// Returns the registration fragment that contributed a generic capability.
     #[must_use]
-    pub fn definition_capability_source(&self, id: TypeDefinitionId, capability_id: &str) -> Option<&FragmentIdentity> {
+    pub fn definition_capability_source(
+        &self,
+        id: TypeDefinitionId,
+        capability_id: &str,
+    ) -> Option<&FragmentIdentity> {
         self.indexes.capability_fragments.iter().find_map(|((target, capability), source)| {
             (matches!(target, crate::registry::fragment::CapabilityTarget::TypeDefinition(definition_id) if *definition_id == id)
                 && capability.as_str() == capability_id)
@@ -565,7 +638,10 @@ impl ReflectRegistry {
     /// exact root. Its order is the registry's stable fragment order, so a
     /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
     pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
-        self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
+        self.indexes
+            .impls_by_target
+            .get(&type_id)
+            .map_or(&[], Box::as_ref)
     }
 
     /// Enumerates statically registered generic, blanket, and constrained impl
@@ -584,7 +660,10 @@ impl ReflectRegistry {
     /// Diagnostic-only text does not participate because
     /// [`TypeExpression`] equality is structural.
     #[must_use]
-    pub fn find_impl_definitions_by_target(&self, target: &TypeExpression) -> ImplDefinitionCandidates {
+    pub fn find_impl_definitions_by_target(
+        &self,
+        target: &TypeExpression,
+    ) -> ImplDefinitionCandidates {
         ImplDefinitionCandidates {
             descriptors: self
                 .impl_definitions
@@ -628,7 +707,10 @@ impl ReflectRegistry {
     /// `None` means no linked registration fragment declared the requested
     /// trait.
     #[must_use]
-    pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn trait_definition(
+        &self,
+        trait_id: &TraitId,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
         self.indexes.traits_by_id.get(trait_id).copied()
     }
 
@@ -637,13 +719,21 @@ impl ReflectRegistry {
     /// `None` means no linked reflected trait declaration has the exact path,
     /// or the path is ambiguous across linked fragments.
     #[must_use]
-    pub fn trait_definition_by_path(&self, rust_path: &str) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn trait_definition_by_path(
+        &self,
+        rust_path: &str,
+    ) -> Option<&'static TraitDefinitionDescriptor> {
         self.find_trait_definitions_by_path(rust_path).only()
     }
 
     /// Finds every trait declaration with a diagnostic Rust path in stable
     /// order.
     pub fn find_trait_definitions_by_path(&self, rust_path: &str) -> TraitCandidates<'_> {
-        TraitCandidates::new(self.indexes.traits_by_rust_path.get(rust_path).map_or(&[], Box::as_ref))
+        TraitCandidates::new(
+            self.indexes
+                .traits_by_rust_path
+                .get(rust_path)
+                .map_or(&[], Box::as_ref),
+        )
     }
 }

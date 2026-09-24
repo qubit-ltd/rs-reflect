@@ -100,8 +100,14 @@ impl<'a> DynamicMut<'a, Local> {
     /// matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable `T` reference for an exact type match, or `None` for
+    /// either unavailable case.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut()
+            .and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Consumes this wrapper and returns the original mutable borrow when its
@@ -111,12 +117,22 @@ impl<'a> DynamicMut<'a, Local> {
     /// wrapper's original `'a` lifetime. A mismatch, including the dedicated
     /// `str` variant, returns the untouched wrapper so its exclusive borrow is
     /// not lost.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original exclusive borrow as `T` when its exact type
+    /// matches.
+    ///
+    /// # Errors
+    ///
+    /// Returns the untouched wrapper when the type differs or it contains the
+    /// dedicated `str` variant.
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            LocalMutStorage::Any(value) if value.is::<T>() => {
-                Ok(value.downcast_mut::<T>().expect("the exact type ID was checked"))
-            }
+            LocalMutStorage::Any(value) if value.is::<T>() => Ok(value
+                .downcast_mut::<T>()
+                .expect("the exact type ID was checked")),
             LocalMutStorage::Any(value) => Err(Self {
                 storage: LocalMutStorage::Any(value),
                 marker,
@@ -131,6 +147,11 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns this value through its local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns the erased shared value, or `None` for the dedicated `str`
+    /// variant.
     #[must_use]
     #[inline(always)]
     pub fn as_any(&self) -> Option<&dyn Any> {
@@ -143,6 +164,11 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns this value through its mutable local `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns the erased mutable value, or `None` for the dedicated `str`
+    /// variant.
     pub fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
         match &mut self.storage {
             LocalMutStorage::Any(value) => Some(&mut **value),
@@ -153,6 +179,10 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
     #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
@@ -166,6 +196,11 @@ impl<'a> DynamicMut<'a, Local> {
     /// one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the mutable string borrow, or `None` for an `Any`-compatible
+    /// value.
     pub fn as_str_mut(&mut self) -> Option<&mut str> {
         match &mut self.storage {
             LocalMutStorage::Any(_) => None,
@@ -178,6 +213,15 @@ impl<'a> DynamicMut<'a, Local> {
     /// The returned reference retains the wrapper's original `'a` lifetime.
     /// An `Any`-compatible value returns the untouched wrapper so its exclusive
     /// borrow is not lost.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original exclusive string borrow.
+    ///
+    /// # Errors
+    ///
+    /// Returns the untouched wrapper when it contains an `Any`-compatible
+    /// value.
     pub fn into_str_mut(self) -> Result<&'a mut str, Self> {
         let Self { storage, marker } = self;
         match storage {
@@ -245,8 +289,14 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable `T` reference for an exact type match, or `None` for
+    /// either unavailable case.
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
+        self.as_any_mut()
+            .and_then(|value| value.downcast_mut::<T>())
     }
 
     /// Consumes this wrapper and returns the original thread-safe mutable
@@ -255,12 +305,22 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// The returned reference retains the wrapper's original `'a` lifetime.
     /// A mismatch, including the dedicated `str` variant, returns the untouched
     /// thread-safe wrapper and preserves its `Send + Sync` erased boundary.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original exclusive borrow as `T` when its exact type
+    /// matches.
+    ///
+    /// # Errors
+    ///
+    /// Returns the untouched wrapper when the type differs or it contains the
+    /// dedicated `str` variant.
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
-            ThreadSafeMutStorage::Any(value) if value.is::<T>() => {
-                Ok(value.downcast_mut::<T>().expect("the exact type ID was checked"))
-            }
+            ThreadSafeMutStorage::Any(value) if value.is::<T>() => Ok(value
+                .downcast_mut::<T>()
+                .expect("the exact type ID was checked")),
             ThreadSafeMutStorage::Any(value) => Err(Self {
                 storage: ThreadSafeMutStorage::Any(value),
                 marker,
@@ -275,6 +335,11 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns this value through its thread-safe `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns the erased shared value, or `None` for the dedicated `str`
+    /// variant.
     #[must_use]
     #[inline(always)]
     pub fn as_any(&self) -> Option<&(dyn Any + Send + Sync)> {
@@ -287,6 +352,11 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns this value through its mutable thread-safe `Any` boundary.
     ///
     /// Returns `None` when this wrapper holds a dedicated `str` borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns the erased mutable value, or `None` for the dedicated `str`
+    /// variant.
     pub fn as_any_mut(&mut self) -> Option<&mut (dyn Any + Send + Sync)> {
         match &mut self.storage {
             ThreadSafeMutStorage::Any(value) => Some(&mut **value),
@@ -297,6 +367,10 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the dedicated `str` borrow when this wrapper contains one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
     #[inline(always)]
     pub fn as_str(&self) -> Option<&str> {
@@ -310,6 +384,11 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// one.
     ///
     /// Returns `None` when this wrapper holds an `Any`-compatible value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the mutable string borrow, or `None` for an `Any`-compatible
+    /// value.
     pub fn as_str_mut(&mut self) -> Option<&mut str> {
         match &mut self.storage {
             ThreadSafeMutStorage::Any(_) => None,
@@ -323,6 +402,15 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// The returned reference retains the wrapper's original `'a` lifetime.
     /// An `Any`-compatible value returns the untouched wrapper and preserves
     /// its `Send + Sync` erased boundary.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original exclusive string borrow.
+    ///
+    /// # Errors
+    ///
+    /// Returns the untouched wrapper when it contains an `Any`-compatible
+    /// value.
     pub fn into_str_mut(self) -> Result<&'a mut str, Self> {
         let Self { storage, marker } = self;
         match storage {

@@ -47,6 +47,7 @@ pub struct MethodInstanceDescriptor {
 }
 
 /// An inconsistent method implementation source or invocation capability.
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MethodInstanceBuildError {
     /// An inherent instance does not reference an impl-owned declaration.
@@ -72,7 +73,9 @@ impl fmt::Display for MethodInstanceBuildError {
             Self::DeclaredMethodNotOwnedByImpl => {
                 formatter.write_str("a declared inherent method must be owned by an impl")
             }
-            Self::TraitMethodNotOwnedByTrait => formatter.write_str("a trait method instance must be owned by a trait"),
+            Self::TraitMethodNotOwnedByTrait => {
+                formatter.write_str("a trait method instance must be owned by a trait")
+            }
             Self::RequiredMethodHasAdapter => {
                 formatter.write_str("a required method cannot have an invocation adapter")
             }
@@ -82,9 +85,8 @@ impl fmt::Display for MethodInstanceBuildError {
             Self::UnexpectedImplementationMethod => {
                 formatter.write_str("only an overridden method can name an impl method")
             }
-            Self::AdapterHasUnavailableReasons => {
-                formatter.write_str("an available invocation adapter cannot have unavailable reasons")
-            }
+            Self::AdapterHasUnavailableReasons => formatter
+                .write_str("an available invocation adapter cannot have unavailable reasons"),
             Self::UnavailableMethodMissingReasons => {
                 formatter.write_str("an unavailable method must provide a structured reason")
             }
@@ -134,7 +136,10 @@ impl MethodInstanceDescriptor {
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
         let entry_point = self.adapter?.catching_thread_safe?;
         Some(
-            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+            match invocation.bind_arguments(
+                self.effective_method().identity(),
+                self.effective_method().parameters(),
+            ) {
                 Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
@@ -285,7 +290,10 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.local?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -316,7 +324,10 @@ impl MethodInstanceDescriptor {
         let entry_point = self.adapter?.thread_safe?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -344,7 +355,10 @@ impl MethodInstanceDescriptor {
     ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
         let entry_point = self.adapter?.catching_local?;
         Some(
-            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+            match invocation.bind_arguments(
+                self.effective_method().identity(),
+                self.effective_method().parameters(),
+            ) {
                 Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
             },
@@ -382,7 +396,10 @@ impl MethodInstanceDescriptor {
             .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }
@@ -418,7 +435,10 @@ impl MethodInstanceDescriptor {
             .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()?;
         Some(
             invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+                .bind_arguments(
+                    self.effective_method().identity(),
+                    self.effective_method().parameters(),
+                )
                 .and_then(|invocation| entry_point(registry, invocation)),
         )
     }

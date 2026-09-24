@@ -10,6 +10,7 @@
 //! Errors produced while validating stable textual IDs.
 
 /// An invalid stable reflection ID.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum IdError {
     /// The ID is empty or has a segment that is not an ASCII identifier.

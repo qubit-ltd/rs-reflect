@@ -102,7 +102,8 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Named,
             }));
         }
-        let validated = crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
+        let validated =
+            crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -119,7 +120,8 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Tuple,
             }));
         }
-        let validated = crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
+        let validated =
+            crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -169,7 +171,9 @@ impl<M: Mode + 'static> StructConstructor<M> {
             self.fields.len(),
             "construction policy must cover every direct struct field"
         );
-        for (descriptor_field, construction_field) in self.descriptor.fields().iter().zip(self.fields) {
+        for (descriptor_field, construction_field) in
+            self.descriptor.fields().iter().zip(self.fields)
+        {
             assert!(
                 std::ptr::eq(descriptor_field, construction_field.descriptor()),
                 "construction policy fields must be the descriptor's own fields"
@@ -219,7 +223,9 @@ impl StructConstructor<ThreadSafe> {
     }
 
     /// Validates and constructs a thread-safe unit struct.
-    pub fn construct_unit(&self) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
+    pub fn construct_unit(
+        &self,
+    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
         self.construct_unit_with(thread_safe_type_id)
     }
 }

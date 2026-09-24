@@ -12,6 +12,7 @@ use crate::capability::CapabilityConflict;
 use crate::identity::CapabilityId;
 
 /// An error returned when a typed capability exists but cannot be executed.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum CapabilityAccessError {
     /// The intrinsic capability declarations conflict.

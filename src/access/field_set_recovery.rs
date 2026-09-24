@@ -26,7 +26,11 @@ pub struct FieldSetRecovery<M: Mode = Local> {
 
 impl<M: Mode> FieldSetRecovery<M> {
     /// Creates recovery for one field replacement value.
-    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: DynamicOwned<M>) -> Self {
+    pub(crate) const fn new(
+        field: FieldIdentity,
+        query_name: Option<&'static str>,
+        value: DynamicOwned<M>,
+    ) -> Self {
         Self {
             field,
             query_name,
@@ -122,6 +126,7 @@ impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
 /// Adapter errors occur after the adapter accepts ownership and therefore do
 /// not contain recovery. Call [`Self::recovery`] to distinguish the two
 /// phases without inspecting display text.
+#[must_use]
 pub struct FieldSetFailure<M: Mode = Local> {
     error: Box<FieldAccessError>,
     recovery: Option<Box<FieldSetRecovery<M>>>,

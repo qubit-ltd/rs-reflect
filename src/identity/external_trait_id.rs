@@ -22,6 +22,14 @@ impl ExternalTraitId {
     ///
     /// Returns [`IdError`] when `value` is malformed or uses the reserved
     /// `qubit.reflect` namespace.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated external trait ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IdError`] when the name is malformed or reserved.
     pub fn new(value: &str) -> Result<Self, IdError> {
         validate(value, IdAuthority::EXTERNAL)?;
         Ok(Self(value.into()))

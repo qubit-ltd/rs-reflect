@@ -182,6 +182,15 @@ impl TypeDescriptor {
     }
 
     /// Constructs a named struct through its generated local adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error and all recoverable caller values if
+    /// validation fails or this descriptor has no constructor.
     pub fn construct_struct(
         &self,
         input: NamedConstructionInput<crate::value::Local>,
@@ -194,6 +203,15 @@ impl TypeDescriptor {
 
     /// Constructs a tuple or newtype struct through its generated local
     /// adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error and all recoverable caller values if
+    /// validation fails or this descriptor has no constructor.
     pub fn construct_tuple(
         &self,
         input: TupleConstructionInput<crate::value::Local>,
@@ -205,7 +223,18 @@ impl TypeDescriptor {
     }
 
     /// Constructs a unit struct through its generated local adapter.
-    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed value with local dynamic ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns the construction error if validation fails or this descriptor
+    /// has no constructor.
+    pub fn construct_unit(
+        &self,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
         match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
@@ -217,7 +246,10 @@ impl TypeDescriptor {
 
     /// Creates a primitive root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> Self {
+    pub(crate) const fn new_primitive<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: PrimitiveKind,
+    ) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Primitive(PrimitiveTypeDescriptor::new(kind)),
@@ -228,7 +260,10 @@ impl TypeDescriptor {
 
     /// Creates a text root for generated or built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> Self {
+    pub(crate) const fn new_text<T: ?Sized + 'static>(
+        query_name: &'static str,
+        kind: TextKind,
+    ) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Text(TextTypeDescriptor::new(kind)),
@@ -261,7 +296,10 @@ impl TypeDescriptor {
 
     /// Attaches generic declaration and concrete-instance facts to this root.
     #[doc(hidden)]
-    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
+    pub const fn with_concrete_generic(
+        mut self,
+        generic: &'static ConcreteGenericDescriptor,
+    ) -> Self {
         self.generic = Some(generic);
         self
     }
@@ -269,7 +307,10 @@ impl TypeDescriptor {
     /// Links this concrete descriptor to its source-level generic declaration.
     #[doc(hidden)]
     #[must_use]
-    pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
+    pub const fn with_type_definition(
+        mut self,
+        definition: fn() -> &'static TypeDefinitionDescriptor,
+    ) -> Self {
         self.definition = Some(definition);
         self
     }
@@ -301,7 +342,10 @@ impl TypeDescriptor {
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
     /// data.
     #[doc(hidden)]
-    pub(crate) const fn new_tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> Self {
+    pub(crate) const fn new_tuple<T: ?Sized + 'static>(
+        query_name: &'static str,
+        elements: &'static [TypeRef],
+    ) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Tuple(TupleTypeDescriptor::new(elements)),
@@ -358,7 +402,10 @@ impl TypeDescriptor {
 
     /// Creates an optional root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
+    pub(crate) const fn new_optional<T: ?Sized + 'static>(
+        query_name: &'static str,
+        element: &'static TypeRef,
+    ) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Optional(OptionalTypeDescriptor::new(element)),
@@ -541,7 +588,10 @@ impl TypeDescriptor {
 
     /// Creates a slice root for built-in descriptor data.
     #[doc(hidden)]
-    pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
+    pub(crate) const fn new_slice<T: ?Sized + 'static>(
+        query_name: &'static str,
+        element: &'static TypeRef,
+    ) -> Self {
         Self::new::<T>(
             query_name,
             TypeDescriptorData::Slice(SliceTypeDescriptor::new(element)),
@@ -662,7 +712,12 @@ impl TypeDescriptor {
     /// Creates an intentionally opaque root for generated descriptor data.
     #[doc(hidden)]
     pub(crate) const fn new_opaque<T: ?Sized + 'static>(query_name: &'static str) -> Self {
-        Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
+        Self::new::<T>(
+            query_name,
+            TypeDescriptorData::Opaque(OpaqueTypeView),
+            &[],
+            &[],
+        )
     }
 
     /// Creates an opaque root with an explicit static capability resolver.
@@ -994,7 +1049,9 @@ impl TypeDescriptor {
     /// `None` means the root has no direct field with that lookup name.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
-        self.fields.iter().find(|field| field.query_name() == Some(name))
+        self.fields
+            .iter()
+            .find(|field| field.query_name() == Some(name))
     }
 
     /// Returns a direct field by source index.
@@ -1019,7 +1076,9 @@ impl TypeDescriptor {
     /// `None` means the root has no variant with that lookup name.
     #[must_use]
     pub fn variant(&self, name: &str) -> Option<&VariantDescriptor> {
-        self.variants.iter().find(|variant| variant.query_name() == name)
+        self.variants
+            .iter()
+            .find(|variant| variant.query_name() == name)
     }
 
     /// Returns a variant by source index.
@@ -1027,7 +1086,9 @@ impl TypeDescriptor {
     /// `None` means no visible variant has the source declaration index.
     #[must_use]
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor> {
-        self.variants.iter().find(|variant| variant.index() == index)
+        self.variants
+            .iter()
+            .find(|variant| variant.index() == index)
     }
 
     /// Finds the fieldless integer-`repr` variant with the exact numeric value.
@@ -1047,6 +1108,15 @@ impl TypeDescriptor {
     /// Both the returned slice and its descriptors belong to the immutable
     /// process-wide registry. A cached [`RegistryError`] is returned when
     /// distributed registration could not be aggregated.
+    ///
+    /// # Returns
+    ///
+    /// Returns implementations targeting this type in deterministic order.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cached registry initialization error if registration could
+    /// not be aggregated.
     #[must_use = "inspect the reflected implementations or handle the registry error"]
     pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
@@ -1056,7 +1126,10 @@ impl TypeDescriptor {
     /// Returns implementations from an explicitly supplied immutable registry
     /// snapshot without consulting process-wide initialization.
     #[must_use]
-    pub fn impls_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [&'static ImplDescriptor] {
+    pub fn impls_in<'registry>(
+        &self,
+        registry: &'registry ReflectRegistry,
+    ) -> &'registry [&'static ImplDescriptor] {
         registry.implementations(self.type_id())
     }
 
@@ -1066,6 +1139,15 @@ impl TypeDescriptor {
     /// defaulted trait methods replaced by their effective override where
     /// applicable. The slice is empty when no reflected impl targets this
     /// root. A cached [`RegistryError`] is returned when aggregation failed.
+    ///
+    /// # Returns
+    ///
+    /// Returns the frozen effective method instances for this type.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cached registry initialization error if registration could
+    /// not be aggregated.
     #[must_use = "inspect the effective methods or handle the registry error"]
     pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
@@ -1089,6 +1171,15 @@ impl TypeDescriptor {
     /// use the name. Callers that need a qualified namespace can use
     /// [`crate::registry::EffectiveTypeView::lookup_method`] on a registry
     /// view. A cached [`RegistryError`] is returned when aggregation failed.
+    ///
+    /// # Returns
+    ///
+    /// Returns the missing, unique, or ambiguous lookup result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cached registry initialization error if registration could
+    /// not be aggregated.
     pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.methods_named_in(registry, name))

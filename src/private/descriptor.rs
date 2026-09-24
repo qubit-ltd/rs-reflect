@@ -243,7 +243,10 @@ pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'stat
 /// name.
 #[doc(hidden)]
 #[must_use]
-pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> TypeDescriptor {
+pub const fn primitive<T: ?Sized + 'static>(
+    query_name: &'static str,
+    kind: PrimitiveKind,
+) -> TypeDescriptor {
     TypeDescriptor::new_primitive::<T>(query_name, kind)
 }
 
@@ -354,7 +357,10 @@ pub const fn enum_type_with_repr<T: ?Sized + 'static>(
 /// name.
 #[doc(hidden)]
 #[must_use]
-pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> TypeDescriptor {
+pub const fn tuple<T: ?Sized + 'static>(
+    query_name: &'static str,
+    elements: &'static [TypeRef],
+) -> TypeDescriptor {
     TypeDescriptor::new_tuple::<T>(query_name, elements)
 }
 
@@ -374,7 +380,10 @@ pub const fn array<T: ?Sized + 'static>(
 /// name.
 #[doc(hidden)]
 #[must_use]
-pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
+pub const fn optional<T: ?Sized + 'static>(
+    query_name: &'static str,
+    element: &'static TypeRef,
+) -> TypeDescriptor {
     TypeDescriptor::new_optional::<T>(query_name, element)
 }
 
@@ -441,7 +450,10 @@ pub const fn reference<T: ?Sized + 'static>(
 /// name.
 #[doc(hidden)]
 #[must_use]
-pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
+pub const fn slice<T: ?Sized + 'static>(
+    query_name: &'static str,
+    element: &'static TypeRef,
+) -> TypeDescriptor {
     TypeDescriptor::new_slice::<T>(query_name, element)
 }
 
@@ -535,7 +547,14 @@ pub const fn field(
     field_type: &'static TypeRef,
     visibility: Visibility,
 ) -> FieldDescriptor {
-    FieldDescriptor::new(declaring_type, index, rust_name, query_name, field_type, visibility)
+    FieldDescriptor::new(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        field_type,
+        visibility,
+    )
 }
 
 /// Creates an immutable field whose concrete type relationship is resolved on
@@ -549,7 +568,14 @@ pub const fn lazy_field(
     field_type: &'static LazyTypeRef,
     visibility: Visibility,
 ) -> FieldDescriptor {
-    FieldDescriptor::new_lazy(declaring_type, index, rust_name, query_name, field_type, visibility)
+    FieldDescriptor::new_lazy(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        field_type,
+        visibility,
+    )
 }
 
 /// Creates an immutable enum variant descriptor for generated descriptor data.
@@ -564,7 +590,15 @@ pub const fn variant(
     fields: &'static [FieldDescriptor],
     active_test: VariantActiveAdapter,
 ) -> VariantDescriptor {
-    VariantDescriptor::new(declaring_type, index, rust_name, query_name, kind, fields, active_test)
+    VariantDescriptor::new(
+        declaring_type,
+        index,
+        rust_name,
+        query_name,
+        kind,
+        fields,
+        active_test,
+    )
 }
 
 #[cfg(test)]

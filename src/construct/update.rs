@@ -73,8 +73,12 @@ impl<M: Mode + 'static> StructUpdater<M> {
         value_type_id: fn(&DynamicOwned<M>) -> TypeId,
     ) -> Result<DynamicOwned<M>, ConstructionRecovery<M>> {
         self.assert_descriptor_contract();
-        let validated =
-            crate::construct::validated::validate_update(input, self.descriptor.type_id(), self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_update(
+            input,
+            self.descriptor.type_id(),
+            self.fields,
+            value_type_id,
+        )?;
         let output = (self.adapter)(validated);
         assert_eq!(
             value_type_id(&output),
@@ -95,7 +99,9 @@ impl<M: Mode + 'static> StructUpdater<M> {
             self.fields.len(),
             "update policy must cover every direct struct field"
         );
-        for (descriptor_field, construction_field) in self.descriptor.fields().iter().zip(self.fields) {
+        for (descriptor_field, construction_field) in
+            self.descriptor.fields().iter().zip(self.fields)
+        {
             assert!(
                 std::ptr::eq(descriptor_field, construction_field.descriptor()),
                 "update policy fields must be the descriptor's own fields"
@@ -106,7 +112,10 @@ impl<M: Mode + 'static> StructUpdater<M> {
 
 impl StructUpdater<Local> {
     /// Atomically validates and updates a local owned struct value.
-    pub fn update(&self, input: StructUpdateInput<Local>) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
+    pub fn update(
+        &self,
+        input: StructUpdateInput<Local>,
+    ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
         self.update_with(input, local_type_id)
     }
 }
