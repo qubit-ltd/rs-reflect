@@ -40,14 +40,14 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
 
     /// Returns the recovered receiver, or `None` for an associated function.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
         self.receiver.as_ref()
     }
 
     /// Returns all recovered arguments in their original caller order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         &self.arguments
     }
@@ -105,13 +105,13 @@ pub struct InvocationFailure<'call, M: InvocationMode> {
 impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     /// Returns the structured validation error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable invocation input.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn recovery(&self) -> &InvocationRecovery<'call, M> {
         &self.recovery
     }

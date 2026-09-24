@@ -61,7 +61,7 @@ impl CapabilityId {
 
     /// Returns the stable textual representation of this ID.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> &str {
         let Self(value) = self;
         value

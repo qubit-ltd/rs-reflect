@@ -72,7 +72,7 @@ impl<M: Mode> ConstructionRecovery<M> {
 
     /// Returns the machine-readable validation error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
     }
@@ -82,7 +82,7 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// Update recovery places the base first, followed by overrides in caller
     /// order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
         &self.values
     }

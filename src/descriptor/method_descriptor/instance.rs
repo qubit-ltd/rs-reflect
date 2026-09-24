@@ -201,7 +201,7 @@ impl MethodInstanceDescriptor {
 
     /// Returns the declaration shared by this concrete specialization.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaration(&self) -> &'static MethodDescriptor {
         self.declaration
     }
@@ -210,14 +210,14 @@ impl MethodInstanceDescriptor {
     ///
     /// `None` means the instance is required or uses its trait default.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implementation_method(&self) -> Option<&'static MethodDescriptor> {
         self.implementation_method
     }
 
     /// Returns the effective declaration or explicit implementation method.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn effective_method(&self) -> &'static MethodDescriptor {
         match self.implementation_method {
             Some(method) => method,
@@ -228,7 +228,7 @@ impl MethodInstanceDescriptor {
     /// Returns whether the implementation is required, defaulted, or
     /// overridden.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implementation_source(&self) -> MethodImplementationSource {
         self.implementation_source
     }
@@ -237,7 +237,7 @@ impl MethodInstanceDescriptor {
     ///
     /// `None` means callers must inspect [`Self::unavailable_reasons`].
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn adapter(&self) -> Option<&'static InvocationAdapter> {
         self.adapter
     }
@@ -245,14 +245,14 @@ impl MethodInstanceDescriptor {
     /// Returns the concrete type and const arguments of this method
     /// specialization in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
 
     /// Returns stable reasons that prevent dynamic invocation.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn unavailable_reasons(&self) -> &[InvocationUnavailableReason] {
         &self.unavailable_reasons
     }

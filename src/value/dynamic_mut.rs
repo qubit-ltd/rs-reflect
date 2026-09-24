@@ -152,7 +152,7 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns the erased shared value, or `None` for the dedicated `str`
     /// variant.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&dyn Any> {
         match &self.storage {
             LocalMutStorage::Any(value) => Some(&**value),
@@ -183,7 +183,7 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             LocalMutStorage::Any(_) => None,
@@ -339,7 +339,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the erased shared value, or `None` for the dedicated `str`
     /// variant.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&(dyn Any + Send + Sync)> {
         match &self.storage {
             ThreadSafeMutStorage::Any(value) => Some(&**value),
@@ -370,7 +370,7 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             ThreadSafeMutStorage::Any(_) => None,

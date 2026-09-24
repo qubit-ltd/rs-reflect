@@ -106,49 +106,49 @@ impl TraitDefinitionDescriptor {
 
     /// Returns the trait declaration's normalized source visibility.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn visibility(&self) -> &Visibility {
         &self.visibility
     }
 
     /// Returns the reflected marker or external trait identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn trait_id(&self) -> &TraitId {
         &self.trait_id
     }
 
     /// Returns the Rust declaration name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the diagnostic fully qualified Rust path.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_path(&self) -> &'static str {
         self.rust_path
     }
 
     /// Returns the lookup name, which may differ from the Rust name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns whether the complete declaration is known.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn completeness(&self) -> TraitCompleteness {
         self.completeness
     }
 
     /// Returns generic parameters and predicates in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
     }
@@ -161,7 +161,7 @@ impl TraitDefinitionDescriptor {
 
     /// Returns associated types declared by this trait in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn associated_types(&self) -> &[AssociatedTypeDescriptor] {
         self.members
             .get()
@@ -170,7 +170,7 @@ impl TraitDefinitionDescriptor {
 
     /// Returns associated constants declared by this trait in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn associated_consts(&self) -> &[AssociatedConstDescriptor] {
         self.members
             .get()
@@ -255,35 +255,34 @@ impl AssociatedTypeDescriptor {
 
     /// Returns the source declaration index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the Rust declaration name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the lookup name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns declared bounds in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn bounds(&self) -> &[PredicateDescriptor] {
         &self.bounds
     }
 
     /// Returns GAT parameters and where predicates in declaration order.
     #[must_use]
-    #[inline(always)]
     pub fn generic_definition(&self) -> &GenericDefinitionDescriptor {
         static EMPTY: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
             parameters: Box::new([]),
@@ -297,7 +296,7 @@ impl AssociatedTypeDescriptor {
     ///
     /// `None` means the trait requires implementations to provide the binding.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn default(&self) -> Option<&TypeExpression> {
         self.default.as_ref()
     }
@@ -355,35 +354,35 @@ impl AssociatedConstDescriptor {
 
     /// Returns the source declaration index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the Rust declaration name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the lookup name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns the declared constant type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declared_type(&self) -> &TypeExpression {
         &self.declared_type
     }
 
     /// Returns whether the trait declaration provides a default value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn has_default(&self) -> bool {
         self.has_default
     }

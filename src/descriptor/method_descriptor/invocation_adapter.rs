@@ -248,7 +248,7 @@ impl InvocationAdapter {
     /// Returns the opaque entry-point identity.
     #[doc(hidden)]
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn entry_point(&self) -> fn() {
         self.entry_point
     }
@@ -256,7 +256,7 @@ impl InvocationAdapter {
     /// Reports whether an explicitly requested panic-catching entry point is
     /// callable in this binary.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn catching_availability(&self) -> CatchingAvailability {
         self.catching_availability
     }

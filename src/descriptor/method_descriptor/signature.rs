@@ -76,7 +76,7 @@ impl ParameterDescriptor {
 
     /// Returns the zero-based non-receiver parameter index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
@@ -85,28 +85,28 @@ impl ParameterDescriptor {
     ///
     /// `None` denotes a wildcard or destructuring pattern.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn name(&self) -> Option<&'static str> {
         self.name
     }
 
     /// Returns the parser-independent source pattern category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn pattern(&self) -> &ParameterPatternDescriptor {
         &self.pattern
     }
 
     /// Returns how the argument crosses the method boundary.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn passing_mode(&self) -> ParameterPassingMode {
         self.passing_mode
     }
 
     /// Returns the declared, possibly symbolic parameter type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn signature_type(&self) -> &TypeExpression {
         &self.signature_type
     }
@@ -115,7 +115,6 @@ impl ParameterDescriptor {
     ///
     /// `None` denotes a symbolic, opaque, or otherwise unresolved type.
     #[must_use]
-    #[inline(always)]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
     }
@@ -185,7 +184,7 @@ impl ReturnDescriptor {
 
     /// Returns the structural return category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> ReturnKind {
         self.kind
     }
@@ -194,7 +193,7 @@ impl ReturnDescriptor {
     ///
     /// `None` means the unit or never category carries the complete fact.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn signature_type(&self) -> Option<&TypeExpression> {
         self.signature_type.as_ref()
     }
@@ -204,7 +203,6 @@ impl ReturnDescriptor {
     /// `None` denotes unit, never, a reference, opaque output, or an unresolved
     /// symbolic type.
     #[must_use]
-    #[inline(always)]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
     }

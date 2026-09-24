@@ -166,14 +166,14 @@ impl InvocationError {
 
     /// Returns the structured identity of the method being invoked.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn method_identity(&self) -> &MemberId {
         &self.method_identity
     }
 
     /// Returns the stable machine-readable validation reason.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> &InvocationErrorKind {
         &self.kind
     }
@@ -223,14 +223,14 @@ impl InvocationPanic {
 
     /// Returns the structured identity of the method that panicked.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn method_identity(&self) -> &MemberId {
         &self.method_identity
     }
 
     /// Returns the retained panic payload without interpreting its text.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn payload(&self) -> &(dyn Any + Send) {
         self.payload.as_ref()
     }

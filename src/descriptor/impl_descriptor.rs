@@ -85,7 +85,7 @@ impl ImplAssociatedTypeDescriptor {
 
     /// Returns the Rust associated type name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
@@ -111,14 +111,14 @@ impl ImplAssociatedConstDescriptor {
 
     /// Returns the Rust associated constant name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the declared constant type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declared_type(&self) -> &TypeExpression {
         &self.declared_type
     }
@@ -176,21 +176,21 @@ impl ImplDefinitionDescriptor {
 
     /// Returns the source/content identity of this impl fragment.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn fragment_identity(&self) -> &FragmentIdentity {
         &self.fragment_identity
     }
 
     /// Returns the possibly symbolic target type expression.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn target_type(&self) -> &TypeExpression {
         &self.target_type
     }
 
     /// Returns whether this definition is inherent or implements a trait.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> ImplKind {
         self.kind
     }
@@ -200,14 +200,14 @@ impl ImplDefinitionDescriptor {
     /// `None` identifies an inherent impl or an unresolved trait declaration.
     /// Use [`Self::implemented_trait_in`] for snapshot-resolved links.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
         self.implemented_trait
     }
 
     /// Returns the diagnostic trait path recorded by the impl declaration.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn implemented_trait_path(&self) -> Option<&str> {
         self.implemented_trait_path.as_deref()
     }
@@ -215,7 +215,7 @@ impl ImplDefinitionDescriptor {
     /// Returns an exact trait identity supplied by the impl declaration when
     /// one is available before registry linking.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn implemented_trait_id(&self) -> Option<&TraitId> {
         self.implemented_trait_id.as_ref()
     }
@@ -233,21 +233,21 @@ impl ImplDefinitionDescriptor {
 
     /// Returns generic parameters and predicates in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
         self.generic_definition
     }
 
     /// Returns methods declared by this impl definition in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn methods(&self) -> &[MethodDescriptor] {
         self.methods.get().map_or(&[], Box::as_ref)
     }
 
     /// Returns associated types explicitly bound by this impl in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn associated_types(&self) -> &[ImplAssociatedTypeDescriptor] {
         self.associated_items.get().map_or(&[], |items| items.types.as_ref())
     }
@@ -255,7 +255,7 @@ impl ImplDefinitionDescriptor {
     /// Returns associated constants explicitly bound by this impl in source
     /// order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn associated_consts(&self) -> &[ImplAssociatedConstDescriptor] {
         self.associated_items.get().map_or(&[], |items| items.consts.as_ref())
     }
@@ -331,7 +331,6 @@ impl AssociatedConstReader {
 
     /// Reads a fresh owned reflected value.
     #[must_use]
-    #[inline(always)]
     pub fn read(&self) -> ReflectedOwned {
         match self.read {
             AssociatedConstReadAdapter::Function(read) => read(),
@@ -375,14 +374,14 @@ impl AssociatedTypeBindingDescriptor {
 
     /// Returns the trait declaration being bound.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaration(&self) -> &'static AssociatedTypeDescriptor {
         self.declaration
     }
 
     /// Returns the concrete or still-symbolic binding expression.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn value(&self) -> &TypeExpression {
         &self.value
     }
@@ -391,7 +390,6 @@ impl AssociatedTypeBindingDescriptor {
     ///
     /// `None` means the expression remains symbolic or unresolved.
     #[must_use]
-    #[inline(always)]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
     }
@@ -429,21 +427,21 @@ impl AssociatedConstBindingDescriptor {
 
     /// Returns the trait declaration being implemented.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaration(&self) -> &'static AssociatedConstDescriptor {
         self.declaration
     }
 
     /// Returns whether the value is defaulted or explicitly overridden.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implementation_source(&self) -> AssociatedConstImplementationSource {
         self.implementation_source
     }
 
     /// Returns whether a safe owned-value reader is available.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_readable(&self) -> bool {
         self.reader.is_some()
     }
@@ -452,7 +450,7 @@ impl AssociatedConstBindingDescriptor {
     ///
     /// `None` means [`Self::read`] can produce a fresh owned value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn read_unavailable_reason(&self) -> Option<AssociatedConstReadUnavailableReason> {
         self.read_unavailable_reason
     }
@@ -461,7 +459,6 @@ impl AssociatedConstBindingDescriptor {
     ///
     /// `None` means the declared type cannot cross the owned dynamic boundary.
     #[must_use]
-    #[inline(always)]
     pub fn read(&self) -> Option<ReflectedOwned> {
         self.reader.map(AssociatedConstReader::read)
     }
@@ -627,42 +624,41 @@ impl ImplDescriptor {
 
     /// Returns the generic or blanket impl definition.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn definition(&self) -> &'static ImplDefinitionDescriptor {
         self.definition
     }
 
     /// Returns the reflected root targeted by this concrete impl.
     #[must_use]
-    #[inline(always)]
     pub fn target_type(&self) -> &'static TypeDescriptor {
         (self.target_type)()
     }
 
     /// Returns whether this is an inherent or trait implementation.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> ImplKind {
         self.definition.kind()
     }
 
     /// Returns the concrete applied trait, or `None` for an inherent impl.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implemented_trait(&self) -> Option<&'static TraitDescriptor> {
         self.implemented_trait
     }
 
     /// Returns methods explicitly declared by this impl definition.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn methods(&self) -> &[MethodDescriptor] {
         self.methods
     }
 
     /// Returns methods explicitly declared by this impl definition.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implementation_methods(&self) -> &[MethodDescriptor] {
         self.methods
     }
@@ -676,28 +672,28 @@ impl ImplDescriptor {
 
     /// Returns concrete effective instances, including defaulted methods.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn method_instances(&self) -> &[MethodInstanceDescriptor] {
         &self.method_instances
     }
 
     /// Returns associated type bindings in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_types(&self) -> &[AssociatedTypeBindingDescriptor] {
         &self.associated_types
     }
 
     /// Returns associated constant bindings in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_consts(&self) -> &[AssociatedConstBindingDescriptor] {
         &self.associated_consts
     }
 
     /// Returns concrete impl arguments in definition parameter order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }

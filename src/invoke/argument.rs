@@ -75,14 +75,14 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
 
     /// Returns the caller-supplied name, or `None` for a positional binding.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Returns the bound dynamic argument without consuming it.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn argument(&self) -> &InvocationArg<'call, M> {
         &self.argument
     }
@@ -96,7 +96,7 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
 impl<M: InvocationMode> InvocationArg<'_, M> {
     /// Returns the input's ownership or borrowing mode.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn mode(&self) -> InvocationInputMode {
         match self {
             Self::Owned(_) => InvocationInputMode::Owned,
@@ -107,7 +107,7 @@ impl<M: InvocationMode> InvocationArg<'_, M> {
 
     /// Returns the exact process-local Rust type identity of the input.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn type_id(&self) -> TypeId {
         match self {
             Self::Owned(value) => M::owned_type_id(value),
@@ -146,21 +146,21 @@ impl ArgumentExpectation {
 
     /// Returns the required argument mode.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn mode(self) -> InvocationInputMode {
         self.mode
     }
 
     /// Returns the exact expected process-local Rust type identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn type_id(self) -> TypeId {
         self.type_id
     }
 
     /// Returns the expected Rust type name for diagnostics.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn type_name(self) -> &'static str {
         self.type_name
     }

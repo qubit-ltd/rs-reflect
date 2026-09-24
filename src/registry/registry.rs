@@ -96,21 +96,21 @@ impl<'registry> TypeCandidates<'registry> {
 
     /// Returns candidates in stable fragment order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching descriptors.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no descriptor matched the requested name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
@@ -141,28 +141,28 @@ impl<'registry> TraitCandidates<'registry> {
 
     /// Returns candidates in stable fragment order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching declarations.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no declarations match.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
 
     /// Returns the sole matching declaration, rejecting ambiguous path lookups.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn only(self) -> Option<&'static TraitDefinitionDescriptor> {
         (self.descriptors.len() == 1).then(|| self.descriptors[0])
     }
@@ -188,21 +188,21 @@ pub struct ImplDefinitionCandidates {
 impl ImplDefinitionCandidates {
     /// Iterates over matching definitions in stable fragment order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_ {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching definitions.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn len(&self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no impl definition has the requested target.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(&self) -> bool {
         self.descriptors.is_empty()
     }
@@ -292,7 +292,7 @@ impl ReflectRegistry {
 
     /// Enumerates all statically registered roots in stable fragment order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn types(&self) -> &[&'static TypeDescriptor] {
         &self.types
     }
@@ -611,7 +611,7 @@ impl ReflectRegistry {
     /// Generic and blanket definitions appear here even when they have no
     /// explicitly registered concrete specialization.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn impl_definitions(&self) -> &[&'static ImplDefinitionDescriptor] {
         &self.impl_definitions
     }

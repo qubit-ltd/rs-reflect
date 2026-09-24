@@ -43,37 +43,37 @@ impl FragmentIdentity {
 
     /// Returns the crate that declared this fragment.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn declaring_crate(&self) -> &str {
         &self.declaring_crate
     }
     /// Returns the declaring module path.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn module_path(&self) -> &str {
         &self.module_path
     }
     /// Returns the declaration line number.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn line(&self) -> u32 {
         self.line
     }
     /// Returns the declaration column number.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn column(&self) -> u32 {
         self.column
     }
     /// Returns the category of members declared by this fragment.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn member_kind(&self) -> &str {
         &self.member_kind
     }
     /// Returns the deterministic fingerprint of normalized macro input.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn content_fingerprint(&self) -> u64 {
         self.content_fingerprint
     }

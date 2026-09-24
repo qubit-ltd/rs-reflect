@@ -102,7 +102,7 @@ impl DynamicOwned<Local> {
     ///
     /// Owned dynamic values currently always contain an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&dyn Any> {
         let LocalOwnedStorage::Any(value) = &self.storage;
         Some(value.as_ref())
@@ -199,7 +199,7 @@ impl DynamicOwned<ThreadSafe> {
     ///
     /// Owned dynamic values currently always contain an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&(dyn Any + Send + Sync)> {
         let ThreadSafeOwnedStorage::Any(value) = &self.storage;
         Some(value.as_ref())

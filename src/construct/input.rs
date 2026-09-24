@@ -111,14 +111,14 @@ impl<M: Mode> ConstructionField<M> {
 
     /// Returns the immutable structural field descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn descriptor(&self) -> &'static FieldDescriptor {
         self.descriptor
     }
 
     /// Returns the explicit generated construction policy.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn policy(&self) -> ConstructionFieldPolicy<M> {
         self.policy
     }
@@ -176,14 +176,14 @@ impl UpdateField {
 
     /// Returns the immutable structural field descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn descriptor(&self) -> &'static FieldDescriptor {
         self.descriptor
     }
 
     /// Returns the independent generated update policy.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn policy(&self) -> UpdateFieldPolicy {
         self.policy
     }
@@ -220,7 +220,7 @@ impl<M: Mode> NamedConstructionInput<M> {
 
     /// Returns named values in their original caller order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn fields(&self) -> &[(Box<str>, DynamicOwned<M>)] {
         &self.fields
     }
@@ -269,7 +269,7 @@ impl<M: Mode> TupleConstructionInput<M> {
 
     /// Returns values in their original positional order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn values(&self) -> &[DynamicOwned<M>] {
         &self.values
     }
@@ -316,14 +316,14 @@ impl<M: Mode> StructUpdateInput<M> {
 
     /// Returns the untouched owned base value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn base(&self) -> &DynamicOwned<M> {
         &self.base
     }
 
     /// Returns overrides in their original caller order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn overrides(&self) -> &NamedConstructionInput<M> {
         &self.overrides
     }

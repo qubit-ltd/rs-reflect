@@ -44,7 +44,6 @@ impl VariantConstructionDescriptor {
 
     /// Returns the local owned constructor for this variant.
     #[must_use]
-    #[inline(always)]
     pub fn local_constructor(&self) -> &'static VariantConstructor<Local> {
         self.cached_local_constructor.get_or_init(self.local_constructor)
     }

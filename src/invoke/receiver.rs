@@ -38,7 +38,7 @@ pub enum InvocationReceiver<'call, M: InvocationMode> {
 impl<M: InvocationMode> InvocationReceiver<'_, M> {
     /// Returns the receiver's ownership or borrowing mode.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn mode(&self) -> InvocationInputMode {
         match self {
             Self::Owned(_) => InvocationInputMode::Owned,
@@ -49,7 +49,7 @@ impl<M: InvocationMode> InvocationReceiver<'_, M> {
 
     /// Returns the exact process-local Rust type identity of the receiver.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn type_id(&self) -> TypeId {
         match self {
             Self::Owned(value) => M::owned_type_id(value),
@@ -143,7 +143,7 @@ impl ReceiverExpectation {
     /// Returns the required receiver mode, or `None` for an associated
     /// function.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn mode(self) -> Option<InvocationInputMode> {
         match self {
             Self::None => None,
@@ -155,7 +155,7 @@ impl ReceiverExpectation {
 
     /// Returns the expected receiver type identity when a receiver is required.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn type_id(self) -> Option<TypeId> {
         match self {
             Self::None => None,
@@ -165,7 +165,7 @@ impl ReceiverExpectation {
 
     /// Returns the expected receiver type name when a receiver is required.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn type_name(self) -> Option<&'static str> {
         match self {
             Self::None => None,

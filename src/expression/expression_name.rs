@@ -37,21 +37,21 @@ impl ExpressionName {
 
     /// Returns the validated name text.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
 impl AsRef<str> for ExpressionName {
-    #[inline(always)]
+    #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
 impl Borrow<str> for ExpressionName {
-    #[inline(always)]
+    #[inline]
     fn borrow(&self) -> &str {
         self.as_str()
     }

@@ -118,35 +118,35 @@ impl FieldIdentity {
 
     /// Returns the declaring root's process-local Rust type identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaring_type(&self) -> TypeId {
         self.declaring_type
     }
 
     /// Returns the declaring root's diagnostic Rust type name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaring_type_name(&self) -> &'static str {
         self.declaring_type_name
     }
 
     /// Returns the field's zero-based source declaration index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the source Rust name, or `None` for positional fields.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> Option<&'static str> {
         self.rust_name
     }
 
     /// Returns the reflection query name used for lookup.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> Option<&'static str> {
         self.query_name
     }
@@ -155,7 +155,7 @@ impl FieldIdentity {
     ///
     /// `None` identifies a direct struct field.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn variant_index(&self) -> Option<usize> {
         self.variant_index
     }
@@ -164,7 +164,7 @@ impl FieldIdentity {
     ///
     /// `None` identifies a direct struct field.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
         self.variant_rust_name
     }

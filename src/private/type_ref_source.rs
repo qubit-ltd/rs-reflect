@@ -22,7 +22,7 @@ pub(crate) enum TypeRefSource {
 impl TypeRefSource {
     /// Returns the stable public relationship object.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn get(self) -> &'static TypeRef {
         match self {
             Self::Eager(reference) => reference,

@@ -48,21 +48,21 @@ impl CapabilityDescriptor {
 
     /// Returns the stable capability identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn id(&self) -> &CapabilityId {
         &self.id
     }
 
     /// Returns the process-local identity of the adapter contract.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn adapter_type(&self) -> TypeId {
         self.adapter_type
     }
 
     /// Returns whether this descriptor carries an executable adapter.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn has_adapter(&self) -> bool {
         self.adapter.is_some()
     }

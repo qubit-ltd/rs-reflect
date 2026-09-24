@@ -61,14 +61,12 @@ impl StructConstructionDescriptor {
 
     /// Returns the local owned from-zero constructor.
     #[must_use]
-    #[inline(always)]
     pub fn local_constructor(&self) -> &'static StructConstructor<Local> {
         self.cached_local_constructor.get_or_init(self.local_constructor)
     }
 
     /// Returns the local owned whole-field updater when generated.
     #[must_use]
-    #[inline(always)]
     pub fn local_updater(&self) -> Option<&'static StructUpdater<Local>> {
         *self
             .cached_local_updater

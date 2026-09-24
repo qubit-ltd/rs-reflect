@@ -74,14 +74,14 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
 
     /// Returns the pinned shared receiver without weakening its pin guarantee.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Pin<&'call T> {
         self.receiver
     }
 
     /// Returns arguments in their current caller or declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -162,14 +162,14 @@ pub struct PinnedRefInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, M> {
     /// Returns the recovered pinned receiver.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Pin<&'call T> {
         self.receiver
     }
 
     /// Returns recovered arguments in their original order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -201,13 +201,13 @@ pub struct PinnedRefInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable pinned invocation input.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn recovery(&self) -> &PinnedRefInvocationRecovery<'call, T, M> {
         &self.recovery
     }
@@ -282,7 +282,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
 
     /// Returns arguments in their current caller or declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -358,14 +358,14 @@ pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, M> {
     /// Returns a reborrowed pinned mutable receiver.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn receiver(&mut self) -> Pin<&mut T> {
         self.receiver.as_mut()
     }
 
     /// Returns recovered arguments in their original order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         self.invocation.arguments()
     }
@@ -398,13 +398,13 @@ pub struct PinnedMutInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable pinned invocation input.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn recovery(&self) -> &PinnedMutInvocationRecovery<'call, T, M> {
         &self.recovery
     }

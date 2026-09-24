@@ -31,7 +31,7 @@ impl LazyTypeRefList {
 
     /// Returns the number of relationships without resolving any target.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn len(&self) -> usize {
         self.references.len()
     }
