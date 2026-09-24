@@ -61,7 +61,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
         Some(&1),
     );
     field
-        .set(ReflectedMut::new(&mut field_probe), ReflectedOwned::new(2_u64))
+        .set(
+            ReflectedMut::new(&mut field_probe),
+            ReflectedOwned::new(2_u64),
+        )
         .expect("dynamic field set setup must succeed");
     assert_eq!(field_probe.id, 2);
 
@@ -82,7 +85,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
         3,
     );
     descriptor
-        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(3_u64))]))
+        .construct_struct(NamedConstructionInput::new([(
+            "id",
+            ReflectedOwned::new(3_u64),
+        )]))
         .expect("dynamic construction setup must succeed");
 
     criterion.bench_function("field/direct_get", |bench| {
@@ -103,7 +109,12 @@ fn dynamic_operations(criterion: &mut Criterion) {
     criterion.bench_function("field/reflected_set", |bench| {
         bench.iter_batched(
             || BenchmarkRecord { id: 0 },
-            |mut value| black_box(field.set(ReflectedMut::new(&mut value), ReflectedOwned::new(black_box(1_u64)))),
+            |mut value| {
+                black_box(field.set(
+                    ReflectedMut::new(&mut value),
+                    ReflectedOwned::new(black_box(1_u64)),
+                ))
+            },
             BatchSize::SmallInput,
         );
     });
