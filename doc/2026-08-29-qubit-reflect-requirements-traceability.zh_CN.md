@@ -2,7 +2,7 @@
 
 本矩阵逐项对应最终需求规范中的全部 285 个唯一 `REQ-*` ID。每行均给出实施任务、至少一个真实实现文件和至少一个真实测试文件；所有路径均按 2026-09-01 完成破坏性边界重构后的仓库结构核验。
 
-表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v3`，唯一的 registry resolver 是 `ReflectRegistry`；公共 `RegistrySnapshotBuilder` 为明确拥有的 fragment 提供隔离且事务性的构建入口。
+表中的 `T01`—`T26` 是原始实施计划的历史任务编号，用于保留需求决策来源，并不表示当前实现仍处于计划阶段。当前生成协议为 `__private::codegen_v3`，下游模型元数据 ABI 为 `v7`；唯一的 registry resolver 是 `ReflectRegistry`。公共 `RegistrySnapshotBuilder` 为明确拥有的 fragment 提供隔离且事务性的构建入口。
 
 ## 验证方法
 

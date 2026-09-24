@@ -469,7 +469,7 @@ pub mod __private {
 
 业务声明随后可使用 `#[reflect(crate = my_facade)]`。生成代码只需要 `codegen_v3`，外观库无需为宏展开额外重导出 `descriptor`、`construct`、`value` 等运行时模块。不要通配重导出 `qubit_reflect` 或它的 `__private`，否则无关的内部实现会成为外观库的 API。下游过程宏应只在自己的精确私有 ABI 中逐项重导出所需协议项。`codegen_v3` 是生成代码与运行时之间的协议，不是供业务代码手写描述符的稳定 API；将来若协议不兼容，应新增版本化模块。
 
-使用显式快照不需要更换生成协议，外观库仍导出 `__private::codegen_v3`。下游 `qubit-model-metadata` 的模型 ABI v4 是独立协议。
+使用显式快照不需要更换生成协议，外观库仍导出 `__private::codegen_v3`。当前下游 `qubit-model-metadata` 使用独立的模型元数据 ABI `v7`。
 
 ### 迁移 effective capability 查询
 
@@ -485,7 +485,7 @@ pub mod __private {
 
 所有 `invoke_*` 入口都必须传入注册表。方法能够找到，调用却返回 `ReceiverAdapterUnavailable` 时，应检查所选快照是否提供了类型和调用模式都匹配的接收者适配器。同一能力键在不同快照中可以绑定不同适配器，各自独立生效；全局初始化失败也不会影响有效的本地快照调用。输出和 Future 不借用注册表，但仍受输入生命周期约束。
 
-仍导出 `codegen_v2` 的旧外观库会编译失败，需要改为精确导出 `codegen_v3`。模型 ABI v4 与 `definition_provider_v2` 是独立协议。`Debug` 只输出结构信息，不执行提供器；提供器不得重入注册表初始化。
+仍导出 `codegen_v2` 的旧外观库会编译失败，需要改为精确导出 `codegen_v3`。当前模型元数据 ABI `v7` 与 `definition_provider_v2` 是独立协议。`Debug` 只输出结构信息，不执行提供器；提供器不得重入注册表初始化。
 
 ## 术语速查
 
