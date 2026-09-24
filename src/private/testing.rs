@@ -13,6 +13,9 @@ pub use crate::__private::registration::CapabilityRegistration;
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub use crate::__private::registration::aggregate_benchmark_registry_facts;
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub use crate::__private::registration::build_benchmark_effective_type_view;
 #[doc(hidden)]
 pub use crate::__private::registration::build_registry;
 #[doc(hidden)]
