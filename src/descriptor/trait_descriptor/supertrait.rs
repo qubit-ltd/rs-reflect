@@ -94,7 +94,7 @@ impl TraitDescriptorRef {
 
     /// Returns the referenced applied trait descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn descriptor(self) -> &'static TraitDescriptor {
         let Self(descriptor) = self;
         descriptor
@@ -120,21 +120,21 @@ pub struct SupertraitClosure<'a> {
 impl<'a> SupertraitClosure<'a> {
     /// Returns applied supertraits in deterministic path order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
         self.descriptors.iter().map(|descriptor| descriptor.descriptor())
     }
 
     /// Returns the number of distinct transitive supertraits.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether the closure is empty.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }

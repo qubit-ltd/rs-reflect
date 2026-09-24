@@ -53,21 +53,21 @@ pub struct AppliedTraitId {
 impl AppliedTraitId {
     /// Returns the reflected marker or external definition identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn definition(&self) -> &TraitId {
         &self.definition
     }
 
     /// Returns concrete type and const arguments in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
 
     /// Returns concrete associated-type equalities in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_type_arguments(&self) -> &[GenericArgument] {
         &self.associated_type_arguments
     }

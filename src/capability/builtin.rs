@@ -74,7 +74,6 @@ impl DefaultAdapter {
 
     /// Creates a local dynamic value containing `T::default()`.
     #[must_use]
-    #[inline(always)]
     pub fn create(&self) -> DynamicOwned<Local> {
         (self.create)()
     }

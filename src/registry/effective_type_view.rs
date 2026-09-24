@@ -76,7 +76,7 @@ impl EffectiveTypeView {
 
     /// Returns all contributing impl fragments in registry-stable order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn implementations(&self) -> &[&'static ImplDescriptor] {
         &self.implementations
     }

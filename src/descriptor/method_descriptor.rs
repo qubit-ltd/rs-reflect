@@ -110,42 +110,42 @@ impl MethodDescriptor {
 
     /// Returns the stable composite member identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn identity(&self) -> &MemberId {
         &self.identity
     }
 
     /// Returns the Rust declaration name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.rust_name
     }
 
     /// Returns the lookup name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> &'static str {
         self.query_name
     }
 
     /// Returns normalized source visibility facts.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn visibility(&self) -> &MethodVisibility {
         &self.visibility
     }
 
     /// Returns the receiver, or `None` for an associated function.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Option<&ReceiverDescriptor> {
         self.receiver.as_ref()
     }
 
     /// Returns non-receiver parameters in source declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn parameters(&self) -> &[ParameterDescriptor] {
         &self.parameters
     }
@@ -168,28 +168,28 @@ impl MethodDescriptor {
 
     /// Returns the declared return facts.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn return_value(&self) -> &ReturnDescriptor {
         &self.return_value
     }
 
     /// Returns callability-related source qualifiers.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn qualifiers(&self) -> &MethodQualifiers {
         &self.qualifiers
     }
 
     /// Returns generic parameters and predicates in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn generic_definition(&self) -> &GenericDefinitionDescriptor {
         &self.generic_definition
     }
 
     /// Returns whether the trait declaration supplies a default body.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn has_default(&self) -> bool {
         self.has_default
     }
@@ -198,7 +198,7 @@ impl MethodDescriptor {
     ///
     /// `None` means this method is declared by an impl definition.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaring_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(descriptor) => Some(descriptor),
@@ -210,7 +210,7 @@ impl MethodDescriptor {
     ///
     /// `None` means this method is declared by a trait definition.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor> {
         match self.declaration_owner {
             MethodDeclarationOwner::Trait(_) => None,

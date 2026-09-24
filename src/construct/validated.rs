@@ -37,14 +37,14 @@ pub struct ValidatedConstructionInput<M: Mode> {
 impl<M: Mode> ValidatedConstructionInput<M> {
     /// Returns values in exact descriptor source-index order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn values(&self) -> &[DynamicOwned<M>] {
         &self.values
     }
 
     /// Consumes validation state so generated code may downcast every value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn into_values(self) -> Box<[DynamicOwned<M>]> {
         self.values
     }
@@ -69,14 +69,14 @@ pub struct ValidatedOverride<M: Mode> {
 impl<M: Mode> ValidatedOverride<M> {
     /// Returns the declared source field index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the exact validated whole-field replacement value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn value(&self) -> &DynamicOwned<M> {
         &self.value
     }
@@ -106,14 +106,14 @@ pub struct ValidatedUpdateInput<M: Mode> {
 impl<M: Mode> ValidatedUpdateInput<M> {
     /// Returns the exact validated owned root value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn base(&self) -> &DynamicOwned<M> {
         &self.base
     }
 
     /// Returns supplied overrides in descriptor source-index order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn overrides(&self) -> &[ValidatedOverride<M>] {
         &self.overrides
     }

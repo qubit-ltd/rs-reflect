@@ -25,7 +25,7 @@ impl<'a> FieldVisibility<'a> {
     ///
     /// `None` means this is an enum-variant field with inherited visibility.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn as_declared(self) -> Option<&'a Visibility> {
         match self {
             Self::Declared(visibility) => Some(visibility),
@@ -35,7 +35,7 @@ impl<'a> FieldVisibility<'a> {
 
     /// Returns whether this field inherits an enum variant's access boundary.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_variant_inherited(self) -> bool {
         matches!(self, Self::VariantInherited)
     }

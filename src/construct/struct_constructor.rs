@@ -56,14 +56,14 @@ impl<M: Mode + 'static> StructConstructor<M> {
 
     /// Returns the concrete struct root descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn descriptor(&self) -> &'static TypeDescriptor {
         self.descriptor
     }
 
     /// Returns field construction policies in source declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
     }
@@ -75,7 +75,6 @@ impl<M: Mode + 'static> StructConstructor<M> {
     /// Panics if generated or manually assembled metadata associates this
     /// constructor with a non-struct descriptor.
     #[must_use]
-    #[inline(always)]
     pub fn shape(&self) -> ConstructionShape {
         match self
             .descriptor

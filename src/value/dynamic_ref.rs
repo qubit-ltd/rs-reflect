@@ -140,7 +140,7 @@ impl<'a> DynamicRef<'a, Local> {
     ///
     /// Returns the erased value, or `None` for the dedicated `str` variant.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&dyn Any> {
         match &self.storage {
             LocalRefStorage::Any(value) => Some(*value),
@@ -156,7 +156,7 @@ impl<'a> DynamicRef<'a, Local> {
     ///
     /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             LocalRefStorage::Any(_) => None,
@@ -296,7 +296,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     ///
     /// Returns the erased value, or `None` for the dedicated `str` variant.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_any(&self) -> Option<&(dyn Any + Sync)> {
         match &self.storage {
             ThreadSafeRefStorage::Any(value) => Some(*value),
@@ -312,7 +312,7 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     ///
     /// Returns the string borrow, or `None` for an `Any`-compatible value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match &self.storage {
             ThreadSafeRefStorage::Any(_) => None,

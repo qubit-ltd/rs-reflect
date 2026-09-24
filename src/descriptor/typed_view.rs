@@ -38,7 +38,7 @@ impl PrimitiveTypeDescriptor {
 
     /// Returns the exact primitive represented by this view.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> PrimitiveKind {
         self.kind
     }
@@ -58,7 +58,7 @@ impl TextTypeDescriptor {
 
     /// Returns the exact text representation.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> TextKind {
         self.kind
     }
@@ -79,7 +79,7 @@ impl StructTypeDescriptor {
     /// Returns whether the struct is named, tuple-shaped, a newtype, or
     /// unit-shaped.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> StructKind {
         self.kind
     }
@@ -144,7 +144,7 @@ impl EnumTypeDescriptor {
     /// declaration. Components use canonical order and never contain
     /// diagnostic text.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn representations(&self) -> &'static [EnumRepr] {
         self.representations
     }
@@ -173,14 +173,14 @@ impl TupleTypeDescriptor {
 
     /// Returns the tuple element types in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn elements(&self) -> &'static [TypeRef] {
         self.elements.get()
     }
 
     /// Returns the tuple arity. The unit type `()` therefore has arity zero.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arity(&self) -> usize {
         match self.elements {
             TypeRefListSource::Eager(elements) => elements.len(),
@@ -215,14 +215,14 @@ impl ArrayTypeDescriptor {
 
     /// Returns the repeated element type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn element_type(&self) -> &'static TypeRef {
         self.element.get()
     }
 
     /// Returns the compile-time array length.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn length(&self) -> usize {
         self.length
     }
@@ -252,7 +252,7 @@ impl OptionalTypeDescriptor {
 
     /// Returns the optional element type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn element_type(&self) -> &'static TypeRef {
         self.element.get()
     }
@@ -291,14 +291,14 @@ impl SequenceTypeDescriptor {
 
     /// Returns the concrete standard-library sequence family.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> SequenceKind {
         self.kind
     }
 
     /// Returns the sequence element type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn element_type(&self) -> &'static TypeRef {
         self.element.get()
     }
@@ -339,14 +339,14 @@ impl SetTypeDescriptor {
 
     /// Returns the concrete standard-library set family.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> SetKind {
         self.kind
     }
 
     /// Returns the set element type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn element_type(&self) -> &'static TypeRef {
         self.element.get()
     }
@@ -391,21 +391,21 @@ impl MapTypeDescriptor {
 
     /// Returns the concrete standard-library map family.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> MapKind {
         self.kind
     }
 
     /// Returns the map key type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn key_type(&self) -> &'static TypeRef {
         self.key.get()
     }
 
     /// Returns the map value type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn value_type(&self) -> &'static TypeRef {
         self.value.get()
     }
@@ -438,14 +438,14 @@ impl SmartPointerTypeDescriptor {
 
     /// Returns the concrete smart-pointer family.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> SmartPointerKind {
         self.kind
     }
 
     /// Returns the pointee type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn pointee_type(&self) -> &'static TypeRef {
         self.pointee.get()
     }
@@ -477,14 +477,14 @@ impl ReferenceTypeDescriptor {
 
     /// Returns whether the reference is shared or mutable.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> ReferenceKind {
         self.kind
     }
 
     /// Returns the referenced type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn target_type(&self) -> &'static TypeRef {
         self.target.get()
     }
@@ -513,7 +513,7 @@ impl SliceTypeDescriptor {
 
     /// Returns the slice element type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn element_type(&self) -> &'static TypeRef {
         self.element.get()
     }
@@ -545,14 +545,14 @@ impl RawPointerTypeDescriptor {
 
     /// Returns whether the pointer is const or mutable.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn mutability(&self) -> Mutability {
         self.mutability
     }
 
     /// Returns the pointee type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn pointee_type(&self) -> &'static TypeRef {
         self.pointee.get()
     }
@@ -606,35 +606,35 @@ impl FunctionTypeDescriptor {
 
     /// Returns whether the function pointer is safe or unsafe.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn kind(&self) -> FunctionPointerKind {
         self.kind
     }
 
     /// Returns the declared calling convention.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn abi(&self) -> &'static FunctionAbi {
         self.abi
     }
 
     /// Returns whether the function pointer accepts a C-style variadic tail.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn is_variadic(&self) -> bool {
         self.variadic
     }
 
     /// Returns parameter types in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn parameters(&self) -> &'static [TypeRef] {
         self.parameters.get()
     }
 
     /// Returns the function return type.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn return_type(&self) -> &'static TypeRef {
         self.return_type.get()
     }
@@ -654,7 +654,6 @@ impl TraitObjectTypeDescriptor {
 
     /// Returns the applied trait declaration represented by this object type.
     #[must_use]
-    #[inline(always)]
     pub fn trait_descriptor(&self) -> &'static TraitDescriptor {
         (self.trait_descriptor)()
     }

@@ -46,14 +46,14 @@ impl<A: 'static> CapabilityKey<A> {
 
     /// Returns the stable capability identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn id(&self) -> &CapabilityId {
         &self.id
     }
 
     /// Returns the process-local identity of the expected adapter contract.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn adapter_type(&self) -> TypeId {
         self.adapter_type
     }

@@ -142,7 +142,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
 
     /// Returns the supplied receiver, or `None` for an associated function.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
         self.receiver.as_ref()
     }
@@ -152,7 +152,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// Newly collected bindings remain in caller order. Descriptor-aware
     /// binding internally reorders them immediately before adapter validation.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         &self.arguments
     }
@@ -504,14 +504,14 @@ pub struct ValidatedInvocation<'call, M: InvocationMode> {
 impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     /// Returns the validated receiver, or `None` for an associated function.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
         self.receiver.as_ref()
     }
 
     /// Returns the validated positional arguments in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
         &self.arguments
     }

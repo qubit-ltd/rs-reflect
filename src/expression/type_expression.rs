@@ -188,7 +188,7 @@ impl ConcreteTypeExpression {
 
     /// Returns final-segment generic arguments in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
@@ -293,7 +293,7 @@ impl AssociatedTypeExpression {
     }
     /// Returns associated type arguments.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }

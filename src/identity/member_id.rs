@@ -35,25 +35,25 @@ impl MemberId {
 
     /// Returns the identity of the descriptor declaring this member.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn declaring_identity(&self) -> &str {
         &self.declaring_identity
     }
     /// Returns the member category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn kind(&self) -> &str {
         &self.kind
     }
     /// Returns the member's declaration index within its category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn index(&self) -> usize {
         self.index
     }
     /// Returns the fragment that contributed this member.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn fragment(&self) -> &FragmentIdentity {
         &self.fragment
     }

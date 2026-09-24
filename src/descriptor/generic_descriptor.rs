@@ -74,7 +74,7 @@ impl ConcreteGenericDescriptor {
 
     /// Returns the declaration shared by every concrete instance.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn definition(&self) -> &'static GenericDefinitionDescriptor {
         self.definition
     }
@@ -87,7 +87,7 @@ impl ConcreteGenericDescriptor {
     /// Use [`Self::definition_index`] or [`Self::argument_index`] when
     /// declaration-level parameter positions are required.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arguments(&self) -> &'static [GenericArgument] {
         self.arguments
     }

@@ -36,21 +36,21 @@ impl<M: Mode> FieldSetRecovery<M> {
 
     /// Returns the field whose replacement was rejected.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn field(&self) -> &FieldIdentity {
         &self.field
     }
 
     /// Returns the original query name, or `None` for a positional field.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> Option<&'static str> {
         self.query_name
     }
 
     /// Returns the untouched replacement value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn value(&self) -> &DynamicOwned<M> {
         &self.value
     }
@@ -74,7 +74,7 @@ impl<M: Mode> FieldSetRecovery<M> {
 
     /// Consumes recovery and returns the untouched replacement value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn into_value(self) -> DynamicOwned<M> {
         self.value
     }
@@ -153,7 +153,7 @@ impl<M: Mode> FieldSetFailure<M> {
 
     /// Returns the machine-readable field access error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error
     }
@@ -163,7 +163,7 @@ impl<M: Mode> FieldSetFailure<M> {
     /// `None` means an adapter already accepted ownership before it reported
     /// the error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn recovery(&self) -> Option<&FieldSetRecovery<M>> {
         self.recovery.as_deref()
     }
@@ -187,7 +187,6 @@ impl<M: Mode> FieldSetFailure<M> {
 
     /// Consumes the failure and returns its machine-readable error.
     #[must_use]
-    #[inline(always)]
     pub fn into_error(self) -> FieldAccessError {
         *self.error
     }

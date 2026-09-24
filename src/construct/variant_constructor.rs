@@ -58,21 +58,21 @@ impl<M: Mode + 'static> VariantConstructor<M> {
 
     /// Returns the immutable enum variant descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn variant(&self) -> &'static VariantDescriptor {
         self.variant
     }
 
     /// Returns field construction policies in source declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
     }
 
     /// Returns the input shape required by this variant.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn shape(&self) -> ConstructionShape {
         match self.variant.kind() {
             VariantKind::Struct => ConstructionShape::Named,

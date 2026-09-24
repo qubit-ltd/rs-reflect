@@ -80,7 +80,7 @@ impl ConstGenericArgument {
     }
     /// Returns the structural const value.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn value(&self) -> &ConstExpression {
         &self.value
     }

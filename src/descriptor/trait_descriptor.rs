@@ -99,21 +99,21 @@ impl TraitDescriptor {
 
     /// Returns the declaration-level descriptor shared by every application.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn definition(&self) -> &'static TraitDefinitionDescriptor {
         self.definition
     }
 
     /// Returns the reflected marker or external identity.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn trait_id(&self) -> &AppliedTraitId {
         &self.trait_id
     }
 
     /// Returns concrete generic arguments in declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }
@@ -121,49 +121,49 @@ impl TraitDescriptor {
     /// Returns concrete associated-type equalities required by this applied
     /// trait object or application.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_type_arguments(&self) -> &[GenericArgument] {
         &self.associated_type_arguments
     }
 
     /// Returns the Rust declaration name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> &'static str {
         self.definition.rust_name()
     }
 
     /// Returns the diagnostic fully qualified Rust path.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_path(&self) -> &'static str {
         self.definition.rust_path()
     }
 
     /// Returns the lookup name.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> &'static str {
         self.definition.query_name()
     }
 
     /// Returns whether this descriptor contains a complete declaration.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn completeness(&self) -> TraitCompleteness {
         self.definition.completeness()
     }
 
     /// Returns direct supertraits in source declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn direct_supertraits(&self) -> &[TraitDescriptorRef] {
         &self.direct_supertraits
     }
 
     /// Returns the sorted, duplicate-free, transitive supertrait closure.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn all_supertraits(&self) -> SupertraitClosure<'_> {
         SupertraitClosure {
             descriptors: &self.all_supertraits,
@@ -172,7 +172,7 @@ impl TraitDescriptor {
 
     /// Returns method declarations in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn methods(&self) -> &[MethodDescriptor] {
         self.methods
     }
@@ -187,7 +187,7 @@ impl TraitDescriptor {
 
     /// Returns associated type declarations in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_types(&self) -> &[AssociatedTypeDescriptor] {
         &self.associated_types
     }
@@ -202,7 +202,7 @@ impl TraitDescriptor {
 
     /// Returns associated constant declarations in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn associated_consts(&self) -> &[AssociatedConstDescriptor] {
         &self.associated_consts
     }

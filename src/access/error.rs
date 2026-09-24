@@ -79,7 +79,7 @@ impl FieldAccessError {
 
     /// Returns the field identity shared by every error classification.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn field(&self) -> &FieldIdentity {
         match self {
             Self::TargetTypeMismatch { field, .. }

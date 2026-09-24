@@ -54,14 +54,14 @@ impl<M: Mode + 'static> StructUpdater<M> {
 
     /// Returns the concrete struct root descriptor.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn descriptor(&self) -> &'static TypeDescriptor {
         self.descriptor
     }
 
     /// Returns update policies in source declaration order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn fields(&self) -> &'static [UpdateField] {
         self.fields
     }

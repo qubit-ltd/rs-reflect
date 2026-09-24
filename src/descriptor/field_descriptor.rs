@@ -240,35 +240,33 @@ impl FieldDescriptor {
 
     /// Returns the root type that contains this field.
     #[must_use]
-    #[inline(always)]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
 
     /// Returns the zero-based source declaration index.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Returns the Rust field name, or `None` for tuple and newtype fields.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn rust_name(&self) -> Option<&'static str> {
         self.rust_name
     }
 
     /// Returns the lookup name, or `None` for tuple and newtype fields.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn query_name(&self) -> Option<&'static str> {
         self.query_name
     }
 
     /// Returns the resolved, explicitly opaque, or symbolic field type.
     #[must_use]
-    #[inline(always)]
     pub fn field_type(&self) -> &'static TypeRef {
         self.field_type.get()
     }
@@ -276,7 +274,7 @@ impl FieldDescriptor {
     /// Returns declared struct-field visibility or the explicit fact that an
     /// enum-variant field inherits its enclosing access boundary.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn visibility(&self) -> FieldVisibility<'_> {
         match self.variant_index {
             Some(_) => FieldVisibility::VariantInherited,
@@ -286,7 +284,7 @@ impl FieldDescriptor {
 
     /// Returns the source policy controlling this field's dynamic adapters.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn access_policy(&self) -> FieldAccessPolicy {
         self.access_policy
     }
@@ -295,7 +293,7 @@ impl FieldDescriptor {
     ///
     /// `None` identifies a direct struct field.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn variant_index(&self) -> Option<usize> {
         self.variant_index
     }
@@ -304,7 +302,7 @@ impl FieldDescriptor {
     ///
     /// `None` identifies a direct struct field.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
         self.variant_rust_name
     }

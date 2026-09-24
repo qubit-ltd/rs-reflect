@@ -154,7 +154,7 @@ impl RegistryError {
 
     /// Returns the stable machine-readable error category.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn kind(&self) -> RegistryErrorKind {
         let Self(data) = self;
         data.kind
@@ -163,7 +163,7 @@ impl RegistryError {
     /// Returns the two conflicting fragments when this error originated from a
     /// conflict.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn conflicting_fragments(&self) -> Option<(&FragmentIdentity, &FragmentIdentity)> {
         let Self(data) = self;
         match (&data.left, &data.right) {
@@ -175,7 +175,7 @@ impl RegistryError {
     /// Returns the single implicated fragment for a non-conflict aggregation
     /// error.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn fragment_identity(&self) -> Option<&FragmentIdentity> {
         let Self(data) = self;
         match (&data.left, &data.right) {
@@ -186,7 +186,7 @@ impl RegistryError {
 
     /// Returns the stable ID involved in a detailed capability conflict.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn capability_id(&self) -> Option<CapabilityId> {
         let Self(data) = self;
         data.capability_details.as_ref().map(|conflict| *conflict.id())
@@ -195,7 +195,7 @@ impl RegistryError {
     /// Returns the complete capability conflict details retained by registry
     /// construction, or `None` when a legacy constructor had no details.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn capability_details(&self) -> Option<&CapabilityConflict> {
         let Self(data) = self;
         data.capability_details.as_ref()
@@ -204,7 +204,7 @@ impl RegistryError {
     /// Returns the concrete or definition target involved in a capability
     /// conflict when registry construction supplied it.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn capability_target(&self) -> Option<CapabilityTarget> {
         let Self(data) = self;
         data.capability_target

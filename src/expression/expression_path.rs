@@ -44,7 +44,7 @@ impl ExpressionPath {
 
     /// Returns the validated path segments in source order.
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn segments(&self) -> &[ExpressionName] {
         &self.0
     }
