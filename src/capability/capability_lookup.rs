@@ -35,8 +35,8 @@ pub enum CapabilityLookup<'a, A: 'static> {
 }
 
 impl<'a, A: 'static> CapabilityLookup<'a, A> {
-    /// Returns the executable adapter, degrading every diagnostic state to
-    /// absence.
+    /// Returns the executable adapter, mapping `Missing` to `Ok(None)` while
+    /// preserving fact-only and adapter-type-mismatch states as errors.
     pub const fn into_adapter(self) -> Result<Option<&'a A>, CapabilityAccessError> {
         match self {
             Self::Found(value) => Ok(Some(value)),
