@@ -212,8 +212,10 @@ the cache-map lock. Providers must be snapshot-independent and must not re-enter
 the contract does not catch provider panics.
 
 Typed `capability_lookup` preserves four outcomes: `Missing`, `FactOnly`,
-`AdapterTypeMismatch`, and `Found`. The convenience `capability` method may
-collapse the first three to `Ok(None)`. Effective facts retain
+`AdapterTypeMismatch`, and `Found`. The convenience `capability` method maps
+`Found` to `Ok(Some(adapter))` and `Missing` to `Ok(None)`; `FactOnly` and
+`AdapterTypeMismatch` remain errors. Invalid intrinsic capability sets return
+their conflict error. Effective facts retain
 `CapabilityOrigin::Intrinsic { type_id }` or `CapabilityOrigin::Registered { source }`;
 the registry exposes both the origin and the contributing `FragmentIdentity`.
 
