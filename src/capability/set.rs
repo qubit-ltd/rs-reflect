@@ -117,11 +117,7 @@ impl TypeCapabilities {
     /// Returns the conflicting ID and adapter contracts when an ID occurs
     /// more than once.
     pub fn try_new(mut descriptors: Vec<CapabilityDescriptor>) -> Result<Self, CapabilityConflict> {
-        descriptors.sort_by(|left, right| {
-            left.id()
-                .cmp(right.id())
-                .then_with(|| left.adapter_type().cmp(&right.adapter_type()))
-        });
+        descriptors.sort_by(|left, right| left.id().cmp(right.id()));
         for pair in descriptors.windows(2) {
             let [first, second] = pair else {
                 continue;
@@ -153,13 +149,13 @@ impl TypeCapabilities {
 
     /// Retrieves a capability adapter through its typed key.
     ///
-    /// `None` means the ID is absent, the contract differs, or the descriptor
-    /// represents a fact without an executable adapter.
+    /// `Ok(None)` means the ID is absent. A fact without an executable adapter
+    /// or a different adapter contract is returned as an error.
     ///
     /// # Returns
     ///
-    /// Returns the typed adapter when its ID and contract match, or `None` for
-    /// each of the three non-executable lookup states.
+    /// Returns the typed adapter when its ID and contract match, or `None` when
+    /// the ID is absent.
     ///
     /// # Errors
     ///
