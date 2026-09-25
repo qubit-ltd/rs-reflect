@@ -338,6 +338,20 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 
 把生成的快照传给 `impls_in`、`methods_in` 或 `methods_named_in`，即可指定查询范围。`build()` 会统一校验标识、引用关系和能力冲突，失败时返回 `RegistryError`。每个片段应提供稳定的 `FragmentIdentity`，便于定位重复或内容变化的来源。冲突详情可通过 `conflicting_fragments()`、`capability_details()`、`capability_target()` 和 `capability_id()` 查看；类型自身提供的能力发生冲突时，还可通过 `intrinsic_conflict()` 与 `Error::source()` 追踪原因。
 
+全局入口面向完整的链接注册集合；发生冲突时，整体初始化会失败。调用方需要隔离的模型视图时，可以只把选定描述符加入显式快照，并将同一个快照传给 `qubit_model_metadata::registry::ModelRegistry::from_reflect_registry`：
+
+```rust,ignore
+let mut builder = RegistrySnapshotBuilder::new();
+builder.add_type(
+    TypeDescriptor::of::<MyModel>(),
+    FragmentIdentity::new("example", "models", 1, 1, "type", 1),
+);
+let snapshot = builder.build()?;
+let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registry(&snapshot)?;
+```
+
+显式快照从空集合开始，不会自动包含进程中链接的所有注册信息。
+
 ## 选择依赖功能与访问边界
 
 ### 选择依赖功能

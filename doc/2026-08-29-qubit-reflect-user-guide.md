@@ -460,6 +460,25 @@ identities are diagnosable. For a conflict, inspect
 `capability_id()`. Intrinsic provider failures remain available through
 `intrinsic_conflict()` and `Error::source()`.
 
+The global entry point is for the complete set of linked registrations; a
+conflict makes its initialization fail as a whole. A caller that needs an
+isolated model view can instead add only its selected descriptors to an
+explicit snapshot and pass that same snapshot to
+`qubit_model_metadata::registry::ModelRegistry::from_reflect_registry`:
+
+```rust,ignore
+let mut builder = RegistrySnapshotBuilder::new();
+builder.add_type(
+    TypeDescriptor::of::<MyModel>(),
+    FragmentIdentity::new("example", "models", 1, 1, "type", 1),
+);
+let snapshot = builder.build()?;
+let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registry(&snapshot)?;
+```
+
+An explicit snapshot starts empty and does not automatically include every
+registration linked into the process.
+
 ## Choose features and access boundaries
 
 ### Choose dependency features
