@@ -466,7 +466,7 @@ isolated model view can instead add only its selected descriptors to an
 explicit snapshot and pass that same snapshot to
 `qubit_model_metadata::registry::ModelRegistry::from_reflect_registry`:
 
-```rust,ignore
+```text
 let mut builder = RegistrySnapshotBuilder::new();
 builder.add_type(
     TypeDescriptor::of::<MyModel>(),

@@ -71,7 +71,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     }
 
     /// Returns the machine-readable validation error.
-    #[must_use]
     #[inline]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
@@ -88,7 +87,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     }
 
     /// Consumes recovery and returns the structured error and ordered values.
-    #[must_use]
     pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }

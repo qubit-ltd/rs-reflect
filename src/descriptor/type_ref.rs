@@ -12,6 +12,7 @@
 use std::any::TypeId;
 use std::fmt;
 
+use super::opaque_type_descriptor::OpaqueTypeDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::expression::TypeExpression;
 
@@ -106,55 +107,5 @@ impl fmt::Debug for TypeRef {
             Self::Opaque(descriptor) => formatter.debug_tuple("Opaque").field(descriptor).finish(),
             Self::Symbolic(expression) => formatter.debug_tuple("Symbolic").field(expression).finish(),
         }
-    }
-}
-
-/// A concrete member type whose internal structure was explicitly hidden.
-///
-/// This object is a member-local view, not a second root [`TypeDescriptor`]. It
-/// retains only exact process-local identity and diagnostic naming until safe
-/// whole-value adapters are added.
-pub struct OpaqueTypeDescriptor {
-    type_id: fn() -> TypeId,
-    type_name: fn() -> &'static str,
-}
-
-impl OpaqueTypeDescriptor {
-    /// Creates an immutable opaque member descriptor for `T`.
-    ///
-    /// Its diagnostic name is resolved from `T` only when queried, so static
-    /// generated descriptor data cannot substitute a different type name.
-    #[doc(hidden)]
-    pub(crate) const fn new<T: ?Sized + 'static>() -> Self {
-        Self {
-            type_id: type_id_of::<T>,
-            type_name: type_name_of::<T>,
-        }
-    }
-
-    /// Returns the exact process-local Rust type identity.
-    #[must_use]
-    #[inline]
-    pub fn type_id(&self) -> TypeId {
-        (self.type_id)()
-    }
-
-    /// Returns the diagnostic Rust type name.
-    #[must_use]
-    #[inline]
-    pub fn type_name(&self) -> &'static str {
-        (self.type_name)()
-    }
-}
-
-impl fmt::Debug for OpaqueTypeDescriptor {
-    /// Formats the diagnostic identity without attempting root-descriptor
-    /// navigation.
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("OpaqueTypeDescriptor")
-            .field("type_id", &self.type_id())
-            .field("type_name", &self.type_name())
-            .finish()
     }
 }

@@ -39,3 +39,158 @@ reason = "Trait expansion records and emits one closed declaration protocol."
 rule = "multiple-public-types"
 path = "derive/src/parse/attributes.rs"
 reason = "Helper parser syntax nodes share one grammar and are consumed together."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/value/mode.rs"
+reason = "The sealed mode trait and its two marker implementations jointly define the associated storage and auto-trait contract."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/value/storage.rs"
+reason = "Owned, shared, and mutable storage for local and thread-safe modes form one six-cell representation matrix."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/expression/type_expression.rs"
+reason = "These public nodes are the recursive grammar variants of one parser-independent Rust type expression model."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/expression/generic_argument.rs"
+reason = "Generic arguments and const-expression nodes form one recursive grammar used to represent generic instantiations."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/capability/set.rs"
+reason = "Set construction, typed lookup, conflict details, and the lazy result alias form one immutable capability-set contract."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/construct/recovery.rs"
+reason = "The recovered value and aggregate recovery object jointly preserve ownership across failed construction."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/construct/validated.rs"
+reason = "Validated construction, override, and update tokens define the shared preflight boundary before extraction."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/construct/error.rs"
+reason = "Construction error kinds and field identifiers are the structured context carried by ConstructionError."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/construct/input.rs"
+reason = "Field policies and named, tuple, and update inputs make up one input model consumed by construction validation."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/access/field_set_recovery.rs"
+reason = "Field-set failure metadata and retained recovery values form one ownership-preserving failure result."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/invocation.rs"
+reason = "Invocation, receiver adaptation, and validated invocation are consecutive states in the same call protocol."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/recovery.rs"
+reason = "InvocationFailure describes the cause retained by InvocationRecovery, so the pair is one recovery contract."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/receiver.rs"
+reason = "Receiver expectations and adapters jointly validate and adapt the receiver before invoking a method."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/error.rs"
+reason = "InvocationError and InvocationPanic preserve structured kind and panic payload details for one call failure."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/future.rs"
+reason = "InvocationMode selects the execution contract represented by ReflectedFuture."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/argument.rs"
+reason = "Argument modes, bindings, and expectations jointly describe input validation and adaptation for one invocation."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/invoke/output.rs"
+reason = "BorrowOrigin and InvocationOutput jointly retain the source lifetime contract of a returned value."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/registry/registry.rs"
+reason = "Candidate collections and ReflectRegistry are the typed query results and owner of one immutable registry snapshot."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/registry/fragment.rs"
+reason = "Identity, target, payload, and kind types form the closed registration-fragment protocol consumed by aggregation."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/method_descriptor/instance.rs"
+reason = "Method implementation source, built instance, and build error share one declaration-to-runtime linking contract."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/method_descriptor/signature.rs"
+reason = "Parameter, receiver, return, visibility, and qualifier records are the coordinated parts of one method signature."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/method_descriptor/invocation_adapter.rs"
+reason = "Adapter availability and unavailability reasons jointly explain whether one reflected method can be invoked."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/method_descriptor.rs"
+reason = "MethodDescriptor stores its declaration owner directly, keeping ownership and declaration data together."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/impl_descriptor.rs"
+reason = "Impl kinds, associated bindings, method lookup, and builders form one linked implementation-descriptor object model."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/trait_descriptor/application.rs"
+reason = "Trait identity, application substitutions, and impl payload are the linked records for one applied trait."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/trait_descriptor/builder.rs"
+reason = "TraitDescriptorBuilder and its build error define one atomic validation and construction boundary."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/trait_descriptor/definition.rs"
+reason = "Trait completeness and associated item descriptors are the definition-level records consumed by trait builders."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/trait_descriptor/supertrait.rs"
+reason = "The trait reference and its transitive closure are the paired representation of supertrait navigation."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/variant_descriptor.rs"
+reason = "Variant kind, numeric discriminant, and origin are the metadata fields interpreted together by VariantDescriptor."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/type_kind.rs"
+reason = "These classification enums are the closed kind vocabulary used by the root and typed view descriptors."
+
+[[exceptions]]
+rule = "multiple-public-types"
+path = "src/descriptor/typed_view.rs"
+reason = "Primitive, collection, pointer, and aggregate views are the coordinated projections of one root TypeDescriptor."

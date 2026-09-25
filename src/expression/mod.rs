@@ -8,26 +8,28 @@
 
 //! Structural, parser-independent representations of Rust types and generics.
 
-mod error;
+mod expression_error;
 mod expression_name;
 mod expression_path;
 mod generic_argument;
-mod generic_definition;
+mod generic_definition_descriptor;
+mod generic_parameter_descriptor;
 mod lifetime_expression;
-mod predicate;
+mod predicate_descriptor;
+mod trait_bound_modifier;
 mod type_expression;
 
-pub use error::ExpressionError;
+pub use expression_error::ExpressionError;
 pub use expression_name::ExpressionName;
 pub use expression_path::ExpressionPath;
 pub use generic_argument::ConstExpression;
 pub use generic_argument::ConstGenericArgument;
 pub use generic_argument::GenericArgument;
-pub use generic_definition::GenericDefinitionDescriptor;
-pub use generic_definition::GenericParameterDescriptor;
+pub use generic_definition_descriptor::GenericDefinitionDescriptor;
+pub use generic_parameter_descriptor::GenericParameterDescriptor;
 pub use lifetime_expression::LifetimeExpression;
-pub use predicate::PredicateDescriptor;
-pub use predicate::TraitBoundModifier;
+pub use predicate_descriptor::PredicateDescriptor;
+pub use trait_bound_modifier::TraitBoundModifier;
 pub use type_expression::ArrayTypeExpression;
 pub use type_expression::AssociatedTypeExpression;
 pub use type_expression::ConcretePathSegment;

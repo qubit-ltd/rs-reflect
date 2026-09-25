@@ -104,7 +104,6 @@ pub struct InvocationFailure<'call, M: InvocationMode> {
 
 impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     /// Returns the structured validation error.
-    #[must_use]
     #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error

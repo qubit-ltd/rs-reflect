@@ -12,19 +12,11 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use super::trait_bound_modifier::TraitBoundModifier;
 use crate::expression::DiagnosticText;
 use crate::expression::ExpressionError;
 use crate::expression::LifetimeExpression;
 use crate::expression::TypeExpression;
-
-/// The modifier attached to one structural trait bound.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum TraitBoundModifier {
-    /// The trait bound is required.
-    None,
-    /// The trait bound uses Rust's `?Trait` relaxation syntax.
-    Maybe,
-}
 
 /// A structural predicate from a generic declaration, trait object, or opaque
 /// type bound.

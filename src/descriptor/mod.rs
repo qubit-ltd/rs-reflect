@@ -8,12 +8,14 @@
 
 //! Immutable type and member descriptor APIs.
 
+mod concrete_generic_descriptor;
 mod field_definition_descriptor;
 mod field_descriptor;
-mod generic_descriptor;
 mod impl_descriptor;
 mod internal;
 mod method_descriptor;
+mod opaque_type_descriptor;
+mod reflect;
 mod trait_descriptor;
 mod type_definition_data;
 mod type_definition_descriptor;
@@ -25,10 +27,10 @@ mod typed_view;
 mod variant_definition_descriptor;
 mod variant_descriptor;
 
+pub use concrete_generic_descriptor::ConcreteGenericDescriptor;
 pub use field_definition_descriptor::FieldDefinitionDescriptor;
 pub use field_descriptor::FieldDescriptor;
 pub use field_descriptor::TypeDescriptorResolver;
-pub use generic_descriptor::ConcreteGenericDescriptor;
 pub use impl_descriptor::AssociatedConstBindingDescriptor;
 pub use impl_descriptor::AssociatedConstImplementationSource;
 pub use impl_descriptor::AssociatedConstReadUnavailableReason;
@@ -59,6 +61,8 @@ pub use method_descriptor::ParameterPatternDescriptor;
 pub use method_descriptor::ReceiverDescriptor;
 pub use method_descriptor::ReturnDescriptor;
 pub use method_descriptor::ReturnKind;
+pub use opaque_type_descriptor::OpaqueTypeDescriptor;
+pub use reflect::Reflect;
 pub use trait_descriptor::AppliedTraitId;
 pub use trait_descriptor::AssociatedConstDescriptor;
 pub use trait_descriptor::AssociatedTypeDescriptor;
@@ -76,7 +80,6 @@ pub use trait_descriptor::external_supertrait;
 pub use type_definition_data::TypeDefinitionData;
 pub use type_definition_descriptor::TypeDefinitionDescriptor;
 pub use type_definition_id::TypeDefinitionId;
-pub use type_descriptor::Reflect;
 pub use type_descriptor::TypeDescriptor;
 pub use type_kind::FunctionPointerKind;
 pub use type_kind::Mutability;
@@ -86,7 +89,6 @@ pub use type_kind::SmartPointerKind;
 pub use type_kind::StructKind;
 pub use type_kind::TextKind;
 pub use type_kind::TypeKind;
-pub use type_ref::OpaqueTypeDescriptor;
 pub use type_ref::TypeRef;
 pub use typed_view::ArrayTypeDescriptor;
 pub use typed_view::EnumRepr;

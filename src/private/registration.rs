@@ -38,31 +38,10 @@ pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<Ref
     crate::registry::build_registry(fragments)
 }
 
-/// Prepared synthetic facts for post-materialization registry aggregation
-/// benchmarks.
-///
-/// This type is absent unless the non-default `bench-internals` feature is
-/// enabled.
 #[cfg(feature = "bench-internals")]
-#[doc(hidden)]
-pub struct BenchmarkRegistryFacts(crate::registry::BenchmarkRegistryFacts);
-
-/// Prepares adapter-free capability facts outside the measured aggregation.
+pub use super::benchmark_registry_facts::aggregate_benchmark_registry_facts;
 #[cfg(feature = "bench-internals")]
-#[doc(hidden)]
-#[must_use]
-pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
-    BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(fragment_count))
-}
-
-/// Runs production post-materialization validation, indexing, and freezing on
-/// prepared benchmark facts.
-#[cfg(feature = "bench-internals")]
-#[doc(hidden)]
-pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
-    let BenchmarkRegistryFacts(facts) = facts;
-    crate::registry::aggregate_benchmark_registry_facts(facts)
-}
+pub use super::benchmark_registry_facts::prepare_benchmark_registry_facts;
 
 /// Builds an effective method view from prepared impl facts for benchmarks.
 #[cfg(feature = "bench-internals")]
