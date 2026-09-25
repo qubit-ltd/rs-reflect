@@ -31,6 +31,8 @@ use reflect::__private::testing::aggregate_benchmark_registry_facts;
 use reflect::__private::testing::build_benchmark_effective_type_view;
 use reflect::__private::testing::prepare_benchmark_registry_facts;
 use reflect::TypeDescriptor;
+use reflect::capability::CapabilityDescriptor;
+use reflect::capability::CapabilityKey;
 use reflect::descriptor::ImplDefinitionDescriptor;
 use reflect::descriptor::ImplDescriptor;
 use reflect::descriptor::ImplKind;
@@ -43,13 +45,11 @@ use reflect::descriptor::TypeDefinitionDescriptor;
 use reflect::descriptor::TypeDefinitionId;
 use reflect::expression::GenericDefinitionDescriptor;
 use reflect::expression::TypeExpression;
-use reflect::identity::FragmentIdentity;
 use reflect::identity::CapabilityId;
+use reflect::identity::FragmentIdentity;
 use reflect::identity::MemberId;
 use reflect::registry::ReflectRegistry;
 use reflect::registry::RegistrySnapshotBuilder;
-use reflect::capability::CapabilityDescriptor;
-use reflect::capability::CapabilityKey;
 
 struct RegistryBenchmarkType;
 
@@ -148,7 +148,8 @@ fn prepare_source_lookup_registry(capability_count: usize) -> ReflectRegistry {
     builder.build().expect("source lookup benchmark snapshot is valid")
 }
 
-/// Builds an isolated registry with the requested number of generic source entries.
+/// Builds an isolated registry with the requested number of generic source
+/// entries.
 fn prepare_definition_source_lookup_registry(capability_count: usize) -> (ReflectRegistry, TypeDefinitionId) {
     let definition_id = TypeDefinitionId::of::<Vec<u8>>();
     let generics = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
@@ -169,7 +170,10 @@ fn prepare_definition_source_lookup_registry(capability_count: usize) -> (Reflec
         .collect();
     let source = FragmentIdentity::new("registry-bench", "definition_source_lookup", 1, 1, "capability", 1);
     builder.add_definition_capabilities(definition, capabilities, source);
-    (builder.build().expect("definition source lookup snapshot is valid"), definition_id)
+    (
+        builder.build().expect("definition source lookup snapshot is valid"),
+        definition_id,
+    )
 }
 
 static REGISTRY_BENCHMARK_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
@@ -237,7 +241,9 @@ fn registry_operations(criterion: &mut Criterion) {
             bench.iter(|| black_box(source_registry.capability_source(benchmark_target_type(), black_box(&hit_id))));
         });
         source_lookup.bench_function(BenchmarkId::new("miss", capability_count), |bench| {
-            bench.iter(|| black_box(source_registry.capability_source(benchmark_target_type(), "registry.bench_missing")));
+            bench.iter(|| {
+                black_box(source_registry.capability_source(benchmark_target_type(), "registry.bench_missing"))
+            });
         });
     }
     source_lookup.finish();
@@ -250,7 +256,9 @@ fn registry_operations(criterion: &mut Criterion) {
             bench.iter(|| black_box(source_registry.definition_capability_source(definition_id, black_box(&hit_id))));
         });
         definition_source_lookup.bench_function(BenchmarkId::new("miss", capability_count), |bench| {
-            bench.iter(|| black_box(source_registry.definition_capability_source(definition_id, "registry.bench_missing")));
+            bench.iter(|| {
+                black_box(source_registry.definition_capability_source(definition_id, "registry.bench_missing"))
+            });
         });
     }
     definition_source_lookup.finish();
