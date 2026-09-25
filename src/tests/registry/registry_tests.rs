@@ -11,12 +11,56 @@
 use std::any::TypeId;
 
 use crate::TypeDescriptor;
+use crate::capability::CapabilityDescriptor;
+use crate::capability::CapabilityKey;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDefinitionId;
 use crate::expression::TypeExpression;
 use crate::identity::ExternalTraitId;
+use crate::identity::CapabilityId;
+use crate::identity::FragmentIdentity;
 use crate::registry::RegistrySnapshotBuilder;
+
+/// Checks source lookups for registered capabilities without relying on type membership.
+#[test]
+fn test_capability_source_tracks_registered_fragments_only() {
+    let descriptor = TypeDescriptor::of::<u16>();
+    let type_id = CapabilityId::new("example.registry_source_type").unwrap();
+    let type_key = CapabilityKey::<u8>::new(type_id);
+    let type_source = FragmentIdentity::new("example", "type", 1, 1, "capability", 1);
+
+    let generic = Box::leak(Box::new(crate::expression::GenericDefinitionDescriptor::new([], [])));
+    let definition = Box::leak(Box::new(crate::descriptor::TypeDefinitionDescriptor::opaque(
+        TypeDefinitionId::of::<Vec<u8>>(), "alloc::vec::Vec", "Vec", generic,
+    )));
+    let definition_id = CapabilityId::new("example.registry_source_definition").unwrap();
+    let definition_key = CapabilityKey::<u8>::new(definition_id);
+    let definition_source = FragmentIdentity::new("example", "definition", 1, 1, "capability", 2);
+
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_capabilities(
+        descriptor,
+        vec![CapabilityDescriptor::without_adapter(type_key)],
+        type_source.clone(),
+    );
+    builder.add_definition_capabilities(
+        definition,
+        vec![CapabilityDescriptor::without_adapter(definition_key)],
+        definition_source.clone(),
+    );
+    let registry = builder.build().expect("explicit source snapshot is valid");
+
+    assert_eq!(registry.capability_source(descriptor, "example.registry_source_type"), Some(&type_source));
+    assert_eq!(registry.definition_capability_source(definition.id(), "example.registry_source_definition"), Some(&definition_source));
+    assert!(registry.capability_source(descriptor, "example.registry_source_missing").is_none());
+    assert!(registry.definition_capability_source(definition.id(), "example.registry_source_missing").is_none());
+    assert!(registry.get(descriptor.type_id()).is_none(), "capabilities do not imply type membership");
+
+    let intrinsic_only = TypeDescriptor::of::<u8>();
+    assert!(registry.capability_source(intrinsic_only, "qubit.reflect.clone").is_none());
+    assert!(registry.definition_capability_source(TypeDefinitionId::of::<String>(), "example.registry_source_definition").is_none());
+}
 
 /// Verifies empty snapshots preserve the documented absence and ambiguity
 /// states across every public registry view.
