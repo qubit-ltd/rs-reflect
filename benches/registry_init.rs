@@ -42,8 +42,12 @@ use reflect::descriptor::MethodInstanceDescriptor;
 use reflect::expression::GenericDefinitionDescriptor;
 use reflect::expression::TypeExpression;
 use reflect::identity::FragmentIdentity;
+use reflect::identity::CapabilityId;
 use reflect::identity::MemberId;
 use reflect::registry::ReflectRegistry;
+use reflect::registry::RegistrySnapshotBuilder;
+use reflect::capability::CapabilityDescriptor;
+use reflect::capability::CapabilityKey;
 
 struct RegistryBenchmarkType;
 
@@ -126,6 +130,22 @@ fn benchmark_payload() -> FragmentPayload {
     FragmentPayload::Type(&REGISTRY_BENCHMARK_DESCRIPTOR)
 }
 
+/// Builds an isolated registry with the requested number of source entries.
+fn prepare_source_lookup_registry(capability_count: usize) -> ReflectRegistry {
+    let mut builder = RegistrySnapshotBuilder::new();
+    let capabilities = (0..capability_count)
+        .map(|index| {
+            let id: &'static str = Box::leak(format!("registry.bench_source_{index}").into_boxed_str());
+            CapabilityDescriptor::without_adapter(CapabilityKey::<()>::new(
+                CapabilityId::new(id).expect("benchmark capability ID is valid"),
+            ))
+        })
+        .collect();
+    let source = FragmentIdentity::new("registry-bench", "source_lookup", 1, 1, "capability", 1);
+    builder.add_type_capabilities(benchmark_target_type(), capabilities, source);
+    builder.build().expect("source lookup benchmark snapshot is valid")
+}
+
 static REGISTRY_BENCHMARK_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Type,
     StaticFragmentIdentity::new("registry-bench", "single", 1, 1, "type", 1),
@@ -182,6 +202,19 @@ fn registry_operations(criterion: &mut Criterion) {
         });
     }
     lookup.finish();
+
+    let mut source_lookup = criterion.benchmark_group("registry/capability_source");
+    for capability_count in [1_usize, 100, 10_000] {
+        let source_registry = prepare_source_lookup_registry(capability_count);
+        let hit_id = format!("registry.bench_source_{}", capability_count - 1);
+        source_lookup.bench_function(BenchmarkId::new("hit", capability_count), |bench| {
+            bench.iter(|| black_box(source_registry.capability_source(benchmark_target_type(), black_box(&hit_id))));
+        });
+        source_lookup.bench_function(BenchmarkId::new("miss", capability_count), |bench| {
+            bench.iter(|| black_box(source_registry.capability_source(benchmark_target_type(), "registry.bench_missing")));
+        });
+    }
+    source_lookup.finish();
 
     let mut effective_view = criterion.benchmark_group("registry/effective_view_build");
     for method_count in [0_usize, 2, 9, 18] {
