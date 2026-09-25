@@ -340,7 +340,7 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 
 全局入口面向完整的链接注册集合；发生冲突时，整体初始化会失败。调用方需要隔离的模型视图时，可以只把选定描述符加入显式快照，并将同一个快照传给 `qubit_model_metadata::registry::ModelRegistry::from_reflect_registry`：
 
-```rust,ignore
+```text
 let mut builder = RegistrySnapshotBuilder::new();
 builder.add_type(
     TypeDescriptor::of::<MyModel>(),

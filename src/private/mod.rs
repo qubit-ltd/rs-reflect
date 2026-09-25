@@ -17,6 +17,8 @@ pub mod testing;
 
 #[cfg(test)]
 pub(crate) mod assertions;
+#[cfg(feature = "bench-internals")]
+pub(crate) mod benchmark_registry_facts;
 pub(crate) mod descriptor;
 mod lazy_type_ref;
 mod lazy_type_ref_list;

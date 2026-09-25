@@ -24,7 +24,6 @@ pub struct TypeMismatch {
 
 impl TypeMismatch {
     /// Creates a mismatch from the expected and actual runtime type IDs.
-    #[must_use]
     pub const fn new(expected: TypeId, actual: TypeId) -> Self {
         Self {
             expected,
@@ -36,7 +35,6 @@ impl TypeMismatch {
 
     /// Adds diagnostic type names without changing the type IDs used for
     /// matching.
-    #[must_use]
     pub const fn with_diagnostic_names(mut self, expected_name: &'static str, actual_name: &'static str) -> Self {
         self.expected_name = Some(expected_name);
         self.actual_name = Some(actual_name);
@@ -44,7 +42,6 @@ impl TypeMismatch {
     }
     /// Adds the expected diagnostic type name when the actual erased name is
     /// unavailable.
-    #[must_use]
     pub const fn with_expected_name(mut self, expected_name: &'static str) -> Self {
         self.expected_name = Some(expected_name);
         self

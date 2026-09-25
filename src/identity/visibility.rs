@@ -9,20 +9,7 @@
 // qubit-style: allow public-type-layout
 //! Stable visibility categories for source declarations.
 
-/// A normalized source visibility category.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum VisibilityKind {
-    /// Public outside the declaring crate.
-    Public,
-    /// Visible throughout the declaring crate.
-    Crate,
-    /// Visible to the immediate parent module.
-    Super,
-    /// Visible only in an explicitly named source scope.
-    Restricted,
-    /// Visible only in the declaring module.
-    Private,
-}
+use super::visibility_kind::VisibilityKind;
 
 /// A normalized source visibility with diagnostic data for restricted paths.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

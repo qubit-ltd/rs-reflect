@@ -8,7 +8,7 @@
 
 //! APIs for reflected field and variant access.
 
-mod error;
+mod field_access_error;
 mod field_access_operation;
 mod field_access_policy;
 pub(crate) mod field_adapter;
@@ -17,7 +17,7 @@ mod field_set_recovery;
 mod field_visibility;
 mod variant_adapter;
 
-pub use error::FieldAccessError;
+pub use field_access_error::FieldAccessError;
 pub use field_access_operation::FieldAccessOperation;
 pub use field_access_policy::FieldAccessPolicy;
 pub use field_adapter::FieldGetAdapter;

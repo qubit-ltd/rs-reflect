@@ -41,6 +41,7 @@ use crate::descriptor::PrimitiveTypeDescriptor;
 use crate::descriptor::RawPointerTypeDescriptor;
 use crate::descriptor::ReferenceKind;
 use crate::descriptor::ReferenceTypeDescriptor;
+use crate::descriptor::Reflect;
 use crate::descriptor::SequenceKind;
 use crate::descriptor::SequenceTypeDescriptor;
 use crate::descriptor::SetKind;
@@ -65,22 +66,6 @@ use crate::error::RegistryError;
 use crate::expression::FunctionAbi;
 use crate::registry::ReflectRegistry;
 use crate::value::ReflectedOwned;
-
-/// The sole public generic contract for types that provide a static reflection
-/// descriptor.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::{Reflect, TypeDescriptor};
-///
-/// let descriptor = <u32 as Reflect>::type_descriptor();
-/// assert!(std::ptr::eq(descriptor, TypeDescriptor::of::<u32>()));
-/// ```
-pub trait Reflect: 'static {
-    /// Returns the unique root descriptor for `Self`.
-    fn type_descriptor() -> &'static TypeDescriptor;
-}
 
 /// Kind-specific data retained by a root descriptor.
 enum TypeDescriptorData {

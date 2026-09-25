@@ -152,7 +152,6 @@ impl<M: Mode> FieldSetFailure<M> {
     }
 
     /// Returns the machine-readable field access error.
-    #[must_use]
     #[inline]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error
@@ -169,7 +168,6 @@ impl<M: Mode> FieldSetFailure<M> {
     }
 
     /// Consumes the failure and returns its error and optional recovery.
-    #[must_use]
     pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery<M>>) {
         (*self.error, self.recovery.map(|recovery| *recovery))
     }
@@ -186,7 +184,6 @@ impl<M: Mode> FieldSetFailure<M> {
     }
 
     /// Consumes the failure and returns its machine-readable error.
-    #[must_use]
     pub fn into_error(self) -> FieldAccessError {
         *self.error
     }

@@ -9,18 +9,18 @@
 // qubit-style: allow public-type-layout
 //! Immutable declarations and concrete instances of reflected methods.
 
-mod builder;
 mod instance;
 mod invocation_adapter;
+mod method_descriptor_builder;
 mod signature;
 
-pub use self::builder::MethodDescriptorBuilder;
 pub use self::instance::MethodImplementationSource;
 pub use self::instance::MethodInstanceBuildError;
 pub use self::instance::MethodInstanceDescriptor;
 pub use self::invocation_adapter::CatchingAvailability;
 pub use self::invocation_adapter::InvocationAdapter;
 pub use self::invocation_adapter::InvocationUnavailableReason;
+pub use self::method_descriptor_builder::MethodDescriptorBuilder;
 pub use self::signature::MethodQualifiers;
 pub use self::signature::MethodVisibility;
 pub use self::signature::ParameterDescriptor;
