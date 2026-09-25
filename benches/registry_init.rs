@@ -39,6 +39,8 @@ use reflect::descriptor::MethodDeclarationOwner;
 use reflect::descriptor::MethodDescriptor;
 use reflect::descriptor::MethodImplementationSource;
 use reflect::descriptor::MethodInstanceDescriptor;
+use reflect::descriptor::TypeDefinitionDescriptor;
+use reflect::descriptor::TypeDefinitionId;
 use reflect::expression::GenericDefinitionDescriptor;
 use reflect::expression::TypeExpression;
 use reflect::identity::FragmentIdentity;
@@ -146,6 +148,30 @@ fn prepare_source_lookup_registry(capability_count: usize) -> ReflectRegistry {
     builder.build().expect("source lookup benchmark snapshot is valid")
 }
 
+/// Builds an isolated registry with the requested number of generic source entries.
+fn prepare_definition_source_lookup_registry(capability_count: usize) -> (ReflectRegistry, TypeDefinitionId) {
+    let definition_id = TypeDefinitionId::of::<Vec<u8>>();
+    let generics = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
+    let definition = Box::leak(Box::new(TypeDefinitionDescriptor::opaque(
+        definition_id,
+        "alloc::vec::Vec",
+        "Vec",
+        generics,
+    )));
+    let mut builder = RegistrySnapshotBuilder::new();
+    let capabilities = (0..capability_count)
+        .map(|index| {
+            let id: &'static str = Box::leak(format!("registry.bench_definition_source_{index}").into_boxed_str());
+            CapabilityDescriptor::without_adapter(CapabilityKey::<()>::new(
+                CapabilityId::new(id).expect("benchmark definition capability ID is valid"),
+            ))
+        })
+        .collect();
+    let source = FragmentIdentity::new("registry-bench", "definition_source_lookup", 1, 1, "capability", 1);
+    builder.add_definition_capabilities(definition, capabilities, source);
+    (builder.build().expect("definition source lookup snapshot is valid"), definition_id)
+}
+
 static REGISTRY_BENCHMARK_FRAGMENT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Type,
     StaticFragmentIdentity::new("registry-bench", "single", 1, 1, "type", 1),
@@ -215,6 +241,19 @@ fn registry_operations(criterion: &mut Criterion) {
         });
     }
     source_lookup.finish();
+
+    let mut definition_source_lookup = criterion.benchmark_group("registry/definition_capability_source");
+    for capability_count in [1_usize, 100, 10_000] {
+        let (source_registry, definition_id) = prepare_definition_source_lookup_registry(capability_count);
+        let hit_id = format!("registry.bench_definition_source_{}", capability_count - 1);
+        definition_source_lookup.bench_function(BenchmarkId::new("hit", capability_count), |bench| {
+            bench.iter(|| black_box(source_registry.definition_capability_source(definition_id, black_box(&hit_id))));
+        });
+        definition_source_lookup.bench_function(BenchmarkId::new("miss", capability_count), |bench| {
+            bench.iter(|| black_box(source_registry.definition_capability_source(definition_id, "registry.bench_missing")));
+        });
+    }
+    definition_source_lookup.finish();
 
     let mut effective_view = criterion.benchmark_group("registry/effective_view_build");
     for method_count in [0_usize, 2, 9, 18] {
