@@ -131,12 +131,7 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .is_none()
     );
     assert!(registry.capability_source(descriptor, "missing").is_none());
-    assert!(
-        registry
-            .definition_capabilities(TypeDefinitionId::of::<u8>())
-            .descriptors()
-            .is_empty()
-    );
+    assert!(registry.definition_capabilities(TypeDefinitionId::of::<u8>()).is_none());
     assert!(
         registry
             .definition_capability_by_id(TypeDefinitionId::of::<u8>(), "missing")
