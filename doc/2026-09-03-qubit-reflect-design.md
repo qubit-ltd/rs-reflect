@@ -67,6 +67,12 @@ Rust's orphan rule requires implementations of `Reflect` for external types to l
 trait. Feature modules satisfy that rule without forcing those implementations or dependencies into the default
 kernel.
 
+`Reflect` remains an open trait so downstream crates can describe their own types. Implementations must return a
+descriptor whose `TypeId` is the identity of the implementing Rust type. `TypeDescriptor::of::<T>()` checks this
+invariant and panics for a mismatched implementation; a direct call to `T::type_descriptor()` remains the
+implementor's responsibility. The `register_reflected_type!` payload path calls the trait method directly so the
+registry can report a structured `IdentityConflict` during initialization instead of panicking.
+
 The derive dependency budget is `proc-macro2`, `quote`, `syn`, and `proc-macro-crate`. The repository uses
 Rust 2024 with MSRV 1.94. Runtime and generated code both forbid unsafe code.
 
