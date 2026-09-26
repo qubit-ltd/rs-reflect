@@ -9,14 +9,16 @@
 // qubit-style: allow public-type-layout
 //! Stable identities for distributed registration fragments.
 
+use std::sync::Arc;
+
 /// The source and content identity of one registration fragment.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct FragmentIdentity {
-    declaring_crate: Box<str>,
-    module_path: Box<str>,
+    declaring_crate: Arc<str>,
+    module_path: Arc<str>,
     line: u32,
     column: u32,
-    member_kind: Box<str>,
+    member_kind: Arc<str>,
     content_fingerprint: u64,
 }
 
