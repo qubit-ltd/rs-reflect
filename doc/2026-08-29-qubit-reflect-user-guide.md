@@ -422,13 +422,12 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
         CapabilityId::new("example.limit").expect("valid capability ID"),
     );
     let mut builder = RegistrySnapshotBuilder::new();
-    builder
-        .add_type(target, source("type", 10))
-        .add_type_capabilities(
-            target,
-            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-            source("capability", 11),
-        );
+    builder.add_type_with_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+        source("type", 10),
+        source("capability", 11),
+    );
     let snapshot = builder.build()?;
 
     assert!(snapshot.get(target.type_id()).is_some());
@@ -443,7 +442,8 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 }
 ```
 
-The membership and capability payloads are separate. An empty builder yields a
+The combined `add_type_with_capabilities` method registers a root and its
+capabilities while keeping their source identities separate. An empty builder yields a
 snapshot with no registered roots. Calling only `add_type_capabilities` creates
 a capability-only snapshot: `types()` remains empty, while `capability()` and
 `capability_by_id()` can still resolve the target. The other typed inputs are

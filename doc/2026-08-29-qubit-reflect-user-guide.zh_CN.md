@@ -311,13 +311,12 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
         CapabilityId::new("example.limit").expect("合法的 capability ID"),
     );
     let mut builder = RegistrySnapshotBuilder::new();
-    builder
-        .add_type(target, source("type", 10))
-        .add_type_capabilities(
-            target,
-            vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-            source("capability", 11),
-        );
+    builder.add_type_with_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+        source("type", 10),
+        source("capability", 11),
+    );
     let snapshot = builder.build()?;
 
     assert!(snapshot.get(target.type_id()).is_some());
@@ -332,7 +331,7 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 }
 ```
 
-类型成员与能力数据相互独立。空构建器生成的快照不含注册类型；只调用 `add_type_capabilities` 时，`types()` 仍为空，但 `capability()` 和 `capability_by_id()` 可以查询目标的能力。其他注册入口包括
+组合入口 `add_type_with_capabilities` 会同时注册类型成员与能力，并保留两者各自的来源身份。空构建器生成的快照不含注册类型；只调用 `add_type_capabilities` 时，`types()` 仍为空，但 `capability()` 和 `capability_by_id()` 可以查询目标的能力。其他注册入口包括
 `add_definition`、`add_trait`、`add_impl_definition`、`add_impl` 和
 `add_definition_capabilities`。
 
