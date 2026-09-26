@@ -46,6 +46,8 @@ register_reflected_type!(u32);
 struct DefinitionMarker;
 struct TraitMarker;
 struct ProviderTarget;
+struct DefinitionCapabilityOnlyA;
+struct DefinitionCapabilityOnlyB;
 
 static EMPTY_GENERICS: LazyLock<GenericDefinitionDescriptor> =
     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
@@ -54,6 +56,24 @@ static DEFINITION: LazyLock<TypeDefinitionDescriptor> = LazyLock::new(|| {
         TypeDefinitionId::of::<DefinitionMarker>(),
         "snapshot::GenericChoice",
         "GenericChoice",
+        &EMPTY_GENERICS,
+        &[],
+    )
+});
+static DEFINITION_CAPABILITY_ONLY_A: LazyLock<TypeDefinitionDescriptor> = LazyLock::new(|| {
+    TypeDefinitionDescriptor::enum_type(
+        TypeDefinitionId::of::<DefinitionCapabilityOnlyA>(),
+        "snapshot::A",
+        "A",
+        &EMPTY_GENERICS,
+        &[],
+    )
+});
+static DEFINITION_CAPABILITY_ONLY_B: LazyLock<TypeDefinitionDescriptor> = LazyLock::new(|| {
+    TypeDefinitionDescriptor::enum_type(
+        TypeDefinitionId::of::<DefinitionCapabilityOnlyB>(),
+        "snapshot::B",
+        "B",
         &EMPTY_GENERICS,
         &[],
     )
@@ -499,6 +519,41 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
             source: source(51, "definition-capability", 51),
         }),
     );
+}
+
+#[test]
+fn test_capability_only_definition_targets_are_reported_in_fragment_order() {
+    let capability_id = "example.snapshot.generic";
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder
+        .add_definition(&DEFINITION, source(52, "member", 1))
+        .add_definition_capabilities(
+            &DEFINITION,
+            vec![CapabilityDescriptor::with_adapter(key(capability_id), 1_u32)],
+            source(52, "capability", 1),
+        )
+        .add_definition_capabilities(
+            &DEFINITION_CAPABILITY_ONLY_A,
+            vec![CapabilityDescriptor::with_adapter(key(capability_id), 1_u32)],
+            source(54, "capability", 1),
+        )
+        .add_definition_capabilities(
+            &DEFINITION_CAPABILITY_ONLY_B,
+            vec![CapabilityDescriptor::with_adapter(key(capability_id), 2_u64)],
+            source(53, "capability", 1),
+        );
+    let registry = builder.build().expect("snapshot");
+    let targets = registry.capability_only_definition_targets(capability_id);
+    assert_eq!(
+        targets.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+        vec![DEFINITION_CAPABILITY_ONLY_B.id(), DEFINITION_CAPABILITY_ONLY_A.id()]
+    );
+    assert_eq!(
+        targets.iter().map(|(_, source)| (*source).clone()).collect::<Vec<_>>(),
+        vec![source(53, "capability", 1), source(54, "capability", 1)]
+    );
+    assert!(registry.capability_only_definition_targets("missing").is_empty());
+    assert_eq!(registry.definitions().len(), 1);
 }
 
 #[test]
