@@ -217,7 +217,7 @@ fn test_generic_enum_definition_exposes_source_structure() {
     ));
     let missing = TypeDefinitionId::of::<MissingDefinition>();
     assert!(registry.definition(missing).is_none());
-    assert!(registry.definition_capabilities(missing).descriptors().is_empty());
+    assert!(registry.definition_capabilities(missing).is_none());
     assert!(
         registry
             .definition_capability(missing, definition_key())

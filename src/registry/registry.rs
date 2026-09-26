@@ -551,12 +551,18 @@ impl ReflectRegistry {
     }
 
     /// Returns the effective capabilities of one generic declaration.
+    ///
+    /// Returns `None` when the declaration is unknown to this snapshot. An
+    /// empty capability set means the declaration is registered but has no
+    /// effective capabilities.
     #[must_use]
-    pub fn definition_capabilities(&self, id: TypeDefinitionId) -> &TypeCapabilities {
-        self.indexes
-            .capabilities_by_definition
-            .get(&id)
-            .unwrap_or(&self.empty_capabilities)
+    pub fn definition_capabilities(&self, id: TypeDefinitionId) -> Option<&TypeCapabilities> {
+        self.indexes.capabilities_by_definition.get(&id).or_else(|| {
+            self.indexes
+                .definitions_by_id
+                .contains_key(&id)
+                .then_some(&self.empty_capabilities)
+        })
     }
 
     /// Retrieves one effective typed capability for a generic declaration.
@@ -565,7 +571,10 @@ impl ReflectRegistry {
         id: TypeDefinitionId,
         key: CapabilityKey<A>,
     ) -> Result<Option<&A>, CapabilityAccessError> {
-        self.definition_capabilities(id).get(key)
+        match self.definition_capabilities(id) {
+            Some(capabilities) => capabilities.get(key),
+            None => Ok(None),
+        }
     }
 
     /// Finds one effective declaration capability by textual ID.
@@ -575,7 +584,7 @@ impl ReflectRegistry {
         id: TypeDefinitionId,
         capability_id: &str,
     ) -> Option<&CapabilityDescriptor> {
-        self.definition_capabilities(id).descriptor(capability_id)
+        self.definition_capabilities(id)?.descriptor(capability_id)
     }
 
     /// Enumerates registered roots carrying the exact typed capability key.
@@ -596,10 +605,41 @@ impl ReflectRegistry {
         &self,
         key: CapabilityKey<A>,
     ) -> impl Iterator<Item = &'static TypeDefinitionDescriptor> + '_ {
-        self.definitions
+        self.definitions.iter().copied().filter(move |definition| {
+            self.definition_capabilities(definition.id())
+                .is_some_and(|capabilities| capabilities.contains(key))
+        })
+    }
+
+    /// Returns registered capability targets absent from this snapshot's type
+    /// membership, ordered by their source fragment identity.
+    ///
+    /// Matching uses the stable capability ID and includes adapter type
+    /// mismatches. This query does not add targets to [`Self::types`].
+    #[must_use]
+    pub fn capability_only_type_targets(&self, capability_id: &str) -> Vec<(TypeId, &FragmentIdentity)> {
+        let mut targets = self
+            .indexes
+            .capabilities_by_target
             .iter()
-            .copied()
-            .filter(move |definition| self.definition_capabilities(definition.id()).contains(key))
+            .filter_map(|(type_id, capabilities)| {
+                if self.indexes.types_by_id.contains_key(type_id) {
+                    return None;
+                }
+                let capability = capabilities.descriptor(capability_id)?;
+                let source = self
+                    .indexes
+                    .capability_fragments
+                    .get(&(
+                        crate::registry::fragment::CapabilityTarget::Type(*type_id),
+                        *capability.id(),
+                    ))
+                    .expect("every effective capability has a retained source fragment");
+                Some((*type_id, source))
+            })
+            .collect::<Vec<_>>();
+        targets.sort_by(|left, right| left.1.cmp(right.1));
+        targets
     }
 
     /// Returns every reflected implementation targeting `type_id`.

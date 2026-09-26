@@ -169,6 +169,51 @@ fn test_capability_only_snapshots_do_not_register_or_share_members() {
 }
 
 #[test]
+fn test_capability_only_type_targets_are_reported_in_fragment_order() {
+    let capability_id = "example.snapshot.audit";
+    let capability_key = key::<u32>(capability_id);
+    let member = TypeDescriptor::of::<u8>();
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type(member, source(50, "type", 50));
+    builder.add_type_capabilities(
+        member,
+        vec![CapabilityDescriptor::with_adapter(capability_key, 1_u32)],
+        source(51, "capability", 51),
+    );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u16>(),
+        vec![CapabilityDescriptor::with_adapter(capability_key, 2_u32)],
+        source(43, "capability", 43),
+    );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u32>(),
+        vec![CapabilityDescriptor::with_adapter(capability_key, 3_u32)],
+        source(42, "capability", 42),
+    );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u64>(),
+        vec![CapabilityDescriptor::with_adapter(key::<u64>(capability_id), 4_u64)],
+        source(44, "capability", 44),
+    );
+    let registry = builder.build().expect("valid capability-only targets");
+
+    let first_source = source(42, "capability", 42);
+    let second_source = source(43, "capability", 43);
+    let third_source = source(44, "capability", 44);
+    assert_eq!(
+        registry.capability_only_type_targets(capability_id),
+        vec![
+            (TypeId::of::<u32>(), &first_source),
+            (TypeId::of::<u16>(), &second_source),
+            (TypeId::of::<u64>(), &third_source),
+        ],
+    );
+    assert!(registry.capability_only_type_targets("example.missing").is_empty());
+    assert_eq!(registry.types().len(), 1);
+    assert!(std::ptr::eq(registry.types()[0], member));
+}
+
+#[test]
 fn test_combined_type_and_capability_registration_preserves_each_source() {
     let descriptor = TypeDescriptor::of::<u64>();
     let capability_key = key::<u32>("example.snapshot.combined");
@@ -409,6 +454,13 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
     assert_eq!(definition_only.definitions().len(), 1);
     assert!(std::ptr::eq(definition_only.definitions()[0], &*DEFINITION));
     assert!(matches!(DEFINITION.data(), TypeDefinitionData::Enum { .. }));
+    assert!(
+        definition_only
+            .definition_capabilities(DEFINITION.id())
+            .expect("registered declaration")
+            .descriptors()
+            .is_empty()
+    );
 
     let capability_key = key("example.snapshot.definition");
     let mut capability_only = RegistrySnapshotBuilder::new();
@@ -418,6 +470,11 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
         source(51, "definition-capability", 51),
     );
     let capability_only = capability_only.build().expect("definition capability snapshot");
+    assert!(
+        capability_only
+            .definition_capabilities(DEFINITION.id())
+            .is_some_and(|capabilities| capabilities.contains(capability_key))
+    );
     assert_eq!(
         capability_only.definition_capability_source(DEFINITION.id(), "example.snapshot.definition"),
         Some(&source(51, "definition-capability", 51)),
