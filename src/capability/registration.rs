@@ -225,7 +225,7 @@ macro_rules! register_reflected_type {
             }
 
             fn __qubit_reflect_descriptor() -> &'static $crate::descriptor::TypeDescriptor {
-                $crate::descriptor::TypeDescriptor::of::<$target>()
+                <$target as $crate::descriptor::Reflect>::type_descriptor()
             }
 
             fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
