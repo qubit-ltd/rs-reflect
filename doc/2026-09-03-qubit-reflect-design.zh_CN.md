@@ -62,6 +62,11 @@ Rust 要求过程宏位于 `proc-macro` crate，因此 runtime 与 derive 保持
 要求 `Reflect` 的外部类型实现位于拥有 trait 的 `qubit-reflect` crate；feature 模块既满足该规则，
 又避免把这些实现和依赖塞入默认内核。
 
+`Reflect` 保持开放，以便下游 crate 描述自有类型。实现必须返回 `TypeId` 与实现类型一致的描述符。
+`TypeDescriptor::of::<T>()` 会检查这一不变量，错误实现会触发 panic；直接调用 `T::type_descriptor()`
+仍由 trait 实现者负责保证身份正确。`register_reflected_type!` 的 payload 路径直接调用 trait 方法，
+使 registry 初始化可以返回结构化的 `IdentityConflict`，而不是触发 panic。
+
 derive 的直接依赖限于 `proc-macro2`、`quote`、`syn` 和 `proc-macro-crate`。
 仓库使用 Rust 2024，MSRV 为 1.94，runtime 与生成代码均禁止 unsafe。
 
