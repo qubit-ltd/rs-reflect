@@ -66,6 +66,35 @@ impl RegistrySnapshotBuilder {
         self.push(FragmentPayload::Type(descriptor), source)
     }
 
+    /// Adds a type member and its capabilities as two independent fragments.
+    ///
+    /// `type_source` identifies the type fragment, while `capability_source`
+    /// identifies the capability fragment. Both identities must be distinct
+    /// when they describe different payloads. Validation remains deferred to
+    /// [`Self::build`], which rejects reused source identities and duplicate
+    /// type members transactionally.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: The concrete reflected type to add as a snapshot member.
+    /// - `capabilities`: The typed capabilities to register for that type.
+    /// - `type_source`: The identity of the type fragment.
+    /// - `capability_source`: The identity of the capability fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
+    pub fn add_type_with_capabilities(
+        &mut self,
+        descriptor: &'static TypeDescriptor,
+        capabilities: Vec<CapabilityDescriptor>,
+        type_source: FragmentIdentity,
+        capability_source: FragmentIdentity,
+    ) -> &mut Self {
+        self.add_type(descriptor, type_source);
+        self.add_type_capabilities(descriptor, capabilities, capability_source)
+    }
+
     /// Adds one source-level generic type declaration as a snapshot member.
     pub fn add_definition(
         &mut self,

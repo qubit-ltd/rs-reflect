@@ -169,6 +169,62 @@ fn test_capability_only_snapshots_do_not_register_or_share_members() {
 }
 
 #[test]
+fn test_combined_type_and_capability_registration_preserves_each_source() {
+    let descriptor = TypeDescriptor::of::<u64>();
+    let capability_key = key::<u32>("example.snapshot.combined");
+    let type_source = source(60, "type", 60);
+    let capability_source = source(61, "capability", 61);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_with_capabilities(
+        descriptor,
+        vec![CapabilityDescriptor::with_adapter(capability_key, 17_u32)],
+        type_source.clone(),
+        capability_source.clone(),
+    );
+
+    let registry = builder.build().expect("combined snapshot");
+    assert_eq!(registry.types().len(), 1);
+    assert!(std::ptr::eq(
+        registry.get(descriptor.type_id()).expect("registered type"),
+        descriptor
+    ));
+    assert_eq!(registry.capability(descriptor, capability_key), Ok(Some(&17_u32)));
+    let mut types_with_identity = registry.types_with_identity();
+    let (member, member_source) = types_with_identity.next().expect("type identity");
+    assert!(std::ptr::eq(member, descriptor));
+    assert_eq!(member_source, &type_source);
+    assert!(types_with_identity.next().is_none());
+    assert_eq!(
+        registry.capability_source(descriptor, "example.snapshot.combined"),
+        Some(&capability_source),
+    );
+}
+
+#[test]
+fn test_combined_registration_rejects_reusing_one_source_for_both_payloads() {
+    let descriptor = TypeDescriptor::of::<u64>();
+    let source = source(62, "combined", 62);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_with_capabilities(
+        descriptor,
+        vec![CapabilityDescriptor::with_adapter(
+            key::<u32>("example.snapshot.samesource"),
+            17_u32,
+        )],
+        source.clone(),
+        source,
+    );
+
+    assert_eq!(
+        builder
+            .build()
+            .expect_err("one identity cannot name two payloads")
+            .kind(),
+        RegistryErrorKind::DuplicateFragment,
+    );
+}
+
+#[test]
 fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts() {
     let intrinsic_key = key::<u32>("example.intrinsic");
     let mut intrinsic_builder = RegistrySnapshotBuilder::new();
