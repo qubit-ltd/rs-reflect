@@ -300,6 +300,7 @@ use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
 use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::TypeDescriptor;
+use std::any::TypeId;
 
 fn source(kind: &str, line: u32) -> FragmentIdentity {
     FragmentIdentity::new("example", "fixture", line, 1, kind, u64::from(line))
@@ -317,6 +318,11 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
         source("type", 10),
         source("capability", 11),
     );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u64>(),
+        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+        source("capability", 12),
+    );
     let snapshot = builder.build()?;
 
     assert!(snapshot.get(target.type_id()).is_some());
@@ -326,6 +332,11 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
             .expect("capability 声明合法"),
         Some(&7),
     );
+    assert_eq!(snapshot.types().len(), 1);
+    assert_eq!(
+        snapshot.capability_only_type_targets("example.limit")[0].0,
+        TypeId::of::<u64>(),
+    );
     assert!(target.methods_in(&snapshot).is_empty());
     Ok(())
 }
@@ -334,6 +345,18 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 组合入口 `add_type_with_capabilities` 会同时注册类型成员与能力，并保留两者各自的来源身份。空构建器生成的快照不含注册类型；只调用 `add_type_capabilities` 时，`types()` 仍为空，但 `capability()` 和 `capability_by_id()` 可以查询目标的能力。其他注册入口包括
 `add_definition`、`add_trait`、`add_impl_definition`、`add_impl` 和
 `add_definition_capabilities`。
+
+只有通过 `add_type` 或 `add_type_with_capabilities` 添加的描述符才属于快照的类型成员。示例中，
+`u64` 仅注册能力，断言确认它仍不在 `types()` 中。
+`ModelRegistry::from_reflect_registry` 只投影这些成员，因此能力专用目标不会自动成为模型。
+使用 `capability_only_type_targets(capability_id)` 可列出未出现在 `types()` 中的能力目标。
+该查询按稳定的能力 ID 匹配，即使 adapter 类型不一致也会返回，并按来源 fragment 排序。
+需要审计模型元数据注册时，可选调用
+`snapshot.capability_only_type_targets("qubit.model.metadata.v1")`。
+
+对于泛型定义，`definition_capabilities(id)` 在定义未知时返回 `None`，在定义已注册但没有能力时
+返回 `Some(empty)`，存在有效能力时返回 `Some(nonempty)`。便捷查询仍返回原有的 `Option` 或
+`Result<Option<_>>`，未知定义上的能力查询仍表示能力缺失。
 
 把生成的快照传给 `impls_in`、`methods_in` 或 `methods_named_in`，即可指定查询范围。`build()` 会统一校验标识、引用关系和能力冲突，失败时返回 `RegistryError`。每个片段应提供稳定的 `FragmentIdentity`，便于定位重复或内容变化的来源。冲突详情可通过 `conflicting_fragments()`、`capability_details()`、`capability_target()` 和 `capability_id()` 查看；类型自身提供的能力发生冲突时，还可通过 `intrinsic_conflict()` 与 `Error::source()` 追踪原因。
 

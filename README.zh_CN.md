@@ -78,6 +78,41 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 [隔离快照](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#构建隔离的-registry-snapshot)、
 [能力冲突处理](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#迁移-effective-capability-查询)和
 [空结构体构造](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#空结构体的构造方式)的操作步骤见用户指南。
+快照中的类型成员决定模型投影范围；能力专用目标仍可单独查询，并可通过
+`capability_only_type_targets` 检查。
+例如，可用 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`
+审计模型元数据能力的注册目标。
+
+```rust
+use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::TypeDescriptor;
+
+fn main() -> Result<(), qubit_reflect::RegistryError> {
+let target = TypeDescriptor::of::<u32>();
+let key = CapabilityKey::<u32>::new(
+    CapabilityId::new("example.limit").expect("合法的 capability ID"),
+);
+let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
+let mut builder = RegistrySnapshotBuilder::new();
+builder.add_type_with_capabilities(
+    target,
+    vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+    source("type", 10),
+    source("capability", 11),
+);
+builder.add_type_capabilities(
+    TypeDescriptor::of::<u64>(),
+    vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+    source("capability", 12),
+);
+let snapshot = builder.build()?;
+assert_eq!(snapshot.types().len(), 1);
+assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
+Ok(())
+}
+```
 
 ## 延伸阅读
 
