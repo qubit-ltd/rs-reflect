@@ -515,11 +515,12 @@ impl ReflectRegistry {
     /// Returns the registration fragment that contributed a capability.
     #[must_use]
     pub fn capability_source(&self, descriptor: &TypeDescriptor, capability_id: &str) -> Option<&FragmentIdentity> {
-        self.indexes.capability_fragments.iter().find_map(|((target, id), source)| {
-            (matches!(target, crate::registry::fragment::CapabilityTarget::Type(type_id) if *type_id == descriptor.type_id())
-                && id.as_str() == capability_id)
-                .then_some(source)
-        })
+        let capabilities = self.indexes.capabilities_by_target.get(&descriptor.type_id())?;
+        let capability = capabilities.descriptor(capability_id)?;
+        self.indexes.capability_fragments.get(&(
+            crate::registry::fragment::CapabilityTarget::Type(descriptor.type_id()),
+            *capability.id(),
+        ))
     }
 
     /// Returns the owned origin of a generic declaration capability by
@@ -541,11 +542,12 @@ impl ReflectRegistry {
     /// Returns the registration fragment that contributed a generic capability.
     #[must_use]
     pub fn definition_capability_source(&self, id: TypeDefinitionId, capability_id: &str) -> Option<&FragmentIdentity> {
-        self.indexes.capability_fragments.iter().find_map(|((target, capability), source)| {
-            (matches!(target, crate::registry::fragment::CapabilityTarget::TypeDefinition(definition_id) if *definition_id == id)
-                && capability.as_str() == capability_id)
-                .then_some(source)
-        })
+        let capabilities = self.indexes.capabilities_by_definition.get(&id)?;
+        let capability = capabilities.descriptor(capability_id)?;
+        self.indexes.capability_fragments.get(&(
+            crate::registry::fragment::CapabilityTarget::TypeDefinition(id),
+            *capability.id(),
+        ))
     }
 
     /// Returns the effective capabilities of one generic declaration.

@@ -197,8 +197,19 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     );
     let first = first_builder.build().expect("first registered snapshot");
     assert_eq!(
+        first.capability_source(target, "example.registered"),
+        Some(&first_source)
+    );
+    assert_eq!(
+        first.capability_source(TypeDescriptor::of::<u64>(), "example.registered"),
+        None
+    );
+    assert_eq!(first.capability_source(target, "missing"), None);
+    assert_eq!(
         first.capability_origin(target, "example.registered"),
-        Ok(Some(CapabilityOrigin::Registered { source: first_source })),
+        Ok(Some(CapabilityOrigin::Registered {
+            source: first_source.clone()
+        })),
     );
 
     let mut second_builder = RegistrySnapshotBuilder::new();
@@ -210,14 +221,33 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
     let second = second_builder.build().expect("second registered snapshot");
     assert_eq!(
         second.capability_origin(target, "example.registered"),
-        Ok(Some(CapabilityOrigin::Registered { source: second_source })),
+        Ok(Some(CapabilityOrigin::Registered {
+            source: second_source.clone()
+        })),
     );
     assert_eq!(first.capability_origin(target, "missing"), Ok(None));
+    assert_eq!(
+        second.capability_source(target, "example.registered"),
+        Some(&second_source)
+    );
+    assert_eq!(
+        first.capability_source(target, "example.registered"),
+        Some(&first_source)
+    );
+    let empty = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+    assert_eq!(
+        empty.capability_source(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        None
+    );
 }
 
 #[test]
 fn test_add_only_collects_payloads_until_build() {
     let calls_before = PROVIDER_CALLS.load(Ordering::SeqCst);
+    let empty = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+    assert_eq!(empty.capability_source(&PROVIDER_DESCRIPTOR, "missing"), None);
+    assert_eq!(PROVIDER_CALLS.load(Ordering::SeqCst), calls_before);
+
     let mut builder = RegistrySnapshotBuilder::new();
     builder.add_type_capabilities(&PROVIDER_DESCRIPTOR, Vec::new(), source(10, "capability", 10));
     assert_eq!(PROVIDER_CALLS.load(Ordering::SeqCst), calls_before);
@@ -332,6 +362,19 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
         source(51, "definition-capability", 51),
     );
     let capability_only = capability_only.build().expect("definition capability snapshot");
+    assert_eq!(
+        capability_only.definition_capability_source(DEFINITION.id(), "example.snapshot.definition"),
+        Some(&source(51, "definition-capability", 51)),
+    );
+    assert_eq!(
+        capability_only.definition_capability_source(DEFINITION.id(), "missing"),
+        None
+    );
+    assert_eq!(
+        capability_only
+            .definition_capability_source(TypeDefinitionId::of::<ProviderTarget>(), "example.snapshot.definition"),
+        None
+    );
     assert!(capability_only.definitions().is_empty());
     assert_eq!(
         capability_only.definition_capability(DEFINITION.id(), capability_key),
