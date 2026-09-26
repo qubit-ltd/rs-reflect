@@ -100,10 +100,7 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
             reflect = root / "reflect-worktree"
             for directory in (platform, model, reflect):
                 directory.mkdir(parents=True)
-                manifest = "[package]\n"
-                if directory == model:
-                    manifest += 'qubit-validation-vocabulary = { path = "../rs-validator/rs-validation-vocabulary" }\n'
-                (directory / "Cargo.toml").write_text(manifest, encoding="utf-8")
+                (directory / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
             for dependency in measure.COMMON_DEPENDENCIES:
                 (source / dependency).mkdir(parents=True)
             output = root / "measurements"
@@ -121,8 +118,7 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
                 (source / "rs-id").resolve(),
             )
             rewritten_model_manifest = (model_copy / "Cargo.toml").read_text(encoding="utf-8")
-            self.assertIn('path = "../../rust-common/rs-validator/rs-validation-vocabulary"', rewritten_model_manifest)
-            self.assertNotIn('path = "../rs-validator/rs-validation-vocabulary"', rewritten_model_manifest)
+            self.assertEqual(rewritten_model_manifest, "[package]\n")
 
     def test_source_layout_refuses_to_overwrite_previous_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -193,16 +193,6 @@ def prepare_source_layout(
         if not source.is_dir():
             raise MeasurementError(f"missing workspace path dependency: {source}")
         (rust_common / dependency).symlink_to(source.resolve(strict=True), target_is_directory=True)
-    model_manifest = model_copy / "Cargo.toml"
-    manifest_text = model_manifest.read_text(encoding="utf-8")
-    validator_vocabulary_path = 'path = "../rs-validator/rs-validation-vocabulary"'
-    validator_vocabulary_path_in_layout = 'path = "../../rust-common/rs-validator/rs-validation-vocabulary"'
-    if manifest_text.count(validator_vocabulary_path) != 1:
-        raise MeasurementError(f"expected one validator vocabulary path in {model_manifest}")
-    model_manifest.write_text(
-        manifest_text.replace(validator_vocabulary_path, validator_vocabulary_path_in_layout),
-        encoding="utf-8",
-    )
     return reflect_copy, model_copy, platform_copy
 
 
