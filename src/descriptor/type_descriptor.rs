@@ -119,9 +119,21 @@ pub struct TypeDescriptor {
 impl TypeDescriptor {
     /// Returns the unique root descriptor supplied by `T`'s [`Reflect`]
     /// implementation.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the descriptor returned by `T` reports a different
+    /// [`TypeId`] than `T`. This indicates an invalid `Reflect` implementation.
     #[must_use]
     pub fn of<T: Reflect + ?Sized>() -> &'static Self {
-        T::type_descriptor()
+        let descriptor = T::type_descriptor();
+        assert_eq!(
+            descriptor.type_id(),
+            TypeId::of::<T>(),
+            "Reflect descriptor type mismatch for {}",
+            std::any::type_name::<T>(),
+        );
+        descriptor
     }
 
     /// Returns generated construction and owned-update entry points for a
