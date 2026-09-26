@@ -411,6 +411,7 @@ use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
 use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::TypeDescriptor;
+use std::any::TypeId;
 
 fn source(kind: &str, line: u32) -> FragmentIdentity {
     FragmentIdentity::new("example", "fixture", line, 1, kind, u64::from(line))
@@ -428,6 +429,11 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
         source("type", 10),
         source("capability", 11),
     );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u64>(),
+        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+        source("capability", 12),
+    );
     let snapshot = builder.build()?;
 
     assert!(snapshot.get(target.type_id()).is_some());
@@ -436,6 +442,11 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
             .capability(target, key)
             .expect("valid capability declarations"),
         Some(&7),
+    );
+    assert_eq!(snapshot.types().len(), 1);
+    assert_eq!(
+        snapshot.capability_only_type_targets("example.limit")[0].0,
+        TypeId::of::<u64>(),
     );
     assert!(target.methods_in(&snapshot).is_empty());
     Ok(())
@@ -449,6 +460,23 @@ a capability-only snapshot: `types()` remains empty, while `capability()` and
 `capability_by_id()` can still resolve the target. The other typed inputs are
 `add_definition`, `add_trait`, `add_impl_definition`, `add_impl`, and
 `add_definition_capabilities`.
+
+Only descriptors added with `add_type` or `add_type_with_capabilities` are
+snapshot type members. `ModelRegistry::from_reflect_registry` projects those
+members, so a capability-only target does not become a model implicitly. The
+example registers `u64` only for a capability and confirms it remains outside
+`types()`. Use
+`capability_only_type_targets(capability_id)` to list registered capability
+targets absent from `types()`. The query matches the stable capability ID even
+when the adapter type differs, and orders results by their source fragment.
+For an optional metadata registration audit, query
+`snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
+
+For generic declarations, `definition_capabilities(id)` returns `None` when
+the declaration is unknown, `Some(empty)` when it is registered without
+capabilities, and `Some(nonempty)` when effective capabilities exist. The
+convenience lookup methods keep their `Option` or `Result<Option<_>>` results
+and report a missing capability for an unknown declaration.
 
 Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
 `methods_named_in` when a property or method query must use that exact set of

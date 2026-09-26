@@ -123,6 +123,41 @@ Use `RegistrySnapshotBuilder` when a library or test needs an explicit set of
 registrations. The guide covers [isolated snapshots](doc/2026-08-29-qubit-reflect-user-guide.md#build-an-isolated-registry-snapshot),
 [capability conflicts](doc/2026-08-29-qubit-reflect-user-guide.md#migrating-effective-capability-queries),
 and [empty struct construction](doc/2026-08-29-qubit-reflect-user-guide.md#constructing-empty-structs).
+Snapshot type membership controls model projection; capability-only targets stay
+queryable and can be inspected with `capability_only_type_targets`.
+For example, inspect metadata registrations with
+`snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
+
+```rust
+use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::TypeDescriptor;
+
+fn main() -> Result<(), qubit_reflect::RegistryError> {
+let target = TypeDescriptor::of::<u32>();
+let key = CapabilityKey::<u32>::new(
+    CapabilityId::new("example.limit").expect("valid capability ID"),
+);
+let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
+let mut builder = RegistrySnapshotBuilder::new();
+builder.add_type_with_capabilities(
+    target,
+    vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+    source("type", 10),
+    source("capability", 11),
+);
+builder.add_type_capabilities(
+    TypeDescriptor::of::<u64>(),
+    vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+    source("capability", 12),
+);
+let snapshot = builder.build()?;
+assert_eq!(snapshot.types().len(), 1);
+assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
+Ok(())
+}
+```
 
 ## Learn More
 
