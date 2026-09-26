@@ -642,6 +642,43 @@ impl ReflectRegistry {
         targets
     }
 
+    /// Returns generic definition targets with this capability that are not
+    /// registered as reflected definitions. Capability identity alone is
+    /// matched, so this includes fact-only capabilities and adapter types that
+    /// do not match a caller's expected provider type.
+    ///
+    /// Results are ordered by the capability's source fragment. This audits
+    /// the frozen registry facts only: it does not execute providers or add
+    /// definitions to the registry.
+    #[must_use]
+    pub fn capability_only_definition_targets(
+        &self,
+        capability_id: &str,
+    ) -> Vec<(crate::TypeDefinitionId, &FragmentIdentity)> {
+        let mut targets = self
+            .indexes
+            .capabilities_by_definition
+            .iter()
+            .filter_map(|(id, capabilities)| {
+                if self.indexes.definitions_by_id.contains_key(id) {
+                    return None;
+                }
+                let capability = capabilities.descriptor(capability_id)?;
+                let source = self
+                    .indexes
+                    .capability_fragments
+                    .get(&(
+                        crate::registry::fragment::CapabilityTarget::TypeDefinition(*id),
+                        *capability.id(),
+                    ))
+                    .expect("every effective definition capability has a retained source fragment");
+                Some((*id, source))
+            })
+            .collect::<Vec<_>>();
+        targets.sort_by(|left, right| left.1.cmp(right.1));
+        targets
+    }
+
     /// Returns every reflected implementation targeting `type_id`.
     ///
     /// The slice is empty when no linked implementation fragment targets the
