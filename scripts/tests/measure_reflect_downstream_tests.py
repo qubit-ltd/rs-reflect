@@ -19,7 +19,7 @@ SPEC.loader.exec_module(measure)
 
 
 def output(model_count: int = 133, ns: int = 100) -> str:
-    lines = [f"platform/models={model_count}"]
+    lines = ["platform/benchmark_version=2", f"platform/models={model_count}"]
     for index, name in enumerate(measure.METRICS, start=1):
         lines.append(
             f"{name}: iterations={index}, ns/op={ns * index}, "
@@ -37,6 +37,9 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
 
         for invalid in (
             output().replace("platform/models=133\n", ""),
+            output().replace("platform/benchmark_version=2\n", ""),
+            output().replace("benchmark_version=2", "benchmark_version=1"),
+            output() + "\nplatform/benchmark_version=2",
             output() + "\nplatform/models=133",
             output().replace("allocated_bytes/op=100", "allocated_bytes/op=broken"),
             output().replace(measure.METRICS[-1], "platform/missing_metric"),
@@ -97,7 +100,10 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
             reflect = root / "reflect-worktree"
             for directory in (platform, model, reflect):
                 directory.mkdir(parents=True)
-                (directory / "Cargo.toml").write_text("[package]\n", encoding="utf-8")
+                manifest = "[package]\n"
+                if directory == model:
+                    manifest += 'qubit-validation-vocabulary = { path = "../rs-validator/rs-validation-vocabulary" }\n'
+                (directory / "Cargo.toml").write_text(manifest, encoding="utf-8")
             for dependency in measure.COMMON_DEPENDENCIES:
                 (source / dependency).mkdir(parents=True)
             output = root / "measurements"
@@ -114,6 +120,9 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
                 (output / "source-layout" / "rust-common" / "rs-id").resolve(),
                 (source / "rs-id").resolve(),
             )
+            rewritten_model_manifest = (model_copy / "Cargo.toml").read_text(encoding="utf-8")
+            self.assertIn('path = "../../rust-common/rs-validator/rs-validation-vocabulary"', rewritten_model_manifest)
+            self.assertNotIn('path = "../rs-validator/rs-validation-vocabulary"', rewritten_model_manifest)
 
     def test_source_layout_refuses_to_overwrite_previous_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

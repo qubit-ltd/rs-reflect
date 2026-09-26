@@ -18,8 +18,10 @@ import sys
 from typing import Any, Sequence
 
 
+BENCHMARK_VERSION = 2
 METRICS = (
-    "platform/cold_link_and_projection",
+    "platform/cold_reflection_init",
+    "platform/cold_model_projection",
     "platform/type_metadata_try_of_representatives",
     "platform/warm_model_projection",
     "platform/relationship_validation",
@@ -30,6 +32,7 @@ METRIC_PATTERN = re.compile(
     r"allocated_bytes/op=(?P<bytes>[0-9]+)$"
 )
 MODEL_PATTERN = re.compile(r"^platform/models=(?P<count>[0-9]+)$")
+VERSION_PATTERN = re.compile(r"^platform/benchmark_version=(?P<version>[0-9]+)$")
 COPY_EXCLUDED = frozenset({".git", ".worktrees", "target"})
 COMMON_DEPENDENCIES = (
     "rs-datatype",
@@ -47,11 +50,16 @@ class MeasurementError(RuntimeError):
 def parse_benchmark_output(output: str) -> tuple[int, dict[str, dict[str, int]]]:
     """Parse every required model-registry metric from one process output."""
     model_counts: list[int] = []
+    benchmark_versions: list[int] = []
     metrics: dict[str, dict[str, int]] = {}
     for line in output.splitlines():
         model_match = MODEL_PATTERN.fullmatch(line.strip())
         if model_match:
             model_counts.append(int(model_match.group("count")))
+            continue
+        version_match = VERSION_PATTERN.fullmatch(line.strip())
+        if version_match:
+            benchmark_versions.append(int(version_match.group("version")))
             continue
         metric_match = METRIC_PATTERN.fullmatch(line.strip())
         if metric_match:
@@ -67,6 +75,10 @@ def parse_benchmark_output(output: str) -> tuple[int, dict[str, dict[str, int]]]
 
     if len(model_counts) != 1:
         raise MeasurementError(f"expected one platform model count; found {len(model_counts)}")
+    if benchmark_versions != [BENCHMARK_VERSION]:
+        raise MeasurementError(
+            f"expected exactly one benchmark version {BENCHMARK_VERSION}; found {benchmark_versions}"
+        )
     missing = [name for name in METRICS if name not in metrics]
     if missing:
         raise MeasurementError(f"missing benchmark metrics: {', '.join(missing)}")
@@ -181,6 +193,16 @@ def prepare_source_layout(
         if not source.is_dir():
             raise MeasurementError(f"missing workspace path dependency: {source}")
         (rust_common / dependency).symlink_to(source.resolve(strict=True), target_is_directory=True)
+    model_manifest = model_copy / "Cargo.toml"
+    manifest_text = model_manifest.read_text(encoding="utf-8")
+    validator_vocabulary_path = 'path = "../rs-validator/rs-validation-vocabulary"'
+    validator_vocabulary_path_in_layout = 'path = "../../rust-common/rs-validator/rs-validation-vocabulary"'
+    if manifest_text.count(validator_vocabulary_path) != 1:
+        raise MeasurementError(f"expected one validator vocabulary path in {model_manifest}")
+    model_manifest.write_text(
+        manifest_text.replace(validator_vocabulary_path, validator_vocabulary_path_in_layout),
+        encoding="utf-8",
+    )
     return reflect_copy, model_copy, platform_copy
 
 
