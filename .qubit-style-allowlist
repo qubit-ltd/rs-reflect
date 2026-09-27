@@ -1,0 +1,2 @@
+multiple-public-types | src/invoke/pinned.rs | Pinned invocation validation and recovery types share one lifetime-sensitive call protocol.
+multiple-public-types | src/private/descriptor.rs | Generated-code probes and descriptor factories form one hidden macro protocol.
