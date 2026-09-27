@@ -59,6 +59,23 @@ struct ReflectedRoot;
 #[reflect(capabilities(Clone, Default))]
 struct DerivedCapabilities;
 
+mod custom {
+    use qubit_reflect::capability::CapabilityDescriptor;
+    use qubit_reflect::capability::CapabilityKey;
+    use qubit_reflect::identity::CapabilityId;
+
+    #[allow(non_snake_case)]
+    pub fn Clone<T: 'static>() -> CapabilityDescriptor {
+        let _ = std::any::TypeId::of::<T>();
+        let id = CapabilityId::new("example.capability.qualified_clone").expect("test capability ID");
+        CapabilityDescriptor::without_adapter(CapabilityKey::<()>::new(id))
+    }
+}
+
+#[derive(DeriveReflect)]
+#[reflect(capabilities(custom::Clone))]
+struct QualifiedClone;
+
 #[derive(DeriveReflect)]
 struct DerivedExtensionRegistration;
 
@@ -299,6 +316,27 @@ fn test_derive_capabilities_attach_to_the_generated_descriptor() {
             .capability(descriptor, default_key())
             .expect("valid capability declarations")
             .is_some()
+    );
+}
+
+/// Confirms a qualified custom provider ending in `Clone` is not treated as
+/// the built-in clone operation.
+#[test]
+fn test_qualified_capability_provider_is_not_rewritten_as_builtin() {
+    let descriptor = QualifiedClone::type_descriptor();
+    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+
+    assert!(
+        registry
+            .capability_by_id(descriptor, "example.capability.qualified_clone")
+            .expect("valid custom capability")
+            .is_some()
+    );
+    assert!(
+        registry
+            .capability(descriptor, clone_key())
+            .expect("valid capability lookup")
+            .is_none()
     );
 }
 
