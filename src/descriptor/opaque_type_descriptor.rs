@@ -25,6 +25,8 @@ use super::type_ref::type_name_of;
 ///
 /// ```
 /// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// use qubit_reflect::descriptor::TypeRef;
@@ -43,6 +45,9 @@ use super::type_ref::type_name_of;
 ///     panic!("the field is explicitly opaque");
 /// };
 /// assert_eq!(opaque.type_name(), std::any::type_name::<u8>());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 pub struct OpaqueTypeDescriptor {
     type_id: fn() -> TypeId,

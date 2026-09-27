@@ -16,6 +16,15 @@ use crate::identity::MemberId;
 use crate::invoke::InvocationInputMode;
 
 /// The machine-readable reason pre-execution invocation validation failed.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::InvocationErrorKind;
+///
+/// let kind = InvocationErrorKind::ArgumentCountMismatch { expected: 2, actual: 1 };
+/// assert!(kind.to_string().contains("expected 2, got 1"));
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum InvocationErrorKind {
     /// Intrinsic explicit receiver capabilities contain conflicting facts.
@@ -204,6 +213,22 @@ impl std::error::Error for InvocationError {
 /// Ordinary invocation does not construct this type and propagates panic
 /// unchanged. The structured member identity remains available independently
 /// of the panic payload's unstable diagnostic text.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
+/// use qubit_reflect::invoke::InvocationPanic;
+///
+/// let identity = MemberId::new(
+///     "example::Worker",
+///     "run",
+///     0,
+///     FragmentIdentity::new("example", "example::Worker", 1, 1, "method", 1),
+/// );
+/// let panic = InvocationPanic::new(identity, Box::new(String::from("failed")));
+/// assert_eq!(panic.payload().downcast_ref::<String>().map(String::as_str), Some("failed"));
+/// ```
 #[must_use]
 pub struct InvocationPanic {
     method_identity: Box<MemberId>,

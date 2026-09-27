@@ -107,6 +107,9 @@ impl fmt::Display for ConstructionUnavailableReason {
 /// # Examples
 ///
 /// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+/// # #![allow(proc_macro_derive_resolution_fallback)]
 /// use qubit_reflect::construct::ConstructionError;
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::value::DynamicOwned;
@@ -114,12 +117,16 @@ impl fmt::Display for ConstructionUnavailableReason {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct User {
+///         name: String,
+///     }
 /// }
 ///
-/// let constructor = TypeDescriptor::of::<User>()
+/// let constructor = TypeDescriptor::of::<example::User>()
 ///     .struct_construction()
 ///     .expect("derived construction")
 ///     .local_constructor();
@@ -131,7 +138,10 @@ impl fmt::Display for ConstructionUnavailableReason {
 /// let ConstructionError::MissingField { field } = recovery.error() else {
 ///     panic!("expected missing-field error");
 /// };
-/// assert_eq!(field.to_string(), "User::name");
+/// assert!(field.to_string().ends_with("User::name"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ConstructionFieldId {

@@ -16,6 +16,15 @@ use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
 
 /// The invocation input from which a returned borrow may originate.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::BorrowOrigin;
+///
+/// let origin = BorrowOrigin::Parameter(1);
+/// assert_eq!(origin, BorrowOrigin::Parameter(1));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum BorrowOrigin {
     /// The output may borrow from the method receiver.
@@ -25,6 +34,19 @@ pub enum BorrowOrigin {
 }
 
 /// The result produced after a reflected method begins execution.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::InvocationOutput;
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let output = InvocationOutput::<Local>::Owned(DynamicOwned::<Local>::new(42_u32));
+/// let InvocationOutput::Owned(value) = output else {
+///     panic!("the example returns an owned value")
+/// };
+/// assert_eq!(value.downcast_ref::<u32>(), Some(&42));
+/// ```
 pub enum InvocationOutput<'call, M: InvocationMode + 'call> {
     /// The method returned `()`.
     Unit,

@@ -109,6 +109,9 @@ impl TextTypeDescriptor {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
@@ -116,6 +119,9 @@ impl TextTypeDescriptor {
 /// struct Record { value: u8 }
 /// let record = TypeDescriptor::of::<Record>().as_struct().expect("struct type");
 /// assert_eq!(record.kind(), qubit_reflect::descriptor::StructKind::Named);
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct StructTypeDescriptor {
@@ -203,6 +209,9 @@ pub enum EnumRepr {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
@@ -210,6 +219,9 @@ pub enum EnumRepr {
 /// enum State { Ready }
 /// let state = TypeDescriptor::of::<State>().as_enum().expect("enum type");
 /// assert!(state.representations().is_empty());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct EnumTypeDescriptor {
@@ -1227,6 +1239,8 @@ impl std::fmt::Debug for TraitObjectTypeDescriptor {
 ///
 /// ```
 /// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
@@ -1234,6 +1248,9 @@ impl std::fmt::Debug for TraitObjectTypeDescriptor {
 /// struct Hidden;
 /// let opaque = TypeDescriptor::of::<Hidden>().as_opaque().expect("opaque root");
 /// assert_eq!(std::mem::size_of_val(opaque), 0);
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OpaqueTypeView;

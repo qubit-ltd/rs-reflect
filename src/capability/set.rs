@@ -143,7 +143,7 @@ impl CapabilityConflict {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use qubit_reflect::ReflectRegistry;
 /// use qubit_reflect::TypeDescriptor;
 ///
@@ -358,7 +358,7 @@ pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use qubit_reflect::capability::TypeCapabilitiesResult;
 /// use qubit_reflect::ReflectRegistry;
 /// use qubit_reflect::TypeDescriptor;

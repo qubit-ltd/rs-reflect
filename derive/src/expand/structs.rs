@@ -36,6 +36,11 @@ use crate::ir::VisibilityIr;
 ///
 /// Returns generated items or a diagnostic if retained generic syntax is
 /// malformed.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the declaration is not a struct or retained
+/// generic syntax cannot be parsed.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return Err(syn::Error::new(
@@ -370,6 +375,15 @@ pub(crate) fn capabilities(
 }
 
 /// Returns the built-in capability name for a bare, unqualified path.
+///
+/// # Parameters
+///
+/// - `path`: Normalized path from a capability attribute.
+///
+/// # Returns
+///
+/// Returns the built-in name for a supported bare path, or `None` for custom
+/// and qualified provider paths.
 fn builtin_capability_name(path: &crate::ir::PathIr) -> Option<&'static str> {
     if path.leading_colon || path.qualified_self.is_some() || path.segments.len() != 1 {
         return None;

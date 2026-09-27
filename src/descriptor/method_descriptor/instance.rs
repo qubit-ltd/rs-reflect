@@ -36,6 +36,41 @@ pub enum MethodImplementationSource {
 /// mode without an entry returns `None`; pre-execution errors return
 /// `Some(Err(...))` with caller-ordered recovery. Outputs, futures, and
 /// recovery retain input lifetimes without borrowing the selected registry.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// use qubit_reflect::descriptor::MethodLookup;
+/// use qubit_reflect::registry::ReflectRegistry;
+/// mod example {
+///     use qubit_reflect::{Reflect, reflect_impl};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Service {
+///         fn ping(&self) {}
+///     }
+/// }
+/// # #[cfg(feature = "derive")]
+/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+/// let registry = ReflectRegistry::initialize()?;
+/// let MethodLookup::Unique(method) =
+///     TypeDescriptor::of::<example::Service>().methods_named_in(registry, "ping")
+/// else {
+///     panic!("one reflected method")
+/// };
+/// assert!(method.adapter().is_some());
+/// # Ok(())
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// }
+/// ```
 #[derive(Clone, Debug)]
 pub struct MethodInstanceDescriptor {
     declaration: &'static MethodDescriptor,

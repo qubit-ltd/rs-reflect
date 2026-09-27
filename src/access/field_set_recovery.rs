@@ -22,6 +22,37 @@ use crate::value::Mode;
 /// # Type Parameters
 ///
 /// - `M`: Local or thread-safe ownership mode of the retained replacement.
+///
+/// # Examples
+///
+/// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+///     use qubit_reflect::ReflectedMut;
+///     use qubit_reflect::ReflectedOwned;
+///     use qubit_reflect::TypeDescriptor;
+///     use qubit_reflect::access::FieldSetRecovery;
+///     use qubit_reflect::value::Local;
+///     mod example {
+///         use qubit_reflect::Reflect;
+///         #[derive(Reflect)]
+///         #[reflect(crate = qubit_reflect)]
+///         pub struct Record {
+///             #[reflect(read_only)]
+///             pub value: u32,
+///         }
+///     }
+///     let field = TypeDescriptor::of::<example::Record>().field("value").expect("field exists");
+///     let mut record = example::Record { value: 7 };
+///     let failure = field
+///         .set(ReflectedMut::new(&mut record), ReflectedOwned::new(9_u32))
+///         .expect_err("the field is read-only");
+///     let recovery: &FieldSetRecovery<Local> = failure.recovery().expect("input is retained");
+///     assert_eq!(recovery.value().downcast_ref::<u32>(), Some(&9));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
+/// ```
 #[must_use]
 pub struct FieldSetRecovery<M: Mode = Local> {
     field: FieldIdentity,
@@ -201,6 +232,36 @@ impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
 /// # Type Parameters
 ///
 /// - `M`: Local or thread-safe ownership mode of any retained replacement.
+///
+/// # Examples
+///
+/// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+///     use qubit_reflect::ReflectedMut;
+///     use qubit_reflect::ReflectedOwned;
+///     use qubit_reflect::TypeDescriptor;
+///     use qubit_reflect::access::FieldSetFailure;
+///     mod example {
+///         use qubit_reflect::Reflect;
+///         #[derive(Reflect)]
+///         #[reflect(crate = qubit_reflect)]
+///         pub struct Record {
+///             #[reflect(read_only)]
+///             pub value: u32,
+///         }
+///     }
+///     let field = TypeDescriptor::of::<example::Record>().field("value").expect("field exists");
+///     let mut record = example::Record { value: 7 };
+///     let failure: FieldSetFailure = field
+///         .set(ReflectedMut::new(&mut record), ReflectedOwned::new(9_u32))
+///         .expect_err("the field is read-only");
+///     assert!(failure.error().to_string().contains("read-only"));
+///     assert!(failure.recovery().is_some());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
+/// ```
 #[must_use]
 pub struct FieldSetFailure<M: Mode = Local> {
     error: Box<FieldAccessError>,
@@ -254,7 +315,6 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Returns
     ///
     /// The structured reason the field-set operation failed.
-    #[must_use]
     #[inline]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error
@@ -280,7 +340,6 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Returns
     ///
     /// The structured error and any value retained before adapter execution.
-    #[must_use]
     pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery<M>>) {
         (*self.error, self.recovery.map(|recovery| *recovery))
     }

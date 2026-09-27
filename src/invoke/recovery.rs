@@ -18,6 +18,26 @@ use crate::invoke::InvocationMode;
 use crate::invoke::InvocationReceiver;
 
 /// Complete invocation input retained after pre-execution validation fails.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
+/// use qubit_reflect::invoke::{Invocation, InvocationArg, ReceiverExpectation};
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let identity = MemberId::new(
+///     "example::Worker",
+///     "run",
+///     0,
+///     FragmentIdentity::new("example", "example::Worker", 1, 1, "method", 1),
+/// );
+/// let failure = Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(5_u8))])
+///     .validate(&identity, ReceiverExpectation::owned::<()>(), &[])
+///     .expect_err("an owned receiver is required");
+/// let recovery = failure.into_recovery();
+/// assert_eq!(recovery.arguments().len(), 1);
+/// ```
 pub struct InvocationRecovery<'call, M: InvocationMode> {
     receiver: Option<InvocationReceiver<'call, M>>,
     arguments: Box<[InvocationArg<'call, M>]>,
@@ -94,6 +114,25 @@ impl<M: InvocationMode> fmt::Debug for InvocationRecovery<'_, M> {
 }
 
 /// A validation error paired with the complete recoverable invocation input.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
+/// use qubit_reflect::invoke::{Invocation, ReceiverExpectation};
+/// use qubit_reflect::value::Local;
+///
+/// let identity = MemberId::new(
+///     "example::Worker",
+///     "run",
+///     0,
+///     FragmentIdentity::new("example", "example::Worker", 1, 1, "method", 1),
+/// );
+/// let failure = Invocation::<Local>::associated([])
+///     .validate(&identity, ReceiverExpectation::owned::<()>(), &[])
+///     .expect_err("an owned receiver is required");
+/// assert!(failure.recovery().receiver().is_none());
+/// ```
 #[must_use]
 pub struct InvocationFailure<'call, M: InvocationMode> {
     /// Structured reason the invocation could not enter user code.

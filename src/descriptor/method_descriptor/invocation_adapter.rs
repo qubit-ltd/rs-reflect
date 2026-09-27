@@ -118,7 +118,7 @@ impl InvocationAdapter {
     /// point.
     ///
     /// The entry point's type preserves both the call lifetime and the runtime
-    /// `Send` boundary required by [`ThreadSafe`](crate::value::ThreadSafe).
+    /// `Send` boundary required by [`ThreadSafe`].
     #[doc(hidden)]
     pub const fn thread_safe(entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>) -> Self {
         Self {

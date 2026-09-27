@@ -184,20 +184,48 @@ macro_rules! register_type_capabilities {
 /// # Examples
 ///
 /// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+/// use std::sync::OnceLock;
 /// use qubit_reflect::capability::{CapabilityKey, TypeCapabilities};
+/// use qubit_reflect::descriptor::{TypeDefinitionDescriptor, TypeDefinitionId};
+/// use qubit_reflect::expression::{DiagnosticText, ExpressionName, GenericDefinitionDescriptor, GenericParameterDescriptor};
 /// use qubit_reflect::identity::CapabilityId;
 /// use qubit_reflect::register_definition_capabilities;
 ///
 /// struct ExampleAdapter;
+/// struct ExampleDefinition;
+/// fn example_type_definition() -> &'static TypeDefinitionDescriptor {
+///     static GENERICS: OnceLock<GenericDefinitionDescriptor> = OnceLock::new();
+///     static DEFINITION: OnceLock<TypeDefinitionDescriptor> = OnceLock::new();
+///     DEFINITION.get_or_init(|| {
+///         let parameter = GenericParameterDescriptor::Type {
+///             name: ExpressionName::new("T").expect("valid generic parameter"),
+///             bounds: Box::default(),
+///             default: None,
+///             diagnostic: DiagnosticText::default(),
+///         };
+///         let generics = GENERICS.get_or_init(|| GenericDefinitionDescriptor::new([parameter], []));
+///         TypeDefinitionDescriptor::opaque(
+///             TypeDefinitionId::of::<ExampleDefinition>(),
+///             "example::Generic<T>",
+///             "Generic",
+///             generics,
+///         )
+///     })
+/// }
 ///
 /// register_definition_capabilities! {
-///     definition = qubit_reflect::descriptor::TypeDefinitionDescriptor::of::<Vec<u8>>,
+///     definition = example_type_definition,
 ///     capabilities = [
 ///         CapabilityKey::<ExampleAdapter>::new(CapabilityId::new("example.generic").expect("valid ID")) => ExampleAdapter,
 ///     ],
 /// }
 ///
 /// let _ = TypeCapabilities::default();
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[macro_export]
 macro_rules! register_definition_capabilities {
@@ -248,13 +276,20 @@ macro_rules! register_definition_capabilities {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::register_reflected_type;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct Example;
 ///
 /// register_reflected_type!(Example);
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[macro_export]
 macro_rules! register_reflected_type {

@@ -41,6 +41,11 @@ use crate::ir::VariantKindIr;
 ///
 /// Returns generated enum reflection, access, construction, and registration
 /// items, or a diagnostic if retained generic syntax is malformed.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the declaration is not an enum or retained
+/// generic syntax cannot be parsed.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return Err(syn::Error::new(

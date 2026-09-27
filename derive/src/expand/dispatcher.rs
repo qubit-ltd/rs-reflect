@@ -31,7 +31,6 @@ use crate::ir::TypeDeclarationKindIr;
 ///
 /// Returns a runtime facade, malformed declaration, or unsupported declaration
 /// diagnostic when expansion cannot proceed.
-#[must_use]
 pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
     let attributes = match &declaration {
         DeclarationIr::Type(value) => &value.attributes,
@@ -72,16 +71,32 @@ mod tests {
     use crate::ir::TypeDeclarationKindIr;
     use crate::parse::parse_and_validate_declaration;
 
+    /// Parses and validates one type fixture through the derive pipeline.
+    ///
+    /// # Parameters
+    ///
+    /// - `item`: Type item tokens to pass through parsing and validation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated type declaration used by dispatch tests.
     fn parse_type(item: TokenStream) -> TypeDeclarationIr {
         let input = quote!(#[reflect(crate = qubit_reflect)] #item);
         let parsed = parse_and_validate_declaration(MacroKind::Derive, TokenStream::new(), input)
             .expect("the test declaration should parse and validate");
         let DeclarationIr::Type(declaration) = parsed.declaration else {
-            panic!("expected type declaration");
+            panic!("the derive parser must produce a type declaration");
         };
         declaration
     }
 
+    /// Confirms malformed type IR becomes an actionable compile error.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaration`: Deliberately malformed type declaration.
+    /// - `expected`: Expected diagnostic prefix.
+    /// - `detail`: Expected diagnostic detail.
     fn assert_diagnostic(declaration: TypeDeclarationIr, expected: &str, detail: &str) {
         let error = dispatch(DeclarationIr::Type(declaration)).expect_err("malformed IR must be diagnosed");
         assert!(error.to_string().contains(expected), "{error}");
@@ -90,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_struct_generics_report_compile_diagnostic() {
+    fn test_malformed_struct_generics_report_compile_diagnostic() {
         let mut declaration = parse_type(quote!(
             struct Broken<T> {
                 value: T,
@@ -102,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_enum_generics_report_compile_diagnostic() {
+    fn test_malformed_enum_generics_report_compile_diagnostic() {
         let mut declaration = parse_type(quote!(
             enum Broken<T> {
                 Value(T),
@@ -114,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_struct_where_clause_reports_compile_diagnostic() {
+    fn test_malformed_struct_where_clause_reports_compile_diagnostic() {
         let mut declaration = parse_type(quote!(
             struct Broken<T>
             where
@@ -129,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_enum_where_clause_reports_compile_diagnostic() {
+    fn test_malformed_enum_where_clause_reports_compile_diagnostic() {
         let mut declaration = parse_type(quote!(
             enum Broken<T>
             where
@@ -144,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn union_dispatch_reports_compile_diagnostic() {
+    fn test_union_dispatch_reports_compile_diagnostic() {
         let mut declaration = parse_type(quote!(
             struct Broken;
         ));

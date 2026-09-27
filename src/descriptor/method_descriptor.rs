@@ -41,24 +41,23 @@ use crate::identity::MemberId;
 ///
 /// ```
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// use qubit_reflect::{Reflect, TypeDescriptor};
 /// #[cfg(feature = "derive")]
-/// use qubit_reflect::reflect_impl;
-///
-/// #[cfg(feature = "derive")]
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct Service;
-///
-/// #[cfg(feature = "derive")]
-/// #[reflect_impl(crate = qubit_reflect)]
-/// impl Service {
-///     fn ping(&self) {}
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// mod example {
+///     use qubit_reflect::{Reflect, reflect_impl};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Service {
+///         fn ping(&self) {}
+///     }
 /// }
 ///
 /// # #[cfg(feature = "derive")]
 /// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-/// let method = TypeDescriptor::of::<Service>()
+/// let method = TypeDescriptor::of::<example::Service>()
 ///     .impls()?
 ///     .first()
 ///     .and_then(|implementation| implementation.method("ping"))
@@ -68,6 +67,7 @@ use crate::identity::MemberId;
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
+/// }
 /// ```
 #[derive(Clone, Debug)]
 pub struct MethodDescriptor {
