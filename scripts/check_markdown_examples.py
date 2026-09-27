@@ -118,7 +118,13 @@ def check_examples(root, documents, timeout=10, dependency_name="qubit-reflect")
             members.append(name)
             package = workspace / name
             (package / "src").mkdir(parents=True)
-            manifest = f'[package]\nname={json.dumps(name)}\nversion="0.0.0"\nedition="2024"\npublish=false\n[dependencies]\n{json.dumps(dependency_name)}={{path={json.dumps(str(root))}}}\n'
+            dependencies = f'{json.dumps(dependency_name)}={{path={json.dumps(str(root))}}}\n'
+            if block.document.resolve().parent == (root / "derive").resolve():
+                dependencies += f'"qubit-reflect-derive"={{path={json.dumps(str(root / "derive"))}}}\n'
+            manifest = (
+                f'[package]\nname={json.dumps(name)}\nversion="0.0.0"\nedition="2024"\npublish=false\n'
+                f'[dependencies]\n{dependencies}'
+            )
             (package / "Cargo.toml").write_text(manifest, encoding="utf-8")
             (package / "src" / ("main.rs" if block.mode == "run" else "lib.rs")).write_text(block.source, encoding="utf-8")
         (workspace / "Cargo.toml").write_text(f'[workspace]\nresolver="3"\nmembers={json.dumps(members)}\n', encoding="utf-8")
@@ -177,8 +183,14 @@ def main():
     parser.add_argument("documents", nargs="*", type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    documents = args.documents or [root / name for name in ["README.md", "README.zh_CN.md",
-        "doc/2026-08-29-qubit-reflect-user-guide.md", "doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md"]]
+    documents = args.documents or [root / name for name in [
+        "README.md",
+        "README.zh_CN.md",
+        "derive/README.md",
+        "derive/README.zh_CN.md",
+        "doc/2026-08-29-qubit-reflect-user-guide.md",
+        "doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md",
+    ]]
     try:
         count = check_examples(root, documents)
     except ExampleError as error:

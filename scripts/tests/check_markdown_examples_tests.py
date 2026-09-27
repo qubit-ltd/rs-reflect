@@ -63,6 +63,11 @@ fn main() {
             document.write_text(source + "\n" + source)
             self.assertEqual(MODULE.check_examples(root, [document]), 2)
 
+    def test_derive_readmes_compile_with_direct_macro_dependency(self):
+        root = SCRIPT.parents[1]
+        documents = [root / "derive/README.md", root / "derive/README.zh_CN.md"]
+        self.assertEqual(MODULE.check_examples(root, documents), 2)
+
 
 class CargoTests(unittest.TestCase):
     """Real Cargo executions: compiler success alone is insufficient."""
