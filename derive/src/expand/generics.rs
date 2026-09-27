@@ -28,6 +28,32 @@ use crate::ir::TypeDeclarationKindIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
+/// Re-parses the generic syntax retained in the type IR and reports malformed
+/// internal syntax at the declaration name instead of dropping the derive.
+pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Result<syn::Generics> {
+    let kind = match declaration.kind {
+        TypeDeclarationKindIr::Struct => "struct",
+        TypeDeclarationKindIr::Enum => "enum",
+        TypeDeclarationKindIr::Union => "union",
+    };
+    let error = |detail: &str, error: syn::Error| {
+        syn::Error::new(
+            declaration.span,
+            format!(
+                "cannot expand Reflect for {kind} `{}`: invalid {detail}: {error}",
+                declaration.name
+            ),
+        )
+    };
+    let mut generics: syn::Generics =
+        syn::parse2(declaration.generics.declaration.clone()).map_err(|cause| error("generics", cause))?;
+    if !declaration.generics.where_clause.is_empty() {
+        generics.where_clause =
+            Some(syn::parse2(declaration.generics.where_clause.clone()).map_err(|cause| error("where clause", cause))?);
+    }
+    Ok(generics)
+}
+
 /// Emits the concrete generic view for the current monomorphized root.
 ///
 /// # Parameters
