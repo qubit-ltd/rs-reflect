@@ -12,6 +12,20 @@ use crate::capability::CapabilityConflict;
 use crate::identity::CapabilityId;
 
 /// An error returned when a typed capability exists but cannot be executed.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::capability::CapabilityAccessError;
+/// use qubit_reflect::identity::CapabilityId;
+///
+/// let error = CapabilityAccessError::FactOnly {
+///     id: CapabilityId::new("example.fact").expect("valid ID"),
+///     adapter_type: TypeId::of::<u32>(),
+/// };
+/// assert!(error.to_string().contains("no adapter"));
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum CapabilityAccessError {

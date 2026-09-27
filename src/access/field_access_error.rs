@@ -15,6 +15,20 @@ use crate::access::FieldIdentity;
 use crate::error::TypeMismatch;
 
 /// A checked field access failed before producing or changing a field value.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+///
+/// use qubit_reflect::access::FieldAccessError;
+/// use qubit_reflect::access::FieldIdentity;
+///
+/// let error = FieldAccessError::InactiveVariant {
+///     field: FieldIdentity::new(TypeId::of::<u32>(), "u32", 0, Some("value")),
+/// };
+/// assert!(error.to_string().contains("u32::value"));
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum FieldAccessError {
@@ -71,12 +85,24 @@ impl FieldAccessError {
     ///
     /// The adapter calls this only after the descriptor has validated the root
     /// enum type. The returned error does not modify the target.
+    ///
+    /// # Parameters
+    ///
+    /// - `field`: Identity of the field belonging to the inactive variant.
+    ///
+    /// # Returns
+    ///
+    /// An error identifying the inactive variant field.
     #[doc(hidden)]
     pub const fn inactive_variant(field: FieldIdentity) -> Self {
         Self::InactiveVariant { field }
     }
 
     /// Returns the field identity shared by every error classification.
+    ///
+    /// # Returns
+    ///
+    /// The field identity retained by this error.
     #[must_use]
     #[inline]
     pub const fn field(&self) -> &FieldIdentity {

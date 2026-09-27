@@ -256,21 +256,25 @@ impl MethodQualifiers {
     pub const fn is_async(&self) -> bool {
         self.is_async
     }
+
     /// Returns whether the declaration is unsafe.
     #[must_use]
     pub const fn is_unsafe(&self) -> bool {
         self.is_unsafe
     }
+
     /// Returns whether the declaration is const.
     #[must_use]
     pub const fn is_const(&self) -> bool {
         self.is_const
     }
+
     /// Returns the explicitly declared ABI.
     #[must_use]
     pub const fn abi(&self) -> Option<&FunctionAbi> {
         self.abi.as_ref()
     }
+
     /// Returns whether the declaration has a variadic tail.
     #[must_use]
     pub const fn is_variadic(&self) -> bool {

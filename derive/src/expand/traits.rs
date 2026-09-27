@@ -54,6 +54,15 @@ use crate::ir::TraitDeclarationIr;
 use crate::ir::WherePredicateIr;
 
 /// Emits the normalized visibility carried by one reflected trait.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait declaration containing source visibility.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns the corresponding runtime visibility expression.
 fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
     match &declaration.visibility {
         crate::ir::VisibilityIr::Public => {
@@ -76,6 +85,15 @@ fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> T
 }
 
 /// Emits direct reflected and external supertrait applications.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait and its supertrait metadata.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns expressions for each supported direct supertrait.
 fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     declaration
         .supertraits
@@ -112,6 +130,15 @@ fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) ->
 }
 
 /// Emits concrete arguments applied to the reflected trait payload.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait generic parameter metadata.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns supported concrete type and const generic argument expressions.
 fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     declaration
         .generics
@@ -167,6 +194,14 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
 }
 
 /// Emits the `'static` bounds required by generated trait payload hooks.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait generic parameter metadata.
+///
+/// # Returns
+///
+/// Returns bounds for every type parameter.
 fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
     declaration
         .generics
@@ -181,6 +216,19 @@ fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
 }
 
 /// Analyzes and emits all default-method adapter protocol entries.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait declaration and methods.
+/// - `suffix`: Stable generated-name suffix for this trait.
+/// - `trait_name`: Diagnostic trait name for invocation identities.
+/// - `hook_type_bounds`: Bounds required by generated payload hooks.
+/// - `facade`: Runtime facade path used by generated references.
+/// - `context`: Expansion configuration and runtime facade resolver.
+///
+/// # Returns
+///
+/// Returns generated adapter items and corresponding descriptor entries.
 fn default_method_expansion(
     declaration: &TraitDeclarationIr,
     suffix: &str,
@@ -244,6 +292,15 @@ fn default_method_expansion(
 }
 
 /// Emits optional concrete resolvers for nongeneric associated types.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait associated type metadata.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns resolver expressions, using `None` for generic associated types.
 fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     let codegen = quote!(#facade::__private::codegen_v3);
     declaration
@@ -266,6 +323,16 @@ fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &T
 
 /// Expands a validated reflected trait without changing its ordinary Rust
 /// semantics.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait declaration and retained source tokens.
+/// - `context`: Expansion configuration and runtime facade resolver.
+///
+/// # Returns
+///
+/// Returns the original trait augmented with hidden reflection hooks and
+/// generated support items.
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
     let codegen = quote!(#facade::__private::codegen_v3);
@@ -677,6 +744,17 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 }
 
 /// Builds a `'static` concrete dyn application from the trait declaration.
+///
+/// # Parameters
+///
+/// - `item`: Parsed Rust trait item used for syntactic generic facts.
+/// - `declaration`: Validated trait declaration used for normalized metadata.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns generated impl parameters, trait arguments, bounds and associated
+/// type expressions.
 fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade: &TokenStream) -> DynTraitGenerics {
     let mut impl_parameters = Vec::new();
     let mut impl_predicates = Vec::new();
@@ -807,6 +885,15 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
 
 /// Replaces declared trait lifetime arguments with `'static` in generated dyn
 /// applications and their where predicates.
+///
+/// # Parameters
+///
+/// - `tokens`: Predicate or application tokens to rewrite recursively.
+/// - `declaration`: Trait declaration whose lifetime parameters are replaced.
+///
+/// # Returns
+///
+/// Returns rewritten tokens with token group spans retained.
 fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &TraitDeclarationIr) -> TokenStream {
     let lifetime_names: std::collections::HashSet<_> = declaration
         .generics
@@ -844,6 +931,17 @@ fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &Tra
 }
 
 /// Rewrites `Self::Assoc` predicates to the generated dyn binding parameter.
+///
+/// # Parameters
+///
+/// - `tokens`: Predicate tokens to rewrite recursively.
+/// - `item`: Parsed trait item used to identify associated types.
+/// - `declaration`: Validated declaration used to identify inherited associated
+///   types.
+///
+/// # Returns
+///
+/// Returns rewritten tokens with token group spans retained.
 fn replace_self_associated_types(
     tokens: TokenStream,
     item: &ItemTrait,

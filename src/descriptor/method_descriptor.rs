@@ -88,9 +88,15 @@ pub struct MethodDescriptor {
 #[derive(Clone, Copy, Debug)]
 pub enum MethodDeclarationOwner {
     /// A method declared by a trait definition.
-    Trait(&'static TraitDefinitionDescriptor),
+    Trait(
+        /// Trait declaration that owns the method.
+        &'static TraitDefinitionDescriptor,
+    ),
     /// A method explicitly declared by an impl definition.
-    Impl(&'static ImplDefinitionDescriptor),
+    Impl(
+        /// Impl declaration that owns the method.
+        &'static ImplDefinitionDescriptor,
+    ),
 }
 
 impl MethodDescriptor {
@@ -98,6 +104,19 @@ impl MethodDescriptor {
     ///
     /// The member identity remains independent of `query_name`, so renaming a
     /// method does not change its Rust identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `identity`: Stable source identity of the method.
+    /// - `rust_name`: Rust identifier used in the declaration.
+    /// - `query_name`: Name used by reflected lookup.
+    /// - `declaration_owner`: Trait or impl declaration that owns the method.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder initialized with the method's stable declaration
+    /// facts.
+    #[inline]
     #[must_use]
     pub fn builder(
         identity: MemberId,
@@ -109,6 +128,10 @@ impl MethodDescriptor {
     }
 
     /// Returns the stable composite member identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identity independent of the reflected query name.
     #[must_use]
     #[inline]
     pub const fn identity(&self) -> &MemberId {
@@ -116,6 +139,10 @@ impl MethodDescriptor {
     }
 
     /// Returns the Rust declaration name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier used by the Rust declaration.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -123,6 +150,10 @@ impl MethodDescriptor {
     }
 
     /// Returns the lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflected query name, which may differ from the Rust name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -130,6 +161,10 @@ impl MethodDescriptor {
     }
 
     /// Returns normalized source visibility facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns visibility and any restricted path recorded by the declaration.
     #[must_use]
     #[inline]
     pub const fn visibility(&self) -> &MethodVisibility {
@@ -137,6 +172,10 @@ impl MethodDescriptor {
     }
 
     /// Returns the receiver, or `None` for an associated function.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declared receiver, or `None` when the method is associated.
     #[must_use]
     #[inline]
     pub const fn receiver(&self) -> Option<&ReceiverDescriptor> {
@@ -144,6 +183,10 @@ impl MethodDescriptor {
     }
 
     /// Returns non-receiver parameters in source declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parameter descriptors in their original declaration order.
     #[must_use]
     #[inline]
     pub const fn parameters(&self) -> &[ParameterDescriptor] {
@@ -153,6 +196,14 @@ impl MethodDescriptor {
     /// Finds a uniquely named identifier parameter.
     ///
     /// `None` means no parameter has the requested identifier.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Parameter identifier to find.
+    ///
+    /// # Returns
+    ///
+    /// Returns the uniquely matching parameter, or `None` when absent.
     #[must_use]
     pub fn parameter(&self, name: &str) -> Option<&ParameterDescriptor> {
         self.parameters.iter().find(|parameter| parameter.name() == Some(name))
@@ -161,12 +212,24 @@ impl MethodDescriptor {
     /// Returns a non-receiver parameter by declaration index.
     ///
     /// `None` means `index` is outside the parameter range.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based position in the non-receiver parameter list.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parameter at that position, or `None` when out of range.
     #[must_use]
     pub fn parameter_at(&self, index: usize) -> Option<&ParameterDescriptor> {
         self.parameters.get(index)
     }
 
     /// Returns the declared return facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source-level return kind and type expression, when present.
     #[must_use]
     #[inline]
     pub const fn return_value(&self) -> &ReturnDescriptor {
@@ -174,6 +237,10 @@ impl MethodDescriptor {
     }
 
     /// Returns callability-related source qualifiers.
+    ///
+    /// # Returns
+    ///
+    /// Returns the qualifiers recorded for this method declaration.
     #[must_use]
     #[inline]
     pub const fn qualifiers(&self) -> &MethodQualifiers {
@@ -181,6 +248,10 @@ impl MethodDescriptor {
     }
 
     /// Returns generic parameters and predicates in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the method's generic definition and predicates.
     #[must_use]
     #[inline]
     pub const fn generic_definition(&self) -> &GenericDefinitionDescriptor {
@@ -188,6 +259,10 @@ impl MethodDescriptor {
     }
 
     /// Returns whether the trait declaration supplies a default body.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the trait method has a default implementation.
     #[must_use]
     #[inline]
     pub const fn has_default(&self) -> bool {
@@ -197,6 +272,10 @@ impl MethodDescriptor {
     /// Returns the owning trait definition for a trait method.
     ///
     /// `None` means this method is declared by an impl definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns the owning trait declaration, or `None` for an impl method.
     #[must_use]
     #[inline]
     pub const fn declaring_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
@@ -209,6 +288,10 @@ impl MethodDescriptor {
     /// Returns the owning impl definition for an implementation method.
     ///
     /// `None` means this method is declared by a trait definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns the owning impl declaration, or `None` for a trait method.
     #[must_use]
     #[inline]
     pub const fn declaring_impl(&self) -> Option<&'static ImplDefinitionDescriptor> {
@@ -220,6 +303,14 @@ impl MethodDescriptor {
 
     /// Applies concrete trait arguments to every signature relationship while
     /// preserving the declaration identity and source metadata.
+    ///
+    /// # Parameters
+    ///
+    /// - `substitutions`: Concrete application substitutions to apply.
+    ///
+    /// # Returns
+    ///
+    /// Returns a cloned method descriptor with substituted signature facts.
     pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
         let mut result = self.clone();
         for parameter in &mut result.parameters {
@@ -241,6 +332,14 @@ impl MethodDescriptor {
 
     /// Returns whether applying the substitutions changes any method-level
     /// signature or predicate fact.
+    ///
+    /// # Parameters
+    ///
+    /// - `substitutions`: Concrete application substitutions to compare.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when at least one signature or predicate changes.
     pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
         self.parameters
             .iter()

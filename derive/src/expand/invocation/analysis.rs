@@ -31,14 +31,26 @@ use crate::ir::TypeKindIr;
 
 /// Owner-specific facts needed by otherwise pure method analysis.
 pub(crate) struct MethodContext<'a> {
+    /// Concrete target type used to analyze explicit receiver forms.
     pub(crate) target: &'a TokenStream,
+    /// Substituted extension receiver type, when provided by the owner.
     pub(crate) extension_receiver: Option<TokenStream>,
+    /// Whether the method is a trait default body.
     pub(crate) default_method: bool,
+    /// Whether associated types needed by a default body are not proven.
     pub(crate) has_unproven_associated_type: bool,
 }
 
 impl<'a> MethodContext<'a> {
     /// Creates ordinary impl-method analysis context.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Concrete impl target type tokens.
+    ///
+    /// # Returns
+    ///
+    /// Returns an implementation context without trait-default constraints.
     pub(crate) fn implementation(target: &'a TokenStream) -> Self {
         Self {
             target,
@@ -49,6 +61,16 @@ impl<'a> MethodContext<'a> {
     }
 
     /// Creates default-trait-method analysis context.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Trait self type tokens.
+    /// - `has_unproven_associated_type`: Whether required owner facts are
+    ///   unavailable.
+    ///
+    /// # Returns
+    ///
+    /// Returns a context for checking a trait default method.
     pub(crate) fn trait_default(target: &'a TokenStream, has_unproven_associated_type: bool) -> Self {
         Self {
             target,
@@ -60,6 +82,15 @@ impl<'a> MethodContext<'a> {
 }
 
 /// Produces one complete invocation decision without emitting tokens.
+///
+/// # Parameters
+///
+/// - `method`: Validated method declaration and its invocation attributes.
+/// - `context`: Owner-specific type and proof facts.
+///
+/// # Returns
+///
+/// Returns the invocation plan.
 pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> syn::Result<InvocationPlan> {
     let receiver = method.receiver.as_ref().map(|receiver| match receiver.kind {
         ReceiverKindIr::Value => ReceiverPlan::Value,
@@ -146,6 +177,23 @@ pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> s
     })
 }
 
+/// Collects every invocation blocker in the project's canonical order.
+///
+/// # Parameters
+///
+/// - `method`: Method declaration being analyzed.
+/// - `receiver`: Classified receiver plan, if present.
+/// - `parameters`: Classified parameter plans.
+/// - `unproven_default_constraint`: Whether a default method has unproven
+///   predicates.
+/// - `unproven_associated_type`: Whether a default method depends on unproven
+///   associated types.
+/// - `pinned_mode_conflict`: Whether pinned invocation conflicts with requested
+///   modes.
+///
+/// # Returns
+///
+/// Returns ordered reasons explaining why the adapter is unavailable.
 fn unavailable_reasons(
     method: &MethodIr,
     receiver: Option<&ReceiverPlan>,
@@ -203,6 +251,15 @@ fn unavailable_reasons(
     reasons
 }
 
+/// Classifies the invocation output form before checking adapter support.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns the corresponding output plan.
 fn output_plan(return_type: &ReturnTypeIr) -> OutputPlan {
     match return_type {
         ReturnTypeIr::Unit => OutputPlan::Unit,
@@ -227,11 +284,29 @@ fn output_plan(return_type: &ReturnTypeIr) -> OutputPlan {
     }
 }
 
+/// Returns whether a method has a particular reflection helper attribute.
+///
+/// # Parameters
+///
+/// - `method`: Method whose attributes are checked.
+/// - `helper`: Helper attribute name to find.
+///
+/// # Returns
+///
+/// Returns `true` when the method declares that helper.
 fn has_helper(method: &MethodIr, helper: HelperName) -> bool {
     method.attributes.iter().any(|attribute| attribute.name == helper)
 }
 
 /// Returns whether a parameter can cross the safe dynamic boundary.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed parameter type.
+///
+/// # Returns
+///
+/// Returns `true` when the type has a supported owned dynamic representation.
 pub(crate) fn supports_invocation_parameter(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Reference { element, .. } => supports_owned_dynamic_type(element),
@@ -239,6 +314,15 @@ pub(crate) fn supports_invocation_parameter(ty: &TypeIr) -> bool {
     }
 }
 
+/// Returns whether a type has a sized owned dynamic representation.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to classify.
+///
+/// # Returns
+///
+/// Returns `true` for supported structural type forms.
 fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
     matches!(
         ty.kind,
@@ -251,6 +335,14 @@ fn supports_owned_dynamic_type(ty: &TypeIr) -> bool {
 }
 
 /// Returns whether an invocation adapter can represent this output.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns whether the output can be represented by the invocation API.
 pub(crate) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
     match return_type {
         ReturnTypeIr::Unit => true,
@@ -261,6 +353,15 @@ pub(crate) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
     }
 }
 
+/// Returns whether reflection attributes disable invocation for a method.
+///
+/// # Parameters
+///
+/// - `method`: Method whose policy attributes are checked.
+///
+/// # Returns
+///
+/// Returns `true` for `no_invoke` or `skip`.
 fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
     method
         .attributes
@@ -268,6 +369,15 @@ fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
         .any(|attribute| matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip))
 }
 
+/// Returns whether a reference type contains an unsupported unsized value.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect.
+///
+/// # Returns
+///
+/// Returns `true` for slice and trait-object reference targets.
 fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
     matches!(
         &ty.kind,
@@ -277,6 +387,15 @@ fn has_unsupported_unsized_parameter(ty: &TypeIr) -> bool {
 }
 
 /// Returns the owned standard container for an explicit receiver.
+///
+/// # Parameters
+///
+/// - `receiver`: Explicit receiver declaration to inspect.
+/// - `target`: Concrete impl target type tokens.
+///
+/// # Returns
+///
+/// Returns a recognized owned container type, or `None` for other receivers.
 pub(crate) fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target: &TokenStream) -> Option<TokenStream> {
     if receiver.kind != ReceiverKindIr::Typed {
         return None;
@@ -300,6 +419,15 @@ pub(crate) fn typed_owned_receiver_type(receiver: &crate::ir::ReceiverIr, target
 }
 
 /// Returns pinned shared/mutable receiver mode for `Pin<&Self>` shapes.
+///
+/// # Parameters
+///
+/// - `receiver`: Explicit receiver declaration to inspect.
+///
+/// # Returns
+///
+/// Returns `Some(false)` for shared pin, `Some(true)` for mutable pin, or
+/// `None`.
 pub(crate) fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) -> Option<bool> {
     if receiver.kind != ReceiverKindIr::Typed {
         return None;
@@ -320,10 +448,28 @@ pub(crate) fn typed_pinned_receiver_mutable(receiver: &crate::ir::ReceiverIr) ->
     (segment.name == "Pin" && is_self_type(element)).then_some(*mutable)
 }
 
+/// Returns whether a type is the unqualified `Self` type.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect.
+///
+/// # Returns
+///
+/// Returns `true` only for the direct `Self` path.
 fn is_self_type(ty: &TypeIr) -> bool {
     matches!(&ty.kind, TypeKindIr::Path(path) if path.segments.len() == 1 && path.segments[0].name == "Self")
 }
 
+/// Returns whether a type is the standard `Box<Self>` receiver shape.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect.
+///
+/// # Returns
+///
+/// Returns `true` for a `Box` path with exactly the `Self` type argument.
 fn is_box_self_type(ty: &TypeIr) -> bool {
     let TypeKindIr::Path(path) = &ty.kind else {
         return false;
@@ -339,11 +485,27 @@ fn is_box_self_type(ty: &TypeIr) -> bool {
 }
 
 /// Returns whether a return declaration contains a non-static lifetime.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns whether it contains a non-static borrow lifetime.
 pub(crate) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
     super::lifetime::return_contains_non_static_lifetime(return_type)
 }
 
 /// Returns whether a shared borrow can retain the invocation call lifetime.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns `true` for a shared reference return.
 pub(crate) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> bool {
     matches!(
         return_type,
@@ -355,6 +517,14 @@ pub(crate) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> b
 }
 
 /// Returns whether a unique mutable-borrow origin can be identified.
+///
+/// # Parameters
+///
+/// - `method`: Method whose receiver, parameters and return are inspected.
+///
+/// # Returns
+///
+/// Returns `true` when the mutable return originates uniquely from `&mut self`.
 pub(crate) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
     matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
@@ -373,6 +543,14 @@ pub(crate) fn is_supported_mutable_borrow_return(method: &MethodIr) -> bool {
 }
 
 /// Returns whether the declaration returns a borrow.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns `true` for shared or mutable reference returns.
 pub(crate) fn is_borrow_return(return_type: &ReturnTypeIr) -> bool {
     matches!(
         return_type,
@@ -384,6 +562,14 @@ pub(crate) fn is_borrow_return(return_type: &ReturnTypeIr) -> bool {
 }
 
 /// Returns whether `ty` names Rust's built-in unsized `str` type.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect.
+///
+/// # Returns
+///
+/// Returns `true` for an unparameterized path ending in `str`.
 pub(crate) fn is_str_type(ty: &TypeIr) -> bool {
     matches!(
         &ty.kind,
@@ -411,6 +597,15 @@ mod tests {
     use crate::ir::MethodIr;
     use crate::parse::parse_and_validate_declaration;
 
+    /// Parses one test impl and returns its only method.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Impl tokens used as the test fixture.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parsed method declaration.
     fn impl_method(input: TokenStream) -> MethodIr {
         let parsed = parse_and_validate_declaration(MacroKind::Impl, TokenStream::new(), input)
             .expect("the reflected impl should parse");
@@ -420,11 +615,29 @@ mod tests {
         declaration.methods.into_iter().next().expect("one method")
     }
 
+    /// Analyzes one test method as an ordinary implementation method.
+    ///
+    /// # Parameters
+    ///
+    /// - `method`: Method declaration to analyze.
+    ///
+    /// # Returns
+    ///
+    /// Returns its invocation plan.
     fn plan(method: &MethodIr) -> InvocationPlan {
         analyze_method(method, MethodContext::implementation(&quote!(Service)))
             .expect("method analysis should be infallible")
     }
 
+    /// Returns the ordered blocker list for a described-only plan.
+    ///
+    /// # Parameters
+    ///
+    /// - `plan`: Invocation plan to inspect.
+    ///
+    /// # Returns
+    ///
+    /// Returns an empty slice for executable plans, or their blocker list.
     fn reasons(plan: &InvocationPlan) -> &[UnavailableReasonPlan] {
         match &plan.availability {
             AvailabilityPlan::Executable => &[],
@@ -433,7 +646,7 @@ mod tests {
     }
 
     #[test]
-    fn safe_method_is_executable() {
+    fn test_safe_method_is_executable() {
         let method = impl_method(quote! {
             impl Service {
                 fn execute(&self, value: u32) -> String { unreachable!() }
@@ -447,7 +660,7 @@ mod tests {
 
     /// Unsized slices remain described without an invalid Sized adapter.
     #[test]
-    fn slice_return_is_described_only() {
+    fn test_slice_return_is_described_only() {
         let method = impl_method(quote! {
             impl Service {
                 fn values(&self) -> &[String] { unreachable!() }
@@ -460,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn unsafe_abi_and_generic_reasons_are_canonical() {
+    fn test_unsafe_abi_and_generic_reasons_are_canonical() {
         let unsafe_method = impl_method(quote! {
             impl Service {
                 unsafe extern "C" fn execute(&self, value: u32) -> u32 { value }
@@ -486,7 +699,7 @@ mod tests {
     }
 
     #[test]
-    fn policy_and_async_borrow_disable_execution() {
+    fn test_policy_and_async_borrow_disable_execution() {
         let disabled = impl_method(quote! {
             impl Service {
                 #[reflect(no_invoke)]
@@ -507,7 +720,7 @@ mod tests {
     }
 
     #[test]
-    fn adapter_modes_and_pinned_receiver_are_retained() {
+    fn test_adapter_modes_and_pinned_receiver_are_retained() {
         let thread_safe = impl_method(quote! {
             impl Service {
                 #[reflect(thread_safe)]
@@ -531,7 +744,7 @@ mod tests {
     }
 
     #[test]
-    fn trait_default_requires_proven_owner_facts() {
+    fn test_trait_default_requires_proven_owner_facts() {
         let parsed = parse_and_validate_declaration(
             MacroKind::Trait,
             TokenStream::new(),

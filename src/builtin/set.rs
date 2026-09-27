@@ -8,6 +8,7 @@
 
 //! Reflection descriptors for standard set collections.
 
+use std::any::type_name;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
@@ -17,9 +18,23 @@ use crate::descriptor::SetKind;
 use crate::descriptor::TypeDescriptor;
 
 /// Builds the descriptor shared by every set family specialization.
+///
+/// # Type Parameters
+///
+/// - `Set`: Concrete set type represented by the descriptor.
+/// - `Element`: Reflected element type stored in the set.
+///
+/// # Parameters
+///
+/// - `kind`: Standard set family represented by `Set`.
+///
+/// # Returns
+///
+/// A descriptor with a deferred relationship to the element type.
+#[must_use]
 fn descriptor<Set: ?Sized + 'static, Element: Reflect>(kind: SetKind) -> TypeDescriptor {
     TypeDescriptor::new_set_lazy::<Set>(
-        std::any::type_name::<Set>(),
+        type_name::<Set>(),
         kind,
         crate::__private::descriptor::lazy_type_ref::<Element>(),
     )
@@ -27,6 +42,10 @@ fn descriptor<Set: ?Sized + 'static, Element: Reflect>(kind: SetKind) -> TypeDes
 
 impl<T: Reflect, Hasher: 'static> Reflect for HashSet<T, Hasher> {
     /// Returns the interned descriptor for this hash-set specialization.
+    ///
+    /// # Returns
+    ///
+    /// The descriptor recording the hash-set family and element relationship.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| descriptor::<Self, T>(SetKind::HashSet))
     }
@@ -34,6 +53,10 @@ impl<T: Reflect, Hasher: 'static> Reflect for HashSet<T, Hasher> {
 
 impl<T: Reflect> Reflect for BTreeSet<T> {
     /// Returns the interned descriptor for this B-tree-set specialization.
+    ///
+    /// # Returns
+    ///
+    /// The descriptor recording the B-tree-set family and element relationship.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| descriptor::<Self, T>(SetKind::BTreeSet))
     }

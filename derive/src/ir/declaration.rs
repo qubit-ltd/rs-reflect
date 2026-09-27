@@ -23,8 +23,11 @@ use crate::ir::TypeIr;
 /// Selects one of the three reflection procedural macro entry points.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum MacroKind {
+    /// Derive a descriptor for a type.
     Derive,
+    /// Expand a reflected trait declaration.
     Trait,
+    /// Expand a reflected impl declaration.
     Impl,
 }
 
@@ -45,8 +48,11 @@ pub(crate) struct ValidatedDeclaration {
 /// One of the declarations supported by the reflection macros.
 #[derive(Clone, Debug)]
 pub(crate) enum DeclarationIr {
+    /// Struct, enum, or union declaration.
     Type(TypeDeclarationIr),
+    /// Trait declaration.
     Trait(TraitDeclarationIr),
+    /// Inherent or trait impl declaration.
     Impl(ImplDeclarationIr),
 }
 
@@ -89,8 +95,11 @@ pub(crate) enum FieldShapeIr {
 /// Distinguishes the three data declaration forms accepted by `syn`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TypeDeclarationKindIr {
+    /// Struct declaration.
     Struct,
+    /// Enum declaration.
     Enum,
+    /// Union declaration, retained for validation diagnostics.
     Union,
 }
 
@@ -133,8 +142,11 @@ pub(crate) struct VariantIr {
 /// The source shape of an enum variant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum VariantKindIr {
+    /// Unit variant.
     Unit,
+    /// Tuple variant.
     Tuple,
+    /// Struct-like variant.
     Struct,
 }
 
@@ -222,61 +234,87 @@ pub(crate) struct MethodIr {
 /// A method receiver classified without retaining a `syn::Receiver`.
 #[derive(Clone, Debug)]
 pub(crate) struct ReceiverIr {
+    /// Normalized receiver category.
     pub(crate) kind: ReceiverKindIr,
+    /// Converted receiver type.
     pub(crate) ty: TypeIr,
+    /// Original receiver declaration tokens.
     pub(crate) declaration: TokenStream,
+    /// Receiver source span.
     pub(crate) span: Span,
 }
 
 /// The core receiver forms relevant to safe adapter selection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReceiverKindIr {
+    /// `self` by value.
     Value,
+    /// `&self`.
     SharedReference,
+    /// `&mut self`.
     MutableReference,
+    /// Explicit typed receiver syntax.
     Typed,
 }
 
 /// One non-receiver method parameter.
 #[derive(Clone, Debug)]
 pub(crate) struct ParameterIr {
+    /// Identifier name when the pattern is a plain binding.
     pub(crate) name: Option<String>,
+    /// Normalized parameter pattern facts.
     pub(crate) pattern: ParameterPatternIr,
+    /// Converted parameter type.
     pub(crate) ty: TypeIr,
+    /// Zero-based position in the method signature.
     pub(crate) index: usize,
+    /// Parameter source span.
     pub(crate) span: Span,
 }
 
 /// A method parameter pattern represented independently of `syn::Pat`.
 #[derive(Clone, Debug)]
 pub(crate) struct ParameterPatternIr {
+    /// Pattern category used by invocation logic.
     pub(crate) kind: ParameterPatternKindIr,
+    /// Diagnostic rendering of the pattern.
     pub(crate) source: String,
+    /// Original pattern tokens with source spans.
     pub(crate) tokens: TokenStream,
 }
 
 /// Parameter pattern categories that affect named invocation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ParameterPatternKindIr {
+    /// A simple identifier binding.
     Identifier,
+    /// A wildcard pattern.
     Wildcard,
+    /// Any destructuring pattern.
     Destructure,
 }
 
 /// Method qualifiers that affect descriptor facts and adapter safety.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct MethodQualifiersIr {
+    /// Whether the method is declared `const`.
     pub(crate) is_const: bool,
+    /// Whether the method is declared `async`.
     pub(crate) is_async: bool,
+    /// Whether the method is declared `unsafe`.
     pub(crate) is_unsafe: bool,
+    /// Explicit ABI name, when present.
     pub(crate) abi: Option<String>,
+    /// Whether the method is variadic.
     pub(crate) is_variadic: bool,
 }
 
 /// The semantic return category of a method.
 #[derive(Clone, Debug)]
 pub(crate) enum ReturnTypeIr {
+    /// No explicit return type, equivalent to `()`.
     Unit,
+    /// Explicit non-unit return type.
     Type(TypeIr),
 }
 
@@ -338,17 +376,27 @@ pub(crate) struct GenericsIr {
 /// A structured predicate from a declaration's where clause.
 #[derive(Clone, Debug)]
 pub(crate) enum WherePredicateIr {
+    /// Lifetime outlives predicate such as `'a: 'b`.
     Lifetime {
+        /// Lifetime on the left-hand side.
         lifetime: String,
+        /// Lifetime bounds on the right-hand side.
         bounds: Vec<String>,
+        /// Original predicate tokens.
         declaration: TokenStream,
     },
+    /// Type bound predicate such as `T: Trait`.
     Type {
+        /// Type bounded by the predicate.
         bounded_type: TypeIr,
+        /// Higher-ranked lifetimes declared by the predicate.
         lifetimes: Vec<String>,
+        /// Trait and lifetime bounds on the type.
         bounds: Vec<GenericBoundIr>,
+        /// Original predicate tokens.
         declaration: TokenStream,
     },
+    /// Predicate syntax outside the structured forms.
     Other(TokenStream),
 }
 
@@ -374,50 +422,77 @@ pub(crate) struct GenericParamIr {
 /// A generic lifetime or trait bound.
 #[derive(Clone, Debug)]
 pub(crate) enum GenericBoundIr {
+    /// Lifetime outlives bound.
     Lifetime(String),
+    /// Trait bound with modifiers and higher-ranked lifetimes.
     Trait {
+        /// Bound trait path.
         path: PathIr,
+        /// Optional `?` modifier.
         modifier: TraitBoundModifierIr,
+        /// Higher-ranked lifetime binders.
         lifetimes: Vec<String>,
     },
+    /// Bound syntax not covered by the structured variants.
     Other(TokenStream),
 }
 
 /// The optionality modifier of a trait bound.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TraitBoundModifierIr {
+    /// Required trait bound.
     None,
+    /// Optional trait bound written `?Trait`.
     Maybe,
 }
 
 /// A type or const generic default.
 #[derive(Clone, Debug)]
 pub(crate) enum GenericDefaultIr {
+    /// Default type argument.
     Type(TypeIr),
+    /// Default const expression tokens.
     Const(TokenStream),
 }
 
 /// The kind of a source generic parameter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GenericKindIr {
+    /// Lifetime parameter.
     Lifetime,
+    /// Type parameter.
     Type,
+    /// Const parameter.
     Const,
 }
 
 /// A normalized Rust source visibility.
 #[derive(Clone, Debug)]
 pub(crate) enum VisibilityIr {
+    /// Public visibility.
     Public,
+    /// Crate-wide visibility.
     Crate,
+    /// Parent-module visibility.
     Super,
+    /// Current-module visibility.
     SelfValue,
+    /// Restricted path visibility.
     Restricted(PathIr),
+    /// Private inherited visibility.
     Inherited,
 }
 
 impl TypeDeclarationIr {
     /// Counts occurrences of `name` on the type declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Helper key to count.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of matching type-level helper attributes.
     pub(crate) fn helper_count(&self, name: crate::ir::HelperName) -> usize {
         self.attributes
             .iter()

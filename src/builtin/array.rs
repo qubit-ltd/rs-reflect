@@ -8,16 +8,23 @@
 
 //! Reflection descriptors for fixed-size arrays.
 
+use std::any::type_name;
+
 use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
 
 impl<T: Reflect, const LENGTH: usize> Reflect for [T; LENGTH] {
     /// Returns the interned descriptor for this array specialization.
+    ///
+    /// # Returns
+    ///
+    /// The shared descriptor containing the element relationship and array
+    /// length for `[T; LENGTH]`.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_array_lazy::<Self>(
-                std::any::type_name::<Self>(),
+                type_name::<Self>(),
                 crate::__private::descriptor::lazy_type_ref::<T>(),
                 LENGTH,
             )

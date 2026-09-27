@@ -19,6 +19,15 @@ use crate::capability::CapabilityLookup;
 use crate::identity::CapabilityId;
 
 /// The machine-readable reason a capability set could not be formed.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::capability::CapabilityConflictKind;
+///
+/// let kind = CapabilityConflictKind::DuplicateId;
+/// assert_eq!(kind, CapabilityConflictKind::DuplicateId);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityConflictKind {
     /// The same stable ID was declared more than once with one contract.
@@ -28,6 +37,22 @@ pub enum CapabilityConflictKind {
 }
 
 /// A conflict between two descriptors claiming one stable capability ID.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::capability::CapabilityConflict;
+/// use qubit_reflect::capability::CapabilityDescriptor;
+/// use qubit_reflect::capability::CapabilityKey;
+/// use qubit_reflect::capability::TypeCapabilities;
+/// use qubit_reflect::identity::CapabilityId;
+///
+/// let id = CapabilityId::new("example.conflict").expect("valid ID");
+/// let first = CapabilityDescriptor::without_adapter(CapabilityKey::<u32>::new(id));
+/// let second = CapabilityDescriptor::without_adapter(CapabilityKey::<u64>::new(id));
+/// let error = TypeCapabilities::try_new(vec![first, second]).unwrap_err();
+/// assert_eq!(error.kind(), qubit_reflect::capability::CapabilityConflictKind::AdapterTypeMismatch);
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("conflicting reflection capability `{id}`: {kind:?}")]
@@ -41,6 +66,19 @@ pub struct CapabilityConflict {
 impl CapabilityConflict {
     /// Classifies two descriptors already known to claim the same capability
     /// ID while preserving their input contract order.
+    ///
+    /// # Parameters
+    ///
+    /// - `first`: The first descriptor claiming the ID.
+    /// - `second`: The second descriptor claiming the same ID.
+    ///
+    /// # Returns
+    ///
+    /// Returns the classified conflict and preserves the input contract order.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug builds if the descriptors have different IDs.
     pub(crate) fn from_same_id(first: &CapabilityDescriptor, second: &CapabilityDescriptor) -> Self {
         debug_assert_eq!(first.id(), second.id());
         let kind = if first.adapter_type() == second.adapter_type() {
@@ -57,6 +95,10 @@ impl CapabilityConflict {
     }
 
     /// Returns the machine-readable conflict class.
+    ///
+    /// # Returns
+    ///
+    /// Returns the conflict kind.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> CapabilityConflictKind {
@@ -64,6 +106,10 @@ impl CapabilityConflict {
     }
 
     /// Returns the stable ID claimed by both descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns the shared capability ID.
     #[must_use]
     #[inline]
     pub const fn id(&self) -> &CapabilityId {
@@ -71,6 +117,10 @@ impl CapabilityConflict {
     }
 
     /// Returns the first descriptor's process-local adapter contract identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the first adapter contract's `TypeId`.
     #[must_use]
     #[inline]
     pub const fn first_adapter_type(&self) -> TypeId {
@@ -78,6 +128,10 @@ impl CapabilityConflict {
     }
 
     /// Returns the second descriptor's process-local adapter contract identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the second adapter contract's `TypeId`.
     #[must_use]
     #[inline]
     pub const fn second_adapter_type(&self) -> TypeId {
@@ -90,7 +144,8 @@ impl CapabilityConflict {
 /// # Examples
 ///
 /// ```
-/// use qubit_reflect::{ReflectRegistry, TypeDescriptor};
+/// use qubit_reflect::ReflectRegistry;
+/// use qubit_reflect::TypeDescriptor;
 ///
 /// let registry = ReflectRegistry::initialize()?;
 /// let capabilities = registry.capabilities(TypeDescriptor::of::<u32>()).expect("valid capability declarations");
@@ -107,6 +162,10 @@ impl TypeCapabilities {
     ///
     /// Returns [`CapabilityConflict`] when an ID occurs more than once. A
     /// different adapter type is reported separately from an exact duplicate.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptors`: The descriptors to validate and sort.
     ///
     /// # Returns
     ///
@@ -133,6 +192,10 @@ impl TypeCapabilities {
     }
 
     /// Returns descriptors in stable capability-ID order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the set's descriptors sorted by stable ID.
     #[must_use]
     #[inline]
     pub const fn descriptors(&self) -> &[CapabilityDescriptor] {
@@ -141,6 +204,18 @@ impl TypeCapabilities {
 
     /// Returns whether the set contains the key's exact ID and adapter
     /// contract.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `A`: The expected adapter contract type.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: The typed capability key to check.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when a descriptor has the key's ID and adapter type.
     #[must_use]
     pub fn contains<A: 'static>(&self, key: CapabilityKey<A>) -> bool {
         self.find(key.id())
@@ -152,10 +227,21 @@ impl TypeCapabilities {
     /// `Ok(None)` means the ID is absent. A fact without an executable adapter
     /// or a different adapter contract is returned as an error.
     ///
+    /// # Type Parameters
+    ///
+    /// - `A`: The requested adapter contract type.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: The typed key used to retrieve the capability.
+    ///
     /// # Returns
     ///
     /// Returns the typed adapter when its ID and contract match, or `None` when
     /// the ID is absent.
+    ///
+    /// `Err` distinguishes a fact-only capability from a mismatched adapter
+    /// contract.
     ///
     /// # Errors
     ///
@@ -168,6 +254,24 @@ impl TypeCapabilities {
 
     /// Looks up a capability while preserving all four states: missing ID,
     /// fact-only descriptor, adapter contract mismatch, and executable adapter.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `A`: The expected adapter contract type.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: The typed key used to classify the lookup.
+    ///
+    /// # Returns
+    ///
+    /// Returns the lookup state while preserving missing, fact-only, mismatch,
+    /// and found outcomes.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a descriptor records an adapter type that does not match its
+    /// stored adapter value, violating the descriptor invariant.
     #[must_use]
     pub fn lookup<A: 'static>(&self, key: CapabilityKey<A>) -> CapabilityLookup<'_, A> {
         let Some(descriptor) = self.find(key.id()) else {
@@ -187,6 +291,14 @@ impl TypeCapabilities {
 
     /// Finds a capability descriptor by its stable textual ID without
     /// allocating an owned identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: The stable textual capability ID.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching descriptor, or `None` if the ID is absent.
     #[must_use]
     pub fn descriptor(&self, id: &str) -> Option<&CapabilityDescriptor> {
         let index = self
@@ -197,6 +309,14 @@ impl TypeCapabilities {
     }
 
     /// Finds one descriptor by stable ID in the sorted collection.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: The validated capability ID to find.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching descriptor, or `None` if absent.
     fn find(&self, id: &CapabilityId) -> Option<&CapabilityDescriptor> {
         let index = self
             .descriptors
@@ -208,6 +328,10 @@ impl TypeCapabilities {
 
 impl Default for TypeCapabilities {
     /// Creates an empty immutable capability set.
+    ///
+    /// # Returns
+    ///
+    /// Returns a capability set with no descriptors.
     fn default() -> Self {
         Self {
             descriptors: Box::default(),
@@ -217,10 +341,31 @@ impl Default for TypeCapabilities {
 
 /// Returns the shared empty set used by descriptors without registered
 /// capabilities.
+///
+/// # Returns
+///
+/// Returns the process-wide empty capability set.
+#[must_use]
 pub(crate) fn empty_capabilities() -> &'static TypeCapabilities {
     static EMPTY: OnceLock<TypeCapabilities> = OnceLock::new();
     EMPTY.get_or_init(TypeCapabilities::default)
 }
 
 /// A lazily initialized capability set or its structural conflict.
+///
+/// The result contains the shared set after successful initialization, or the
+/// conflict that prevented construction.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::capability::TypeCapabilitiesResult;
+/// use qubit_reflect::ReflectRegistry;
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let registry = ReflectRegistry::initialize()?;
+/// let result: TypeCapabilitiesResult = registry.capabilities(TypeDescriptor::of::<u32>());
+/// assert!(result.is_ok());
+/// # Ok::<(), qubit_reflect::RegistryError>(())
+/// ```
 pub type TypeCapabilitiesResult = Result<&'static TypeCapabilities, CapabilityConflict>;

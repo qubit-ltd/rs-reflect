@@ -16,11 +16,27 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Returns whether a return declaration carries a non-static borrow.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return declaration.
+///
+/// # Returns
+///
+/// Returns whether its type contains any non-static lifetime.
 pub(super) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
     matches!(return_type, ReturnTypeIr::Type(ty) if type_contains_non_static_lifetime(ty))
 }
 
 /// Recursively detects path arguments whose lifetime is not explicitly static.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type to inspect recursively.
+///
+/// # Returns
+///
+/// Returns whether a non-static or unknown lifetime occurs in the type.
 fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_non_static_lifetime(path),
@@ -48,6 +64,14 @@ fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
 }
 
 /// Recursively detects non-static lifetime arguments nested in one path.
+///
+/// # Parameters
+///
+/// - `path`: Structured path and its arguments to inspect.
+///
+/// # Returns
+///
+/// Returns whether a non-static or unknown lifetime occurs in the path.
 fn path_contains_non_static_lifetime(path: &crate::ir::PathIr) -> bool {
     path.qualified_self
         .as_ref()
@@ -71,6 +95,14 @@ fn path_contains_non_static_lifetime(path: &crate::ir::PathIr) -> bool {
 }
 
 /// Returns whether a bound retains a non-static lifetime.
+///
+/// # Parameters
+///
+/// - `bound`: Generic bound to inspect.
+///
+/// # Returns
+///
+/// Returns whether the bound contains a non-static or unknown lifetime.
 fn bound_contains_non_static_lifetime(bound: &GenericBoundIr) -> bool {
     match bound {
         GenericBoundIr::Lifetime(lifetime) => lifetime != "'static",
@@ -90,6 +122,15 @@ mod tests {
     use super::type_contains_non_static_lifetime;
     use crate::ir::ReturnTypeIr;
 
+    /// Parses source type tokens for lifetime analysis fixtures.
+    ///
+    /// # Parameters
+    ///
+    /// - `tokens`: Type syntax used by the fixture.
+    ///
+    /// # Returns
+    ///
+    /// Returns the converted type IR.
     fn parsed_type(tokens: TokenStream) -> crate::ir::TypeIr {
         let ty = syn::parse2(tokens).expect("the fixture type must parse");
         crate::parse::convert_type(&ty)

@@ -9,6 +9,7 @@
 // qubit-style: allow public-type-layout
 //! Immutable structural facts about reflected fields.
 
+use std::any::TypeId;
 use std::fmt;
 
 use crate::__private::LazyTypeRef;
@@ -76,22 +77,39 @@ assert_eq!(field.rust_name(), Some("name"));
 "#
 )]
 pub struct FieldDescriptor {
+    /// Resolver for the exact root type that owns this field.
     declaring_type: TypeDescriptorResolver,
+    /// Zero-based source position in the declaring type or variant.
     index: usize,
+    /// Source Rust identifier, absent for positional fields.
     rust_name: Option<&'static str>,
+    /// Reflected lookup identifier, absent for positional fields.
     query_name: Option<&'static str>,
+    /// Eager or lazy source for the field's reflected type.
     field_type: TypeRefSource,
+    /// Declared source visibility retained for structural inspection.
     visibility: Visibility,
+    /// Containing enum variant index, absent for struct fields.
     variant_index: Option<usize>,
+    /// Containing enum variant's Rust name, absent for struct fields.
     variant_rust_name: Option<&'static str>,
+    /// Policy checked before any dynamic field operation.
     access_policy: FieldAccessPolicy,
+    /// Generated local shared-borrow adapter, when supported.
     get: Option<FieldGetAdapter>,
+    /// Generated local exclusive-borrow adapter, when supported.
     get_mut: Option<FieldGetMutAdapter>,
+    /// Generated local replacement adapter, when supported.
     set: Option<FieldSetAdapter>,
+    /// Optional local validation hook run before replacement consumes input.
     set_preflight: Option<FieldSetPreflightAdapter>,
+    /// Generated thread-safe shared-borrow adapter, when supported.
     thread_safe_get: Option<ThreadSafeFieldGetAdapter>,
+    /// Generated thread-safe exclusive-borrow adapter, when supported.
     thread_safe_get_mut: Option<ThreadSafeFieldGetMutAdapter>,
+    /// Generated thread-safe replacement adapter, when supported.
     thread_safe_set: Option<ThreadSafeFieldSetAdapter>,
+    /// Optional thread-safe hook run before replacement consumes input.
     thread_safe_set_preflight: Option<ThreadSafeFieldSetPreflightAdapter>,
 }
 
@@ -102,7 +120,22 @@ impl FieldDescriptor {
     /// The resolver must return the root containing this field. Positional
     /// fields use `None` for both names. This constructor performs no
     /// allocation and never calls the resolver.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaring_type`: Resolver for the root type that owns the field.
+    /// - `index`: Zero-based position in the source declaration.
+    /// - `rust_name`: Source identifier, or `None` for positional fields.
+    /// - `query_name`: Lookup identifier, or `None` for positional fields.
+    /// - `field_type`: The eager resolved, opaque, or symbolic field type.
+    /// - `visibility`: The declared source visibility.
+    ///
+    /// # Returns
+    ///
+    /// Returns a structural descriptor with default read-write policy and no
+    /// runtime access adapters.
     #[doc(hidden)]
+    #[must_use]
     pub(crate) const fn new(
         declaring_type: TypeDescriptorResolver,
         index: usize,
@@ -136,7 +169,21 @@ impl FieldDescriptor {
     ///
     /// Generated descriptors use this constructor so recursive type graphs do
     /// not re-enter a root descriptor while its member list is being built.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaring_type`: Resolver for the root type that owns the field.
+    /// - `index`: Zero-based position in the source declaration.
+    /// - `rust_name`: Source identifier, or `None` for positional fields.
+    /// - `query_name`: Lookup identifier, or `None` for positional fields.
+    /// - `field_type`: Lazy source for the resolved field type.
+    /// - `visibility`: The declared source visibility.
+    ///
+    /// # Returns
+    ///
+    /// Returns a structural descriptor that resolves its type on navigation.
     #[doc(hidden)]
+    #[must_use]
     pub(crate) const fn new_lazy(
         declaring_type: TypeDescriptorResolver,
         index: usize,
@@ -171,8 +218,20 @@ impl FieldDescriptor {
     /// Descriptors without adapters remain useful for structural navigation;
     /// their dynamic operations return [`FieldAccessError::Unavailable`]. The
     /// policy is enforced before any adapter is invoked.
+    ///
+    /// # Parameters
+    ///
+    /// - `access_policy`: Source policy checked before dynamic dispatch.
+    /// - `get`: Optional local shared-borrow adapter.
+    /// - `get_mut`: Optional local exclusive-borrow adapter.
+    /// - `set`: Optional local replacement adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with the local operation contract attached.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_access(
         mut self,
         access_policy: FieldAccessPolicy,
@@ -192,16 +251,36 @@ impl FieldDescriptor {
     ///
     /// Generated enum fields use this hook to validate the active variant
     /// while the replacement remains recoverable by the descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// - `set_preflight`: Optional non-consuming preflight adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with the local preflight hook attached.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_set_preflight(mut self, set_preflight: Option<FieldSetPreflightAdapter>) -> Self {
         self.set_preflight = set_preflight;
         self
     }
 
     /// Attaches mode-preserving thread-safe field adapters.
+    ///
+    /// # Parameters
+    ///
+    /// - `get`: Optional thread-safe shared-borrow adapter.
+    /// - `get_mut`: Optional thread-safe exclusive-borrow adapter.
+    /// - `set`: Optional thread-safe replacement adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with its thread-safe operations attached.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_thread_safe_access(
         mut self,
         get: Option<ThreadSafeFieldGetAdapter>,
@@ -215,8 +294,17 @@ impl FieldDescriptor {
     }
 
     /// Attaches a thread-safe non-consuming set preflight hook.
+    ///
+    /// # Parameters
+    ///
+    /// - `set_preflight`: Optional non-consuming thread-safe preflight adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with the thread-safe preflight hook attached.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_thread_safe_set_preflight(
         mut self,
         set_preflight: Option<ThreadSafeFieldSetPreflightAdapter>,
@@ -230,8 +318,18 @@ impl FieldDescriptor {
     /// The variant source index and Rust name become part of the field's
     /// runtime identity, so fields at equal positions in different variants
     /// remain distinct.
+    ///
+    /// # Parameters
+    ///
+    /// - `variant_index`: Zero-based source position of the enum variant.
+    /// - `variant_rust_name`: Source identifier of the enum variant.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor associated with the supplied variant.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_variant(mut self, variant_index: usize, variant_rust_name: &'static str) -> Self {
         self.variant_index = Some(variant_index);
         self.variant_rust_name = Some(variant_rust_name);
@@ -239,12 +337,21 @@ impl FieldDescriptor {
     }
 
     /// Returns the root type that contains this field.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact declaring root descriptor.
     #[must_use]
+    #[inline]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
 
     /// Returns the zero-based source declaration index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the field's source position in its struct or variant.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -252,6 +359,10 @@ impl FieldDescriptor {
     }
 
     /// Returns the Rust field name, or `None` for tuple and newtype fields.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier, or `None` for positional fields.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> Option<&'static str> {
@@ -259,6 +370,11 @@ impl FieldDescriptor {
     }
 
     /// Returns the lookup name, or `None` for tuple and newtype fields.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflected lookup identifier, or `None` for positional
+    /// fields.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> Option<&'static str> {
@@ -266,6 +382,10 @@ impl FieldDescriptor {
     }
 
     /// Returns the resolved, explicitly opaque, or symbolic field type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the cached field type classification.
     #[must_use]
     pub fn field_type(&self) -> &'static TypeRef {
         self.field_type.get()
@@ -273,6 +393,11 @@ impl FieldDescriptor {
 
     /// Returns declared struct-field visibility or the explicit fact that an
     /// enum-variant field inherits its enclosing access boundary.
+    ///
+    /// # Returns
+    ///
+    /// Returns declared visibility for structs or the inherited marker for
+    /// enum-variant fields.
     #[must_use]
     #[inline]
     pub const fn visibility(&self) -> FieldVisibility<'_> {
@@ -283,6 +408,10 @@ impl FieldDescriptor {
     }
 
     /// Returns the source policy controlling this field's dynamic adapters.
+    ///
+    /// # Returns
+    ///
+    /// Returns the policy checked before any operation adapter is invoked.
     #[must_use]
     #[inline]
     pub const fn access_policy(&self) -> FieldAccessPolicy {
@@ -292,6 +421,10 @@ impl FieldDescriptor {
     /// Returns the containing variant's source index for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    ///
+    /// # Returns
+    ///
+    /// Returns the containing variant index, or `None` for a struct field.
     #[must_use]
     #[inline]
     pub const fn variant_index(&self) -> Option<usize> {
@@ -301,6 +434,10 @@ impl FieldDescriptor {
     /// Returns the containing variant's Rust name for an enum field.
     ///
     /// `None` identifies a direct struct field.
+    ///
+    /// # Returns
+    ///
+    /// Returns the containing variant name, or `None` for a struct field.
     #[must_use]
     #[inline]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
@@ -313,6 +450,10 @@ impl FieldDescriptor {
     /// invoking generated code. An enum-field adapter may additionally report
     /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot
     /// outlive `target`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: The shared dynamic borrow of the exact declaring type.
     ///
     /// # Returns
     ///
@@ -335,6 +476,10 @@ impl FieldDescriptor {
     /// Returns a target mismatch, read-only/skipped policy, or unavailable-
     /// adapter error before invoking generated code. The returned exclusive
     /// borrow cannot outlive `target`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: The exclusive dynamic borrow of the exact declaring type.
     ///
     /// # Returns
     ///
@@ -363,6 +508,11 @@ impl FieldDescriptor {
     /// [`FieldSetFailure::recovery`]. A symbolic definition-level field has no
     /// exact runtime identity and therefore reports
     /// [`FieldAccessError::Unavailable`].
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: The exclusive dynamic borrow of the exact declaring type.
+    /// - `value`: The owned replacement with the field's expected type.
     ///
     /// # Returns
     ///
@@ -411,6 +561,19 @@ impl FieldDescriptor {
     }
 
     /// Reads this field while preserving a thread-safe erased boundary.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: A thread-safe shared borrow of the exact declaring type.
+    ///
+    /// # Returns
+    ///
+    /// Returns a thread-safe shared borrow of the field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an access error for a target mismatch, disallowed policy,
+    /// unavailable adapter, or inactive enum variant.
     pub fn get_thread_safe<'a>(
         &self,
         target: DynamicRef<'a, ThreadSafe>,
@@ -422,6 +585,19 @@ impl FieldDescriptor {
     }
 
     /// Mutably reads this field while preserving a thread-safe erased boundary.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: A thread-safe exclusive borrow of the exact declaring type.
+    ///
+    /// # Returns
+    ///
+    /// Returns a thread-safe exclusive borrow of the field.
+    ///
+    /// # Errors
+    ///
+    /// Returns an access error for a target mismatch, disallowed policy,
+    /// unavailable adapter, or inactive enum variant.
     pub fn get_mut_thread_safe<'a>(
         &self,
         target: DynamicMut<'a, ThreadSafe>,
@@ -433,6 +609,20 @@ impl FieldDescriptor {
     }
 
     /// Replaces this field through thread-safe dynamic values.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: A thread-safe exclusive borrow of the exact declaring type.
+    /// - `value`: The owned thread-safe replacement value.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after replacement succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the structured error and retains the replacement when validation
+    /// fails before adapter execution.
     pub fn set_thread_safe(
         &self,
         target: DynamicMut<'_, ThreadSafe>,
@@ -473,6 +663,18 @@ impl FieldDescriptor {
     }
 
     /// Validates a shared target without consuming or changing it.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: The shared borrow whose exact root type is checked.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the target matches this field's declaring type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a target-type mismatch associated with this field.
     fn validate_shared_target(&self, target: &ReflectedRef<'_>) -> Result<(), FieldAccessError> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(target);
@@ -480,6 +682,18 @@ impl FieldDescriptor {
     }
 
     /// Validates a mutable target without consuming or changing it.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: The mutable borrow whose exact root type is checked.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the target matches this field's declaring type.
+    ///
+    /// # Errors
+    ///
+    /// Returns a target-type mismatch associated with this field.
     fn validate_mutable_target(&self, target: &ReflectedMut<'_>) -> Result<(), FieldAccessError> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_mut_type_id(target);
@@ -488,11 +702,20 @@ impl FieldDescriptor {
 
     /// Compares exact target identities and attaches this field's identity to
     /// a mismatch.
-    fn validate_target_identity(
-        &self,
-        expected: std::any::TypeId,
-        actual: std::any::TypeId,
-    ) -> Result<(), FieldAccessError> {
+    ///
+    /// # Parameters
+    ///
+    /// - `expected`: The declaring root's exact process-local type identity.
+    /// - `actual`: The supplied target's exact process-local type identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the identities match.
+    ///
+    /// # Errors
+    ///
+    /// Returns a mismatch carrying this field's source identity otherwise.
+    fn validate_target_identity(&self, expected: TypeId, actual: TypeId) -> Result<(), FieldAccessError> {
         if actual == expected {
             Ok(())
         } else {
@@ -506,6 +729,18 @@ impl FieldDescriptor {
     }
 
     /// Enforces skip and read-only policy before dispatching an adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `operation`: The requested read or mutation operation.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the field policy allows the operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a skipped or read-only error when policy forbids the operation.
     fn validate_policy(&self, operation: FieldAccessOperation) -> Result<(), FieldAccessError> {
         match (self.access_policy, operation) {
             (FieldAccessPolicy::Skipped, _) => Err(FieldAccessError::Skipped {
@@ -524,7 +759,12 @@ impl FieldDescriptor {
 
     /// Returns the exact runtime identity and diagnostic name for a concrete
     /// resolved or explicitly opaque field.
-    fn concrete_field_identity(&self) -> Option<(std::any::TypeId, &'static str)> {
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-local type ID and diagnostic name, or `None` for a
+    /// symbolic field type.
+    fn concrete_field_identity(&self) -> Option<(TypeId, &'static str)> {
         match self.field_type() {
             TypeRef::Resolved(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
             TypeRef::Opaque(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
@@ -533,6 +773,14 @@ impl FieldDescriptor {
     }
 
     /// Builds the source identity included in every field access error.
+    ///
+    /// # Returns
+    ///
+    /// Returns this field's stable source identity, including variant context.
+    ///
+    /// # Panics
+    ///
+    /// Panics if variant index and variant name metadata are inconsistent.
     fn identity(&self) -> FieldIdentity {
         let declaring_type = self.declaring_type();
         match (self.variant_index, self.variant_rust_name) {
@@ -557,6 +805,14 @@ impl FieldDescriptor {
     }
 
     /// Builds an unavailable-adapter error for `operation`.
+    ///
+    /// # Parameters
+    ///
+    /// - `operation`: The operation for which no adapter is available.
+    ///
+    /// # Returns
+    ///
+    /// Returns an unavailable-adapter error associated with this field.
     fn unavailable(&self, operation: FieldAccessOperation) -> FieldAccessError {
         FieldAccessError::Unavailable {
             field: self.identity(),
@@ -565,6 +821,15 @@ impl FieldDescriptor {
     }
 
     /// Pairs a pre-execution set error with the untouched replacement value.
+    ///
+    /// # Parameters
+    ///
+    /// - `error`: The validation or dispatch error.
+    /// - `value`: The original replacement value retained for recovery.
+    ///
+    /// # Returns
+    ///
+    /// Returns a failure that owns the error and replacement recovery.
     fn set_failure(&self, error: FieldAccessError, value: ReflectedOwned) -> FieldSetFailure {
         FieldSetFailure::before_execution(error, self.identity(), self.query_name, value)
     }
@@ -573,6 +838,18 @@ impl FieldDescriptor {
 impl fmt::Debug for FieldDescriptor {
     /// Formats local facts without following declaring or field-type
     /// relationships recursively.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after formatting the local metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error if writing to `formatter` fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("FieldDescriptor")

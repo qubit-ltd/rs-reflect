@@ -91,6 +91,16 @@ impl EffectiveTypeView {
 
     /// Looks up one of the same frozen effective entries returned by
     /// [`Self::methods`].
+    ///
+    /// # Parameters
+    ///
+    /// - `qualifier`: The inherent, trait, or unqualified method namespace.
+    /// - `name`: The method query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Missing`, the unique effective method, or `Ambiguous` when
+    /// multiple namespaces or specializations match.
     pub fn lookup_method<'a>(&'a self, qualifier: MethodQualifier<'_>, name: &str) -> MethodLookup<'a> {
         let mut found = None;
         for (implementation, instance) in self.method_implementations.iter().zip(&self.methods) {

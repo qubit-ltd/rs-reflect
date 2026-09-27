@@ -39,6 +39,15 @@ use crate::ir::HelperValueIr;
 use crate::ir::TraitDeclarationIr;
 
 /// Returns inherited associated types explicitly proven for a dyn root.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated trait declaration containing dyn-compatible
+///   attributes.
+///
+/// # Returns
+///
+/// Returns each declared inherited associated type path in source order.
 pub(super) fn dyn_inherited_associated_types(
     declaration: &TraitDeclarationIr,
 ) -> impl Iterator<Item = &crate::ir::PathIr> {
@@ -53,6 +62,16 @@ pub(super) fn dyn_inherited_associated_types(
 }
 
 /// Adds explicit inherited bindings to one reflected dyn supertrait path.
+///
+/// # Parameters
+///
+/// - `path`: Parsed reflected supertrait path to augment.
+/// - `declaration`: Validated declaration containing proven inherited bindings.
+///
+/// # Returns
+///
+/// Returns the generated supertrait path with explicit bindings and static
+/// lifetimes.
 pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDeclarationIr) -> TokenStream {
     let mut syntax: Path =
         parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
@@ -93,6 +112,16 @@ pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaratio
 }
 
 /// Builds inherited associated bindings for an external supertrait identity.
+///
+/// # Parameters
+///
+/// - `path`: Parsed external supertrait path.
+/// - `declaration`: Validated declaration containing inherited bindings.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns expressions describing applicable inherited associated types.
 pub(super) fn dyn_inherited_arguments_for_supertrait(
     path: &crate::ir::PathIr,
     declaration: &TraitDeclarationIr,
@@ -124,6 +153,16 @@ pub(super) fn dyn_inherited_arguments_for_supertrait(
 }
 
 /// Returns whether `Supertrait::Item` names an item on this direct bound.
+///
+/// # Parameters
+///
+/// - `inherited`: Fully qualified inherited associated item path.
+/// - `supertrait`: Direct supertrait path to compare against.
+///
+/// # Returns
+///
+/// Returns whether the inherited path extends the direct supertrait by one
+/// segment.
 pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, supertrait: &crate::ir::PathIr) -> bool {
     inherited.segments.len() == supertrait.segments.len() + 1
         && inherited
@@ -140,6 +179,16 @@ pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, sup
 /// define which concrete application a declaration-level macro should choose.
 /// Supertraits are limited to standard traits whose dyn compatibility is known
 /// without inspecting another macro expansion.
+///
+/// # Parameters
+///
+/// - `item`: Parsed Rust trait item.
+/// - `declaration`: Validated trait metadata and helper attributes.
+///
+/// # Returns
+///
+/// Returns whether this trait can be treated as dyn-compatible by this
+/// analysis.
 pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
     if declaration
         .attributes
@@ -171,6 +220,14 @@ pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDe
 
 /// Returns whether one supertrait bound is known locally to preserve dyn
 /// compatibility.
+///
+/// # Parameters
+///
+/// - `bound`: Rust supertrait bound to inspect.
+///
+/// # Returns
+///
+/// Returns whether the bound is on the locally recognized safe list.
 pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
     match bound {
         TypeParamBound::Lifetime(_) => true,
@@ -219,12 +276,28 @@ pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
 
 /// Returns whether a dyn application must name a concrete binding for this
 /// associated type.
+///
+/// # Parameters
+///
+/// - `associated`: Parsed associated type declaration.
+///
+/// # Returns
+///
+/// Returns whether the associated type requires a dyn binding.
 pub(super) fn associated_type_requires_dyn_binding(associated: &TraitItemType) -> bool {
     !where_clause_requires_sized_self(associated.generics.where_clause.as_ref())
 }
 
 /// Returns whether one method is dispatchable through a trait object or is
 /// explicitly excluded from the vtable by `Self: Sized`.
+///
+/// # Parameters
+///
+/// - `method`: Parsed trait method declaration.
+///
+/// # Returns
+///
+/// Returns whether the method is valid on a dyn-dispatchable trait object.
 pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
     if where_clause_requires_sized_self(method.sig.generics.where_clause.as_ref()) {
         return true;
@@ -264,6 +337,14 @@ pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
 }
 
 /// Returns whether a method receiver is one of Rust's dyn-dispatchable forms.
+///
+/// # Parameters
+///
+/// - `receiver`: Parsed method receiver.
+///
+/// # Returns
+///
+/// Returns whether the receiver syntax is supported for trait-object dispatch.
 pub(super) fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
     if receiver.colon_token.is_none() {
         return true;
@@ -272,6 +353,14 @@ pub(super) fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
 }
 
 /// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
+///
+/// # Parameters
+///
+/// - `ty`: Explicit receiver type to inspect recursively.
+///
+/// # Returns
+///
+/// Returns whether the type resolves to a supported trait-object receiver.
 pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
     match ty {
         Type::Path(path) if path.qself.is_none() && path.path.is_ident("Self") => true,
@@ -300,6 +389,14 @@ pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
 }
 
 /// Returns whether `Self` occurs outside an associated-type projection.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream to scan recursively.
+///
+/// # Returns
+///
+/// Returns whether an unprojected `Self` identifier occurs.
 pub(super) fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
     let tokens: Vec<_> = tokens.into_iter().collect();
     tokens.iter().enumerate().any(|(index, token)| match token {
@@ -317,6 +414,14 @@ pub(super) fn tokens_contain_unprojected_self(tokens: TokenStream) -> bool {
 }
 
 /// Returns whether a where clause contains a direct `Self: Sized` predicate.
+///
+/// # Parameters
+///
+/// - `where_clause`: Optional parsed where clause.
+///
+/// # Returns
+///
+/// Returns whether the clause excludes the method or type from trait objects.
 pub(super) fn where_clause_requires_sized_self(where_clause: Option<&WhereClause>) -> bool {
     where_clause.is_some_and(|where_clause| {
         where_clause.predicates.iter().any(|predicate| {
@@ -334,11 +439,29 @@ pub(super) fn where_clause_requires_sized_self(where_clause: Option<&WhereClause
 }
 
 /// Returns whether a token stream contains the standalone `Self` type name.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream to scan recursively.
+///
+/// # Returns
+///
+/// Returns whether a standalone `Self` identifier occurs.
 pub(super) fn tokens_contain_self(tokens: TokenStream) -> bool {
     tokens_contain_ident(tokens, "Self")
 }
 
 /// Returns whether a token stream contains one standalone identifier.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream to scan recursively.
+/// - `expected`: Identifier spelling to find.
+///
+/// # Returns
+///
+/// Returns whether the identifier occurs outside literal and punctuation
+/// tokens.
 pub(super) fn tokens_contain_ident(tokens: TokenStream, expected: &str) -> bool {
     tokens.into_iter().any(|token| match token {
         TokenTree::Ident(identifier) => identifier == expected,
@@ -353,7 +476,7 @@ mod tests {
     use syn::Path;
     use syn::parse_str;
     #[test]
-    fn inherited_binding_and_projection_are_analyzed_in_one_module() {
+    fn test_inherited_binding_and_projection_are_analyzed_in_one_module() {
         let supertrait = crate::parse::convert_path(&parse_str::<Path>("Base").unwrap());
         let inherited = crate::parse::convert_path(&parse_str::<Path>("Base::Assoc").unwrap());
         assert!(super::inherited_belongs_to_supertrait(&inherited, &supertrait));

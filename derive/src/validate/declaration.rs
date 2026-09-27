@@ -35,6 +35,15 @@ use crate::ir::ValidatedDeclaration;
 ///
 /// Returns a combined `syn::Error` whose component spans point at the offending
 /// helpers.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed declaration whose locally provable rules are
+///   checked.
+///
+/// # Returns
+///
+/// Returns validated IR or aggregated validation diagnostics.
 #[allow(
     dead_code,
     reason = "the staged validation API is exercised directly by unit tests and later expansion tasks"
@@ -49,6 +58,14 @@ pub(crate) fn validate_declaration(declaration: ParsedDeclaration) -> syn::Resul
 }
 
 /// Collects semantic diagnostics without consuming the parsed declaration.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed declaration to inspect.
+///
+/// # Returns
+///
+/// Returns combined diagnostics, or `None` when validation succeeds.
 pub(crate) fn validation_error(declaration: &DeclarationIr) -> Option<syn::Error> {
     let mut errors = ErrorCollector::default();
     match declaration {
@@ -60,6 +77,11 @@ pub(crate) fn validation_error(declaration: &DeclarationIr) -> Option<syn::Error
 }
 
 /// Validates a struct, enum, or rejected union declaration.
+///
+/// # Parameters
+///
+/// - `declaration`: Type declaration and nested members to validate.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
     validate_attributes(&declaration.attributes, errors);
     if declaration.generics.params.is_empty() {
@@ -116,6 +138,11 @@ fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
 }
 
 /// Validates field helper policies in source order.
+///
+/// # Parameters
+///
+/// - `fields`: Fields to validate.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_fields(fields: &[crate::ir::FieldIr], errors: &mut ErrorCollector) {
     for field in fields {
         validate_attributes(&field.attributes, errors);
@@ -140,6 +167,11 @@ fn validate_fields(fields: &[crate::ir::FieldIr], errors: &mut ErrorCollector) {
 }
 
 /// Validates trait-level mappings, methods, and associated-item helpers.
+///
+/// # Parameters
+///
+/// - `declaration`: Trait declaration and its members to validate.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
     validate_attributes(&declaration.attributes, errors);
     validate_query_name(&declaration.attributes, &declaration.name.to_string(), errors);
@@ -199,6 +231,11 @@ fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector)
 
 /// Validates impl-level identity, specialization, methods, and associated
 /// items.
+///
+/// # Parameters
+///
+/// - `declaration`: Impl declaration and its members to validate.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_impl(declaration: &ImplDeclarationIr, errors: &mut ErrorCollector) {
     validate_attributes(&declaration.attributes, errors);
     if declaration.trait_path.is_none() {
@@ -232,6 +269,11 @@ fn validate_impl(declaration: &ImplDeclarationIr, errors: &mut ErrorCollector) {
 }
 
 /// Validates one method and each of its concrete specialization declarations.
+///
+/// # Parameters
+///
+/// - `method`: Method and its reflection policies.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_method(method: &MethodIr, errors: &mut ErrorCollector) {
     validate_attributes(&method.attributes, errors);
     if method.qualifiers.is_async
@@ -253,6 +295,11 @@ fn validate_method(method: &MethodIr, errors: &mut ErrorCollector) {
 
 /// Validates legality, cardinality, values, and mutually exclusive helper
 /// policies.
+///
+/// # Parameters
+///
+/// - `attributes`: Helper occurrences attached to one declaration.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
     let mut seen = HashMap::new();
     for attribute in attributes {
@@ -289,6 +336,11 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
 }
 
 /// Validates policy pairs that would otherwise request contradictory adapters.
+///
+/// # Parameters
+///
+/// - `attributes`: Helper occurrences attached to one declaration.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
     if let Some(skip) = attributes.iter().find(|attribute| attribute.name == HelperName::Skip) {
         let conflicts = match skip.target {
@@ -313,6 +365,13 @@ fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollec
 }
 
 /// Reports one mutually exclusive helper pair when both keys are present.
+///
+/// # Parameters
+///
+/// - `attributes`: Helper occurrences to inspect.
+/// - `left`: First policy in the diagnostic pair.
+/// - `right`: Conflicting policy to find.
+/// - `errors`: Collector for independent diagnostics.
 fn report_conflict(attributes: &[HelperAttributeIr], left: HelperName, right: HelperName, errors: &mut ErrorCollector) {
     if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == right) {
         errors.push(syn::Error::new(
@@ -323,6 +382,12 @@ fn report_conflict(attributes: &[HelperAttributeIr], left: HelperName, right: He
 }
 
 /// Validates that rename literals are non-empty.
+///
+/// # Parameters
+///
+/// - `attributes`: Helper occurrences attached to one declaration.
+/// - `rust_name`: Source member name used in diagnostics.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_query_name(attributes: &[HelperAttributeIr], rust_name: &str, errors: &mut ErrorCollector) {
     if let Some(rename) = attributes.iter().find(|attribute| attribute.name == HelperName::Rename)
         && rename.rename().is_some_and(str::is_empty)
@@ -335,6 +400,12 @@ fn validate_query_name(attributes: &[HelperAttributeIr], rust_name: &str, errors
 }
 
 /// Validates query-name uniqueness in one member scope.
+///
+/// # Parameters
+///
+/// - `members`: Source names, helper lists, and spans for one member scope.
+/// - `member_kind`: Diagnostic label for this scope.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_query_name_scope<'a>(
     members: impl Iterator<Item = (String, &'a Vec<HelperAttributeIr>, Span)>,
     member_kind: &str,
@@ -360,6 +431,11 @@ fn validate_query_name_scope<'a>(
 }
 
 /// Validates query-name uniqueness across methods in one trait or impl.
+///
+/// # Parameters
+///
+/// - `methods`: Methods in the containing trait or impl.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector) {
     validate_query_name_scope(
         methods
@@ -371,6 +447,11 @@ fn validate_method_query_names(methods: &[MethodIr], errors: &mut ErrorCollector
 }
 
 /// Validates external trait IDs and detects same-input path or ID conflicts.
+///
+/// # Parameters
+///
+/// - `declaration`: Trait declaration and its direct supertrait mappings.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
     let direct_supertraits: HashSet<_> = declaration
         .supertraits
@@ -438,6 +519,12 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
 
 /// Validates the stable dot-separated identifier grammar and reserved
 /// namespace.
+///
+/// # Parameters
+///
+/// - `value`: Candidate external identity.
+/// - `span`: Source span for diagnostics.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_stable_id(value: &str, span: Span, errors: &mut ErrorCollector) {
     let valid = !value.is_empty()
         && value.split('.').all(|segment| {
@@ -463,6 +550,12 @@ fn validate_stable_id(value: &str, span: Span, errors: &mut ErrorCollector) {
 
 /// Validates named specialization completeness and RHS syntax by parameter
 /// kind.
+///
+/// # Parameters
+///
+/// - `specialization`: Named concrete bindings to validate.
+/// - `generics`: Generic parameter declaration to compare against.
+/// - `errors`: Collector for independent diagnostics.
 fn validate_specialization(specialization: &SpecializationIr, generics: &GenericsIr, errors: &mut ErrorCollector) {
     let expected: HashMap<_, _> = generics
         .params

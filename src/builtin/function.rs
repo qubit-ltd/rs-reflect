@@ -8,6 +8,8 @@
 
 //! Reflection descriptors for portable function-pointer signatures.
 
+use std::any::type_name;
+
 use crate::__private::LazyTypeRef;
 use crate::builtin::interner;
 use crate::descriptor::FunctionPointerKind;
@@ -16,6 +18,25 @@ use crate::descriptor::TypeDescriptor;
 use crate::expression::FunctionAbi;
 
 /// Creates a function-pointer descriptor from deferred signature parts.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete function-pointer type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `kind`: Safe or unsafe call classification.
+/// - `abi`: Calling convention represented by the function pointer.
+/// - `parameters`: Deferred relationships for the ordered input types.
+/// - `return_type`: Deferred relationship for the output type.
+///
+/// # Returns
+///
+/// A descriptor that resolves the signature relationships when navigated.
+///
+/// The ABI and relationship records are allocated for process-lifetime use and
+/// intentionally leaked so the descriptor can retain static references.
+#[must_use]
 fn descriptor<T: ?Sized + 'static>(
     kind: FunctionPointerKind,
     abi: FunctionAbi,
@@ -25,11 +46,31 @@ fn descriptor<T: ?Sized + 'static>(
     let abi = Box::leak(Box::new(abi));
     let parameters = crate::__private::descriptor::lazy_type_ref_list(parameters);
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function_lazy::<T>(std::any::type_name::<T>(), kind, abi, false, parameters, return_type)
+    TypeDescriptor::new_function_lazy::<T>(type_name::<T>(), kind, abi, false, parameters, return_type)
 }
 
 /// Creates a C-variadic function-pointer descriptor from deferred signature
 /// parts.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete variadic function-pointer type represented by the
+///   descriptor.
+///
+/// # Parameters
+///
+/// - `kind`: Safe or unsafe call classification.
+/// - `parameters`: Deferred relationships for the fixed input types.
+/// - `return_type`: Deferred relationship for the output type.
+///
+/// # Returns
+///
+/// A descriptor marked as C variadic, with the signature relationships
+/// resolved only when navigated.
+///
+/// The ABI and relationship records are allocated for process-lifetime use and
+/// intentionally leaked so the descriptor can retain static references.
+#[must_use]
 fn variadic_descriptor<T: ?Sized + 'static>(
     kind: FunctionPointerKind,
     parameters: Vec<LazyTypeRef>,
@@ -38,13 +79,18 @@ fn variadic_descriptor<T: ?Sized + 'static>(
     let abi = Box::leak(Box::new(FunctionAbi::C));
     let parameters = crate::__private::descriptor::lazy_type_ref_list(parameters);
     let return_type = Box::leak(Box::new(return_type));
-    TypeDescriptor::new_function_lazy::<T>(std::any::type_name::<T>(), kind, abi, true, parameters, return_type)
+    TypeDescriptor::new_function_lazy::<T>(type_name::<T>(), kind, abi, true, parameters, return_type)
 }
 
 macro_rules! impl_function_pointers {
     ($($argument:ident),*) => {
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this safe Rust function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -57,6 +103,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this unsafe Rust function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
@@ -69,6 +120,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for extern "C" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this safe C function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -81,6 +137,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "C" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this unsafe C function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
@@ -93,6 +154,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for extern "C-unwind" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this safe C-unwind function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -105,6 +171,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "C-unwind" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this unsafe C-unwind function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
@@ -117,6 +188,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for extern "system" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this safe system function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -129,6 +205,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "system" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this unsafe system function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
@@ -141,6 +222,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for extern "system-unwind" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this safe system-unwind function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -153,6 +239,11 @@ macro_rules! impl_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "system-unwind" fn($($argument),*) -> Return {
             /// Returns the interned descriptor for this unsafe system-unwind function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for this function pointer's ABI, argument
+            /// types, and return type.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| descriptor::<Self>(
                     FunctionPointerKind::Unsafe,
@@ -219,6 +310,11 @@ macro_rules! impl_c_variadic_function_pointers {
     ($($argument:ident),*) => {
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for extern "C" fn($($argument,)* ...) -> Return {
             /// Returns the interned descriptor for this safe C-variadic function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for its ABI, fixed argument types, and
+            /// return type; the descriptor also records its variadic status.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| variadic_descriptor::<Self>(
                     FunctionPointerKind::Safe,
@@ -230,6 +326,11 @@ macro_rules! impl_c_variadic_function_pointers {
 
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "C" fn($($argument,)* ...) -> Return {
             /// Returns the interned descriptor for this unsafe C-variadic function pointer.
+            ///
+            /// # Returns
+            ///
+            /// The shared descriptor for its ABI, fixed argument types, and
+            /// return type; the descriptor also records its variadic status.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| variadic_descriptor::<Self>(
                     FunctionPointerKind::Unsafe,

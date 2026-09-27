@@ -93,11 +93,23 @@ pub struct TraitDescriptor {
 
 impl TraitDescriptor {
     /// Starts an applied trait builder for `definition`.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Declaration whose concrete application is being built.
+    ///
+    /// # Returns
+    ///
+    /// Returns an empty builder for that trait declaration.
     pub fn builder(definition: &'static TraitDefinitionDescriptor) -> TraitDescriptorBuilder {
         TraitDescriptorBuilder::new(definition)
     }
 
     /// Returns the declaration-level descriptor shared by every application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source declaration descriptor.
     #[must_use]
     #[inline]
     pub const fn definition(&self) -> &'static TraitDefinitionDescriptor {
@@ -105,6 +117,10 @@ impl TraitDescriptor {
     }
 
     /// Returns the reflected marker or external identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete applied trait identity.
     #[must_use]
     #[inline]
     pub const fn trait_id(&self) -> &AppliedTraitId {
@@ -112,6 +128,10 @@ impl TraitDescriptor {
     }
 
     /// Returns concrete generic arguments in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the ordered concrete type and const arguments.
     #[must_use]
     #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
@@ -120,6 +140,10 @@ impl TraitDescriptor {
 
     /// Returns concrete associated-type equalities required by this applied
     /// trait object or application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete associated-type equalities.
     #[must_use]
     #[inline]
     pub const fn associated_type_arguments(&self) -> &[GenericArgument] {
@@ -127,6 +151,10 @@ impl TraitDescriptor {
     }
 
     /// Returns the Rust declaration name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source trait name.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -134,6 +162,10 @@ impl TraitDescriptor {
     }
 
     /// Returns the diagnostic fully qualified Rust path.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source trait path.
     #[must_use]
     #[inline]
     pub const fn rust_path(&self) -> &'static str {
@@ -141,6 +173,10 @@ impl TraitDescriptor {
     }
 
     /// Returns the lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -148,6 +184,10 @@ impl TraitDescriptor {
     }
 
     /// Returns whether this descriptor contains a complete declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the completeness classification.
     #[must_use]
     #[inline]
     pub const fn completeness(&self) -> TraitCompleteness {
@@ -155,6 +195,10 @@ impl TraitDescriptor {
     }
 
     /// Returns direct supertraits in source declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the direct applied supertrait references.
     #[must_use]
     #[inline]
     pub const fn direct_supertraits(&self) -> &[TraitDescriptorRef] {
@@ -162,6 +206,10 @@ impl TraitDescriptor {
     }
 
     /// Returns the sorted, duplicate-free, transitive supertrait closure.
+    ///
+    /// # Returns
+    ///
+    /// Returns a deterministic view of every transitive supertrait.
     #[must_use]
     #[inline]
     pub const fn all_supertraits(&self) -> SupertraitClosure<'_> {
@@ -171,6 +219,10 @@ impl TraitDescriptor {
     }
 
     /// Returns method declarations in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the applied method declarations.
     #[must_use]
     #[inline]
     pub const fn methods(&self) -> &[MethodDescriptor] {
@@ -180,12 +232,24 @@ impl TraitDescriptor {
     /// Finds a method by query name.
     ///
     /// `None` means this applied trait has no method with the requested name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Method query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the method declaration, or `None` when no method matches.
     #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)
     }
 
     /// Returns associated type declarations in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the applied associated type declarations.
     #[must_use]
     #[inline]
     pub const fn associated_types(&self) -> &[AssociatedTypeDescriptor] {
@@ -195,12 +259,24 @@ impl TraitDescriptor {
     /// Finds an associated type by query name.
     ///
     /// `None` means no associated type has the requested name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Associated-type query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated type, or `None` when no item matches.
     #[must_use]
     pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
         self.associated_types.iter().find(|item| item.query_name() == name)
     }
 
     /// Returns associated constant declarations in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the applied associated constant declarations.
     #[must_use]
     #[inline]
     pub const fn associated_consts(&self) -> &[AssociatedConstDescriptor] {
@@ -210,12 +286,28 @@ impl TraitDescriptor {
     /// Finds an associated constant by query name.
     ///
     /// `None` means no associated constant has the requested name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Associated-constant query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated constant, or `None` when no item matches.
     #[must_use]
     pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
         self.associated_consts.iter().find(|item| item.query_name() == name)
     }
 
     /// Returns whether two descriptors are the same concrete trait application.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Applied trait to compare with this descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when both descriptors have the same complete identity.
     #[must_use]
     pub fn same_application(&self, other: &Self) -> bool {
         self.trait_id == other.trait_id

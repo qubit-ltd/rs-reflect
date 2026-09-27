@@ -25,6 +25,20 @@ use crate::ir::TypeKindIr;
 
 /// Generates one concrete local adapter hook for a safely erasable default
 /// method and the payload entry that exposes it to reflected impl expansion.
+///
+/// # Parameters
+///
+/// - `method`: Validated trait method to adapt.
+/// - `index`: Method position used in generated identities.
+/// - `suffix`: Stable generated-name suffix for this trait declaration.
+/// - `trait_name`: Diagnostic trait name retained in invocation identities.
+/// - `hook_type_bounds`: Bounds required by generated trait payload hooks.
+/// - `facade`: Runtime facade path used by generated references.
+/// - `_context`: Expansion context retained for the shared adapter interface.
+///
+/// # Returns
+///
+/// Returns generated adapter and descriptor entry when invocation is supported.
 pub(super) fn default_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
@@ -493,6 +507,20 @@ pub(super) fn default_method_invocation_adapter(
 
 /// Generates a typed local adapter for a default `Pin<&Self>` or
 /// `Pin<&mut Self>` receiver without erasing its pin proof.
+///
+/// # Parameters
+///
+/// - `method`: Validated trait method to adapt.
+/// - `index`: Method position used in generated identities.
+/// - `suffix`: Stable generated-name suffix for this trait declaration.
+/// - `trait_name`: Diagnostic trait name retained in invocation identities.
+/// - `hook_type_bounds`: Bounds required by generated trait payload hooks.
+/// - `facade`: Runtime facade path used by generated references.
+/// - `pinned_mutable`: Whether the receiver is `Pin<&mut Self>`.
+///
+/// # Returns
+///
+/// Returns the generated adapter item and descriptor entry.
 fn default_pinned_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
@@ -608,6 +636,14 @@ fn default_pinned_method_invocation_adapter(
 
 /// Returns whether a dynamic signature contains an associated type whose
 /// concrete `'static` bound cannot be proven at the trait declaration site.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed signature type to inspect recursively.
+///
+/// # Returns
+///
+/// Returns whether the type contains an associated type or unknown syntax.
 pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_associated_type(path),
@@ -629,6 +665,14 @@ pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
 }
 
 /// Recursively checks associated bindings and nested arguments on one path.
+///
+/// # Parameters
+///
+/// - `path`: Parsed path and its generic arguments.
+///
+/// # Returns
+///
+/// Returns whether the path contains an associated type or unknown syntax.
 fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
     path.qualified_self.is_some()
         || (path.segments.len() > 1 && path.segments[0].name == "Self")
@@ -652,6 +696,14 @@ fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
 }
 
 /// Checks whether one trait or lifetime bound contains an associated binding.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed generic bound to inspect.
+///
+/// # Returns
+///
+/// Returns whether the bound contains an associated type or unknown syntax.
 fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
     match bound {
         GenericBoundIr::Trait { path, .. } => path_contains_associated_type(path),

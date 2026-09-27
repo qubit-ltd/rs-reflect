@@ -16,6 +16,14 @@ use crate::expression::ExpressionName;
 ///
 /// Named lifetimes omit the leading apostrophe so they can be compared and
 /// displayed without retaining parser tokens.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::LifetimeExpression;
+/// let lifetime = LifetimeExpression::named("a").expect("valid lifetime name");
+/// assert_eq!(lifetime, LifetimeExpression::Named("a".into()));
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LifetimeExpression {
     /// The distinguished `'static` lifetime.
@@ -30,6 +38,14 @@ pub enum LifetimeExpression {
 
 impl LifetimeExpression {
     /// Creates a named lifetime expression without the leading apostrophe.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Lifetime name without the leading apostrophe.
+    ///
+    /// # Returns
+    ///
+    /// Returns the named lifetime expression.
     ///
     /// # Errors
     ///

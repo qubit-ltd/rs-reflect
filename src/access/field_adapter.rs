@@ -8,6 +8,7 @@
 
 //! Safe function-pointer boundaries used by generated field adapters.
 
+use std::any::Any;
 use std::any::TypeId;
 
 use crate::access::FieldAccessError;
@@ -51,6 +52,19 @@ pub type ThreadSafeFieldSetAdapter =
 pub type ThreadSafeFieldSetPreflightAdapter = for<'a> fn(&DynamicMut<'a, ThreadSafe>) -> Result<(), FieldAccessError>;
 
 /// Returns the exact type identity carried by a local shared dynamic value.
+///
+/// # Parameters
+///
+/// - `value`: Shared dynamic value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local `TypeId`; string values use the unsized `str` identity.
+///
+/// # Panics
+///
+/// Panics in debug builds if a value without an `Any` identity is not a string.
+#[must_use]
 pub(crate) fn dynamic_ref_type_id(value: &DynamicRef<'_, Local>) -> TypeId {
     match value.as_any() {
         Some(value) => value.type_id(),
@@ -62,6 +76,19 @@ pub(crate) fn dynamic_ref_type_id(value: &DynamicRef<'_, Local>) -> TypeId {
 }
 
 /// Returns the exact type identity carried by a local mutable dynamic value.
+///
+/// # Parameters
+///
+/// - `value`: Mutable dynamic value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local `TypeId`; string values use the unsized `str` identity.
+///
+/// # Panics
+///
+/// Panics in debug builds if a value without an `Any` identity is not a string.
+#[must_use]
 pub(crate) fn dynamic_mut_type_id(value: &DynamicMut<'_, Local>) -> TypeId {
     match value.as_any() {
         Some(value) => value.type_id(),
@@ -73,6 +100,20 @@ pub(crate) fn dynamic_mut_type_id(value: &DynamicMut<'_, Local>) -> TypeId {
 }
 
 /// Returns the exact type identity carried by a local owned dynamic value.
+///
+/// # Parameters
+///
+/// - `value`: Owned dynamic value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local identity of the owned value's concrete type.
+///
+/// # Panics
+///
+/// Panics if the local owned value does not expose an `Any` value. The local
+/// owned representation guarantees this invariant.
+#[must_use]
 pub(crate) fn dynamic_owned_type_id(value: &DynamicOwned<Local>) -> TypeId {
     value
         .as_any()
@@ -81,23 +122,55 @@ pub(crate) fn dynamic_owned_type_id(value: &DynamicOwned<Local>) -> TypeId {
 }
 
 /// Returns the exact identity carried by a thread-safe shared value.
+///
+/// # Parameters
+///
+/// - `value`: Shared thread-safe value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local `TypeId`; string values use the unsized `str` identity.
+#[must_use]
 pub(crate) fn thread_safe_ref_type_id(value: &DynamicRef<'_, ThreadSafe>) -> TypeId {
     value
         .as_any()
-        .map_or_else(TypeId::of::<str>, |value| (value as &dyn std::any::Any).type_id())
+        .map_or_else(TypeId::of::<str>, |value| (value as &dyn Any).type_id())
 }
 
 /// Returns the exact identity carried by a thread-safe mutable value.
+///
+/// # Parameters
+///
+/// - `value`: Mutable thread-safe value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local `TypeId`; string values use the unsized `str` identity.
+#[must_use]
 pub(crate) fn thread_safe_mut_type_id(value: &DynamicMut<'_, ThreadSafe>) -> TypeId {
     value
         .as_any()
-        .map_or_else(TypeId::of::<str>, |value| (value as &dyn std::any::Any).type_id())
+        .map_or_else(TypeId::of::<str>, |value| (value as &dyn Any).type_id())
 }
 
 /// Returns the exact identity carried by a thread-safe owned value.
+///
+/// # Parameters
+///
+/// - `value`: Owned thread-safe value whose concrete type is inspected.
+///
+/// # Returns
+///
+/// The process-local identity of the owned value's concrete type.
+///
+/// # Panics
+///
+/// Panics if the owned value does not expose an `Any` value. The thread-safe
+/// owned representation guarantees this invariant.
+#[must_use]
 pub(crate) fn thread_safe_owned_type_id(value: &DynamicOwned<ThreadSafe>) -> TypeId {
     (value
         .as_any()
-        .expect("thread-safe owned dynamic values are always Any-compatible") as &dyn std::any::Any)
+        .expect("thread-safe owned dynamic values are always Any-compatible") as &dyn Any)
         .type_id()
 }

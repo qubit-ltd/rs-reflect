@@ -19,27 +19,48 @@ use crate::ir::TypeIr;
 /// Identifies a supported reflection helper key.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum HelperName {
+    /// Rename the reflected query name.
     Rename,
+    /// Hide type details behind an opaque descriptor.
     Opaque,
+    /// Declare type capabilities.
     Capabilities,
+    /// Exclude a field, variant, or method from reflection.
     Skip,
+    /// Disable mutation through a field descriptor.
     ReadOnly,
+    /// Disable construction through a field or variant.
     NoConstruct,
+    /// Supply a default value or path.
     Default,
+    /// Disable dynamic method invocation.
     NoInvoke,
+    /// Enable panic-catching invocation.
     CatchUnwind,
+    /// Require thread-safe reflection behavior.
     ThreadSafe,
+    /// Select a concrete generic specialization.
     Specialize,
+    /// Declare an external trait identity on an impl.
     ExternalTraitId,
+    /// Map a trait supertrait to an external identity.
     ExternalTrait,
+    /// Declare a reflected supertrait relationship.
     Supertrait,
+    /// Assert dyn compatibility and inherited bindings.
     DynCompatible,
+    /// Select the runtime crate facade.
     RuntimeCrate,
+    /// Select a v2 type definition provider.
     DefinitionProviderV2,
 }
 
 impl HelperName {
     /// Returns the source spelling of this helper key.
+    ///
+    /// # Returns
+    ///
+    /// Returns the canonical attribute key spelling.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Rename => "rename",
@@ -63,6 +84,14 @@ impl HelperName {
     }
 
     /// Resolves a source helper key, returning `None` for unknown keys.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Source key spelling to resolve.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching helper name, or `None` when unrecognized.
     pub(crate) fn from_str(value: &str) -> Option<Self> {
         HELPER_RULES
             .iter()
@@ -71,6 +100,14 @@ impl HelperName {
     }
 
     /// Returns whether this helper is legal on `target`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Declaration element carrying the helper.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether the shared legality matrix permits the placement.
     pub(crate) fn supports(self, target: HelperTarget) -> bool {
         HELPER_RULES
             .iter()
@@ -82,17 +119,28 @@ impl HelperName {
 /// Identifies the declaration element carrying a helper attribute.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum HelperTarget {
+    /// Type or trait object declaration.
     Type,
+    /// Struct or union field.
     Field,
+    /// Enum variant.
     Variant,
+    /// Method declaration.
     Method,
+    /// Implementation block.
     Impl,
+    /// Trait declaration.
     Trait,
+    /// Associated type or constant.
     AssociatedItem,
 }
 
 impl HelperTarget {
     /// Returns a diagnostic label for this helper target.
+    ///
+    /// # Returns
+    ///
+    /// Returns the human-readable target label.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Type => "type",
@@ -106,6 +154,10 @@ impl HelperTarget {
     }
 
     /// Returns the bit assigned to this target in the static target matrix.
+    ///
+    /// # Returns
+    ///
+    /// Returns the target's unique bit mask.
     const fn bit(self) -> u16 {
         1 << (self as u16)
     }
@@ -113,15 +165,34 @@ impl HelperTarget {
 
 /// A compact set of helper targets used by the shared matrix.
 #[derive(Clone, Copy)]
-struct TargetSet(u16);
+struct TargetSet(
+    /// Bit set of supported `HelperTarget` values.
+    u16,
+);
 
 impl TargetSet {
     /// Creates a target set from its bit representation.
+    ///
+    /// # Parameters
+    ///
+    /// - `bits`: Combined target bit masks.
+    ///
+    /// # Returns
+    ///
+    /// Returns the compact target set.
     const fn new(bits: u16) -> Self {
         Self(bits)
     }
 
     /// Returns whether `target` belongs to this set.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Target to look up.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether its bit is set.
     const fn contains(self, target: HelperTarget) -> bool {
         let Self(bits) = self;
         bits & target.bit() != 0
@@ -130,8 +201,11 @@ impl TargetSet {
 
 /// Describes one supported helper and all targets that accept it.
 struct HelperRule {
+    /// Typed helper key.
     name: HelperName,
+    /// Canonical source spelling accepted by the parser.
     source_name: &'static str,
+    /// Legal declaration targets.
     targets: TargetSet,
 }
 
@@ -250,15 +324,25 @@ pub(crate) struct HelperAttributeIr {
 /// Carries the syntax-specific value of a helper occurrence.
 #[derive(Clone, Debug)]
 pub(crate) enum HelperValueIr {
+    /// A flag helper with no explicit value.
     Flag,
+    /// A query-name override.
     Rename(String),
+    /// One or more Rust paths.
     Paths(Vec<PathIr>),
+    /// Optional path-based default value.
     DefaultPath(Option<PathIr>),
+    /// Named concrete generic specialization.
     Specialization(SpecializationIr),
+    /// Stable external trait identity.
     ExternalTraitId(String),
+    /// External trait path and stable identity mapping.
     ExternalTrait(ExternalTraitIr),
+    /// Explicit inherited associated type bindings for dyn compatibility.
     DynCompatible(Vec<PathIr>),
+    /// Runtime crate facade path.
     RuntimeCrate(PathIr),
+    /// Explicit v2 definition-provider identifier.
     DefinitionProviderV2(syn::Ident),
 }
 
@@ -287,8 +371,11 @@ pub(crate) struct SpecializationBindingIr {
 /// A specialization RHS parsed exactly once at the parser boundary.
 #[derive(Clone, Debug)]
 pub(crate) enum SpecializationValueIr {
+    /// Concrete Rust type argument.
     Type(TypeIr),
+    /// Const expression tokens.
     Const(TokenStream),
+    /// Path syntax retained until generic parameter kind is known.
     AmbiguousPath(TokenStream),
 }
 
@@ -307,6 +394,10 @@ pub(crate) struct ExternalTraitIr {
 
 impl HelperAttributeIr {
     /// Returns a borrowed rename value when this is a `rename` helper.
+    ///
+    /// # Returns
+    ///
+    /// Returns the rename string, or `None` for other helper values.
     pub(crate) fn rename(&self) -> Option<&str> {
         match &self.value {
             HelperValueIr::Rename(value) => Some(value),
@@ -315,6 +406,10 @@ impl HelperAttributeIr {
     }
 
     /// Returns the specialization carried by this helper, if any.
+    ///
+    /// # Returns
+    ///
+    /// Returns the specialization data, or `None` for other helper values.
     pub(crate) fn specialization(&self) -> Option<&SpecializationIr> {
         match &self.value {
             HelperValueIr::Specialization(value) => Some(value),

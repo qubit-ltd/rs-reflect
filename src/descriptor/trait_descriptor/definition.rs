@@ -21,6 +21,14 @@ use crate::expression::TypeExpression;
 use crate::identity::Visibility;
 
 /// How much of a trait declaration is known to reflection.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TraitCompleteness;
+///
+/// assert_ne!(TraitCompleteness::Complete, TraitCompleteness::ExternalIncomplete);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TraitCompleteness {
     /// The trait declaration, supertraits, and associated items are known.
@@ -30,6 +38,18 @@ pub enum TraitCompleteness {
 }
 
 /// Declaration-level facts shared by every concrete application of a trait.
+///
+/// This descriptor is created by generated metadata and shared by all
+/// applications of the same trait declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TraitCompleteness;
+///
+/// let completeness = TraitCompleteness::Complete;
+/// assert_eq!(completeness, TraitCompleteness::Complete);
+/// ```
 #[derive(Debug)]
 pub struct TraitDefinitionDescriptor {
     trait_id: TraitId,
@@ -58,6 +78,19 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Creates immutable trait definition facts.
+    ///
+    /// # Parameters
+    ///
+    /// * `trait_id`: identity of the reflected trait.
+    /// * `rust_name`: source declaration name.
+    /// * `rust_path`: fully qualified source path for diagnostics.
+    /// * `query_name`: name used by reflection lookups.
+    /// * `completeness`: extent of the declaration facts.
+    /// * `generic_definition`: generic parameters and predicates.
+    ///
+    /// # Returns
+    ///
+    /// A definition with private visibility and uninitialized members.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -81,6 +114,15 @@ impl TraitDefinitionDescriptor {
 
     /// Creates immutable trait definition facts with normalized source
     /// visibility.
+    ///
+    /// # Parameters
+    ///
+    /// The parameters have the same meaning as [`Self::new`], with `visibility`
+    /// recording the declaration's normalized source visibility.
+    ///
+    /// # Returns
+    ///
+    /// A definition retaining all supplied facts and uninitialized members.
     #[doc(hidden)]
     #[must_use]
     pub const fn new_with_visibility(

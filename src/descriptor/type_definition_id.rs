@@ -14,11 +14,28 @@ use std::any::TypeId;
 ///
 /// This identity distinguishes declarations inside one process. It is not a
 /// persistent or cross-build identifier.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TypeDefinitionId;
+/// struct Marker;
+/// let id = TypeDefinitionId::of::<Marker>();
+/// assert_eq!(id.marker_type_id(), std::any::TypeId::of::<Marker>());
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeDefinitionId(TypeId);
 
 impl TypeDefinitionId {
     /// Creates the declaration identity represented by generated marker `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Process-local marker type identifying the generic declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-local identity for `T`.
     #[doc(hidden)]
     #[must_use]
     pub fn of<T: 'static>() -> Self {
@@ -26,7 +43,12 @@ impl TypeDefinitionId {
     }
 
     /// Returns the underlying process-local marker identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the marker's `TypeId`, which is not stable across processes.
     #[must_use]
+    #[inline]
     pub const fn marker_type_id(self) -> TypeId {
         self.0
     }

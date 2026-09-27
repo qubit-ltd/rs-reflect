@@ -9,6 +9,14 @@
 //! Modifiers attached to structural trait bounds.
 
 /// The modifier attached to one structural trait bound.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::TraitBoundModifier;
+/// let modifier = TraitBoundModifier::Maybe;
+/// assert_eq!(modifier, TraitBoundModifier::Maybe);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TraitBoundModifier {
     /// The trait bound is required.

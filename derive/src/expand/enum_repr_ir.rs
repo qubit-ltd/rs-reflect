@@ -14,26 +14,49 @@ use quote::quote;
 /// A normalized enum representation component retained by generated metadata.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) enum EnumReprIr {
+    /// Rust's default representation.
     Rust,
+    /// C-compatible representation.
     C,
+    /// Single-field transparent representation.
     Transparent,
+    /// Signed 8-bit discriminant representation.
     I8,
+    /// Signed 16-bit discriminant representation.
     I16,
+    /// Signed 32-bit discriminant representation.
     I32,
+    /// Signed 64-bit discriminant representation.
     I64,
+    /// Signed 128-bit discriminant representation.
     I128,
+    /// Pointer-sized signed discriminant representation.
     Isize,
+    /// Unsigned 8-bit discriminant representation.
     U8,
+    /// Unsigned 16-bit discriminant representation.
     U16,
+    /// Unsigned 32-bit discriminant representation.
     U32,
+    /// Unsigned 64-bit discriminant representation.
     U64,
+    /// Unsigned 128-bit discriminant representation.
     U128,
+    /// Pointer-sized unsigned discriminant representation.
     Usize,
+    /// Explicit minimum alignment in bytes.
+    ///
+    /// The payload is the requested alignment.
     Align(usize),
 }
 
 impl EnumReprIr {
     /// Returns the primitive integer spelling used for compiler-checked casts.
+    ///
+    /// # Returns
+    ///
+    /// Returns the integer type spelling, or `None` for non-integer
+    /// representations.
     pub(super) fn integer_name(&self) -> Option<&'static str> {
         match self {
             Self::I8 => Some("i8"),
@@ -53,6 +76,14 @@ impl EnumReprIr {
     }
 
     /// Emits the public structured representation value for descriptor data.
+    ///
+    /// # Parameters
+    ///
+    /// - `facade`: Runtime facade path referenced by the generated expression.
+    ///
+    /// # Returns
+    ///
+    /// Returns tokens for the corresponding runtime representation value.
     pub(super) fn descriptor_tokens(&self, facade: &TokenStream) -> TokenStream {
         match self {
             Self::Rust => {

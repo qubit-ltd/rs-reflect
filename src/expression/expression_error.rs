@@ -11,6 +11,14 @@
 // qubit-style: allow type-file-name
 
 /// An invariant violation in a structural expression.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::{ExpressionError, ExpressionName};
+/// let error = ExpressionName::new("").expect_err("empty names are rejected");
+/// assert_eq!(error, ExpressionError::EmptyName);
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[non_exhaustive]

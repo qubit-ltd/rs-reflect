@@ -9,6 +9,14 @@
 //! Machine-readable classes of registry aggregation failures.
 
 /// The machine-readable class of a registry aggregation error.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::error::RegistryErrorKind;
+/// let kind = RegistryErrorKind::DuplicateFragment;
+/// assert_eq!(kind, RegistryErrorKind::DuplicateFragment);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RegistryErrorKind {
     /// Two registration fragments claim the same identity.

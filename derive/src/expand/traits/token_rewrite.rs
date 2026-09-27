@@ -14,6 +14,15 @@ use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 
 /// Replaces `Self` with an explicit owner while retaining grouping and spans.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream to rewrite recursively.
+/// - `owner`: Identifier that replaces each `Self` identifier.
+///
+/// # Returns
+///
+/// Returns the rewritten stream with token groups and spans retained.
 pub(super) fn replace_self_with_owner(tokens: TokenStream, owner: &Ident) -> TokenStream {
     tokens
         .into_iter()

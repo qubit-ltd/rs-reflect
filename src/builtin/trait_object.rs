@@ -8,6 +8,10 @@
 
 //! Reflection descriptors for common dyn-compatible trait objects.
 
+use std::any::type_name;
+use std::fmt::Debug;
+use std::sync::LazyLock;
+
 use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::TraitCompleteness;
@@ -20,14 +24,23 @@ use crate::identity::ExternalTraitId;
 
 /// Returns the process-lifetime declaration link for the built-in `dyn Debug`
 /// descriptor.
+///
+/// # Returns
+///
+/// The shared descriptor for the external `Debug` trait declaration.
+///
+/// # Panics
+///
+/// Panics if the built-in trait ID or its descriptor violates the crate's
+/// fixed initialization invariants.
+#[must_use]
 fn debug_trait_descriptor() -> &'static TraitDescriptor {
-    static GENERICS: std::sync::LazyLock<GenericDefinitionDescriptor> =
-        std::sync::LazyLock::new(|| GenericDefinitionDescriptor {
-            parameters: Box::new([]),
-            predicates: Box::new([]),
-            diagnostic: crate::expression::DiagnosticText::default(),
-        });
-    static DEFINITION: std::sync::LazyLock<TraitDefinitionDescriptor> = std::sync::LazyLock::new(|| {
+    static GENERICS: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
+        parameters: Box::new([]),
+        predicates: Box::new([]),
+        diagnostic: crate::expression::DiagnosticText::default(),
+    });
+    static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
         TraitDefinitionDescriptor::new(
             TraitId::External(ExternalTraitId::new("core.fmt.Debug").expect("the built-in Debug trait ID is valid")),
             "Debug",
@@ -37,7 +50,7 @@ fn debug_trait_descriptor() -> &'static TraitDescriptor {
             &GENERICS,
         )
     });
-    static APPLIED: std::sync::LazyLock<TraitDescriptor> = std::sync::LazyLock::new(|| {
+    static APPLIED: LazyLock<TraitDescriptor> = LazyLock::new(|| {
         TraitDescriptor::builder(&DEFINITION)
             .build()
             .expect("the built-in Debug trait descriptor is valid")
@@ -45,11 +58,15 @@ fn debug_trait_descriptor() -> &'static TraitDescriptor {
     &APPLIED
 }
 
-impl Reflect for dyn std::fmt::Debug {
+impl Reflect for dyn Debug {
     /// Returns the interned descriptor for `dyn Debug`.
+    ///
+    /// # Returns
+    ///
+    /// The shared descriptor linked to the external `Debug` trait metadata.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_trait_object::<Self>(std::any::type_name::<Self>(), debug_trait_descriptor)
+            TypeDescriptor::new_trait_object::<Self>(type_name::<Self>(), debug_trait_descriptor)
         })
     }
 }

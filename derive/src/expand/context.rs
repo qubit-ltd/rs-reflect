@@ -25,11 +25,25 @@ use crate::ir::HelperValueIr;
 /// Immutable context shared by one declaration expansion.
 #[derive(Debug)]
 pub(crate) struct ExpansionContext {
+    /// Caller-visible path to the runtime facade.
     facade: TokenStream,
 }
 
 impl ExpansionContext {
     /// Resolves an explicit runtime facade or the Cargo dependency name.
+    ///
+    /// # Parameters
+    ///
+    /// - `attributes`: Validated helper attributes attached to the declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the expansion context, or a diagnostic when the runtime crate
+    /// cannot be resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns a syntax diagnostic when the runtime facade cannot be resolved.
     pub(crate) fn from_attributes(attributes: &[HelperAttributeIr]) -> SynResult<Self> {
         if let Some(facade) = attributes.iter().find_map(|attribute| {
             if let HelperValueIr::RuntimeCrate(path) = &attribute.value {
@@ -44,15 +58,44 @@ impl ExpansionContext {
     }
 
     /// Returns the caller-visible runtime facade path.
+    ///
+    /// # Returns
+    ///
+    /// Returns the runtime facade token stream used in generated paths.
+    #[must_use]
     pub(crate) fn facade(&self) -> &TokenStream {
         &self.facade
     }
 
     /// Computes the stable content fingerprint used by fragment identities.
+    ///
+    /// # Parameters
+    ///
+    /// - `source`: Normalized source representation to fingerprint.
+    ///
+    /// # Returns
+    ///
+    /// Returns the deterministic 64-bit FNV-1a fingerprint.
+    #[must_use]
     pub(crate) fn fingerprint(&self, source: &str) -> u64 {
         fingerprint(source)
     }
 
+    /// Builds the facade path from the dependency resolver result.
+    ///
+    /// # Parameters
+    ///
+    /// - `found`: Resolved package identity, or `None` when no dependency is
+    ///   available.
+    ///
+    /// # Returns
+    ///
+    /// Returns the context, or a diagnostic directing the caller to configure
+    /// the runtime path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a diagnostic when no runtime dependency was found.
     fn from_found_crate(found: Option<FoundCrate>) -> SynResult<Self> {
         let facade = match found {
             Some(FoundCrate::Itself) => quote!(crate),
@@ -72,6 +115,15 @@ impl ExpansionContext {
 }
 
 /// Computes one deterministic FNV-1a content fingerprint.
+///
+/// # Parameters
+///
+/// - `source`: Source text whose bytes are fingerprinted in order.
+///
+/// # Returns
+///
+/// Returns the 64-bit FNV-1a fingerprint.
+#[must_use]
 pub(crate) fn fingerprint(source: &str) -> u64 {
     source.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
@@ -92,7 +144,7 @@ mod tests {
     use crate::ir::PathIr;
 
     #[test]
-    fn explicit_facade_has_priority() {
+    fn test_explicit_facade_has_priority() {
         let attributes = [HelperAttributeIr {
             name: HelperName::RuntimeCrate,
             value: HelperValueIr::RuntimeCrate(PathIr {
@@ -112,14 +164,14 @@ mod tests {
     }
 
     #[test]
-    fn renamed_dependency_becomes_an_absolute_path() {
+    fn test_renamed_dependency_becomes_an_absolute_path() {
         let context = ExpansionContext::from_found_crate(Some(FoundCrate::Name("reflect_runtime".to_owned())))
             .expect("renamed dependency must resolve");
         assert_eq!(context.facade().to_string(), ":: reflect_runtime");
     }
 
     #[test]
-    fn missing_facade_reports_actionable_error() {
+    fn test_missing_facade_reports_actionable_error() {
         let error = ExpansionContext::from_found_crate(None).expect_err("missing runtime must fail");
         assert!(error.to_string().contains("#[reflect(crate = path)]"));
     }

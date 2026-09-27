@@ -31,6 +31,14 @@ use crate::identity::FragmentIdentity;
 use crate::value::ReflectedOwned;
 
 /// Whether an implementation is inherent or implements a trait.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ImplKind;
+/// let kind = ImplKind::Inherent;
+/// assert_eq!(kind, ImplKind::Inherent);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ImplKind {
     /// An inherent implementation block.
@@ -41,6 +49,10 @@ pub enum ImplKind {
 
 impl ImplKind {
     /// Returns the deterministic inherent-before-trait registry rank.
+    ///
+    /// # Returns
+    ///
+    /// Returns `0` for inherent impls and `1` for trait impls.
     pub(crate) const fn registry_rank(self) -> u8 {
         match self {
             Self::Inherent => 0,
@@ -50,33 +62,57 @@ impl ImplKind {
 }
 
 /// Declaration facts for a generic, blanket, or concrete impl block.
+///
+/// This descriptor is constructed by generated registration code.
 #[derive(Debug)]
 pub struct ImplDefinitionDescriptor {
+    /// Stable identity of the source impl fragment.
     fragment_identity: FragmentIdentity,
+    /// Target expression, which may contain generic parameters.
     target_type: TypeExpression,
+    /// Whether the source impl is inherent or implements a trait.
     kind: ImplKind,
+    /// Resolved trait declaration, when it is already available.
     implemented_trait: Option<&'static TraitDefinitionDescriptor>,
+    /// Exact trait identity retained for registry linking.
     implemented_trait_id: Option<TraitId>,
+    /// Diagnostic path retained even when the trait declaration is unresolved.
     implemented_trait_path: Option<Box<str>>,
+    /// Generic parameters and predicates declared by this impl.
     generic_definition: &'static GenericDefinitionDescriptor,
+    /// Lazily initialized methods in source order.
     methods: OnceLock<Box<[MethodDescriptor]>>,
+    /// Lazily initialized associated-item facts.
     associated_items: OnceLock<ImplAssociatedItems>,
 }
 
 #[derive(Debug)]
 struct ImplAssociatedItems {
+    /// Explicit associated type bindings.
     types: Box<[ImplAssociatedTypeDescriptor]>,
+    /// Explicit associated constant bindings.
     consts: Box<[ImplAssociatedConstDescriptor]>,
 }
 
 /// One associated type explicitly bound by an impl definition.
+///
+/// This descriptor is constructed by generated registration code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedTypeDescriptor {
+    /// Name used in the Rust declaration.
     rust_name: &'static str,
 }
 
 impl ImplAssociatedTypeDescriptor {
     /// Creates declaration-level associated type binding facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `rust_name`: Name used by the associated type declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declaration-level binding facts.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(rust_name: &'static str) -> Self {
@@ -84,6 +120,10 @@ impl ImplAssociatedTypeDescriptor {
     }
 
     /// Returns the Rust associated type name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated type's Rust name.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -92,14 +132,27 @@ impl ImplAssociatedTypeDescriptor {
 }
 
 /// One associated constant explicitly bound by an impl definition.
+///
+/// This descriptor is constructed by generated registration code.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedConstDescriptor {
+    /// Name used in the Rust declaration.
     rust_name: &'static str,
+    /// Declared type expression for the constant.
     declared_type: TypeExpression,
 }
 
 impl ImplAssociatedConstDescriptor {
     /// Creates declaration-level associated constant binding facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `rust_name`: Name used by the associated constant declaration.
+    /// - `declared_type`: Type expression declared for the constant.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declaration-level binding facts.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(rust_name: &'static str, declared_type: TypeExpression) -> Self {
@@ -110,6 +163,10 @@ impl ImplAssociatedConstDescriptor {
     }
 
     /// Returns the Rust associated constant name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated constant's Rust name.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -117,6 +174,10 @@ impl ImplAssociatedConstDescriptor {
     }
 
     /// Returns the declared constant type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declared type expression.
     #[must_use]
     #[inline]
     pub const fn declared_type(&self) -> &TypeExpression {
@@ -129,7 +190,29 @@ impl ImplDefinitionDescriptor {
     ///
     /// Returns [`ImplDescriptorBuildError`] when `kind` and
     /// `implemented_trait` disagree.
+    ///
+    /// # Parameters
+    ///
+    /// - `fragment_identity`: Stable source identity for this impl fragment.
+    /// - `target_type`: Target type expression, possibly containing parameters.
+    /// - `kind`: Whether the impl is inherent or a trait impl.
+    /// - `implemented_trait`: Trait declaration for a trait impl, or `None` for
+    ///   an inherent impl.
+    /// - `generic_definition`: Generic parameters and predicates declared by
+    ///   the impl.
+    ///
+    /// # Returns
+    ///
+    /// Returns the initialized declaration descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ImplDescriptorBuildError::InherentImplHasTrait`] when an
+    /// inherent impl names a trait,
+    /// or [`ImplDescriptorBuildError::TraitImplMissingTrait`] when a trait impl
+    /// has no trait declaration.
     #[doc(hidden)]
+    #[must_use]
     pub fn new(
         fragment_identity: FragmentIdentity,
         target_type: TypeExpression,
@@ -153,6 +236,20 @@ impl ImplDefinitionDescriptor {
 
     /// Creates a trait impl definition whose declaration link is resolved by
     /// the immutable registry after all trait fragments have been collected.
+    ///
+    /// # Parameters
+    ///
+    /// - `fragment_identity`: Stable source identity for this impl fragment.
+    /// - `target_type`: Target type expression, possibly containing parameters.
+    /// - `implemented_trait_path`: Diagnostic Rust path for the trait
+    ///   declaration.
+    /// - `implemented_trait_id`: Exact trait identity when available.
+    /// - `generic_definition`: Generic parameters and predicates declared by
+    ///   the impl.
+    ///
+    /// # Returns
+    ///
+    /// Returns an unresolved trait impl declaration for later registry linking.
     #[doc(hidden)]
     pub fn new_unresolved_trait(
         fragment_identity: FragmentIdentity,
@@ -175,6 +272,10 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns the source/content identity of this impl fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns the stable source identity.
     #[must_use]
     #[inline]
     pub const fn fragment_identity(&self) -> &FragmentIdentity {
@@ -182,6 +283,10 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns the possibly symbolic target type expression.
+    ///
+    /// # Returns
+    ///
+    /// Returns the target type expression.
     #[must_use]
     #[inline]
     pub const fn target_type(&self) -> &TypeExpression {
@@ -189,6 +294,10 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns whether this definition is inherent or implements a trait.
+    ///
+    /// # Returns
+    ///
+    /// Returns the implementation kind.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> ImplKind {
@@ -199,6 +308,11 @@ impl ImplDefinitionDescriptor {
     ///
     /// `None` identifies an inherent impl or an unresolved trait declaration.
     /// Use [`Self::implemented_trait_in`] for snapshot-resolved links.
+    ///
+    /// # Returns
+    ///
+    /// Returns the linked trait declaration, or `None` when this definition is
+    /// inherent or unresolved.
     #[must_use]
     #[inline]
     pub fn implemented_trait(&self) -> Option<&'static TraitDefinitionDescriptor> {
@@ -206,6 +320,10 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns the diagnostic trait path recorded by the impl declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the recorded trait path, or `None` for an inherent impl.
     #[must_use]
     #[inline]
     pub fn implemented_trait_path(&self) -> Option<&str> {
@@ -214,6 +332,10 @@ impl ImplDefinitionDescriptor {
 
     /// Returns an exact trait identity supplied by the impl declaration when
     /// one is available before registry linking.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact trait identity, or `None` when it was not supplied.
     #[must_use]
     #[inline]
     pub fn implemented_trait_id(&self) -> Option<&TraitId> {
@@ -223,6 +345,16 @@ impl ImplDefinitionDescriptor {
     /// Returns the trait link resolved in `registry`, or `None` when this
     /// definition has no trait link in that snapshot. Never initializes a
     /// global registry or changes this declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable registry snapshot used to resolve the trait
+    ///   link.
+    ///
+    /// # Returns
+    ///
+    /// Returns the snapshot-resolved trait declaration, or `None` when
+    /// unavailable.
     #[must_use]
     pub fn implemented_trait_in(
         &self,
@@ -232,6 +364,10 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns generic parameters and predicates in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns this impl's generic definition.
     #[must_use]
     #[inline]
     pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
@@ -239,6 +375,11 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns methods declared by this impl definition in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the initialized methods, or an empty slice before
+    /// initialization.
     #[must_use]
     #[inline]
     pub fn methods(&self) -> &[MethodDescriptor] {
@@ -246,6 +387,11 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Returns associated types explicitly bound by this impl in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the initialized associated type bindings, or an empty slice
+    /// before initialization.
     #[must_use]
     #[inline]
     pub fn associated_types(&self) -> &[ImplAssociatedTypeDescriptor] {
@@ -254,6 +400,11 @@ impl ImplDefinitionDescriptor {
 
     /// Returns associated constants explicitly bound by this impl in source
     /// order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the initialized associated constant bindings, or an empty slice
+    /// before initialization.
     #[must_use]
     #[inline]
     pub fn associated_consts(&self) -> &[ImplAssociatedConstDescriptor] {
@@ -261,12 +412,30 @@ impl ImplDefinitionDescriptor {
     }
 
     /// Initializes declaration-level methods exactly once.
+    ///
+    /// # Parameters
+    ///
+    /// - `initialize`: Callback that builds methods from this static
+    ///   definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()`; subsequent calls leave the initialized value unchanged.
     #[doc(hidden)]
     pub fn initialize_methods(&'static self, initialize: impl FnOnce(&'static Self) -> Box<[MethodDescriptor]>) {
         self.methods.get_or_init(|| initialize(self));
     }
 
     /// Initializes declaration-level associated-item facts exactly once.
+    ///
+    /// # Parameters
+    ///
+    /// - `initialize`: Callback that builds associated types and constants from
+    ///   this static definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()`; subsequent calls leave the initialized value unchanged.
     #[doc(hidden)]
     pub fn initialize_associated_items(
         &'static self,
@@ -285,6 +454,16 @@ impl ImplDefinitionDescriptor {
 }
 
 /// The effective source of an associated constant value.
+///
+/// This value distinguishes a trait-provided default from an explicit impl
+/// override.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::AssociatedConstImplementationSource;
+/// assert_eq!(AssociatedConstImplementationSource::Defaulted, AssociatedConstImplementationSource::Defaulted);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AssociatedConstImplementationSource {
     /// The implementation uses the trait declaration's default value.
@@ -294,6 +473,17 @@ pub enum AssociatedConstImplementationSource {
 }
 
 /// Why an associated constant has no safe owned-value reader.
+///
+/// This reason is reported when generated code cannot prove the value can cross
+/// the owned dynamic boundary.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::AssociatedConstReadUnavailableReason;
+/// let reason = AssociatedConstReadUnavailableReason::UnprovenOwnedValue;
+/// assert_eq!(reason, AssociatedConstReadUnavailableReason::UnprovenOwnedValue);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum AssociatedConstReadUnavailableReason {
     /// The generated code cannot prove that the declared value type is sized
@@ -302,17 +492,32 @@ pub enum AssociatedConstReadUnavailableReason {
 }
 
 /// A safe reader for one concrete associated constant value.
+///
+/// A reader invokes its generated adapter each time, producing a fresh owned
+/// value without exposing a reference to static storage.
 pub struct AssociatedConstReader {
+    /// Safe function or closure adapter that reads a fresh owned value.
     read: AssociatedConstReadAdapter,
 }
 
+/// Internal storage forms for generated associated constant readers.
 enum AssociatedConstReadAdapter {
+    /// Non-capturing generated reader.
     Function(fn() -> ReflectedOwned),
+    /// Static closure used to adapt a concrete value getter.
     Closure(&'static (dyn Fn() -> ReflectedOwned + Send + Sync)),
 }
 
 impl AssociatedConstReader {
     /// Creates a reader from generated safe adapter code.
+    ///
+    /// # Parameters
+    ///
+    /// - `read`: Generated function returning an owned reflected value.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reader that invokes `read` on each call.
     #[doc(hidden)]
     pub const fn new(read: fn() -> ReflectedOwned) -> Self {
         Self {
@@ -321,6 +526,19 @@ impl AssociatedConstReader {
     }
 
     /// Creates a reader from a compiler-proven sized `'static` value getter.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete associated constant value type.
+    ///
+    /// # Parameters
+    ///
+    /// - `getter`: Function that returns the associated constant value.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reader that owns each value produced by `getter`.
+    /// The generated closure is retained for the process lifetime.
     #[doc(hidden)]
     pub fn from_getter<T: 'static>(getter: fn() -> T) -> Self {
         let read = Box::leak(Box::new(move || ReflectedOwned::new(getter())));
@@ -330,6 +548,12 @@ impl AssociatedConstReader {
     }
 
     /// Reads a fresh owned reflected value.
+    ///
+    /// This invokes the generated reader adapter on every call.
+    ///
+    /// # Returns
+    ///
+    /// Returns a newly owned reflected value.
     #[must_use]
     pub fn read(&self) -> ReflectedOwned {
         match self.read {
@@ -341,16 +565,35 @@ impl AssociatedConstReader {
 
 impl fmt::Debug for AssociatedConstReader {
     /// Formats adapter availability without exposing a process address.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the stable, address-free
+    ///   representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the representation, or the formatter
+    /// error.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by `formatter`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("AssociatedConstReader(..)")
     }
 }
 
 /// One associated type binding contributed by a concrete impl.
+///
+/// This descriptor is constructed by generated registration code.
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeBindingDescriptor {
+    /// Associated type declaration being implemented.
     declaration: &'static AssociatedTypeDescriptor,
+    /// Concrete or symbolic assigned type expression.
     value: TypeExpression,
+    /// Resolver for the exact type, when it can be resolved.
     concrete_type: Option<TypeDescriptorResolver>,
 }
 
@@ -358,6 +601,16 @@ impl AssociatedTypeBindingDescriptor {
     /// Creates an associated type binding.
     ///
     /// `concrete_type` is present only when `value` resolves to an exact root.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaration`: Associated type declaration being bound.
+    /// - `value`: Concrete or symbolic assigned type expression.
+    /// - `concrete_type`: Exact reflected type resolver, when known.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated type binding facts.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -373,6 +626,10 @@ impl AssociatedTypeBindingDescriptor {
     }
 
     /// Returns the trait declaration being bound.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated type declaration.
     #[must_use]
     #[inline]
     pub const fn declaration(&self) -> &'static AssociatedTypeDescriptor {
@@ -380,6 +637,10 @@ impl AssociatedTypeBindingDescriptor {
     }
 
     /// Returns the concrete or still-symbolic binding expression.
+    ///
+    /// # Returns
+    ///
+    /// Returns the assigned type expression.
     #[must_use]
     #[inline]
     pub const fn value(&self) -> &TypeExpression {
@@ -389,6 +650,10 @@ impl AssociatedTypeBindingDescriptor {
     /// Returns the exact reflected binding when it is known.
     ///
     /// `None` means the expression remains symbolic or unresolved.
+    ///
+    /// # Returns
+    ///
+    /// Returns the resolved root descriptor, or `None` when unresolved.
     #[must_use]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
@@ -396,16 +661,33 @@ impl AssociatedTypeBindingDescriptor {
 }
 
 /// One associated constant binding contributed by a concrete impl.
+///
+/// This descriptor is constructed by generated registration code.
 #[derive(Clone, Debug)]
 pub struct AssociatedConstBindingDescriptor {
+    /// Associated constant declaration being implemented.
     declaration: &'static AssociatedConstDescriptor,
+    /// Whether the value comes from the default or an override.
     implementation_source: AssociatedConstImplementationSource,
+    /// Safe owned-value reader, when available.
     reader: Option<&'static AssociatedConstReader>,
+    /// Reason no reader can be provided.
     read_unavailable_reason: Option<AssociatedConstReadUnavailableReason>,
 }
 
 impl AssociatedConstBindingDescriptor {
     /// Creates associated constant binding facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaration`: Associated constant declaration being bound.
+    /// - `implementation_source`: Whether the implementation is defaulted or
+    ///   overridden.
+    /// - `reader`: Safe owned-value reader, when the value type permits one.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated constant binding facts.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -426,6 +708,10 @@ impl AssociatedConstBindingDescriptor {
     }
 
     /// Returns the trait declaration being implemented.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated constant declaration.
     #[must_use]
     #[inline]
     pub const fn declaration(&self) -> &'static AssociatedConstDescriptor {
@@ -433,6 +719,10 @@ impl AssociatedConstBindingDescriptor {
     }
 
     /// Returns whether the value is defaulted or explicitly overridden.
+    ///
+    /// # Returns
+    ///
+    /// Returns the implementation source.
     #[must_use]
     #[inline]
     pub const fn implementation_source(&self) -> AssociatedConstImplementationSource {
@@ -440,6 +730,10 @@ impl AssociatedConstBindingDescriptor {
     }
 
     /// Returns whether a safe owned-value reader is available.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when [`Self::read`] can return a value.
     #[must_use]
     #[inline]
     pub const fn is_readable(&self) -> bool {
@@ -449,6 +743,11 @@ impl AssociatedConstBindingDescriptor {
     /// Returns the structured reason why no safe reader is available.
     ///
     /// `None` means [`Self::read`] can produce a fresh owned value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reason reading is unavailable, or `None` when it is
+    /// available.
     #[must_use]
     #[inline]
     pub const fn read_unavailable_reason(&self) -> Option<AssociatedConstReadUnavailableReason> {
@@ -458,6 +757,11 @@ impl AssociatedConstBindingDescriptor {
     /// Reads the associated constant through its safe adapter.
     ///
     /// `None` means the declared type cannot cross the owned dynamic boundary.
+    ///
+    /// # Returns
+    ///
+    /// Returns a fresh owned reflected value, or `None` when no safe reader
+    /// exists.
     #[must_use]
     pub fn read(&self) -> Option<ReflectedOwned> {
         self.reader.map(AssociatedConstReader::read)
@@ -465,6 +769,14 @@ impl AssociatedConstBindingDescriptor {
 }
 
 /// An invalid impl definition or concrete application.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ImplDescriptorBuildError;
+/// let error = ImplDescriptorBuildError::TraitImplMissingTrait;
+/// assert_eq!(error, ImplDescriptorBuildError::TraitImplMissingTrait);
+/// ```
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ImplDescriptorBuildError {
@@ -482,6 +794,18 @@ pub enum ImplDescriptorBuildError {
 
 impl fmt::Display for ImplDescriptorBuildError {
     /// Formats a stable diagnostic message.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the diagnostic message.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the message, or the formatter error.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by `formatter`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InherentImplHasTrait => formatter.write_str("an inherent impl cannot name a trait"),
@@ -500,22 +824,38 @@ impl fmt::Display for ImplDescriptorBuildError {
 impl std::error::Error for ImplDescriptorBuildError {}
 
 /// A qualifier used to resolve methods across implementation namespaces.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodQualifier;
+/// let qualifier = MethodQualifier::Any;
+/// assert!(matches!(qualifier, MethodQualifier::Any));
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub enum MethodQualifier<'a> {
     /// Search inherent and every trait namespace.
     Any,
     /// Search only inherent implementations.
     Inherent,
-    /// Search one concrete applied trait namespace.
+    /// Search one concrete applied trait namespace, using the contained trait.
     Trait(&'a TraitDescriptor),
 }
 
 /// The result of a method lookup across implementation namespaces.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodLookup;
+/// let result = MethodLookup::Missing;
+/// assert!(matches!(result, MethodLookup::Missing));
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub enum MethodLookup<'a> {
     /// No matching concrete method instance exists.
     Missing,
-    /// Exactly one concrete method instance matches.
+    /// Exactly one concrete method instance matches; the variant contains it.
     Unique(&'a MethodInstanceDescriptor),
     /// Multiple namespaces or fragments match the query.
     Ambiguous,
@@ -555,19 +895,35 @@ pub enum MethodLookup<'a> {
 /// # fn main() {}
 /// ```
 pub struct ImplDescriptor {
+    /// Source declaration represented by this concrete application.
     definition: &'static ImplDefinitionDescriptor,
+    /// Resolver for the concrete target root.
     target_type: TypeDescriptorResolver,
+    /// Concrete applied trait namespace, if this is a trait impl.
     implemented_trait: Option<&'static TraitDescriptor>,
+    /// Methods declared by the impl definition.
     methods: &'static [MethodDescriptor],
+    /// Effective concrete method instances.
     method_instances: Box<[MethodInstanceDescriptor]>,
+    /// Concrete associated type bindings.
     associated_types: Box<[AssociatedTypeBindingDescriptor]>,
+    /// Concrete associated constant bindings.
     associated_consts: Box<[AssociatedConstBindingDescriptor]>,
+    /// Concrete generic arguments in definition order.
     arguments: Box<[GenericArgument]>,
 }
 
 impl ImplDescriptor {
     /// Returns whether two descriptors represent the same concrete impl
     /// application.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor to compare with this application.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when both descriptors identify the same impl application.
     pub(crate) fn same_application(&self, other: &Self) -> bool {
         self.kind() == other.kind()
             && self.definition().fragment_identity() == other.definition().fragment_identity()
@@ -576,6 +932,14 @@ impl ImplDescriptor {
     }
 
     /// Orders implementations by kind, namespace, and source identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor to compare with this implementation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the deterministic ordering between the implementations.
     pub(crate) fn registry_cmp(&self, other: &Self) -> Ordering {
         self.kind()
             .registry_rank()
@@ -589,6 +953,14 @@ impl ImplDescriptor {
     }
 
     /// Orders implementation namespaces deterministically.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor whose namespace is compared with this one.
+    ///
+    /// # Returns
+    ///
+    /// Returns the ordering between the implementation namespaces.
     fn namespace_cmp(&self, other: &Self) -> Ordering {
         match (self.implemented_trait(), other.implemented_trait()) {
             (None, None) => Ordering::Equal,
@@ -604,6 +976,14 @@ impl ImplDescriptor {
     }
 
     /// Returns whether this implementation belongs to a lookup namespace.
+    ///
+    /// # Parameters
+    ///
+    /// - `qualifier`: Namespace restriction for the lookup.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when this implementation matches the qualifier.
     pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
         match qualifier {
             MethodQualifier::Any => true,
@@ -615,6 +995,15 @@ impl ImplDescriptor {
     }
 
     /// Starts a concrete impl builder for `definition` and `target_type`.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Source impl declaration to instantiate.
+    /// - `target_type`: Resolver for the concrete target root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder initialized for the requested declaration and target.
     pub fn builder(
         definition: &'static ImplDefinitionDescriptor,
         target_type: TypeDescriptorResolver,
@@ -623,6 +1012,10 @@ impl ImplDescriptor {
     }
 
     /// Returns the generic or blanket impl definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source impl definition.
     #[must_use]
     #[inline]
     pub const fn definition(&self) -> &'static ImplDefinitionDescriptor {
@@ -630,12 +1023,20 @@ impl ImplDescriptor {
     }
 
     /// Returns the reflected root targeted by this concrete impl.
+    ///
+    /// # Returns
+    ///
+    /// Returns the resolved target type descriptor.
     #[must_use]
     pub fn target_type(&self) -> &'static TypeDescriptor {
         (self.target_type)()
     }
 
     /// Returns whether this is an inherent or trait implementation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the implementation kind.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> ImplKind {
@@ -643,6 +1044,10 @@ impl ImplDescriptor {
     }
 
     /// Returns the concrete applied trait, or `None` for an inherent impl.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete trait application, or `None` for an inherent impl.
     #[must_use]
     #[inline]
     pub const fn implemented_trait(&self) -> Option<&'static TraitDescriptor> {
@@ -650,6 +1055,10 @@ impl ImplDescriptor {
     }
 
     /// Returns methods explicitly declared by this impl definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns the impl's declared methods.
     #[must_use]
     #[inline]
     pub const fn methods(&self) -> &[MethodDescriptor] {
@@ -657,6 +1066,10 @@ impl ImplDescriptor {
     }
 
     /// Returns methods explicitly declared by this impl definition.
+    ///
+    /// # Returns
+    ///
+    /// Returns the impl's declared methods.
     #[must_use]
     #[inline]
     pub const fn implementation_methods(&self) -> &[MethodDescriptor] {
@@ -665,12 +1078,24 @@ impl ImplDescriptor {
 
     /// Finds a method explicitly declared by this concrete impl, by query
     /// name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching declared method, or `None` when absent.
     #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)
     }
 
     /// Returns concrete effective instances, including defaulted methods.
+    ///
+    /// # Returns
+    ///
+    /// Returns effective method instances in their stored order.
     #[must_use]
     #[inline]
     pub const fn method_instances(&self) -> &[MethodInstanceDescriptor] {
@@ -678,6 +1103,10 @@ impl ImplDescriptor {
     }
 
     /// Returns associated type bindings in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete associated type bindings.
     #[must_use]
     #[inline]
     pub const fn associated_types(&self) -> &[AssociatedTypeBindingDescriptor] {
@@ -685,6 +1114,10 @@ impl ImplDescriptor {
     }
 
     /// Returns associated constant bindings in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete associated constant bindings.
     #[must_use]
     #[inline]
     pub const fn associated_consts(&self) -> &[AssociatedConstBindingDescriptor] {
@@ -692,6 +1125,10 @@ impl ImplDescriptor {
     }
 
     /// Returns concrete impl arguments in definition parameter order.
+    ///
+    /// # Returns
+    ///
+    /// Returns this application's generic arguments.
     #[must_use]
     #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
@@ -699,6 +1136,18 @@ impl ImplDescriptor {
     }
 
     /// Looks up one effective method across impl namespaces.
+    ///
+    /// # Parameters
+    ///
+    /// - `implementations`: Concrete implementations searched in the given
+    ///   order.
+    /// - `qualifier`: Namespace restriction applied to each implementation.
+    /// - `name`: Method query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Missing`, `Unique`, or `Ambiguous` according to the matches
+    /// found.
     pub fn lookup_method<'a>(
         implementations: &'a [&'a ImplDescriptor],
         qualifier: MethodQualifier<'_>,
@@ -725,6 +1174,19 @@ impl ImplDescriptor {
 
 impl fmt::Debug for ImplDescriptor {
     /// Formats local facts without recursively expanding graph roots.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the local, address-free
+    ///   representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after formatting, or the formatter error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error reported by the formatter.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ImplDescriptor")
@@ -738,20 +1200,40 @@ impl fmt::Debug for ImplDescriptor {
 }
 
 /// Builds a concrete impl while preserving source order.
+///
+/// The builder validates generic arguments and member ownership before
+/// producing an [`ImplDescriptor`].
 #[derive(Debug)]
 pub struct ImplDescriptorBuilder {
+    /// Impl declaration being instantiated.
     definition: &'static ImplDefinitionDescriptor,
+    /// Resolver for the concrete target type.
     target_type: TypeDescriptorResolver,
+    /// Concrete trait namespace, when this is a trait impl.
     implemented_trait: Option<&'static TraitDescriptor>,
+    /// Methods declared by the impl definition.
     methods: &'static [MethodDescriptor],
+    /// Effective concrete method instances.
     method_instances: Vec<MethodInstanceDescriptor>,
+    /// Concrete associated type bindings.
     associated_types: Vec<AssociatedTypeBindingDescriptor>,
+    /// Concrete associated constant bindings.
     associated_consts: Vec<AssociatedConstBindingDescriptor>,
+    /// Concrete generic arguments in definition order.
     arguments: Vec<GenericArgument>,
 }
 
 impl ImplDescriptorBuilder {
     /// Creates an empty concrete instance builder.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Impl declaration to instantiate.
+    /// - `target_type`: Resolver for its concrete target type.
+    ///
+    /// # Returns
+    ///
+    /// Returns an empty builder for the impl application.
     fn new(definition: &'static ImplDefinitionDescriptor, target_type: TypeDescriptorResolver) -> Self {
         Self {
             definition,
@@ -766,12 +1248,29 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets the applied trait implemented by this instance.
+    ///
+    /// # Parameters
+    ///
+    /// - `implemented_trait`: Concrete applied trait namespace.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with the trait namespace set.
+    #[must_use]
     pub fn implemented_trait(mut self, implemented_trait: &'static TraitDescriptor) -> Self {
         self.implemented_trait = Some(implemented_trait);
         self
     }
 
     /// Sets methods explicitly declared by the impl definition.
+    ///
+    /// # Parameters
+    ///
+    /// - `methods`: Methods declared by the source impl.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with its declared methods set.
     #[must_use]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
@@ -779,6 +1278,14 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets concrete effective method instances.
+    ///
+    /// # Parameters
+    ///
+    /// - `instances`: Effective method instances for this application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with its effective method instances set.
     #[must_use]
     pub fn method_instances(mut self, instances: Vec<MethodInstanceDescriptor>) -> Self {
         self.method_instances = instances;
@@ -786,6 +1293,14 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets associated type bindings in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `bindings`: Concrete associated type bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with its associated type bindings set.
     #[must_use]
     pub fn associated_types(mut self, bindings: Vec<AssociatedTypeBindingDescriptor>) -> Self {
         self.associated_types = bindings;
@@ -793,6 +1308,14 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets associated constant bindings in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `bindings`: Concrete associated constant bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with its associated constant bindings set.
     #[must_use]
     pub fn associated_consts(mut self, bindings: Vec<AssociatedConstBindingDescriptor>) -> Self {
         self.associated_consts = bindings;
@@ -800,6 +1323,14 @@ impl ImplDescriptorBuilder {
     }
 
     /// Sets concrete impl arguments in definition parameter order.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Concrete type and const arguments in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the builder with its generic arguments set.
     #[must_use]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;

@@ -9,6 +9,13 @@
 //! Categories used by normalized source visibility.
 
 /// A normalized source visibility category.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::identity::VisibilityKind;
+/// assert_eq!(VisibilityKind::Public, VisibilityKind::Public);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisibilityKind {
     /// Public outside the declaring crate.

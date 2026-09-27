@@ -23,5 +23,10 @@ use crate::descriptor::TypeDescriptor;
 /// ```
 pub trait Reflect: 'static {
     /// Returns the unique root descriptor for `Self`.
+    ///
+    /// # Returns
+    ///
+    /// The process-lifetime root descriptor for this concrete type.
+    #[must_use]
     fn type_descriptor() -> &'static TypeDescriptor;
 }

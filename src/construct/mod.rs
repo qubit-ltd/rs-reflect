@@ -13,8 +13,8 @@
 //! [`ValidatedConstructionInput`](crate::construct::ValidatedConstructionInput)
 //! or [`ValidatedUpdateInput`](crate::construct::ValidatedUpdateInput) can
 //! cross the generated adapter boundary. Validation failures retain every
-//! caller-owned
-//! value in [`ConstructionRecovery`](crate::construct::ConstructionRecovery).
+//! caller-owned value in
+//! [`ConstructionRecovery`](crate::construct::ConstructionRecovery).
 
 mod error;
 mod input;

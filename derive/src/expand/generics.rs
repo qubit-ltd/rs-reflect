@@ -29,6 +29,16 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Emits the concrete generic view for the current monomorphized root.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic type declaration being instantiated.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns generated concrete generic metadata, or an empty stream for
+/// non-generic declarations.
 pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let codegen = quote!(#facade::__private::codegen_v3);
     let environment = GenericEnvironment::from_generics(&declaration.generics);
@@ -98,12 +108,28 @@ pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &Toke
 
 /// Returns the stable hidden provider name shared with facade macros that
 /// augment one reflected generic declaration.
+///
+/// # Parameters
+///
+/// - `name`: Generic declaration identifier.
+///
+/// # Returns
+///
+/// Returns the generated provider identifier shared across macro expansions.
 pub(crate) fn definition_provider_name(name: &Ident) -> Ident {
     format_ident!("__qubit_reflect_generic_definition_{}", name)
 }
 
 /// Returns the stable hidden provider name for the source-level type
 /// declaration shared with domain derive crates.
+///
+/// # Parameters
+///
+/// - `declaration`: Type declaration carrying any explicit provider override.
+///
+/// # Returns
+///
+/// Returns the configured provider identifier or the canonical generated name.
 pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> Ident {
     for attribute in &declaration.attributes {
         if let crate::ir::HelperValueIr::DefinitionProviderV2(name) = &attribute.value {
@@ -118,6 +144,17 @@ pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> 
 /// Unlike `Reflect::type_descriptor`, this provider can be called without
 /// choosing a concrete monomorph. Domain derive crates use it to register one
 /// template while still reusing reflection's canonical generic IR.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic declaration whose canonical parameter facts are
+///   emitted.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns a hidden provider function, or an empty stream for non-generic
+/// declarations.
 pub(crate) fn definition_provider(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
@@ -138,6 +175,18 @@ pub(crate) fn definition_provider(declaration: &TypeDeclarationIr, facade: &Toke
 
 /// Emits and registers the canonical source-level descriptor for a generic
 /// declaration.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic struct, enum, or union declaration.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `fingerprint`: Stable normalized-input fingerprint for registration
+///   identity.
+///
+/// # Returns
+///
+/// Returns provider, marker, and registration tokens, or an empty stream for
+/// non-generic declarations.
 pub(crate) fn type_definition_provider(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
@@ -320,6 +369,16 @@ pub(crate) fn type_definition_provider(
     }
 }
 
+/// Converts source visibility into the runtime symbolic visibility model.
+///
+/// # Parameters
+///
+/// - `visibility`: Parsed visibility of a field.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns tokens representing the visibility category and restricted path.
 fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStream) -> TokenStream {
     match visibility {
         crate::ir::VisibilityIr::Public => {
@@ -343,6 +402,15 @@ fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStrea
 
 /// Returns every visible field type that generated descriptor navigation must
 /// be able to reflect as a complete Rust type.
+///
+/// # Parameters
+///
+/// - `declaration`: Type declaration whose visible fields are inspected.
+///
+/// # Returns
+///
+/// Returns complete field types that mention one of the declaration's generic
+/// parameters.
 pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&TypeIr> {
     if declaration
         .attributes
@@ -376,6 +444,14 @@ pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&Typ
 }
 
 /// Returns one field's complete type when its descriptor is source-visible.
+///
+/// # Parameters
+///
+/// - `field`: Field whose reflection attributes determine visibility.
+///
+/// # Returns
+///
+/// Returns its complete type, or `None` for opaque fields.
 fn reflected_field_type(field: &crate::ir::FieldIr) -> Option<&TypeIr> {
     (!field
         .attributes
@@ -387,6 +463,14 @@ fn reflected_field_type(field: &crate::ir::FieldIr) -> Option<&TypeIr> {
 /// Returns parameters nested only through reflection-transparent builtin type
 /// constructors whose public reflection implementations require the nested
 /// argument itself to implement `Reflect`.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic declaration whose field types are inspected.
+///
+/// # Returns
+///
+/// Returns type parameters that occur through known transparent containers.
 pub(crate) fn transparently_reflected_type_parameters(declaration: &TypeDeclarationIr) -> Vec<Ident> {
     declaration
         .generics
@@ -404,6 +488,16 @@ pub(crate) fn transparently_reflected_type_parameters(declaration: &TypeDeclarat
 
 /// Returns whether `parameter` occurs through constructors whose reflected
 /// metadata exposes all relevant nested type arguments.
+///
+/// # Parameters
+///
+/// - `ty`: Structured field type to inspect.
+/// - `parameter`: Generic type parameter name.
+///
+/// # Returns
+///
+/// Returns `true` when the parameter occurs in a supported transparent
+/// position.
 fn transparent_type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
     if type_is_parameter(ty, parameter) {
         return true;
@@ -457,6 +551,15 @@ fn transparent_type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
 
 /// Returns the reflected type-argument arity for syntactically unambiguous
 /// standard-library container paths.
+///
+/// # Parameters
+///
+/// - `path`: Parsed path whose final container name is classified.
+///
+/// # Returns
+///
+/// Returns its reflected type-argument arity, or `None` when the path is
+/// unsupported or ambiguous.
 fn transparent_constructor_arity(path: &crate::ir::PathIr) -> Option<usize> {
     let segments: Vec<_> = path.segments.iter().map(|segment| segment.name.as_str()).collect();
     match segments.as_slice() {
@@ -473,6 +576,16 @@ fn transparent_constructor_arity(path: &crate::ir::PathIr) -> Option<usize> {
 }
 
 /// Returns whether one structured type node refers to `parameter`.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type node to inspect recursively.
+/// - `parameter`: Type parameter name being searched for.
+///
+/// # Returns
+///
+/// Returns `true` when the parameter occurs in a type, path argument, or bound
+/// position.
 fn type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -504,6 +617,15 @@ fn type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
 }
 
 /// Returns whether path arguments contain `parameter` in a type position.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed path arguments to inspect.
+/// - `parameter`: Type parameter name being searched for.
+///
+/// # Returns
+///
+/// Returns `true` when the parameter occurs in a type-valued argument or bound.
 fn path_arguments_use_parameter(arguments: &PathArgumentsIr, parameter: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
@@ -527,6 +649,15 @@ fn path_arguments_use_parameter(arguments: &PathArgumentsIr, parameter: &str) ->
 }
 
 /// Returns whether one trait bound path contains `parameter`.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed generic bound to inspect.
+/// - `parameter`: Type parameter name being searched for.
+///
+/// # Returns
+///
+/// Returns `true` when the trait path or its arguments mention the parameter.
 fn bound_uses_parameter(bound: &GenericBoundIr, parameter: &str) -> bool {
     let GenericBoundIr::Trait { path, .. } = bound else {
         return false;
@@ -541,6 +672,16 @@ fn bound_uses_parameter(bound: &GenericBoundIr, parameter: &str) -> bool {
 }
 
 /// Returns whether one structured type node refers to an outer lifetime.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type node to inspect recursively.
+/// - `lifetime`: Lifetime name without its leading apostrophe.
+///
+/// # Returns
+///
+/// Returns `true` when the lifetime occurs outside a shadowing higher-ranked
+/// scope.
 fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -587,6 +728,16 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
 }
 
 /// Returns whether path arguments contain one outer lifetime.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed path arguments to inspect.
+/// - `lifetime`: Lifetime name without its leading apostrophe.
+///
+/// # Returns
+///
+/// Returns `true` when the lifetime occurs in an argument type or lifetime
+/// slot.
 fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
@@ -608,6 +759,16 @@ fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> b
 }
 
 /// Returns whether one structured type node refers to an outer const generic.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type node to inspect recursively.
+/// - `parameter`: Const parameter name being searched for.
+///
+/// # Returns
+///
+/// Returns `true` when the parameter occurs in a type or const argument
+/// position.
 fn type_uses_const(ty: &TypeIr, parameter: &str) -> bool {
     if type_is_parameter(ty, parameter) {
         return true;
@@ -645,6 +806,16 @@ fn type_uses_const(ty: &TypeIr, parameter: &str) -> bool {
 }
 
 /// Returns whether path arguments contain one outer const generic.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed path arguments to inspect.
+/// - `parameter`: Const parameter name being searched for.
+///
+/// # Returns
+///
+/// Returns `true` when a const-valued argument or nested type mentions the
+/// parameter.
 fn path_arguments_use_const(arguments: &PathArgumentsIr, parameter: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
@@ -665,11 +836,30 @@ fn path_arguments_use_const(arguments: &PathArgumentsIr, parameter: &str) -> boo
 }
 
 /// Returns whether a const-expression token is the direct parameter path.
+///
+/// # Parameters
+///
+/// - `tokens`: Const-expression tokens to parse as a path.
+/// - `parameter`: Const parameter identifier to compare.
+///
+/// # Returns
+///
+/// Returns `true` only when the expression is exactly the unqualified parameter
+/// path.
 fn token_is_parameter(tokens: &TokenStream, parameter: &str) -> bool {
     parse2::<ExprPath>(tokens.clone()).is_ok_and(|path| path.qself.is_none() && path.path.is_ident(parameter))
 }
 
 /// Returns whether `ty` is the direct generic parameter named `parameter`.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type node to inspect.
+/// - `parameter`: Generic parameter name to compare.
+///
+/// # Returns
+///
+/// Returns `true` when the type is exactly that unqualified parameter.
 fn type_is_parameter(ty: &TypeIr, parameter: &str) -> bool {
     let TypeKindIr::Path(path) = &ty.kind else {
         return false;
