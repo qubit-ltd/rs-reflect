@@ -223,7 +223,9 @@ impl RegistryBuilder {
         } else if let Some(first) = self.trait_fragments.get(&definition_id) {
             return Err(RegistryError::identity_conflict(first.clone(), identity.clone()));
         }
-        self.trait_fragments.insert(definition_id.clone(), identity.clone());
+        self.trait_fragments
+            .entry(definition_id.clone())
+            .or_insert_with(|| identity.clone());
         self.traits_by_id.entry(definition_id).or_insert(descriptor);
         Ok(())
     }
