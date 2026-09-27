@@ -2,7 +2,7 @@
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
-[![分发状态](https://img.shields.io/badge/distribution-internal-blue.svg)](#安装)
+[![Crates.io](https://img.shields.io/crates/v/qubit-reflect.svg?color=blue)](https://crates.io/crates/qubit-reflect)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
@@ -71,7 +71,8 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 - 严格的类型化能力查询保留四种状态：`Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`。需要追溯来源时，注册表还会报告有效能力来自 `Intrinsic` 还是 `Registered`，并可返回贡献该能力的 `FragmentIdentity`。
 - 动态值明确区分 `Local` 与选择性启用的 `ThreadSafe` 边界；只有生成代码证明类型满足所需 `Send + Sync` 约束时，才会提供线程安全字段访问和构造。
 
-反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、描述符地址和 trait 标记 仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
+反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、描述符地址和 trait 标记仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
+
 元组支持 0 到 32 个元素，可移植函数指针支持 0 到 32 个参数；超出该数量范围时不受支持，也不会获得 `Reflect` 实现。
 
 当库或测试需要自行指定注册内容时，可以使用 `RegistrySnapshotBuilder`。
@@ -88,7 +89,6 @@ use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
 use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::TypeDescriptor;
-
 fn main() -> Result<(), qubit_reflect::RegistryError> {
 let target = TypeDescriptor::of::<u32>();
 let key = CapabilityKey::<u32>::new(
@@ -155,7 +155,7 @@ Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 ## 贡献
 
 欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
-Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
+Pull Request 前运行 `./align-ci.sh` 格式化代码，运行 `./ci-check.sh` 对齐 CI 要求。
 
 ## 作者
 
