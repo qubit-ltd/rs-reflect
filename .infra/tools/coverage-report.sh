@@ -11,24 +11,39 @@ if [ -f "$coverage_config" ]; then
     coverage_scope=$(jq -r '.scope // "default-members"' "$coverage_config")
 fi
 report_args=()
+metadata=$(cargo metadata --no-deps --format-version 1 \
+    --manifest-path "$project_root/Cargo.toml")
+excluded_packages=$(jq -c '.exclude_packages // []' "$coverage_config" 2>/dev/null || printf '[]')
 case "$coverage_scope" in
-    workspace) report_args+=(--workspace) ;;
+    workspace)
+        mapfile -t package_names < <(jq -r \
+            --argjson excluded "$excluded_packages" \
+            '. as $metadata
+             | $metadata.packages[]
+             | select(.id as $id | $metadata.workspace_members | index($id))
+             | select(.name as $name | $excluded | index($name) | not)
+             | .name' <<<"$metadata")
+        ;;
     package)
-        package_name=$(cargo metadata --no-deps --format-version 1 \
-            --manifest-path "$project_root/Cargo.toml" | jq -r \
+        mapfile -t package_names < <(jq -r \
             --arg manifest "$project_root/Cargo.toml" \
             '.packages[] | select(.manifest_path == $manifest) | .name')
-        [ -n "$package_name" ] || { echo "error: unable to resolve coverage package scope" >&2; exit 1; }
-        report_args+=(--package "$package_name")
         ;;
-    default-members) ;;
+    default-members)
+        mapfile -t package_names < <(jq -r \
+            --argjson excluded "$excluded_packages" \
+            '. as $metadata
+             | $metadata.packages[]
+             | select(.id as $id | $metadata.workspace_default_members | index($id))
+             | select(.name as $name | $excluded | index($name) | not)
+             | .name' <<<"$metadata")
+        ;;
     *) echo "error: unsupported coverage scope '$coverage_scope'" >&2; exit 1 ;;
 esac
-if [ -f "$coverage_config" ]; then
-    while IFS= read -r excluded; do
-        [ -n "$excluded" ] && report_args+=(--exclude "$excluded")
-    done < <(jq -r '.exclude_packages[]? // empty' "$coverage_config")
-fi
+for package_name in "${package_names[@]}"; do
+    report_args+=(--package "$package_name")
+done
+[ "${#package_names[@]}" -gt 0 ] || { echo "error: coverage scope selected no packages" >&2; exit 1; }
 cargo llvm-cov report "${report_args[@]}" --json --output-path coverage.json
 cargo llvm-cov report "${report_args[@]}" --lcov --output-path lcov.info
 cargo llvm-cov report "${report_args[@]}" --cobertura --output-path target/llvm-cov/cobertura.xml
