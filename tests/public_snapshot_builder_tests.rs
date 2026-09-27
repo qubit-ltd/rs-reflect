@@ -522,6 +522,56 @@ fn test_definition_membership_is_separate_from_definition_capabilities() {
 }
 
 #[test]
+fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
+    let capability_key = key("example.snapshot.definition.states");
+
+    let unknown = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+    assert!(unknown.definition(DEFINITION.id()).is_none());
+    assert!(unknown.definition_capabilities(DEFINITION.id()).is_none());
+
+    let mut member_only = RegistrySnapshotBuilder::new();
+    member_only.add_definition(&DEFINITION, source(56, "type-definition", 56));
+    let member_only = member_only.build().expect("member-only snapshot");
+    assert!(member_only.definition(DEFINITION.id()).is_some());
+    assert!(
+        member_only
+            .definition_capabilities(DEFINITION.id())
+            .expect("member is known")
+            .descriptors()
+            .is_empty()
+    );
+
+    let mut capability_only = RegistrySnapshotBuilder::new();
+    capability_only.add_definition_capabilities(
+        &DEFINITION,
+        vec![CapabilityDescriptor::with_adapter(capability_key, 17_u32)],
+        source(57, "definition-capability", 57),
+    );
+    let capability_only = capability_only.build().expect("capability-only snapshot");
+    assert!(capability_only.definition(DEFINITION.id()).is_none());
+    assert_eq!(
+        capability_only
+            .definition_capabilities(DEFINITION.id())
+            .and_then(|capabilities| capabilities.get(capability_key).ok().flatten()),
+        Some(&17),
+    );
+
+    let mut both = RegistrySnapshotBuilder::new();
+    both.add_definition(&DEFINITION, source(58, "type-definition", 58));
+    both.add_definition_capabilities(
+        &DEFINITION,
+        vec![CapabilityDescriptor::with_adapter(capability_key, 23_u32)],
+        source(59, "definition-capability", 59),
+    );
+    let both = both.build().expect("member with capabilities snapshot");
+    assert!(both.definition(DEFINITION.id()).is_some());
+    assert_eq!(
+        both.definition_capability(DEFINITION.id(), capability_key),
+        Ok(Some(&23)),
+    );
+}
+
+#[test]
 fn test_capability_only_definition_targets_are_reported_in_fragment_order() {
     let capability_id = "example.snapshot.generic";
     let mut builder = RegistrySnapshotBuilder::new();
