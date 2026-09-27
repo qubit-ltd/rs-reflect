@@ -116,7 +116,7 @@ jobs:
         with:
           toolchain: 1.94
       - name: Install Rust sources for coverage UI tests
-        run: rustup component add rust-src --toolchain 1.94.0
+        run: rustup component add rust-src --toolchain 1.94
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --version 0.8.6 --locked
       - name: Collect and check coverage
