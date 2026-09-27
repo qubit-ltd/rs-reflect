@@ -7,6 +7,8 @@
 // =============================================================================
 
 // qubit-style: allow explicit-imports
+//! Integration tests for trait declarations, applications, and impl metadata.
+
 use std::any::TypeId;
 use std::sync::Arc;
 use std::sync::Barrier;

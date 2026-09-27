@@ -83,7 +83,9 @@ fn isolated_builder() -> RegistrySnapshotBuilder {
 
 #[test]
 fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
-    let registry = isolated_builder().build().unwrap();
+    let registry = isolated_builder()
+        .build()
+        .expect("the isolated generated method snapshot must build");
     assert!(ReflectRegistry::initialize().is_err());
     let MethodLookup::Unique(method) = ImplDescriptor::lookup_method(
         registry.implementations(Receiver::type_descriptor().type_id()),
@@ -140,7 +142,9 @@ fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failur
         )],
         FragmentIdentity::new("isolated", "receiver", 1, 1, "capability", 1),
     );
-    let registry = builder.build().unwrap();
+    let registry = builder
+        .build()
+        .expect("the isolated snapshot with its receiver adapter must build");
     let MethodLookup::Unique(method) = Receiver::type_descriptor().methods_named_in(&registry, "run") else {
         panic!("generated method in local snapshot")
     };
@@ -151,10 +155,18 @@ fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failur
             InvocationArg::Owned(ReflectedOwned::new(22_u16)),
         ],
     );
-    let output = method.invoke_local(&registry, invocation).unwrap().unwrap();
+    let output = method
+        .invoke_local(&registry, invocation)
+        .expect("the local entry point must be available")
+        .expect("the explicit receiver and arguments must validate");
     let InvocationOutput::Owned(value) = output else {
         panic!("owned result")
     };
-    assert_eq!(value.downcast::<u32>().unwrap_or_else(|_| panic!("u32")), 33);
+    assert_eq!(
+        value
+            .downcast::<u32>()
+            .unwrap_or_else(|_| panic!("result must retain its u32 type")),
+        33
+    );
     assert!(ReflectRegistry::initialize().is_err());
 }

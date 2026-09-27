@@ -189,4 +189,12 @@ fn test_variant_fields_include_variant_in_runtime_identity() {
     assert_eq!(done_error.field().variant_rust_name(), Some("Done"));
     assert_eq!(PROGRESS_FIELDS[0].visibility(), FieldVisibility::VariantInherited);
     assert_eq!(DONE_FIELDS[0].visibility(), FieldVisibility::VariantInherited);
+
+    let declared_visibility = Visibility::Public;
+    let declared_field = FieldVisibility::Declared(&declared_visibility);
+    assert_eq!(declared_field.as_declared(), Some(&declared_visibility));
+    assert!(!declared_field.is_variant_inherited());
+    let inherited_field = FieldVisibility::VariantInherited;
+    assert_eq!(inherited_field.as_declared(), None);
+    assert!(inherited_field.is_variant_inherited());
 }

@@ -12,6 +12,7 @@
 
 use std::marker::PhantomData;
 
+use EmptyTrait as EmptyAlias;
 use qubit_reflect::error::RegistryErrorKind;
 use qubit_reflect::reflect;
 use qubit_reflect::reflect_impl;
@@ -19,8 +20,6 @@ use qubit_reflect::registry::ReflectRegistry;
 
 #[reflect]
 trait EmptyTrait {}
-
-use EmptyTrait as EmptyAlias;
 
 struct EmptyTarget<T>(PhantomData<T>);
 

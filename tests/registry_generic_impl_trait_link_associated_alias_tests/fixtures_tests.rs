@@ -12,6 +12,7 @@
 
 use std::marker::PhantomData;
 
+use AssociatedAliasTrait as AssociatedAlias;
 use qubit_reflect::reflect;
 use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
@@ -39,8 +40,6 @@ trait AssociatedAliasDecoy {
     /// Returns a fixture value with the same method signature.
     fn associated_value(&self) -> Self::Output;
 }
-
-use AssociatedAliasTrait as AssociatedAlias;
 
 struct AssociatedTarget<T>(PhantomData<T>);
 

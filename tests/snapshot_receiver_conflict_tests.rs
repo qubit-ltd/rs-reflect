@@ -33,7 +33,7 @@ use qubit_reflect::value::Local;
 /// Declares the first conflicting intrinsic fact.
 fn first<T: 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(
-        CapabilityKey::new(CapabilityId::new("snapshot.conflict").unwrap()),
+        CapabilityKey::new(CapabilityId::new("snapshot.conflict").expect("fixture capability ID must be valid")),
         std::any::TypeId::of::<T>(),
     )
 }
@@ -84,37 +84,42 @@ register_type_capabilities!(Global: [
 
 /// Copies only generated impl facts, without type membership or capabilities.
 fn isolated(target: &'static TypeDescriptor) -> ReflectRegistry {
-    let global = ReflectRegistry::initialize().unwrap();
+    let global = ReflectRegistry::initialize().expect("generated fixtures must register");
     let mut builder = RegistrySnapshotBuilder::new();
     for implementation in global.implementations(target.type_id()) {
         builder.add_impl(implementation, implementation.definition().fragment_identity().clone());
     }
-    builder.build().unwrap()
+    builder.build().expect("impl-only snapshot must be valid")
 }
 
 #[test]
 fn test_intrinsic_conflict_survives_generated_snapshot_invocation() {
     let target = TypeDescriptor::of::<Conflict<u8>>();
     let registry = isolated(target);
-    let expected = registry.capabilities(target).unwrap_err();
+    let expected = registry
+        .capabilities(target)
+        .expect_err("conflicting intrinsic capabilities must be rejected");
     let MethodLookup::Unique(method) = target.methods_named_in(&registry, "read") else {
-        panic!("method")
+        panic!("the reflected Conflict<u8> method must resolve uniquely")
     };
     let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))), []);
-    let failure = method.invoke_local(&registry, input).unwrap().err().unwrap();
+    let failure = method
+        .invoke_local(&registry, input)
+        .expect("static adapter must exist")
+        .expect_err("intrinsic conflict must reject invocation");
     let InvocationErrorKind::CapabilityResolution(actual) = failure.error().kind() else {
-        panic!("original conflict")
+        panic!("invocation must preserve the original capability conflict")
     };
     assert_eq!(actual, &expected);
     let (receiver, arguments) = failure.into_recovery().into_parts();
     assert!(arguments.is_empty());
     let Some(InvocationReceiver::Owned(value)) = receiver else {
-        panic!("owned input")
+        panic!("failed invocation must recover the owned receiver")
     };
     assert_eq!(
         value
             .downcast::<Pin<Rc<Conflict<u8>>>>()
-            .unwrap_or_else(|_| panic!("receiver"))
+            .unwrap_or_else(|_| panic!("recovered receiver must retain its Conflict<u8> type"))
             .value,
         1
     );
@@ -123,19 +128,22 @@ fn test_intrinsic_conflict_survives_generated_snapshot_invocation() {
 #[test]
 fn test_missing_local_capability_does_not_use_a_valid_global_adapter() {
     let target = TypeDescriptor::of::<Global>();
-    let global = ReflectRegistry::initialize().unwrap();
+    let global = ReflectRegistry::initialize().expect("generated fixtures must register");
     assert!(
         global
             .capability(target, receiver_adapter_key::<Pin<Rc<Global>>, Local>())
-            .unwrap()
+            .expect("global receiver capability contract must match")
             .is_some()
     );
     let registry = isolated(target);
     let MethodLookup::Unique(method) = target.methods_named_in(&registry, "read") else {
-        panic!("method")
+        panic!("the reflected Global method must resolve uniquely")
     };
     let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Global))), []);
-    let failure = method.invoke_local(&registry, input).unwrap().err().unwrap();
+    let failure = method
+        .invoke_local(&registry, input)
+        .expect("static adapter must exist")
+        .expect_err("isolated snapshot lacks the global receiver capability");
     assert!(matches!(
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterUnavailable { .. }
