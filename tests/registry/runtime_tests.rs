@@ -226,6 +226,18 @@ static EXTERNAL_DEFINITION_RIGHT: LazyLock<TraitDefinitionDescriptor> = LazyLock
         &EMPTY_GENERIC_DEFINITION,
     )
 });
+static EXTERNAL_DEFINITION_OTHER: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+    TraitDefinitionDescriptor::new(
+        TraitId::External(
+            ExternalTraitId::new("fixture.registry.other").expect("the fixture external trait ID must be valid"),
+        ),
+        "Shared",
+        "fixture::left::Shared",
+        "shared",
+        TraitCompleteness::ExternalIncomplete,
+        &EMPTY_GENERIC_DEFINITION,
+    )
+});
 static EXTERNAL_DEFINITION_CONFLICT: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
     TraitDefinitionDescriptor::new(
         TraitId::External(shared_external_trait_id()),
@@ -243,6 +255,7 @@ fn shared_external_trait_id() -> ExternalTraitId {
 
 const FIRST_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_a", 60, "trait", 1);
 const SECOND_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_b", 61, "trait", 2);
+const OTHER_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_aa", 63, "trait", 4);
 const CONFLICTING_EXTERNAL_IDENTITY: StaticFragmentIdentity = static_identity("external_c", 62, "trait", 3);
 
 /// Returns the shared runtime external-trait identity.
@@ -258,6 +271,18 @@ fn first_external_payload() -> FragmentPayload {
 /// Builds the second external-trait payload.
 fn second_external_payload() -> FragmentPayload {
     FragmentPayload::Trait(&EXTERNAL_DEFINITION_RIGHT)
+}
+
+/// Returns the distinct external trait identity that shares a diagnostic path.
+fn other_external_runtime_identity() -> RuntimeIdentity {
+    RuntimeIdentity::Trait(TraitId::External(
+        ExternalTraitId::new("fixture.registry.other").expect("the fixture external trait ID must be valid"),
+    ))
+}
+
+/// Builds the distinct external-trait payload sharing the left diagnostic path.
+fn other_external_payload() -> FragmentPayload {
+    FragmentPayload::Trait(&EXTERNAL_DEFINITION_OTHER)
 }
 
 /// Builds incompatible generic declaration facts for the shared external ID.
@@ -276,6 +301,12 @@ static EXTERNAL_RIGHT: RegistrationFragment = RegistrationFragment::new(
     SECOND_EXTERNAL_IDENTITY,
     external_runtime_identity,
     second_external_payload,
+);
+static EXTERNAL_OTHER: RegistrationFragment = RegistrationFragment::new(
+    FragmentKind::Trait,
+    OTHER_EXTERNAL_IDENTITY,
+    other_external_runtime_identity,
+    other_external_payload,
 );
 static EXTERNAL_CONFLICT: RegistrationFragment = RegistrationFragment::new(
     FragmentKind::Trait,
@@ -622,6 +653,30 @@ fn test_registry_runtime_rejects_capability_contract_conflict() {
 fn test_registry_runtime_merges_external_trait_path_aliases() {
     build_registry(&[&EXTERNAL_RIGHT, &EXTERNAL_LEFT])
         .expect("different diagnostic paths with one external ID must merge");
+}
+
+/// Verifies a later compatible alias does not reorder path candidates.
+#[test]
+fn test_registry_runtime_preserves_external_trait_candidate_order() {
+    let without_alias = build_registry(&[&EXTERNAL_LEFT, &EXTERNAL_OTHER]).expect("distinct traits must register");
+    let with_alias = build_registry(&[&EXTERNAL_LEFT, &EXTERNAL_OTHER, &EXTERNAL_RIGHT])
+        .expect("compatible aliases for one external trait must merge");
+
+    let without_alias = without_alias
+        .find_trait_definitions_by_path("fixture::left::Shared")
+        .iter()
+        .collect::<Vec<_>>();
+    let with_alias = with_alias
+        .find_trait_definitions_by_path("fixture::left::Shared")
+        .iter()
+        .collect::<Vec<_>>();
+
+    assert_eq!(without_alias.len(), 2);
+    assert_eq!(with_alias.len(), 2);
+    assert!(std::ptr::eq(without_alias[0], &*EXTERNAL_DEFINITION_LEFT));
+    assert!(std::ptr::eq(with_alias[0], &*EXTERNAL_DEFINITION_LEFT));
+    assert!(std::ptr::eq(without_alias[1], &*EXTERNAL_DEFINITION_OTHER));
+    assert!(std::ptr::eq(with_alias[1], &*EXTERNAL_DEFINITION_OTHER));
 }
 
 /// Verifies one external-trait ID cannot identify incompatible declaration
