@@ -19,10 +19,14 @@ use crate::value::ThreadSafe;
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// enum State {
 ///     Ready,
 /// }
@@ -30,6 +34,9 @@ use crate::value::ThreadSafe;
 /// let variant = TypeDescriptor::of::<State>().variant("Ready").expect("derived variant");
 /// let construction = variant.construction().expect("generated constructor");
 /// assert_eq!(construction.local_constructor().variant().rust_name(), "Ready");
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 pub struct VariantConstructionDescriptor {
     /// Factory for the local-mode variant constructor.
@@ -86,7 +93,6 @@ impl VariantConstructionDescriptor {
     /// # Returns
     ///
     /// Returns the cached local-mode constructor.
-    #[must_use]
     pub fn local_constructor(&self) -> &'static VariantConstructor<Local> {
         self.cached_local_constructor.get_or_init(self.local_constructor)
     }

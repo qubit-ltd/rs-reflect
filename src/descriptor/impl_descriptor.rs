@@ -212,7 +212,6 @@ impl ImplDefinitionDescriptor {
     /// or [`ImplDescriptorBuildError::TraitImplMissingTrait`] when a trait impl
     /// has no trait declaration.
     #[doc(hidden)]
-    #[must_use]
     pub fn new(
         fragment_identity: FragmentIdentity,
         target_type: TypeExpression,
@@ -867,24 +866,23 @@ pub enum MethodLookup<'a> {
 ///
 /// ```
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// use qubit_reflect::{Reflect, TypeDescriptor};
 /// #[cfg(feature = "derive")]
-/// use qubit_reflect::reflect_impl;
-///
-/// #[cfg(feature = "derive")]
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct Service;
-///
-/// #[cfg(feature = "derive")]
-/// #[reflect_impl(crate = qubit_reflect)]
-/// impl Service {
-///     fn ping(&self) {}
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// mod example {
+///     use qubit_reflect::{Reflect, reflect_impl};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Service {
+///         fn ping(&self) {}
+///     }
 /// }
 ///
 /// # #[cfg(feature = "derive")]
 /// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-/// let implementation = TypeDescriptor::of::<Service>()
+/// let implementation = TypeDescriptor::of::<example::Service>()
 ///     .impls()?
 ///     .first()
 ///     .expect("reflected implementation");
@@ -893,6 +891,7 @@ pub enum MethodLookup<'a> {
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
+/// }
 /// ```
 pub struct ImplDescriptor {
     /// Source declaration represented by this concrete application.

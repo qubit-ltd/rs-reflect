@@ -40,6 +40,9 @@ pub type StructUpdateAdapter<M> = fn(ValidatedUpdateInput<M>) -> DynamicOwned<M>
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::construct::StructUpdateInput;
 /// use qubit_reflect::value::DynamicOwned;
@@ -48,6 +51,7 @@ pub type StructUpdateAdapter<M> = fn(ValidatedUpdateInput<M>) -> DynamicOwned<M>
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -56,10 +60,13 @@ pub type StructUpdateAdapter<M> = fn(ValidatedUpdateInput<M>) -> DynamicOwned<M>
 /// let updater = descriptor.struct_construction().expect("generated updater").local_updater().expect("update enabled");
 /// let input = StructUpdateInput::new(
 ///     DynamicOwned::<Local>::new(User { name: String::from("Ada") }),
-///     NamedConstructionInput::new([("name", DynamicOwned::new(String::from("Grace")))]),
+///     NamedConstructionInput::new([("name", DynamicOwned::<Local>::new(String::from("Grace")))]),
 /// );
 /// let updated = updater.update(input).expect("valid replacement");
 /// assert_eq!(updated.downcast_ref::<User>().map(|user| user.name.as_str()), Some("Grace"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 pub struct StructUpdater<M: Mode + 'static> {
     /// Exact reflected root whose owned fields may be replaced.
@@ -120,7 +127,6 @@ impl<M: Mode + 'static> StructUpdater<M> {
     /// # Returns
     ///
     /// Returns the policies corresponding to direct fields by source index.
-    #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [UpdateField] {
         self.fields

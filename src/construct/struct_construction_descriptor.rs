@@ -20,17 +20,27 @@ use crate::value::ThreadSafe;
 /// # Examples
 ///
 /// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+/// # #![allow(proc_macro_derive_resolution_fallback)]
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct User {
+///         name: String,
+///     }
 /// }
 ///
-/// let construction = TypeDescriptor::of::<User>().struct_construction().expect("generated constructor");
+/// let construction = TypeDescriptor::of::<example::User>().struct_construction().expect("generated constructor");
 /// let constructor = construction.local_constructor();
-/// assert_eq!(constructor.descriptor().type_name(), "User");
+/// assert!(constructor.descriptor().type_name().ends_with("User"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 pub struct StructConstructionDescriptor {
     /// Factory for the local-mode from-zero constructor.

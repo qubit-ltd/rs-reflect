@@ -17,6 +17,14 @@ use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
 
 /// The ownership or borrowing mode of an invocation input.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::InvocationInputMode;
+///
+/// assert_eq!(InvocationInputMode::Owned, InvocationInputMode::Owned);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvocationInputMode {
     /// The input is consumed by the invoked method.
@@ -28,6 +36,16 @@ pub enum InvocationInputMode {
 }
 
 /// One non-receiver positional invocation argument.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::{InvocationArg, InvocationInputMode};
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let argument = InvocationArg::<Local>::Owned(DynamicOwned::<Local>::new(7_u8));
+/// assert_eq!(argument.mode(), InvocationInputMode::Owned);
+/// ```
 pub enum InvocationArg<'call, M: InvocationMode> {
     /// An owned argument that may be consumed only after validation succeeds.
     Owned(DynamicOwned<M>),
@@ -44,6 +62,19 @@ pub enum InvocationArg<'call, M: InvocationMode> {
 /// that has not already been occupied by an earlier binding. A named input
 /// selects the unique identifier parameter with that name. Binding validation
 /// never extracts an owned dynamic value.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::{InvocationArg, InvocationBinding};
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let binding = InvocationBinding::named(
+///     "count",
+///     InvocationArg::Owned(DynamicOwned::<Local>::new(3_u32)),
+/// );
+/// assert_eq!(binding.name(), Some("count"));
+/// ```
 pub struct InvocationBinding<'call, M: InvocationMode> {
     name: Option<Box<str>>,
     argument: InvocationArg<'call, M>,

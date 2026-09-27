@@ -44,6 +44,9 @@ pub type VariantConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dy
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::TupleConstructionInput;
 /// use qubit_reflect::value::DynamicOwned;
 /// use qubit_reflect::value::Local;
@@ -51,6 +54,7 @@ pub type VariantConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dy
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// enum Event {
 ///     Text(String),
 /// }
@@ -64,6 +68,9 @@ pub type VariantConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dy
 /// let input = TupleConstructionInput::new([DynamicOwned::<Local>::new(String::from("hello"))]);
 /// let event = constructor.construct_tuple(input).expect("valid tuple field");
 /// assert!(event.downcast_ref::<Event>().is_some());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[must_use]
 pub struct VariantConstructor<M: Mode + 'static> {
@@ -95,7 +102,6 @@ impl<M: Mode + 'static> VariantConstructor<M> {
     ///
     /// Returns a constructor over the supplied immutable metadata.
     #[doc(hidden)]
-    #[must_use]
     #[inline]
     pub const fn new(
         variant: &'static VariantDescriptor,
@@ -125,7 +131,6 @@ impl<M: Mode + 'static> VariantConstructor<M> {
     /// # Returns
     ///
     /// Returns policies corresponding to the variant fields by source index.
-    #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields

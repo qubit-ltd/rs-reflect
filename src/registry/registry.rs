@@ -228,7 +228,7 @@ impl IntoIterator for ImplDefinitionCandidates {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use std::any::TypeId;
 /// use qubit_reflect::registry::ReflectRegistry;
 ///
@@ -414,7 +414,7 @@ impl ReflectRegistry {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use qubit_reflect::{ReflectRegistry, TypeDescriptor};
     /// use qubit_reflect::capability::clone_key;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {

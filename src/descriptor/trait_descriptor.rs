@@ -45,30 +45,27 @@ pub use self::supertrait::external_supertrait;
 ///
 /// ```
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// use qubit_reflect::{Reflect, TypeDescriptor};
 /// #[cfg(feature = "derive")]
-/// use qubit_reflect::{reflect, reflect_impl};
-///
-/// #[cfg(feature = "derive")]
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct Service;
-///
-/// #[cfg(feature = "derive")]
-/// #[reflect(crate = qubit_reflect)]
-/// trait Named {
-///     fn name(&self) -> &'static str;
-/// }
-///
-/// #[cfg(feature = "derive")]
-/// #[reflect_impl(crate = qubit_reflect)]
-/// impl Named for Service {
-///     fn name(&self) -> &'static str { "service" }
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// mod example {
+///     use qubit_reflect::{reflect, reflect_impl, Reflect};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect(crate = qubit_reflect)]
+///     pub trait Named {
+///         fn name(&self) -> &'static str;
+///     }
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Named for Service {
+///         fn name(&self) -> &'static str { "service" }
+///     }
 /// }
 ///
 /// # #[cfg(feature = "derive")]
 /// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-/// let applied = TypeDescriptor::of::<Service>()
+/// let applied = TypeDescriptor::of::<example::Service>()
 ///     .impls()?
 ///     .iter()
 ///     .find_map(|implementation| implementation.implemented_trait())
@@ -78,6 +75,7 @@ pub use self::supertrait::external_supertrait;
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
+/// }
 /// ```
 pub struct TraitDescriptor {
     definition: &'static TraitDefinitionDescriptor,

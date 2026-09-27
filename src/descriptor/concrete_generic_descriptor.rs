@@ -27,17 +27,27 @@ type ConstArgumentValueFactory = fn() -> ReflectedOwned;
 /// # Examples
 ///
 /// ```
+/// #[cfg(feature = "derive")]
+/// fn main() {
+/// # #![allow(proc_macro_derive_resolution_fallback)]
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct Envelope<T>(T);
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Envelope<T>(T);
+/// }
 ///
-/// let generic = TypeDescriptor::of::<Envelope<String>>()
+/// let generic = TypeDescriptor::of::<example::Envelope<String>>()
 ///     .concrete_generic()
 ///     .expect("generic instance metadata");
 /// assert_eq!(generic.arguments().len(), 1);
 /// assert!(generic.type_argument(0).is_some());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Debug)]
 pub struct ConcreteGenericDescriptor {

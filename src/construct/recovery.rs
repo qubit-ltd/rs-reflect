@@ -94,6 +94,9 @@ impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::value::DynamicOwned;
 /// use qubit_reflect::value::Local;
@@ -101,6 +104,7 @@ impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -115,6 +119,9 @@ impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
 ///     Ok(_) => panic!("expected missing-field recovery"),
 /// };
 /// assert!(recovery.to_string().contains("missing required construction field"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[must_use]
 pub struct ConstructionRecovery<M: Mode> {
@@ -151,7 +158,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the structured error that stopped construction.
-    #[must_use]
     #[inline]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
@@ -161,7 +167,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     ///
     /// Update recovery places the base first, followed by overrides in caller
     /// order.
-    #[must_use]
     #[inline]
     pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
         &self.values
@@ -172,7 +177,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the error and all retained values in recovery order.
-    #[must_use]
     pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }

@@ -105,12 +105,16 @@ impl<M: Mode> fmt::Debug for ConstructionFieldPolicy<M> {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::ConstructionField;
 /// use qubit_reflect::value::Local;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -118,6 +122,9 @@ impl<M: Mode> fmt::Debug for ConstructionFieldPolicy<M> {
 /// let descriptor = TypeDescriptor::of::<User>().field("name").expect("field exists");
 /// let policy = ConstructionField::<Local>::required(descriptor);
 /// assert_eq!(policy.descriptor().query_name(), Some("name"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[must_use]
 pub struct ConstructionField<M: Mode> {
@@ -150,7 +157,6 @@ impl<M: Mode> ConstructionField<M> {
     /// # Returns
     ///
     /// Returns a required-field construction policy.
-    #[must_use]
     #[inline]
     pub const fn required(descriptor: &'static FieldDescriptor) -> Self {
         Self {
@@ -169,7 +175,6 @@ impl<M: Mode> ConstructionField<M> {
     /// # Returns
     ///
     /// Returns a policy that accepts caller input or invokes `provider`.
-    #[must_use]
     #[inline]
     pub const fn defaulted(descriptor: &'static FieldDescriptor, provider: ConstructionDefaultProvider<M>) -> Self {
         Self {
@@ -191,7 +196,6 @@ impl<M: Mode> ConstructionField<M> {
     /// # Returns
     ///
     /// Returns a policy that rejects caller input and invokes `provider`.
-    #[must_use]
     #[inline]
     pub const fn provider_only(descriptor: &'static FieldDescriptor, provider: ConstructionDefaultProvider<M>) -> Self {
         Self {
@@ -210,7 +214,6 @@ impl<M: Mode> ConstructionField<M> {
     /// # Returns
     ///
     /// Returns an unavailable-field policy.
-    #[must_use]
     #[inline]
     pub const fn unavailable(
         descriptor: &'static FieldDescriptor,
@@ -295,11 +298,15 @@ pub enum UpdateFieldPolicy {
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::UpdateField;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -307,6 +314,9 @@ pub enum UpdateFieldPolicy {
 /// let field = TypeDescriptor::of::<User>().field("name").expect("field exists");
 /// let update = UpdateField::allowed(field);
 /// assert_eq!(update.descriptor().query_name(), Some("name"));
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 #[derive(Clone, Copy)]
 #[must_use]
@@ -327,7 +337,6 @@ impl UpdateField {
     /// # Returns
     ///
     /// Returns an update policy that permits whole-field replacement.
-    #[must_use]
     #[inline]
     pub const fn allowed(descriptor: &'static FieldDescriptor) -> Self {
         Self {
@@ -346,7 +355,6 @@ impl UpdateField {
     /// # Returns
     ///
     /// Returns an update policy that rejects replacement.
-    #[must_use]
     #[inline]
     pub const fn unavailable(
         descriptor: &'static FieldDescriptor,
@@ -419,7 +427,7 @@ impl fmt::Debug for UpdateField {
 /// use qubit_reflect::value::Local;
 ///
 /// let input = NamedConstructionInput::<Local>::new([
-///     ("name", DynamicOwned::new(String::from("Ada"))),
+///     ("name", DynamicOwned::<Local>::new(String::from("Ada"))),
 /// ]);
 /// assert_eq!(input.fields()[0].0.as_ref(), "name");
 /// ```
@@ -529,8 +537,8 @@ impl<M: Mode> fmt::Debug for NamedConstructionInput<M> {
 /// use qubit_reflect::value::Local;
 ///
 /// let input = TupleConstructionInput::<Local>::new([
-///     DynamicOwned::new(7_u32),
-///     DynamicOwned::new(String::from("seven")),
+///     DynamicOwned::<Local>::new(7_u32),
+///     DynamicOwned::<Local>::new(String::from("seven")),
 /// ]);
 /// assert_eq!(input.values().len(), 2);
 /// ```
@@ -641,7 +649,7 @@ impl<M: Mode> fmt::Debug for TupleConstructionInput<M> {
 ///
 /// let base = DynamicOwned::<Local>::new((1_u32, String::from("before")));
 /// let overrides = NamedConstructionInput::new([
-///     ("name", DynamicOwned::new(String::from("after"))),
+///     ("name", DynamicOwned::<Local>::new(String::from("after"))),
 /// ]);
 /// let input = StructUpdateInput::new(base, overrides);
 /// assert_eq!(input.overrides().fields().len(), 1);

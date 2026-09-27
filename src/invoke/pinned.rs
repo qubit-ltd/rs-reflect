@@ -39,6 +39,17 @@ pub type PinnedMutAdapter<T, M> =
 ///
 /// The receiver is never erased, so this type can invoke methods on `!Unpin`
 /// values without reconstructing a pin proof from an ordinary reference.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::PinnedRefInvocation;
+/// use qubit_reflect::value::Local;
+///
+/// let value = Box::pin(7_u8);
+/// let invocation = PinnedRefInvocation::<_, Local>::new(value.as_ref(), []);
+/// assert_eq!(*invocation.receiver().get_ref(), 7);
+/// ```
 pub struct PinnedRefInvocation<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call T>,
     invocation: crate::invoke::Invocation<'call, M>,
@@ -246,6 +257,17 @@ impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedRefInvocationFail
 }
 
 /// Invocation input for a `Pin<&mut T>` receiver.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::PinnedMutInvocation;
+/// use qubit_reflect::value::Local;
+///
+/// let mut value = Box::pin(7_u8);
+/// let invocation = PinnedMutInvocation::<_, Local>::new(value.as_mut(), []);
+/// assert!(invocation.arguments().is_empty());
+/// ```
 pub struct PinnedMutInvocation<'call, T: ?Sized, M: InvocationMode> {
     receiver: Pin<&'call mut T>,
     invocation: crate::invoke::Invocation<'call, M>,

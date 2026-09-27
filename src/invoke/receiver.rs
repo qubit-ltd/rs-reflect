@@ -26,6 +26,16 @@ use crate::value::DynamicRef;
 /// discard their pin proof. Generated invocation support therefore uses the
 /// typed pinned invocation contracts for supported pinned borrows; arbitrary
 /// receiver conversions still require a separately registered safe adapter.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::{InvocationInputMode, InvocationReceiver};
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let receiver = InvocationReceiver::<Local>::Owned(DynamicOwned::<Local>::new(7_u8));
+/// assert_eq!(receiver.mode(), InvocationInputMode::Owned);
+/// ```
 pub enum InvocationReceiver<'call, M: InvocationMode> {
     /// A receiver consumed as `self` or an owned receiver container.
     Owned(DynamicOwned<M>),
@@ -79,6 +89,16 @@ pub fn receiver_adapter_key<R: 'static, M: InvocationMode>() -> CapabilityKey<Re
 }
 
 /// The receiver shape and exact type required by a method adapter.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::{InvocationInputMode, ReceiverExpectation};
+///
+/// let expected = ReceiverExpectation::borrowed::<String>();
+/// assert_eq!(expected.mode(), Some(InvocationInputMode::Ref));
+/// assert!(expected.type_name().is_some());
+/// ```
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReceiverExpectation {
     /// The method is an associated function and accepts no receiver.

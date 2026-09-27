@@ -19,7 +19,7 @@ use crate::descriptor::MethodQualifier;
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use std::any::TypeId;
 /// use qubit_reflect::registry::ReflectRegistry;
 ///

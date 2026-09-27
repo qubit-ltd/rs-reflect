@@ -43,6 +43,9 @@ pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dyn
 /// # Examples
 ///
 /// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::value::DynamicOwned;
 /// use qubit_reflect::value::Local;
@@ -50,6 +53,7 @@ pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dyn
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
+/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -61,6 +65,9 @@ pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dyn
 /// let input = NamedConstructionInput::new([("name", DynamicOwned::<Local>::new(String::from("Ada")))]);
 /// let user = constructor.construct_named(input).expect("valid field input");
 /// assert!(user.downcast_ref::<User>().is_some());
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
 /// ```
 pub struct StructConstructor<M: Mode + 'static> {
     /// Exact reflected root that the generated adapter constructs.
@@ -121,7 +128,6 @@ impl<M: Mode + 'static> StructConstructor<M> {
     /// # Returns
     ///
     /// Returns the policies corresponding to direct fields by source index.
-    #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields

@@ -29,8 +29,8 @@ use crate::value::storage::ThreadSafeOwnedStorage;
 /// a borrow lifetime.
 ///
 /// This wrapper only accepts sized `Any`-compatible values. Borrowed `str` is
-/// represented exclusively by [`DynamicRef`](crate::value::DynamicRef) and
-/// [`DynamicMut`](crate::value::DynamicMut)'s dedicated variants, never by an
+/// represented exclusively by [`DynamicRef`] and
+/// [`DynamicMut`]'s dedicated variants, never by an
 /// owned dynamic value.
 ///
 /// # Examples
