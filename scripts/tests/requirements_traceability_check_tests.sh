@@ -47,7 +47,8 @@ expect_failure "missing ID" "$missing"
 
 duplicate=$(copy_fixture duplicate-id)
 traceability="$duplicate/doc/2026-09-03-qubit-reflect-requirements-traceability.md"
-rg '^\| REQ-TYPE-030 \|' "$traceability" >> "$traceability"
+duplicate_line=$(grep -E '^\| REQ-TYPE-030 \|' "$traceability")
+printf '%s\n' "$duplicate_line" >> "$traceability"
 expect_failure "duplicate ID" "$duplicate"
 
 reordered=$(copy_fixture reordered-id)
@@ -63,5 +64,5 @@ expect_failure "reordered ID" "$reordered"
 
 missing_path=$(copy_fixture missing-path)
 traceability="$missing_path/doc/2026-09-03-qubit-reflect-requirements-traceability.md"
-sed -i 's#`src/capability/key.rs`#`src/capability/missing.rs`#' "$traceability"
+sed -i 's#`src/capability/registration.rs`#`src/capability/missing.rs`#' "$traceability"
 expect_failure "missing path" "$missing_path"
