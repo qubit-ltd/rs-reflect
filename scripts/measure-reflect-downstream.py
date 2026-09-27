@@ -18,10 +18,11 @@ import sys
 from typing import Any, Sequence
 
 
-BENCHMARK_VERSION = 2
+BENCHMARK_VERSION = 3
 METRICS = (
     "platform/cold_reflection_init",
     "platform/cold_model_projection",
+    "platform/capability_only_target_audit",
     "platform/type_metadata_try_of_representatives",
     "platform/warm_model_projection",
     "platform/relationship_validation",

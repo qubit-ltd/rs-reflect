@@ -19,7 +19,7 @@ SPEC.loader.exec_module(measure)
 
 
 def output(model_count: int = 133, ns: int = 100) -> str:
-    lines = ["platform/benchmark_version=2", f"platform/models={model_count}"]
+    lines = ["platform/benchmark_version=3", f"platform/models={model_count}"]
     for index, name in enumerate(measure.METRICS, start=1):
         lines.append(
             f"{name}: iterations={index}, ns/op={ns * index}, "
@@ -37,9 +37,10 @@ class MeasureReflectDownstreamTests(unittest.TestCase):
 
         for invalid in (
             output().replace("platform/models=133\n", ""),
-            output().replace("platform/benchmark_version=2\n", ""),
-            output().replace("benchmark_version=2", "benchmark_version=1"),
-            output() + "\nplatform/benchmark_version=2",
+            output().replace("platform/benchmark_version=3\n", ""),
+            output().replace("benchmark_version=3", "benchmark_version=2"),
+            output().replace("benchmark_version=3", "benchmark_version=1"),
+            output() + "\nplatform/benchmark_version=3",
             output() + "\nplatform/models=133",
             output().replace("allocated_bytes/op=100", "allocated_bytes/op=broken"),
             output().replace(measure.METRICS[-1], "platform/missing_metric"),
