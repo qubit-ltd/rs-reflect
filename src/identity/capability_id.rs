@@ -41,7 +41,6 @@ impl CapabilityId {
     ///
     /// Returns [`IdError`] when the name is malformed or uses the reserved
     /// `qubit.reflect` namespace.
-    #[must_use]
     pub fn validate(value: &str) -> Result<(), IdError> {
         validate(value, IdAuthority::EXTERNAL)
     }
@@ -62,7 +61,6 @@ impl CapabilityId {
     /// # Errors
     ///
     /// Returns [`IdError`] when the name is malformed or reserved.
-    #[must_use]
     pub fn new(value: &'static str) -> Result<Self, IdError> {
         Self::validate(value)?;
         Ok(Self(value))
@@ -110,7 +108,6 @@ impl AsRef<str> for CapabilityId {
     /// # Returns
     ///
     /// Returns the stable identifier text.
-    #[must_use]
     #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()

@@ -62,7 +62,6 @@ impl<'a, A: 'static> CapabilityLookup<'a, A> {
     /// Returns [`CapabilityAccessError::FactOnly`] for a fact without an
     /// adapter, or [`CapabilityAccessError::AdapterTypeMismatch`] when the
     /// declared adapter contract differs from the requested contract.
-    #[must_use]
     #[inline]
     pub const fn into_adapter(self) -> Result<Option<&'a A>, CapabilityAccessError> {
         match self {

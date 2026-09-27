@@ -45,7 +45,6 @@ impl ExternalTraitId {
     /// # Errors
     ///
     /// Returns [`IdError`] when the name is malformed or reserved.
-    #[must_use]
     pub fn new(value: &str) -> Result<Self, IdError> {
         validate(value, IdAuthority::EXTERNAL)?;
         Ok(Self(value.into()))
@@ -70,7 +69,6 @@ impl AsRef<str> for ExternalTraitId {
     /// # Returns
     ///
     /// Returns the validated identifier text.
-    #[must_use]
     #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
