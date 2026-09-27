@@ -354,9 +354,11 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 需要审计模型元数据注册时，可选调用
 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`。
 
-对于泛型定义，`definition_capabilities(id)` 在定义未知时返回 `None`，在定义已注册但没有能力时
-返回 `Some(empty)`，存在有效能力时返回 `Some(nonempty)`。便捷查询仍返回原有的 `Option` 或
-`Result<Option<_>>`，未知定义上的能力查询仍表示能力缺失。
+对于泛型定义，`definition_capabilities(id)` 查询能力事实，与定义是否属于快照成员相互独立。
+当该 ID 既不是定义成员、也没有能力事实时返回 `None`；定义已加入快照但没有能力时返回
+`Some(empty)`；存在有效能力事实时返回 `Some(nonempty)`。最后一种情况也包括仅注册了能力的目标：
+此时 `definition_capabilities(id)` 可返回能力，而 `definition(id)` 仍为 `None`。需要判断成员资格时，
+使用 `definition(id).is_some()`。带类型和文本 ID 的便捷查询可以读取能力专用目标上的能力；没有匹配事实时才表示能力缺失。
 
 把生成的快照传给 `impls_in`、`methods_in` 或 `methods_named_in`，即可指定查询范围。`build()` 会统一校验标识、引用关系和能力冲突，失败时返回 `RegistryError`。每个片段应提供稳定的 `FragmentIdentity`，便于定位重复或内容变化的来源。冲突详情可通过 `conflicting_fragments()`、`capability_details()`、`capability_target()` 和 `capability_id()` 查看；类型自身提供的能力发生冲突时，还可通过 `intrinsic_conflict()` 与 `Error::source()` 追踪原因。
 
