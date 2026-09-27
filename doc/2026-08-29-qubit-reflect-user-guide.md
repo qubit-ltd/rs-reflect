@@ -397,6 +397,12 @@ A missing capability leaves the entry point present: invocation returns
 `Some(Err(ReceiverAdapterUnavailable))` with the original inputs. Statically
 unsupported signatures have no entry point.
 
+In `#[reflect(capabilities(...))]`, the bare names `Clone`, `Default`, `Send`,
+and `Sync` select built-in capabilities. A qualified path calls the named
+custom provider, including when its final segment matches one of those names:
+`#[reflect(capabilities(my_crate::Clone))]` invokes
+`my_crate::Clone::<Self>()`.
+
 ### Build an isolated registry snapshot
 
 `ReflectRegistry::initialize()` is the process-global inventory entry point.
