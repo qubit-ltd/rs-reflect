@@ -200,6 +200,7 @@ pub struct PinnedRefInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
+    #[must_use]
     #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
@@ -396,6 +397,7 @@ pub struct PinnedMutInvocationFailure<'call, T: ?Sized, M: InvocationMode> {
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M> {
     /// Returns the structured validation error.
+    #[must_use]
     #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
