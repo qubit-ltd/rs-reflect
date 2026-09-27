@@ -9,8 +9,8 @@
 use std::any::TypeId;
 
 use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
+use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::Reflect;
 
 struct Wrong;
 impl Reflect for Wrong {
@@ -28,7 +28,7 @@ impl Reflect for Right {
 }
 
 #[cfg(feature = "derive")]
-#[derive(qubit_reflect::Reflect)]
+#[derive(Reflect)]
 struct Derived;
 
 #[test]
