@@ -4,6 +4,10 @@ set -euo pipefail
 PROJECT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 RS_CI_BUILD_TOOLCHAIN="${RS_CI_BUILD_TOOLCHAIN:-1.94.0}"
 
+# Markdown examples are built in isolated workspaces with Cargo offline. Fetch
+# the lockfile's complete dependency set before those checks start.
+cargo +"$RS_CI_BUILD_TOOLCHAIN" fetch --locked
+
 python3 -m unittest discover -s "$PROJECT_ROOT/scripts/tests" -p check_markdown_examples_tests.py
 "$PROJECT_ROOT/scripts/check-markdown-examples.sh"
 "$PROJECT_ROOT/scripts/check-requirements-traceability.sh"
