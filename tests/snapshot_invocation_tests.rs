@@ -147,11 +147,12 @@ fn test_missing_snapshot_capability_recovers_the_original_receiver() {
     let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
         panic!("generated method exists")
     };
-    let failure = method
+    let result = method
         .invoke_local(&registry, invocation())
-        .expect("static adapter exists")
-        .err()
-        .expect("missing receiver capability must fail dynamically");
+        .expect("static adapter exists");
+    let Err(failure) = result else {
+        panic!("missing receiver capability must fail dynamically")
+    };
     assert!(matches!(
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterUnavailable { .. }
@@ -173,11 +174,12 @@ fn test_snapshot_receiver_rejection_preserves_input() {
     let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
         panic!("generated method exists")
     };
-    let failure = method
+    let result = method
         .invoke_local(&registry, invocation())
-        .expect("static adapter exists")
-        .err()
-        .expect("adapter rejects receiver");
+        .expect("static adapter exists");
+    let Err(failure) = result else {
+        panic!("adapter rejects receiver")
+    };
     assert!(matches!(
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterRejected { .. }
@@ -261,10 +263,12 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
                 InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
             ],
         );
-        let failure = method
+        let result = method
             .invoke_local(&registry, invocation)
-            .expect("static adapter exists")
-            .expect_err("missing dynamic receiver capability must fail");
+            .expect("static adapter exists");
+        let Err(failure) = result else {
+            panic!("missing dynamic receiver capability must fail")
+        };
         assert!(matches!(
             failure.error().kind(),
             InvocationErrorKind::ReceiverAdapterUnavailable { .. }

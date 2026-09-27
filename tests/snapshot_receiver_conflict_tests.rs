@@ -103,10 +103,12 @@ fn test_intrinsic_conflict_survives_generated_snapshot_invocation() {
         panic!("the reflected Conflict<u8> method must resolve uniquely")
     };
     let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))), []);
-    let failure = method
+    let result = method
         .invoke_local(&registry, input)
-        .expect("static adapter must exist")
-        .expect_err("intrinsic conflict must reject invocation");
+        .expect("static adapter must exist");
+    let Err(failure) = result else {
+        panic!("intrinsic conflict must reject invocation")
+    };
     let InvocationErrorKind::CapabilityResolution(actual) = failure.error().kind() else {
         panic!("invocation must preserve the original capability conflict")
     };
@@ -140,10 +142,12 @@ fn test_missing_local_capability_does_not_use_a_valid_global_adapter() {
         panic!("the reflected Global method must resolve uniquely")
     };
     let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Global))), []);
-    let failure = method
+    let result = method
         .invoke_local(&registry, input)
-        .expect("static adapter must exist")
-        .expect_err("isolated snapshot lacks the global receiver capability");
+        .expect("static adapter must exist");
+    let Err(failure) = result else {
+        panic!("isolated snapshot lacks the global receiver capability")
+    };
     assert!(matches!(
         failure.error().kind(),
         InvocationErrorKind::ReceiverAdapterUnavailable { .. }

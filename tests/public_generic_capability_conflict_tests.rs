@@ -8,6 +8,7 @@
 
 //! Invalid intrinsic facts on unregistered monomorphs must remain errors.
 #![cfg(feature = "derive")]
+
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::ReflectedOwned;
