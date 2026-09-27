@@ -23,9 +23,12 @@ use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VariantKindIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
-pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Enum {
-        return TokenStream::new();
+        return Err(syn::Error::new(
+            declaration.span,
+            "cannot expand Reflect for non-enum declaration",
+        ));
     }
     let facade = context.facade().clone();
     let name = declaration.name.clone();
@@ -38,16 +41,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
-        Ok(generics) => generics,
-        Err(_) => return TokenStream::new(),
-    };
-    if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
-            return TokenStream::new();
-        };
-        generics.where_clause = Some(where_clause);
-    }
+    let mut generics = super::generics::parse_type_generics(&declaration)?;
     {
         let where_clause = generics.make_where_clause();
         for parameter in declaration
@@ -134,7 +128,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
                 #definition,
             ))
         };
-        return quote! {
+        return Ok(quote! {
             impl #impl_generics #name #type_generics #where_clause {
                 #capability_definition
             }
@@ -148,7 +142,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             #registration
             #generic_definition_provider
             #type_definition_provider
-        };
+        });
     }
     let thread_safe = declaration
         .attributes
@@ -258,7 +252,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         #generic_definition_provider
         #type_definition_provider
     };
-    root_descriptor
+    Ok(root_descriptor)
 }
 
 /// Emits the static registry fragment for one concrete derived enum root.

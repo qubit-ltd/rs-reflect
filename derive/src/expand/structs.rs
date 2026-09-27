@@ -19,15 +19,19 @@ use crate::expand::ExpansionContext;
 use crate::ir::FieldShapeIr;
 use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
+use crate::ir::PathArgumentsIr;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 use crate::ir::VisibilityIr;
 
 /// Expands a concrete struct into a static root descriptor and safe field
 /// adapters.
-pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Struct {
-        return TokenStream::new();
+        return Err(syn::Error::new(
+            declaration.span,
+            "cannot expand Reflect for non-struct declaration",
+        ));
     }
     let facade = context.facade().clone();
     let name = declaration.name.clone();
@@ -50,16 +54,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
         .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
-        Ok(generics) => generics,
-        Err(_) => return TokenStream::new(),
-    };
-    if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
-            return TokenStream::new();
-        };
-        generics.where_clause = Some(where_clause);
-    }
+    let mut generics = super::generics::parse_type_generics(&declaration)?;
     {
         let where_clause = generics.make_where_clause();
         for parameter in declaration
@@ -290,7 +285,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
     let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
-    quote! {
+    Ok(quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition
             #(#adapter_definitions)*
@@ -306,7 +301,7 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         #registration
         #generic_definition_provider
         #type_definition_provider
-    }
+    })
 }
 
 /// Expands the static capability set requested on one derived type.
@@ -324,7 +319,7 @@ pub(crate) fn capabilities(
             })
             .into_iter()
             .flatten()
-            .map(|path| match path.source.rsplit("::").next() {
+            .map(|path| match builtin_capability_name(path) {
                 Some("Clone") => {
                     quote!(#facade::__private::codegen_v3::capability::clone_descriptor::<Self>())
                 }
@@ -351,6 +346,24 @@ pub(crate) fn capabilities(
                 )
             })
         }
+    }
+}
+
+/// Returns the built-in capability name for a bare, unqualified path.
+fn builtin_capability_name(path: &crate::ir::PathIr) -> Option<&'static str> {
+    if path.leading_colon || path.qualified_self.is_some() || path.segments.len() != 1 {
+        return None;
+    }
+    let segment = &path.segments[0];
+    if !matches!(&segment.arguments, PathArgumentsIr::None) {
+        return None;
+    }
+    match segment.name.as_str() {
+        "Clone" => Some("Clone"),
+        "Default" => Some("Default"),
+        "Send" => Some("Send"),
+        "Sync" => Some("Sync"),
+        _ => None,
     }
 }
 
