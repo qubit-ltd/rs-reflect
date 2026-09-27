@@ -64,7 +64,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns an error categorized as a duplicate fragment.
-    #[must_use]
     pub fn duplicate_fragment(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::DuplicateFragment, left, right)
     }
@@ -80,7 +79,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns an identity conflict error.
-    #[must_use]
     pub fn identity_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::IdentityConflict, left, right)
     }
@@ -95,7 +93,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns an external trait ID conflict error.
-    #[must_use]
     pub fn external_trait_id_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::ExternalTraitIdConflict, left, right)
     }
@@ -110,7 +107,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns a capability conflict error without detailed conflict facts.
-    #[must_use]
     pub fn capability_conflict(left: FragmentIdentity, right: FragmentIdentity) -> Self {
         Self::conflict(RegistryErrorKind::CapabilityConflict, left, right)
     }
@@ -125,7 +121,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns an intrinsic capability conflict retaining its details.
-    #[must_use]
     pub fn intrinsic_capability_conflict(fragment: FragmentIdentity, conflict: CapabilityConflict) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::CapabilityConflict,
@@ -204,7 +199,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns a trait resolution error identifying the fragment.
-    #[must_use]
     pub fn impl_trait_resolution(fragment: FragmentIdentity) -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::ImplTraitResolution,
@@ -222,7 +216,6 @@ impl RegistryError {
     /// # Returns
     ///
     /// Returns an error categorized as an unsupported platform.
-    #[must_use]
     pub fn unsupported_platform() -> Self {
         Self(Arc::new(RegistryErrorData {
             kind: RegistryErrorKind::UnsupportedPlatform,

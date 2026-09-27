@@ -46,7 +46,6 @@ impl TypeMismatch {
     /// # Returns
     ///
     /// Returns a mismatch without optional diagnostic names.
-    #[must_use]
     pub const fn new(expected: TypeId, actual: TypeId) -> Self {
         Self {
             expected,
@@ -67,7 +66,6 @@ impl TypeMismatch {
     /// # Returns
     ///
     /// Returns this mismatch with both diagnostic names attached.
-    #[must_use]
     pub const fn with_diagnostic_names(mut self, expected_name: &'static str, actual_name: &'static str) -> Self {
         self.expected_name = Some(expected_name);
         self.actual_name = Some(actual_name);
@@ -84,7 +82,6 @@ impl TypeMismatch {
     /// # Returns
     ///
     /// Returns this mismatch with the expected diagnostic name attached.
-    #[must_use]
     pub const fn with_expected_name(mut self, expected_name: &'static str) -> Self {
         self.expected_name = Some(expected_name);
         self

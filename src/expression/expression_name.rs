@@ -69,7 +69,6 @@ impl AsRef<str> for ExpressionName {
     /// # Returns
     ///
     /// Returns the validated name text.
-    #[must_use]
     #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
@@ -82,7 +81,6 @@ impl Borrow<str> for ExpressionName {
     /// # Returns
     ///
     /// Returns the validated name text.
-    #[must_use]
     #[inline]
     fn borrow(&self) -> &str {
         self.as_str()
