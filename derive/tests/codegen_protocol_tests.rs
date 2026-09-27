@@ -12,6 +12,11 @@ use std::fs;
 use std::path::Path;
 
 /// Recursively visits Rust source files below `directory`.
+///
+/// # Parameters
+///
+/// - `directory`: Directory whose Rust sources are visited.
+/// - `visit`: Callback invoked once for each Rust source file.
 fn visit_rust_files(directory: &Path, visit: &mut impl FnMut(&Path)) {
     for entry in fs::read_dir(directory).expect("derive source directory should be readable") {
         let entry = entry.expect("derive source entry should be readable");

@@ -28,6 +28,16 @@ mod sealed {
 ///
 /// This trait is only implemented by [`Local`] and [`ThreadSafe`]. Its hidden
 /// associated types preserve each mode's erased type and auto-trait boundary.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::{Local, Mode, ThreadSafe};
+///
+/// fn accepts_dynamic_mode<M: Mode>() {}
+/// accepts_dynamic_mode::<Local>();
+/// accepts_dynamic_mode::<ThreadSafe>();
+/// ```
 pub trait Mode: sealed::Sealed {
     /// Internal marker that determines the wrapper's auto traits.
     #[doc(hidden)]
@@ -46,6 +56,15 @@ pub trait Mode: sealed::Sealed {
 /// The local dynamic value mode.
 ///
 /// Wrappers in this mode intentionally cannot implement `Send` or `Sync`.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::{Local, Mode};
+///
+/// fn accepts_local<M: Mode>() {}
+/// accepts_local::<Local>();
+/// ```
 ///
 /// ```compile_fail
 /// use qubit_reflect::value::ReflectedRef;
@@ -98,6 +117,15 @@ pub enum Local {}
 ///
 /// Thread-safe constructors reject values that do not meet their documented
 /// bounds at compile time.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::{Mode, ThreadSafe};
+///
+/// fn accepts_thread_safe<M: Mode>() {}
+/// accepts_thread_safe::<ThreadSafe>();
+/// ```
 ///
 /// ```compile_fail
 /// use qubit_reflect::value::SendReflectedOwned;

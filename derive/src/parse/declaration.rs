@@ -80,6 +80,16 @@ use crate::validate::validation_error;
 ///
 /// Returns combined syntax diagnostics when the input target or helper grammar
 /// is invalid.
+///
+/// # Parameters
+///
+/// - `kind`: Procedural macro entry point to parse.
+/// - `args`: Macro attribute arguments, if any.
+/// - `input`: Item tokens supplied by the compiler.
+///
+/// # Returns
+///
+/// Returns parsed declaration IR or aggregated syntax diagnostics.
 #[allow(
     dead_code,
     reason = "the staged parse API is exercised directly by unit tests and later expansion tasks"
@@ -97,6 +107,17 @@ pub(crate) fn parse_declaration(
 }
 
 /// Parses and validates one macro invocation while aggregating recoverable
+/// diagnostics.
+///
+/// # Parameters
+///
+/// - `kind`: Procedural macro entry point to parse.
+/// - `args`: Macro attribute arguments, if any.
+/// - `input`: Item tokens supplied by the compiler.
+///
+/// # Returns
+///
+/// Returns validated declaration IR or aggregated syntax and validation
 /// diagnostics.
 pub(crate) fn parse_and_validate_declaration(
     kind: MacroKind,
@@ -121,6 +142,16 @@ pub(crate) fn parse_and_validate_declaration(
 }
 
 /// Runs only the syntax and IR conversion phase for one macro kind.
+///
+/// # Parameters
+///
+/// - `kind`: Procedural macro entry point to parse.
+/// - `args`: Macro attribute arguments, if any.
+/// - `input`: Item tokens supplied by the compiler.
+///
+/// # Returns
+///
+/// Returns parser IR and recoverable syntax errors.
 fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
@@ -130,6 +161,15 @@ fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> Syn
 }
 
 /// Parses a `Reflect` derive input.
+///
+/// # Parameters
+///
+/// - `args`: Derive macro arguments, which must be empty.
+/// - `input`: Derive item tokens.
+///
+/// # Returns
+///
+/// Returns type declaration IR and recoverable helper diagnostics.
 fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     if !args.is_empty() {
         return Err(Error::new_spanned(
@@ -219,6 +259,15 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
 
 /// Parses a `#[reflect]` trait input and removes nested helpers from retained
 /// tokens.
+///
+/// # Parameters
+///
+/// - `args`: Trait reflection helper arguments.
+/// - `input`: Trait item tokens.
+///
+/// # Returns
+///
+/// Returns trait declaration IR and recoverable helper diagnostics.
 fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Trait(mut item) = item else {
@@ -267,6 +316,15 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
 
 /// Parses a `#[reflect_impl]` impl input and removes nested helpers from
 /// retained tokens.
+///
+/// # Parameters
+///
+/// - `args`: Impl reflection helper arguments.
+/// - `input`: Impl item tokens.
+///
+/// # Returns
+///
+/// Returns impl declaration IR and recoverable helper diagnostics.
 fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Impl(mut item) = item else {
@@ -306,6 +364,15 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
 }
 
 /// Converts a field collection in source order.
+///
+/// # Parameters
+///
+/// - `fields`: Parsed struct or variant fields.
+/// - `errors`: Collector for field helper diagnostics.
+///
+/// # Returns
+///
+/// Returns converted field IR in source order.
 fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> {
     fields
         .iter()
@@ -322,6 +389,14 @@ fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> 
 }
 
 /// Converts source generics without retaining a `Generics` value.
+///
+/// # Parameters
+///
+/// - `generics`: Parsed generic parameter list and where clause.
+///
+/// # Returns
+///
+/// Returns structured generic IR with original syntax retained as tokens.
 fn convert_generics(generics: &Generics) -> GenericsIr {
     let (impl_declaration, arguments, where_clause) = generics.split_for_impl();
     GenericsIr {
@@ -406,6 +481,14 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
 }
 
 /// Normalizes a Rust visibility while preserving restricted paths.
+///
+/// # Parameters
+///
+/// - `visibility`: Parsed Rust visibility.
+///
+/// # Returns
+///
+/// Returns the normalized visibility IR.
 fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
     match visibility {
         Visibility::Public(_) => VisibilityIr::Public,
@@ -418,6 +501,15 @@ fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
 }
 
 /// Converts all trait items relevant to later expansion.
+///
+/// # Parameters
+///
+/// - `item`: Parsed trait declaration.
+/// - `errors`: Collector for nested helper diagnostics.
+///
+/// # Returns
+///
+/// Returns methods, associated types, and associated constants in source order.
 fn convert_trait_items(
     item: &ItemTrait,
     errors: &mut ErrorCollector,
@@ -461,6 +553,15 @@ fn convert_trait_items(
 }
 
 /// Converts all impl items relevant to later expansion.
+///
+/// # Parameters
+///
+/// - `item`: Parsed impl declaration.
+/// - `errors`: Collector for nested helper diagnostics.
+///
+/// # Returns
+///
+/// Returns methods, associated types, and associated constants in source order.
 fn convert_impl_items(
     item: &ItemImpl,
     errors: &mut ErrorCollector,
@@ -501,6 +602,18 @@ fn convert_impl_items(
 }
 
 /// Converts a method signature and all method helpers.
+///
+/// # Parameters
+///
+/// - `signature`: Parsed method signature.
+/// - `visibility`: Method visibility from the source item.
+/// - `attributes`: Method attributes to parse.
+/// - `has_default`: Whether the method provides a trait default body.
+/// - `errors`: Collector for method helper diagnostics.
+///
+/// # Returns
+///
+/// Returns the normalized method IR.
 fn convert_method(
     signature: &Signature,
     visibility: &Visibility,
@@ -592,6 +705,10 @@ fn convert_method(
 }
 
 /// Removes nested helper attributes from a retained trait token stream.
+///
+/// # Parameters
+///
+/// - `item`: Mutable trait item whose helper attributes are removed.
 fn strip_trait_helpers(item: &mut ItemTrait) {
     remove_reflect_attributes(&mut item.attrs);
     for trait_item in &mut item.items {
@@ -605,6 +722,10 @@ fn strip_trait_helpers(item: &mut ItemTrait) {
 }
 
 /// Removes nested helper attributes from a retained impl token stream.
+///
+/// # Parameters
+///
+/// - `item`: Mutable impl item whose helper attributes are removed.
 fn strip_impl_helpers(item: &mut ItemImpl) {
     remove_reflect_attributes(&mut item.attrs);
     for impl_item in &mut item.items {

@@ -8,11 +8,19 @@
 
 //! Expansion of non-generic reflected enum declarations.
 
-// qubit-style: allow explicit-imports
-
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+use syn::DeriveInput;
+use syn::Generics;
+use syn::Ident;
+use syn::Lifetime;
+use syn::LitInt;
+use syn::Meta;
+use syn::Token;
+use syn::parse_quote;
+use syn::parse2;
+use syn::punctuated::Punctuated;
 
 use super::enum_repr_ir::EnumReprIr;
 use crate::expand::ExpansionContext;
@@ -20,9 +28,20 @@ use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
+use crate::ir::VariantIr;
 use crate::ir::VariantKindIr;
 
 /// Expands an enum root, its variants, and safe active-variant field adapters.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated enum declaration and reflection attributes.
+/// - `context`: Expansion context containing the caller-visible runtime path.
+///
+/// # Returns
+///
+/// Returns generated enum reflection, access, construction, and registration
+/// items.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return TokenStream::new();
@@ -36,14 +55,14 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
         .params
         .iter()
         .filter(|parameter| parameter.kind == GenericKindIr::Type)
-        .map(|parameter| syn::Ident::new(&parameter.name, parameter.span))
+        .map(|parameter| Ident::new(&parameter.name, parameter.span))
         .collect();
-    let mut generics: syn::Generics = match syn::parse2(declaration.generics.declaration.clone()) {
+    let mut generics: Generics = match parse2(declaration.generics.declaration.clone()) {
         Ok(generics) => generics,
         Err(_) => return TokenStream::new(),
     };
     if !declaration.generics.where_clause.is_empty() {
-        let Ok(where_clause) = syn::parse2(declaration.generics.where_clause.clone()) else {
+        let Ok(where_clause) = parse2(declaration.generics.where_clause.clone()) else {
             return TokenStream::new();
         };
         generics.where_clause = Some(where_clause);
@@ -56,22 +75,22 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
-            let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
+            let lifetime = Lifetime::new(&format!("'{}", parameter.name), parameter.span);
+            where_clause.predicates.push(parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameters {
-            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#field_type: #facade::__private::codegen_v3::Reflect));
+                .push(parse_quote!(#field_type: #facade::__private::codegen_v3::Reflect));
         }
         for parameter in &transparently_reflected_parameters {
             where_clause
                 .predicates
-                .push(syn::parse_quote!(#parameter: #facade::__private::codegen_v3::Reflect));
+                .push(parse_quote!(#parameter: #facade::__private::codegen_v3::Reflect));
         }
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -262,10 +281,22 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
 }
 
 /// Emits the static registry fragment for one concrete derived enum root.
+///
+/// # Parameters
+///
+/// - `facade`: Runtime facade path used by the generated registration code.
+/// - `name`: Enum identifier used to resolve its runtime type.
+/// - `module`: Unique generated module identifier.
+/// - `fingerprint`: Stable normalized-input fingerprint.
+/// - `has_generics`: Whether generic parameters prevent static registration.
+///
+/// # Returns
+///
+/// Returns the registration module, or an empty stream for generic enums.
 fn registration(
     facade: &TokenStream,
-    name: &syn::Ident,
-    module: &syn::Ident,
+    name: &Ident,
+    module: &Ident,
     fingerprint: u64,
     has_generics: bool,
 ) -> TokenStream {
@@ -302,12 +333,18 @@ fn registration(
 }
 
 /// Generates active-variant and field-access adapters for one enum variant.
-fn adapters(
-    _name: &syn::Ident,
-    variant: &crate::ir::VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> Vec<TokenStream> {
+///
+/// # Parameters
+///
+/// - `_name`: Enum identifier retained for the call site's declaration context.
+/// - `variant`: Validated variant and field metadata.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `thread_safe`: Whether thread-safe adapter variants are also emitted.
+///
+/// # Returns
+///
+/// Returns generated active-variant and field access functions.
+fn adapters(_name: &Ident, variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> Vec<TokenStream> {
     let variant_name = &variant.name;
     let variant_index = variant.index;
     let variant_name_text = variant_name.to_string();
@@ -440,10 +477,24 @@ fn adapters(
 }
 
 /// Generates the descriptor for one reflected enum variant.
+///
+/// # Parameters
+///
+/// - `name`: Enum identifier used for discriminant expressions.
+/// - `self_type`: Fully parameterized enum type tokens.
+/// - `variant`: Validated variant metadata.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `integer_repr`: Integer representation spelling for fieldless enums, when
+///   known.
+/// - `thread_safe`: Whether thread-safe field adapters are attached.
+///
+/// # Returns
+///
+/// Returns the generated variant descriptor expression.
 fn variant_descriptor(
-    name: &syn::Ident,
+    name: &Ident,
     self_type: &TokenStream,
-    variant: &crate::ir::VariantIr,
+    variant: &VariantIr,
     facade: &TokenStream,
     integer_repr: Option<&str>,
     thread_safe: bool,
@@ -557,18 +608,25 @@ fn variant_descriptor(
 }
 
 /// Extracts and canonically orders all supported enum representation hints.
+///
+/// # Parameters
+///
+/// - `tokens`: Original enum item tokens, including compiler-validated
+///   attributes.
+///
+/// # Returns
+///
+/// Returns the unique supported representation hints in canonical order.
 fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
-    let Ok(input) = syn::parse2::<syn::DeriveInput>(tokens.clone()) else {
+    let Ok(input) = parse2::<DeriveInput>(tokens.clone()) else {
         return Vec::new();
     };
     let mut representations = Vec::new();
     for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
-        let syn::Meta::List(list) = &attribute.meta else {
+        let Meta::List(list) = &attribute.meta else {
             continue;
         };
-        let Ok(values) =
-            list.parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
-        else {
+        let Ok(values) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) else {
             continue;
         };
         representations.extend(values.iter().filter_map(parse_enum_representation));
@@ -579,25 +637,33 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
 }
 
 /// Parses one compiler-validated `repr` component into structural metadata.
-fn parse_enum_representation(meta: &syn::Meta) -> Option<EnumReprIr> {
+///
+/// # Parameters
+///
+/// - `meta`: One representation path or alignment list.
+///
+/// # Returns
+///
+/// Returns the recognized representation, or `None` for unsupported metadata.
+fn parse_enum_representation(meta: &Meta) -> Option<EnumReprIr> {
     match meta {
-        syn::Meta::Path(path) if path.is_ident("Rust") => Some(EnumReprIr::Rust),
-        syn::Meta::Path(path) if path.is_ident("C") => Some(EnumReprIr::C),
-        syn::Meta::Path(path) if path.is_ident("transparent") => Some(EnumReprIr::Transparent),
-        syn::Meta::Path(path) if path.is_ident("i8") => Some(EnumReprIr::I8),
-        syn::Meta::Path(path) if path.is_ident("i16") => Some(EnumReprIr::I16),
-        syn::Meta::Path(path) if path.is_ident("i32") => Some(EnumReprIr::I32),
-        syn::Meta::Path(path) if path.is_ident("i64") => Some(EnumReprIr::I64),
-        syn::Meta::Path(path) if path.is_ident("i128") => Some(EnumReprIr::I128),
-        syn::Meta::Path(path) if path.is_ident("isize") => Some(EnumReprIr::Isize),
-        syn::Meta::Path(path) if path.is_ident("u8") => Some(EnumReprIr::U8),
-        syn::Meta::Path(path) if path.is_ident("u16") => Some(EnumReprIr::U16),
-        syn::Meta::Path(path) if path.is_ident("u32") => Some(EnumReprIr::U32),
-        syn::Meta::Path(path) if path.is_ident("u64") => Some(EnumReprIr::U64),
-        syn::Meta::Path(path) if path.is_ident("u128") => Some(EnumReprIr::U128),
-        syn::Meta::Path(path) if path.is_ident("usize") => Some(EnumReprIr::Usize),
-        syn::Meta::List(list) if list.path.is_ident("align") => {
-            let alignment = syn::parse2::<syn::LitInt>(list.tokens.clone()).ok()?;
+        Meta::Path(path) if path.is_ident("Rust") => Some(EnumReprIr::Rust),
+        Meta::Path(path) if path.is_ident("C") => Some(EnumReprIr::C),
+        Meta::Path(path) if path.is_ident("transparent") => Some(EnumReprIr::Transparent),
+        Meta::Path(path) if path.is_ident("i8") => Some(EnumReprIr::I8),
+        Meta::Path(path) if path.is_ident("i16") => Some(EnumReprIr::I16),
+        Meta::Path(path) if path.is_ident("i32") => Some(EnumReprIr::I32),
+        Meta::Path(path) if path.is_ident("i64") => Some(EnumReprIr::I64),
+        Meta::Path(path) if path.is_ident("i128") => Some(EnumReprIr::I128),
+        Meta::Path(path) if path.is_ident("isize") => Some(EnumReprIr::Isize),
+        Meta::Path(path) if path.is_ident("u8") => Some(EnumReprIr::U8),
+        Meta::Path(path) if path.is_ident("u16") => Some(EnumReprIr::U16),
+        Meta::Path(path) if path.is_ident("u32") => Some(EnumReprIr::U32),
+        Meta::Path(path) if path.is_ident("u64") => Some(EnumReprIr::U64),
+        Meta::Path(path) if path.is_ident("u128") => Some(EnumReprIr::U128),
+        Meta::Path(path) if path.is_ident("usize") => Some(EnumReprIr::Usize),
+        Meta::List(list) if list.path.is_ident("align") => {
+            let alignment = parse2::<LitInt>(list.tokens.clone()).ok()?;
             alignment.base10_parse().ok().map(EnumReprIr::Align)
         }
         _ => None,
@@ -605,9 +671,21 @@ fn parse_enum_representation(meta: &syn::Meta) -> Option<EnumReprIr> {
 }
 
 /// Emits an exact compiler-checked cast for a fieldless integer-repr variant.
+///
+/// # Parameters
+///
+/// - `enum_name`: Enum identifier used in the cast expression.
+/// - `variant_name`: Fieldless variant identifier and source span.
+/// - `repr`: Integer representation spelling, when supported.
+/// - `facade`: Runtime facade path used by the generated discriminant value.
+///
+/// # Returns
+///
+/// Returns tokens for the numeric discriminant, or `None` when no integer
+/// representation applies.
 fn numeric_discriminant(
-    enum_name: &syn::Ident,
-    variant_name: &syn::Ident,
+    enum_name: &Ident,
+    variant_name: &Ident,
     repr: Option<&str>,
     facade: &TokenStream,
 ) -> TokenStream {
@@ -629,6 +707,6 @@ fn numeric_discriminant(
         "usize" => quote!(Usize),
         _ => return quote!(None),
     };
-    let repr = syn::Ident::new(repr, variant_name.span());
+    let repr = Ident::new(repr, variant_name.span());
     quote!(Some(#facade::__private::codegen_v3::descriptor::NumericDiscriminant::#variant(#enum_name::#variant_name as #repr)))
 }

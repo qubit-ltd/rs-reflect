@@ -26,6 +26,16 @@ use syn::visit_mut::visit_type_mut;
 use syn::visit_mut::visit_type_path_mut;
 
 /// Substitutes generic symbols only in type and const expression positions.
+///
+/// # Parameters
+///
+/// - `tokens`: Validated Rust type syntax to rewrite.
+/// - `replacements`: Generic identifiers and their concrete type or const
+///   tokens.
+///
+/// # Returns
+///
+/// Returns the rewritten type syntax.
 pub(in crate::expand::impls) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
@@ -36,17 +46,40 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
 }
 
 /// Substitutes generic symbols in a validated path.
+///
+/// # Parameters
+///
+/// - `path`: Validated path syntax to rewrite.
+/// - `replacements`: Generic identifiers and their concrete type or const
+///   tokens.
+///
+/// # Returns
+///
+/// Returns the rewritten path.
 pub(in crate::expand::impls) fn substitute_path_syntax(path: &Path, replacements: &[(Ident, TokenStream)]) -> Path {
     let mut path = path.clone();
     GenericSubstituter { replacements }.visit_path_mut(&mut path);
     path
 }
 
+/// Visitor that applies substitutions only in Rust type and const-expression
+/// nodes.
 struct GenericSubstituter<'a> {
+    /// Concrete syntax replacements keyed by generic identifier.
     replacements: &'a [(Ident, TokenStream)],
 }
 
 impl GenericSubstituter<'_> {
+    /// Finds the replacement tokens for one identifier.
+    ///
+    /// # Parameters
+    ///
+    /// - `identifier`: Generic identifier being visited.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching replacement tokens, or `None` when it is not
+    /// mapped.
     fn replacement(&self, identifier: &Ident) -> Option<&TokenStream> {
         self.replacements
             .iter()
@@ -167,6 +200,11 @@ mod tests {
     use super::substitute_path_syntax;
     use super::substitute_type_syntax;
 
+    /// Creates type and const substitutions used by the visitor tests.
+    ///
+    /// # Returns
+    ///
+    /// Returns mappings for `T` and `N`.
     fn replacements() -> [(Ident, TokenStream); 2] {
         [
             (Ident::new("T", Span::call_site()), quote!(Vec<u8>)),

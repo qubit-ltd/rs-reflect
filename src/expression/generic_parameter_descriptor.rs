@@ -19,6 +19,21 @@ use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
 
 /// A single parameter declared by a generic definition.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::DiagnosticText;
+/// use qubit_reflect::expression::ExpressionName;
+/// use qubit_reflect::expression::GenericParameterDescriptor;
+/// let parameter = GenericParameterDescriptor::Type {
+///     name: ExpressionName::new("Item").expect("valid parameter name"),
+///     bounds: Box::default(),
+///     default: None,
+///     diagnostic: DiagnosticText::default(),
+/// };
+/// assert!(matches!(parameter, GenericParameterDescriptor::Type { .. }));
+/// ```
 #[derive(Clone, Debug)]
 pub enum GenericParameterDescriptor {
     /// A lifetime parameter such as `'a`.

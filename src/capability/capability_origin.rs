@@ -13,6 +13,16 @@ use std::any::TypeId;
 use crate::identity::FragmentIdentity;
 
 /// Identifies where an effective capability fact came from.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::capability::CapabilityOrigin;
+///
+/// let origin = CapabilityOrigin::Intrinsic { type_id: TypeId::of::<u32>() };
+/// assert!(matches!(origin, CapabilityOrigin::Intrinsic { .. }));
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityOrigin {
     /// The capability was declared by the reflected type itself.

@@ -24,6 +24,18 @@ pub enum FieldAccessOperation {
 
 impl fmt::Display for FieldAccessOperation {
     /// Formats the operation using its public API spelling.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Destination that receives the operation spelling.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after writing the spelling.
+    ///
+    /// # Errors
+    ///
+    /// Returns the formatter's error if it cannot accept the output.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Get => formatter.write_str("get"),

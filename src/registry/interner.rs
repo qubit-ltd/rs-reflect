@@ -25,6 +25,23 @@ static INTERNER: OnceLock<Mutex<HashMap<TypeId, &'static DescriptorCell>>> = Onc
 /// descriptors. A factory panic propagates unchanged and leaves the cell
 /// uninitialized for a later retry. Descriptor cells are intentionally leaked
 /// because descriptors are process-lifetime immutable data.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete Rust type whose descriptor is interned.
+///
+/// # Parameters
+///
+/// - `build`: Factory for the immutable descriptor, called only on a cache
+///   miss.
+///
+/// # Returns
+///
+/// Returns the unique process-lifetime descriptor for `T`.
+///
+/// # Panics
+///
+/// Propagates a panic from `build`; the cell remains uninitialized for retry.
 pub(crate) fn intern<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'static TypeDescriptor {
     let interner = INTERNER.get_or_init(|| Mutex::new(HashMap::new()));
     let mut descriptors = match interner.lock() {

@@ -12,6 +12,14 @@
 use super::visibility_kind::VisibilityKind;
 
 /// A normalized source visibility with diagnostic data for restricted paths.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::identity::{Visibility, VisibilityKind};
+/// let visibility = Visibility::from_source("pub(crate)");
+/// assert_eq!(visibility.kind(), VisibilityKind::Crate);
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Visibility {
     /// Public outside the declaring crate.
@@ -33,6 +41,15 @@ impl Visibility {
     ///
     /// Unknown spellings are treated as private because they do not grant a
     /// recognized outward visibility.
+    ///
+    /// # Parameters
+    ///
+    /// - `source`: Rust visibility spelling to normalize.
+    ///
+    /// # Returns
+    ///
+    /// Returns the stable visibility category, preserving a restricted path
+    /// when present.
     #[must_use]
     pub fn from_source(source: &str) -> Self {
         match source.trim() {
@@ -53,6 +70,10 @@ impl Visibility {
     }
 
     /// Returns this visibility's stable category.
+    ///
+    /// # Returns
+    ///
+    /// Returns the normalized visibility kind.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> VisibilityKind {
@@ -66,6 +87,11 @@ impl Visibility {
     }
 
     /// Returns the retained restricted path, or `None` for other visibility
+    /// kinds.
+    ///
+    /// # Returns
+    ///
+    /// Returns the path from `pub(in path)`, or `None` for other visibility
     /// kinds.
     #[must_use]
     #[inline]

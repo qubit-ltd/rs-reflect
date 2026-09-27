@@ -8,6 +8,8 @@
 
 //! Reflection descriptors for ordered sequence collections.
 
+use std::any::type_name;
+
 use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::SequenceKind;
@@ -15,10 +17,14 @@ use crate::descriptor::TypeDescriptor;
 
 impl<T: Reflect> Reflect for Vec<T> {
     /// Returns the interned descriptor for this vector specialization.
+    ///
+    /// # Returns
+    ///
+    /// The vector descriptor with a deferred relationship to its element type.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_sequence_lazy::<Self>(
-                std::any::type_name::<Self>(),
+                type_name::<Self>(),
                 SequenceKind::Vec,
                 crate::__private::descriptor::lazy_type_ref::<T>(),
             )

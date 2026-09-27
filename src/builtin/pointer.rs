@@ -8,6 +8,7 @@
 
 //! Reflection descriptors for standard smart pointers.
 
+use std::any::type_name;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -21,10 +22,15 @@ macro_rules! impl_smart_pointer {
         impl<T: Reflect + ?Sized> Reflect for $type<T> {
             /// Returns the interned descriptor for this smart-pointer
             /// specialization.
+            ///
+            /// # Returns
+            ///
+            /// The descriptor for the pointer family and its deferred pointee
+            /// relationship.
             fn type_descriptor() -> &'static TypeDescriptor {
                 interner::intern::<Self>(|| {
                     TypeDescriptor::new_smart_pointer_lazy::<Self>(
-                        std::any::type_name::<Self>(),
+                        type_name::<Self>(),
                         $kind,
                         crate::__private::descriptor::lazy_type_ref::<T>(),
                     )

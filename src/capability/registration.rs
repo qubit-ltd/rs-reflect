@@ -34,11 +34,20 @@ macro_rules! __qubit_reflect_capability_descriptor {
 /// The registration records facts only: `Send` and `Sync` never change the
 /// erased mode of a dynamic value.
 ///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::register_type_capabilities;
+///
+/// register_type_capabilities!(String: Clone, Send, Sync);
+/// ```
+///
 /// Third-party typed operations use the bracket form, where each key expression
 /// must match its adapter expression's Rust type:
 ///
 /// ```
-/// use qubit_reflect::capability::{CapabilityKey, TypeCapabilities};
+/// use qubit_reflect::capability::CapabilityKey;
+/// use qubit_reflect::capability::TypeCapabilities;
 /// use qubit_reflect::identity::CapabilityId;
 /// use qubit_reflect::register_type_capabilities;
 ///
@@ -171,6 +180,25 @@ macro_rules! register_type_capabilities {
 
 /// Registers typed capabilities for a generic definition without adding it as
 /// a registry definition member.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::capability::{CapabilityKey, TypeCapabilities};
+/// use qubit_reflect::identity::CapabilityId;
+/// use qubit_reflect::register_definition_capabilities;
+///
+/// struct ExampleAdapter;
+///
+/// register_definition_capabilities! {
+///     definition = qubit_reflect::descriptor::TypeDefinitionDescriptor::of::<Vec<u8>>,
+///     capabilities = [
+///         CapabilityKey::<ExampleAdapter>::new(CapabilityId::new("example.generic").expect("valid ID")) => ExampleAdapter,
+///     ],
+/// }
+///
+/// let _ = TypeCapabilities::default();
+/// ```
 #[macro_export]
 macro_rules! register_definition_capabilities {
     (
@@ -216,6 +244,18 @@ macro_rules! register_definition_capabilities {
 ///
 /// The emitted fragment calls `TypeDescriptor::of` and therefore both verifies
 /// the trait bound and preserves the interner's existing root identity.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::Reflect;
+/// use qubit_reflect::register_reflected_type;
+///
+/// #[derive(Reflect)]
+/// struct Example;
+///
+/// register_reflected_type!(Example);
+/// ```
 #[macro_export]
 macro_rules! register_reflected_type {
     ($target:ty $(,)?) => {

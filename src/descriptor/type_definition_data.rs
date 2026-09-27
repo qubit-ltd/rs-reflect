@@ -13,6 +13,14 @@ use crate::descriptor::StructKind;
 use crate::descriptor::VariantDefinitionDescriptor;
 
 /// Kind-specific source structure for one generic declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TypeDefinitionData;
+/// let data = TypeDefinitionData::Opaque;
+/// assert!(matches!(data, TypeDefinitionData::Opaque));
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeDefinitionData {
     /// An opaque declaration without navigable members.

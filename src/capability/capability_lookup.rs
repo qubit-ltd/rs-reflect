@@ -17,6 +17,20 @@ use crate::capability::CapabilityDescriptor;
 ///
 /// The four variants deliberately distinguish an absent ID, a fact without an
 /// executable adapter, a contract mismatch, and an adapter that can run.
+///
+/// # Type Parameters
+///
+/// - `'a`: The lifetime of descriptors and adapters borrowed from the set.
+/// - `A`: The requested adapter contract type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::capability::CapabilityLookup;
+///
+/// let lookup: CapabilityLookup<'_, u32> = CapabilityLookup::Missing;
+/// assert!(matches!(lookup, CapabilityLookup::Missing));
+/// ```
 #[derive(Debug)]
 pub enum CapabilityLookup<'a, A: 'static> {
     /// No descriptor carries the requested stable capability ID.
@@ -37,6 +51,19 @@ pub enum CapabilityLookup<'a, A: 'static> {
 impl<'a, A: 'static> CapabilityLookup<'a, A> {
     /// Returns the executable adapter, mapping `Missing` to `Ok(None)` while
     /// preserving fact-only and adapter-type-mismatch states as errors.
+    ///
+    /// # Returns
+    ///
+    /// Returns the adapter when found, `Ok(None)` when missing, or an access
+    /// error when the capability exists but cannot be executed as requested.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CapabilityAccessError::FactOnly`] for a fact without an
+    /// adapter, or [`CapabilityAccessError::AdapterTypeMismatch`] when the
+    /// declared adapter contract differs from the requested contract.
+    #[must_use]
+    #[inline]
     pub const fn into_adapter(self) -> Result<Option<&'a A>, CapabilityAccessError> {
         match self {
             Self::Found(value) => Ok(Some(value)),

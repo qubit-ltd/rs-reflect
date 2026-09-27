@@ -31,6 +31,16 @@ use crate::ir::TypeKindIr;
 /// The helper is then monomorphized with the explicit specialization. This
 /// lets rustc resolve aliases and renamed dependencies while ensuring an
 /// unconstrained concrete binding is never inspected opportunistically.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic impl declaration and associated-type bindings.
+/// - `replacements`: Concrete generic substitutions for one specialization.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns generated resolver match arms in declaration order.
 pub(super) fn specialization_associated_type_resolver_arms(
     declaration: &ImplDeclarationIr,
     replacements: &[(Ident, TokenStream)],
@@ -77,6 +87,14 @@ pub(super) fn specialization_associated_type_resolver_arms(
 }
 
 /// Builds replacement tokens for one validated type or const specialization.
+///
+/// # Parameters
+///
+/// - `specialization`: Validated named generic bindings.
+///
+/// # Returns
+///
+/// Returns generic identifiers paired with their concrete syntax tokens.
 pub(super) fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident, TokenStream)> {
     specialization
         .bindings
@@ -94,12 +112,26 @@ pub(super) fn specialization_replacements(specialization: &SpecializationIr) -> 
 /// Substitutes generic symbols only where the Rust AST identifies a type or
 /// const expression path. Member names, labels, patterns, and unrelated token
 /// identifiers are never rewritten.
+///
+/// # Parameters
+///
+/// - `tokens`: Type syntax containing generic references.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
+///
+/// # Returns
+///
+/// Returns the rewritten type syntax.
 pub(super) fn substitute_type_syntax(tokens: &TokenStream, replacements: &[(Ident, TokenStream)]) -> TokenStream {
     super::internal::generic_substituter::substitute_type_syntax(tokens, replacements)
 }
 
 /// Replaces impl generic references in method signature types while retaining
 /// their structural IR for descriptor rendering.
+///
+/// # Parameters
+///
+/// - `declaration`: Concrete impl declaration whose method types are rewritten.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
 pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, replacements: &[(Ident, TokenStream)]) {
     for method in &mut declaration.methods {
         let replacements = replacements
@@ -126,6 +158,12 @@ pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, 
 }
 
 /// Replaces impl generic references in associated-item binding types.
+///
+/// # Parameters
+///
+/// - `declaration`: Concrete impl declaration whose associated item types are
+///   rewritten.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
 pub(super) fn substitute_impl_associated_item_types(
     declaration: &mut ImplDeclarationIr,
     replacements: &[(Ident, TokenStream)],
@@ -141,6 +179,16 @@ pub(super) fn substitute_impl_associated_item_types(
 }
 
 /// Rebuilds structural type IR after specialization changes a root path.
+///
+/// # Parameters
+///
+/// - `ty`: Type IR to rewrite and rebuild.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
+///
+/// # Panics
+///
+/// Panics if validated specialization tokens no longer parse as Rust type
+/// syntax.
 fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
     let tokens = substitute_type_syntax(&ty.tokens, replacements);
     let parsed: syn::Type =
@@ -149,6 +197,12 @@ fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream
 }
 
 /// Applies the runtime-root lifetime policy to one specialized impl.
+///
+/// # Parameters
+///
+/// - `declaration`: Concrete impl declaration whose generic lifetimes become
+///   `'static`.
+/// - `lifetime_names`: Impl lifetime names selected for substitution.
 pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names: &[&str]) {
     substitute_type_lifetimes(&mut declaration.target_type, lifetime_names);
     if let Some(trait_path) = &mut declaration.trait_path {
@@ -177,6 +231,11 @@ pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lif
 }
 
 /// Substitutes impl lifetimes with `'static` in one type IR.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type whose impl lifetimes are rewritten.
+/// - `lifetime_names`: Lifetime names selected for substitution.
 fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
     ty.tokens = substitute_lifetime_tokens(&ty.tokens, lifetime_names);
     ty.source = ty.tokens.to_string();
@@ -221,6 +280,11 @@ fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
 }
 
 /// Substitutes impl lifetimes in one path and its structured arguments.
+///
+/// # Parameters
+///
+/// - `path`: Structured path whose impl lifetimes are rewritten.
+/// - `lifetime_names`: Lifetime names selected for substitution.
 fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&str]) {
     path.tokens = substitute_lifetime_tokens(&path.tokens, lifetime_names);
     path.source = path.tokens.to_string();
@@ -263,6 +327,15 @@ fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&st
 }
 
 /// Rewrites lifetime token pairs while preserving group delimiters and spans.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream that may contain selected lifetime names.
+/// - `lifetime_names`: Lifetime names to replace with `'static`.
+///
+/// # Returns
+///
+/// Returns a token stream with matching lifetime tokens rewritten.
 fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> TokenStream {
     let trees: Vec<_> = tokens.clone().into_iter().collect();
     let mut output = TokenStream::new();
@@ -294,11 +367,25 @@ fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> 
 }
 
 /// Recursively substitutes one type and every nested type retained by its IR.
+///
+/// # Parameters
+///
+/// - `ty`: Structured type IR to rewrite.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
 pub(super) fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
     reparse_substituted_type(ty, replacements);
 }
 
 /// Rebuilds a trait path after substituting bound impl generic parameters.
+///
+/// # Parameters
+///
+/// - `path`: Structured trait path to rewrite.
+/// - `replacements`: Generic identifiers and concrete type or const tokens.
+///
+/// # Panics
+///
+/// Panics if validated specialization tokens no longer parse as a Rust path.
 pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
     let mut parsed: syn::Path =
         syn::parse2(path.tokens.clone()).expect("validated specialization must retain valid trait path syntax");
@@ -308,6 +395,16 @@ pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replace
 
 /// Returns a non-core explicit receiver type that requires a registered
 /// `ReceiverAdapter` capability for dynamic invocation.
+///
+/// # Parameters
+///
+/// - `receiver`: Explicit receiver declaration to classify.
+/// - `target`: Concrete impl target type tokens.
+///
+/// # Returns
+///
+/// Returns the substituted extension receiver type, or `None` for core
+/// receivers.
 pub(super) fn typed_extension_receiver_type(
     receiver: &crate::ir::ReceiverIr,
     target: &TokenStream,
@@ -326,6 +423,16 @@ pub(super) fn typed_extension_receiver_type(
 }
 
 /// Emits concrete arguments for one validated method specialization.
+///
+/// # Parameters
+///
+/// - `specialization`: Validated named generic bindings.
+/// - `generics`: Generic parameters declared by the method.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns generated runtime generic-argument tokens.
 pub(super) fn specialization_arguments(
     specialization: &SpecializationIr,
     generics: &crate::ir::GenericsIr,
@@ -391,6 +498,16 @@ pub(super) fn specialization_arguments(
 /// Materializes one method specialization as concrete method IR and call
 /// arguments. The ordinary invocation analyzer and emitter can then make the
 /// same availability decision as they do for a non-generic method.
+///
+/// # Parameters
+///
+/// - `method`: Generic method declaration to specialize.
+/// - `specialization`: Validated named generic bindings.
+///
+/// # Returns
+///
+/// Returns concrete method IR and call arguments, or `None` for incomplete
+/// bindings.
 pub(super) fn specialized_method(
     method: &MethodIr,
     specialization: &SpecializationIr,
@@ -425,6 +542,16 @@ pub(super) fn specialized_method(
 }
 
 /// Resolves one named type argument from a validated specialization.
+///
+/// # Parameters
+///
+/// - `specialization`: Validated named generic bindings.
+/// - `name`: Type parameter name to resolve.
+///
+/// # Returns
+///
+/// Returns the corresponding type tokens, or `None` for a missing/non-type
+/// binding.
 fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
     match &specialization
         .bindings
@@ -439,6 +566,16 @@ fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -
 }
 
 /// Resolves one named const argument from a validated specialization.
+///
+/// # Parameters
+///
+/// - `specialization`: Validated named generic bindings.
+/// - `name`: Const parameter name to resolve.
+///
+/// # Returns
+///
+/// Returns the corresponding const tokens, or `None` for a missing/non-const
+/// binding.
 fn specialization_const_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
     match &specialization
         .bindings

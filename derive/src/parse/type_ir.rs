@@ -31,6 +31,14 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Converts a Rust path while retaining source tokens and structured segments.
+///
+/// # Parameters
+///
+/// - `path`: Parsed Rust path.
+///
+/// # Returns
+///
+/// Returns structured path IR with its diagnostic source and span.
 pub(crate) fn convert_path(path: &Path) -> PathIr {
     let tokens = path.to_token_stream();
     PathIr {
@@ -52,6 +60,14 @@ pub(crate) fn convert_path(path: &Path) -> PathIr {
 
 /// Converts a `Type` at the parser boundary so later stages never store
 /// it.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed Rust type.
+///
+/// # Returns
+///
+/// Returns structured type IR with retained source tokens and span.
 pub(crate) fn convert_type(ty: &Type) -> TypeIr {
     let tokens = ty.to_token_stream();
     let kind = match ty {
@@ -128,6 +144,14 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
 }
 
 /// Converts all generic arguments attached to one path segment.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed generic argument syntax.
+///
+/// # Returns
+///
+/// Returns the corresponding structured path argument representation.
 fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
     match arguments {
         SynPathArguments::None => PathArgumentsIr::None,
@@ -168,6 +192,14 @@ fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
 }
 
 /// Converts a lifetime or trait bound into semantic IR.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed lifetime, trait, or other bound.
+///
+/// # Returns
+///
+/// Returns the matching generic bound IR variant.
 pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
     match bound {
         TypeParamBound::Lifetime(lifetime) => GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string()),

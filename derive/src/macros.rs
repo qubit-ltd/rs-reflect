@@ -22,6 +22,14 @@ use crate::ir::MacroKind;
 ///
 /// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.md)
 /// for construction, capability, generic, and facade examples.
+///
+/// # Parameters
+///
+/// - `input`: Rust item tokens supplied to the derive macro.
+///
+/// # Returns
+///
+/// Returns generated reflection items or compiler diagnostics.
 pub fn derive_reflect(input: TokenStream) -> TokenStream {
     entry::process_macro(MacroKind::Derive, TokenStream::new(), input)
 }
@@ -32,6 +40,15 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 /// parameters, and supported supertraits. Dynamic invocation is emitted only
 /// when the method signature can cross the reflection boundary safely;
 /// unsupported methods retain a structured unavailable reason.
+///
+/// # Parameters
+///
+/// - `attribute`: Reflection macro arguments.
+/// - `item`: Trait declaration tokens.
+///
+/// # Returns
+///
+/// Returns the augmented trait and generated support items or diagnostics.
 pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
     entry::process_macro(MacroKind::Trait, attribute, item)
 }
@@ -43,6 +60,15 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 /// implementation; and `crate = path` selects a downstream runtime facade.
 /// `thread_safe` and `catch_unwind` validate the generated boundary before
 /// emitting invocation code.
+///
+/// # Parameters
+///
+/// - `attribute`: Reflection macro arguments.
+/// - `item`: Impl declaration tokens.
+///
+/// # Returns
+///
+/// Returns generated registration and invocation items or diagnostics.
 pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
     entry::process_macro(MacroKind::Impl, attribute, item)
 }

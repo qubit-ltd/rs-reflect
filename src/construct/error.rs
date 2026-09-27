@@ -16,6 +16,14 @@ use crate::descriptor::FieldDescriptor;
 use crate::error::TypeMismatch;
 
 /// The input shape selected for one reflected construction attempt.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::construct::ConstructionShape;
+///
+/// assert_eq!(ConstructionShape::Named.to_string(), "named");
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ConstructionShape {
     /// Query-name bindings for named fields.
@@ -28,6 +36,18 @@ pub enum ConstructionShape {
 
 impl fmt::Display for ConstructionShape {
     /// Formats the stable shape name used in diagnostics.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the shape name.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error if writing to `formatter` fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Named => formatter.write_str("named"),
@@ -38,6 +58,14 @@ impl fmt::Display for ConstructionShape {
 }
 
 /// Why a generated construction path is not available.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::construct::ConstructionUnavailableReason;
+///
+/// assert_eq!(ConstructionUnavailableReason::UpdateForbidden.to_string(), "field update is unavailable");
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ConstructionUnavailableReason {
     /// A skipped or no-construct field has no explicit value provider.
@@ -52,6 +80,18 @@ pub enum ConstructionUnavailableReason {
 
 impl fmt::Display for ConstructionUnavailableReason {
     /// Formats a concise human-readable reason.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the reason.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error if writing to `formatter` fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingDefaultProvider => formatter.write_str("missing explicit default provider"),
@@ -63,19 +103,64 @@ impl fmt::Display for ConstructionUnavailableReason {
 }
 
 /// Stable identity for a field participating in reflected construction.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::construct::ConstructionError;
+/// use qubit_reflect::construct::NamedConstructionInput;
+/// use qubit_reflect::value::DynamicOwned;
+/// use qubit_reflect::value::Local;
+/// use qubit_reflect::Reflect;
+/// use qubit_reflect::TypeDescriptor;
+///
+/// #[derive(Reflect)]
+/// struct User {
+///     name: String,
+/// }
+///
+/// let constructor = TypeDescriptor::of::<User>()
+///     .struct_construction()
+///     .expect("derived construction")
+///     .local_constructor();
+/// let input = NamedConstructionInput::<Local>::new(std::iter::empty::<(&str, DynamicOwned<Local>)>());
+/// let recovery = match constructor.construct_named(input) {
+///     Err(recovery) => recovery,
+///     Ok(_) => panic!("expected missing-field error"),
+/// };
+/// let ConstructionError::MissingField { field } = recovery.error() else {
+///     panic!("expected missing-field error");
+/// };
+/// assert_eq!(field.to_string(), "User::name");
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ConstructionFieldId {
+    /// Exact runtime identity of the type that declared the field.
     declaring_type: TypeId,
+    /// Static type name retained for diagnostics.
     declaring_type_name: &'static str,
+    /// Zero-based source position among the declaring type's fields.
     index: usize,
+    /// Source Rust identifier, absent for positional fields.
     rust_name: Option<&'static str>,
+    /// Reflected query identifier, absent for positional fields.
     query_name: Option<&'static str>,
+    /// Containing enum variant index, absent for struct fields.
     variant_index: Option<usize>,
+    /// Containing enum variant's source identifier, absent for struct fields.
     variant_rust_name: Option<&'static str>,
 }
 
 impl ConstructionFieldId {
     /// Captures the public identity facts from an immutable field descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// - `field`: The immutable descriptor whose source identity is captured.
+    ///
+    /// # Returns
+    ///
+    /// Returns a stable copy of the field's construction identity.
     pub(crate) fn from_descriptor(field: &FieldDescriptor) -> Self {
         let declaring_type = field.declaring_type();
         Self {
@@ -90,6 +175,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the declaring root's exact process-local Rust identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declaring type's process-local `TypeId`.
     #[must_use]
     #[inline]
     pub const fn declaring_type(&self) -> TypeId {
@@ -97,6 +186,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the declaring root's diagnostic Rust type name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the static diagnostic type name.
     #[must_use]
     #[inline]
     pub const fn declaring_type_name(&self) -> &'static str {
@@ -104,6 +197,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the zero-based source field index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the field's source-order index.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -111,6 +208,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the source Rust field name, or `None` for positional fields.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier, or `None` when the field is positional.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> Option<&'static str> {
@@ -118,6 +219,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the reflected query name, or `None` for positional fields.
+    ///
+    /// # Returns
+    ///
+    /// Returns the query name, or `None` when the field is positional.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> Option<&'static str> {
@@ -125,6 +230,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the containing variant index for an enum field.
+    ///
+    /// # Returns
+    ///
+    /// Returns the enum variant index, or `None` for a struct field.
     #[must_use]
     #[inline]
     pub const fn variant_index(&self) -> Option<usize> {
@@ -132,6 +241,10 @@ impl ConstructionFieldId {
     }
 
     /// Returns the containing variant Rust name for an enum field.
+    ///
+    /// # Returns
+    ///
+    /// Returns the variant source identifier, or `None` for a struct field.
     #[must_use]
     #[inline]
     pub const fn variant_rust_name(&self) -> Option<&'static str> {
@@ -141,6 +254,18 @@ impl ConstructionFieldId {
 
 impl fmt::Display for ConstructionFieldId {
     /// Formats source identity while retaining renamed query names separately.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: The destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after formatting the source identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error if writing to `formatter` fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.variant_rust_name, self.rust_name) {
             (Some(variant), Some(field)) => {
@@ -160,6 +285,18 @@ impl fmt::Display for ConstructionFieldId {
 }
 
 /// A machine-readable reason reflected construction failed before execution.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::construct::{ConstructionError, ConstructionShape};
+///
+/// let error = ConstructionError::WrongShape {
+///     expected: ConstructionShape::Named,
+///     actual: ConstructionShape::Tuple,
+/// };
+/// assert!(error.to_string().contains("shape mismatch"));
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ConstructionError {

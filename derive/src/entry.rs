@@ -14,6 +14,18 @@ use crate::ir::MacroKind;
 use crate::parse::parse_and_validate_declaration;
 
 /// Parses, validates, and expands one reflection macro invocation.
+///
+/// # Parameters
+///
+/// - `kind`: Reflection macro kind being invoked.
+/// - `args`: Attribute arguments supplied to the macro.
+/// - `input`: Rust item token stream passed to the macro.
+///
+/// # Returns
+///
+/// Returns expanded tokens or compiler-error tokens for the first pipeline
+/// error.
+#[must_use]
 pub(crate) fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
     match parse_and_validate_declaration(kind, args.into(), input.into()) {
         Ok(validated) => match crate::expand::dispatch(validated.declaration) {

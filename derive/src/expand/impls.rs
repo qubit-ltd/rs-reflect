@@ -52,6 +52,15 @@ use crate::ir::VisibilityIr;
 /// The descriptor graph is deliberately constructed during registry
 /// initialization, not from an inventory constructor. This keeps user code out
 /// of linker startup and uses the T12 registration protocol exclusively.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated inherent or trait implementation.
+/// - `context`: Expansion context containing the runtime facade.
+///
+/// # Returns
+///
+/// Returns the retained impl and generated registration metadata.
 pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if !declaration.generics.params.is_empty() {
         return expand_generic_impl_specializations(declaration, context);
@@ -72,6 +81,16 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionCon
 ///
 /// Blanket and constrained impls have no finite runtime `TypeId` set, so an
 /// impl without `specialize(...)` deliberately remains descriptor-only.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated generic impl and its explicit specializations.
+/// - `context`: Expansion context containing the runtime facade.
+///
+/// # Returns
+///
+/// Returns the retained impl, generic definition and selected concrete
+/// fragments.
 fn expand_generic_impl_specializations(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let retained = declaration.retained_tokens.clone();
     let facade = context.facade().clone();
@@ -123,6 +142,16 @@ fn expand_generic_impl_specializations(declaration: ImplDeclarationIr, context: 
 ///
 /// This payload deliberately has no `TypeId`: it describes the symbolic impl
 /// declaration and cannot enter a concrete type's effective view.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic impl whose symbolic definition is registered.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `context`: Expansion context used to fingerprint the declaration.
+///
+/// # Returns
+///
+/// Returns generated definition-provider and registration tokens.
 fn expand_generic_impl_definition(
     declaration: &ImplDeclarationIr,
     facade: &TokenStream,
@@ -323,6 +352,15 @@ fn expand_generic_impl_definition(
 
 /// Returns the stable generated module name owning one generic impl
 /// definition.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic impl whose source location and tokens identify the
+///   module.
+///
+/// # Returns
+///
+/// Returns the deterministic hidden module identifier.
 fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
     let fingerprint = super::context::fingerprint(&declaration.retained_tokens.to_string());
     let location = declaration.span.start();
@@ -335,6 +373,15 @@ fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
 
 /// Emits a private trait witness whose concrete use proves that the selected
 /// specialization satisfies the original impl header and where predicates.
+///
+/// # Parameters
+///
+/// - `declaration`: Original generic impl declaration and predicates.
+/// - `concrete_target`: Selected concrete target type tokens.
+///
+/// # Returns
+///
+/// Returns a private witness trait implementation and compile-time assertion.
 fn impl_specialization_applicability_witness(
     declaration: &ImplDeclarationIr,
     concrete_target: &TokenStream,
@@ -358,6 +405,15 @@ fn impl_specialization_applicability_witness(
 
 /// Builds declaration-level method descriptors without concrete adapters or
 /// instances.
+///
+/// # Parameters
+///
+/// - `declaration`: Generic impl declaration containing method signatures.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns method descriptor expressions in declaration order.
 fn definition_method_entries(declaration: &ImplDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     let target_source = declaration.target_type.source.as_str();
     let environment = GenericEnvironment::from_generics(&declaration.generics);
@@ -500,6 +556,21 @@ fn definition_method_entries(declaration: &ImplDeclarationIr, facade: &TokenStre
 }
 
 /// Expands one concrete implementation registration fragment.
+///
+/// # Parameters
+///
+/// - `declaration`: Concrete impl declaration to emit.
+/// - `impl_arguments`: Runtime generic arguments retained for specialization.
+/// - `shared_definition`: Optional shared generic impl-definition provider.
+/// - `applicability_witness`: Optional compile-time specialization proof.
+/// - `specialized_associated_type_resolver_arms`: Resolver arms for specialized
+///   associated types.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `context`: Expansion context used to analyze invocation support.
+///
+/// # Returns
+///
+/// Returns the retained impl and generated concrete registration module.
 fn expand_concrete_impl(
     declaration: ImplDeclarationIr,
     impl_arguments: TokenStream,
@@ -1079,6 +1150,16 @@ fn expand_concrete_impl(
 
 /// Expands every statically applicable invocation blocker in canonical enum
 /// order.
+///
+/// # Parameters
+///
+/// - `method`: Validated method signature to analyze.
+/// - `target`: Concrete implementation target type tokens.
+/// - `context`: Expansion context used to emit runtime reason paths.
+///
+/// # Returns
+///
+/// Returns generated tokens for the method's ordered unavailable reasons.
 pub(super) fn invocation_unavailable_reason_entry(
     method: &MethodIr,
     target: &TokenStream,

@@ -20,6 +20,22 @@ use crate::expression::TypeExpression;
 
 /// A structural predicate from a generic declaration, trait object, or opaque
 /// type bound.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ConcreteTypeExpression;
+/// use qubit_reflect::expression::PredicateDescriptor;
+/// use qubit_reflect::expression::TraitBoundModifier;
+/// use qubit_reflect::expression::TypeExpression;
+/// let subject = TypeExpression::parameter("T").expect("valid parameter");
+/// let debug = TypeExpression::Concrete(
+///     ConcreteTypeExpression::new(["core", "fmt", "Debug"], []).expect("valid path"),
+/// );
+/// let predicate = PredicateDescriptor::type_bound(subject, [debug], [TraitBoundModifier::None], [])
+///     .expect("matching bound metadata");
+/// assert!(matches!(predicate, PredicateDescriptor::TypeBound { .. }));
+/// ```
 #[derive(Clone, Debug)]
 pub enum PredicateDescriptor {
     /// Bounds placed on a type, for example `T: Display + Send`.
@@ -27,7 +43,7 @@ pub enum PredicateDescriptor {
     TypeBound {
         /// The type being constrained.
         subject: TypeExpression,
-        /// Trait or lifetime bounds in declaration order.
+        /// Trait bounds in declaration order.
         bounds: Box<[TypeExpression]>,
         /// Modifiers corresponding by index to `bounds`.
         bound_modifiers: Box<[TraitBoundModifier]>,
@@ -68,6 +84,24 @@ pub enum PredicateDescriptor {
 
 impl PredicateDescriptor {
     /// Creates a type-bound predicate after validating its parallel lists.
+    ///
+    /// # Parameters
+    ///
+    /// - `subject`: Type constrained by these bounds.
+    /// - `bounds`: Trait or lifetime bounds in declaration order.
+    /// - `modifiers`: Modifier corresponding to each trait bound.
+    /// - `higher_ranked_lifetimes`: Lifetimes introduced by a higher-ranked
+    ///   bound.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated type-bound predicate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExpressionError::EmptyTypeBounds`] for no bounds, or
+    /// [`ExpressionError::BoundModifierCount`] when the parallel lists differ
+    /// in length.
     pub fn type_bound(
         subject: TypeExpression,
         bounds: impl Into<Box<[TypeExpression]>>,
@@ -95,6 +129,20 @@ impl PredicateDescriptor {
     }
 
     /// Creates a lifetime-outlives predicate with at least one bound.
+    ///
+    /// # Parameters
+    ///
+    /// - `lifetime`: Lifetime that must outlive every bound lifetime.
+    /// - `bounds`: Lifetimes that must be outlived.
+    ///
+    /// # Returns
+    ///
+    /// Returns the validated lifetime-outlives predicate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExpressionError::EmptyLifetimeBounds`] when no bound lifetime
+    /// is supplied.
     pub fn lifetime_outlives(
         lifetime: LifetimeExpression,
         bounds: impl Into<Box<[LifetimeExpression]>>,
@@ -111,6 +159,10 @@ impl PredicateDescriptor {
     }
 
     /// Returns optional source-oriented diagnostic text.
+    ///
+    /// # Returns
+    ///
+    /// Returns the retained diagnostic text, or `None` when absent.
     #[must_use]
     pub fn diagnostic(&self) -> Option<&str> {
         match self {
@@ -123,6 +175,15 @@ impl PredicateDescriptor {
 
     /// Attaches source-oriented diagnostic text without changing structural
     /// identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Source-oriented text used only for diagnostics.
+    ///
+    /// # Returns
+    ///
+    /// Returns the predicate with diagnostic text attached; structural identity
+    /// is unchanged.
     #[must_use]
     pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
         let diagnostic = DiagnosticText::from(value.into());

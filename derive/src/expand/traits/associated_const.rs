@@ -15,10 +15,31 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Proves that an associated constant's type has no unresolved lifetime.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type of the associated constant.
+///
+/// # Returns
+///
+/// Returns whether every lifetime and type shape is statically resolvable.
 pub(super) fn has_proven_static_shape(ty: &TypeIr) -> bool {
     has_proven_static_shape_in(ty, &std::collections::HashSet::new(), false)
 }
 
+/// Recursively checks a type while tracking enclosing lifetime binders.
+///
+/// # Parameters
+///
+/// - `ty`: Type node to inspect.
+/// - `bound_lifetimes`: Lifetimes known to be bound and valid in the current
+///   scope.
+/// - `callable_elision`: Whether elided reference lifetimes are allowed in this
+///   callable scope.
+///
+/// # Returns
+///
+/// Returns whether the type has a provably static shape.
 fn has_proven_static_shape_in(
     ty: &TypeIr,
     bound_lifetimes: &std::collections::HashSet<String>,
@@ -123,13 +144,13 @@ mod tests {
     use super::has_proven_static_shape;
 
     #[test]
-    fn helper_is_available_as_a_narrow_parent_api() {
+    fn test_helper_is_available_as_a_narrow_parent_api() {
         let ty = crate::parse::convert_type(&syn::parse_str::<syn::Type>("u32").expect("a primitive type must parse"));
         assert!(has_proven_static_shape(&ty));
     }
 
     #[test]
-    fn rejects_unresolved_associated_constant_lifetimes() {
+    fn test_rejects_unresolved_associated_constant_lifetimes() {
         let borrowed =
             crate::parse::convert_type(&syn::parse_str::<syn::Type>("&'a u32").expect("a reference must parse"));
         let static_borrowed =

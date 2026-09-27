@@ -32,6 +32,16 @@ use crate::ir::TypeKindIr;
 use crate::ir::WherePredicateIr;
 
 /// Maps a parsed Rust ABI into the shared runtime ABI model.
+///
+/// # Parameters
+///
+/// - `abi`: Source ABI spelling, or `None` for the Rust default.
+/// - `span`: Source span used for unsupported ABI diagnostics.
+/// - `facade`: Runtime facade path used in the generated expression.
+///
+/// # Returns
+///
+/// Returns tokens naming the corresponding runtime ABI value.
 pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) -> TokenStream {
     match abi {
         Some("Rust") | None => {
@@ -52,6 +62,16 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
 
 /// Converts generic declaration facts into the runtime generic descriptor
 /// model.
+///
+/// # Parameters
+///
+/// - `generics`: Parsed generic parameters and where predicates.
+/// - `span`: Declaration span used for lifetime metadata.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns tokens constructing the runtime generic definition descriptor.
 pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let environment = GenericEnvironment::from_generics(generics);
     let parameters = generics.params.iter().map(|parameter| {
@@ -158,6 +178,18 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
 }
 
 /// Converts generic bounds into runtime predicate descriptors.
+///
+/// # Parameters
+///
+/// - `bounds`: Bounds attached to one generic parameter.
+/// - `subject`: Parameter name represented by those bounds.
+/// - `span`: Source span used for lifetime expressions.
+/// - `environment`: Generic names visible at the metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns the supported trait and lifetime predicates in source order.
 fn generic_bounds(
     bounds: &[GenericBoundIr],
     subject: &LitStr,
@@ -207,6 +239,18 @@ fn generic_bounds(
 }
 
 /// Converts source lifetime syntax into the runtime lifetime expression model.
+///
+/// # Parameters
+///
+/// - `lifetime`: Rust lifetime spelling, including its leading apostrophe when
+///   named.
+/// - `span`: Source span associated with the lifetime.
+/// - `facade`: Runtime facade path used in the generated expression.
+///
+/// # Returns
+///
+/// Returns tokens for the static, named, or otherwise named lifetime
+/// expression.
 pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> TokenStream {
     if lifetime == "'static" {
         return quote!(#facade::__private::codegen_v3::expression::LifetimeExpression::Static);
@@ -217,6 +261,16 @@ pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStre
 
 /// Converts the type forms required by trait item descriptors into runtime
 /// expressions.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed Rust type structure.
+/// - `environment`: Generic names visible at the type's metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns tokens representing the type expression in runtime metadata.
 pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => {
@@ -333,6 +387,22 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
 }
 
 /// Converts one parsed path into a runtime type-expression token stream.
+///
+/// # Parameters
+///
+/// - `path`: Structured path and generic arguments.
+/// - `ty`: Full parsed type, used for source diagnostics.
+/// - `environment`: Generic names visible at the type's metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns tokens for the structural, associated, or concrete path expression.
+///
+/// # Panics
+///
+/// Panics if a qualified path has no associated item segment, which violates
+/// the parser's validated path invariant.
 fn path_expression(
     path: &crate::ir::PathIr,
     ty: &TypeIr,
@@ -431,6 +501,16 @@ fn path_expression(
 
 /// Converts a parsed trait path using the same structural path encoder as a
 /// type expression.
+///
+/// # Parameters
+///
+/// - `path`: Structured trait path and generic arguments.
+/// - `environment`: Generic names visible at the trait metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns the trait path as a runtime type expression.
 pub(crate) fn path_type_expression(
     path: &crate::ir::PathIr,
     environment: &GenericEnvironment,
@@ -446,6 +526,17 @@ pub(crate) fn path_type_expression(
 }
 
 /// Converts parsed path arguments into runtime generic-argument expressions.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed angle-bracketed or parenthesized arguments.
+/// - `environment`: Generic names visible at this metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+/// - `span`: Source span used for synthesized literal metadata.
+///
+/// # Returns
+///
+/// Returns supported arguments in source order; unsupported forms are omitted.
 pub(crate) fn path_arguments(
     arguments: &PathArgumentsIr,
     environment: &GenericEnvironment,
@@ -492,6 +583,17 @@ pub(crate) fn path_arguments(
 
 /// Materializes direct external-supertrait arguments at the trait hook's
 /// concrete instance.
+///
+/// # Parameters
+///
+/// - `arguments`: Parsed arguments from the direct supertrait path.
+/// - `declaration`: Trait declaration whose generic scope supplies concrete
+///   types.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns runtime generic arguments with direct trait parameters materialized.
 pub(super) fn external_supertrait_arguments(
     arguments: &PathArgumentsIr,
     declaration: &TraitDeclarationIr,
@@ -551,6 +653,17 @@ pub(super) fn external_supertrait_arguments(
 }
 
 /// Converts trait-object or opaque-type bounds into runtime predicates.
+///
+/// # Parameters
+///
+/// - `bounds`: Parsed trait and lifetime bounds.
+/// - `environment`: Generic names visible at this metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+/// - `span`: Source span used for lifetime expressions.
+///
+/// # Returns
+///
+/// Returns supported trait and outlives predicates in source order.
 fn bound_predicates(
     bounds: &[GenericBoundIr],
     environment: &GenericEnvironment,
@@ -598,6 +711,17 @@ fn bound_predicates(
 }
 
 /// Converts a parsed const expression into structural runtime metadata.
+///
+/// # Parameters
+///
+/// - `value`: Parsed const expression tokens.
+/// - `environment`: Generic names visible at this metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns structural tokens for supported expressions or a compile error for
+/// unsupported syntax.
 fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = parse2::<Ident>(value.clone()) {
@@ -650,6 +774,17 @@ fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment,
 
 /// Converts the literal const-default subset that has a structural runtime
 /// representation.
+///
+/// # Parameters
+///
+/// - `value`: Const default tokens from the trait declaration.
+/// - `environment`: Generic names visible at the default's metadata site.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns an optional structural const expression or a compile error for
+/// unsupported defaults.
 pub(super) fn const_expression(
     value: &TokenStream,
     environment: &GenericEnvironment,
@@ -705,6 +840,17 @@ pub(super) fn const_expression(
 
 /// Converts an integer literal without relying on its whitespace-normalized
 /// token rendering.
+///
+/// # Parameters
+///
+/// - `value`: Parsed integer literal, including any suffix.
+/// - `negative`: Whether unary negation applies to the literal.
+/// - `facade`: Runtime facade path used in generated expressions.
+///
+/// # Returns
+///
+/// Returns signed or unsigned structural tokens when the value fits, or `None`
+/// when parsing overflows.
 fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
@@ -720,6 +866,14 @@ fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream
 
 /// Emits a deterministic compile error for const defaults without a runtime
 /// structural value.
+///
+/// # Parameters
+///
+/// - `value`: Unsupported source expression retained for the diagnostic.
+///
+/// # Returns
+///
+/// Returns tokens that produce a compile-time error at the user's invocation.
 fn unsupported_const_default(value: impl ToTokens) -> TokenStream {
     let source = LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
     quote!(compile_error!(

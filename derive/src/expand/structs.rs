@@ -25,6 +25,16 @@ use crate::ir::VisibilityIr;
 
 /// Expands a concrete struct into a static root descriptor and safe field
 /// adapters.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated struct declaration and its retained source facts.
+/// - `context`: Expansion configuration and runtime facade resolver.
+///
+/// # Returns
+///
+/// Returns generated items, or an empty stream if stored generic tokens cannot
+/// be parsed.
 pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
@@ -310,6 +320,16 @@ pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext)
 }
 
 /// Expands the static capability set requested on one derived type.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated declaration containing capability attributes.
+/// - `facade`: Runtime facade path used by generated references.
+/// - `function`: Generated capability resolver identifier.
+///
+/// # Returns
+///
+/// Returns the generated capability resolver item.
 pub(crate) fn capabilities(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
@@ -355,6 +375,18 @@ pub(crate) fn capabilities(
 }
 
 /// Generates a static fragment for concrete derived roots.
+///
+/// # Parameters
+///
+/// - `facade`: Runtime facade path used by generated references.
+/// - `name`: Reflected type identifier.
+/// - `module`: Unique generated module identifier.
+/// - `fingerprint`: Stable source fingerprint for the fragment identity.
+/// - `has_generics`: Whether the declaration is generic.
+///
+/// # Returns
+///
+/// Returns an empty stream for generic roots, or the registration module.
 fn registration(
     facade: &TokenStream,
     name: &syn::Ident,
@@ -395,6 +427,16 @@ fn registration(
 }
 
 /// Expands a normalized source visibility into its public runtime form.
+///
+/// # Parameters
+///
+/// - `visibility`: Normalized source visibility.
+/// - `facade`: Runtime facade path used by generated references.
+/// - `span`: Source span for generated string literals.
+///
+/// # Returns
+///
+/// Returns the corresponding runtime visibility expression.
 fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => {
@@ -418,6 +460,15 @@ fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> To
 
 /// Emits the runtime struct category shared by concrete and generic
 /// descriptors.
+///
+/// # Parameters
+///
+/// - `declaration`: Struct declaration containing its normalized field shape.
+/// - `facade`: Runtime facade path used by generated references.
+///
+/// # Returns
+///
+/// Returns tokens naming the matching runtime struct category.
 pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     match declaration.field_shape {
         FieldShapeIr::Unit => {

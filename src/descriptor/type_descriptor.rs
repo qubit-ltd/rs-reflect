@@ -120,6 +120,14 @@ impl TypeDescriptor {
     /// Returns the unique root descriptor supplied by `T`'s [`Reflect`]
     /// implementation.
     ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Reflected concrete type whose root descriptor is requested.
+    ///
+    /// # Returns
+    ///
+    /// Returns the static root descriptor provided by `T`.
+    ///
     /// # Panics
     ///
     /// Panics if the descriptor returned by `T` reports a different
@@ -138,6 +146,11 @@ impl TypeDescriptor {
 
     /// Returns generated construction and owned-update entry points for a
     /// reflected struct root, if that root exposes them.
+    ///
+    /// # Returns
+    ///
+    /// Returns the construction descriptor, or `None` when construction is
+    /// unavailable.
     #[must_use]
     #[inline]
     pub const fn struct_construction(&self) -> Option<&StructConstructionDescriptor> {
@@ -146,6 +159,10 @@ impl TypeDescriptor {
 
     /// Returns the declaration and concrete substitution facts for a generic
     /// root instance, if this root was derived from generic source.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete generic metadata, or `None` for non-generic roots.
     #[must_use]
     #[inline]
     pub const fn concrete_generic(&self) -> Option<&'static ConcreteGenericDescriptor> {
@@ -154,6 +171,11 @@ impl TypeDescriptor {
 
     /// Returns the declaration and concrete substitutions for this generic
     /// instance.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete arguments and their source definition, or `None`
+    /// when this root has no generic metadata.
     #[must_use]
     #[inline]
     pub const fn generic_arguments(&self) -> Option<&'static ConcreteGenericDescriptor> {
@@ -164,7 +186,12 @@ impl TypeDescriptor {
     ///
     /// `None` means this descriptor does not originate from a registered
     /// generic type declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source generic declaration, or `None` when unavailable.
     #[must_use]
+    #[inline]
     pub fn type_definition(&self) -> Option<&'static TypeDefinitionDescriptor> {
         self.definition.map(|definition| definition())
     }
@@ -173,12 +200,22 @@ impl TypeDescriptor {
     ///
     /// `None` means this descriptor does not originate from a generic
     /// declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-local declaration identity, or `None` when this
+    /// root is not linked to a generic declaration.
     #[must_use]
+    #[inline]
     pub fn definition_id(&self) -> Option<TypeDefinitionId> {
         self.type_definition().map(TypeDefinitionDescriptor::id)
     }
 
     /// Constructs a named struct through its generated local adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Named field values supplied for the reflected struct.
     ///
     /// # Returns
     ///
@@ -200,6 +237,10 @@ impl TypeDescriptor {
 
     /// Constructs a tuple or newtype struct through its generated local
     /// adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Positional field values supplied for the reflected struct.
     ///
     /// # Returns
     ///
@@ -240,6 +281,19 @@ impl TypeDescriptor {
     }
 
     /// Creates a primitive root for generated or built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the new root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name for the root.
+    /// - `kind`: Primitive category represented by the root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a primitive root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> Self {
         Self::new::<T>(
@@ -251,6 +305,19 @@ impl TypeDescriptor {
     }
 
     /// Creates a text root for generated or built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the new root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name for the root.
+    /// - `kind`: Owned or borrowed UTF-8 text category.
+    ///
+    /// # Returns
+    ///
+    /// Returns a text root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> Self {
         Self::new::<T>(
@@ -262,6 +329,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a struct root for generated descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the new root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name for the root.
+    /// - `kind`: Named, tuple, newtype, or unit struct shape.
+    /// - `fields`: Direct field descriptors in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a struct root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_struct<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -277,20 +358,47 @@ impl TypeDescriptor {
     }
 
     /// Attaches generated struct construction entry points to this root.
+    ///
+    /// # Parameters
+    ///
+    /// - `construction`: Generated local and optional thread-safe constructor
+    ///   metadata.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root with its struct construction entry points attached.
     #[doc(hidden)]
+    #[must_use]
     pub fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
     }
 
     /// Attaches generic declaration and concrete-instance facts to this root.
+    ///
+    /// # Parameters
+    ///
+    /// - `generic`: Concrete generic metadata for this root instance.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root linked to its concrete generic metadata.
     #[doc(hidden)]
+    #[must_use]
     pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
         self.generic = Some(generic);
         self
     }
 
     /// Links this concrete descriptor to its source-level generic declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Resolver for the static source-level declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root linked to that generic declaration.
     #[doc(hidden)]
     #[must_use]
     pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
@@ -299,6 +407,19 @@ impl TypeDescriptor {
     }
 
     /// Creates an enum root for generated descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust enum type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `variants`: Visible variants in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an enum root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_enum<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -308,6 +429,20 @@ impl TypeDescriptor {
     }
 
     /// Creates an enum root with normalized explicit representation metadata.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust enum type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `variants`: Visible variants in source order.
+    /// - `representations`: Normalized `repr` hints retained from the source.
+    ///
+    /// # Returns
+    ///
+    /// Returns an enum root descriptor with representation metadata.
     #[doc(hidden)]
     pub(crate) const fn new_enum_with_repr<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -324,6 +459,19 @@ impl TypeDescriptor {
 
     /// Creates a tuple root, including the zero-arity unit tuple, for built-in
     /// data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust tuple type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `elements`: Element type references in tuple order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> Self {
         Self::new::<T>(
@@ -336,6 +484,19 @@ impl TypeDescriptor {
 
     /// Creates a tuple root whose element relationships resolve on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust tuple type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `elements`: Lazy element references in tuple order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple root with lazily resolved element types.
     #[doc(hidden)]
     pub(crate) const fn new_tuple_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -350,6 +511,20 @@ impl TypeDescriptor {
     }
 
     /// Creates an array root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust array type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Element type reference.
+    /// - `length`: Fixed array length.
+    ///
+    /// # Returns
+    ///
+    /// Returns an array root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_array<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -366,6 +541,20 @@ impl TypeDescriptor {
 
     /// Creates an array root whose element relationship resolves on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust array type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Lazy element type reference.
+    /// - `length`: Fixed array length.
+    ///
+    /// # Returns
+    ///
+    /// Returns an array root with a lazily resolved element type.
     #[doc(hidden)]
     pub(crate) const fn new_array_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -381,6 +570,19 @@ impl TypeDescriptor {
     }
 
     /// Creates an optional root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust optional type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Optional element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns an optional root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
@@ -393,6 +595,19 @@ impl TypeDescriptor {
 
     /// Creates an optional root whose element relationship is resolved on
     /// first navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust optional type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Lazy optional element reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns an optional root with a lazily resolved element type.
     #[doc(hidden)]
     pub(crate) const fn new_optional_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -407,6 +622,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a sequence root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust sequence type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Sequence family, such as vector or deque.
+    /// - `element`: Element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a sequence root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_sequence<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -423,6 +652,20 @@ impl TypeDescriptor {
 
     /// Creates a sequence root whose element relationship resolves on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust sequence type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Sequence family, such as vector or deque.
+    /// - `element`: Lazy element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a sequence root with a lazily resolved element type.
     #[doc(hidden)]
     pub(crate) const fn new_sequence_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -438,6 +681,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a set root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust set type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Set family, such as ordered or hashed.
+    /// - `element`: Element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a set root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_set<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -454,6 +711,20 @@ impl TypeDescriptor {
 
     /// Creates a set root whose element relationship resolves on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust set type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Set family, such as ordered or hashed.
+    /// - `element`: Lazy element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a set root with a lazily resolved element type.
     #[doc(hidden)]
     pub(crate) const fn new_set_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -469,6 +740,21 @@ impl TypeDescriptor {
     }
 
     /// Creates a map root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust map type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Ordered or hashed map family.
+    /// - `key`: Key type reference.
+    /// - `value`: Value type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a map root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_map<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -486,6 +772,21 @@ impl TypeDescriptor {
 
     /// Creates a map root whose key and value relationships resolve on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust map type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Ordered or hashed map family.
+    /// - `key`: Lazy key type reference.
+    /// - `value`: Lazy value type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a map root with lazily resolved key and value types.
     #[doc(hidden)]
     pub(crate) const fn new_map_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -502,6 +803,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a smart-pointer root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust smart-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Smart-pointer family.
+    /// - `pointee`: Pointee type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a smart-pointer root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_smart_pointer<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -518,6 +833,20 @@ impl TypeDescriptor {
 
     /// Creates a smart-pointer root whose pointee relationship is resolved on
     /// first navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust smart-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Smart-pointer family.
+    /// - `pointee`: Lazy pointee type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a smart-pointer root with a lazily resolved pointee type.
     #[doc(hidden)]
     pub(crate) const fn new_smart_pointer_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -533,6 +862,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a reference root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust reference type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Shared or mutable reference category.
+    /// - `target`: Referenced type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reference root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_reference<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -549,6 +892,20 @@ impl TypeDescriptor {
 
     /// Creates a reference root whose target relationship resolves on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust reference type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Shared or mutable reference category.
+    /// - `target`: Lazy referenced type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a reference root with a lazily resolved target type.
     #[doc(hidden)]
     pub(crate) const fn new_reference_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -564,6 +921,19 @@ impl TypeDescriptor {
     }
 
     /// Creates a slice root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust slice type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Slice element type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a slice root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> Self {
         Self::new::<T>(
@@ -576,6 +946,19 @@ impl TypeDescriptor {
 
     /// Creates a slice root whose element relationship resolves on first
     /// navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust slice type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `element`: Lazy slice element reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a slice root with a lazily resolved element type.
     #[doc(hidden)]
     pub(crate) const fn new_slice_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -590,6 +973,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a raw-pointer root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust raw-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `mutability`: Const or mutable pointer category.
+    /// - `pointee`: Pointee type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a raw-pointer root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_raw_pointer<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -606,6 +1003,20 @@ impl TypeDescriptor {
 
     /// Creates a raw-pointer root whose pointee relationship resolves on
     /// first navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust raw-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `mutability`: Const or mutable pointer category.
+    /// - `pointee`: Lazy pointee type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a raw-pointer root with a lazily resolved pointee type.
     #[doc(hidden)]
     pub(crate) const fn new_raw_pointer_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -621,6 +1032,23 @@ impl TypeDescriptor {
     }
 
     /// Creates a function-pointer root for built-in descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust function-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Safe or unsafe function-pointer category.
+    /// - `abi`: Calling convention retained by the descriptor.
+    /// - `variadic`: Whether the signature accepts variadic arguments.
+    /// - `parameters`: Parameter types in source order.
+    /// - `return_type`: Return type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a function-pointer root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_function<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -646,6 +1074,23 @@ impl TypeDescriptor {
 
     /// Creates a function-pointer root whose signature relationships resolve
     /// on first navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust function-pointer type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Safe or unsafe function-pointer category.
+    /// - `abi`: Calling convention retained by the descriptor.
+    /// - `variadic`: Whether the signature accepts variadic arguments.
+    /// - `parameters`: Lazy parameter type references in source order.
+    /// - `return_type`: Lazy return type reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns a function-pointer root with lazily resolved signature types.
     #[doc(hidden)]
     pub(crate) const fn new_function_lazy<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -670,6 +1115,19 @@ impl TypeDescriptor {
     }
 
     /// Creates a trait-object root for generated descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust trait-object type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `trait_descriptor`: Resolver for the reflected trait root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a trait-object root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_trait_object<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -684,12 +1142,37 @@ impl TypeDescriptor {
     }
 
     /// Creates an intentionally opaque root for generated descriptor data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the opaque root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns an opaque root descriptor for `T`.
     #[doc(hidden)]
     pub(crate) const fn new_opaque<T: ?Sized + 'static>(query_name: &'static str) -> Self {
         Self::new::<T>(query_name, TypeDescriptorData::Opaque(OpaqueTypeView), &[], &[])
     }
 
     /// Creates an opaque root with an explicit static capability resolver.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the opaque root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `capabilities`: Resolver for capabilities intrinsic to this root.
+    ///
+    /// # Returns
+    ///
+    /// Returns an opaque root descriptor with the supplied capability source.
     #[doc(hidden)]
     pub(crate) const fn new_opaque_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -705,6 +1188,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a primitive root with an explicit static capability resolver.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust primitive type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Primitive category represented by the root.
+    /// - `capabilities`: Resolver for capabilities intrinsic to this root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a primitive root descriptor with the supplied capability source.
     #[doc(hidden)]
     pub(crate) const fn new_primitive_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -721,6 +1218,20 @@ impl TypeDescriptor {
     }
 
     /// Creates a text root with an explicit static capability resolver.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust text type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `kind`: Owned or borrowed UTF-8 text category.
+    /// - `capabilities`: Resolver for capabilities intrinsic to this root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a text root descriptor with the supplied capability source.
     #[doc(hidden)]
     pub(crate) const fn new_text_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
@@ -738,6 +1249,22 @@ impl TypeDescriptor {
 
     /// Builds common immutable root state without exposing an independently
     /// mutable builder.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `data`: Kind-specific root metadata.
+    /// - `fields`: Direct fields in source order.
+    /// - `variants`: Enum variants in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a root with empty intrinsic capabilities and no optional
+    /// construction or generic metadata.
     const fn new<T: ?Sized + 'static>(
         query_name: &'static str,
         data: TypeDescriptorData,
@@ -751,6 +1278,23 @@ impl TypeDescriptor {
 
     /// Builds common immutable root state with a descriptor-owned capability
     /// resolver.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Rust type represented by the root.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name.
+    /// - `data`: Kind-specific root metadata.
+    /// - `fields`: Direct fields in source order.
+    /// - `variants`: Enum variants in source order.
+    /// - `capabilities`: Resolver for the root's intrinsic capabilities.
+    ///
+    /// # Returns
+    ///
+    /// Returns a root initialized with the supplied identity, members, and
+    /// capability resolver.
     const fn new_with_capabilities<T: ?Sized + 'static>(
         query_name: &'static str,
         data: TypeDescriptorData,
@@ -776,6 +1320,14 @@ impl TypeDescriptor {
     ///
     /// Generated descriptor roots call this before the root is interned, so
     /// every query observes one stable capability set for the concrete type.
+    ///
+    /// # Parameters
+    ///
+    /// - `capabilities`: Resolver for capabilities intrinsic to this root.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root with its capability resolver replaced.
     #[doc(hidden)]
     pub const fn with_capabilities(mut self, capabilities: fn() -> TypeCapabilitiesResult) -> Self {
         self.capabilities = capabilities;
@@ -783,6 +1335,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the process-local Rust type identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact `TypeId` represented by this root.
     #[must_use]
     #[inline]
     pub fn type_id(&self) -> TypeId {
@@ -790,6 +1346,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the diagnostic Rust type name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the compiler-provided Rust type name.
     #[must_use]
     #[inline]
     pub fn type_name(&self) -> &'static str {
@@ -798,6 +1358,10 @@ impl TypeDescriptor {
 
     /// Returns the immutable lookup name, which may differ from
     /// [`Self::type_name`].
+    ///
+    /// # Returns
+    ///
+    /// Returns the immutable reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -805,11 +1369,20 @@ impl TypeDescriptor {
     }
 
     /// Returns capabilities declared directly by this descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns the intrinsic capabilities for this concrete root.
     pub(crate) fn declared_capabilities(&self) -> TypeCapabilitiesResult {
         (self.capabilities)()
     }
 
     /// Returns the stable hierarchical type category.
+    ///
+    /// # Returns
+    ///
+    /// Returns the category and any primitive, shape, pointer, or mutability
+    /// qualifier attached to it.
     #[must_use]
     pub const fn kind(&self) -> TypeKind {
         match &self.data {
@@ -834,6 +1407,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the primitive view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns primitive metadata, or `None` when this root is not primitive.
     #[must_use]
     #[inline]
     pub const fn as_primitive(&self) -> Option<&PrimitiveTypeDescriptor> {
@@ -844,6 +1421,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the text view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns text metadata, or `None` when this root is not a text type.
     #[must_use]
     #[inline]
     pub const fn as_text(&self) -> Option<&TextTypeDescriptor> {
@@ -854,6 +1435,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the struct view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns struct shape metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_struct(&self) -> Option<&StructTypeDescriptor> {
@@ -864,6 +1449,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the enum view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns enum representation metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_enum(&self) -> Option<&EnumTypeDescriptor> {
@@ -874,6 +1463,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the tuple view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns tuple element metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_tuple(&self) -> Option<&TupleTypeDescriptor> {
@@ -884,6 +1477,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the array view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns array element and length metadata, or `None` for other kinds.
     #[must_use]
     #[inline]
     pub const fn as_array(&self) -> Option<&ArrayTypeDescriptor> {
@@ -894,6 +1491,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the optional view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns optional element metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_optional(&self) -> Option<&OptionalTypeDescriptor> {
@@ -904,6 +1505,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the sequence view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns sequence kind and element metadata, or `None` for other kinds.
     #[must_use]
     #[inline]
     pub const fn as_sequence(&self) -> Option<&SequenceTypeDescriptor> {
@@ -914,6 +1519,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the set view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns set kind and element metadata, or `None` for other kinds.
     #[must_use]
     #[inline]
     pub const fn as_set(&self) -> Option<&SetTypeDescriptor> {
@@ -924,6 +1533,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the map view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns map kind, key, and value metadata, or `None` for other kinds.
     #[must_use]
     #[inline]
     pub const fn as_map(&self) -> Option<&MapTypeDescriptor> {
@@ -934,6 +1547,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the smart-pointer view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns smart-pointer kind and pointee metadata, or `None` otherwise.
     #[must_use]
     #[inline]
     pub const fn as_smart_pointer(&self) -> Option<&SmartPointerTypeDescriptor> {
@@ -944,6 +1561,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the reference view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns reference kind and target metadata, or `None` otherwise.
     #[must_use]
     #[inline]
     pub const fn as_reference(&self) -> Option<&ReferenceTypeDescriptor> {
@@ -954,6 +1575,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the slice view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns slice element metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_slice(&self) -> Option<&SliceTypeDescriptor> {
@@ -964,6 +1589,11 @@ impl TypeDescriptor {
     }
 
     /// Returns the raw-pointer view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns raw-pointer mutability and pointee metadata, or `None`
+    /// otherwise.
     #[must_use]
     #[inline]
     pub const fn as_raw_pointer(&self) -> Option<&RawPointerTypeDescriptor> {
@@ -974,6 +1604,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the function-pointer view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns function signature metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_function(&self) -> Option<&FunctionTypeDescriptor> {
@@ -984,6 +1618,10 @@ impl TypeDescriptor {
     }
 
     /// Returns the trait-object view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns trait-object metadata, or `None` for other root kinds.
     #[must_use]
     #[inline]
     pub const fn as_trait_object(&self) -> Option<&TraitObjectTypeDescriptor> {
@@ -994,6 +1632,11 @@ impl TypeDescriptor {
     }
 
     /// Returns the opaque-root view, or `None` for every other kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns the opaque marker, or `None` when this root exposes another
+    /// kind.
     #[must_use]
     #[inline]
     pub const fn as_opaque(&self) -> Option<&OpaqueTypeView> {
@@ -1006,6 +1649,11 @@ impl TypeDescriptor {
     /// Returns direct struct fields in source declaration order.
     ///
     /// Non-struct roots, including enum roots, return an empty slice.
+    ///
+    /// # Returns
+    ///
+    /// Returns direct fields, or an empty slice for roots without direct
+    /// fields.
     #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [FieldDescriptor] {
@@ -1015,6 +1663,15 @@ impl TypeDescriptor {
     /// Finds a direct named field by query name.
     ///
     /// `None` means the root has no direct field with that lookup name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Field lookup name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching direct field, or `None` when no field has that
+    /// name.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
         self.fields.iter().find(|field| field.query_name() == Some(name))
@@ -1023,6 +1680,14 @@ impl TypeDescriptor {
     /// Returns a direct field by source index.
     ///
     /// `None` means the index is outside the direct field range.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based position in the direct field slice.
+    ///
+    /// # Returns
+    ///
+    /// Returns the field at that index, or `None` when out of range.
     #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
         self.fields.get(index)
@@ -1031,6 +1696,10 @@ impl TypeDescriptor {
     /// Returns enum variants in source declaration order.
     ///
     /// Non-enum roots return an empty slice.
+    ///
+    /// # Returns
+    ///
+    /// Returns variants in source order, or an empty slice for non-enum roots.
     #[must_use]
     #[inline]
     pub const fn variants(&self) -> &'static [VariantDescriptor] {
@@ -1040,6 +1709,14 @@ impl TypeDescriptor {
     /// Finds a variant by query name.
     ///
     /// `None` means the root has no variant with that lookup name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Variant lookup name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching variant, or `None` when absent.
     #[must_use]
     pub fn variant(&self, name: &str) -> Option<&VariantDescriptor> {
         self.variants.iter().find(|variant| variant.query_name() == name)
@@ -1048,12 +1725,30 @@ impl TypeDescriptor {
     /// Returns a variant by source index.
     ///
     /// `None` means no visible variant has the source declaration index.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based source variant index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the visible variant with that source index, or `None` when
+    /// absent.
     #[must_use]
     pub fn variant_at(&self, index: usize) -> Option<&VariantDescriptor> {
         self.variants.iter().find(|variant| variant.index() == index)
     }
 
     /// Finds the fieldless integer-`repr` variant with the exact numeric value.
+    ///
+    /// # Parameters
+    ///
+    /// - `discriminant`: Signed or unsigned integer value to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching fieldless variant, or `None` when no variant has
+    /// that exact numeric discriminant.
     #[must_use]
     pub fn variant_by_discriminant(
         &self,
@@ -1087,6 +1782,15 @@ impl TypeDescriptor {
 
     /// Returns implementations from an explicitly supplied immutable registry
     /// snapshot without consulting process-wide initialization.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Snapshot from which this root's implementations are read.
+    ///
+    /// # Returns
+    ///
+    /// Returns implementations borrowed from the supplied snapshot in its
+    /// deterministic order.
     #[must_use]
     pub fn impls_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [&'static ImplDescriptor] {
         registry.implementations(self.type_id())
@@ -1115,6 +1819,14 @@ impl TypeDescriptor {
 
     /// Returns effective methods from an explicitly supplied immutable
     /// registry snapshot.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Snapshot whose effective method view is queried.
+    ///
+    /// # Returns
+    ///
+    /// Returns effective method instances borrowed from the supplied snapshot.
     #[must_use]
     pub fn methods_in<'registry>(
         &self,
@@ -1131,6 +1843,10 @@ impl TypeDescriptor {
     /// [`crate::registry::EffectiveTypeView::lookup_method`] on a registry
     /// view. A cached [`RegistryError`] is returned when aggregation failed.
     ///
+    /// # Parameters
+    ///
+    /// - `name`: Method query name to match.
+    ///
     /// # Returns
     ///
     /// Returns the missing, unique, or ambiguous lookup result.
@@ -1139,6 +1855,7 @@ impl TypeDescriptor {
     ///
     /// Returns the cached registry initialization error if registration could
     /// not be aggregated.
+    #[must_use = "inspect the method lookup result or handle the registry error"]
     pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.methods_named_in(registry, name))
@@ -1146,6 +1863,17 @@ impl TypeDescriptor {
 
     /// Looks up an effective method in an explicitly supplied immutable
     /// registry snapshot.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Snapshot whose effective method view is queried.
+    /// - `name`: Method query name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the missing, unique, or ambiguous lookup result borrowing the
+    /// supplied registry snapshot.
+    #[must_use]
     pub fn methods_named_in<'registry>(
         &self,
         registry: &'registry ReflectRegistry,

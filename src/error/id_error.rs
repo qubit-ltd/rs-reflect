@@ -10,6 +10,14 @@
 //! Errors produced while validating stable textual IDs.
 
 /// An invalid stable reflection ID.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::error::IdError;
+/// let error = IdError::InvalidFormat { value: "bad id".into() };
+/// assert!(matches!(error, IdError::InvalidFormat { .. }));
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum IdError {

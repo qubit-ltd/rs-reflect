@@ -107,6 +107,16 @@ impl InvocationMode for ThreadSafe {
 /// Local futures may be non-`Send`; thread-safe futures must be `Send` when
 /// constructed and remain `Send` after erasure.
 ///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::invoke::{InvocationOutput, ReflectedFuture};
+/// use qubit_reflect::value::Local;
+///
+/// let future = ReflectedFuture::<Local>::new(async { InvocationOutput::Unit });
+/// assert!(std::mem::size_of_val(&future) > 0);
+/// ```
+///
 /// ```compile_fail
 /// use std::rc::Rc;
 /// use qubit_reflect::invoke::{InvocationOutput, ReflectedFuture};

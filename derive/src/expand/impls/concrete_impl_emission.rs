@@ -12,6 +12,9 @@ use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 
 /// Fully materialized token groups needed to emit one concrete impl module.
+///
+/// Each field corresponds to one independently generated descriptor or
+/// registration component consumed by the final token emitter.
 pub(super) struct ConcreteImplEmission {
     /// Original impl tokens retained in generated output.
     pub(super) retained: TokenStream,

@@ -16,6 +16,15 @@ use quote::quote;
 use super::concrete_impl_emission::ConcreteImplEmission;
 
 /// Emits the isolated registration module for one concrete impl.
+///
+/// # Parameters
+///
+/// - `emission`: Fully prepared token groups for the impl descriptor and
+///   registration.
+///
+/// # Returns
+///
+/// Returns the retained impl and its hidden registration module as tokens.
 pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
     let ConcreteImplEmission {
         retained,
@@ -208,7 +217,7 @@ pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
                             let unavailable_reasons: ::std::boxed::Box<[
                                 #facade::__private::codegen_v3::descriptor::InvocationUnavailableReason
                             ]> = if adapter.is_some() {
-                                ::std::vec![] .into_boxed_slice()
+                                ::std::vec![].into_boxed_slice()
                             } else {
                                 declared_unavailable_reasons[index]
                                     .to_vec()

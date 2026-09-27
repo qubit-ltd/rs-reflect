@@ -20,6 +20,14 @@ use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
 
 /// An argument applied to a generic path segment.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::{GenericArgument, TypeExpression};
+/// let argument = GenericArgument::Type(TypeExpression::parameter("Item").expect("valid parameter"));
+/// assert!(matches!(argument, GenericArgument::Type(_)));
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GenericArgument {
     /// A type argument such as `Vec<u8>`'s `u8`.
@@ -61,6 +69,18 @@ pub struct ConstGenericArgument {
 
 impl ConstGenericArgument {
     /// Creates a typed structural const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `declared_type`: Type declared for the const generic parameter.
+    /// - `value`: Structural const expression supplied as the argument.
+    /// - `normalized_diagnostic`: Source-oriented text retained for
+    ///   diagnostics.
+    ///
+    /// # Returns
+    ///
+    /// Returns the typed const argument. Diagnostic text does not affect
+    /// identity.
     pub fn new(
         declared_type: TypeExpression,
         value: ConstExpression,
@@ -74,17 +94,31 @@ impl ConstGenericArgument {
     }
 
     /// Returns the declared const parameter type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the type declared for this const argument.
     #[must_use]
     pub fn declared_type(&self) -> &TypeExpression {
         &self.declared_type
     }
+
     /// Returns the structural const value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the const expression supplied as this argument.
     #[must_use]
     #[inline]
     pub fn value(&self) -> &ConstExpression {
         &self.value
     }
+
     /// Returns the normalized source-oriented rendering.
+    ///
+    /// # Returns
+    ///
+    /// Returns the retained diagnostic rendering.
     #[must_use]
     pub fn normalized_diagnostic(&self) -> &str {
         &self.normalized_diagnostic
@@ -112,6 +146,14 @@ impl Hash for ConstGenericArgument {
 /// Values are stored as typed data rather than source tokens.  A path can
 /// identify a named const item or parameter, but this descriptor does not
 /// attempt runtime const evaluation.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ConstExpression;
+/// let parameter = ConstExpression::parameter("COUNT").expect("valid parameter");
+/// assert!(matches!(parameter, ConstExpression::Parameter(_)));
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConstExpression {
     /// A signed integer value.
@@ -131,6 +173,14 @@ pub enum ConstExpression {
 impl ConstExpression {
     /// Creates a named const-parameter expression.
     ///
+    /// # Parameters
+    ///
+    /// - `name`: Const parameter identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns a parameter expression.
+    ///
     /// # Errors
     ///
     /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
@@ -139,6 +189,19 @@ impl ConstExpression {
     }
 
     /// Creates a qualified const-item path.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `P`: Iterable collection of path segments.
+    /// - `S`: Segment value convertible to owned text.
+    ///
+    /// # Parameters
+    ///
+    /// - `segments`: Qualified const item path.
+    ///
+    /// # Returns
+    ///
+    /// Returns a path expression.
     ///
     /// # Errors
     ///

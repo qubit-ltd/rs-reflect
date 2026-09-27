@@ -30,6 +30,16 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Emits the canonical runtime unavailability slice for one adapter plan.
+///
+/// # Parameters
+///
+/// - `plan`: Validated invocation availability plan.
+/// - `context`: Expansion context containing the runtime facade.
+///
+/// # Returns
+///
+/// Returns generated tokens for the ordered reasons, or an empty slice for
+/// executable plans.
 pub(crate) fn emit_unavailable_reasons(plan: &InvocationPlan, context: &ExpansionContext) -> TokenStream {
     debug_assert!(!plan.is_executable() || !matches!(plan.output, OutputPlan::Opaque | OutputPlan::Unsupported));
     let facade = context.facade();
@@ -79,6 +89,17 @@ pub(crate) fn emit_unavailable_reasons(plan: &InvocationPlan, context: &Expansio
 }
 
 /// Emits method-local bounds required by a thread-safe adapter.
+///
+/// # Parameters
+///
+/// - `method`: Method whose receiver, arguments and result are checked.
+/// - `target`: Concrete impl target type tokens.
+/// - `typed_owned_receiver`: Optional recognized owned receiver type.
+/// - `typed_extension_receiver`: Optional substituted extension receiver type.
+///
+/// # Returns
+///
+/// Returns generated compile-time trait assertions at the original item spans.
 pub(crate) fn thread_safe_assertions(
     method: &MethodIr,
     target: &TokenStream,
@@ -140,6 +161,17 @@ pub(crate) fn thread_safe_assertions(
 }
 
 /// Emits method-local bounds required by a panic-catching adapter.
+///
+/// # Parameters
+///
+/// - `method`: Method whose receiver, arguments and result are checked.
+/// - `target`: Concrete impl target type tokens.
+/// - `typed_owned_receiver`: Optional recognized owned receiver type.
+/// - `typed_extension_receiver`: Optional substituted extension receiver type.
+///
+/// # Returns
+///
+/// Returns generated unwind-safety assertions at the original item spans.
 pub(crate) fn catching_assertions(
     method: &MethodIr,
     target: &TokenStream,
@@ -225,6 +257,15 @@ pub(crate) fn catching_assertions(
 }
 
 /// Emits the runtime expectation for one positional parameter.
+///
+/// # Parameters
+///
+/// - `parameter`: Validated positional parameter declaration.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns an owned, shared-borrow or mutable-borrow expectation expression.
 pub(crate) fn argument_expectation(parameter: &ParameterIr, facade: &TokenStream) -> TokenStream {
     match &parameter.ty.kind {
         TypeKindIr::Reference {
@@ -245,6 +286,21 @@ pub(crate) fn argument_expectation(parameter: &ParameterIr, facade: &TokenStream
 }
 
 /// Emits extraction of one already validated positional argument.
+///
+/// # Parameters
+///
+/// - `parameter`: Validated positional parameter declaration.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `mode`: Dynamic value mode used by the generated adapter.
+///
+/// # Returns
+///
+/// Returns tokens binding the argument to its concrete Rust type.
+///
+/// # Panics
+///
+/// The generated code is unreachable if validation did not verify count, type
+/// and mode.
 pub(crate) fn argument_binding(parameter: &ParameterIr, facade: &TokenStream, mode: &TokenStream) -> TokenStream {
     let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {

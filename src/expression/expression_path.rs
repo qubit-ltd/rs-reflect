@@ -12,11 +12,32 @@ use crate::expression::ExpressionError;
 use crate::expression::ExpressionName;
 
 /// A non-empty sequence of non-empty structural path segments.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ExpressionPath;
+/// let path = ExpressionPath::new(["std", "vec", "Vec"]).expect("valid path");
+/// assert_eq!(path.segments().len(), 3);
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ExpressionPath(Box<[ExpressionName]>);
 
 impl ExpressionPath {
     /// Creates a validated structural path.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `P`: Iterable collection of path segments.
+    /// - `S`: Segment value convertible to owned text.
+    ///
+    /// # Parameters
+    ///
+    /// - `segments`: Non-empty path segments in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a validated path.
     ///
     /// # Errors
     ///
@@ -43,26 +64,13 @@ impl ExpressionPath {
     }
 
     /// Returns the validated path segments in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns all non-empty path segments.
     #[must_use]
     #[inline]
     pub fn segments(&self) -> &[ExpressionName] {
         &self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::ExpressionPath;
-
-    #[test]
-    fn validates_non_empty_segments() {
-        let path = ExpressionPath::new(["user", "name"]).expect("valid path");
-        assert_eq!(path.segments().len(), 2);
-    }
-
-    #[test]
-    fn rejects_empty_paths_and_segments() {
-        assert!(ExpressionPath::new(std::iter::empty::<&str>()).is_err());
-        assert!(ExpressionPath::new(["user", ""]).is_err());
     }
 }

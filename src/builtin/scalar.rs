@@ -24,6 +24,12 @@ use crate::descriptor::TypeDescriptor;
 
 macro_rules! reflected_primitive {
     ($type:ty, $kind:expr, $descriptor:ident, $capabilities:ident) => {
+        /// Returns the cached core capabilities for this primitive type.
+        ///
+        /// # Returns
+        ///
+        /// The shared capability result, including any stable registration
+        /// conflict.
         fn $capabilities() -> TypeCapabilitiesResult {
             static CAPABILITIES: OnceLock<Result<TypeCapabilities, CapabilityConflict>> = OnceLock::new();
             CAPABILITIES
@@ -44,6 +50,11 @@ macro_rules! reflected_primitive {
 
         impl Reflect for $type {
             /// Returns this built-in type's unique static descriptor.
+            ///
+            /// # Returns
+            ///
+            /// The immutable descriptor shared by every call for this type.
+            #[inline]
             fn type_descriptor() -> &'static TypeDescriptor {
                 &$descriptor
             }
@@ -69,6 +80,10 @@ reflected_primitive!(f32, PrimitiveKind::F32, F32_DESCRIPTOR, f32_capabilities);
 reflected_primitive!(f64, PrimitiveKind::F64, F64_DESCRIPTOR, f64_capabilities);
 
 /// Returns the core capabilities registered for the concrete `String` type.
+///
+/// # Returns
+///
+/// The cached capability result, including any stable registration conflict.
 fn string_capabilities() -> TypeCapabilitiesResult {
     static CAPABILITIES: OnceLock<Result<TypeCapabilities, CapabilityConflict>> = OnceLock::new();
     CAPABILITIES
@@ -89,6 +104,11 @@ static STRING_DESCRIPTOR: TypeDescriptor =
 
 impl Reflect for String {
     /// Returns `String`'s unique static descriptor.
+    ///
+    /// # Returns
+    ///
+    /// The immutable descriptor shared by every call for `String`.
+    #[inline]
     fn type_descriptor() -> &'static TypeDescriptor {
         &STRING_DESCRIPTOR
     }
@@ -98,6 +118,11 @@ static STR_DESCRIPTOR: TypeDescriptor = crate::__private::descriptor::text::<str
 
 impl Reflect for str {
     /// Returns `str`'s unique static descriptor.
+    ///
+    /// # Returns
+    ///
+    /// The immutable descriptor shared by every call for `str`.
+    #[inline]
     fn type_descriptor() -> &'static TypeDescriptor {
         &STR_DESCRIPTOR
     }

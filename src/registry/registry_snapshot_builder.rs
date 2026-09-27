@@ -62,6 +62,15 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one concrete reflected type as a snapshot member.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: The concrete reflected type to add as a snapshot member.
+    /// - `source`: Identity assigned to the type fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_type(&mut self, descriptor: &'static TypeDescriptor, source: FragmentIdentity) -> &mut Self {
         self.push(FragmentPayload::Type(descriptor), source)
     }
@@ -96,6 +105,15 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one source-level generic type declaration as a snapshot member.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Generic type declaration to add.
+    /// - `source`: Identity assigned to the definition fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_definition(
         &mut self,
         descriptor: &'static TypeDefinitionDescriptor,
@@ -105,11 +123,29 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one reflected or external trait declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Trait declaration to add.
+    /// - `source`: Identity assigned to the trait fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_trait(&mut self, descriptor: &'static TraitDefinitionDescriptor, source: FragmentIdentity) -> &mut Self {
         self.push(FragmentPayload::Trait(descriptor), source)
     }
 
     /// Adds one generic, blanket, constrained, or concrete impl declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Impl definition to add.
+    /// - `source`: Identity assigned to the impl-definition fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_impl_definition(
         &mut self,
         descriptor: &'static ImplDefinitionDescriptor,
@@ -119,12 +155,31 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Adds one concrete impl application without implicitly adding its type.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete impl application to add.
+    /// - `source`: Identity assigned to the impl fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_impl(&mut self, descriptor: &'static ImplDescriptor, source: FragmentIdentity) -> &mut Self {
         self.push(FragmentPayload::Impl(descriptor), source)
     }
 
     /// Adds capabilities for a concrete type without adding the type as a
     /// snapshot member.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Concrete type receiving the capabilities.
+    /// - `capabilities`: Typed capability descriptors to register.
+    /// - `source`: Identity assigned to the capability fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_type_capabilities(
         &mut self,
         target: &'static TypeDescriptor,
@@ -139,6 +194,16 @@ impl RegistrySnapshotBuilder {
 
     /// Adds capabilities for a generic declaration without adding the
     /// declaration as a snapshot member.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Generic declaration receiving the capabilities.
+    /// - `capabilities`: Typed capability descriptors to register.
+    /// - `source`: Identity assigned to the capability fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
     pub fn add_definition_capabilities(
         &mut self,
         target: &'static TypeDefinitionDescriptor,

@@ -585,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_probes_use_generic_environment_bounds_without_concrete_inspection() {
+    fn test_semantic_probes_use_generic_environment_bounds_without_concrete_inspection() {
         assert!(unresolved_descriptor::<u8>().is_none());
         assert!(proven_descriptor::<u8>().is_some());
     }

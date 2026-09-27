@@ -11,6 +11,7 @@
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
+use syn::Index;
 
 use crate::ir::FieldShapeIr;
 use crate::ir::HelperName;
@@ -21,6 +22,15 @@ use crate::ir::VariantIr;
 use crate::ir::VariantKindIr;
 
 /// Emits generated local construction and update adapters for one struct.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated struct declaration and helper attributes.
+/// - `facade`: Runtime crate path used in generated references.
+///
+/// # Returns
+///
+/// Returns generated local adapters and any requested thread-safe adapters.
 pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let local = struct_mode_adapters(declaration, facade, false);
     let thread_safe = declaration
@@ -31,6 +41,18 @@ pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStr
     quote!(#local #thread_safe)
 }
 
+/// Emits one mode-specific constructor and updater implementation.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated struct declaration.
+/// - `facade`: Runtime crate path used in generated references.
+/// - `thread_safe`: Whether adapters use the thread-safe dynamic mode.
+///
+/// # Returns
+///
+/// Returns generated items for the selected dynamic mode, or an empty stream
+/// for non-structs.
 fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
@@ -67,7 +89,7 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         })
     });
     let construction_fields = fields.iter().map(|field| {
-        let index = syn::Index::from(field.index);
+        let index = Index::from(field.index);
         let default = field.attributes.iter().any(|attribute| attribute.name == HelperName::Default);
         let restricted = field.attributes.iter().any(|attribute| {
             matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
@@ -88,7 +110,7 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         }
     });
     let update_fields = fields.iter().map(|field| {
-        let index = syn::Index::from(field.index);
+        let index = Index::from(field.index);
         if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
             quote!(#facade::__private::codegen_v3::construct::UpdateField::unavailable(
                 &descriptor.fields()[#index], #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::UpdateForbidden,
@@ -122,7 +144,7 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         let target = match &field.name {
             Some(name) => quote!(#name),
             None => {
-                let index = syn::Index::from(index);
+                let index = Index::from(index);
                 quote!(#index)
             }
         };
@@ -183,6 +205,15 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
 
 /// Returns the descriptor expression linking a struct to its generated entry
 /// points.
+///
+/// # Parameters
+///
+/// - `declaration`: Struct declaration whose adapters were generated.
+/// - `facade`: Runtime crate path used in the descriptor expression.
+///
+/// # Returns
+///
+/// Returns the generated construction descriptor expression.
 pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let thread_safe = declaration
         .attributes
@@ -202,6 +233,16 @@ pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenS
 
 /// Emits a local constructor and its descriptor attachment for one enum
 /// variant.
+///
+/// # Parameters
+///
+/// - `variant`: Validated enum variant declaration.
+/// - `facade`: Runtime crate path used in generated references.
+/// - `thread_safe`: Whether thread-safe adapters should also be generated.
+///
+/// # Returns
+///
+/// Returns generated local and optional thread-safe variant adapters.
 pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     let local = variant_adapters_for_mode(variant, facade, false);
     let thread_safe_adapters = thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
@@ -209,6 +250,17 @@ pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream, thread
 }
 
 /// Emits one mode-specific enum variant constructor.
+///
+/// # Parameters
+///
+/// - `variant`: Validated enum variant declaration.
+/// - `facade`: Runtime crate path used in generated references.
+/// - `thread_safe`: Whether generated values use the thread-safe mode.
+///
+/// # Returns
+///
+/// Returns generated items, or an empty stream when construction is disabled
+/// for the variant.
 fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes
@@ -255,7 +307,7 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
     });
     let fields = variant.fields.iter();
     let policies = fields.clone().map(|field| {
-        let index = syn::Index::from(field.index);
+        let index = Index::from(field.index);
         let default = field.attributes.iter().any(|attribute| attribute.name == HelperName::Default);
         let restricted = field.attributes.iter().any(|attribute| {
             matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
@@ -319,6 +371,17 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
 }
 
 /// Returns an optional descriptor attachment for one variant.
+///
+/// # Parameters
+///
+/// - `variant`: Validated enum variant declaration.
+/// - `facade`: Runtime crate path used in the descriptor expression.
+/// - `thread_safe`: Whether a thread-safe constructor is also available.
+///
+/// # Returns
+///
+/// Returns generated descriptor tokens, or an empty stream when construction is
+/// disabled.
 pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes

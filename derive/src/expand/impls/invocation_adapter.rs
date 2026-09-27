@@ -21,6 +21,19 @@ use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
 /// Generates one executable invocation adapter for a concrete impl method.
+///
+/// # Parameters
+///
+/// - `method`: Validated implementation method declaration.
+/// - `index`: Method's declaration index.
+/// - `target`: Concrete impl target type tokens.
+/// - `trait_call_path`: Optional trait path used for qualified calls.
+/// - `target_source`: Normalized target spelling used in member identity.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns generated adapter tokens when the method is executable, or `None`.
 pub(super) fn definition(
     method: &MethodIr,
     index: usize,
@@ -34,6 +47,22 @@ pub(super) fn definition(
 
 /// Generates an adapter for a concrete method specialization through the same
 /// analyzer and emitter used by ordinary methods.
+///
+/// # Parameters
+///
+/// - `method`: Validated implementation method declaration.
+/// - `method_index`: Method's declaration index.
+/// - `specialization`: Specialization index and concrete generic argument
+///   tokens.
+/// - `target`: Concrete impl target type tokens.
+/// - `trait_call_path`: Optional trait path used for qualified calls.
+/// - `target_source`: Normalized target spelling used in member identity.
+/// - `facade`: Runtime facade path used in generated references.
+///
+/// # Returns
+///
+/// Returns generated adapter tokens when the specialization is executable, or
+/// `None`.
 pub(super) fn specialization_definition(
     method: &MethodIr,
     method_index: usize,
@@ -58,10 +87,35 @@ pub(super) fn specialization_definition(
 
 /// Returns the static descriptor name shared by specialization emission and
 /// registration.
+///
+/// # Parameters
+///
+/// - `method_index`: Method's declaration index.
+/// - `specialization_index`: Specialization's index for that method.
+///
+/// # Returns
+///
+/// Returns the stable static identifier used by both code generation phases.
 pub(super) fn specialization_descriptor_name(method_index: usize, specialization_index: usize) -> Ident {
     format_ident!("__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}")
 }
 
+/// Builds one mode-specific adapter after analyzing its invocation contract.
+///
+/// # Parameters
+///
+/// - `method`: Validated implementation method declaration.
+/// - `index`: Method's declaration index.
+/// - `target`: Concrete impl target type tokens.
+/// - `trait_call_path`: Optional trait path used for qualified calls.
+/// - `target_source`: Normalized target spelling used in member identity.
+/// - `facade`: Runtime facade path used in generated references.
+/// - `generic_arguments`: Concrete generic arguments for a specialization.
+/// - `specialization_index`: Optional specialization index.
+///
+/// # Returns
+///
+/// Returns generated adapter tokens when executable, or `None` when blocked.
 #[allow(clippy::too_many_arguments)]
 fn definition_for_call(
     method: &MethodIr,

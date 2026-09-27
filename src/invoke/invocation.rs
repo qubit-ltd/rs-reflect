@@ -60,6 +60,14 @@ struct BindingRecovery {
 
 impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// Creates an associated-function invocation without a receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Positional arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation containing those arguments.
     pub fn associated<I>(arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -83,6 +91,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Creates an invocation with an owned receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Dynamic receiver value consumed by the invocation.
+    /// - `arguments`: Positional arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation containing the receiver and arguments.
     pub fn owned<I>(receiver: DynamicOwned<M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -91,6 +108,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Creates an invocation with a shared borrowed receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Dynamic shared receiver borrowed for the call lifetime.
+    /// - `arguments`: Positional arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation containing the receiver and arguments.
     pub fn borrowed<I>(receiver: DynamicRef<'call, M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -99,6 +125,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Creates an invocation with a mutable borrowed receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Dynamic mutable receiver borrowed for the call lifetime.
+    /// - `arguments`: Positional arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation containing the receiver and arguments.
     pub fn borrowed_mut<I>(receiver: DynamicMut<'call, M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -107,6 +142,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Creates an invocation from an optional explicit receiver and arguments.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Explicit receiver, or `None` for an associated function.
+    /// - `arguments`: Positional arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation containing the supplied inputs.
     pub fn new<I>(receiver: Option<InvocationReceiver<'call, M>>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,

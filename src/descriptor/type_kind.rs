@@ -10,6 +10,14 @@
 //! Stable, hierarchical categories for reflected Rust types.
 
 /// A Rust primitive represented by a root descriptor.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::PrimitiveKind;
+/// let kind = PrimitiveKind::Bool;
+/// assert_eq!(kind, PrimitiveKind::Bool);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrimitiveKind {
     /// `bool`.
@@ -47,6 +55,14 @@ pub enum PrimitiveKind {
 }
 
 /// A UTF-8 text representation.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TextKind;
+/// let text = TextKind::String;
+/// assert_eq!(text, TextKind::String);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TextKind {
     /// An owned [`String`].
@@ -56,6 +72,14 @@ pub enum TextKind {
 }
 
 /// The declared shape of a Rust struct.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::StructKind;
+/// let shape = StructKind::Newtype;
+/// assert_eq!(shape, StructKind::Newtype);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum StructKind {
     /// A struct with named fields.
@@ -69,6 +93,14 @@ pub enum StructKind {
 }
 
 /// A standard smart-pointer family.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::SmartPointerKind;
+/// let pointer = SmartPointerKind::Box;
+/// assert_eq!(pointer, SmartPointerKind::Box);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SmartPointerKind {
     /// [`Box<T>`](Box).
@@ -80,6 +112,14 @@ pub enum SmartPointerKind {
 }
 
 /// The borrowing mode of a reference.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ReferenceKind;
+/// let reference = ReferenceKind::Shared;
+/// assert_eq!(reference, ReferenceKind::Shared);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ReferenceKind {
     /// A shared reference.
@@ -89,6 +129,14 @@ pub enum ReferenceKind {
 }
 
 /// The mutability of a raw pointer.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::Mutability;
+/// let mutability = Mutability::Const;
+/// assert_eq!(mutability, Mutability::Const);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Mutability {
     /// A const raw pointer.
@@ -98,6 +146,14 @@ pub enum Mutability {
 }
 
 /// The safety qualifier of a function pointer.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::FunctionPointerKind;
+/// let kind = FunctionPointerKind::Safe;
+/// assert_eq!(kind, FunctionPointerKind::Safe);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FunctionPointerKind {
     /// A safe function pointer.
@@ -107,6 +163,14 @@ pub enum FunctionPointerKind {
 }
 
 /// The stable top-level category of a reflected Rust type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::{PrimitiveKind, TypeKind};
+/// let kind = TypeKind::Primitive(PrimitiveKind::Bool);
+/// assert!(matches!(kind, TypeKind::Primitive(PrimitiveKind::Bool)));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeKind {
     /// A scalar primitive.

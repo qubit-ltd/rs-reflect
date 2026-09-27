@@ -48,6 +48,10 @@ pub struct DynamicMut<'a, M: Mode> {
 
 impl<'a> DynamicMut<'a, Local> {
     /// Returns the exact identity of the mutably borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
     #[must_use]
     pub fn value_type_id(&self) -> std::any::TypeId {
         self.as_any()
@@ -62,6 +66,18 @@ impl<'a> DynamicMut<'a, Local> {
     }
 
     /// Wraps a sized `'static` value as a local mutable dynamic borrow.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Sized, `'static` value type to borrow.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Exclusive borrow to erase.
+    ///
+    /// # Returns
+    ///
+    /// Returns a local dynamic wrapper for `value`.
     pub fn new<T: Sized + 'static>(value: &'a mut T) -> Self {
         Self {
             storage: LocalMutStorage::Any(value),
@@ -73,6 +89,14 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// The resulting value is not `Any`-compatible; use [`Self::as_str_mut`]
     /// to access the original borrow.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Mutable string slice to borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a local dynamic wrapper using the dedicated string variant.
     pub fn new_str_mut(value: &'a mut str) -> Self {
         Self {
             storage: LocalMutStorage::Str(value),
@@ -83,6 +107,14 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type to compare with the stored value.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether the stored `Any` value has exactly type `T`.
     #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
@@ -91,6 +123,10 @@ impl<'a> DynamicMut<'a, Local> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type requested for the shared borrow.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
@@ -126,6 +162,10 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns the untouched wrapper when the type differs or it contains the
     /// dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type requested by the caller.
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
@@ -235,6 +275,10 @@ impl<'a> DynamicMut<'a, Local> {
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the exact identity of the mutably borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
     #[must_use]
     pub fn value_type_id(&self) -> std::any::TypeId {
         self.as_any()
@@ -250,6 +294,18 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
 
     /// Wraps a sized, `'static`, `Send`, and `Sync` value as a thread-safe
     /// mutable borrow.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Sized, `'static`, `Send + Sync` value type to borrow.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Exclusive borrow to erase.
+    ///
+    /// # Returns
+    ///
+    /// Returns a thread-safe dynamic wrapper for `value`.
     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
         Self {
             storage: ThreadSafeMutStorage::Any(value),
@@ -261,6 +317,15 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// The resulting value is not `Any`-compatible; use [`Self::as_str_mut`]
     /// to access the original borrow.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Mutable string slice to borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a thread-safe dynamic wrapper using the dedicated string
+    /// variant.
     pub fn new_str_mut(value: &'a mut str) -> Self {
         Self {
             storage: ThreadSafeMutStorage::Str(value),
@@ -271,6 +336,14 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns whether the stored `Any` value has the exact type `T`.
     ///
     /// Returns `false` for the dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type to compare with the stored value.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether the stored `Any` value has exactly type `T`.
     #[must_use]
     pub fn is<T: 'static>(&self) -> bool {
         self.as_any().is_some_and(|value| value.is::<T>())
@@ -279,6 +352,10 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// Returns the stored `Any` value as `T` when its exact type matches.
     ///
     /// Returns `None` for a type mismatch or the dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type requested for the shared borrow.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
@@ -313,6 +390,10 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns the untouched wrapper when the type differs or it contains the
     /// dedicated `str` variant.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete type requested by the caller.
     pub fn downcast<T: 'static>(self) -> Result<&'a mut T, Self> {
         let Self { storage, marker } = self;
         match storage {
@@ -422,6 +503,10 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
 
     /// Downgrades this thread-safe mutable borrow to the local mode without
     /// changing it.
+    ///
+    /// # Returns
+    ///
+    /// Returns the same exclusive borrow in local mode.
     #[must_use]
     pub fn into_local(self) -> DynamicMut<'a, Local> {
         let Self { storage, .. } = self;

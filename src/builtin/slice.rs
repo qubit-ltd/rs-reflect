@@ -8,16 +8,22 @@
 
 //! Reflection descriptors for unsized slice types.
 
+use std::any::type_name;
+
 use crate::builtin::interner;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
 
 impl<T: Reflect> Reflect for [T] {
     /// Returns the interned descriptor for this slice specialization.
+    ///
+    /// # Returns
+    ///
+    /// The shared descriptor with a deferred relationship to the element type.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_slice_lazy::<Self>(
-                std::any::type_name::<Self>(),
+                type_name::<Self>(),
                 crate::__private::descriptor::lazy_type_ref::<T>(),
             )
         })

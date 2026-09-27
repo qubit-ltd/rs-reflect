@@ -49,7 +49,13 @@ pub enum TypeRef {
 
 impl TypeRef {
     /// Returns the exact identity for a concrete reference.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-local Rust `TypeId` for resolved and opaque types,
+    /// or `None` for symbolic expressions.
     #[must_use]
+    #[inline]
     pub fn concrete_type_id(&self) -> Option<TypeId> {
         match self {
             Self::Resolved(value) => Some(value.type_id()),

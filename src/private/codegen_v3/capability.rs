@@ -29,6 +29,24 @@ pub use crate::capability::sync_descriptor;
 #[doc(hidden)]
 type CapabilityCell = std::sync::OnceLock<Result<TypeCapabilities, crate::capability::CapabilityConflict>>;
 
+/// Interns one concrete type's validated capability set for the process
+/// lifetime.
+///
+/// # Type Parameters
+///
+/// - `T`: The exact target type whose capability set is cached.
+///
+/// # Parameters
+///
+/// - `build`: Factory that validates and constructs the immutable set.
+///
+/// # Returns
+///
+/// Returns the shared capability set, or the cached validation error.
+///
+/// # Panics
+///
+/// Propagates a panic from `build`; the cell remains available for retry.
 #[doc(hidden)]
 pub fn intern_capabilities<T: ?Sized + 'static>(
     build: fn() -> Result<TypeCapabilities, crate::capability::CapabilityConflict>,
