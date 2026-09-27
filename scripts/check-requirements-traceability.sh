@@ -83,8 +83,8 @@ done
 # paths remain descriptive evidence and are intentionally out of scope here.
 for traceability in "${traceability_documents[@]}"; do
     paths="$TEMP_CHECK/$(basename "$traceability").paths"
-    rg -o '`[^`]+`' "$traceability" | sed 's/^`//;s/`$//' \
-        | rg '^(src|derive|tests|test-crates|scripts|project-ci-check)' \
+    grep -oE '`[^`]+`' "$traceability" | sed 's/^`//;s/`$//' \
+        | grep -E '^(src|derive|tests|test-crates|scripts|project-ci-check)' \
         | sort -u > "$paths" || :
     while IFS= read -r trace_path; do
         if [ ! -e "$trace_path" ]; then
@@ -94,13 +94,13 @@ for traceability in "${traceability_documents[@]}"; do
     done < "$paths"
 done
 
-rg -q '^\| REQ-SYS-008 .*scripts/check-markdown-examples\.sh' \
+grep -Eq '^\| REQ-SYS-008 .*scripts/check-markdown-examples\.sh' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
-rg -q '^\| REQ-ERR-00[1-3] .*tests/ui' \
+grep -Eq '^\| REQ-ERR-00[1-3] .*tests/ui' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
-rg -q '^\| REQ-GEN-006 .*tests/descriptor/builtin_tests\.rs' \
+grep -Eq '^\| REQ-GEN-006 .*tests/descriptor/builtin_tests\.rs' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
-rg -q '^\| REQ-ACCPT-010 .*model_facade' \
+grep -Eq '^\| REQ-ACCPT-010 .*model_facade' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
 
 echo "Requirements and traceability documents are aligned."
