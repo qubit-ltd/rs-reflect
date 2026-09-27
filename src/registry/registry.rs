@@ -552,9 +552,11 @@ impl ReflectRegistry {
 
     /// Returns the effective capabilities of one generic declaration.
     ///
-    /// Returns `None` when the declaration is unknown to this snapshot. An
-    /// empty capability set means the declaration is registered but has no
-    /// effective capabilities.
+    /// Returns `None` when the ID has neither definition membership nor
+    /// capability facts. A capability-only target returns its effective facts
+    /// even though [`Self::definition`] returns `None`; an empty capability
+    /// set means the definition is a snapshot member with no effective facts.
+    /// Use [`Self::definition`] when membership must be checked.
     #[must_use]
     pub fn definition_capabilities(&self, id: TypeDefinitionId) -> Option<&TypeCapabilities> {
         self.indexes.capabilities_by_definition.get(&id).or_else(|| {

@@ -472,11 +472,16 @@ when the adapter type differs, and orders results by their source fragment.
 For an optional metadata registration audit, query
 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
 
-For generic declarations, `definition_capabilities(id)` returns `None` when
-the declaration is unknown, `Some(empty)` when it is registered without
-capabilities, and `Some(nonempty)` when effective capabilities exist. The
-convenience lookup methods keep their `Option` or `Result<Option<_>>` results
-and report a missing capability for an unknown declaration.
+For generic declarations, `definition_capabilities(id)` reports capability
+facts independently from definition membership. It returns `None` when the
+snapshot has neither the definition nor capability facts for that ID,
+`Some(empty)` for a definition member without capabilities, and
+`Some(nonempty)` when capability facts exist. The last case also includes a
+capability-only target: `definition_capabilities(id)` can return facts while
+`definition(id)` is `None`. Use `definition(id).is_some()` to check snapshot
+membership. Typed and textual convenience lookups can read capabilities from
+capability-only targets; they report a missing capability for IDs with no
+matching facts.
 
 Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
 `methods_named_in` when a property or method query must use that exact set of
