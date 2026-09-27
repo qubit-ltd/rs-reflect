@@ -8,6 +8,7 @@ license = "Apache-2.0"
 repository = "https://github.com/qubit-ltd/rs-reflect"
 description = "Procedural macros for qubit-reflect"
 homepage = "https://github.com/qubit-ltd/rs-reflect"
+readme = "README.md"
 keywords = ["reflection", "metadata", "derive", "macro", "qubit"]
 categories = ["development-tools"]
 
