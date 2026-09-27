@@ -6,6 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+//! Tests that manual, built-in, and derived descriptors match their Rust types.
+
 use std::any::TypeId;
 
 use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
@@ -33,12 +35,12 @@ struct Derived;
 
 #[test]
 #[should_panic(expected = "Reflect descriptor type mismatch")]
-fn wrong_manual_descriptor_is_rejected() {
+fn test_wrong_manual_descriptor_is_rejected() {
     let _ = TypeDescriptor::of::<Wrong>();
 }
 
 #[test]
-fn manual_builtin_and_derived_descriptors_match_their_types() {
+fn test_manual_builtin_and_derived_descriptors_match_their_types() {
     assert_eq!(TypeDescriptor::of::<Right>().type_id(), TypeId::of::<Right>());
     assert_eq!(TypeDescriptor::of::<u32>().type_id(), TypeId::of::<u32>());
     #[cfg(feature = "derive")]

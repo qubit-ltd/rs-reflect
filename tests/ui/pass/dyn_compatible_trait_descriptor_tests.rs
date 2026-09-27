@@ -9,6 +9,8 @@
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::reflect;
 
+use self::dependency as renamed_dependency;
+
 #[reflect]
 trait Service {
     fn value(&self) -> usize;
@@ -64,8 +66,6 @@ mod dependency {
         fn dependency_parent(&self) -> usize;
     }
 }
-
-use dependency as renamed_dependency;
 
 #[reflect(
     supertrait(renamed_dependency::DependencyParent),

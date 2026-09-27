@@ -16,6 +16,11 @@ use qubit_reflect::reflect;
 use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
+use self::path_traits::__qubit_reflect_trait_definition_CrateQualifiedTrait;
+use self::path_traits::__qubit_reflect_trait_definition_ImportedAliasTrait;
+use self::path_traits::__qubit_reflect_trait_definition_RelativeQualifiedTrait;
+use self::path_traits::ImportedAliasTrait as ReflectedAlias;
+
 pub(crate) mod path_traits {
     use qubit_reflect::reflect;
 
@@ -55,10 +60,6 @@ struct RelativeQualifiedTarget<T>(PhantomData<T>);
 struct SelfQualifiedTarget<T>(PhantomData<T>);
 struct ImportedAliasTarget<T>(PhantomData<T>);
 
-use self::path_traits::__qubit_reflect_trait_definition_CrateQualifiedTrait;
-use self::path_traits::__qubit_reflect_trait_definition_ImportedAliasTrait;
-use self::path_traits::__qubit_reflect_trait_definition_RelativeQualifiedTrait;
-
 #[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_CrateQualifiedTrait)]
 impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait for CrateQualifiedTarget<T> {
     /// Returns the crate-qualified fixture value.
@@ -82,8 +83,6 @@ impl<T> self::SelfQualifiedTrait for SelfQualifiedTarget<T> {
         3
     }
 }
-
-use self::path_traits::ImportedAliasTrait as ReflectedAlias;
 
 #[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_ImportedAliasTrait)]
 impl<T> ReflectedAlias for ImportedAliasTarget<T> {

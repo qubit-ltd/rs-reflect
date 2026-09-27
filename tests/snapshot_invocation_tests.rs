@@ -195,7 +195,10 @@ fn test_owned_output_and_local_future_outlive_the_selected_registry() {
         let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read") else {
             panic!("generated method")
         };
-        method.invoke_local(&registry, invocation()).unwrap().unwrap()
+        method
+            .invoke_local(&registry, invocation())
+            .expect("static adapter exists")
+            .expect("snapshot receiver capability must be selected")
     };
     let InvocationOutput::Owned(value) = output else {
         panic!("owned output")
@@ -207,7 +210,10 @@ fn test_owned_output_and_local_future_outlive_the_selected_registry() {
         else {
             panic!("generated async method")
         };
-        method.invoke_local(&registry, invocation()).unwrap().unwrap()
+        method
+            .invoke_local(&registry, invocation())
+            .expect("static async adapter exists")
+            .expect("snapshot receiver capability must be selected")
     };
     let InvocationOutput::Future(future) = output else {
         panic!("local future")
@@ -241,7 +247,7 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
             capability.into_iter().collect(),
             FragmentIdentity::new("snapshot-call-test", "wrong", 1, 1, "capability", 1),
         );
-        let registry = builder.build().unwrap();
+        let registry = builder.build().expect("capability snapshot should be valid");
         let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>().methods_named_in(&registry, "read_inputs")
         else {
             panic!("generated method")
@@ -255,7 +261,10 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
                 InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
             ],
         );
-        let failure = method.invoke_local(&registry, invocation).unwrap().err().unwrap();
+        let failure = method
+            .invoke_local(&registry, invocation)
+            .expect("static adapter exists")
+            .expect_err("missing dynamic receiver capability must fail");
         assert!(matches!(
             failure.error().kind(),
             InvocationErrorKind::ReceiverAdapterUnavailable { .. }

@@ -35,7 +35,9 @@ fn descriptor(index: u8) -> &'static TypeDescriptor {
 
 /// Creates one of eight static adapter keys.
 fn key(index: u8) -> CapabilityKey<u32> {
-    CapabilityKey::new(CapabilityId::new(IDS[usize::from(index) % IDS.len()]).unwrap())
+    CapabilityKey::new(
+        CapabilityId::new(IDS[usize::from(index) % IDS.len()]).expect("fixture capability ID must be valid"),
+    )
 }
 
 /// Creates one of sixteen fixed source identities.
@@ -80,7 +82,12 @@ fn observations(registry: &ReflectRegistry) -> Vec<(bool, Vec<Option<u32>>)> {
             (
                 registry.get(target.type_id()).is_some(),
                 (0..8)
-                    .map(|id| registry.capability(target, key(id)).unwrap().copied())
+                    .map(|id| {
+                        registry
+                            .capability(target, key(id))
+                            .expect("fixture capability contract must match")
+                            .copied()
+                    })
                     .collect(),
             )
         })
@@ -111,7 +118,7 @@ pub fn check(unbounded: &[u8]) {
             vec![CapabilityDescriptor::with_adapter(key(0), value)],
             source(0),
         );
-        builder.build().unwrap()
+        builder.build().expect("isolated fixture snapshot must be valid")
     };
     let first = isolated(value);
     let second = isolated(value + 1);
@@ -133,6 +140,16 @@ pub fn check(unbounded: &[u8]) {
     }
     assert!(conflicting.build().is_err());
     assert_eq!(observations(&first), before);
-    assert_eq!(first.capability(descriptor(0), key(0)).unwrap(), Some(&value));
-    assert_eq!(second.capability(descriptor(0), key(0)).unwrap(), Some(&(value + 1)));
+    assert_eq!(
+        first
+            .capability(descriptor(0), key(0))
+            .expect("first snapshot capability contract must match"),
+        Some(&value)
+    );
+    assert_eq!(
+        second
+            .capability(descriptor(0), key(0))
+            .expect("second snapshot capability contract must match"),
+        Some(&(value + 1))
+    );
 }

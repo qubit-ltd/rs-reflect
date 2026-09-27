@@ -34,7 +34,7 @@ fn test_empty_named_constructs_as_named() {
     assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
     let output = descriptor
         .construct_struct(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()))
-        .unwrap();
+        .expect("empty named struct construction should succeed");
     assert!(output.downcast::<EmptyNamed>().is_ok());
 }
 
@@ -64,9 +64,9 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
     ];
     let constructor = descriptor
         .struct_construction()
-        .unwrap()
+        .expect("empty struct descriptor should expose construction")
         .thread_safe_constructor()
-        .unwrap();
+        .expect("empty struct should have a thread-safe constructor");
     let threaded = [
         constructor.construct_unit(),
         constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(
@@ -92,14 +92,14 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
         if actual == expected {
             let updated = descriptor
                 .struct_construction()
-                .unwrap()
+                .expect("empty struct descriptor should expose construction")
                 .local_updater()
-                .unwrap()
+                .expect("empty struct should have a local updater")
                 .update(StructUpdateInput::new(
-                    result.unwrap(),
+                    result.expect("matching local construction shape should succeed"),
                     NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()),
                 ))
-                .unwrap();
+                .expect("updating an empty struct with no fields should succeed");
             assert!(updated.downcast::<T>().is_ok());
         } else {
             let Err(failure) = result else {
@@ -113,7 +113,12 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
     }
     for (actual, result) in shapes.into_iter().zip(threaded) {
         if actual == expected {
-            assert!(result.unwrap().downcast::<T>().is_ok());
+            assert!(
+                result
+                    .expect("matching thread-safe construction shape should succeed")
+                    .downcast::<T>()
+                    .is_ok()
+            );
         } else {
             let Err(failure) = result else {
                 panic!("wrong thread-safe shape must fail")
@@ -144,23 +149,30 @@ fn assert_generic_shape<T: Reflect, U: Reflect>(kind: StructKind) {
     assert_eq!(
         first
             .generic_arguments()
-            .unwrap()
+            .expect("generic type should expose its const argument")
             .const_argument_value(0)
-            .unwrap()
+            .expect("first generic argument should be the const parameter")
             .downcast_ref::<usize>(),
         Some(&1)
     );
     assert_eq!(
         second
             .generic_arguments()
-            .unwrap()
+            .expect("generic type should expose its const argument")
             .const_argument_value(0)
-            .unwrap()
+            .expect("first generic argument should be the const parameter")
             .downcast_ref::<usize>(),
         Some(&2)
     );
-    let definition = first.type_definition().unwrap();
-    assert!(std::ptr::eq(definition, second.type_definition().unwrap()));
+    let definition = first
+        .type_definition()
+        .expect("generic struct should have a shared type definition");
+    assert!(std::ptr::eq(
+        definition,
+        second
+            .type_definition()
+            .expect("second const instance should share the type definition")
+    ));
     let TypeDefinitionData::Struct { kind: actual, fields } = definition.data() else {
         panic!("struct definition")
     };

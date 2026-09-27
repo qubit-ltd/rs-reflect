@@ -142,7 +142,11 @@ fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
     };
     let (receiver, arguments) = validated.into_parts();
     assert!(std::ptr::eq(receiver.get_ref(), &value));
-    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+    let InvocationArg::Owned(argument) = arguments
+        .into_vec()
+        .pop()
+        .expect("the validated invocation retains its one owned argument")
+    else {
         panic!("owned input")
     };
     assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 43);
@@ -164,7 +168,11 @@ fn test_pinned_failures_can_split_diagnostics_and_retry_original_values() {
     };
     let (mut receiver, arguments) = validated.into_parts();
     *receiver.as_mut().get_mut() = 53;
-    let InvocationArg::Owned(argument) = arguments.into_vec().pop().unwrap() else {
+    let InvocationArg::Owned(argument) = arguments
+        .into_vec()
+        .pop()
+        .expect("the validated mutable invocation retains its one owned argument")
+    else {
         panic!("owned input")
     };
     assert_eq!(argument.downcast::<u16>().unwrap_or_else(|_| panic!("exact type")), 47);

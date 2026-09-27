@@ -221,7 +221,7 @@ fn test_generic_enum_definition_exposes_source_structure() {
     assert!(
         registry
             .definition_capability(missing, definition_key())
-            .unwrap()
+            .expect("missing definition capability lookup is valid")
             .is_none()
     );
     assert!(
