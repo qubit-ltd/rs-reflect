@@ -2,11 +2,6 @@ format = 1
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/invoke/pinned.rs"
-reason = "Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/private/descriptor.rs"
 reason = "Generated-code probes and descriptor factories form one hidden macro protocol."
 
@@ -52,11 +47,6 @@ reason = "Owned, shared, and mutable storage for local and thread-safe modes for
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/expression/type_expression.rs"
-reason = "These public nodes are the recursive grammar variants of one parser-independent Rust type expression model."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/expression/generic_argument.rs"
 reason = "Generic arguments and const-expression nodes form one recursive grammar used to represent generic instantiations."
 
@@ -92,33 +82,13 @@ reason = "Field-set failure metadata and retained recovery values form one owner
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/invoke/invocation.rs"
-reason = "Invocation, receiver adaptation, and validated invocation are consecutive states in the same call protocol."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/invoke/recovery.rs"
-reason = "InvocationFailure describes the cause retained by InvocationRecovery, so the pair is one recovery contract."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/invoke/receiver.rs"
 reason = "Receiver expectations and adapters jointly validate and adapt the receiver before invoking a method."
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/invoke/error.rs"
-reason = "InvocationError and InvocationPanic preserve structured kind and panic payload details for one call failure."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/invoke/future.rs"
 reason = "InvocationMode selects the execution contract represented by ReflectedFuture."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/invoke/argument.rs"
-reason = "Argument modes, bindings, and expectations jointly describe input validation and adaptation for one invocation."
 
 [[exceptions]]
 rule = "multiple-public-types"
@@ -129,23 +99,3 @@ reason = "BorrowOrigin and InvocationOutput jointly retain the source lifetime c
 rule = "multiple-public-types"
 path = "src/registry/fragment.rs"
 reason = "Identity, target, payload, and kind types form the closed registration-fragment protocol consumed by aggregation."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/method_descriptor/instance.rs"
-reason = "Method implementation source, built instance, and build error share one declaration-to-runtime linking contract."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/method_descriptor/signature.rs"
-reason = "Parameter, receiver, return, visibility, and qualifier records are the coordinated parts of one method signature."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/method_descriptor/invocation_adapter.rs"
-reason = "Adapter availability and unavailability reasons jointly explain whether one reflected method can be invoked."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/impl_descriptor.rs"
-reason = "Impl kinds, associated bindings, method lookup, and builders form one linked implementation-descriptor object model."
