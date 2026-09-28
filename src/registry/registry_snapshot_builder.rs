@@ -19,7 +19,7 @@ use crate::identity::FragmentIdentity;
 use crate::registry::fragment::CapabilityRegistration;
 use crate::registry::fragment::FragmentPayload;
 use crate::registry::internal::MaterializedFragment;
-use crate::registry::registry::ReflectRegistry;
+use crate::registry::reflect_registry::ReflectRegistry;
 
 /// Collects typed reflection facts for one isolated registry snapshot.
 ///
