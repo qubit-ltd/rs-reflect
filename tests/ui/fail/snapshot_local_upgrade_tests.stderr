@@ -9,7 +9,7 @@ error[E0308]: mismatched types
    = note: expected struct `Invocation<'_, ThreadSafe>`
               found struct `Invocation<'_, Local>`
 note: method defined here
-  --> src/descriptor/method_descriptor/instance.rs
+  --> src/descriptor/method_descriptor/instance/method_instance_descriptor.rs
    |
    |     pub fn invoke_thread_safe<'call>(
    |            ^^^^^^^^^^^^^^^^^^
