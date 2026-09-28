@@ -10,7 +10,7 @@ note: required by a bound in `__qubit_reflect_assert_send_sync`
    |
 17 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_send_sync`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
   --> tests/ui/fail/thread_safe_mutable_parameter_not_send_sync_tests.rs:20:24
@@ -24,4 +24,4 @@ note: required by a bound in `__qubit_reflect_assert_send_sync`
    |
 17 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_send_sync`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

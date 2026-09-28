@@ -17,4 +17,4 @@ note: for a trait to be dyn compatible it needs to allow building a vtable
 19 | trait InvalidProof: External {}
    |       ------------ this trait is not dyn compatible...
    = help: consider moving `generic` to another trait
-   = note: this error originates in the attribute macro `reflect` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

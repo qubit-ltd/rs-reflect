@@ -28,6 +28,9 @@ pub mod expression;
 pub mod identity;
 /// Invocation types and factories required by generated code.
 pub mod invoke;
+/// Internal derive support required by reflected trait and impl attributes.
+#[cfg(feature = "derive")]
+pub mod macro_support;
 /// Distributed registration protocol required by generated code.
 pub mod registration;
 /// Dynamic-value types required by generated code.

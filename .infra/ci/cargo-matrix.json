@@ -41,6 +41,18 @@
       "features": ["qubit-types"]
     },
     {
+      "name": "conditional-feature-disabled",
+      "commands": ["check"],
+      "packages": ["conditional-feature"],
+      "features": []
+    },
+    {
+      "name": "conditional-feature-enabled",
+      "commands": ["check"],
+      "packages": ["conditional-feature"],
+      "features": ["conditional-extra"]
+    },
+    {
       "name": "bench-internals",
       "commands": ["check", "test", "clippy"],
       "packages": ["qubit-reflect"],

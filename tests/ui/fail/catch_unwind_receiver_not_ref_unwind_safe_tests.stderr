@@ -20,4 +20,4 @@ note: required by a bound in `__qubit_reflect_assert_ref_unwind_safe`
    |
 20 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_ref_unwind_safe`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

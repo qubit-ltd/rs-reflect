@@ -147,6 +147,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
+name = "conditional-feature"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+]
+
+[[package]]
 name = "criterion"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -341,6 +348,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965"
 dependencies = [
  "scopeguard",
+]
+
+[[package]]
+name = "macro-runtime-only"
+version = "0.1.0"
+dependencies = [
+ "qubit-reflect",
+ "qubit-reflect-derive",
 ]
 
 [[package]]

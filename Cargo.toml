@@ -33,6 +33,8 @@ members = [
     "test-crates/model-facade-runtime",
     "test-crates/model-facade-derive",
     "test-crates/model-facade-app",
+    "test-crates/macro-runtime-only",
+    "test-crates/conditional-feature",
 ]
 exclude = ["fuzz"]
 resolver = "3"

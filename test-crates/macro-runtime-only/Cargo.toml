@@ -1,0 +1,9 @@
+[package]
+name = "macro-runtime-only"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+qubit-reflect = { path = "../..", default-features = false }
+qubit-reflect-derive = { path = "../../derive" }

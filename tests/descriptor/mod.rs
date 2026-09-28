@@ -14,6 +14,8 @@ mod builtin_tests;
 #[cfg(feature = "derive")]
 mod capability_tests;
 #[cfg(feature = "derive")]
+mod conditional_compilation_tests;
+#[cfg(feature = "derive")]
 mod default_trait_invocation_tests;
 #[cfg(feature = "derive")]
 mod derive_enum_tests;
