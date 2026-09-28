@@ -28,6 +28,25 @@ type DynTraitCache = HashMap<TypeId, &'static OnceLock<TraitDescriptor>>;
 
 /// Returns a cached incomplete descriptor for an explicitly mapped external
 /// supertrait.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete dyn trait-object root linked to the external supertrait.
+///
+/// # Parameters
+///
+/// - `id`: Stable external trait identifier.
+/// - `rust_path`: Fully qualified source path retained for diagnostics.
+/// - `arguments`: Concrete generic arguments for the application.
+///
+/// # Returns
+///
+/// Returns the process-lifetime applied trait descriptor.
+///
+/// # Panics
+///
+/// Panics if the supplied external ID is invalid or generated descriptor facts
+/// violate the incomplete-trait contract.
 #[doc(hidden)]
 #[must_use]
 pub fn external_supertrait<T: ?Sized + 'static>(
@@ -67,6 +86,22 @@ pub fn external_supertrait<T: ?Sized + 'static>(
 
 /// Returns the unique applied trait descriptor linked from one concrete dyn
 /// trait-object root.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete trait-object type used as the cache key.
+///
+/// # Parameters
+///
+/// - `build`: One-time factory for the applied trait descriptor.
+///
+/// # Returns
+///
+/// Returns the unique process-lifetime applied trait descriptor for `T`.
+///
+/// # Panics
+///
+/// Propagates a panic from `build`; the cache cell remains uninitialized.
 #[doc(hidden)]
 pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
     build: impl FnOnce() -> TraitDescriptor,
@@ -82,10 +117,21 @@ pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
 
 /// A static reference used by direct and transitive supertrait views.
 #[derive(Clone, Copy, Debug)]
-pub struct TraitDescriptorRef(&'static TraitDescriptor);
+pub struct TraitDescriptorRef(
+    /// Process-lifetime applied trait descriptor retained by this reference.
+    &'static TraitDescriptor,
+);
 
 impl TraitDescriptorRef {
     /// Creates a supertrait reference.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Applied trait descriptor to retain.
+    ///
+    /// # Returns
+    ///
+    /// Returns a lightweight static reference to the descriptor.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(descriptor: &'static TraitDescriptor) -> Self {
@@ -93,6 +139,10 @@ impl TraitDescriptorRef {
     }
 
     /// Returns the referenced applied trait descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-lifetime applied trait descriptor.
     #[must_use]
     #[inline]
     pub const fn descriptor(self) -> &'static TraitDescriptor {
@@ -105,6 +155,10 @@ impl Deref for TraitDescriptorRef {
     type Target = TraitDescriptor;
 
     /// Dereferences to the applied trait descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns a shared reference to the retained descriptor.
     fn deref(&self) -> &Self::Target {
         let Self(descriptor) = self;
         descriptor
@@ -114,11 +168,16 @@ impl Deref for TraitDescriptorRef {
 /// A deterministic, duplicate-free transitive supertrait view.
 #[derive(Clone, Copy, Debug)]
 pub struct SupertraitClosure<'a> {
+    /// Sorted, duplicate-free applied supertraits.
     pub(super) descriptors: &'a [TraitDescriptorRef],
 }
 
 impl<'a> SupertraitClosure<'a> {
     /// Returns applied supertraits in deterministic path order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over the transitive closure.
     #[must_use]
     #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a TraitDescriptor> {
@@ -126,6 +185,10 @@ impl<'a> SupertraitClosure<'a> {
     }
 
     /// Returns the number of distinct transitive supertraits.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of applied supertraits in the closure.
     #[must_use]
     #[inline]
     pub const fn len(self) -> usize {
@@ -133,6 +196,10 @@ impl<'a> SupertraitClosure<'a> {
     }
 
     /// Returns whether the closure is empty.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when no supertraits are present.
     #[must_use]
     #[inline]
     pub const fn is_empty(self) -> bool {

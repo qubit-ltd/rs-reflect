@@ -83,6 +83,14 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// parameter. A descriptor-aware entry point such as
     /// [`MethodInstanceDescriptor::invoke_local`](crate::descriptor::MethodInstanceDescriptor::invoke_local)
     /// validates and orders these bindings before its generated adapter runs.
+    ///
+    /// # Parameters
+    ///
+    /// - `bindings`: Positional or named arguments in caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation retaining those bindings.
     pub fn associated_bindings<I>(bindings: I) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
@@ -170,6 +178,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     ///
     /// This constructor only collects inputs. Method-aware binding, mode
     /// checks, and exact type checks happen later without extracting values.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Explicit receiver, or `None` for an associated function.
+    /// - `bindings`: Caller-ordered positional or named bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation retaining the supplied inputs.
     pub fn from_bindings<I>(receiver: Option<InvocationReceiver<'call, M>>, bindings: I) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
@@ -185,6 +202,10 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     }
 
     /// Returns the supplied receiver, or `None` for an associated function.
+    ///
+    /// # Returns
+    ///
+    /// Returns the receiver by shared reference, or `None` when absent.
     #[must_use]
     #[inline]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
@@ -218,6 +239,21 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// before arguments are reordered or any dynamic value is extracted. On
     /// failure, recovery retains the receiver and every binding's original
     /// name, mode, caller order, and value.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity attached to any validation error.
+    /// - `parameters`: Declaration-order parameter descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation reordered to declaration order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured error for unknown, ambiguous, unavailable,
+    /// duplicate, overflowing, or missing bindings. The failure retains every
+    /// original input in caller order.
     pub(crate) fn bind_arguments(
         self,
         method_identity: &MemberId,
@@ -345,6 +381,22 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// reborrowing. Every other mode must match exactly; in particular, owned
     /// values are never implicitly borrowed. Any error returns all original
     /// inputs without downcasting or extracting an owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity attached to any validation error.
+    /// - `receiver`: Expected receiver mode and exact type.
+    /// - `arguments`: Expected argument modes and exact types in declaration
+    ///   order.
+    ///
+    /// # Returns
+    ///
+    /// Returns validated inputs ready for generated adapter execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured validation failure paired with all untouched
+    /// inputs.
     pub fn validate(
         self,
         method_identity: &MemberId,
@@ -399,6 +451,22 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     ///
     /// This preserves every input until the adapter has accepted the receiver,
     /// so a later failure can still return the original complete invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity attached to any validation error.
+    /// - `arguments`: Expected argument modes and exact types in declaration
+    ///   order.
+    ///
+    /// # Returns
+    ///
+    /// Returns validated arguments while leaving receiver validation to the
+    /// explicit receiver adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured validation failure paired with all untouched
+    /// inputs.
     pub fn validate_arguments(
         self,
         method_identity: &MemberId,

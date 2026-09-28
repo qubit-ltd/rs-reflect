@@ -30,8 +30,11 @@ use crate::descriptor::MethodQualifier;
 /// ```
 #[derive(Debug)]
 pub struct EffectiveTypeView {
+    /// All contributing impl fragments in deterministic registry order.
     implementations: Box<[&'static ImplDescriptor]>,
+    /// Implementations that own the effective method instances below.
     method_implementations: Box<[&'static ImplDescriptor]>,
+    /// Frozen effective methods in deterministic lookup order.
     methods: Box<[&'static MethodInstanceDescriptor]>,
 }
 
@@ -75,6 +78,10 @@ impl EffectiveTypeView {
     }
 
     /// Returns all contributing impl fragments in registry-stable order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the implementation descriptors retained by this view.
     #[must_use]
     #[inline]
     pub const fn implementations(&self) -> &[&'static ImplDescriptor] {
@@ -84,6 +91,10 @@ impl EffectiveTypeView {
     /// Returns effective methods in deterministic implementation and source
     /// declaration order. An explicit trait implementation replaces its
     /// corresponding defaulted method instance.
+    ///
+    /// # Returns
+    ///
+    /// Returns the unique effective method instances in deterministic order.
     #[must_use]
     pub const fn methods(&self) -> &[&'static MethodInstanceDescriptor] {
         &self.methods

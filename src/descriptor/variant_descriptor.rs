@@ -99,15 +99,25 @@ assert_eq!(variant.rust_name(), "Ready");
 "#
 )]
 pub struct VariantDescriptor {
+    /// Resolver for the enum root that contains this variant.
     declaring_type: TypeDescriptorResolver,
+    /// Zero-based position in the source enum.
     index: usize,
+    /// Source Rust identifier for the variant.
     rust_name: &'static str,
+    /// Stable reflection lookup name for the variant.
     query_name: &'static str,
+    /// Unit, tuple, or struct-like shape.
     kind: VariantKind,
+    /// Variant fields retained in source order.
     fields: &'static [FieldDescriptor],
+    /// Generated adapter that checks the active enum variant.
     active_test: VariantActiveAdapter,
+    /// Whether source specified this variant's discriminant.
     discriminant_origin: DiscriminantOrigin,
+    /// Exact numeric discriminant when supported by the enum representation.
     numeric_discriminant: Option<NumericDiscriminant>,
+    /// Optional generated dynamic-construction entry point.
     construction: Option<VariantConstructionDescriptor>,
 }
 
@@ -168,6 +178,10 @@ impl VariantDescriptor {
 
     /// Constructs a named variant through its generated local adapter.
     ///
+    /// # Parameters
+    ///
+    /// - `input`: Named field values supplied for the variant.
+    ///
     /// # Returns
     ///
     /// Returns the constructed enum value with local dynamic ownership.
@@ -187,6 +201,10 @@ impl VariantDescriptor {
     }
 
     /// Constructs a tuple variant through its generated local adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Positional field values supplied for the variant.
     ///
     /// # Returns
     ///
@@ -227,12 +245,20 @@ impl VariantDescriptor {
     }
 
     /// Returns the enum root that contains this variant.
+    ///
+    /// # Returns
+    ///
+    /// Returns the static root descriptor for the declaring enum.
     #[must_use]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
 
     /// Returns the zero-based source declaration index.
+    ///
+    /// # Returns
+    ///
+    /// Returns this variant's position in the enum declaration.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -240,6 +266,10 @@ impl VariantDescriptor {
     }
 
     /// Returns the immutable Rust variant name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source Rust identifier.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -247,6 +277,10 @@ impl VariantDescriptor {
     }
 
     /// Returns the immutable lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -254,6 +288,10 @@ impl VariantDescriptor {
     }
 
     /// Returns whether the variant is unit-, tuple-, or struct-shaped.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source variant kind.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> VariantKind {
@@ -261,6 +299,10 @@ impl VariantDescriptor {
     }
 
     /// Returns whether the discriminant appeared explicitly in source.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source discriminant origin.
     #[must_use]
     #[inline]
     pub const fn discriminant_origin(&self) -> DiscriminantOrigin {
@@ -268,6 +310,10 @@ impl VariantDescriptor {
     }
 
     /// Returns a numeric discriminant only for fieldless integer-`repr` enums.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact numeric discriminant, or `None` when unavailable.
     #[must_use]
     #[inline]
     pub const fn numeric_discriminant(&self) -> Option<NumericDiscriminant> {
@@ -275,6 +321,10 @@ impl VariantDescriptor {
     }
 
     /// Returns fields in source declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns this variant's fields in source order.
     #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [FieldDescriptor] {
@@ -284,6 +334,14 @@ impl VariantDescriptor {
     /// Finds a named field by query name.
     ///
     /// `None` means the variant has no field with that lookup name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Field lookup name to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching field, or `None` when absent.
     #[must_use]
     pub fn field(&self, name: &str) -> Option<&FieldDescriptor> {
         self.fields.iter().find(|field| field.query_name() == Some(name))
@@ -292,6 +350,14 @@ impl VariantDescriptor {
     /// Returns a field by source index.
     ///
     /// `None` means the index is outside this variant's field range.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based position in this variant's field slice.
+    ///
+    /// # Returns
+    ///
+    /// Returns the field at that position, or `None` when out of range.
     #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
         self.fields.get(index)
@@ -311,6 +377,10 @@ impl VariantDescriptor {
     ///
     /// Returns [`TypeMismatch`] if `value` does not contain the declaring enum
     /// type.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Dynamic reference expected to contain the declaring enum.
     pub fn is_active(&self, value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(&value);

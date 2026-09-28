@@ -165,6 +165,16 @@ pub struct InvocationError {
 
 impl InvocationError {
     /// Creates an invocation error for one exact method member.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity of the method that was rejected.
+    /// - `kind`: Machine-readable validation reason.
+    ///
+    /// # Returns
+    ///
+    /// Returns a structured invocation error.
+    #[must_use = "the invocation error records why this method call was rejected"]
     pub fn new(method_identity: MemberId, kind: InvocationErrorKind) -> Self {
         Self {
             method_identity: Box::new(method_identity),
@@ -173,6 +183,10 @@ impl InvocationError {
     }
 
     /// Returns the structured identity of the method being invoked.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact method member identity.
     #[must_use]
     #[inline]
     pub fn method_identity(&self) -> &MemberId {
@@ -180,6 +194,10 @@ impl InvocationError {
     }
 
     /// Returns the stable machine-readable validation reason.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reason validation rejected the invocation.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> &InvocationErrorKind {
@@ -237,6 +255,16 @@ pub struct InvocationPanic {
 
 impl InvocationPanic {
     /// Creates a caught-panic value retaining method identity and payload.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity of the method that panicked.
+    /// - `payload`: Original panic payload captured by the adapter.
+    ///
+    /// # Returns
+    ///
+    /// Returns a panic record retaining the identity and payload.
+    #[must_use = "the panic record retains the method identity and payload"]
     pub fn new(method_identity: MemberId, payload: Box<dyn Any + Send>) -> Self {
         Self {
             method_identity: Box::new(method_identity),
@@ -245,6 +273,10 @@ impl InvocationPanic {
     }
 
     /// Returns the structured identity of the method that panicked.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact method member identity.
     #[must_use]
     #[inline]
     pub fn method_identity(&self) -> &MemberId {
@@ -252,6 +284,10 @@ impl InvocationPanic {
     }
 
     /// Returns the retained panic payload without interpreting its text.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original opaque panic payload.
     #[must_use]
     #[inline]
     pub fn payload(&self) -> &(dyn Any + Send) {
@@ -262,6 +298,14 @@ impl InvocationPanic {
     ///
     /// A type mismatch returns the original caught-panic value without losing
     /// its method identity or payload.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete panic payload type requested by the caller.
+    ///
+    /// # Returns
+    ///
+    /// Returns the payload as `T`, or the original panic record on mismatch.
     pub fn downcast_payload<T: Any + Send>(self) -> Result<T, Self> {
         let Self {
             method_identity,

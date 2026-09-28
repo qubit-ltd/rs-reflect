@@ -29,16 +29,35 @@ use crate::identity::FragmentIdentity;
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StaticFragmentIdentity {
+    /// Crate containing the source declaration.
     declaring_crate: &'static str,
+    /// Rust module path containing the declaration.
     module_path: &'static str,
+    /// Source line of the declaration.
     line: u32,
+    /// Source column of the declaration.
     column: u32,
+    /// Category of the registered member.
     member_kind: &'static str,
+    /// Deterministic fingerprint of normalized declaration content.
     content_fingerprint: u64,
 }
 
 impl StaticFragmentIdentity {
     /// Creates static identity facts from macro-provided constants.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaring_crate`: Crate containing the source declaration.
+    /// - `module_path`: Rust module path containing the declaration.
+    /// - `line`: Source line of the declaration.
+    /// - `column`: Source column of the declaration.
+    /// - `member_kind`: Category of the registered member.
+    /// - `content_fingerprint`: Deterministic normalized content fingerprint.
+    ///
+    /// # Returns
+    ///
+    /// Returns a borrowed, const-constructible fragment identity.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -60,6 +79,11 @@ impl StaticFragmentIdentity {
     }
 
     /// Copies borrowed identity facts into the owned public representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns an owned identity suitable for diagnostics and indexes.
+    #[must_use]
     pub(crate) fn to_owned(self) -> FragmentIdentity {
         FragmentIdentity::new(
             self.declaring_crate,
@@ -120,8 +144,11 @@ pub enum CapabilityTarget {
 /// A descriptor provider retained by a capability registration.
 #[derive(Clone, Copy, Debug)]
 enum CapabilityRegistrationTarget {
+    /// A registration tied to a reflected root descriptor.
     Type(&'static TypeDescriptor),
+    /// A benchmark registration tied only to an exact type ID.
     TypeId(TypeId),
+    /// A registration tied to a generic type declaration.
     TypeDefinition(&'static TypeDefinitionDescriptor),
 }
 
@@ -129,12 +156,23 @@ enum CapabilityRegistrationTarget {
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct CapabilityRegistration {
+    /// Concrete or generic target carrying this registration.
     target: CapabilityRegistrationTarget,
+    /// Capability facts contributed by the fragment.
     descriptors: Vec<CapabilityDescriptor>,
 }
 
 impl CapabilityRegistration {
     /// Creates a capability payload for `target_type_id`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Reflected root carrying the capability facts.
+    /// - `descriptors`: Capability facts contributed for that root.
+    ///
+    /// # Returns
+    ///
+    /// Returns the registration payload.
     #[doc(hidden)]
     #[must_use]
     pub const fn for_type(target: &'static TypeDescriptor, descriptors: Vec<CapabilityDescriptor>) -> Self {
@@ -145,6 +183,15 @@ impl CapabilityRegistration {
     }
 
     /// Creates a capability payload for one generic type declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Generic declaration carrying the capability facts.
+    /// - `descriptors`: Capability facts contributed for that declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the registration payload.
     #[doc(hidden)]
     #[must_use]
     pub const fn for_definition(
@@ -158,6 +205,15 @@ impl CapabilityRegistration {
     }
 
     /// Creates a benchmark-only payload when no reflected descriptor exists.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Exact process-local Rust type identity.
+    /// - `descriptors`: Capability facts associated with the type.
+    ///
+    /// # Returns
+    ///
+    /// Returns a registration payload for benchmark fixtures.
     #[doc(hidden)]
     pub const fn for_type_id(target: TypeId, descriptors: Vec<CapabilityDescriptor>) -> Self {
         Self {
@@ -167,6 +223,10 @@ impl CapabilityRegistration {
     }
 
     /// Returns the process-local target identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete type or generic declaration identity.
     #[must_use]
     #[inline]
     pub fn target(&self) -> CapabilityTarget {
@@ -181,6 +241,11 @@ impl CapabilityRegistration {
 
     /// Returns the concrete target descriptor when this registration targets a
     /// type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root descriptor for concrete type registrations, or `None`
+    /// for type-ID and generic-definition registrations.
     #[must_use]
     pub(crate) const fn type_descriptor(&self) -> Option<&'static TypeDescriptor> {
         match self.target {
@@ -190,6 +255,10 @@ impl CapabilityRegistration {
     }
 
     /// Returns the immutable capability descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns the capability facts contributed by this registration.
     #[must_use]
     #[inline]
     pub(crate) fn descriptors(&self) -> &[CapabilityDescriptor] {
@@ -252,14 +321,29 @@ impl FragmentPayload {
 #[doc(hidden)]
 #[derive(Clone, Copy)]
 pub struct RegistrationFragment {
+    /// Payload category declared in the static inventory record.
     kind: FragmentKind,
+    /// Borrowed source and content facts for this fragment.
     identity: StaticFragmentIdentity,
+    /// Deferred function that determines the process-local target.
     target_identity: fn() -> RuntimeIdentity,
+    /// Deferred function that materializes the fragment payload.
     build: fn() -> FragmentPayload,
 }
 
 impl RegistrationFragment {
     /// Creates a static fragment from generated factories.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Declared category of the registration payload.
+    /// - `identity`: Borrowed source and content identity.
+    /// - `target_identity`: Deferred factory for the process-local target.
+    /// - `build`: Deferred factory for the immutable payload.
+    ///
+    /// # Returns
+    ///
+    /// Returns a static linker-discovered fragment record.
     #[doc(hidden)]
     pub const fn new(
         kind: FragmentKind,

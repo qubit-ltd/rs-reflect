@@ -35,6 +35,7 @@ use crate::expression::FunctionAbi;
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct PrimitiveTypeDescriptor {
+    /// Primitive category represented by the root.
     kind: PrimitiveKind,
 }
 
@@ -75,6 +76,7 @@ impl PrimitiveTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct TextTypeDescriptor {
+    /// Owned or borrowed UTF-8 text representation.
     kind: TextKind,
 }
 
@@ -125,6 +127,7 @@ impl TextTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct StructTypeDescriptor {
+    /// Declared struct shape.
     kind: StructKind,
 }
 
@@ -225,6 +228,7 @@ pub enum EnumRepr {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct EnumTypeDescriptor {
+    /// Explicit representation components in canonical order.
     representations: &'static [EnumRepr],
 }
 
@@ -270,6 +274,7 @@ impl EnumTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct TupleTypeDescriptor {
+    /// Eager or lazily resolved tuple element references.
     elements: TypeRefListSource,
 }
 
@@ -342,7 +347,9 @@ impl TupleTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct ArrayTypeDescriptor {
+    /// Eager or lazily resolved element type.
     element: TypeRefSource,
+    /// Fixed number of array elements.
     length: usize,
 }
 
@@ -416,6 +423,7 @@ impl ArrayTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct OptionalTypeDescriptor {
+    /// Eager or lazily resolved optional element type.
     element: TypeRefSource,
 }
 
@@ -489,7 +497,9 @@ pub enum SequenceKind {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SequenceTypeDescriptor {
+    /// Standard-library sequence family.
     kind: SequenceKind,
+    /// Eager or lazily resolved element type.
     element: TypeRefSource,
 }
 
@@ -580,7 +590,9 @@ pub enum SetKind {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SetTypeDescriptor {
+    /// Standard-library set family.
     kind: SetKind,
+    /// Eager or lazily resolved element type.
     element: TypeRefSource,
 }
 
@@ -671,8 +683,11 @@ pub enum MapKind {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct MapTypeDescriptor {
+    /// Standard-library map family.
     kind: MapKind,
+    /// Eager or lazily resolved key type.
     key: TypeRefSource,
+    /// Eager or lazily resolved value type.
     value: TypeRefSource,
 }
 
@@ -763,7 +778,9 @@ impl MapTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SmartPointerTypeDescriptor {
+    /// Standard smart-pointer family.
     kind: SmartPointerKind,
+    /// Eager or lazily resolved pointee type.
     pointee: TypeRefSource,
 }
 
@@ -838,7 +855,9 @@ impl SmartPointerTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct ReferenceTypeDescriptor {
+    /// Shared or mutable borrowing category.
     kind: ReferenceKind,
+    /// Eager or lazily resolved referenced type.
     target: TypeRefSource,
 }
 
@@ -912,6 +931,7 @@ impl ReferenceTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SliceTypeDescriptor {
+    /// Eager or lazily resolved slice element type.
     element: TypeRefSource,
 }
 
@@ -970,7 +990,9 @@ impl SliceTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct RawPointerTypeDescriptor {
+    /// Const or mutable raw-pointer category.
     mutability: Mutability,
+    /// Eager or lazily resolved pointee type.
     pointee: TypeRefSource,
 }
 
@@ -1044,10 +1066,15 @@ impl RawPointerTypeDescriptor {
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct FunctionTypeDescriptor {
+    /// Safe or unsafe function-pointer category.
     kind: FunctionPointerKind,
+    /// Static calling-convention descriptor.
     abi: &'static FunctionAbi,
+    /// Whether the signature accepts a variadic tail.
     variadic: bool,
+    /// Eager or lazily resolved parameter types in declaration order.
     parameters: TypeRefListSource,
+    /// Eager or lazily resolved return type.
     return_type: TypeRefSource,
 }
 
@@ -1182,6 +1209,7 @@ impl FunctionTypeDescriptor {
 /// ```
 #[derive(Clone, Copy)]
 pub struct TraitObjectTypeDescriptor {
+    /// Resolver for the applied trait descriptor represented by the object.
     trait_descriptor: fn() -> &'static TraitDescriptor,
 }
 

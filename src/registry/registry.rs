@@ -38,34 +38,56 @@ use crate::registry::registry_builder::initialize_cached;
 /// A borrowed, deterministic set of type-descriptor name matches.
 #[derive(Clone, Copy, Debug)]
 pub struct TypeCandidates<'registry> {
+    /// Registry-owned roots matching the requested name in stable order.
     descriptors: &'registry [&'static TypeDescriptor],
 }
 
 /// A borrowed, deterministic set of generic declaration matches.
 #[derive(Clone, Copy, Debug)]
 pub struct TypeDefinitionCandidates<'registry> {
+    /// Registry-owned generic declarations matching the requested name.
     descriptors: &'registry [&'static TypeDefinitionDescriptor],
 }
 
 impl<'registry> TypeDefinitionCandidates<'registry> {
     /// Creates a candidate view over one registry-owned slice.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptors`: Matching generic declarations in stable order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a borrowed candidate view.
     pub(crate) const fn new(descriptors: &'registry [&'static TypeDefinitionDescriptor]) -> Self {
         Self { descriptors }
     }
 
     /// Returns candidates in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over matching declarations.
     #[must_use]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
 
     /// Returns the number of matching declarations.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of candidates.
     #[must_use]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
 
     /// Returns whether no declaration matched.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the candidate set is empty.
     #[must_use]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
@@ -73,6 +95,10 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
 
     /// Returns the sole matching declaration, or `None` when absent or
     /// ambiguous.
+    ///
+    /// # Returns
+    ///
+    /// Returns the sole candidate, or `None` when the count is not one.
     #[must_use]
     pub fn only(self) -> Option<&'static TypeDefinitionDescriptor> {
         (self.descriptors.len() == 1).then(|| self.descriptors[0])
@@ -84,6 +110,10 @@ impl<'registry> IntoIterator for TypeDefinitionCandidates<'registry> {
     type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDefinitionDescriptor>>;
 
     /// Iterates over declarations in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over the candidates.
     fn into_iter(self) -> Self::IntoIter {
         self.descriptors.iter().copied()
     }
@@ -91,11 +121,23 @@ impl<'registry> IntoIterator for TypeDefinitionCandidates<'registry> {
 
 impl<'registry> TypeCandidates<'registry> {
     /// Creates a borrowed candidate view over a registry-owned slice.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptors`: Matching roots in stable order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a borrowed candidate view.
     pub(crate) const fn new(descriptors: &'registry [&'static TypeDescriptor]) -> Self {
         Self { descriptors }
     }
 
     /// Returns candidates in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over matching roots.
     #[must_use]
     #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDescriptor> + 'registry {
@@ -103,6 +145,10 @@ impl<'registry> TypeCandidates<'registry> {
     }
 
     /// Returns the number of matching descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of candidates.
     #[must_use]
     #[inline]
     pub const fn len(self) -> usize {
@@ -110,6 +156,10 @@ impl<'registry> TypeCandidates<'registry> {
     }
 
     /// Returns whether no descriptor matched the requested name.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the candidate set is empty.
     #[must_use]
     #[inline]
     pub const fn is_empty(self) -> bool {
@@ -122,6 +172,10 @@ impl<'registry> IntoIterator for TypeCandidates<'registry> {
     type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TypeDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over the candidates.
     fn into_iter(self) -> Self::IntoIter {
         self.descriptors.iter().copied()
     }
@@ -131,16 +185,29 @@ impl<'registry> IntoIterator for TypeCandidates<'registry> {
 /// path.
 #[derive(Clone, Copy, Debug)]
 pub struct TraitCandidates<'registry> {
+    /// Registry-owned trait declarations matching one Rust path.
     descriptors: &'registry [&'static TraitDefinitionDescriptor],
 }
 
 impl<'registry> TraitCandidates<'registry> {
     /// Creates a borrowed candidate view over a registry-owned slice.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptors`: Matching declarations in stable order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a borrowed candidate view.
     pub(crate) const fn new(descriptors: &'registry [&'static TraitDefinitionDescriptor]) -> Self {
         Self { descriptors }
     }
 
     /// Returns candidates in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over matching trait declarations.
     #[must_use]
     #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TraitDefinitionDescriptor> + 'registry {
@@ -148,6 +215,10 @@ impl<'registry> TraitCandidates<'registry> {
     }
 
     /// Returns the number of matching declarations.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of candidates.
     #[must_use]
     #[inline]
     pub const fn len(self) -> usize {
@@ -155,6 +226,10 @@ impl<'registry> TraitCandidates<'registry> {
     }
 
     /// Returns whether no declarations match.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the candidate set is empty.
     #[must_use]
     #[inline]
     pub const fn is_empty(self) -> bool {
@@ -162,6 +237,10 @@ impl<'registry> TraitCandidates<'registry> {
     }
 
     /// Returns the sole matching declaration, rejecting ambiguous path lookups.
+    ///
+    /// # Returns
+    ///
+    /// Returns the sole candidate, or `None` when absent or ambiguous.
     #[must_use]
     #[inline]
     pub fn only(self) -> Option<&'static TraitDefinitionDescriptor> {
@@ -174,6 +253,10 @@ impl<'registry> IntoIterator for TraitCandidates<'registry> {
     type IntoIter = std::iter::Copied<std::slice::Iter<'registry, &'static TraitDefinitionDescriptor>>;
 
     /// Iterates over candidates in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over the candidates.
     fn into_iter(self) -> Self::IntoIter {
         self.descriptors.iter().copied()
     }
@@ -183,11 +266,16 @@ impl<'registry> IntoIterator for TraitCandidates<'registry> {
 /// target expression.
 #[derive(Clone, Debug)]
 pub struct ImplDefinitionCandidates {
+    /// Matching declarations retained in stable source-fragment order.
     descriptors: Box<[&'static ImplDefinitionDescriptor]>,
 }
 
 impl ImplDefinitionCandidates {
     /// Iterates over matching definitions in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an exact-size iterator over matching declarations.
     #[must_use]
     #[inline]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &'static ImplDefinitionDescriptor> + '_ {
@@ -195,6 +283,10 @@ impl ImplDefinitionCandidates {
     }
 
     /// Returns the number of matching definitions.
+    ///
+    /// # Returns
+    ///
+    /// Returns the number of candidates.
     #[must_use]
     #[inline]
     pub const fn len(&self) -> usize {
@@ -202,6 +294,10 @@ impl ImplDefinitionCandidates {
     }
 
     /// Returns whether no impl definition has the requested target.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when no declaration matched.
     #[must_use]
     #[inline]
     pub const fn is_empty(&self) -> bool {
@@ -214,6 +310,10 @@ impl IntoIterator for ImplDefinitionCandidates {
     type IntoIter = std::vec::IntoIter<&'static ImplDefinitionDescriptor>;
 
     /// Iterates over matching definitions in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns an owning iterator over the matching declarations.
     fn into_iter(self) -> Self::IntoIter {
         self.descriptors.into_vec().into_iter()
     }
@@ -239,11 +339,17 @@ impl IntoIterator for ImplDefinitionCandidates {
 /// ```
 #[derive(Debug)]
 pub struct ReflectRegistry {
+    /// Registered concrete roots in stable fragment order.
     pub(super) types: Box<[&'static TypeDescriptor]>,
+    /// Registered generic declarations in stable fragment order.
     pub(super) definitions: Box<[&'static TypeDefinitionDescriptor]>,
+    /// Registered impl declarations in stable source-fragment order.
     pub(super) impl_definitions: Box<[&'static ImplDefinitionDescriptor]>,
+    /// Immutable indexes built from the validated fragments.
     pub(super) indexes: RegistryIndexes,
+    /// Stable empty effective-method view used for unregistered targets.
     pub(super) empty_effective_view: EffectiveTypeView,
+    /// Stable empty capability set used for registered roots without facts.
     pub(super) empty_capabilities: TypeCapabilities,
 }
 
@@ -270,6 +376,14 @@ impl ReflectRegistry {
     /// Looks up one exact concrete registered type.
     ///
     /// `None` means no linked static fragment registered `type_id`.
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Exact process-local identity to find.
+    ///
+    /// # Returns
+    ///
+    /// Returns the registered root, or `None` when absent.
     #[must_use]
     pub fn get(&self, type_id: TypeId) -> Option<&'static TypeDescriptor> {
         self.indexes.types_by_id.get(&type_id).copied()
@@ -279,6 +393,15 @@ impl ReflectRegistry {
     ///
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Compiler-provided diagnostic Rust type name.
+    ///
+    /// # Returns
+    ///
+    /// Returns every matching root in stable order.
+    #[must_use]
     pub fn find_by_type_name(&self, name: &str) -> TypeCandidates<'_> {
         TypeCandidates::new(self.indexes.types_by_type_name.get(name).map_or(&[], Box::as_ref))
     }
@@ -287,11 +410,24 @@ impl ReflectRegistry {
     ///
     /// The returned view is empty when no descriptor matches and preserves the
     /// registry's stable fragment order when the name is ambiguous.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflection query name.
+    ///
+    /// # Returns
+    ///
+    /// Returns every matching root in stable order.
+    #[must_use]
     pub fn find_by_query_name(&self, name: &str) -> TypeCandidates<'_> {
         TypeCandidates::new(self.indexes.types_by_query_name.get(name).map_or(&[], Box::as_ref))
     }
 
     /// Enumerates all statically registered roots in stable fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns every registered concrete root.
     #[must_use]
     #[inline]
     pub fn types(&self) -> &[&'static TypeDescriptor] {
@@ -299,23 +435,53 @@ impl ReflectRegistry {
     }
 
     /// Enumerates all registered generic type declarations in fragment order.
+    ///
+    /// # Returns
+    ///
+    /// Returns every registered generic declaration.
     #[must_use]
     pub fn definitions(&self) -> &[&'static TypeDefinitionDescriptor] {
         &self.definitions
     }
 
     /// Looks up one generic declaration by its process-local identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local declaration identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declaration, or `None` when it is absent.
     #[must_use]
     pub fn definition(&self, id: TypeDefinitionId) -> Option<&'static TypeDefinitionDescriptor> {
         self.indexes.definitions_by_id.get(&id).copied()
     }
 
     /// Finds generic declarations with the exact Rust source path.
+    ///
+    /// # Parameters
+    ///
+    /// - `path`: Fully qualified Rust source path.
+    ///
+    /// # Returns
+    ///
+    /// Returns all exact path matches in stable order.
+    #[must_use]
     pub fn find_definitions_by_rust_path(&self, path: &str) -> TypeDefinitionCandidates<'_> {
         TypeDefinitionCandidates::new(self.indexes.definitions_by_rust_path.get(path).map_or(&[], Box::as_ref))
     }
 
     /// Finds generic declarations with the exact reflection query name.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflection query name.
+    ///
+    /// # Returns
+    ///
+    /// Returns all exact name matches in stable order.
+    #[must_use]
     pub fn find_definitions_by_query_name(&self, name: &str) -> TypeDefinitionCandidates<'_> {
         TypeDefinitionCandidates::new(
             self.indexes
@@ -326,12 +492,25 @@ impl ReflectRegistry {
     }
 
     /// Returns the fragment that registered one generic declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local declaration identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source fragment, or `None` when absent.
     #[must_use]
     pub fn definition_source(&self, id: TypeDefinitionId) -> Option<&FragmentIdentity> {
         self.indexes.definition_fragments.get(&id)
     }
 
     /// Enumerates generic declarations together with their source fragments.
+    ///
+    /// # Returns
+    ///
+    /// Returns exact-size pairs of declaration and source identity.
+    #[must_use]
     pub fn definitions_with_identity(
         &self,
     ) -> impl ExactSizeIterator<Item = (&'static TypeDefinitionDescriptor, &FragmentIdentity)> + '_ {
@@ -346,6 +525,11 @@ impl ReflectRegistry {
     }
 
     /// Enumerates registered roots together with their source fragments.
+    ///
+    /// # Returns
+    ///
+    /// Returns exact-size pairs of root descriptor and source identity.
+    #[must_use]
     pub fn types_with_identity(
         &self,
     ) -> impl ExactSizeIterator<Item = (&'static TypeDescriptor, &FragmentIdentity)> + '_ {
@@ -360,6 +544,14 @@ impl ReflectRegistry {
     }
 
     /// Returns the source fragment that registered one exact concrete type.
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Exact process-local type identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source fragment, or `None` when absent.
     #[must_use]
     pub fn type_source(&self, type_id: TypeId) -> Option<&FragmentIdentity> {
         self.indexes.type_fragments.get(&type_id)

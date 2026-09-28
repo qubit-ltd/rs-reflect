@@ -60,18 +60,21 @@ pub fn parameter(name: impl Into<Box<str>>) -> TypeExpression {
 
 /// Creates a named lifetime expression from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn named_lifetime(name: impl Into<Box<str>>) -> LifetimeExpression {
     LifetimeExpression::named(name).expect("generated lifetime names are non-empty")
 }
 
 /// Creates a named const-parameter expression from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn const_parameter(name: impl Into<Box<str>>) -> ConstExpression {
     ConstExpression::parameter(name).expect("generated const parameter names are non-empty")
 }
 
 /// Creates a const-item path from generator-validated segments.
 #[doc(hidden)]
+#[must_use]
 pub fn const_path<P, S>(segments: P) -> ConstExpression
 where
     P: IntoIterator<Item = S>,
@@ -92,6 +95,7 @@ pub fn associated_type(name: impl Into<Box<str>>, value: TypeExpression) -> Gene
 
 /// Creates an associated-type bound argument from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn associated_type_bound(name: impl Into<Box<str>>, bounds: Box<[PredicateDescriptor]>) -> GenericArgument {
     GenericArgument::AssociatedTypeBound {
         name: crate::expression::ExpressionName::new(name).expect("generated associated type names are non-empty"),
@@ -101,6 +105,7 @@ pub fn associated_type_bound(name: impl Into<Box<str>>, bounds: Box<[PredicateDe
 
 /// Creates a lifetime generic parameter from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn lifetime_parameter(
     name: impl Into<Box<str>>,
     bounds: Box<[LifetimeExpression]>,
@@ -115,6 +120,7 @@ pub fn lifetime_parameter(
 
 /// Creates a type generic parameter from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn type_parameter(
     name: impl Into<Box<str>>,
     bounds: Box<[PredicateDescriptor]>,
@@ -131,6 +137,7 @@ pub fn type_parameter(
 
 /// Creates a const generic parameter from generator-validated text.
 #[doc(hidden)]
+#[must_use]
 pub fn const_generic_parameter(
     name: impl Into<Box<str>>,
     ty: TypeExpression,
@@ -173,6 +180,7 @@ pub fn concrete_segments(
 
 /// Creates a typed const generic argument from generator-validated inputs.
 #[doc(hidden)]
+#[must_use]
 pub fn const_argument(
     declared_type: TypeExpression,
     value: ConstExpression,

@@ -53,6 +53,7 @@ impl ImplKind {
     /// # Returns
     ///
     /// Returns `0` for inherent impls and `1` for trait impls.
+    #[must_use]
     pub(crate) const fn registry_rank(self) -> u8 {
         match self {
             Self::Inherent => 0,
@@ -64,6 +65,34 @@ impl ImplKind {
 /// Declaration facts for a generic, blanket, or concrete impl block.
 ///
 /// This descriptor is constructed by generated registration code.
+///
+/// # Examples
+///
+/// ```no_run
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// mod example {
+///     use qubit_reflect::{Reflect, reflect_impl};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Service {
+///         fn ping(&self) {}
+///     }
+/// }
+/// let implementation = TypeDescriptor::of::<example::Service>()
+///     .impls()
+///     .expect("registered impls")
+///     .first()
+///     .expect("reflected implementation");
+/// assert_eq!(implementation.definition().kind(), qubit_reflect::descriptor::ImplKind::Inherent);
+/// }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 #[derive(Debug)]
 pub struct ImplDefinitionDescriptor {
     /// Stable identity of the source impl fragment.
@@ -97,6 +126,7 @@ struct ImplAssociatedItems {
 /// One associated type explicitly bound by an impl definition.
 ///
 /// This descriptor is constructed by generated registration code.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedTypeDescriptor {
     /// Name used in the Rust declaration.
@@ -114,7 +144,7 @@ impl ImplAssociatedTypeDescriptor {
     ///
     /// Returns the declaration-level binding facts.
     #[doc(hidden)]
-    #[must_use]
+    #[must_use = "the associated type declaration facts are required by generated registration"]
     pub const fn new(rust_name: &'static str) -> Self {
         Self { rust_name }
     }
@@ -134,6 +164,7 @@ impl ImplAssociatedTypeDescriptor {
 /// One associated constant explicitly bound by an impl definition.
 ///
 /// This descriptor is constructed by generated registration code.
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedConstDescriptor {
     /// Name used in the Rust declaration.
@@ -154,7 +185,7 @@ impl ImplAssociatedConstDescriptor {
     ///
     /// Returns the declaration-level binding facts.
     #[doc(hidden)]
-    #[must_use]
+    #[must_use = "the associated constant declaration facts are required by generated registration"]
     pub const fn new(rust_name: &'static str, declared_type: TypeExpression) -> Self {
         Self {
             rust_name,
@@ -391,7 +422,7 @@ impl ImplDefinitionDescriptor {
     ///
     /// Returns the initialized associated type bindings, or an empty slice
     /// before initialization.
-    #[must_use]
+    #[must_use = "the associated type declarations describe this impl"]
     #[inline]
     pub fn associated_types(&self) -> &[ImplAssociatedTypeDescriptor] {
         self.associated_items.get().map_or(&[], |items| items.types.as_ref())
@@ -404,7 +435,7 @@ impl ImplDefinitionDescriptor {
     ///
     /// Returns the initialized associated constant bindings, or an empty slice
     /// before initialization.
-    #[must_use]
+    #[must_use = "the associated constant declarations describe this impl"]
     #[inline]
     pub fn associated_consts(&self) -> &[ImplAssociatedConstDescriptor] {
         self.associated_items.get().map_or(&[], |items| items.consts.as_ref())
@@ -518,6 +549,7 @@ impl AssociatedConstReader {
     ///
     /// Returns a reader that invokes `read` on each call.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(read: fn() -> ReflectedOwned) -> Self {
         Self {
             read: AssociatedConstReadAdapter::Function(read),
@@ -539,6 +571,7 @@ impl AssociatedConstReader {
     /// Returns a reader that owns each value produced by `getter`.
     /// The generated closure is retained for the process lifetime.
     #[doc(hidden)]
+    #[must_use]
     pub fn from_getter<T: 'static>(getter: fn() -> T) -> Self {
         let read = Box::leak(Box::new(move || ReflectedOwned::new(getter())));
         Self {
@@ -586,6 +619,7 @@ impl fmt::Debug for AssociatedConstReader {
 /// One associated type binding contributed by a concrete impl.
 ///
 /// This descriptor is constructed by generated registration code.
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeBindingDescriptor {
     /// Associated type declaration being implemented.
@@ -611,7 +645,7 @@ impl AssociatedTypeBindingDescriptor {
     ///
     /// Returns the associated type binding facts.
     #[doc(hidden)]
-    #[must_use]
+    #[must_use = "the associated type binding facts are required by generated registration"]
     pub const fn new(
         declaration: &'static AssociatedTypeDescriptor,
         value: TypeExpression,
@@ -662,6 +696,7 @@ impl AssociatedTypeBindingDescriptor {
 /// One associated constant binding contributed by a concrete impl.
 ///
 /// This descriptor is constructed by generated registration code.
+#[must_use]
 #[derive(Clone, Debug)]
 pub struct AssociatedConstBindingDescriptor {
     /// Associated constant declaration being implemented.
@@ -688,7 +723,7 @@ impl AssociatedConstBindingDescriptor {
     ///
     /// Returns the associated constant binding facts.
     #[doc(hidden)]
-    #[must_use]
+    #[must_use = "the associated constant binding facts are required by generated registration"]
     pub const fn new(
         declaration: &'static AssociatedConstDescriptor,
         implementation_source: AssociatedConstImplementationSource,
@@ -824,6 +859,10 @@ impl std::error::Error for ImplDescriptorBuildError {}
 
 /// A qualifier used to resolve methods across implementation namespaces.
 ///
+/// # Type Parameters
+///
+/// - `'a`: Lifetime of the borrowed trait descriptor in [`Self::Trait`].
+///
 /// # Examples
 ///
 /// ```
@@ -842,6 +881,10 @@ pub enum MethodQualifier<'a> {
 }
 
 /// The result of a method lookup across implementation namespaces.
+///
+/// # Type Parameters
+///
+/// - `'a`: Lifetime of a concrete method instance borrowed from an impl.
 ///
 /// # Examples
 ///
@@ -913,6 +956,24 @@ pub struct ImplDescriptor {
 }
 
 impl ImplDescriptor {
+    /// Starts a concrete impl builder for `definition` and `target_type`.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Source impl declaration to instantiate.
+    /// - `target_type`: Resolver for the concrete target root.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder initialized for the requested declaration and target.
+    #[must_use]
+    pub fn builder(
+        definition: &'static ImplDefinitionDescriptor,
+        target_type: TypeDescriptorResolver,
+    ) -> ImplDescriptorBuilder {
+        ImplDescriptorBuilder::new(definition, target_type)
+    }
+
     /// Returns whether two descriptors represent the same concrete impl
     /// application.
     ///
@@ -923,6 +984,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns `true` when both descriptors identify the same impl application.
+    #[must_use]
     pub(crate) fn same_application(&self, other: &Self) -> bool {
         self.kind() == other.kind()
             && self.definition().fragment_identity() == other.definition().fragment_identity()
@@ -939,6 +1001,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns the deterministic ordering between the implementations.
+    #[must_use]
     pub(crate) fn registry_cmp(&self, other: &Self) -> Ordering {
         self.kind()
             .registry_rank()
@@ -960,6 +1023,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns the ordering between the implementation namespaces.
+    #[must_use]
     fn namespace_cmp(&self, other: &Self) -> Ordering {
         match (self.implemented_trait(), other.implemented_trait()) {
             (None, None) => Ordering::Equal,
@@ -983,6 +1047,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns `true` when this implementation matches the qualifier.
+    #[must_use]
     pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
         match qualifier {
             MethodQualifier::Any => true,
@@ -991,23 +1056,6 @@ impl ImplDescriptor {
                 .implemented_trait()
                 .is_some_and(|actual| actual.same_application(expected)),
         }
-    }
-
-    /// Starts a concrete impl builder for `definition` and `target_type`.
-    ///
-    /// # Parameters
-    ///
-    /// - `definition`: Source impl declaration to instantiate.
-    /// - `target_type`: Resolver for the concrete target root.
-    ///
-    /// # Returns
-    ///
-    /// Returns a builder initialized for the requested declaration and target.
-    pub fn builder(
-        definition: &'static ImplDefinitionDescriptor,
-        target_type: TypeDescriptorResolver,
-    ) -> ImplDescriptorBuilder {
-        ImplDescriptorBuilder::new(definition, target_type)
     }
 
     /// Returns the generic or blanket impl definition.
@@ -1106,7 +1154,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns the concrete associated type bindings.
-    #[must_use]
+    #[must_use = "the associated type bindings describe this impl application"]
     #[inline]
     pub const fn associated_types(&self) -> &[AssociatedTypeBindingDescriptor] {
         &self.associated_types
@@ -1117,7 +1165,7 @@ impl ImplDescriptor {
     /// # Returns
     ///
     /// Returns the concrete associated constant bindings.
-    #[must_use]
+    #[must_use = "the associated constant bindings describe this impl application"]
     #[inline]
     pub const fn associated_consts(&self) -> &[AssociatedConstBindingDescriptor] {
         &self.associated_consts
@@ -1147,6 +1195,7 @@ impl ImplDescriptor {
     ///
     /// Returns `Missing`, `Unique`, or `Ambiguous` according to the matches
     /// found.
+    #[must_use]
     pub fn lookup_method<'a>(
         implementations: &'a [&'a ImplDescriptor],
         qualifier: MethodQualifier<'_>,
@@ -1202,6 +1251,36 @@ impl fmt::Debug for ImplDescriptor {
 ///
 /// The builder validates generic arguments and member ownership before
 /// producing an [`ImplDescriptor`].
+///
+/// # Examples
+///
+/// ```no_run
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// {
+/// use qubit_reflect::TypeDescriptor;
+/// use qubit_reflect::descriptor::ImplDescriptor;
+/// mod example {
+///     use qubit_reflect::{Reflect, reflect_impl};
+///     #[derive(Reflect)]
+///     #[reflect(crate = qubit_reflect)]
+///     pub struct Service;
+///     #[reflect_impl(crate = qubit_reflect)]
+///     impl Service {
+///         fn ping(&self) {}
+///     }
+/// }
+/// let source = TypeDescriptor::of::<example::Service>();
+/// let definition = source.impls().expect("registered impls").first().expect("reflected implementation").definition();
+/// let rebuilt = ImplDescriptor::builder(definition, TypeDescriptor::of::<example::Service>)
+///     .arguments(Vec::new())
+///     .build()
+///     .expect("valid concrete impl");
+/// assert_eq!(rebuilt.target_type().type_id(), source.type_id());
+/// }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 #[derive(Debug)]
 pub struct ImplDescriptorBuilder {
     /// Impl declaration being instantiated.
@@ -1233,6 +1312,7 @@ impl ImplDescriptorBuilder {
     /// # Returns
     ///
     /// Returns an empty builder for the impl application.
+    #[must_use]
     fn new(definition: &'static ImplDefinitionDescriptor, target_type: TypeDescriptorResolver) -> Self {
         Self {
             definition,

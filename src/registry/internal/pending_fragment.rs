@@ -13,6 +13,8 @@ use crate::registry::fragment::RegistrationFragment;
 
 /// A sorted fragment paired with its already materialized stable identity.
 pub(crate) struct PendingFragment {
+    /// Static fragment factory to invoke after deterministic sorting.
     pub(crate) fragment: &'static RegistrationFragment,
+    /// Owned stable identity used to order and diagnose the fragment.
     pub(crate) identity: FragmentIdentity,
 }

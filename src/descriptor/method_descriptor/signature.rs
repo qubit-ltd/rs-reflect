@@ -40,11 +40,17 @@ pub enum ParameterPatternDescriptor {
 /// One non-receiver method parameter in declaration order.
 #[derive(Clone, Debug)]
 pub struct ParameterDescriptor {
+    /// Zero-based position among non-receiver parameters.
     index: usize,
+    /// Bindable identifier, absent for wildcard and destructuring patterns.
     name: Option<&'static str>,
+    /// Source pattern category retained independently of parser syntax.
     pattern: ParameterPatternDescriptor,
+    /// Ownership or borrowing mode at the method boundary.
     passing_mode: ParameterPassingMode,
+    /// Declared type expression, which may still be symbolic.
     pub(super) signature_type: TypeExpression,
+    /// Resolver for an exact reflected root, when available.
     concrete_type: Option<TypeDescriptorResolver>,
 }
 
@@ -54,6 +60,19 @@ impl ParameterDescriptor {
     /// `index` excludes the receiver. `name` must be `None` for wildcard and
     /// destructuring patterns. `concrete_type` is present only when the
     /// declaration can navigate to an exact reflected root.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based non-receiver parameter position.
+    /// - `name`: Bindable identifier, or `None` for wildcard/destructuring.
+    /// - `pattern`: Source pattern category.
+    /// - `passing_mode`: Whether the method owns or borrows the argument.
+    /// - `signature_type`: Declared type expression.
+    /// - `concrete_type`: Exact type resolver, when available.
+    ///
+    /// # Returns
+    ///
+    /// Returns immutable parameter facts for the declaration.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -75,6 +94,10 @@ impl ParameterDescriptor {
     }
 
     /// Returns the zero-based non-receiver parameter index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parameter's position after excluding the receiver.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -84,6 +107,10 @@ impl ParameterDescriptor {
     /// Returns the identifier used for named binding.
     ///
     /// `None` denotes a wildcard or destructuring pattern.
+    ///
+    /// # Returns
+    ///
+    /// Returns the bindable identifier, or `None` when the pattern has none.
     #[must_use]
     #[inline]
     pub const fn name(&self) -> Option<&'static str> {
@@ -91,6 +118,10 @@ impl ParameterDescriptor {
     }
 
     /// Returns the parser-independent source pattern category.
+    ///
+    /// # Returns
+    ///
+    /// Returns the parameter's source pattern classification.
     #[must_use]
     #[inline]
     pub const fn pattern(&self) -> &ParameterPatternDescriptor {
@@ -98,6 +129,11 @@ impl ParameterDescriptor {
     }
 
     /// Returns how the argument crosses the method boundary.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether the argument is owned, shared-borrowed, or mutably
+    /// borrowed.
     #[must_use]
     #[inline]
     pub const fn passing_mode(&self) -> ParameterPassingMode {
@@ -105,6 +141,10 @@ impl ParameterDescriptor {
     }
 
     /// Returns the declared, possibly symbolic parameter type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the structural type expression from the signature.
     #[must_use]
     #[inline]
     pub const fn signature_type(&self) -> &TypeExpression {
@@ -114,6 +154,10 @@ impl ParameterDescriptor {
     /// Returns the exact reflected parameter type when it is known.
     ///
     /// `None` denotes a symbolic, opaque, or otherwise unresolved type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact reflected type root, or `None` when unavailable.
     #[must_use]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
@@ -151,8 +195,11 @@ pub enum ReturnKind {
 /// The return declaration of a reflected method.
 #[derive(Clone, Debug)]
 pub struct ReturnDescriptor {
+    /// Structural category of the return value.
     kind: ReturnKind,
+    /// Declared return type expression, when one is needed.
     pub(super) signature_type: Option<TypeExpression>,
+    /// Resolver for an exact reflected root, when available.
     concrete_type: Option<TypeDescriptorResolver>,
 }
 
@@ -162,6 +209,16 @@ impl ReturnDescriptor {
     /// `signature_type` is absent for unit and never returns when their
     /// [`ReturnKind`] is sufficient. `concrete_type` is present only for an
     /// exact reflected root.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Structural return category.
+    /// - `signature_type`: Declared type expression, when applicable.
+    /// - `concrete_type`: Exact reflected type resolver, when available.
+    ///
+    /// # Returns
+    ///
+    /// Returns immutable facts for the declared return value.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -177,12 +234,20 @@ impl ReturnDescriptor {
     }
 
     /// Creates a unit return descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns a descriptor representing `()`.
     #[must_use]
     pub const fn unit() -> Self {
         Self::new(ReturnKind::Unit, None, None)
     }
 
     /// Returns the structural return category.
+    ///
+    /// # Returns
+    ///
+    /// Returns the return category.
     #[must_use]
     #[inline]
     pub const fn kind(&self) -> ReturnKind {
@@ -192,6 +257,10 @@ impl ReturnDescriptor {
     /// Returns the declared return type expression.
     ///
     /// `None` means the unit or never category carries the complete fact.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declared type expression, or `None` for unit/never.
     #[must_use]
     #[inline]
     pub const fn signature_type(&self) -> Option<&TypeExpression> {
@@ -202,6 +271,10 @@ impl ReturnDescriptor {
     ///
     /// `None` denotes unit, never, a reference, opaque output, or an unresolved
     /// symbolic type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact reflected type root, or `None` when unavailable.
     #[must_use]
     pub fn concrete_type(&self) -> Option<&'static TypeDescriptor> {
         self.concrete_type.map(|resolver| resolver())
@@ -234,6 +307,18 @@ pub struct MethodQualifiers {
 
 impl MethodQualifiers {
     /// Creates the complete set of method qualifiers.
+    ///
+    /// # Parameters
+    ///
+    /// - `is_async`: Whether the declaration is asynchronous.
+    /// - `is_unsafe`: Whether the declaration is unsafe.
+    /// - `is_const`: Whether the declaration is const.
+    /// - `abi`: Explicit ABI, or `None` for the Rust ABI.
+    /// - `is_variadic`: Whether the declaration has a variadic tail.
+    ///
+    /// # Returns
+    ///
+    /// Returns the supplied method qualifiers.
     #[must_use]
     pub const fn new(
         is_async: bool,
@@ -252,30 +337,50 @@ impl MethodQualifiers {
     }
 
     /// Returns whether the declaration is asynchronous.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` for an `async` method.
     #[must_use]
     pub const fn is_async(&self) -> bool {
         self.is_async
     }
 
     /// Returns whether the declaration is unsafe.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` for an `unsafe` method.
     #[must_use]
     pub const fn is_unsafe(&self) -> bool {
         self.is_unsafe
     }
 
     /// Returns whether the declaration is const.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` for a `const` method.
     #[must_use]
     pub const fn is_const(&self) -> bool {
         self.is_const
     }
 
     /// Returns the explicitly declared ABI.
+    ///
+    /// # Returns
+    ///
+    /// Returns the ABI, or `None` for the ordinary Rust ABI.
     #[must_use]
     pub const fn abi(&self) -> Option<&FunctionAbi> {
         self.abi.as_ref()
     }
 
     /// Returns whether the declaration has a variadic tail.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the method has a variadic tail.
     #[must_use]
     pub const fn is_variadic(&self) -> bool {
         self.is_variadic
@@ -284,6 +389,11 @@ impl MethodQualifiers {
 
 impl Default for MethodQualifiers {
     /// Returns the qualifiers of an ordinary safe Rust method.
+    ///
+    /// # Returns
+    ///
+    /// Returns default qualifiers with no async, unsafe, const, ABI, or
+    /// variadic modifier.
     fn default() -> Self {
         Self::new(false, false, false, None, false)
     }

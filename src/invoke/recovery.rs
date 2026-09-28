@@ -46,6 +46,16 @@ pub struct InvocationRecovery<'call, M: InvocationMode> {
 
 impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     /// Creates recovery from the untouched invocation input.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Original receiver, if the invocation had one.
+    /// - `arguments`: Original arguments in caller order.
+    /// - `argument_names`: Original names for named bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns the recovery payload retaining the complete input.
     pub(crate) fn new(
         receiver: Option<InvocationReceiver<'call, M>>,
         arguments: Box<[InvocationArg<'call, M>]>,
@@ -59,6 +69,10 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     }
 
     /// Returns the recovered receiver, or `None` for an associated function.
+    ///
+    /// # Returns
+    ///
+    /// Returns the receiver by shared reference, or `None` when absent.
     #[must_use]
     #[inline]
     pub const fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
@@ -66,6 +80,10 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     }
 
     /// Returns all recovered arguments in their original caller order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the recovered argument slice.
     #[must_use]
     #[inline]
     pub fn arguments(&self) -> &[InvocationArg<'call, M>] {
@@ -76,6 +94,15 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     ///
     /// `Some(name)` identifies a named binding. `None` identifies either a
     /// positional binding or an index outside the recovered input range.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based position in the original caller bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original name, or `None` for positional or out-of-range
+    /// input.
     #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.argument_names.get(index).and_then(|name| name.as_deref())
@@ -83,11 +110,20 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
 
     /// Consumes the recovery and returns the receiver and caller-ordered
     /// arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns the optional receiver and caller-ordered arguments.
     pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }
 
     /// Reconstitutes the exact invocation so a caller can inspect or retry it.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation with the original receiver, values, order, and
+    /// binding names.
     pub fn into_invocation(self) -> Invocation<'call, M> {
         Invocation::from_parts(self.receiver, self.arguments, self.argument_names)
     }
@@ -143,21 +179,40 @@ pub struct InvocationFailure<'call, M: InvocationMode> {
 
 impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     /// Returns the structured validation error.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reason user code was not called.
+    #[must_use = "the invocation error explains why the call failed"]
     #[inline]
     pub const fn error(&self) -> &InvocationError {
         &self.error
     }
     /// Returns the recoverable invocation input.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original receiver and arguments.
     #[must_use]
     #[inline]
     pub const fn recovery(&self) -> &InvocationRecovery<'call, M> {
         &self.recovery
     }
     /// Consumes this failure into its error and recovery input.
+    ///
+    /// # Returns
+    ///
+    /// Returns the structured error and complete recovery payload.
+    #[must_use = "the error and recovery input are required to handle the failure"]
     pub fn into_parts(self) -> (InvocationError, InvocationRecovery<'call, M>) {
         (self.error, self.recovery)
     }
     /// Consumes this failure and returns its recoverable invocation input.
+    ///
+    /// # Returns
+    ///
+    /// Returns the original receiver and arguments.
+    #[must_use]
     pub fn into_recovery(self) -> InvocationRecovery<'call, M> {
         self.recovery
     }

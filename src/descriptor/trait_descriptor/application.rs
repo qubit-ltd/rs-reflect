@@ -45,13 +45,20 @@ pub enum TraitId {
 /// The complete identity of one concrete trait application.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AppliedTraitId {
+    /// Reflected marker or external declaration identity.
     pub(super) definition: TraitId,
+    /// Concrete generic arguments in declaration order.
     pub(super) arguments: Box<[GenericArgument]>,
+    /// Concrete associated-type equalities in declaration order.
     pub(super) associated_type_arguments: Box<[GenericArgument]>,
 }
 
 impl AppliedTraitId {
     /// Returns the reflected marker or external definition identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the identity of the trait declaration.
     #[must_use]
     #[inline]
     pub const fn definition(&self) -> &TraitId {
@@ -59,6 +66,10 @@ impl AppliedTraitId {
     }
 
     /// Returns concrete type and const arguments in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the ordered runtime generic arguments.
     #[must_use]
     #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
@@ -66,6 +77,11 @@ impl AppliedTraitId {
     }
 
     /// Returns concrete associated-type equalities in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated-type equalities contributing to application
+    /// identity.
     #[must_use]
     #[inline]
     pub const fn associated_type_arguments(&self) -> &[GenericArgument] {
@@ -83,16 +99,31 @@ impl AppliedTraitId {
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug)]
 pub struct TraitImplPayload {
+    /// Declaration shared by every concrete application of this trait.
     definition: &'static TraitDefinitionDescriptor,
+    /// Concrete trait application for the hook receiver.
     applied: &'static TraitDescriptor,
+    /// Generated default-method adapters in declaration order.
     default_method_adapters: &'static [Option<&'static InvocationAdapter>],
+    /// Reasons generated default-method adapters are unavailable.
     default_method_unavailable_reasons: &'static [&'static [InvocationUnavailableReason]],
+    /// Resolvers for proven concrete associated types.
     associated_type_resolvers: &'static [Option<TypeDescriptorResolver>],
+    /// Safe generated readers for associated constants.
     associated_const_readers: &'static [Option<&'static AssociatedConstReader>],
 }
 
 impl TraitImplPayload {
     /// Creates a payload for one reflected trait declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Trait declaration shared by implementations.
+    /// - `applied`: Concrete trait application for this hook.
+    ///
+    /// # Returns
+    ///
+    /// Returns a payload with no generated implementation adapters attached.
     #[doc(hidden)]
     pub const fn new(definition: &'static TraitDefinitionDescriptor, applied: &'static TraitDescriptor) -> Self {
         Self {
@@ -106,6 +137,10 @@ impl TraitImplPayload {
     }
 
     /// Returns the complete trait declaration shared by every implementation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source declaration descriptor.
     #[doc(hidden)]
     #[must_use]
     pub const fn definition(self) -> &'static TraitDefinitionDescriptor {
@@ -113,6 +148,10 @@ impl TraitImplPayload {
     }
 
     /// Returns the concrete applied trait descriptor for the hook receiver.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete trait application.
     #[doc(hidden)]
     #[must_use]
     pub const fn applied(self) -> &'static TraitDescriptor {
@@ -120,6 +159,10 @@ impl TraitImplPayload {
     }
 
     /// Returns concrete adapters for default methods in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns one optional adapter slot for each default method.
     #[doc(hidden)]
     #[must_use]
     pub const fn default_method_adapters(self) -> &'static [Option<&'static InvocationAdapter>] {
@@ -128,6 +171,10 @@ impl TraitImplPayload {
 
     /// Returns unavailable-reason sets for default methods in declaration
     /// order.
+    ///
+    /// # Returns
+    ///
+    /// Returns unavailable reasons paired with default methods.
     #[doc(hidden)]
     #[must_use]
     pub const fn default_method_unavailable_reasons(self) -> &'static [&'static [InvocationUnavailableReason]] {
@@ -135,6 +182,10 @@ impl TraitImplPayload {
     }
 
     /// Returns proven concrete associated-type resolvers in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns one optional resolver slot for each associated type.
     #[doc(hidden)]
     #[must_use]
     pub const fn associated_type_resolvers(self) -> &'static [Option<TypeDescriptorResolver>] {
@@ -142,6 +193,10 @@ impl TraitImplPayload {
     }
 
     /// Returns safe associated-constant readers in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns one optional reader slot for each associated constant.
     #[doc(hidden)]
     #[must_use]
     pub const fn associated_const_readers(self) -> &'static [Option<&'static AssociatedConstReader>] {
@@ -194,9 +249,13 @@ impl TraitImplPayload {
 /// Concrete substitutions carried by one applied trait descriptor.
 #[derive(Clone)]
 pub(crate) struct TraitApplicationSubstitutions {
+    /// Concrete type arguments indexed by declaration parameter name.
     types: HashMap<crate::expression::ExpressionName, TypeExpression>,
+    /// Concrete const arguments indexed by declaration parameter name.
     consts: HashMap<crate::expression::ExpressionName, ConstExpression>,
+    /// Lifetime parameters represented by the static trait-object root.
     lifetimes: std::collections::HashSet<crate::expression::ExpressionName>,
+    /// Concrete associated-type equalities indexed by associated item name.
     associated_types: HashMap<crate::expression::ExpressionName, TypeExpression>,
 }
 

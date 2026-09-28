@@ -27,11 +27,20 @@ use crate::registry::registry::ReflectRegistry;
 
 /// Prepared adapter-free capability facts used by registry aggregation.
 pub(crate) struct BenchmarkRegistryFacts {
+    /// Deterministically ordered capability rows prepared before timing.
     fragments: Box<[FactRow]>,
 }
 
 impl BenchmarkRegistryFacts {
     /// Aggregates the prepared facts through the production registry path.
+    ///
+    /// # Returns
+    ///
+    /// Returns the immutable registry snapshot or its validation error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when prepared fragments conflict or are inconsistent.
     pub(crate) fn aggregate(&self) -> Result<ReflectRegistry, RegistryError> {
         aggregate_prepared_facts(self)
     }

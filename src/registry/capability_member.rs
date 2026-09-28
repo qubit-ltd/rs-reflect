@@ -55,9 +55,13 @@ use crate::identity::FragmentIdentity;
 #[must_use]
 #[derive(Debug)]
 pub struct CapabilityMember<'registry, T, A: 'static> {
+    /// Type or definition descriptor returned by the registry query.
     target: T,
+    /// Typed state observed for the requested capability.
     lookup: CapabilityLookup<'registry, A>,
+    /// Semantic origin of the effective capability fact.
     origin: CapabilityOrigin,
+    /// Fragment retained as the source of the effective fact.
     source: &'registry FragmentIdentity,
 }
 

@@ -70,27 +70,46 @@ pub enum TraitCompleteness {
 /// ```
 #[derive(Debug)]
 pub struct TraitDefinitionDescriptor {
+    /// Reflected marker or external identity of the declaration.
     trait_id: TraitId,
+    /// Source Rust identifier for the trait.
     rust_name: &'static str,
+    /// Diagnostic fully qualified source path.
     rust_path: &'static str,
+    /// Stable name used by reflection queries.
     query_name: &'static str,
+    /// Extent of declaration facts known to reflection.
     completeness: TraitCompleteness,
+    /// Generic parameters and predicates shared by all applications.
     generic_definition: &'static GenericDefinitionDescriptor,
+    /// Normalized visibility of the source declaration.
     visibility: Visibility,
+    /// Lazily initialized associated-item facts shared across applications.
     members: OnceLock<TraitDefinitionMembers>,
 }
 
 /// Associated-item facts retained before a concrete trait application exists.
 #[derive(Debug)]
 struct TraitDefinitionMembers {
+    /// Declared methods in source order.
     methods: Box<[MethodDescriptor]>,
+    /// Declared associated types in source order.
     associated_types: Box<[AssociatedTypeDescriptor]>,
+    /// Declared associated constants in source order.
     associated_consts: Box<[AssociatedConstDescriptor]>,
 }
 
 impl TraitDefinitionDescriptor {
     /// Returns whether two declarations can be merged for one external trait
     /// ID.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Declaration registered under the same external identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when both declarations have compatible facts.
     pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
         self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
     }
@@ -165,6 +184,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns the trait declaration's normalized source visibility.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source visibility retained by the descriptor.
     #[must_use]
     #[inline]
     pub const fn visibility(&self) -> &Visibility {
@@ -172,6 +195,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns the reflected marker or external trait identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declaration identity.
     #[must_use]
     #[inline]
     pub const fn trait_id(&self) -> &TraitId {
@@ -179,6 +206,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns the Rust declaration name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -186,6 +217,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns the diagnostic fully qualified Rust path.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source path.
     #[must_use]
     #[inline]
     pub const fn rust_path(&self) -> &'static str {
@@ -193,6 +228,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns the lookup name, which may differ from the Rust name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -200,6 +239,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns whether the complete declaration is known.
+    ///
+    /// # Returns
+    ///
+    /// Returns the completeness classification.
     #[must_use]
     #[inline]
     pub const fn completeness(&self) -> TraitCompleteness {
@@ -207,6 +250,10 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns generic parameters and predicates in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the shared source generic definition.
     #[must_use]
     #[inline]
     pub const fn generic_definition(&self) -> &'static GenericDefinitionDescriptor {
@@ -214,12 +261,22 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns methods declared by this trait in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns initialized declaration methods, or an empty slice before
+    /// generated member initialization.
     #[must_use]
     pub fn methods(&self) -> &[MethodDescriptor] {
         self.members.get().map_or(&[], |members| members.methods.as_ref())
     }
 
     /// Returns associated types declared by this trait in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns initialized declaration associated types, or an empty slice
+    /// before generated member initialization.
     #[must_use]
     #[inline]
     pub fn associated_types(&self) -> &[AssociatedTypeDescriptor] {
@@ -229,6 +286,11 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Returns associated constants declared by this trait in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns initialized declaration associated constants, or an empty slice
+    /// before generated member initialization.
     #[must_use]
     #[inline]
     pub fn associated_consts(&self) -> &[AssociatedConstDescriptor] {
@@ -238,6 +300,14 @@ impl TraitDefinitionDescriptor {
     }
 
     /// Initializes declaration-level associated-item facts exactly once.
+    ///
+    /// # Parameters
+    ///
+    /// - `initialize`: Factory for methods, associated types, and constants.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after another initializer wins the one-time cell.
     #[doc(hidden)]
     pub fn initialize_members(
         &'static self,
@@ -263,16 +333,34 @@ impl TraitDefinitionDescriptor {
 /// One associated type declaration.
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeDescriptor {
+    /// Zero-based source position among associated types.
     index: usize,
+    /// Rust declaration identifier.
     rust_name: &'static str,
+    /// Reflection lookup name.
     query_name: &'static str,
+    /// Declared bounds in source order.
     bounds: Box<[PredicateDescriptor]>,
+    /// Optional symbolic default type.
     default: Option<TypeExpression>,
+    /// Optional GAT parameters and predicates.
     generic_definition: Option<Box<GenericDefinitionDescriptor>>,
 }
 
 impl AssociatedTypeDescriptor {
     /// Creates associated type facts in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based source declaration position.
+    /// - `rust_name`: Source Rust identifier.
+    /// - `query_name`: Reflection lookup name.
+    /// - `bounds`: Declared bounds in source order.
+    /// - `default`: Optional symbolic default type.
+    ///
+    /// # Returns
+    ///
+    /// Returns associated-type facts without GAT parameters.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -293,6 +381,19 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Creates associated type facts with GAT parameters and predicates.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based source declaration position.
+    /// - `rust_name`: Source Rust identifier.
+    /// - `query_name`: Reflection lookup name.
+    /// - `bounds`: Declared bounds in source order.
+    /// - `default`: Optional symbolic default type.
+    /// - `generic_definition`: GAT parameters and where predicates.
+    ///
+    /// # Returns
+    ///
+    /// Returns associated-type facts with the supplied GAT definition.
     #[doc(hidden)]
     #[must_use]
     pub fn new_with_generic_definition(
@@ -314,6 +415,10 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Returns the source declaration index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the zero-based position among associated types.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -321,6 +426,10 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Returns the Rust declaration name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -328,6 +437,10 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Returns the lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -335,6 +448,10 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Returns declared bounds in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the declared predicate bounds.
     #[must_use]
     #[inline]
     pub const fn bounds(&self) -> &[PredicateDescriptor] {
@@ -342,6 +459,11 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Returns GAT parameters and where predicates in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the GAT definition, or an empty definition for an ordinary
+    /// associated type.
     #[must_use]
     pub fn generic_definition(&self) -> &GenericDefinitionDescriptor {
         static EMPTY: LazyLock<GenericDefinitionDescriptor> = LazyLock::new(|| GenericDefinitionDescriptor {
@@ -355,6 +477,10 @@ impl AssociatedTypeDescriptor {
     /// Returns the symbolic default type.
     ///
     /// `None` means the trait requires implementations to provide the binding.
+    ///
+    /// # Returns
+    ///
+    /// Returns the symbolic default type, or `None` when no default exists.
     #[must_use]
     #[inline]
     pub const fn default(&self) -> Option<&TypeExpression> {
@@ -362,6 +488,14 @@ impl AssociatedTypeDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `substitutions`: Concrete generic and associated-type substitutions.
+    ///
+    /// # Returns
+    ///
+    /// Returns this declaration with its type expressions substituted.
     pub(super) fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
         Self {
             bounds: self
@@ -385,15 +519,32 @@ impl AssociatedTypeDescriptor {
 /// One associated constant declaration.
 #[derive(Clone, Debug)]
 pub struct AssociatedConstDescriptor {
+    /// Zero-based source position among associated constants.
     index: usize,
+    /// Rust declaration identifier.
     rust_name: &'static str,
+    /// Reflection lookup name.
     query_name: &'static str,
+    /// Declared structural type.
     declared_type: TypeExpression,
+    /// Whether the trait declaration provides a default value.
     has_default: bool,
 }
 
 impl AssociatedConstDescriptor {
     /// Creates associated constant facts in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based source declaration position.
+    /// - `rust_name`: Source Rust identifier.
+    /// - `query_name`: Reflection lookup name.
+    /// - `declared_type`: Structural type of the constant.
+    /// - `has_default`: Whether the declaration supplies a value.
+    ///
+    /// # Returns
+    ///
+    /// Returns immutable associated-constant facts.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(
@@ -413,6 +564,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Returns the source declaration index.
+    ///
+    /// # Returns
+    ///
+    /// Returns the zero-based position among associated constants.
     #[must_use]
     #[inline]
     pub const fn index(&self) -> usize {
@@ -420,6 +575,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Returns the Rust declaration name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source identifier.
     #[must_use]
     #[inline]
     pub const fn rust_name(&self) -> &'static str {
@@ -427,6 +586,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Returns the lookup name.
+    ///
+    /// # Returns
+    ///
+    /// Returns the reflection query name.
     #[must_use]
     #[inline]
     pub const fn query_name(&self) -> &'static str {
@@ -434,6 +597,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Returns the declared constant type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the structural declared type.
     #[must_use]
     #[inline]
     pub const fn declared_type(&self) -> &TypeExpression {
@@ -441,6 +608,10 @@ impl AssociatedConstDescriptor {
     }
 
     /// Returns whether the trait declaration provides a default value.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the source trait provides a default.
     #[must_use]
     #[inline]
     pub const fn has_default(&self) -> bool {
@@ -448,6 +619,14 @@ impl AssociatedConstDescriptor {
     }
 
     /// Applies one concrete trait application to this declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `substitutions`: Concrete generic substitutions.
+    ///
+    /// # Returns
+    ///
+    /// Returns this declaration with its type expression substituted.
     pub(super) fn substituted(self, substitutions: &TraitApplicationSubstitutions) -> Self {
         Self {
             declared_type: substitutions.type_expression(&self.declared_type),

@@ -43,25 +43,52 @@ use crate::registry::registry::ReflectRegistry;
 /// Accumulates validated payloads without exposing partial registry state.
 #[derive(Default)]
 struct RegistryBuilder {
+    /// Concrete roots in stable source-fragment order.
     types: Vec<&'static TypeDescriptor>,
+    /// Unique roots keyed by runtime identity and source fragment.
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
+    /// Generic declarations in stable source-fragment order.
     definitions: Vec<&'static TypeDefinitionDescriptor>,
+    /// Unique generic declarations keyed by identity and source fragment.
     definitions_by_id: HashMap<TypeDefinitionId, (&'static TypeDefinitionDescriptor, FragmentIdentity)>,
+    /// First compatible trait declaration for each reflected/external ID.
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
+    /// Source fragment for each trait ID.
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
+    /// First compatible declaration and source for each external trait ID.
     external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
+    /// Source fragments that already claim a concrete trait implementation.
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
+    /// Trait declarations linked to symbolic impl-definition fragments.
     impl_definition_traits: HashMap<FragmentIdentity, &'static TraitDefinitionDescriptor>,
+    /// Generic and blanket impl definitions in source-fragment order.
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
+    /// Concrete implementations grouped by target type.
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
+    /// Unique capability facts and the fragment that contributed each one.
     capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
+    /// Semantic origin retained for each capability fact.
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
+    /// Candidate intrinsic providers awaiting concrete membership resolution.
     intrinsic_candidates: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
+    /// Unique fragment identities in validated deterministic order.
     fragment_identities: Vec<FragmentIdentity>,
 }
 
 impl RegistryBuilder {
     /// Validates one materialized fragment and records its payload privately.
+    ///
+    /// # Parameters
+    ///
+    /// - `built`: Materialized fragment with validated static identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording the payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns a conflict when another fragment claims incompatible facts.
     fn push(&mut self, built: BuiltFragment) -> Result<(), RegistryError> {
         match built.payload {
             FragmentPayload::Type(descriptor) => self.push_type(descriptor, &built.identity)?,
@@ -86,6 +113,19 @@ impl RegistryBuilder {
     }
 
     /// Adds one unique source-level generic type declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Generic declaration to register.
+    /// - `identity`: Source fragment contributing the declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after insertion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an identity conflict when the declaration ID is already present.
     fn push_definition(
         &mut self,
         descriptor: &'static TypeDefinitionDescriptor,
@@ -101,6 +141,19 @@ impl RegistryBuilder {
     }
 
     /// Adds one unique concrete root descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete root to register.
+    /// - `identity`: Source fragment contributing the root.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after insertion and intrinsic-provider queuing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an identity conflict when the root type is already present.
     fn push_type(
         &mut self,
         descriptor: &'static TypeDescriptor,
@@ -117,6 +170,19 @@ impl RegistryBuilder {
     }
 
     /// Adds one capability registration and the target's intrinsic facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `registration`: Capability payload and its concrete or generic target.
+    /// - `identity`: Source fragment contributing the registration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording all capability facts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capability conflict for a duplicate target and ID.
     fn push_capability_registration(
         &mut self,
         registration: &CapabilityRegistration,
@@ -133,6 +199,11 @@ impl RegistryBuilder {
 
     /// Defers one descriptor's intrinsic facts until concrete membership is
     /// known.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Root whose intrinsic capability provider will run.
+    /// - `identity`: Fragment that first caused the root to be inspected.
     fn queue_intrinsic_capabilities(&mut self, descriptor: &'static TypeDescriptor, identity: &FragmentIdentity) {
         self.intrinsic_candidates
             .entry(descriptor.type_id())
@@ -141,6 +212,14 @@ impl RegistryBuilder {
 
     /// Resolves intrinsic facts after the snapshot's concrete members are
     /// known.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after every queued provider has been resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first intrinsic capability conflict.
     fn resolve_intrinsic_capabilities(&mut self) -> Result<(), RegistryError> {
         let mut candidates = self.intrinsic_candidates.drain().collect::<Vec<_>>();
         candidates.sort_by(|(_, (_, left_source)), (_, (_, right_source))| left_source.cmp(right_source));
@@ -162,6 +241,20 @@ impl RegistryBuilder {
     }
 
     /// Adds one validated intrinsic capability with its selected source.
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Concrete target receiving the capabilities.
+    /// - `source`: Fragment selected as the source of intrinsic facts.
+    /// - `capabilities`: Validated intrinsic descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording all descriptors.
+    ///
+    /// # Errors
+    ///
+    /// Returns a conflict when a capability ID is already registered.
     fn push_intrinsic_descriptors(
         &mut self,
         type_id: TypeId,
@@ -180,6 +273,20 @@ impl RegistryBuilder {
     }
 
     /// Adds one capability while retaining the source fragment that claimed it.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Concrete or generic capability target.
+    /// - `descriptor`: Capability fact to record.
+    /// - `identity`: Fragment that contributed the fact.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording the capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns a conflict when the same target and ID already exist.
     fn push_capability(
         &mut self,
         target: CapabilityTarget,
@@ -197,6 +304,21 @@ impl RegistryBuilder {
     }
 
     /// Adds one capability while retaining its source and semantic origin.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Concrete or generic capability target.
+    /// - `descriptor`: Capability fact to record.
+    /// - `identity`: Fragment that contributed the fact.
+    /// - `origin`: Intrinsic or registered origin retained for lookup.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording the capability.
+    ///
+    /// # Errors
+    ///
+    /// Returns a conflict when the same target and ID already exist.
     fn push_capability_with_origin(
         &mut self,
         target: CapabilityTarget,
@@ -220,6 +342,20 @@ impl RegistryBuilder {
     }
 
     /// Adds one trait descriptor and audits reflected and external identities.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Trait declaration to register.
+    /// - `identity`: Source fragment contributing the declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after registering the declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an identity conflict for a duplicate reflected ID or
+    /// incompatible external declaration.
     fn push_trait(
         &mut self,
         descriptor: &'static TraitDefinitionDescriptor,
@@ -250,6 +386,19 @@ impl RegistryBuilder {
 
     /// Adds one impl after validating its outer, definition, and target
     /// identities.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete impl application to register.
+    /// - `identity`: Source fragment contributing the application.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after recording the implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an identity conflict for a repeated concrete trait impl.
     fn push_impl(
         &mut self,
         descriptor: &'static ImplDescriptor,
@@ -277,6 +426,15 @@ impl RegistryBuilder {
 
     /// Resolves generic trait-impl definitions after every linked trait
     /// declaration has been validated.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after linking every trait impl definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ImplTraitResolution` when a trait declaration is missing or
+    /// ambiguous.
     fn resolve_impl_definition_traits(&mut self) -> Result<(), RegistryError> {
         for definition in &self.impl_definitions {
             if definition.kind() != ImplKind::Trait {
@@ -306,6 +464,10 @@ impl RegistryBuilder {
 
     /// Freezes deterministic slices and hash indexes after successful
     /// validation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the immutable registry snapshot.
     fn finish(mut self) -> ReflectRegistry {
         for implementations in self.impls_by_target.values_mut() {
             implementations.sort_by(|left, right| left.registry_cmp(right));

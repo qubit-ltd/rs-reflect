@@ -104,15 +104,25 @@ enum TypeDescriptorData {
 /// assert!(descriptor.as_primitive().is_some());
 /// ```
 pub struct TypeDescriptor {
+    /// Resolver for the represented type's process-local identity.
     type_id: fn() -> TypeId,
+    /// Resolver for the represented type's diagnostic name.
     type_name: fn() -> &'static str,
+    /// Stable lookup name used by reflection queries.
     query_name: &'static str,
+    /// Type-kind-specific metadata for this root.
     data: TypeDescriptorData,
+    /// Direct fields retained in source declaration order.
     fields: &'static [FieldDescriptor],
+    /// Enum variants retained in source declaration order.
     variants: &'static [VariantDescriptor],
+    /// Resolver for capabilities declared by this root.
     capabilities: fn() -> TypeCapabilitiesResult,
+    /// Optional generated struct construction entry points.
     construction: Option<StructConstructionDescriptor>,
+    /// Optional concrete generic arguments for this root.
     generic: Option<&'static ConcreteGenericDescriptor>,
+    /// Optional resolver for the source generic declaration.
     definition: Option<fn() -> &'static TypeDefinitionDescriptor>,
 }
 
