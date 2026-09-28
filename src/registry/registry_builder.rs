@@ -38,7 +38,7 @@ use crate::registry::indexes::RegistryIndexes;
 use crate::registry::internal::BuiltFragment;
 use crate::registry::internal::MaterializedFragment;
 use crate::registry::internal::PendingFragment;
-use crate::registry::registry::ReflectRegistry;
+use crate::registry::reflect_registry::ReflectRegistry;
 
 /// Accumulates validated payloads without exposing partial registry state.
 #[derive(Default)]

@@ -127,11 +127,6 @@ reason = "BorrowOrigin and InvocationOutput jointly retain the source lifetime c
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/registry/registry.rs"
-reason = "Candidate collections and ReflectRegistry are the typed query results and owner of one immutable registry snapshot."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/registry/fragment.rs"
 reason = "Identity, target, payload, and kind types form the closed registration-fragment protocol consumed by aggregation."
 
@@ -149,11 +144,6 @@ reason = "Parameter, receiver, return, visibility, and qualifier records are the
 rule = "multiple-public-types"
 path = "src/descriptor/method_descriptor/invocation_adapter.rs"
 reason = "Adapter availability and unavailability reasons jointly explain whether one reflected method can be invoked."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/method_descriptor.rs"
-reason = "MethodDescriptor stores its declaration owner directly, keeping ownership and declaration data together."
 
 [[exceptions]]
 rule = "multiple-public-types"

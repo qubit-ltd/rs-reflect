@@ -23,7 +23,7 @@ use crate::registry::fragment::RuntimeIdentity;
 use crate::registry::internal::MaterializedFragment;
 use crate::registry::internal::benchmark_target::BenchmarkTarget;
 use crate::registry::internal::fact_row::FactRow;
-use crate::registry::registry::ReflectRegistry;
+use crate::registry::reflect_registry::ReflectRegistry;
 
 /// Prepared adapter-free capability facts used by registry aggregation.
 pub(crate) struct BenchmarkRegistryFacts {
