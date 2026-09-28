@@ -42,11 +42,19 @@ use crate::value::ReflectedOwned;
 
 /// A zero-sized method-resolution probe for determining whether the generic
 /// environment semantically proves `T: Reflect`.
+///
+/// # Type Parameters
+///
+/// - `T`: Candidate reflected type whose bound is checked by method resolution.
 #[doc(hidden)]
 pub struct ReflectArgumentProbe<T: ?Sized>(std::marker::PhantomData<fn() -> T>);
 
 impl<T: ?Sized> ReflectArgumentProbe<T> {
     /// Creates a probe without evaluating the target type's descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns a zero-sized probe for `T`.
     #[doc(hidden)]
     #[must_use]
     pub const fn new() -> Self {
@@ -59,6 +67,11 @@ impl<T: ?Sized> ReflectArgumentProbe<T> {
 #[doc(hidden)]
 pub trait ResolveReflectArgument {
     /// Returns a lazy resolver when the probed type implements `Reflect`.
+    ///
+    /// # Returns
+    ///
+    /// Returns the process-lifetime lazy resolver when the bound is proven,
+    /// otherwise `None` without resolving the target.
     fn resolve_reflect_argument(self) -> Option<&'static LazyTypeRef>;
 }
 
@@ -80,6 +93,11 @@ impl<T: Reflect + ?Sized> ResolveReflectArgument for &ReflectArgumentProbe<T> {
 pub trait ResolveReflectTypeDescriptor {
     /// Returns the proven resolver, or `None` without inspecting a concrete
     /// implementation that was not constrained by the declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the exact descriptor resolver when `T: Reflect` is proven,
+    /// otherwise `None`.
     fn resolve_reflect_type_descriptor(self) -> Option<TypeDescriptorResolver>;
 }
 
@@ -97,6 +115,18 @@ impl<T: Reflect + ?Sized> ResolveReflectTypeDescriptor for &ReflectArgumentProbe
 
 /// Creates an associated-constant reader only after rustc proves the exact
 /// declared value type satisfies the sized `'static` owned boundary.
+///
+/// # Type Parameters
+///
+/// - `T`: Associated-constant value type proven sized and `'static`.
+///
+/// # Parameters
+///
+/// - `getter`: Function that reads the associated constant.
+///
+/// # Returns
+///
+/// Returns a process-lifetime reader for the generated getter.
 #[doc(hidden)]
 pub fn associated_const_reader<T: 'static>(getter: fn() -> T) -> &'static AssociatedConstReader {
     Box::leak(Box::new(AssociatedConstReader::from_getter(getter)))
@@ -110,12 +140,20 @@ pub trait AssociatedConstProvider {
     type Value: ?Sized;
 
     /// Reads the value only in a context where rustc has proven it is sized.
+    ///
+    /// # Returns
+    ///
+    /// Returns the associated constant value.
     fn get() -> Self::Value
     where
         Self::Value: Sized;
 }
 
 /// Semantic probe for an associated-constant provider.
+///
+/// # Type Parameters
+///
+/// - `P`: Provider whose associated value type is checked by method resolution.
 #[doc(hidden)]
 pub struct AssociatedConstProbe<P: AssociatedConstProvider> {
     marker: std::marker::PhantomData<fn() -> P>,
@@ -123,6 +161,10 @@ pub struct AssociatedConstProbe<P: AssociatedConstProvider> {
 
 impl<P: AssociatedConstProvider> AssociatedConstProbe<P> {
     /// Creates a zero-sized semantic probe.
+    ///
+    /// # Returns
+    ///
+    /// Returns a probe for the provider `P`.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -142,6 +184,11 @@ impl<P: AssociatedConstProvider> Default for AssociatedConstProbe<P> {
 #[doc(hidden)]
 pub trait ResolveAssociatedConstReader {
     /// Returns the proven reader, or `None` without evaluating the constant.
+    ///
+    /// # Returns
+    ///
+    /// Returns an owned-value reader only when the provider's exact value type
+    /// is both sized and `'static`.
     fn resolve_associated_const_reader(self) -> Option<&'static AssociatedConstReader>;
 }
 
@@ -166,9 +213,17 @@ where
 #[doc(hidden)]
 pub trait ConstArgumentValue: Copy + 'static {
     /// Converts this value into its structural const expression.
+    ///
+    /// # Returns
+    ///
+    /// Returns the type-independent structural expression for this value.
     fn expression(self) -> ConstExpression;
 
     /// Produces the normalized diagnostic representation of this value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the stable source-like diagnostic text.
     fn diagnostic(self) -> Box<str>;
 }
 
@@ -212,18 +267,54 @@ impl ConstArgumentValue for char {
 }
 
 /// Converts one primitive const argument into its structural expression.
+///
+/// # Type Parameters
+///
+/// - `T`: Supported primitive const parameter type.
+///
+/// # Parameters
+///
+/// - `value`: Const value to represent structurally.
+///
+/// # Returns
+///
+/// Returns the corresponding structural const expression.
 #[doc(hidden)]
 pub fn const_argument_expression<T: ConstArgumentValue>(value: T) -> ConstExpression {
     value.expression()
 }
 
 /// Returns normalized diagnostic text for one primitive const argument.
+///
+/// # Type Parameters
+///
+/// - `T`: Supported primitive const parameter type.
+///
+/// # Parameters
+///
+/// - `value`: Const value to format for diagnostics.
+///
+/// # Returns
+///
+/// Returns normalized owned text for the value.
 #[doc(hidden)]
 pub fn const_argument_diagnostic<T: ConstArgumentValue>(value: T) -> Box<str> {
     value.diagnostic()
 }
 
 /// Wraps one concrete const argument in the local owned dynamic boundary.
+///
+/// # Type Parameters
+///
+/// - `T`: Sized owned type retained in the dynamic value.
+///
+/// # Parameters
+///
+/// - `value`: Concrete const argument value.
+///
+/// # Returns
+///
+/// Returns the value wrapped as a local reflected owned value.
 #[doc(hidden)]
 pub fn const_argument_owned<T: 'static>(value: T) -> ReflectedOwned {
     ReflectedOwned::new(value)
@@ -234,6 +325,23 @@ pub fn const_argument_owned<T: 'static>(value: T) -> ReflectedOwned {
 /// Generated implementations use this for generic types, whose descriptor
 /// cannot be stored in a single local static without conflating distinct
 /// substitutions.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete Rust specialization whose descriptor is interned.
+///
+/// # Parameters
+///
+/// - `build`: Factory that creates the immutable specialization descriptor.
+///
+/// # Returns
+///
+/// Returns the unique process-lifetime descriptor for `T`.
+///
+/// # Panics
+///
+/// Propagates a panic from `build`; the descriptor cell remains available for
+/// a later retry.
 #[doc(hidden)]
 pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'static TypeDescriptor {
     crate::builtin::interner::intern::<T>(build)
@@ -241,6 +349,19 @@ pub fn intern_type<T: ?Sized + 'static>(build: fn() -> TypeDescriptor) -> &'stat
 
 /// Creates a primitive root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Primitive category to expose.
+///
+/// # Returns
+///
+/// Returns an immutable primitive root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: PrimitiveKind) -> TypeDescriptor {
@@ -249,6 +370,20 @@ pub const fn primitive<T: ?Sized + 'static>(query_name: &'static str, kind: Prim
 
 /// Creates a primitive root descriptor with a descriptor-owned capability
 /// resolver.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Primitive category to expose.
+/// - `capabilities`: Provider for the descriptor's intrinsic capabilities.
+///
+/// # Returns
+///
+/// Returns an immutable primitive root descriptor with that provider.
 #[doc(hidden)]
 pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -260,6 +395,19 @@ pub const fn primitive_with_capabilities<T: ?Sized + 'static>(
 
 /// Creates a text root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Text category to expose.
+///
+/// # Returns
+///
+/// Returns an immutable text root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind) -> TypeDescriptor {
@@ -267,6 +415,20 @@ pub const fn text<T: ?Sized + 'static>(query_name: &'static str, kind: TextKind)
 }
 
 /// Creates a text root descriptor with a descriptor-owned capability resolver.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Text category to expose.
+/// - `capabilities`: Provider for the descriptor's intrinsic capabilities.
+///
+/// # Returns
+///
+/// Returns an immutable text root descriptor with that provider.
 #[doc(hidden)]
 pub const fn text_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -278,6 +440,20 @@ pub const fn text_with_capabilities<T: ?Sized + 'static>(
 
 /// Creates a struct root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Struct category to expose.
+/// - `fields`: Fields in declaration order.
+///
+/// # Returns
+///
+/// Returns an immutable struct root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn struct_type<T: ?Sized + 'static>(
@@ -289,6 +465,21 @@ pub const fn struct_type<T: ?Sized + 'static>(
 }
 
 /// Creates a reflected struct root with generated construction entry points.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Struct category to expose.
+/// - `fields`: Fields in declaration order.
+/// - `construction`: Generated construction and update entry points.
+///
+/// # Returns
+///
+/// Returns an immutable struct root descriptor with construction support.
 #[doc(hidden)]
 pub fn struct_type_with_construction<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -300,6 +491,15 @@ pub fn struct_type_with_construction<T: ?Sized + 'static>(
 }
 
 /// Attaches generic declaration and concrete-instance facts to a root.
+///
+/// # Parameters
+///
+/// - `descriptor`: Root descriptor to enrich.
+/// - `generic`: Generic declaration and concrete substitution facts.
+///
+/// # Returns
+///
+/// Returns the descriptor carrying the concrete generic facts.
 #[doc(hidden)]
 pub const fn with_concrete_generic(
     descriptor: TypeDescriptor,
@@ -309,6 +509,15 @@ pub const fn with_concrete_generic(
 }
 
 /// Links one concrete descriptor to its source-level generic declaration.
+///
+/// # Parameters
+///
+/// - `descriptor`: Concrete root descriptor to enrich.
+/// - `definition`: Lazy resolver for its source generic declaration.
+///
+/// # Returns
+///
+/// Returns the descriptor linked to the generic definition.
 #[doc(hidden)]
 #[must_use]
 pub const fn with_type_definition(
@@ -320,6 +529,15 @@ pub const fn with_type_definition(
 
 /// Attaches a generated capability resolver to one descriptor root before it
 /// is interned.
+///
+/// # Parameters
+///
+/// - `descriptor`: Root descriptor to enrich.
+/// - `capabilities`: Provider for intrinsic capability facts.
+///
+/// # Returns
+///
+/// Returns the descriptor carrying the capability provider.
 #[doc(hidden)]
 pub const fn with_capabilities(
     descriptor: TypeDescriptor,
@@ -330,6 +548,19 @@ pub const fn with_capabilities(
 
 /// Creates an enum root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `variants`: Variants in declaration order.
+///
+/// # Returns
+///
+/// Returns an immutable enum root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn enum_type<T: ?Sized + 'static>(
@@ -340,6 +571,20 @@ pub const fn enum_type<T: ?Sized + 'static>(
 }
 
 /// Creates an enum root with normalized explicit representation metadata.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `variants`: Variants in declaration order.
+/// - `representations`: Explicit representation facts in stable order.
+///
+/// # Returns
+///
+/// Returns an immutable enum root descriptor with representation metadata.
 #[doc(hidden)]
 #[must_use]
 pub const fn enum_type_with_repr<T: ?Sized + 'static>(
@@ -352,6 +597,19 @@ pub const fn enum_type_with_repr<T: ?Sized + 'static>(
 
 /// Creates a tuple root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `elements`: Tuple element types in source order.
+///
+/// # Returns
+///
+/// Returns an immutable tuple root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'static [TypeRef]) -> TypeDescriptor {
@@ -360,6 +618,20 @@ pub const fn tuple<T: ?Sized + 'static>(query_name: &'static str, elements: &'st
 
 /// Creates an array root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `element`: Element type relationship.
+/// - `length`: Number of elements.
+///
+/// # Returns
+///
+/// Returns an immutable array root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn array<T: ?Sized + 'static>(
@@ -372,6 +644,19 @@ pub const fn array<T: ?Sized + 'static>(
 
 /// Creates an optional root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `element`: Optional payload type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable optional root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
@@ -380,6 +665,20 @@ pub const fn optional<T: ?Sized + 'static>(query_name: &'static str, element: &'
 
 /// Creates a sequence root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Sequence category to expose.
+/// - `element`: Sequence element type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable sequence root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn sequence<T: ?Sized + 'static>(
@@ -391,6 +690,20 @@ pub const fn sequence<T: ?Sized + 'static>(
 }
 
 /// Creates a set root descriptor for `T` with a generated diagnostic type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Set category to expose.
+/// - `element`: Set element type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable set root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn set<T: ?Sized + 'static>(
@@ -402,6 +715,21 @@ pub const fn set<T: ?Sized + 'static>(
 }
 
 /// Creates a map root descriptor for `T` with a generated diagnostic type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Map category to expose.
+/// - `key`: Map key type relationship.
+/// - `value`: Map value type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable map root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn map<T: ?Sized + 'static>(
@@ -415,6 +743,20 @@ pub const fn map<T: ?Sized + 'static>(
 
 /// Creates a smart-pointer root descriptor for `T` with a generated diagnostic
 /// type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust pointer type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Smart-pointer category to expose.
+/// - `pointee`: Referenced pointee type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable smart-pointer root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn smart_pointer<T: ?Sized + 'static>(
@@ -427,6 +769,20 @@ pub const fn smart_pointer<T: ?Sized + 'static>(
 
 /// Creates a reference root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust reference type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Shared or mutable reference category.
+/// - `target`: Referenced type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable reference root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn reference<T: ?Sized + 'static>(
@@ -439,6 +795,19 @@ pub const fn reference<T: ?Sized + 'static>(
 
 /// Creates a slice root descriptor for `T` with a generated diagnostic type
 /// name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust slice type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `element`: Slice element type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable slice root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'static TypeRef) -> TypeDescriptor {
@@ -447,6 +816,20 @@ pub const fn slice<T: ?Sized + 'static>(query_name: &'static str, element: &'sta
 
 /// Creates a raw-pointer root descriptor for `T` with a generated diagnostic
 /// type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Raw-pointer type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `mutability`: Whether the pointer target is mutable.
+/// - `pointee`: Pointed-to type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable raw-pointer root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn raw_pointer<T: ?Sized + 'static>(
@@ -459,6 +842,23 @@ pub const fn raw_pointer<T: ?Sized + 'static>(
 
 /// Creates a function-pointer root descriptor for `T` with a generated
 /// diagnostic type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Function-pointer type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Function-pointer calling and safety category.
+/// - `abi`: Function ABI metadata.
+/// - `variadic`: Whether the function accepts variadic arguments.
+/// - `parameters`: Parameter type relationships in call order.
+/// - `return_type`: Function return type relationship.
+///
+/// # Returns
+///
+/// Returns an immutable function-pointer root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn function<T: ?Sized + 'static>(
@@ -474,6 +874,19 @@ pub const fn function<T: ?Sized + 'static>(
 
 /// Creates a trait-object root descriptor for `T` with a generated diagnostic
 /// type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Trait-object type represented by the descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `trait_descriptor`: Lazy resolver for the reflected trait descriptor.
+///
+/// # Returns
+///
+/// Returns an immutable trait-object root descriptor.
 #[doc(hidden)]
 pub const fn trait_object<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -484,6 +897,18 @@ pub const fn trait_object<T: ?Sized + 'static>(
 
 /// Creates an intentionally opaque root descriptor for `T` with a generated
 /// diagnostic type name.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the opaque descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+///
+/// # Returns
+///
+/// Returns an immutable opaque root descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeDescriptor {
@@ -492,6 +917,19 @@ pub const fn opaque_root<T: ?Sized + 'static>(query_name: &'static str) -> TypeD
 
 /// Creates an opaque root descriptor with a descriptor-owned capability
 /// resolver.
+///
+/// # Type Parameters
+///
+/// - `T`: Rust type represented by the opaque descriptor.
+///
+/// # Parameters
+///
+/// - `query_name`: Stable reflection query name.
+/// - `capabilities`: Provider for intrinsic capability facts.
+///
+/// # Returns
+///
+/// Returns an opaque descriptor carrying that capability provider.
 #[doc(hidden)]
 pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
     query_name: &'static str,
@@ -502,6 +940,14 @@ pub const fn opaque_root_with_capabilities<T: ?Sized + 'static>(
 
 /// Creates an explicit opaque member descriptor whose diagnostic name is
 /// derived from `T`.
+///
+/// # Type Parameters
+///
+/// - `T`: Type represented by this opaque member.
+///
+/// # Returns
+///
+/// Returns an opaque member descriptor for `T`.
 #[doc(hidden)]
 #[must_use]
 pub const fn opaque_member<T: ?Sized + 'static>() -> OpaqueTypeDescriptor {
@@ -510,6 +956,14 @@ pub const fn opaque_member<T: ?Sized + 'static>() -> OpaqueTypeDescriptor {
 
 /// Allocates a process-lifetime relationship that resolves `T` only when the
 /// relationship is navigated.
+///
+/// # Type Parameters
+///
+/// - `T`: Reflected target type resolved on first navigation.
+///
+/// # Returns
+///
+/// Returns a process-lifetime lazy relationship resolver.
 #[doc(hidden)]
 #[must_use]
 pub fn lazy_type_ref<T: Reflect + ?Sized>() -> &'static LazyTypeRef {
@@ -518,6 +972,14 @@ pub fn lazy_type_ref<T: Reflect + ?Sized>() -> &'static LazyTypeRef {
 
 /// Allocates a process-lifetime list of relationships that resolve only when
 /// the list is navigated.
+///
+/// # Parameters
+///
+/// - `references`: Lazy relationships in declaration order.
+///
+/// # Returns
+///
+/// Returns a process-lifetime lazy list used by generated descriptors.
 #[doc(hidden)]
 pub(crate) fn lazy_type_ref_list(references: Vec<LazyTypeRef>) -> &'static LazyTypeRefList {
     let references = Box::leak(references.into_boxed_slice());
@@ -525,6 +987,19 @@ pub(crate) fn lazy_type_ref_list(references: Vec<LazyTypeRef>) -> &'static LazyT
 }
 
 /// Creates an immutable field descriptor for generated descriptor data.
+///
+/// # Parameters
+///
+/// - `declaring_type`: Resolver for the field's declaring type.
+/// - `index`: Source declaration index.
+/// - `rust_name`: Rust field name, or `None` for tuple fields.
+/// - `query_name`: Reflection query name, or `None` when unavailable.
+/// - `field_type`: Field type relationship.
+/// - `visibility`: Visibility retained for the field.
+///
+/// # Returns
+///
+/// Returns an immutable field descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn field(
@@ -540,6 +1015,19 @@ pub const fn field(
 
 /// Creates an immutable field whose concrete type relationship is resolved on
 /// first navigation.
+///
+/// # Parameters
+///
+/// - `declaring_type`: Resolver for the field's declaring type.
+/// - `index`: Source declaration index.
+/// - `rust_name`: Rust field name, or `None` for tuple fields.
+/// - `query_name`: Reflection query name, or `None` when unavailable.
+/// - `field_type`: Deferred resolver for the field type.
+/// - `visibility`: Visibility retained for the field.
+///
+/// # Returns
+///
+/// Returns an immutable field descriptor with deferred type navigation.
 #[doc(hidden)]
 pub const fn lazy_field(
     declaring_type: TypeDescriptorResolver,
@@ -553,6 +1041,20 @@ pub const fn lazy_field(
 }
 
 /// Creates an immutable enum variant descriptor for generated descriptor data.
+///
+/// # Parameters
+///
+/// - `declaring_type`: Resolver for the declaring enum.
+/// - `index`: Variant source declaration index.
+/// - `rust_name`: Variant's Rust name.
+/// - `query_name`: Stable reflection query name.
+/// - `kind`: Unit, tuple, or struct variant shape.
+/// - `fields`: Variant fields in declaration order.
+/// - `active_test`: Runtime probe for the active variant.
+///
+/// # Returns
+///
+/// Returns an immutable variant descriptor.
 #[doc(hidden)]
 #[must_use]
 pub const fn variant(

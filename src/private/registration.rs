@@ -32,7 +32,20 @@ pub use crate::registry::fragment::StaticFragmentIdentity;
 ///
 /// This entry point exists for generated-code integration and conformance
 /// fixtures. Ordinary applications should call [`ReflectRegistry::initialize`].
-/// Returns [`RegistryError`] only after checking the complete fragment set.
+/// It checks the complete fragment set before returning a snapshot.
+///
+/// # Parameters
+///
+/// - `fragments`: Static linker-discovered fragments to validate and aggregate.
+///
+/// # Returns
+///
+/// Returns the immutable snapshot after every fragment is validated.
+///
+/// # Errors
+///
+/// Returns a registry error when identities, targets, or registered facts
+/// conflict.
 #[doc(hidden)]
 pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     crate::registry::build_registry(fragments)
@@ -44,6 +57,14 @@ pub use super::benchmark_registry_facts::aggregate_benchmark_registry_facts;
 pub use super::benchmark_registry_facts::prepare_benchmark_registry_facts;
 
 /// Builds an effective method view from prepared impl facts for benchmarks.
+///
+/// # Parameters
+///
+/// - `implementations`: Implementations in deterministic registry order.
+///
+/// # Returns
+///
+/// Returns a frozen effective-method view for those implementations.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub fn build_benchmark_effective_type_view(
@@ -57,6 +78,19 @@ pub fn build_benchmark_effective_type_view(
 /// The first complete success or failure is retained in `cache`; later calls
 /// return the same registry reference or a clone of the cached error even when
 /// supplied a different fragment slice.
+///
+/// # Parameters
+///
+/// - `cache`: Process-lifetime cache to initialize exactly once.
+/// - `fragments`: Static fragments used by the first initializer.
+///
+/// # Returns
+///
+/// Returns the cached immutable registry reference.
+///
+/// # Errors
+///
+/// Returns a clone of the cached registry error when initialization failed.
 #[doc(hidden)]
 pub fn initialize_registry(
     cache: &'static OnceLock<Result<ReflectRegistry, RegistryError>>,
