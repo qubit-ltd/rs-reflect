@@ -15,6 +15,15 @@ use syn::DeriveInput;
 use syn::parse_macro_input;
 
 /// Derives the runtime facade's re-exported `Reflect` implementation.
+///
+/// # Parameters
+///
+/// - `_attribute`: Unused attribute arguments from the facade invocation.
+/// - `item`: Struct or enum declaration to derive reflection for.
+///
+/// # Returns
+///
+/// Returns tokens deriving `Reflect` through `model_facade_runtime`.
 pub fn model_reflect(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as DeriveInput);
     let reflect_attribute = if item.generics.params.is_empty() {
@@ -32,6 +41,15 @@ pub fn model_reflect(_attribute: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 /// Reflects a trait through the runtime facade's attribute macro.
+///
+/// # Parameters
+///
+/// - `_attribute`: Unused attribute arguments from the facade invocation.
+/// - `item`: Trait declaration to reflect.
+///
+/// # Returns
+///
+/// Returns tokens invoking the runtime facade's `reflect` attribute.
 pub fn model_reflect_trait(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item = proc_macro2::TokenStream::from(item);
     quote! {
@@ -42,6 +60,15 @@ pub fn model_reflect_trait(_attribute: TokenStream, item: TokenStream) -> TokenS
 }
 
 /// Reflects an impl through the runtime facade's attribute macro.
+///
+/// # Parameters
+///
+/// - `_attribute`: Unused attribute arguments from the facade invocation.
+/// - `item`: Impl block to reflect.
+///
+/// # Returns
+///
+/// Returns tokens invoking the runtime facade's `reflect_impl` attribute.
 pub fn model_reflect_impl(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item = proc_macro2::TokenStream::from(item);
     quote! {

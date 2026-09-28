@@ -13,18 +13,49 @@ mod macros;
 use proc_macro::TokenStream;
 
 /// Derives the runtime facade's re-exported `Reflect` implementation.
+///
+/// # Parameters
+///
+/// - `attribute`: Attribute arguments from the facade invocation; currently
+///   ignored.
+/// - `item`: Struct or enum declaration to derive reflection for.
+///
+/// # Returns
+///
+/// Returns the declaration with a `Reflect` derive configured for the runtime
+/// facade.
 #[proc_macro_attribute]
 pub fn model_reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
     macros::model_reflect(attribute, item)
 }
 
 /// Reflects a trait through the runtime facade's attribute macro.
+///
+/// # Parameters
+///
+/// - `attribute`: Attribute arguments from the facade invocation; currently
+///   ignored.
+/// - `item`: Trait declaration to reflect.
+///
+/// # Returns
+///
+/// Returns the trait decorated with the runtime's reflection attribute.
 #[proc_macro_attribute]
 pub fn model_reflect_trait(attribute: TokenStream, item: TokenStream) -> TokenStream {
     macros::model_reflect_trait(attribute, item)
 }
 
 /// Reflects an impl through the runtime facade's attribute macro.
+///
+/// # Parameters
+///
+/// - `attribute`: Attribute arguments from the facade invocation; currently
+///   ignored.
+/// - `item`: Impl block to reflect.
+///
+/// # Returns
+///
+/// Returns the impl decorated with the runtime's reflection attribute.
 #[proc_macro_attribute]
 pub fn model_reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
     macros::model_reflect_impl(attribute, item)
