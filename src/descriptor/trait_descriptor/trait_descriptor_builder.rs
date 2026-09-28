@@ -402,6 +402,14 @@ impl TraitDescriptorBuilder {
 }
 
 /// Returns whether an argument contains only concrete runtime identity facts.
+///
+/// # Parameters
+///
+/// - `argument`: Generic argument to inspect.
+///
+/// # Returns
+///
+/// Returns `true` when the argument can be used in a concrete trait identity.
 pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgument) -> bool {
     match argument {
         GenericArgument::Type(expression) => type_expression_is_concrete(expression),
@@ -413,6 +421,14 @@ pub(in crate::descriptor) fn generic_argument_is_concrete(argument: &GenericArgu
 }
 
 /// Returns whether a substituted type expression contains no symbolic type.
+///
+/// # Parameters
+///
+/// - `expression`: Type expression to inspect.
+///
+/// # Returns
+///
+/// Returns `true` when every type and const component is concrete.
 fn type_expression_is_concrete(expression: &TypeExpression) -> bool {
     match expression {
         TypeExpression::Concrete(concrete) => concrete.arguments.iter().all(generic_argument_is_concrete),

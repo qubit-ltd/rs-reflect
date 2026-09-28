@@ -152,11 +152,6 @@ reason = "Impl kinds, associated bindings, method lookup, and builders form one 
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/trait_descriptor/definition.rs"
-reason = "Trait completeness and associated item descriptors are the definition-level records consumed by trait builders."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/trait_descriptor/supertrait.rs"
 reason = "The trait reference and its transitive closure are the paired representation of supertrait navigation."
 
