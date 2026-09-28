@@ -415,6 +415,7 @@ impl MethodQualifiers {
     ///
     /// Returns `true` for an `async` method.
     #[must_use]
+    #[inline]
     pub const fn is_async(&self) -> bool {
         self.is_async
     }
@@ -425,6 +426,7 @@ impl MethodQualifiers {
     ///
     /// Returns `true` for an `unsafe` method.
     #[must_use]
+    #[inline]
     pub const fn is_unsafe(&self) -> bool {
         self.is_unsafe
     }
@@ -435,6 +437,7 @@ impl MethodQualifiers {
     ///
     /// Returns `true` for a `const` method.
     #[must_use]
+    #[inline]
     pub const fn is_const(&self) -> bool {
         self.is_const
     }
@@ -445,6 +448,7 @@ impl MethodQualifiers {
     ///
     /// Returns the ABI, or `None` for the ordinary Rust ABI.
     #[must_use]
+    #[inline]
     pub const fn abi(&self) -> Option<&FunctionAbi> {
         self.abi.as_ref()
     }
@@ -455,6 +459,7 @@ impl MethodQualifiers {
     ///
     /// Returns `true` when the method has a variadic tail.
     #[must_use]
+    #[inline]
     pub const fn is_variadic(&self) -> bool {
         self.is_variadic
     }
