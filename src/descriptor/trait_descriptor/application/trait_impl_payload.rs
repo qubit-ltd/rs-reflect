@@ -25,6 +25,7 @@ use crate::descriptor::TraitDescriptorBuildError;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::expression::GenericArgument;
 
+/// Cache for trait hook payloads keyed by receiver type and applied identity.
 type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImplPayload>>>;
 
 /// Concrete trait facts supplied by a reflected trait's hidden implementation
@@ -165,8 +166,38 @@ impl TraitImplPayload {
         self.associated_const_readers
     }
 
-    /// Reuses an applied descriptor without constructing a discarded candidate
-    /// on cache hits.
+    /// Reuses a cached payload for one receiver type and trait application.
+    ///
+    /// Concurrent callers share one initialization cell for the key. The cache
+    /// lock is released before descriptor and adapter builders run; a later
+    /// call can retry initialization if a builder panics.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete receiver type used as part of the cache key.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Trait declaration shared by all applications.
+    /// - `arguments`: Concrete generic arguments for the trait application.
+    /// - `build`: Constructs the applied descriptor from `arguments`.
+    /// - `build_default_method_adapters`: Builds generated adapters for default
+    ///   methods.
+    /// - `build_default_method_unavailable_reasons`: Builds reasons for
+    ///   unavailable default methods.
+    /// - `build_associated_type_resolvers`: Builds resolvers for concrete
+    ///   associated types.
+    /// - `build_associated_const_readers`: Builds readers for associated
+    ///   constants.
+    ///
+    /// # Returns
+    ///
+    /// Returns the cached payload for this receiver and trait application.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the cache mutex is poisoned, if `build` returns an error, or
+    /// if any supplied builder panics.
     #[doc(hidden)]
     pub fn cached_with_arguments<T: ?Sized + 'static>(
         definition: &'static TraitDefinitionDescriptor,

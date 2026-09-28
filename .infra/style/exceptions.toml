@@ -152,11 +152,6 @@ reason = "Impl kinds, associated bindings, method lookup, and builders form one 
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/trait_descriptor/builder.rs"
-reason = "TraitDescriptorBuilder and its build error define one atomic validation and construction boundary."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/trait_descriptor/definition.rs"
 reason = "Trait completeness and associated item descriptors are the definition-level records consumed by trait builders."
 
