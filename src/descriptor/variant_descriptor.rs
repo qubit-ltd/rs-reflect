@@ -25,75 +25,13 @@ use crate::error::TypeMismatch;
 use crate::value::ReflectedOwned;
 use crate::value::ReflectedRef;
 
-/// The declared shape of an enum variant.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::VariantKind;
-/// assert_eq!(VariantKind::Unit, VariantKind::Unit);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum VariantKind {
-    /// A fieldless variant.
-    Unit,
-    /// A positional variant.
-    Tuple,
-    /// A variant with named fields.
-    Struct,
-}
+mod discriminant_origin;
+mod numeric_discriminant;
+mod variant_kind;
 
-/// Whether a variant's discriminant was written explicitly in Rust source.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::DiscriminantOrigin;
-/// assert_eq!(DiscriminantOrigin::Implicit, DiscriminantOrigin::Implicit);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum DiscriminantOrigin {
-    /// Rust assigned the value from declaration order and preceding values.
-    Implicit,
-    /// The variant declaration contains an explicit discriminant expression.
-    Explicit,
-}
-
-/// The exact integer representation of an enum discriminant value.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::NumericDiscriminant;
-/// assert_eq!(NumericDiscriminant::U8(3), NumericDiscriminant::U8(3));
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum NumericDiscriminant {
-    /// An `i8` discriminant.
-    I8(i8),
-    /// An `i16` discriminant.
-    I16(i16),
-    /// An `i32` discriminant.
-    I32(i32),
-    /// An `i64` discriminant.
-    I64(i64),
-    /// An `i128` discriminant.
-    I128(i128),
-    /// An `isize` discriminant.
-    Isize(isize),
-    /// A `u8` discriminant.
-    U8(u8),
-    /// A `u16` discriminant.
-    U16(u16),
-    /// A `u32` discriminant.
-    U32(u32),
-    /// A `u64` discriminant.
-    U64(u64),
-    /// A `u128` discriminant.
-    U128(u128),
-    /// A `usize` discriminant.
-    Usize(usize),
-}
+pub use discriminant_origin::DiscriminantOrigin;
+pub use numeric_discriminant::NumericDiscriminant;
+pub use variant_kind::VariantKind;
 
 /// The immutable structural description of one reflected enum variant.
 #[cfg_attr(
@@ -177,7 +115,8 @@ impl VariantDescriptor {
     /// # Parameters
     ///
     /// - `origin`: Whether the discriminant was explicit in source.
-    /// - `numeric`: Exact numeric value when supported by the enum representation.
+    /// - `numeric`: Exact numeric value when supported by the enum
+    ///   representation.
     ///
     /// # Returns
     ///
