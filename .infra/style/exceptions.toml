@@ -149,8 +149,3 @@ reason = "Adapter availability and unavailability reasons jointly explain whethe
 rule = "multiple-public-types"
 path = "src/descriptor/impl_descriptor.rs"
 reason = "Impl kinds, associated bindings, method lookup, and builders form one linked implementation-descriptor object model."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/descriptor/typed_view.rs"
-reason = "Primitive, collection, pointer, and aggregate views are the coordinated projections of one root TypeDescriptor."
