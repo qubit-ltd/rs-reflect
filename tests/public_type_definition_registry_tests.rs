@@ -23,6 +23,8 @@ use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
+use qubit_reflect::capability::CapabilityLookup;
+use qubit_reflect::capability::CapabilityOrigin;
 use qubit_reflect::capability::clone_key;
 use qubit_reflect::capability::default_key;
 use qubit_reflect::descriptor::StructKind;
@@ -32,8 +34,10 @@ use qubit_reflect::descriptor::TypeDefinitionId;
 use qubit_reflect::descriptor::VariantKind;
 use qubit_reflect::expression::GenericDefinitionDescriptor;
 use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::identity::FragmentIdentity;
 use qubit_reflect::identity::VisibilityKind;
 use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::registry::RegistrySnapshotBuilder;
 
 #[derive(Clone, Reflect)]
 #[reflect(crate = qubit_reflect, capabilities(Clone))]
@@ -52,6 +56,83 @@ enum GenericEnum<T> {
 /// Returns the typed declaration capability used by this fixture.
 fn definition_key() -> CapabilityKey<u32> {
     CapabilityKey::new(CapabilityId::new("example.generic_definition").expect("valid capability ID"))
+}
+
+/// Verifies definition-member lookup states retain source and origin evidence.
+#[test]
+fn test_snapshot_definition_capability_members_retain_lookup_and_provenance() {
+    let found_key = CapabilityKey::new(CapabilityId::new("example.definition.found").expect("valid ID"));
+    let fact_key = CapabilityKey::<String>::new(CapabilityId::new("example.definition.fact").expect("valid ID"));
+    let mismatch_key = CapabilityKey::<usize>::new(CapabilityId::new("example.definition.mismatch").expect("valid ID"));
+    let missing_key = CapabilityKey::<usize>::new(CapabilityId::new("example.definition.missing").expect("valid ID"));
+    let definition = TypeDescriptor::of::<GenericRecord<u8>>()
+        .type_definition()
+        .expect("generic definition");
+    let capability_source = FragmentIdentity::new("fixture", "definitions", 30, 1, "capability", 30);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_definition(
+        definition,
+        FragmentIdentity::new("fixture", "definitions", 10, 1, "definition", 10),
+    );
+    builder.add_definition_capabilities(
+        definition,
+        vec![
+            CapabilityDescriptor::with_adapter(found_key, 42_usize),
+            CapabilityDescriptor::without_adapter(fact_key),
+            CapabilityDescriptor::without_adapter(CapabilityKey::<u64>::new(*mismatch_key.id())),
+        ],
+        capability_source.clone(),
+    );
+    let capability_only_definition = TypeDescriptor::of::<GenericEnum<u8>>()
+        .type_definition()
+        .expect("generic definition");
+    builder.add_definition_capabilities(
+        capability_only_definition,
+        vec![CapabilityDescriptor::with_adapter(found_key, 44_usize)],
+        FragmentIdentity::new("fixture", "definitions", 32, 1, "capability", 32),
+    );
+    let registry = builder.build().expect("valid definition capability snapshot");
+
+    let found_member = registry
+        .definition_capability_members(found_key)
+        .next()
+        .expect("registered definition member");
+    assert_eq!(found_member.target().id(), definition.id());
+    assert!(matches!(
+        found_member.lookup(),
+        CapabilityLookup::Found(value) if **value == 42,
+    ));
+    assert_eq!(found_member.source(), &capability_source);
+    assert_eq!(
+        found_member.origin(),
+        &CapabilityOrigin::Registered {
+            source: capability_source,
+        },
+    );
+    assert!(matches!(
+        registry
+            .definition_capability_members(fact_key)
+            .next()
+            .expect("fact-only member")
+            .lookup(),
+        CapabilityLookup::FactOnly(_),
+    ));
+    assert!(matches!(
+        registry
+            .definition_capability_members(mismatch_key)
+            .next()
+            .expect("mismatched member")
+            .lookup(),
+        CapabilityLookup::AdapterTypeMismatch { .. },
+    ));
+    assert!(registry.definition_capability_members(missing_key).next().is_none());
+    assert_eq!(registry.definitions().len(), 1);
+    assert_eq!(
+        registry
+            .capability_only_definition_targets(found_key.id().as_str())
+            .len(),
+        1
+    );
 }
 
 /// Declares one capability fragment targeting the generic definition itself.
@@ -130,10 +211,18 @@ fn test_registry_registers_generic_type_definition() {
             .definition_capability_by_id(definition.id(), "example.generic_definition")
             .is_some()
     );
-    assert!(
+    let definition_members: Vec<_> = registry.definition_capability_members(definition_key()).collect();
+    assert_eq!(definition_members.len(), 1);
+    assert_eq!(definition_members[0].target().id(), definition.id());
+    assert!(matches!(
+        definition_members[0].lookup(),
+        CapabilityLookup::Found(value) if **value == 7_u32,
+    ));
+    assert_eq!(
+        definition_members[0].source(),
         registry
-            .definitions_with_capability(definition_key())
-            .any(|candidate| candidate.id() == definition.id())
+            .definition_capability_source(definition.id(), definition_key().id().as_str())
+            .expect("registered definition capability source"),
     );
     assert!(
         registry
