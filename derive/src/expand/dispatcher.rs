@@ -25,12 +25,12 @@ use crate::ir::TypeDeclarationKindIr;
 ///
 /// # Returns
 ///
-/// Returns generated Rust tokens, or a diagnostic if runtime resolution fails.
+/// Returns the generated Rust tokens.
 ///
 /// # Errors
 ///
-/// Returns a runtime facade, malformed declaration, or unsupported declaration
-/// diagnostic when expansion cannot proceed.
+/// Returns a syntax diagnostic when the runtime facade cannot be resolved or
+/// the declaration contains malformed or unsupported expansion data.
 pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
     let attributes = match &declaration {
         DeclarationIr::Type(value) => &value.attributes,

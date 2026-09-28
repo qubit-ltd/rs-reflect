@@ -44,6 +44,11 @@ use crate::ir::ValidatedDeclaration;
 /// # Returns
 ///
 /// Returns validated IR or aggregated validation diagnostics.
+///
+/// # Errors
+///
+/// Returns all collected semantic validation diagnostics with their source
+/// spans.
 #[allow(
     dead_code,
     reason = "the staged validation API is exercised directly by unit tests and later expansion tasks"

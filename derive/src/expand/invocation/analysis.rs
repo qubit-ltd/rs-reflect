@@ -91,6 +91,11 @@ impl<'a> MethodContext<'a> {
 /// # Returns
 ///
 /// Returns the invocation plan.
+///
+/// # Errors
+///
+/// This function currently returns no errors; the result type is retained for
+/// compatibility with callers that compose invocation analysis with parsing.
 pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> syn::Result<InvocationPlan> {
     let receiver = method.receiver.as_ref().map(|receiver| match receiver.kind {
         ReceiverKindIr::Value => ReceiverPlan::Value,

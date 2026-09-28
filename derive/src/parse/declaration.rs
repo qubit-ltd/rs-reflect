@@ -90,6 +90,11 @@ use crate::validate::validation_error;
 /// # Returns
 ///
 /// Returns parsed declaration IR or aggregated syntax diagnostics.
+///
+/// # Errors
+///
+/// Returns parser syntax errors for malformed input or the aggregated helper
+/// diagnostics.
 #[allow(
     dead_code,
     reason = "the staged parse API is exercised directly by unit tests and later expansion tasks"
@@ -118,6 +123,11 @@ pub(crate) fn parse_declaration(
 /// # Returns
 ///
 /// Returns validated declaration IR or aggregated syntax and validation
+/// diagnostics.
+///
+/// # Errors
+///
+/// Returns parser syntax errors or aggregated parser and semantic validation
 /// diagnostics.
 pub(crate) fn parse_and_validate_declaration(
     kind: MacroKind,
@@ -152,6 +162,10 @@ pub(crate) fn parse_and_validate_declaration(
 /// # Returns
 ///
 /// Returns parser IR and recoverable syntax errors.
+///
+/// # Errors
+///
+/// Returns a syntax error when the top-level item cannot be parsed.
 fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
@@ -170,6 +184,10 @@ fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> Syn
 /// # Returns
 ///
 /// Returns type declaration IR and recoverable helper diagnostics.
+///
+/// # Errors
+///
+/// Returns a syntax error when the derive input cannot be parsed.
 fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     if !args.is_empty() {
         return Err(Error::new_spanned(
@@ -268,6 +286,10 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
 /// # Returns
 ///
 /// Returns trait declaration IR and recoverable helper diagnostics.
+///
+/// # Errors
+///
+/// Returns a syntax error when the input is malformed or is not a trait.
 fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Trait(mut item) = item else {
@@ -325,6 +347,10 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
 /// # Returns
 ///
 /// Returns impl declaration IR and recoverable helper diagnostics.
+///
+/// # Errors
+///
+/// Returns a syntax error when the input is malformed or is not an impl block.
 fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Impl(mut item) = item else {

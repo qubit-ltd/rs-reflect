@@ -199,6 +199,10 @@ fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -
 /// # Returns
 ///
 /// Returns inherited paths, or an empty list for a bare flag.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the parenthesized path list is invalid.
 fn parse_optional_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
     if matches!(meta, Meta::Path(_)) {
         return Ok(Vec::new());
@@ -215,6 +219,10 @@ fn parse_optional_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
 /// # Returns
 ///
 /// Returns the converted Rust facade path.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the helper is not a Rust path expression.
 fn parse_runtime_crate(meta: &Meta) -> SynResult<PathIr> {
     let Meta::NameValue(name_value) = meta else {
         return Err(Error::new(meta.span(), "`crate` requires a Rust facade path"));
@@ -238,6 +246,10 @@ fn parse_runtime_crate(meta: &Meta) -> SynResult<PathIr> {
 /// # Returns
 ///
 /// Returns success for a bare path, otherwise a syntax diagnostic.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the flag has a value or argument list.
 fn parse_flag(meta: &Meta, name: &str) -> SynResult<()> {
     if matches!(meta, Meta::Path(_)) {
         Ok(())
@@ -256,6 +268,10 @@ fn parse_flag(meta: &Meta, name: &str) -> SynResult<()> {
 /// # Returns
 ///
 /// Returns the string value or a syntax diagnostic.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the helper value is not a string literal.
 fn parse_string_value(meta: &Meta, name: &str) -> SynResult<String> {
     let Meta::NameValue(name_value) = meta else {
         return Err(Error::new(
@@ -285,6 +301,10 @@ fn parse_string_value(meta: &Meta, name: &str) -> SynResult<String> {
 /// # Returns
 ///
 /// Returns the converted nonempty path list.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic for malformed or empty path lists.
 fn parse_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
     let Meta::List(list) = meta else {
         return Err(Error::new(
@@ -308,6 +328,10 @@ fn parse_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
 /// # Returns
 ///
 /// Returns the optional converted provider path.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the provider is not a Rust path.
 fn parse_default(meta: &Meta) -> SynResult<Option<PathIr>> {
     match meta {
         Meta::Path(_) => Ok(None),
@@ -336,6 +360,10 @@ fn parse_default(meta: &Meta) -> SynResult<Option<PathIr>> {
 /// # Returns
 ///
 /// Returns the named specialization bindings and source span.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic for malformed or empty specialization lists.
 fn parse_specialization(meta: &Meta) -> SynResult<SpecializationIr> {
     let Meta::List(list) = meta else {
         return Err(Error::new(meta.span(), "`specialize` requires named arguments"));
@@ -362,6 +390,10 @@ fn parse_specialization(meta: &Meta) -> SynResult<SpecializationIr> {
 /// # Returns
 ///
 /// Returns the converted external trait mapping.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the path and ID mapping is malformed.
 fn parse_external_trait(meta: &Meta) -> SynResult<ExternalTraitIr> {
     let Meta::List(list) = meta else {
         return Err(Error::new(
@@ -393,6 +425,10 @@ impl Parse for SpecializationBindings {
     /// # Returns
     ///
     /// Returns the parsed bindings or a syntax diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns a syntax diagnostic when a name/value binding is malformed.
     fn parse(input: ParseStream<'_>) -> SynResult<Self> {
         let mut bindings = Vec::new();
         while !input.is_empty() {
@@ -455,6 +491,11 @@ impl Parse for ExternalTraitSyntax {
     /// # Returns
     ///
     /// Returns the path and ID mapping or a syntax diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns a syntax diagnostic when the external trait mapping is
+    /// malformed.
     fn parse(input: ParseStream<'_>) -> SynResult<Self> {
         let path = input.parse()?;
         input.parse::<Token![,]>()?;

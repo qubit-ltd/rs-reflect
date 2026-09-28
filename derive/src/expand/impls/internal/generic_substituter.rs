@@ -36,6 +36,11 @@ use syn::visit_mut::visit_type_path_mut;
 /// # Returns
 ///
 /// Returns the rewritten type syntax.
+///
+/// # Panics
+///
+/// Panics if the validated specialization tokens cannot be parsed as type
+/// syntax.
 pub(in crate::expand::impls) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
