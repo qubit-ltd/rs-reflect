@@ -95,6 +95,16 @@ fn observations(registry: &ReflectRegistry) -> Vec<(bool, Vec<Option<u32>>)> {
 }
 
 /// Checks order invariance, conflict atomicity, membership, and independence.
+///
+/// # Parameters
+///
+/// - `unbounded`: Arbitrary input bytes, limited internally to the fixture's
+///   maximum input length.
+///
+/// # Panics
+///
+/// Panics if snapshot validity or observable registry state depends on input
+/// order, or if an isolated fixture does not retain its expected capability.
 pub fn check(unbounded: &[u8]) {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
     let operations: Vec<_> = data.chunks_exact(5).take(MAX_FRAGMENTS).collect();

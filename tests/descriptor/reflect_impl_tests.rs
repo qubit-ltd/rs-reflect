@@ -534,6 +534,16 @@ impl UnadaptedReceiver {
     fn extension(self: Pin<Rc<Self>>) {}
 }
 
+/// Converts an owned reflected receiver into the registered extension shape.
+///
+/// # Parameters
+///
+/// - `receiver`: Invocation receiver supplied to the capability adapter.
+///
+/// # Returns
+///
+/// Returns the `Pin<Rc<ExtensionReceiver>>` on success, or the original
+/// receiver when it has a different mode or type.
 fn extension_receiver_adapter<'call>(
     receiver: reflect::invoke::InvocationReceiver<'call, reflect::value::Local>,
 ) -> Result<Pin<Rc<ExtensionReceiver>>, reflect::invoke::InvocationReceiver<'call, reflect::value::Local>> {
@@ -2321,6 +2331,15 @@ fn test_reflect_impl_generates_explicit_catching_adapter() {
     assert_eq!(caught.payload().downcast_ref::<&str>(), Some(&"caught panic"));
 }
 
+/// Polls one ready test future once with a no-op waker.
+///
+/// # Parameters
+///
+/// - `future`: Unpinned future to poll.
+///
+/// # Returns
+///
+/// Returns the result of the single poll.
 fn poll_once<F: Future + Unpin>(future: &mut F) -> Poll<F::Output> {
     let waker = std::task::Waker::noop();
     let mut context = Context::from_waker(waker);
@@ -2330,6 +2349,14 @@ fn poll_once<F: Future + Unpin>(future: &mut F) -> Poll<F::Output> {
 #[reflect_impl]
 impl Sample {
     /// Returns a slice whose borrow must remain descriptive without an adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `values`: Slice returned unchanged by the method.
+    ///
+    /// # Returns
+    ///
+    /// Returns the same borrowed slice.
     pub fn reflected_slice_output(values: &[u8]) -> &[u8] {
         values
     }
