@@ -34,6 +34,17 @@ pub(crate) struct TraitApplicationSubstitutions {
 
 impl TraitApplicationSubstitutions {
     /// Builds substitutions from declaration-order runtime identity arguments.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Trait declaration whose generic parameters define the
+    ///   argument order.
+    /// - `arguments`: Concrete type and const arguments in declaration order.
+    /// - `associated_type_arguments`: Concrete associated-type equalities.
+    ///
+    /// # Returns
+    ///
+    /// Returns substitutions for the supplied trait application.
     pub(in crate::descriptor::trait_descriptor) fn new(
         definition: &TraitDefinitionDescriptor,
         arguments: &[GenericArgument],
@@ -76,12 +87,25 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Returns whether this application carries no substitutions.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when no type, const, lifetime, or associated-type
+    /// substitution is present.
     pub(in crate::descriptor::trait_descriptor) fn is_empty(&self) -> bool {
         self.types.is_empty() && self.consts.is_empty() && self.lifetimes.is_empty() && self.associated_types.is_empty()
     }
 
     /// Applies outer trait arguments inside a nested item generic definition
     /// while preserving names shadowed by the item's own parameters.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Nested generic definition to substitute.
+    ///
+    /// # Returns
+    ///
+    /// Returns the generic definition with applicable outer substitutions.
     pub(in crate::descriptor::trait_descriptor) fn generic_definition(
         &self,
         definition: &GenericDefinitionDescriptor,
@@ -150,6 +174,14 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes one structural type expression recursively.
+    ///
+    /// # Parameters
+    ///
+    /// - `expression`: Type expression to transform.
+    ///
+    /// # Returns
+    ///
+    /// Returns the expression with this application's substitutions applied.
     pub(crate) fn type_expression(&self, expression: &TypeExpression) -> TypeExpression {
         match expression {
             TypeExpression::Parameter(name) => self
@@ -250,6 +282,15 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes one generic argument recursively.
+    ///
+    /// # Parameters
+    ///
+    /// - `argument`: Generic argument to transform.
+    ///
+    /// # Returns
+    ///
+    /// Returns the argument with nested types, lifetimes, and predicates
+    /// substituted.
     fn generic_argument(&self, argument: &GenericArgument) -> GenericArgument {
         match argument {
             GenericArgument::Type(value) => GenericArgument::Type(self.type_expression(value)),
@@ -272,6 +313,15 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes one const parameter reference.
+    ///
+    /// # Parameters
+    ///
+    /// - `expression`: Const expression to transform.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete const expression when a matching parameter exists,
+    /// or a clone of the original expression otherwise.
     fn const_expression(&self, expression: &ConstExpression) -> ConstExpression {
         match expression {
             ConstExpression::Parameter(name) => self
@@ -285,6 +335,15 @@ impl TraitApplicationSubstitutions {
 
     /// Maps declaration lifetimes to the only lifetime supported by a
     /// `'static` trait-object root.
+    ///
+    /// # Parameters
+    ///
+    /// - `lifetime`: Lifetime expression to transform.
+    ///
+    /// # Returns
+    ///
+    /// Returns `'static` for a declared lifetime parameter, or the original
+    /// lifetime expression when it is not substituted.
     fn lifetime(&self, lifetime: &crate::expression::LifetimeExpression) -> crate::expression::LifetimeExpression {
         match lifetime {
             crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name.as_str()) => {
@@ -295,6 +354,15 @@ impl TraitApplicationSubstitutions {
     }
 
     /// Substitutes types nested in one predicate.
+    ///
+    /// # Parameters
+    ///
+    /// - `predicate`: Predicate whose contained types or lifetimes are
+    ///   substituted.
+    ///
+    /// # Returns
+    ///
+    /// Returns the predicate with this application's substitutions applied.
     pub(crate) fn predicate(&self, predicate: &PredicateDescriptor) -> PredicateDescriptor {
         let mut result = predicate.clone();
         match &mut result {
