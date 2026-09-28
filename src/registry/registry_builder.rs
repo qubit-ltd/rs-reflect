@@ -43,35 +43,35 @@ use crate::registry::registry::ReflectRegistry;
 /// Accumulates validated payloads without exposing partial registry state.
 #[derive(Default)]
 struct RegistryBuilder {
-    /// Concrete roots in stable source-fragment order.
+    /// Unique concrete type descriptors in deterministic input order.
     types: Vec<&'static TypeDescriptor>,
-    /// Unique roots keyed by runtime identity and source fragment.
+    /// Concrete type identity to descriptor and first contributing fragment.
     types_by_id: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
-    /// Generic declarations in stable source-fragment order.
+    /// Generic type declarations in deterministic input order.
     definitions: Vec<&'static TypeDefinitionDescriptor>,
-    /// Unique generic declarations keyed by identity and source fragment.
+    /// Generic declaration identity to descriptor and first fragment.
     definitions_by_id: HashMap<TypeDefinitionId, (&'static TypeDefinitionDescriptor, FragmentIdentity)>,
-    /// First compatible trait declaration for each reflected/external ID.
+    /// Trait declarations keyed by their stable identity.
     traits_by_id: HashMap<TraitId, &'static TraitDefinitionDescriptor>,
-    /// Source fragment for each trait ID.
+    /// First fragment that contributed each trait declaration.
     trait_fragments: HashMap<TraitId, FragmentIdentity>,
-    /// First compatible declaration and source for each external trait ID.
+    /// External trait declarations keyed by external identity.
     external_traits: HashMap<ExternalTraitId, (&'static TraitDefinitionDescriptor, FragmentIdentity)>,
-    /// Source fragments that already claim a concrete trait implementation.
+    /// Unique concrete implementations keyed by target and applied trait.
     trait_impls: HashMap<(TypeId, AppliedTraitId), FragmentIdentity>,
-    /// Trait declarations linked to symbolic impl-definition fragments.
+    /// Resolved trait declaration for each trait implementation fragment.
     impl_definition_traits: HashMap<FragmentIdentity, &'static TraitDefinitionDescriptor>,
-    /// Generic and blanket impl definitions in source-fragment order.
+    /// Source-level impl declarations in deterministic input order.
     impl_definitions: Vec<&'static ImplDefinitionDescriptor>,
-    /// Concrete implementations grouped by target type.
+    /// Concrete impl descriptors grouped by target type identity.
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
-    /// Unique capability facts and the fragment that contributed each one.
+    /// Effective capability facts and their first contributing fragment.
     capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
-    /// Semantic origin retained for each capability fact.
+    /// Origin classification for every effective capability.
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
-    /// Candidate intrinsic providers awaiting concrete membership resolution.
+    /// Candidate intrinsic capabilities awaiting conflict validation.
     intrinsic_candidates: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
-    /// Unique fragment identities in validated deterministic order.
+    /// All accepted fragment identities in input order.
     fragment_identities: Vec<FragmentIdentity>,
 }
 

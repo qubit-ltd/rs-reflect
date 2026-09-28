@@ -41,9 +41,13 @@ use crate::value::DynamicRef;
 /// assert!(invocation.arguments().is_empty());
 /// ```
 pub struct Invocation<'call, M: InvocationMode> {
+    /// Optional receiver supplied by the caller.
     receiver: Option<InvocationReceiver<'call, M>>,
+    /// Arguments in the order supplied by the caller.
     arguments: Box<[InvocationArg<'call, M>]>,
+    /// Optional caller-provided names aligned with `arguments`.
     argument_names: Box<[Option<Box<str>>]>,
+    /// Original bindings needed to restore inputs after validation failure.
     binding_recovery: Option<Box<BindingRecovery>>,
 }
 
@@ -54,7 +58,9 @@ pub type ReceiverAdaptationResult<'call, R, M> =
 
 /// Caller-order metadata retained while a generated adapter validates inputs.
 struct BindingRecovery {
+    /// Caller argument index for each descriptor-ordered argument.
     caller_index_for_argument: Box<[usize]>,
+    /// Caller-provided names in original argument order.
     caller_names: Box<[Option<Box<str>>]>,
 }
 
@@ -607,9 +613,13 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
 /// Owned values remain inside their dynamic wrappers until the adapter consumes
 /// this state, so validating later inputs cannot lose earlier owned inputs.
 pub struct ValidatedInvocation<'call, M: InvocationMode> {
+    /// Receiver after descriptor-aware validation.
     receiver: Option<InvocationReceiver<'call, M>>,
+    /// Arguments reordered into declaration parameter order.
     arguments: Box<[InvocationArg<'call, M>]>,
+    /// Names aligned with the declaration-ordered arguments.
     argument_names: Box<[Option<Box<str>>]>,
+    /// Recovery map retained for adapter execution failures.
     binding_recovery: Option<Box<BindingRecovery>>,
 }
 
