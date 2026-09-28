@@ -209,6 +209,9 @@ provider 必须与 snapshot 无关，不得重入注册表初始化，其 panic 
 snapshot 索引，构建失败和其他 snapshot 不会修改共享声明。facade 宏使用
 `#[reflect(definition_provider_v2 = identifier)]` 选择 facade 所有的 provider 名称；v2 provider 是
 无参数函数，返回 `&'static TypeDefinitionDescriptor`，不要求具体单态化，也不推断生成名称。
+冻结注册表的 `type_capability_members` 与 `definition_capability_members` 同时携带 lookup 状态、origin
+和来源；注册成员中的 fact-only、适配器类型不匹配状态均可见，capability-only 目标仍通过专用审计查询
+读取。内建能力在存在类型成员时以成员声明片段为来源，否则采用最早触发检查的片段。
 
 derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛型定义和构造展开共用它。
 空字段数量不再决定结构形状。此内部修订不改变 `codegen_v3` 或当前模型 ABI v7 协议。

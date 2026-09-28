@@ -242,6 +242,13 @@ declarations. Facade macros select an owned provider name with
 parameterless function returning `&'static TypeDefinitionDescriptor`, without
 requiring a concrete monomorphization or an inferred generated name.
 
+Frozen registry member queries (`type_capability_members` and
+`definition_capability_members`) carry lookup state, origin, and source. They
+include fact-only and adapter-mismatch states for registered members, while
+capability-only targets remain available through dedicated audit queries.
+Intrinsic facts use the member declaration as source when present, otherwise
+the earliest fragment that triggered inspection.
+
 Derive IR records Unit/Named/Unnamed in `FieldShapeIr`, shared by concrete descriptors, generic
 definitions, and construction expansion. Empty field counts no longer determine source shape.
 This internal change does not change `codegen_v3` or model ABI v7. Downstream metadata/property queries
