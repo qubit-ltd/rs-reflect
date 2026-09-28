@@ -152,10 +152,5 @@ reason = "Impl kinds, associated bindings, method lookup, and builders form one 
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/type_kind.rs"
-reason = "These classification enums are the closed kind vocabulary used by the root and typed view descriptors."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/typed_view.rs"
 reason = "Primitive, collection, pointer, and aggregate views are the coordinated projections of one root TypeDescriptor."
