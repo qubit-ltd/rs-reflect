@@ -144,6 +144,7 @@ trait LifetimeAndLiteralDefaultService<
 }
 
 #[reflect]
+/// Exercises reflection of a method with nested and function-pointer types.
 pub(crate) trait StructuralService {
     fn structural(&self, value: Vec<[u8; 4]>) -> fn(*const u8) -> usize;
 }
