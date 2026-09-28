@@ -138,12 +138,12 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .is_none()
     );
     assert_eq!(
-        registry.types_with_capability(crate::capability::clone_key()).count(),
+        registry.type_capability_members(crate::capability::clone_key()).count(),
         0
     );
     assert_eq!(
         registry
-            .definitions_with_capability(crate::capability::clone_key())
+            .definition_capability_members(crate::capability::clone_key())
             .count(),
         0
     );

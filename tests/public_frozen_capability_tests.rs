@@ -84,7 +84,7 @@ fn test_frozen_empty_and_populated_queries_never_execute_factories() {
                 .capability_by_id(descriptor, "example.frozen")
                 .expect("identifier capability lookup must be valid");
         }
-        assert_eq!(registry.types_with_capability(key()).count(), 1);
+        assert_eq!(registry.type_capability_members(key()).count(), 1);
     }
     assert_eq!(
         before,

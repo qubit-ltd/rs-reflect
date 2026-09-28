@@ -8,6 +8,7 @@
 
 //! Reflection registry APIs.
 
+mod capability_member;
 mod effective_type_view;
 pub(crate) mod fragment;
 mod indexes;
@@ -20,6 +21,7 @@ mod registry;
 mod registry_builder;
 mod registry_snapshot_builder;
 
+pub use capability_member::CapabilityMember;
 pub use effective_type_view::EffectiveTypeView;
 #[cfg(feature = "bench-internals")]
 pub(crate) use effective_type_view::build_benchmark_effective_type_view;

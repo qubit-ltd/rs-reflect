@@ -30,6 +30,7 @@ use crate::error::RegistryError;
 use crate::expression::TypeExpression;
 use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
+use crate::registry::capability_member::CapabilityMember;
 use crate::registry::indexes::RegistryIndexes;
 use crate::registry::registry_builder::build_inventory_registry;
 use crate::registry::registry_builder::initialize_cached;
@@ -589,27 +590,97 @@ impl ReflectRegistry {
         self.definition_capabilities(id)?.descriptor(capability_id)
     }
 
-    /// Enumerates registered roots carrying the exact typed capability key.
-    pub fn types_with_capability<A: 'static>(
-        &self,
+    /// Enumerates registered concrete types that declare the capability ID.
+    ///
+    /// Fact-only capabilities and adapter-type mismatches are included so
+    /// callers can inspect the complete lookup state. Capability-only targets
+    /// are excluded because they are not members of this snapshot.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `A`: Adapter contract required by `key`.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: Stable capability ID and expected adapter contract.
+    ///
+    /// # Returns
+    ///
+    /// Returns members in stable type-fragment order. Every returned lookup is
+    /// `Found`, `FactOnly`, or `AdapterTypeMismatch`.
+    pub fn type_capability_members<'registry, A: 'static>(
+        &'registry self,
         key: CapabilityKey<A>,
-    ) -> impl Iterator<Item = &'static TypeDescriptor> + '_ {
-        self.types.iter().copied().filter(move |descriptor| {
-            self.indexes
-                .capabilities_by_target
-                .get(&descriptor.type_id())
-                .is_some_and(|capabilities| capabilities.contains(key))
+    ) -> impl Iterator<Item = CapabilityMember<'registry, &'static TypeDescriptor, A>> + 'registry {
+        self.types.iter().copied().filter_map(move |descriptor| {
+            let type_id = descriptor.type_id();
+            let target = crate::registry::fragment::CapabilityTarget::Type(type_id);
+            let capabilities = self.indexes.capabilities_by_target.get(&type_id)?;
+            let capability = capabilities.descriptor(key.id().as_str())?;
+            let source = self
+                .indexes
+                .capability_fragments
+                .get(&(target, *capability.id()))
+                .expect("every effective type capability retains its source fragment");
+            let origin = self
+                .indexes
+                .capability_origins
+                .get(&(target, *capability.id()))
+                .expect("every effective type capability retains its origin")
+                .clone();
+            Some(CapabilityMember::new(
+                descriptor,
+                capabilities.lookup(key),
+                origin,
+                source,
+            ))
         })
     }
 
-    /// Enumerates generic declarations carrying the exact typed capability.
-    pub fn definitions_with_capability<A: 'static>(
-        &self,
+    /// Enumerates registered generic definitions that declare the capability
+    /// ID.
+    ///
+    /// Fact-only capabilities and adapter-type mismatches are included so
+    /// callers can inspect the complete lookup state.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `A`: Adapter contract required by `key`.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: Stable capability ID and expected adapter contract.
+    ///
+    /// # Returns
+    ///
+    /// Returns members in stable definition-fragment order. Every returned
+    /// lookup is `Found`, `FactOnly`, or `AdapterTypeMismatch`.
+    pub fn definition_capability_members<'registry, A: 'static>(
+        &'registry self,
         key: CapabilityKey<A>,
-    ) -> impl Iterator<Item = &'static TypeDefinitionDescriptor> + '_ {
-        self.definitions.iter().copied().filter(move |definition| {
-            self.definition_capabilities(definition.id())
-                .is_some_and(|capabilities| capabilities.contains(key))
+    ) -> impl Iterator<Item = CapabilityMember<'registry, &'static TypeDefinitionDescriptor, A>> + 'registry {
+        self.definitions.iter().copied().filter_map(move |definition| {
+            let definition_id = definition.id();
+            let target = crate::registry::fragment::CapabilityTarget::TypeDefinition(definition_id);
+            let capabilities = self.indexes.capabilities_by_definition.get(&definition_id)?;
+            let capability = capabilities.descriptor(key.id().as_str())?;
+            let source = self
+                .indexes
+                .capability_fragments
+                .get(&(target, *capability.id()))
+                .expect("every effective definition capability retains its source fragment");
+            let origin = self
+                .indexes
+                .capability_origins
+                .get(&(target, *capability.id()))
+                .expect("every effective definition capability retains its origin")
+                .clone();
+            Some(CapabilityMember::new(
+                definition,
+                capabilities.lookup(key),
+                origin,
+                source,
+            ))
         })
     }
 
