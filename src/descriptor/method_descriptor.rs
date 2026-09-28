@@ -71,16 +71,27 @@ use crate::identity::MemberId;
 /// ```
 #[derive(Clone, Debug)]
 pub struct MethodDescriptor {
+    /// Stable source identity retained independently of query renaming.
     identity: MemberId,
+    /// Rust identifier declared by the source method.
     rust_name: &'static str,
+    /// Name used to find this method through reflection.
     query_name: &'static str,
+    /// Source visibility normalized into portable descriptor facts.
     visibility: MethodVisibility,
+    /// Receiver form, absent for an associated function.
     receiver: Option<ReceiverDescriptor>,
+    /// Non-receiver parameters in source order.
     parameters: Box<[ParameterDescriptor]>,
+    /// Declared output kind and optional type expression.
     return_value: ReturnDescriptor,
+    /// Async, unsafe, ABI, and other callability qualifiers.
     qualifiers: MethodQualifiers,
+    /// Method-level generic parameters and predicates.
     generic_definition: GenericDefinitionDescriptor,
+    /// Whether a trait declaration supplies a default body.
     has_default: bool,
+    /// Trait or impl declaration that owns this method.
     declaration_owner: MethodDeclarationOwner,
 }
 
@@ -311,6 +322,7 @@ impl MethodDescriptor {
     /// # Returns
     ///
     /// Returns a cloned method descriptor with substituted signature facts.
+    #[must_use]
     pub(crate) fn substituted_for_trait_application(&self, substitutions: &TraitApplicationSubstitutions) -> Self {
         let mut result = self.clone();
         for parameter in &mut result.parameters {
@@ -340,6 +352,7 @@ impl MethodDescriptor {
     /// # Returns
     ///
     /// Returns `true` when at least one signature or predicate changes.
+    #[must_use]
     pub(crate) fn needs_trait_application_substitution(&self, substitutions: &TraitApplicationSubstitutions) -> bool {
         self.parameters
             .iter()

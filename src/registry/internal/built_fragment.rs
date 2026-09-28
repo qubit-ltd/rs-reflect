@@ -13,6 +13,8 @@ use crate::registry::fragment::FragmentPayload;
 
 /// A built fragment retained until every cross-fragment check succeeds.
 pub(crate) struct BuiltFragment {
+    /// Stable source identity used to report aggregation errors.
     pub(crate) identity: FragmentIdentity,
+    /// Materialized registration facts awaiting cross-fragment validation.
     pub(crate) payload: FragmentPayload,
 }

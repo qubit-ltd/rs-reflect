@@ -93,17 +93,32 @@ impl std::error::Error for TraitDescriptorBuildError {}
 /// Builds one applied trait and validates its supertrait closure.
 #[derive(Debug)]
 pub struct TraitDescriptorBuilder {
+    /// Shared declaration for the applied trait being built.
     definition: &'static TraitDefinitionDescriptor,
+    /// Concrete type and const arguments in declaration order.
     arguments: Vec<GenericArgument>,
+    /// Concrete associated-type equalities in declaration order.
     associated_type_arguments: Vec<GenericArgument>,
+    /// Direct applied supertraits in source declaration order.
     direct_supertraits: Vec<TraitDescriptorRef>,
+    /// Applied method declarations in source order.
     methods: &'static [MethodDescriptor],
+    /// Applied associated-type descriptors in source order.
     associated_types: Vec<AssociatedTypeDescriptor>,
+    /// Applied associated-constant descriptors in source order.
     associated_consts: Vec<AssociatedConstDescriptor>,
 }
 
 impl TraitDescriptorBuilder {
     /// Creates an empty applied view for `definition`.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Shared source declaration for this application.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder with no application-specific facts.
     pub(super) fn new(definition: &'static TraitDefinitionDescriptor) -> Self {
         Self {
             definition,
@@ -117,6 +132,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets concrete generic arguments in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Concrete type and const arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the generic arguments replaced.
     #[must_use]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;
@@ -124,6 +147,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets concrete associated-type equalities in declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Concrete associated-type bindings.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the bindings replaced.
     #[must_use]
     pub fn associated_type_arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.associated_type_arguments = arguments;
@@ -131,12 +162,33 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets direct supertraits in source declaration order.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `N`: Number of direct supertraits.
+    ///
+    /// # Parameters
+    ///
+    /// - `direct_supertraits`: Applied direct supertraits in source order.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with its direct supertraits replaced.
+    #[must_use]
     pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
         self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
         self
     }
 
     /// Sets applied method declarations in source order.
+    ///
+    /// # Parameters
+    ///
+    /// - `methods`: Method descriptors declared by this trait application.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with its methods replaced.
     #[must_use]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
@@ -144,6 +196,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets applied associated types in source order.
+    ///
+    /// # Parameters
+    ///
+    /// - `associated_types`: Applied associated-type descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with its associated types replaced.
     #[must_use]
     pub fn associated_types(mut self, associated_types: Vec<AssociatedTypeDescriptor>) -> Self {
         self.associated_types = associated_types;
@@ -151,6 +211,14 @@ impl TraitDescriptorBuilder {
     }
 
     /// Sets applied associated constants in source order.
+    ///
+    /// # Parameters
+    ///
+    /// - `associated_consts`: Applied associated-constant descriptors.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with its associated constants replaced.
     #[must_use]
     pub fn associated_consts(mut self, associated_consts: Vec<AssociatedConstDescriptor>) -> Self {
         self.associated_consts = associated_consts;
@@ -170,6 +238,11 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns [`TraitDescriptorBuildError`] when the graph or external-trait
     /// facts violate the declaration contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid generic arguments, associated-type
+    /// bindings, methods, supertraits, or incomplete external facts.
     pub fn build(self) -> Result<TraitDescriptor, TraitDescriptorBuildError> {
         self.validate_arguments()?;
         self.validate_associated_type_arguments()?;
@@ -246,6 +319,20 @@ impl TraitDescriptorBuilder {
 
     /// Adds `candidate` and its direct ancestors while rejecting recursion and
     /// duplicate applied identities.
+    ///
+    /// # Parameters
+    ///
+    /// - `candidate`: Direct or transitive applied supertrait to inspect.
+    /// - `closure`: Accumulated duplicate-free transitive closure.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after adding all ancestors.
+    ///
+    /// # Errors
+    ///
+    /// Returns `RecursiveSupertrait` if the candidate graph reaches the
+    /// application being built.
     fn collect_supertrait(
         &self,
         candidate: &'static TraitDescriptor,
@@ -270,6 +357,14 @@ impl TraitDescriptorBuilder {
 
     /// Verifies every runtime identity parameter has one concrete argument of
     /// the matching generic kind.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the supplied arguments satisfy the declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the wrong argument count, kind, or concreteness.
     fn validate_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
         if self.definition.completeness() == TraitCompleteness::ExternalIncomplete {
             for (index, argument) in self.arguments.iter().enumerate() {
@@ -310,6 +405,15 @@ impl TraitDescriptorBuilder {
 
     /// Verifies associated-type equalities are concrete, unique, and declared
     /// by this trait or one of its direct supertraits.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when every associated-type binding is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InvalidAssociatedTypeArgument` for an unknown, duplicate,
+    /// symbolic, or malformed binding.
     fn validate_associated_type_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
         let mut names = std::collections::HashSet::new();
         for argument in &self.associated_type_arguments {

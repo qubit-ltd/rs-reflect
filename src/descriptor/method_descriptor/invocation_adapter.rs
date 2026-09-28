@@ -70,19 +70,36 @@ pub enum CatchingAvailability {
 /// explicitly requested catching entries capture only supported user panics.
 #[derive(Clone, Copy, Debug)]
 pub struct InvocationAdapter {
+    /// Opaque identity retained by the method declaration.
     entry_point: fn(),
+    /// Local dynamic-value invocation entry point, when generated.
     pub(super) local: Option<crate::invoke::InvocationAdapter<crate::value::Local>>,
+    /// Thread-safe dynamic-value invocation entry point, when generated.
     pub(super) thread_safe: Option<crate::invoke::InvocationAdapter<crate::value::ThreadSafe>>,
+    /// Local panic-catching entry point, when explicitly requested.
     pub(super) catching_local: Option<crate::invoke::CatchingInvocationAdapter<crate::value::Local>>,
+    /// Thread-safe panic-catching entry point, when explicitly requested.
     pub(super) catching_thread_safe: Option<crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>>,
+    /// Availability classification for a requested catching entry point.
     catching_availability: CatchingAvailability,
+    /// Typed local pinned shared-receiver entry point, when generated.
     pub(super) pinned_ref_local: Option<&'static (dyn Any + Send + Sync)>,
+    /// Typed local pinned mutable-receiver entry point, when generated.
     pub(super) pinned_mut_local: Option<&'static (dyn Any + Send + Sync)>,
 }
 
 impl InvocationAdapter {
     /// Creates an opaque adapter token for generated descriptor data.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Stable function identity retained by the descriptor.
+    ///
+    /// # Returns
+    ///
+    /// Returns a token with no callable invocation modes.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(entry_point: fn()) -> Self {
         Self {
             entry_point,
@@ -100,7 +117,16 @@ impl InvocationAdapter {
     ///
     /// The generated function is higher-ranked over the invocation lifetime,
     /// so it cannot extend erased input borrows beyond one invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated local invocation function.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with a local entry point.
     #[doc(hidden)]
+    #[must_use]
     pub const fn local(entry_point: crate::invoke::InvocationAdapter<crate::value::Local>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -118,8 +144,17 @@ impl InvocationAdapter {
     /// point.
     ///
     /// The entry point's type preserves both the call lifetime and the runtime
-    /// `Send` boundary required by [`ThreadSafe`].
+    /// `Send` boundary required by [`crate::value::ThreadSafe`].
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated thread-safe invocation function.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with a thread-safe entry point.
     #[doc(hidden)]
+    #[must_use]
     pub const fn thread_safe(entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>) -> Self {
         Self {
             entry_point: unavailable_entry_point,
@@ -135,7 +170,17 @@ impl InvocationAdapter {
 
     /// Creates a local adapter paired with an explicitly generated catching
     /// entry point.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated local invocation function.
+    /// - `catching_entry_point`: Generated local panic-catching function.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with both local entry points available.
     #[doc(hidden)]
+    #[must_use]
     pub const fn local_with_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
         catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::Local>,
@@ -154,7 +199,17 @@ impl InvocationAdapter {
 
     /// Creates a thread-safe adapter paired with an explicitly generated
     /// catching entry point.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated thread-safe invocation function.
+    /// - `catching_entry_point`: Generated thread-safe panic-catching function.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with both thread-safe entry points.
     #[doc(hidden)]
+    #[must_use]
     pub const fn thread_safe_with_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
         catching_entry_point: crate::invoke::CatchingInvocationAdapter<crate::value::ThreadSafe>,
@@ -173,7 +228,16 @@ impl InvocationAdapter {
 
     /// Creates a local adapter whose requested catching entry point is
     /// unavailable because this binary aborts on panic.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated local invocation function.
+    ///
+    /// # Returns
+    ///
+    /// Returns a local adapter marked as unavailable for panic catching.
     #[doc(hidden)]
+    #[must_use]
     pub const fn local_with_unavailable_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::Local>,
     ) -> Self {
@@ -191,7 +255,16 @@ impl InvocationAdapter {
 
     /// Creates a thread-safe adapter whose requested catching entry point is
     /// unavailable because this binary aborts on panic.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Generated thread-safe invocation function.
+    ///
+    /// # Returns
+    ///
+    /// Returns a thread-safe adapter marked as unavailable for panic catching.
     #[doc(hidden)]
+    #[must_use]
     pub const fn thread_safe_with_unavailable_catching(
         entry_point: crate::invoke::InvocationAdapter<crate::value::ThreadSafe>,
     ) -> Self {
@@ -212,7 +285,20 @@ impl InvocationAdapter {
     /// The concrete adapter remains behind `Any` only for descriptor storage;
     /// [`Self::invoke_pinned_ref_local`] downcasts it by the caller's `T`
     /// without erasing or reconstructing the pin proof.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Exact concrete receiver type accepted by the pinned adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Static adapter specialized for `Pin<&T>`.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with the typed pinned entry point.
     #[doc(hidden)]
+    #[must_use]
     pub const fn pinned_ref_local<T: 'static>(
         entry_point: &'static crate::invoke::PinnedRefAdapter<T, crate::value::Local>,
     ) -> Self {
@@ -229,7 +315,20 @@ impl InvocationAdapter {
     }
 
     /// Creates a descriptor for a typed local `Pin<&mut T>` entry point.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Exact concrete receiver type accepted by the pinned adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `entry_point`: Static adapter specialized for `Pin<&mut T>`.
+    ///
+    /// # Returns
+    ///
+    /// Returns an adapter descriptor with the typed pinned entry point.
     #[doc(hidden)]
+    #[must_use]
     pub const fn pinned_mut_local<T: 'static>(
         entry_point: &'static crate::invoke::PinnedMutAdapter<T, crate::value::Local>,
     ) -> Self {
@@ -246,6 +345,10 @@ impl InvocationAdapter {
     }
 
     /// Returns the opaque entry-point identity.
+    ///
+    /// # Returns
+    ///
+    /// Returns the function pointer retained as this adapter's identity.
     #[doc(hidden)]
     #[must_use]
     #[inline]
@@ -255,6 +358,11 @@ impl InvocationAdapter {
 
     /// Reports whether an explicitly requested panic-catching entry point is
     /// callable in this binary.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether catching was not requested, is available, or is
+    /// unavailable under abort-on-panic semantics.
     #[must_use]
     #[inline]
     pub const fn catching_availability(&self) -> CatchingAvailability {
@@ -274,6 +382,30 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Local receiver and positional arguments to invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` for a legacy descriptor or another invocation mode;
+    /// otherwise returns `Some(Ok(output))` on success or `Some(Err(failure))`
+    /// when invocation validation fails.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains caller-owned inputs rejected before they
+    /// are consumed.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_local<'call>(
         &self,
@@ -301,6 +433,30 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Thread-safe receiver and positional arguments to invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no thread-safe entry point exists; otherwise
+    /// returns `Some(Ok(output))` on success or `Some(Err(failure))` when
+    /// invocation validation fails.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains caller-owned inputs rejected before they
+    /// are consumed.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
@@ -324,6 +480,26 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Local receiver and positional arguments to invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no local catching entry point exists. Otherwise,
+    /// the outer result reports validation failure and the inner result
+    /// distinguishes a normal output from a caught panic.
+    ///
+    /// # Errors
+    ///
+    /// The outer error retains invocation inputs rejected during validation;
+    /// the inner error contains a panic captured after validation.
     #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
@@ -339,6 +515,26 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Thread-safe receiver and positional arguments to invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no thread-safe catching entry point exists.
+    /// Otherwise, the outer result reports validation failure and the inner
+    /// result distinguishes a normal output from a caught panic.
+    ///
+    /// # Errors
+    ///
+    /// The outer error retains invocation inputs rejected during validation;
+    /// the inner error contains a panic captured after validation.
     #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
@@ -362,6 +558,31 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    /// - `T`: Exact concrete receiver type accepted by the pinned adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Pinned shared receiver and positional arguments to
+    ///   invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no adapter for `T` exists; otherwise returns
+    /// `Some(Ok(output))` or `Some(Err(failure))` for invocation outcomes.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains the original pin and arguments when they
+    /// are rejected before execution.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
@@ -393,6 +614,31 @@ impl InvocationAdapter {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    /// - `T`: Exact concrete receiver type accepted by the pinned adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Pinned mutable receiver and positional arguments to
+    ///   invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no adapter for `T` exists; otherwise returns
+    /// `Some(Ok(output))` or `Some(Err(failure))` for invocation outcomes.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains the original pin and arguments when they
+    /// are rejected before execution.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,

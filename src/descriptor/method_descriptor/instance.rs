@@ -17,6 +17,13 @@ use super::MethodDescriptor;
 use crate::expression::GenericArgument;
 
 /// The effective source of a concrete method instance.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodImplementationSource;
+/// assert_eq!(MethodImplementationSource::Declared, MethodImplementationSource::Declared);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MethodImplementationSource {
     /// A method declared directly by an inherent impl.
@@ -73,15 +80,29 @@ pub enum MethodImplementationSource {
 /// ```
 #[derive(Clone, Debug)]
 pub struct MethodInstanceDescriptor {
+    /// Trait or impl declaration whose signature is specialized.
     declaration: &'static MethodDescriptor,
+    /// Concrete impl method for an explicit trait override, when present.
     implementation_method: Option<&'static MethodDescriptor>,
+    /// Whether the method is declared, required, defaulted, or overridden.
     implementation_source: MethodImplementationSource,
+    /// Generated adapters available for this concrete method instance.
     adapter: Option<&'static InvocationAdapter>,
+    /// Concrete type and const arguments in declaration order.
     arguments: Box<[GenericArgument]>,
+    /// Stable reasons no invocation adapter is available.
     unavailable_reasons: Box<[InvocationUnavailableReason]>,
 }
 
 /// An inconsistent method implementation source or invocation capability.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodInstanceBuildError;
+/// let error = MethodInstanceBuildError::RequiredMethodHasAdapter;
+/// assert_eq!(error, MethodInstanceBuildError::RequiredMethodHasAdapter);
+/// ```
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum MethodInstanceBuildError {
@@ -103,6 +124,18 @@ pub enum MethodInstanceBuildError {
 
 impl fmt::Display for MethodInstanceBuildError {
     /// Formats a stable diagnostic message.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Destination for the diagnostic message.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the message.
+    ///
+    /// # Errors
+    ///
+    /// Returns the formatter error if the destination rejects the message.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DeclaredMethodNotOwnedByImpl => {
@@ -135,6 +168,23 @@ impl MethodInstanceDescriptor {
     ///
     /// `adapter` is present only when `unavailable_reasons` is empty and the
     /// later invocation layer supplied a safe entry point.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaration`: The trait or impl method declaration being specialized.
+    /// - `implementation_method`: The concrete impl method for an override.
+    /// - `implementation_source`: How this instance obtains its method body.
+    /// - `adapter`: Generated entry points, when invocation is available.
+    /// - `unavailable_reasons`: Reasons invocation is unavailable.
+    ///
+    /// # Returns
+    ///
+    /// Returns a validated method instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error when declaration ownership, implementation
+    /// source, adapter availability, or unavailable reasons are inconsistent.
     #[doc(hidden)]
     pub fn new(
         declaration: &'static MethodDescriptor,
@@ -162,6 +212,26 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Thread-safe receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no thread-safe catching adapter exists. Otherwise,
+    /// returns `Some(Ok(Ok(output)))` on success, `Some(Ok(Err(panic)))` when
+    /// the method panics, or `Some(Err(failure))` when validation fails.
+    ///
+    /// # Errors
+    ///
+    /// The outer error contains pre-execution binding or validation recovery;
+    /// the inner error contains a panic captured after validation.
     #[must_use]
     pub fn invoke_catching_thread_safe<'call>(
         &self,
@@ -179,6 +249,25 @@ impl MethodInstanceDescriptor {
 
     /// Creates a concrete method specialization with its generic arguments in
     /// declaration order.
+    ///
+    /// # Parameters
+    ///
+    /// - `declaration`: The trait or impl method declaration being specialized.
+    /// - `implementation_method`: The concrete impl method for an override.
+    /// - `implementation_source`: How this instance obtains its method body.
+    /// - `adapter`: Generated entry points, when invocation is available.
+    /// - `arguments`: Concrete type and const arguments in declaration order.
+    /// - `unavailable_reasons`: Reasons invocation is unavailable.
+    ///
+    /// # Returns
+    ///
+    /// Returns a validated method instance with its concrete arguments.
+    ///
+    /// # Errors
+    ///
+    /// Returns the matching [`MethodInstanceBuildError`] when the declaration
+    /// ownership, implementation method, adapter, or unavailable reasons do
+    /// not match the implementation source.
     #[doc(hidden)]
     pub fn with_arguments(
         declaration: &'static MethodDescriptor,
@@ -235,6 +324,10 @@ impl MethodInstanceDescriptor {
     }
 
     /// Returns the declaration shared by this concrete specialization.
+    ///
+    /// # Returns
+    ///
+    /// Returns the trait or impl declaration whose signature is specialized.
     #[must_use]
     #[inline]
     pub const fn declaration(&self) -> &'static MethodDescriptor {
@@ -244,6 +337,11 @@ impl MethodInstanceDescriptor {
     /// Returns the explicit impl method used by an overridden instance.
     ///
     /// `None` means the instance is required or uses its trait default.
+    ///
+    /// # Returns
+    ///
+    /// Returns the explicit impl method, or `None` for required/defaulted
+    /// methods.
     #[must_use]
     #[inline]
     pub const fn implementation_method(&self) -> Option<&'static MethodDescriptor> {
@@ -251,6 +349,10 @@ impl MethodInstanceDescriptor {
     }
 
     /// Returns the effective declaration or explicit implementation method.
+    ///
+    /// # Returns
+    ///
+    /// Returns the method signature and identity used for invocation.
     #[must_use]
     #[inline]
     pub const fn effective_method(&self) -> &'static MethodDescriptor {
@@ -262,6 +364,10 @@ impl MethodInstanceDescriptor {
 
     /// Returns whether the implementation is required, defaulted, or
     /// overridden.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source that supplies the concrete method behavior.
     #[must_use]
     #[inline]
     pub const fn implementation_source(&self) -> MethodImplementationSource {
@@ -271,6 +377,11 @@ impl MethodInstanceDescriptor {
     /// Returns the safe invocation adapter when one is available.
     ///
     /// `None` means callers must inspect [`Self::unavailable_reasons`].
+    ///
+    /// # Returns
+    ///
+    /// Returns the safe adapter, or `None` when no invocation mode is
+    /// available.
     #[must_use]
     #[inline]
     pub const fn adapter(&self) -> Option<&'static InvocationAdapter> {
@@ -279,6 +390,10 @@ impl MethodInstanceDescriptor {
 
     /// Returns the concrete type and const arguments of this method
     /// specialization in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns the specialization arguments, excluding lifetime parameters.
     #[must_use]
     #[inline]
     pub const fn arguments(&self) -> &[GenericArgument] {
@@ -286,6 +401,10 @@ impl MethodInstanceDescriptor {
     }
 
     /// Returns stable reasons that prevent dynamic invocation.
+    ///
+    /// # Returns
+    ///
+    /// Returns every recorded reason no adapter is available.
     #[must_use]
     #[inline]
     pub const fn unavailable_reasons(&self) -> &[InvocationUnavailableReason] {
@@ -307,6 +426,30 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Local receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no local adapter exists, `Some(Ok(output))` on
+    /// success, or `Some(Err(failure))` when binding, validation, or adapter
+    /// execution reports a structured failure.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure contains the original invocation inputs when
+    /// execution could not safely consume them.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_local<'call>(
         &self,
@@ -338,6 +481,30 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Thread-safe receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no thread-safe adapter exists, `Some(Ok(output))`
+    /// on success, or `Some(Err(failure))` when binding, validation, or adapter
+    /// execution reports a structured failure.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure contains the original invocation inputs when
+    /// execution could not safely consume them.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_thread_safe<'call>(
         &self,
@@ -372,6 +539,26 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Local receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no local catching adapter exists. Otherwise,
+    /// returns `Some(Ok(Ok(output)))` on success, `Some(Ok(Err(panic)))` when
+    /// the method panics, or `Some(Err(failure))` when validation fails.
+    ///
+    /// # Errors
+    ///
+    /// The outer error contains pre-execution binding or validation recovery;
+    /// the inner error contains a panic captured after validation.
     #[must_use]
     pub fn invoke_catching_local<'call>(
         &self,
@@ -401,6 +588,31 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    /// - `T`: Exact concrete receiver type captured by the typed adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Pinned shared receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no adapter exists for `T`; otherwise returns
+    /// `Some(Ok(output))` on success or `Some(Err(failure))` when binding,
+    /// validation, or execution fails.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains the pinned receiver and original arguments
+    /// when they were rejected before execution.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
@@ -437,6 +649,32 @@ impl MethodInstanceDescriptor {
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    /// - `T`: Exact concrete receiver type captured by the typed adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Pinned mutable receiver and arguments to bind and
+    ///   invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns `None` when no adapter exists for `T`; otherwise returns
+    /// `Some(Ok(output))` on success or `Some(Err(failure))` when binding,
+    /// validation, or execution fails.
+    ///
+    /// # Errors
+    ///
+    /// The returned failure retains the pinned receiver and original arguments
+    /// when they were rejected before execution.
+    ///
+    /// # Panics
+    ///
+    /// Panics from the invoked Rust method propagate to the caller.
     #[must_use]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,

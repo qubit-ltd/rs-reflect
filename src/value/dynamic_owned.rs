@@ -42,7 +42,9 @@ use crate::value::storage::ThreadSafeOwnedStorage;
 /// assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("ready"));
 /// ```
 pub struct DynamicOwned<M: Mode> {
+    /// Mode-specific erased owned storage.
     storage: M::OwnedStorage,
+    /// Carries the mode's auto-trait boundary without storing a mode value.
     marker: PhantomData<M::Marker>,
 }
 
@@ -97,6 +99,7 @@ impl DynamicOwned<Local> {
     /// # Returns
     ///
     /// Returns an exclusive dynamic borrow tied to this wrapper's borrow.
+    #[must_use]
     #[inline]
     pub fn as_reflected_mut(&mut self) -> DynamicMut<'_, Local> {
         let LocalOwnedStorage::Any(value) = &mut self.storage;
@@ -144,6 +147,8 @@ impl DynamicOwned<Local> {
     /// # Returns
     ///
     /// Returns a mutable `T` reference on an exact type match, or `None`.
+    #[must_use]
+    #[inline]
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
@@ -169,6 +174,8 @@ impl DynamicOwned<Local> {
     /// # Returns
     ///
     /// Returns mutable erased access; the option is retained for mode symmetry.
+    #[must_use]
+    #[inline]
     pub fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
         let LocalOwnedStorage::Any(value) = &mut self.storage;
         Some(value.as_mut())
@@ -266,6 +273,7 @@ impl DynamicOwned<ThreadSafe> {
     /// # Returns
     ///
     /// Returns a thread-safe exclusive dynamic borrow tied to this wrapper.
+    #[must_use]
     #[inline]
     pub fn as_reflected_mut(&mut self) -> DynamicMut<'_, ThreadSafe> {
         let ThreadSafeOwnedStorage::Any(value) = &mut self.storage;
@@ -313,6 +321,8 @@ impl DynamicOwned<ThreadSafe> {
     /// # Returns
     ///
     /// Returns a mutable `T` reference on an exact type match, or `None`.
+    #[must_use]
+    #[inline]
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
@@ -338,6 +348,8 @@ impl DynamicOwned<ThreadSafe> {
     /// # Returns
     ///
     /// Returns mutable erased access with its `Send + Sync` boundary.
+    #[must_use]
+    #[inline]
     pub fn as_any_mut(&mut self) -> Option<&mut (dyn Any + Send + Sync)> {
         let ThreadSafeOwnedStorage::Any(value) = &mut self.storage;
         Some(value.as_mut())

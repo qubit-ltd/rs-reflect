@@ -78,14 +78,23 @@ pub use self::supertrait::external_supertrait;
 /// }
 /// ```
 pub struct TraitDescriptor {
+    /// Declaration shared by every concrete application.
     definition: &'static TraitDefinitionDescriptor,
+    /// Complete identity of this concrete trait application.
     trait_id: AppliedTraitId,
+    /// Concrete generic arguments in declaration order.
     arguments: Box<[GenericArgument]>,
+    /// Concrete associated-type equalities for this application.
     associated_type_arguments: Box<[GenericArgument]>,
+    /// Direct applied supertraits in declaration order.
     direct_supertraits: Box<[TraitDescriptorRef]>,
+    /// Sorted, duplicate-free transitive supertrait closure.
     all_supertraits: Box<[TraitDescriptorRef]>,
+    /// Applied method declarations in source order.
     methods: &'static [MethodDescriptor],
+    /// Applied associated-type declarations in source order.
     associated_types: Box<[AssociatedTypeDescriptor]>,
+    /// Applied associated-constant declarations in source order.
     associated_consts: Box<[AssociatedConstDescriptor]>,
 }
 

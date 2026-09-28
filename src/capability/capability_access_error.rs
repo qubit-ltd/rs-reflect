@@ -6,6 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+//! Errors raised when typed capability access cannot execute an adapter.
+
 use std::any::TypeId;
 
 use crate::capability::CapabilityConflict;

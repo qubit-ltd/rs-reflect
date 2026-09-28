@@ -56,6 +56,10 @@ pub struct RegistrySnapshotBuilder {
 
 impl RegistrySnapshotBuilder {
     /// Creates an empty snapshot builder.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder with no registered facts.
     #[must_use]
     pub const fn new() -> Self {
         Self { fragments: Vec::new() }
@@ -242,6 +246,15 @@ impl RegistrySnapshotBuilder {
     }
 
     /// Records one typed payload together with its derived validation facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `payload`: Typed registration facts to collect.
+    /// - `source`: Stable source identity assigned to those facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder for further collection.
     fn push(&mut self, payload: FragmentPayload, source: FragmentIdentity) -> &mut Self {
         let declared_kind = payload.kind();
         let declared_target = payload.runtime_identity();
@@ -256,6 +269,11 @@ impl RegistrySnapshotBuilder {
 }
 
 impl Default for RegistrySnapshotBuilder {
+    /// Creates an empty snapshot builder.
+    ///
+    /// # Returns
+    ///
+    /// Returns a builder with no registered facts.
     fn default() -> Self {
         Self::new()
     }

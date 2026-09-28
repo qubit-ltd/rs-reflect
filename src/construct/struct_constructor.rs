@@ -128,6 +128,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
     /// # Returns
     ///
     /// Returns the policies corresponding to direct fields by source index.
+    #[must_use = "the field descriptors define the constructor inputs"]
     #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
@@ -514,6 +515,7 @@ impl<M: Mode + 'static> fmt::Debug for StructConstructor<M> {
 ///
 /// Panics only if local dynamic storage violates its `Any` compatibility
 /// invariant.
+#[must_use]
 #[inline]
 pub(crate) fn local_type_id(value: &DynamicOwned<Local>) -> TypeId {
     value
@@ -536,6 +538,7 @@ pub(crate) fn local_type_id(value: &DynamicOwned<Local>) -> TypeId {
 ///
 /// Panics only if thread-safe dynamic storage violates its `Any` compatibility
 /// invariant.
+#[must_use]
 #[inline]
 pub(crate) fn thread_safe_type_id(value: &DynamicOwned<ThreadSafe>) -> TypeId {
     value

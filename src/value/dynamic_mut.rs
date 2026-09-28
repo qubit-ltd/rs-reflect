@@ -42,7 +42,9 @@ use crate::value::storage::ThreadSafeMutStorage;
 /// assert_eq!(value, 9);
 /// ```
 pub struct DynamicMut<'a, M: Mode> {
+    /// Mode-specific erased mutable storage for the borrowed value.
     storage: M::MutStorage<'a>,
+    /// Carries the mode's auto-trait boundary without storing a mode value.
     marker: PhantomData<M::Marker>,
 }
 
@@ -127,6 +129,11 @@ impl<'a> DynamicMut<'a, Local> {
     /// # Type Parameters
     ///
     /// - `T`: Concrete type requested for the shared borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a shared `T` reference for an exact type match, or `None` when
+    /// the type differs or the wrapper contains `str`.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
@@ -141,6 +148,12 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns a mutable `T` reference for an exact type match, or `None` for
     /// either unavailable case.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable `T` reference for an exact type match, or `None` when
+    /// the type differs or the wrapper contains `str`.
+    #[must_use]
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
@@ -208,6 +221,8 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns the erased mutable value, or `None` for the dedicated `str`
     /// variant.
+    #[must_use]
+    #[inline]
     pub fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
         match &mut self.storage {
             LocalMutStorage::Any(value) => Some(&mut **value),
@@ -240,6 +255,8 @@ impl<'a> DynamicMut<'a, Local> {
     ///
     /// Returns the mutable string borrow, or `None` for an `Any`-compatible
     /// value.
+    #[must_use]
+    #[inline]
     pub fn as_str_mut(&mut self) -> Option<&mut str> {
         match &mut self.storage {
             LocalMutStorage::Any(_) => None,
@@ -356,6 +373,11 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// # Type Parameters
     ///
     /// - `T`: Concrete type requested for the shared borrow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a shared `T` reference for an exact type match, or `None` when
+    /// the type differs or the wrapper contains `str`.
     #[must_use]
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.as_any().and_then(|value| value.downcast_ref::<T>())
@@ -370,6 +392,12 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns a mutable `T` reference for an exact type match, or `None` for
     /// either unavailable case.
+    ///
+    /// # Returns
+    ///
+    /// Returns a mutable `T` reference for an exact type match, or `None` when
+    /// the type differs or the wrapper contains `str`.
+    #[must_use]
     pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.as_any_mut().and_then(|value| value.downcast_mut::<T>())
     }
@@ -436,6 +464,8 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns the erased mutable value, or `None` for the dedicated `str`
     /// variant.
+    #[must_use]
+    #[inline]
     pub fn as_any_mut(&mut self) -> Option<&mut (dyn Any + Send + Sync)> {
         match &mut self.storage {
             ThreadSafeMutStorage::Any(value) => Some(&mut **value),
@@ -468,6 +498,8 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns the mutable string borrow, or `None` for an `Any`-compatible
     /// value.
+    #[must_use]
+    #[inline]
     pub fn as_str_mut(&mut self) -> Option<&mut str> {
         match &mut self.storage {
             ThreadSafeMutStorage::Any(_) => None,
