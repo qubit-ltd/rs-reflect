@@ -69,6 +69,7 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
     ///
     /// Returns an exact-size iterator over matching declarations.
     #[must_use]
+    #[inline]
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'static TypeDefinitionDescriptor> + 'registry {
         self.descriptors.iter().copied()
     }
@@ -79,6 +80,7 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
     ///
     /// Returns the number of candidates.
     #[must_use]
+    #[inline]
     pub const fn len(self) -> usize {
         self.descriptors.len()
     }
@@ -89,6 +91,7 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
     ///
     /// Returns `true` when the candidate set is empty.
     #[must_use]
+    #[inline]
     pub const fn is_empty(self) -> bool {
         self.descriptors.is_empty()
     }
@@ -100,6 +103,7 @@ impl<'registry> TypeDefinitionCandidates<'registry> {
     ///
     /// Returns the sole candidate, or `None` when the count is not one.
     #[must_use]
+    #[inline]
     pub fn only(self) -> Option<&'static TypeDefinitionDescriptor> {
         (self.descriptors.len() == 1).then(|| self.descriptors[0])
     }
@@ -385,6 +389,7 @@ impl ReflectRegistry {
     ///
     /// Returns the registered root, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn get(&self, type_id: TypeId) -> Option<&'static TypeDescriptor> {
         self.indexes.types_by_id.get(&type_id).copied()
     }
@@ -440,6 +445,7 @@ impl ReflectRegistry {
     ///
     /// Returns every registered generic declaration.
     #[must_use]
+    #[inline]
     pub fn definitions(&self) -> &[&'static TypeDefinitionDescriptor] {
         &self.definitions
     }
@@ -454,6 +460,7 @@ impl ReflectRegistry {
     ///
     /// Returns the declaration, or `None` when it is absent.
     #[must_use]
+    #[inline]
     pub fn definition(&self, id: TypeDefinitionId) -> Option<&'static TypeDefinitionDescriptor> {
         self.indexes.definitions_by_id.get(&id).copied()
     }
@@ -501,6 +508,7 @@ impl ReflectRegistry {
     ///
     /// Returns the source fragment, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn definition_source(&self, id: TypeDefinitionId) -> Option<&FragmentIdentity> {
         self.indexes.definition_fragments.get(&id)
     }
@@ -562,6 +570,11 @@ impl ReflectRegistry {
     /// Registered targets borrow frozen facts without executing a provider.
     /// Unregistered monomorphs may initialize their intrinsic capability set.
     ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type whose effective capabilities are
+    ///   requested.
+    ///
     /// # Returns
     ///
     /// Returns the effective capability set for `descriptor`.
@@ -570,6 +583,7 @@ impl ReflectRegistry {
     ///
     /// Returns the complete conflict if intrinsic capability declarations use
     /// the same ID more than once. Failure never changes this snapshot.
+    #[must_use]
     pub fn capabilities<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -592,6 +606,15 @@ impl ReflectRegistry {
     /// four lookup states directly. Intrinsic declaration conflicts return
     /// their conflict error.
     ///
+    /// # Type Parameters
+    ///
+    /// - `A`: Expected adapter type associated with `key`.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type to query.
+    /// - `key`: Typed identity of the requested capability.
+    ///
     /// # Errors
     ///
     /// Returns [`CapabilityAccessError::FactOnly`] when the descriptor has
@@ -604,6 +627,7 @@ impl ReflectRegistry {
     ///
     /// Returns the matching executable adapter, or `None` when the capability
     /// ID is missing.
+    #[must_use]
     ///
     /// # Examples
     ///
@@ -630,6 +654,15 @@ impl ReflectRegistry {
     /// Looks up one effective typed capability without collapsing diagnostic
     /// states into absence.
     ///
+    /// # Type Parameters
+    ///
+    /// - `A`: Expected adapter type associated with `key`.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type to query.
+    /// - `key`: Typed identity of the requested capability.
+    ///
     /// # Errors
     ///
     /// Returns an intrinsic conflict for an invalid unregistered descriptor.
@@ -637,6 +670,7 @@ impl ReflectRegistry {
     /// # Returns
     ///
     /// Returns the diagnostic lookup state for `key`.
+    #[must_use]
     pub fn capability_lookup<'registry, A: 'static>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -650,6 +684,11 @@ impl ReflectRegistry {
     /// Returns `Ok(None)` for unmatched IDs, including invalid textual IDs,
     /// and `Err` when the intrinsic capability set cannot be formed.
     ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type to query.
+    /// - `id`: Stable textual capability identifier.
+    ///
     /// # Returns
     ///
     /// Returns the matching descriptor, or `None` when no descriptor has
@@ -659,6 +698,7 @@ impl ReflectRegistry {
     ///
     /// Returns the intrinsic capability conflict if the descriptor's provider
     /// cannot produce a valid capability set.
+    #[must_use]
     pub fn capability_by_id<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -672,6 +712,11 @@ impl ReflectRegistry {
     /// Unregistered descriptors may initialize their intrinsic capability
     /// provider while this method resolves the effective set.
     ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type to query.
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
     /// # Returns
     ///
     /// Returns the capability origin, or `None` when no capability has
@@ -681,6 +726,7 @@ impl ReflectRegistry {
     ///
     /// Returns the intrinsic capability conflict when the descriptor's
     /// provider cannot produce a valid capability set.
+    #[must_use]
     pub fn capability_origin(
         &self,
         descriptor: &TypeDescriptor,
@@ -706,6 +752,16 @@ impl ReflectRegistry {
     }
 
     /// Returns the registration fragment that contributed a capability.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Concrete reflected type to query.
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source fragment, or `None` when no registered capability
+    /// matches.
     #[must_use]
     pub fn capability_source(&self, descriptor: &TypeDescriptor, capability_id: &str) -> Option<&FragmentIdentity> {
         let capabilities = self.indexes.capabilities_by_target.get(&descriptor.type_id())?;
@@ -719,6 +775,16 @@ impl ReflectRegistry {
     /// Returns the owned origin of a generic declaration capability by
     /// textual ID. Definition capabilities are always retained in the
     /// snapshot and therefore do not execute a provider here.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic declaration identity.
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns the capability origin, or `None` when no matching capability
+    /// exists.
     #[must_use]
     pub fn definition_capability_origin(&self, id: TypeDefinitionId, capability_id: &str) -> Option<CapabilityOrigin> {
         let capability = self.definition_capability_by_id(id, capability_id)?;
@@ -733,6 +799,16 @@ impl ReflectRegistry {
     }
 
     /// Returns the registration fragment that contributed a generic capability.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic declaration identity.
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns the source fragment, or `None` when no matching capability
+    /// exists.
     #[must_use]
     pub fn definition_capability_source(&self, id: TypeDefinitionId, capability_id: &str) -> Option<&FragmentIdentity> {
         let capabilities = self.indexes.capabilities_by_definition.get(&id)?;
@@ -750,6 +826,10 @@ impl ReflectRegistry {
     /// even though [`Self::definition`] returns `None`; an empty capability
     /// set means the definition is a snapshot member with no effective facts.
     /// Use [`Self::definition`] when membership must be checked.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic declaration identity.
     #[must_use]
     pub fn definition_capabilities(&self, id: TypeDefinitionId) -> Option<&TypeCapabilities> {
         self.indexes.capabilities_by_definition.get(&id).or_else(|| {
@@ -761,6 +841,25 @@ impl ReflectRegistry {
     }
 
     /// Retrieves one effective typed capability for a generic declaration.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `A`: Expected adapter type associated with `key`.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic declaration identity.
+    /// - `key`: Typed identity of the requested capability.
+    ///
+    /// # Returns
+    ///
+    /// Returns the adapter, or `None` when the declaration or capability is
+    /// absent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an adapter contract mismatch when the stored value has another
+    /// type.
     pub fn definition_capability<A: 'static>(
         &self,
         id: TypeDefinitionId,
@@ -773,6 +872,16 @@ impl ReflectRegistry {
     }
 
     /// Finds one effective declaration capability by textual ID.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic declaration identity.
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns the descriptor, or `None` when the declaration or capability is
+    /// absent.
     #[must_use]
     pub fn definition_capability_by_id(
         &self,
@@ -800,6 +909,7 @@ impl ReflectRegistry {
     ///
     /// Returns members in stable type-fragment order. Every returned lookup is
     /// `Found`, `FactOnly`, or `AdapterTypeMismatch`.
+    #[must_use]
     pub fn type_capability_members<'registry, A: 'static>(
         &'registry self,
         key: CapabilityKey<A>,
@@ -847,6 +957,7 @@ impl ReflectRegistry {
     ///
     /// Returns members in stable definition-fragment order. Every returned
     /// lookup is `Found`, `FactOnly`, or `AdapterTypeMismatch`.
+    #[must_use]
     pub fn definition_capability_members<'registry, A: 'static>(
         &'registry self,
         key: CapabilityKey<A>,
@@ -915,6 +1026,14 @@ impl ReflectRegistry {
     /// Results are ordered by the capability's source fragment. This audits
     /// the frozen registry facts only: it does not execute providers or add
     /// definitions to the registry.
+    ///
+    /// # Parameters
+    ///
+    /// - `capability_id`: Stable textual capability identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns each matching declaration identity with its source fragment.
     #[must_use]
     pub fn capability_only_definition_targets(
         &self,
@@ -949,6 +1068,16 @@ impl ReflectRegistry {
     /// The slice is empty when no linked implementation fragment targets the
     /// exact root. Its order is the registry's stable fragment order, so a
     /// caller can pass it directly to [`ImplDescriptor::lookup_method`].
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Exact process-local identity of the target type.
+    ///
+    /// # Returns
+    ///
+    /// Returns matching implementations in stable source-fragment order.
+    #[must_use]
+    #[inline]
     pub fn implementations(&self, type_id: TypeId) -> &[&'static ImplDescriptor] {
         self.indexes.impls_by_target.get(&type_id).map_or(&[], Box::as_ref)
     }
@@ -968,7 +1097,16 @@ impl ReflectRegistry {
     ///
     /// Diagnostic-only text does not participate because
     /// [`TypeExpression`] equality is structural.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Structural symbolic type expression to match.
+    ///
+    /// # Returns
+    ///
+    /// Returns matching declarations in stable source-fragment order.
     #[must_use]
+    #[inline]
     pub fn find_impl_definitions_by_target(&self, target: &TypeExpression) -> ImplDefinitionCandidates {
         ImplDefinitionCandidates {
             descriptors: self
@@ -984,7 +1122,16 @@ impl ReflectRegistry {
     ///
     /// Repeated calls borrow the same registry-owned view without allocation.
     /// An unregistered target borrows one stable empty view.
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Exact process-local identity of the target type.
+    ///
+    /// # Returns
+    ///
+    /// Returns the frozen effective view, or the stable empty view when absent.
     #[must_use]
+    #[inline]
     pub fn effective_view(&self, type_id: TypeId) -> &EffectiveTypeView {
         self.indexes
             .effective_views_by_target
@@ -996,7 +1143,16 @@ impl ReflectRegistry {
     ///
     /// `None` means the definition is absent or describes an inherent impl.
     /// Links belong to the snapshot and never mutate shared declaration facts.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Impl declaration whose resolved trait link is requested.
+    ///
+    /// # Returns
+    ///
+    /// Returns the linked trait declaration, or `None` when no trait is linked.
     #[must_use]
+    #[inline]
     pub fn impl_definition_trait(
         &self,
         definition: &ImplDefinitionDescriptor,
@@ -1012,7 +1168,16 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked registration fragment declared the requested
     /// trait.
+    ///
+    /// # Parameters
+    ///
+    /// - `trait_id`: Process-local identity of the trait declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the registered trait declaration, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn trait_definition(&self, trait_id: &TraitId) -> Option<&'static TraitDefinitionDescriptor> {
         self.indexes.traits_by_id.get(trait_id).copied()
     }
@@ -1021,13 +1186,31 @@ impl ReflectRegistry {
     ///
     /// `None` means no linked reflected trait declaration has the exact path,
     /// or the path is ambiguous across linked fragments.
+    ///
+    /// # Parameters
+    ///
+    /// - `rust_path`: Exact diagnostic Rust path to find.
+    ///
+    /// # Returns
+    ///
+    /// Returns the sole matching reflected declaration, or `None` when absent
+    /// or ambiguous.
     #[must_use]
+    #[inline]
     pub fn trait_definition_by_path(&self, rust_path: &str) -> Option<&'static TraitDefinitionDescriptor> {
         self.find_trait_definitions_by_path(rust_path).only()
     }
 
     /// Finds every trait declaration with a diagnostic Rust path in stable
     /// order.
+    ///
+    /// # Parameters
+    ///
+    /// - `rust_path`: Exact diagnostic Rust path to find.
+    ///
+    /// # Returns
+    ///
+    /// Returns all matching declarations in stable order.
     pub fn find_trait_definitions_by_path(&self, rust_path: &str) -> TraitCandidates<'_> {
         TraitCandidates::new(self.indexes.traits_by_rust_path.get(rust_path).map_or(&[], Box::as_ref))
     }
