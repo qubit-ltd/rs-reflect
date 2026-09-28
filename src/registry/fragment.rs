@@ -26,6 +26,15 @@ use crate::identity::FragmentIdentity;
 /// Generated code stores this borrowed form directly in linker inventory. The
 /// registry converts it to the owned public [`FragmentIdentity`] only while
 /// building diagnostics and audit indexes.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
+///
+/// let identity = StaticFragmentIdentity::new("example", "example::settings", 1, 1, "type", 42);
+/// assert_eq!(identity, StaticFragmentIdentity::new("example", "example::settings", 1, 1, "type", 42));
+/// ```
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StaticFragmentIdentity {
@@ -97,6 +106,14 @@ impl StaticFragmentIdentity {
 }
 
 /// The payload category of a distributed registration fragment.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
+///
+/// assert_eq!(FragmentKind::Type, FragmentKind::Type);
+/// ```
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FragmentKind {
@@ -115,6 +132,16 @@ pub enum FragmentKind {
 }
 
 /// The process-local target claimed by a registration fragment.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
+///
+/// let target = RuntimeIdentity::Type(TypeId::of::<u32>());
+/// assert!(matches!(target, RuntimeIdentity::Type(id) if id == TypeId::of::<u32>()));
+/// ```
 #[doc(hidden)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum RuntimeIdentity {
@@ -133,6 +160,16 @@ pub enum RuntimeIdentity {
 }
 
 /// The process-local target of one capability registration.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::registry::CapabilityTarget;
+///
+/// let target = CapabilityTarget::Type(TypeId::of::<u32>());
+/// assert!(matches!(target, CapabilityTarget::Type(id) if id == TypeId::of::<u32>()));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityTarget {
     /// An exact concrete reflected type.
@@ -153,6 +190,16 @@ enum CapabilityRegistrationTarget {
 }
 
 /// One capability payload contributed by generated registration code.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::__private::codegen_v3::registration::CapabilityRegistration;
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let registration = CapabilityRegistration::for_type(TypeDescriptor::of::<u32>(), vec![]);
+/// assert_eq!(registration.target(), qubit_reflect::registry::CapabilityTarget::Type(std::any::TypeId::of::<u32>()));
+/// ```
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct CapabilityRegistration {
@@ -175,7 +222,10 @@ impl CapabilityRegistration {
     /// Returns the registration payload.
     #[doc(hidden)]
     #[must_use]
-    pub const fn for_type(target: &'static TypeDescriptor, descriptors: Vec<CapabilityDescriptor>) -> Self {
+    pub const fn for_type(
+        target: &'static TypeDescriptor,
+        descriptors: Vec<CapabilityDescriptor>,
+    ) -> Self {
         Self {
             target: CapabilityRegistrationTarget::Type(target),
             descriptors,
@@ -232,7 +282,9 @@ impl CapabilityRegistration {
     #[inline]
     pub fn target(&self) -> CapabilityTarget {
         match self.target {
-            CapabilityRegistrationTarget::Type(descriptor) => CapabilityTarget::Type(descriptor.type_id()),
+            CapabilityRegistrationTarget::Type(descriptor) => {
+                CapabilityTarget::Type(descriptor.type_id())
+            }
             CapabilityRegistrationTarget::TypeId(type_id) => CapabilityTarget::Type(type_id),
             CapabilityRegistrationTarget::TypeDefinition(descriptor) => {
                 CapabilityTarget::TypeDefinition(descriptor.id())
@@ -251,7 +303,8 @@ impl CapabilityRegistration {
     pub(crate) const fn type_descriptor(&self) -> Option<&'static TypeDescriptor> {
         match self.target {
             CapabilityRegistrationTarget::Type(descriptor) => Some(descriptor),
-            CapabilityRegistrationTarget::TypeId(_) | CapabilityRegistrationTarget::TypeDefinition(_) => None,
+            CapabilityRegistrationTarget::TypeId(_)
+            | CapabilityRegistrationTarget::TypeDefinition(_) => None,
         }
     }
 
@@ -268,6 +321,16 @@ impl CapabilityRegistration {
 }
 
 /// Materialized data returned by a static registration fragment.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
+/// use qubit_reflect::TypeDescriptor;
+///
+/// let payload = FragmentPayload::Type(TypeDescriptor::of::<u32>());
+/// assert!(matches!(payload, FragmentPayload::Type(_)));
+/// ```
 #[doc(hidden)]
 #[derive(Debug)]
 pub enum FragmentPayload {
@@ -315,7 +378,9 @@ impl FragmentPayload {
             Self::Type(descriptor) => RuntimeIdentity::Type(descriptor.type_id()),
             Self::TypeDefinition(descriptor) => RuntimeIdentity::TypeDefinition(descriptor.id()),
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
-            Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
+            Self::ImplDefinition(descriptor) => {
+                RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone())
+            }
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
             Self::Capability(registration) => RuntimeIdentity::Capabilities(registration.target()),
         }
@@ -327,6 +392,27 @@ impl FragmentPayload {
 /// The record contains only static identity facts, function pointers, and an
 /// enum tag. Calling the functions is deferred until registry initialization,
 /// so linker discovery never executes generated or user code.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::__private::codegen_v3::registration::{FragmentKind, FragmentPayload, RegistrationFragment, RuntimeIdentity, StaticFragmentIdentity};
+/// use qubit_reflect::TypeDescriptor;
+///
+/// fn target() -> RuntimeIdentity {
+///     RuntimeIdentity::Type(std::any::TypeId::of::<u32>())
+/// }
+/// fn payload() -> FragmentPayload {
+///     FragmentPayload::Type(TypeDescriptor::of::<u32>())
+/// }
+/// let fragment = RegistrationFragment::new(
+///     FragmentKind::Type,
+///     StaticFragmentIdentity::new("example", "example", 1, 1, "type", 1),
+///     target,
+///     payload,
+/// );
+/// let _ = fragment;
+/// ```
 #[doc(hidden)]
 #[derive(Clone, Copy)]
 pub struct RegistrationFragment {
