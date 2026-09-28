@@ -74,12 +74,12 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-035 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs`, `tests/invoke/runtime_tests.rs` |
 | REQ-ACCPT-036 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/registry_builder.rs`, `derive/src/expand/impls.rs` | `tests/registry/runtime_tests.rs`, `tests/generic_impl_trait_link_tests.rs` |
 | REQ-ACCPT-037 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/lib.rs`, `derive/src/expand/mod.rs` | `derive/tests/parser_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-ACCPT-038 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/indexes.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-ACCPT-038 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/indexes.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-ACCPT-039 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/slice.rs`, `src/builtin/trait_object.rs`, `src/value/dynamic_ref.rs` | `tests/descriptor/builtin_tests.rs`, `tests/value/str_tests.rs` |
 | REQ-ACCPT-040 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/mod.rs`, `src/descriptor/typed_view.rs` | `tests/descriptor/builtin_tests.rs` |
 | REQ-ACCPT-041 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/interner.rs`, `src/private/lazy_type_ref.rs` | `tests/descriptor/generic_tests.rs`, `tests/registry/stress_tests.rs` |
 | REQ-ACCPT-042 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/descriptor/trait_descriptor.rs`, `derive/src/expand/traits.rs` | `tests/descriptor/reflect_trait_tests.rs`, `tests/descriptor/trait_tests.rs` |
-| REQ-ACCPT-043 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/interner.rs`, `src/registry/registry.rs` | `tests/builtin_registry_freeze_tests.rs` |
+| REQ-ACCPT-043 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/interner.rs`, `src/registry/reflect_registry.rs` | `tests/builtin_registry_freeze_tests.rs` |
 | REQ-ACCPT-044 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/expand/structs.rs`, `src/descriptor/type_ref.rs` | `tests/ui/pass/opaque_generic_tests.rs`, `tests/descriptor/generic_tests.rs` |
 | REQ-ACCPT-045 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/invoke/adapter.rs`, `derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`, `tests/ui/pass/catch_unwind_thread_safe_tests.rs` |
 | REQ-ACCPT-046 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/expand/generics.rs`, `derive/src/expand/structs.rs` | `tests/ui/pass/lifetime_generic_tests.rs`, `tests/descriptor/generic_tests.rs` |
@@ -159,7 +159,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-GEN-009 | T03, T06, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-010 | T03, T06, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-011 | T03, T06, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
-| REQ-GEN-012 | T03, T06, T07, T12, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `src/descriptor/type_definition_descriptor.rs`, `src/descriptor/type_descriptor.rs`, `derive/src/expand/generics.rs`, `src/registry/registry.rs` | `tests/descriptor/generic_tests.rs`, `tests/public_type_definition_registry_tests.rs`, `tests/public_capability_registry_tests.rs`, `tests/capability_key_allocation_tests.rs` |
+| REQ-GEN-012 | T03, T06, T07, T12, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `src/descriptor/type_definition_descriptor.rs`, `src/descriptor/type_descriptor.rs`, `derive/src/expand/generics.rs`, `src/registry/reflect_registry.rs` | `tests/descriptor/generic_tests.rs`, `tests/public_type_definition_registry_tests.rs`, `tests/public_capability_registry_tests.rs`, `tests/capability_key_allocation_tests.rs` |
 | REQ-INT-001 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
 | REQ-INT-002 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
 | REQ-INT-003 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
@@ -226,25 +226,25 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-OUT-002 | T01, T05, T06, T07, T12, T23, T26 | `src/private/registration.rs`, `src/registry/registry_builder.rs` | `tests/registry/cross_crate_tests.rs` |
 | REQ-OUT-003 | T01, T05, T06, T07, T12, T23, T26 | `src/value/storage.rs`, `src/access/field_adapter.rs` | `tests/ui/fail/thread_safe_borrow_bound_tests.rs`, `tests/access/field_tests.rs` |
 | REQ-OUT-004 | T01, T05, T06, T07, T12, T23, T26 | `src/descriptor/type_descriptor.rs`, `src/identity/fragment_identity.rs` | `tests/descriptor/identity_tests.rs`, `tests/descriptor/type_descriptor_tests.rs` |
-| REQ-OUT-005 | T01, T05, T06, T07, T12, T23, T26 | `src/private/registration.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-OUT-005 | T01, T05, T06, T07, T12, T23, T26 | `src/private/registration.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-OUT-006 | T01, T05, T06, T07, T12, T23, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-OUT-007 | T01, T05, T06, T07, T12, T23, T26 | `src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/registry/model_facade_tests.rs` |
 | REQ-OUT-008 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/validated.rs`, `src/construct/struct_constructor.rs` | `tests/construct/runtime_tests.rs` |
 | REQ-OUT-009 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-ci/cargo-feature-check.sh` |
 | REQ-OUT-010 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/struct_construction_descriptor.rs`, `src/descriptor/type_kind.rs` | `tests/construct/adapter_tests.rs` |
-| REQ-SYS-001 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-002 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-003 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-004 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-005 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-006 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-007 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-008 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs`, `scripts/check-markdown-examples.sh` | `tests/registry/runtime_tests.rs`, `project-ci-check.sh`  `scripts/tests/check_markdown_examples_tests.py`, `tests/descriptor_debug_tests.rs` |
-| REQ-SYS-009 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-010 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-001 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-002 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-003 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-004 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-005 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-006 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-007 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-008 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs`, `scripts/check-markdown-examples.sh` | `tests/registry/runtime_tests.rs`, `project-ci-check.sh`  `scripts/tests/check_markdown_examples_tests.py`, `tests/descriptor_debug_tests.rs` |
+| REQ-SYS-009 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-010 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-011 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-ci/cargo-feature-check.sh` |
-| REQ-SYS-012 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-013 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-012 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
+| REQ-SYS-013 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-TRT-001 | T11, T16, T17, T20, T21 | `src/descriptor/trait_descriptor.rs`, `src/descriptor/impl_descriptor.rs`, `src/registry/effective_type_view.rs` | `tests/descriptor/trait_tests.rs`, `tests/descriptor/reflect_trait_tests.rs`, `test-crates/registry-app/src/lib.rs` |
 | REQ-TRT-002 | T11, T16, T17, T20, T21 | `src/descriptor/trait_descriptor.rs`, `src/descriptor/impl_descriptor.rs`, `src/registry/effective_type_view.rs` | `tests/descriptor/trait_tests.rs`, `tests/descriptor/reflect_trait_tests.rs`, `test-crates/registry-app/src/lib.rs` |
 | REQ-TRT-003 | T11, T16, T17, T20, T21 | `src/descriptor/trait_descriptor.rs`, `src/descriptor/impl_descriptor.rs`, `src/registry/effective_type_view.rs` | `tests/descriptor/trait_tests.rs`, `tests/descriptor/reflect_trait_tests.rs`, `test-crates/registry-app/src/lib.rs` |
@@ -271,7 +271,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-TYPE-009 | T05, T23 | `src/descriptor/type_descriptor.rs`, `src/lib.rs` | `test-crates/model-facade-runtime/src/lib.rs`, `test-crates/model-facade-app/src/lib.rs` |
 | REQ-TYPE-010 | T06, T14, T15 | `src/builtin/mod.rs`, `derive/src/expand/generics.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/builtin_tests.rs`, `tests/descriptor/generic_tests.rs`, `tests/ui/pass/opaque_generic_tests.rs` |
 | REQ-TYPE-011 | T05, T14 | `src/descriptor/type_kind.rs`, `src/descriptor/typed_view.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/derive_struct_tests.rs` |
-| REQ-TYPE-012 | T05, T12 | `src/descriptor/type_descriptor.rs`, `src/registry/registry.rs`, `src/registry/indexes.rs` | `tests/registry/runtime_tests.rs`, `tests/builtin_registry_freeze_tests.rs` |
+| REQ-TYPE-012 | T05, T12 | `src/descriptor/type_descriptor.rs`, `src/registry/reflect_registry.rs`, `src/registry/indexes.rs` | `tests/registry/runtime_tests.rs`, `tests/builtin_registry_freeze_tests.rs` |
 | REQ-TYPE-013 | T05, T06 | `src/descriptor/type_kind.rs`, `src/descriptor/typed_view.rs`, `src/builtin/tuple.rs`, `src/builtin/function.rs` | `tests/descriptor/builtin_tests.rs`, `tests/descriptor/type_descriptor_tests.rs` |
 | REQ-TYPE-014 | T07 | `src/capability/capability_key.rs`, `src/capability/capability_descriptor.rs`, `src/capability/set.rs` | `tests/descriptor/capability_tests.rs` |
 | REQ-TYPE-015 | T05, T08, T09, T10, T14, T15 | `src/descriptor/type_ref.rs`, `src/descriptor/field_descriptor.rs`, `src/construct/validated.rs`, `src/invoke/argument.rs` | `tests/access/field_tests.rs`, `tests/construct/runtime_tests.rs`, `tests/invoke/runtime_tests.rs` |
@@ -280,16 +280,16 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-TYPE-018 | T04, T07 | `src/capability/builtin.rs`, `src/capability/capability_descriptor.rs`, `src/value/dynamic_owned.rs` | `tests/descriptor/capability_tests.rs` |
 | REQ-TYPE-019 | T07, T12 | `src/capability/set.rs`, `src/capability/registration.rs`, `src/registry/registry_builder.rs` | `tests/descriptor/capability_tests.rs`, `tests/registry/runtime_tests.rs` |
 | REQ-TYPE-020 | T05, T06 | `src/descriptor/type_descriptor.rs`, `src/descriptor/typed_view.rs` | `tests/descriptor/builtin_tests.rs`, `tests/descriptor/type_descriptor_tests.rs` |
-| REQ-TYPE-021 | T06, T12, T21 | `src/registry/interner.rs`, `src/registry/registry.rs`, `src/descriptor/type_descriptor.rs` | `tests/builtin_registry_freeze_tests.rs`, `tests/type_descriptor_registry_failure_tests.rs` |
+| REQ-TYPE-021 | T06, T12, T21 | `src/registry/interner.rs`, `src/registry/reflect_registry.rs`, `src/descriptor/type_descriptor.rs` | `tests/builtin_registry_freeze_tests.rs`, `tests/type_descriptor_registry_failure_tests.rs` |
 | REQ-TYPE-022 | T04, T05, T06, T16 | `src/descriptor/type_descriptor.rs`, `src/builtin/slice.rs`, `src/builtin/trait_object.rs`, `src/value/dynamic_owned.rs` | `tests/descriptor/builtin_tests.rs`, `tests/ui/fail/slice_dynamic_value_tests.rs`, `tests/ui/fail/dyn_trait_dynamic_value_tests.rs` |
 | REQ-TYPE-023 | T05, T06 | `src/descriptor/type_kind.rs`, `src/builtin/scalar.rs` | `tests/descriptor/builtin_tests.rs`, `tests/builtin_registry_freeze_tests.rs` |
 | REQ-TYPE-024 | T05, T06 | `src/descriptor/typed_view.rs`, `src/builtin/map.rs`, `src/builtin/pointer.rs`, `src/builtin/function.rs` | `tests/descriptor/builtin_tests.rs` |
-| REQ-TYPE-025 | T12, T13, T21 | `src/registry/indexes.rs`, `src/registry/registry.rs`, `derive/src/validate/declaration.rs` | `tests/registry/runtime_tests.rs`, `tests/ui/fail/duplicate_rename_tests.rs` |
+| REQ-TYPE-025 | T12, T13, T21 | `src/registry/indexes.rs`, `src/registry/reflect_registry.rs`, `derive/src/validate/declaration.rs` | `tests/registry/runtime_tests.rs`, `tests/ui/fail/duplicate_rename_tests.rs` |
 | REQ-TYPE-026 | T04, T07 | `src/capability/set.rs`, `src/capability/registration.rs`, `src/value/dynamic_owned.rs` | `tests/descriptor/capability_tests.rs`, `tests/value/thread_mode_tests.rs` |
-| REQ-TYPE-027 | T06, T12 | `src/registry/interner.rs`, `src/registry/registry.rs`, `src/registry/registry_builder.rs` | `tests/builtin_registry_freeze_tests.rs`, `tests/descriptor/builtin_tests.rs` |
+| REQ-TYPE-027 | T06, T12 | `src/registry/interner.rs`, `src/registry/reflect_registry.rs`, `src/registry/registry_builder.rs` | `tests/builtin_registry_freeze_tests.rs`, `tests/descriptor/builtin_tests.rs` |
 | REQ-TYPE-028 | T05, T14, T15, T20 | `src/descriptor/type_ref.rs`, `src/private/lazy_type_ref.rs`, `derive/src/expand/structs.rs`, `src/construct/validated.rs` | `tests/descriptor/type_descriptor_tests.rs`, `tests/descriptor/derive_struct_tests.rs`, `tests/access/field_tests.rs` |
 | REQ-TYPE-029 | T05, T07, T14, T15, T19 | `derive/src/expand/structs.rs`, `derive/src/expand/enums.rs`, `src/private/descriptor.rs` | `tests/descriptor/derive_struct_tests.rs`, `tests/ui/pass/opaque_generic_tests.rs`, `tests/descriptor/capability_tests.rs` |
-| REQ-TYPE-030 | T01, T02, T10 | `src/capability/capability_lookup.rs`, `src/capability/set.rs`, `src/registry/registry.rs` | `tests/public_generic_capability_conflict_tests.rs`, `tests/descriptor/capability_tests.rs` |
+| REQ-TYPE-030 | T01, T02, T10 | `src/capability/capability_lookup.rs`, `src/capability/set.rs`, `src/registry/reflect_registry.rs` | `tests/public_generic_capability_conflict_tests.rs`, `tests/descriptor/capability_tests.rs` |
 | REQ-VAL-001 | T04, T22 | `src/value/dynamic_owned.rs`, `src/value/dynamic_ref.rs`, `src/value/dynamic_mut.rs` | `tests/value/dynamic_owned_tests.rs`, `tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-002 | T04, T22 | `src/value/dynamic_ref.rs`, `src/value/dynamic_mut.rs` | `src/value/mode.rs`, `tests/value/dynamic_ref_tests.rs` |
 | REQ-VAL-003 | T04, T22 | `src/value/dynamic_owned.rs` | `tests/value/dynamic_owned_tests.rs`, `tests/value/thread_mode_tests.rs` |
