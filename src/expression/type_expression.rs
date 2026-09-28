@@ -179,6 +179,15 @@ impl TypeExpression {
 }
 
 /// A concrete type path and its final-segment generic arguments.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ConcreteTypeExpression;
+/// let ty = ConcreteTypeExpression::new(["std", "vec", "Vec"], [])
+///     .expect("non-empty path");
+/// assert_eq!(ty.path().last().map(|part| part.as_ref()), Some("Vec"));
+/// ```
 #[derive(Clone, Debug)]
 pub struct ConcreteTypeExpression {
     /// Path segments in declaration order, for example `std`, `vec`, and
@@ -337,6 +346,15 @@ impl ConcreteTypeExpression {
 impl_identity_without_diagnostic!(ConcreteTypeExpression { segments });
 
 /// One concrete path segment and the generic arguments written on it.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ConcretePathSegment;
+/// let segment = ConcretePathSegment::new("Vec", []);
+/// assert_eq!(segment.name(), "Vec");
+/// assert!(segment.arguments().is_empty());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ConcretePathSegment {
     /// Identifier for this path component.
@@ -386,6 +404,20 @@ impl ConcretePathSegment {
 }
 
 /// An associated type projection.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::AssociatedTypeExpression;
+/// use qubit_reflect::expression::TypeExpression;
+/// let projection = AssociatedTypeExpression::new(
+///     TypeExpression::parameter("T").expect("valid parameter"),
+///     None,
+///     "Item",
+///     [],
+/// );
+/// assert_eq!(projection.item(), "Item");
+/// ```
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeExpression {
     /// The self type whose associated item is projected.
@@ -505,6 +537,20 @@ impl_identity_without_diagnostic!(AssociatedTypeExpression {
 });
 
 /// A shared or mutable reference type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::LifetimeExpression;
+/// use qubit_reflect::expression::ReferenceTypeExpression;
+/// use qubit_reflect::expression::TypeExpression;
+/// let reference = ReferenceTypeExpression::new(
+///     LifetimeExpression::Elided,
+///     true,
+///     TypeExpression::SelfType,
+/// );
+/// assert!(reference.is_mutable());
+/// ```
 #[derive(Clone, Debug)]
 pub struct ReferenceTypeExpression {
     /// The reference lifetime, including [`LifetimeExpression::Elided`] when
@@ -599,6 +645,15 @@ impl_identity_without_diagnostic!(ReferenceTypeExpression {
 });
 
 /// A const or mutable raw pointer type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::RawPointerTypeExpression;
+/// use qubit_reflect::expression::TypeExpression;
+/// let pointer = RawPointerTypeExpression::new(false, TypeExpression::SelfType);
+/// assert!(!pointer.is_mutable());
+/// ```
 #[derive(Clone, Debug)]
 pub struct RawPointerTypeExpression {
     /// Whether this is a mutable raw pointer.
@@ -675,6 +730,19 @@ impl RawPointerTypeExpression {
 impl_identity_without_diagnostic!(RawPointerTypeExpression { mutable, target });
 
 /// An array type and its structural length expression.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::ArrayTypeExpression;
+/// use qubit_reflect::expression::ConstExpression;
+/// use qubit_reflect::expression::TypeExpression;
+/// let array = ArrayTypeExpression::new(
+///     TypeExpression::SelfType,
+///     ConstExpression::UnsignedInteger(4),
+/// );
+/// assert_eq!(array.length(), &ConstExpression::UnsignedInteger(4));
+/// ```
 #[derive(Clone, Debug)]
 pub struct ArrayTypeExpression {
     /// The repeated element type.
@@ -949,6 +1017,14 @@ impl_identity_without_diagnostic!(FunctionPointerExpression {
 });
 
 /// A `dyn Trait` object and the predicates it must satisfy.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::TraitObjectExpression;
+/// let object = TraitObjectExpression::new([]);
+/// assert!(object.bounds().is_empty());
+/// ```
 #[derive(Clone, Debug)]
 pub struct TraitObjectExpression {
     /// Trait and lifetime predicates in declaration order.
@@ -1011,6 +1087,14 @@ impl TraitObjectExpression {
 impl_identity_without_diagnostic!(TraitObjectExpression { bounds });
 
 /// An `impl Trait` opaque type and the predicates it must satisfy.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::OpaqueTypeExpression;
+/// let opaque = OpaqueTypeExpression::new([]);
+/// assert!(opaque.bounds().is_empty());
+/// ```
 #[derive(Clone, Debug)]
 pub struct OpaqueTypeExpression {
     /// Trait and lifetime predicates in declaration order.
