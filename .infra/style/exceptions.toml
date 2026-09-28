@@ -152,11 +152,6 @@ reason = "Impl kinds, associated bindings, method lookup, and builders form one 
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/trait_descriptor/supertrait.rs"
-reason = "The trait reference and its transitive closure are the paired representation of supertrait navigation."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/type_kind.rs"
 reason = "These classification enums are the closed kind vocabulary used by the root and typed view descriptors."
 

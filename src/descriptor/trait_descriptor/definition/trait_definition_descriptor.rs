@@ -273,15 +273,11 @@ impl TraitDefinitionDescriptor {
             .map_or(&[], |members| members.associated_consts.as_ref())
     }
 
-    /// Initializes declaration-level associated-item facts exactly once.
+    /// Initializes declaration-level associated-item facts if needed.
     ///
     /// # Parameters
     ///
     /// - `initialize`: Factory for methods, associated types, and constants.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called after another initializer wins the one-time cell.
     #[doc(hidden)]
     pub fn initialize_members(
         &'static self,
