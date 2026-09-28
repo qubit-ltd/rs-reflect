@@ -363,6 +363,86 @@ fn test_capability_origins_distinguish_intrinsic_registered_and_isolated_facts()
 }
 
 #[test]
+fn test_intrinsic_capability_source_uses_type_member_when_registered() {
+    let key = key::<u32>("example.intrinsic");
+    let early_capability_source = source(1, "capability", 1);
+    let type_source = source(2, "type", 2);
+    let late_capability_source = source(3, "capability", 3);
+
+    let mut early_capability_builder = RegistrySnapshotBuilder::new();
+    early_capability_builder.add_type_capabilities(&INTRINSIC_DESCRIPTOR, Vec::new(), early_capability_source.clone());
+    early_capability_builder.add_type(&INTRINSIC_DESCRIPTOR, type_source.clone());
+    let early_capability_registry = early_capability_builder.build().expect("valid snapshot");
+    assert_eq!(
+        early_capability_registry.capability_source(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Some(&type_source),
+    );
+    assert_eq!(
+        early_capability_registry.capability(&INTRINSIC_DESCRIPTOR, key),
+        Ok(Some(&11_u32)),
+    );
+
+    let mut late_capability_builder = RegistrySnapshotBuilder::new();
+    late_capability_builder.add_type(&INTRINSIC_DESCRIPTOR, type_source.clone());
+    late_capability_builder.add_type_capabilities(&INTRINSIC_DESCRIPTOR, Vec::new(), late_capability_source);
+    let late_capability_registry = late_capability_builder.build().expect("valid snapshot");
+    assert_eq!(
+        late_capability_registry.capability_source(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Some(&type_source),
+    );
+
+    let mut capability_only_builder = RegistrySnapshotBuilder::new();
+    capability_only_builder.add_type_capabilities(&INTRINSIC_DESCRIPTOR, Vec::new(), early_capability_source.clone());
+    let capability_only_registry = capability_only_builder.build().expect("valid snapshot");
+    assert!(capability_only_registry.types().is_empty());
+    assert_eq!(
+        capability_only_registry.capability_source(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Some(&early_capability_source),
+    );
+    assert_eq!(
+        capability_only_registry.capability_origin(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Ok(Some(CapabilityOrigin::Intrinsic {
+            type_id: TypeId::of::<IntrinsicTarget>(),
+        })),
+    );
+}
+
+#[test]
+fn test_capability_only_intrinsic_source_uses_earliest_trigger_identity() {
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_capabilities(&INTRINSIC_DESCRIPTOR, Vec::new(), source(20, "capability", 20));
+    builder.add_type_capabilities(&INTRINSIC_DESCRIPTOR, Vec::new(), source(10, "capability", 10));
+    let registry = builder.build().expect("valid capability-only snapshot");
+
+    assert_eq!(
+        registry.capability_source(&INTRINSIC_DESCRIPTOR, "example.intrinsic"),
+        Some(&source(10, "capability", 10)),
+    );
+}
+
+#[test]
+fn test_intrinsic_capability_conflict_reports_type_and_registration_sources() {
+    let type_source = source(2, "type", 2);
+    let capability_source = source(1, "capability", 1);
+    let key = key::<u32>("example.intrinsic");
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_capabilities(
+        &INTRINSIC_DESCRIPTOR,
+        vec![CapabilityDescriptor::with_adapter(key, 19_u32)],
+        capability_source.clone(),
+    );
+    builder.add_type(&INTRINSIC_DESCRIPTOR, type_source.clone());
+
+    let error = builder.build().expect_err("intrinsic and registered IDs conflict");
+    let (first, second) = error.conflicting_fragments().expect("both sources are retained");
+    assert!(
+        (first == &type_source && second == &capability_source)
+            || (first == &capability_source && second == &type_source),
+        "unexpected conflict sources: {first:?}, {second:?}",
+    );
+}
+
+#[test]
 fn test_add_only_collects_payloads_until_build() {
     let calls_before = PROVIDER_CALLS.load(Ordering::SeqCst);
     let empty = RegistrySnapshotBuilder::new().build().expect("empty snapshot");

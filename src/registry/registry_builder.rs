@@ -10,7 +10,6 @@
 
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::capability::CapabilityConflict;
@@ -57,7 +56,7 @@ struct RegistryBuilder {
     impls_by_target: HashMap<TypeId, Vec<&'static ImplDescriptor>>,
     capabilities: HashMap<(CapabilityTarget, CapabilityId), (CapabilityDescriptor, FragmentIdentity)>,
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
-    loaded_intrinsic_capabilities: HashSet<TypeId>,
+    intrinsic_candidates: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
     fragment_identities: Vec<FragmentIdentity>,
 }
 
@@ -113,7 +112,7 @@ impl RegistryBuilder {
         self.types.push(descriptor);
         self.types_by_id
             .insert(descriptor.type_id(), (descriptor, identity.clone()));
-        self.push_intrinsic_capabilities(descriptor, identity)?;
+        self.queue_intrinsic_capabilities(descriptor, identity);
         Ok(())
     }
 
@@ -124,7 +123,7 @@ impl RegistryBuilder {
         identity: &FragmentIdentity,
     ) -> Result<(), RegistryError> {
         if let Some(descriptor) = registration.type_descriptor() {
-            self.push_intrinsic_capabilities(descriptor, identity)?;
+            self.queue_intrinsic_capabilities(descriptor, identity);
         }
         for descriptor in registration.descriptors() {
             self.push_capability(registration.target(), descriptor.clone(), identity)?;
@@ -132,30 +131,49 @@ impl RegistryBuilder {
         Ok(())
     }
 
-    /// Adds one concrete descriptor's intrinsic facts at most once.
-    fn push_intrinsic_capabilities(
-        &mut self,
-        descriptor: &'static TypeDescriptor,
-        identity: &FragmentIdentity,
-    ) -> Result<(), RegistryError> {
-        if !self.loaded_intrinsic_capabilities.insert(descriptor.type_id()) {
-            return Ok(());
+    /// Defers one descriptor's intrinsic facts until concrete membership is
+    /// known.
+    fn queue_intrinsic_capabilities(&mut self, descriptor: &'static TypeDescriptor, identity: &FragmentIdentity) {
+        self.intrinsic_candidates
+            .entry(descriptor.type_id())
+            .or_insert((descriptor, identity.clone()));
+    }
+
+    /// Resolves intrinsic facts after the snapshot's concrete members are
+    /// known.
+    fn resolve_intrinsic_capabilities(&mut self) -> Result<(), RegistryError> {
+        let mut candidates = self.intrinsic_candidates.drain().collect::<Vec<_>>();
+        candidates.sort_by(|(_, (_, left_source)), (_, (_, right_source))| left_source.cmp(right_source));
+        for (type_id, (descriptor, first_trigger)) in candidates {
+            let source = self
+                .types_by_id
+                .get(&type_id)
+                .map_or(first_trigger, |(_, type_source)| type_source.clone());
+            let capabilities = descriptor.declared_capabilities().map_err(|error| {
+                RegistryError::intrinsic_capability_conflict_with_target(
+                    source.clone(),
+                    CapabilityTarget::Type(type_id),
+                    error,
+                )
+            })?;
+            self.push_intrinsic_descriptors(type_id, &source, capabilities.descriptors())?;
         }
-        let capabilities = descriptor.declared_capabilities().map_err(|error| {
-            RegistryError::intrinsic_capability_conflict_with_target(
-                identity.clone(),
-                CapabilityTarget::Type(descriptor.type_id()),
-                error,
-            )
-        })?;
-        for capability in capabilities.descriptors() {
+        Ok(())
+    }
+
+    /// Adds one validated intrinsic capability with its selected source.
+    fn push_intrinsic_descriptors(
+        &mut self,
+        type_id: TypeId,
+        source: &FragmentIdentity,
+        capabilities: &[CapabilityDescriptor],
+    ) -> Result<(), RegistryError> {
+        for capability in capabilities {
             self.push_capability_with_origin(
-                CapabilityTarget::Type(descriptor.type_id()),
+                CapabilityTarget::Type(type_id),
                 capability.clone(),
-                identity,
-                CapabilityOrigin::Intrinsic {
-                    type_id: descriptor.type_id(),
-                },
+                source,
+                CapabilityOrigin::Intrinsic { type_id },
             )?;
         }
         Ok(())
@@ -492,6 +510,7 @@ pub(crate) fn validate_and_freeze_materialized(
             payload: fragment.payload,
         })?;
     }
+    builder.resolve_intrinsic_capabilities()?;
     builder.resolve_impl_definition_traits()?;
     Ok(builder.finish())
 }
