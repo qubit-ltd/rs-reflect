@@ -26,6 +26,13 @@ use crate::value::ReflectedOwned;
 use crate::value::ReflectedRef;
 
 /// The declared shape of an enum variant.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::VariantKind;
+/// assert_eq!(VariantKind::Unit, VariantKind::Unit);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VariantKind {
     /// A fieldless variant.
@@ -37,6 +44,13 @@ pub enum VariantKind {
 }
 
 /// Whether a variant's discriminant was written explicitly in Rust source.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::DiscriminantOrigin;
+/// assert_eq!(DiscriminantOrigin::Implicit, DiscriminantOrigin::Implicit);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DiscriminantOrigin {
     /// Rust assigned the value from declaration order and preceding values.
@@ -46,6 +60,13 @@ pub enum DiscriminantOrigin {
 }
 
 /// The exact integer representation of an enum discriminant value.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::NumericDiscriminant;
+/// assert_eq!(NumericDiscriminant::U8(3), NumericDiscriminant::U8(3));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NumericDiscriminant {
     /// An `i8` discriminant.
@@ -152,8 +173,18 @@ impl VariantDescriptor {
     }
 
     /// Records source discriminant facts supplied by generated enum metadata.
+    ///
+    /// # Parameters
+    ///
+    /// - `origin`: Whether the discriminant was explicit in source.
+    /// - `numeric`: Exact numeric value when supported by the enum representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with its source discriminant facts recorded.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_discriminant(mut self, origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
         self.discriminant_origin = origin;
         self.numeric_discriminant = numeric;
@@ -161,8 +192,17 @@ impl VariantDescriptor {
     }
 
     /// Attaches a generated dynamic-construction entry point to this variant.
+    ///
+    /// # Parameters
+    ///
+    /// - `construction`: Generated constructor and construction policy.
+    ///
+    /// # Returns
+    ///
+    /// Returns this descriptor with dynamic construction enabled.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub fn with_construction(mut self, construction: VariantConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
@@ -250,6 +290,7 @@ impl VariantDescriptor {
     ///
     /// Returns the static root descriptor for the declaring enum.
     #[must_use]
+    #[inline]
     pub fn declaring_type(&self) -> &'static TypeDescriptor {
         (self.declaring_type)()
     }
@@ -394,6 +435,18 @@ impl VariantDescriptor {
 impl fmt::Debug for VariantDescriptor {
     /// Formats local facts without following declaring-type relationships
     /// recursively.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving this variant's local facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the formatter.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("VariantDescriptor")

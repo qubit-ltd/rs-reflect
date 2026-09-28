@@ -379,6 +379,7 @@ impl TypeDescriptor {
     /// Returns the root with its struct construction entry points attached.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
         self.construction = Some(construction);
         self
@@ -395,6 +396,7 @@ impl TypeDescriptor {
     /// Returns the root linked to its concrete generic metadata.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
         self.generic = Some(generic);
         self
@@ -411,6 +413,7 @@ impl TypeDescriptor {
     /// Returns the root linked to that generic declaration.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
         self.definition = Some(definition);
         self
@@ -1339,6 +1342,8 @@ impl TypeDescriptor {
     ///
     /// Returns the root with its capability resolver replaced.
     #[doc(hidden)]
+    #[must_use]
+    #[inline]
     pub const fn with_capabilities(mut self, capabilities: fn() -> TypeCapabilitiesResult) -> Self {
         self.capabilities = capabilities;
         self
@@ -1802,6 +1807,7 @@ impl TypeDescriptor {
     /// Returns implementations borrowed from the supplied snapshot in its
     /// deterministic order.
     #[must_use]
+    #[inline]
     pub fn impls_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [&'static ImplDescriptor] {
         registry.implementations(self.type_id())
     }
@@ -1838,6 +1844,7 @@ impl TypeDescriptor {
     ///
     /// Returns effective method instances borrowed from the supplied snapshot.
     #[must_use]
+    #[inline]
     pub fn methods_in<'registry>(
         &self,
         registry: &'registry ReflectRegistry,
@@ -1884,6 +1891,7 @@ impl TypeDescriptor {
     /// Returns the missing, unique, or ambiguous lookup result borrowing the
     /// supplied registry snapshot.
     #[must_use]
+    #[inline]
     pub fn methods_named_in<'registry>(
         &self,
         registry: &'registry ReflectRegistry,
@@ -1900,6 +1908,18 @@ impl fmt::Debug for TypeDescriptor {
     /// expanding relationships or evaluating intrinsic capability providers.
     /// Logging a descriptor from its own provider cannot re-enter
     /// initialization.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Destination for the root's local facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the local representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the formatter.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("TypeDescriptor")

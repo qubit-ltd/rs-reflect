@@ -26,6 +26,14 @@ use crate::expression::GenericParameterDescriptor;
 use crate::expression::TypeExpression;
 
 /// An invalid applied trait graph or incomplete external declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::TraitDescriptorBuildError;
+/// let error = TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts;
+/// assert_eq!(error, TraitDescriptorBuildError::ExternalTraitHasUnprovenFacts);
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TraitDescriptorBuildError {
@@ -62,6 +70,18 @@ pub enum TraitDescriptorBuildError {
 
 impl fmt::Display for TraitDescriptorBuildError {
     /// Formats a stable diagnostic message.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the diagnostic message.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the message.
+    ///
+    /// # Errors
+    ///
+    /// Returns the formatter error when writing fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RecursiveSupertrait { rust_path } => {
@@ -91,6 +111,31 @@ impl fmt::Display for TraitDescriptorBuildError {
 impl std::error::Error for TraitDescriptorBuildError {}
 
 /// Builds one applied trait and validates its supertrait closure.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()),
+///         "Example",
+///         "example::Example",
+///         "Example",
+///         TraitCompleteness::Complete,
+///         &GENERICS,
+///     )
+/// });
+/// let applied = TraitDescriptor::builder(&DEFINITION).build().expect("valid application");
+/// assert_eq!(applied.rust_name(), "Example");
+/// ```
 #[derive(Debug)]
 pub struct TraitDescriptorBuilder {
     /// Shared declaration for the applied trait being built.
@@ -233,11 +278,6 @@ impl TraitDescriptorBuilder {
     /// # Returns
     ///
     /// Returns the validated applied trait descriptor.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TraitDescriptorBuildError`] when the graph or external-trait
-    /// facts violate the declaration contract.
     ///
     /// # Errors
     ///

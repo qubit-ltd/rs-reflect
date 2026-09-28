@@ -44,7 +44,7 @@ pub enum TraitCompleteness {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```no_run
 /// # #[cfg(feature = "derive")]
 /// mod example {
 ///     use qubit_reflect;
@@ -331,6 +331,15 @@ impl TraitDefinitionDescriptor {
 }
 
 /// One associated type declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::AssociatedTypeDescriptor;
+///
+/// let item = AssociatedTypeDescriptor::new(0, "Item", "item", Box::new([]), None);
+/// assert_eq!(item.query_name(), "item");
+/// ```
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeDescriptor {
     /// Zero-based source position among associated types.
@@ -517,6 +526,24 @@ impl AssociatedTypeDescriptor {
 }
 
 /// One associated constant declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::AssociatedConstDescriptor;
+/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+///
+/// let item = AssociatedConstDescriptor::new(
+///     0,
+///     "LIMIT",
+///     "limit",
+///     TypeExpression::Concrete(
+///         ConcreteTypeExpression::new(["usize"], []).expect("non-empty path"),
+///     ),
+///     false,
+/// );
+/// assert_eq!(item.query_name(), "limit");
+/// ```
 #[derive(Clone, Debug)]
 pub struct AssociatedConstDescriptor {
     /// Zero-based source position among associated constants.

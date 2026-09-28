@@ -21,6 +21,41 @@ use crate::identity::MemberId;
 use crate::identity::Visibility;
 
 /// Builds a declaration while preserving source order for all collections.
+///
+/// # Examples
+///
+/// ```no_run
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+///     use qubit_reflect::TypeDescriptor;
+///     use qubit_reflect::descriptor::{MethodDeclarationOwner, MethodDescriptor};
+///     mod example {
+///         use qubit_reflect::{Reflect, reflect_impl};
+///         #[derive(Reflect)]
+///         #[reflect(crate = qubit_reflect)]
+///         pub struct Service;
+///         #[reflect_impl(crate = qubit_reflect)]
+///         impl Service { fn ping(&self) {} }
+///     }
+///     let implementation = TypeDescriptor::of::<example::Service>()
+///         .impls()?
+///         .first()
+///         .expect("reflected implementation");
+///     let source = implementation.method("ping").expect("reflected method");
+///     let rebuilt = MethodDescriptor::builder(
+///         source.identity().clone(),
+///         source.rust_name(),
+///         source.query_name(),
+///         MethodDeclarationOwner::Impl(implementation.definition()),
+///     )
+///     .build();
+///     assert_eq!(rebuilt.rust_name(), "ping");
+///     Ok(())
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
+/// ```
 #[derive(Debug)]
 pub struct MethodDescriptorBuilder {
     /// Stable source identity, independent of reflected query naming.
