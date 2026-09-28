@@ -24,37 +24,29 @@ use crate::identity::Visibility;
 ///
 /// # Examples
 ///
-/// ```no_run
-/// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-///     use qubit_reflect::TypeDescriptor;
-///     use qubit_reflect::descriptor::{MethodDeclarationOwner, MethodDescriptor};
-///     mod example {
-///         use qubit_reflect::{Reflect, reflect_impl};
-///         #[derive(Reflect)]
-///         #[reflect(crate = qubit_reflect)]
-///         pub struct Service;
-///         #[reflect_impl(crate = qubit_reflect)]
-///         impl Service { fn ping(&self) {} }
-///     }
-///     let implementation = TypeDescriptor::of::<example::Service>()
-///         .impls()?
-///         .first()
-///         .expect("reflected implementation");
-///     let source = implementation.method("ping").expect("reflected method");
-///     let rebuilt = MethodDescriptor::builder(
-///         source.identity().clone(),
-///         source.rust_name(),
-///         source.query_name(),
-///         MethodDeclarationOwner::Impl(implementation.definition()),
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{MethodDeclarationOwner, MethodDescriptor, TraitCompleteness, TraitDefinitionDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Service", "example::Service", "Service",
+///         TraitCompleteness::Complete, &GENERICS,
 ///     )
-///     .build();
-///     assert_eq!(rebuilt.rust_name(), "ping");
-///     Ok(())
-/// }
-/// #[cfg(not(feature = "derive"))]
-/// fn main() {}
+/// });
+/// let method = MethodDescriptor::builder(
+///     MemberId::new("example::Service", "method", 0,
+///         FragmentIdentity::new("example", "example", 1, 1, "method", 1)),
+///     "ping", "ping", MethodDeclarationOwner::Trait(&DEFINITION),
+/// );
+/// let rebuilt = method.visibility(qubit_reflect::descriptor::MethodVisibility::InheritedFromTrait).build();
+/// assert_eq!(rebuilt.rust_name(), "ping");
 /// ```
 #[derive(Debug)]
 pub struct MethodDescriptorBuilder {

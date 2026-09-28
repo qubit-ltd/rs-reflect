@@ -11,6 +11,7 @@
 
 mod instance;
 mod invocation_adapter;
+mod method_declaration_owner;
 mod method_descriptor_builder;
 mod signature;
 
@@ -20,6 +21,7 @@ pub use self::instance::MethodInstanceDescriptor;
 pub use self::invocation_adapter::CatchingAvailability;
 pub use self::invocation_adapter::InvocationAdapter;
 pub use self::invocation_adapter::InvocationUnavailableReason;
+pub use self::method_declaration_owner::MethodDeclarationOwner;
 pub use self::method_descriptor_builder::MethodDescriptorBuilder;
 pub use self::signature::MethodQualifiers;
 pub use self::signature::MethodVisibility;
@@ -40,34 +42,27 @@ use crate::identity::MemberId;
 /// # Examples
 ///
 /// ```
-/// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
-/// use qubit_reflect::TypeDescriptor;
-/// mod example {
-///     use qubit_reflect::{Reflect, reflect_impl};
-///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
-///     pub struct Service;
-///     #[reflect_impl(crate = qubit_reflect)]
-///     impl Service {
-///         fn ping(&self) {}
-///     }
-/// }
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{MethodDeclarationOwner, MethodDescriptor, TraitCompleteness, TraitDefinitionDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
 ///
-/// # #[cfg(feature = "derive")]
-/// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-/// let method = TypeDescriptor::of::<example::Service>()
-///     .impls()?
-///     .first()
-///     .and_then(|implementation| implementation.method("ping"))
-///     .expect("reflected method");
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Service", "example::Service", "Service",
+///         TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// let method = MethodDescriptor::builder(
+///     MemberId::new("example::Service", "method", 0,
+///         FragmentIdentity::new("example", "example", 1, 1, "method", 1)),
+///     "ping", "ping", MethodDeclarationOwner::Trait(&DEFINITION),
+/// ).build();
 /// assert_eq!(method.rust_name(), "ping");
-/// # Ok(())
-/// # }
-/// # #[cfg(not(feature = "derive"))]
-/// # fn main() {}
-/// }
 /// ```
 #[derive(Clone, Debug)]
 pub struct MethodDescriptor {
@@ -93,49 +88,6 @@ pub struct MethodDescriptor {
     has_default: bool,
     /// Trait or impl declaration that owns this method.
     declaration_owner: MethodDeclarationOwner,
-}
-
-/// The declaration that owns a method descriptor.
-///
-/// # Examples
-///
-/// ```
-/// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// fn main() -> Result<(), qubit_reflect::error::RegistryError> {
-///     use qubit_reflect::TypeDescriptor;
-///     use qubit_reflect::descriptor::MethodDeclarationOwner;
-///     mod example {
-///         use qubit_reflect::{Reflect, reflect_impl};
-///         #[derive(Reflect)]
-///         #[reflect(crate = qubit_reflect)]
-///         pub struct Service;
-///         #[reflect_impl(crate = qubit_reflect)]
-///         impl Service { fn ping(&self) {} }
-///     }
-///     let implementation = TypeDescriptor::of::<example::Service>()
-///         .impls()?
-///         .first()
-///         .expect("reflected implementation");
-///     let owner = MethodDeclarationOwner::Impl(implementation.definition());
-///     assert!(matches!(owner, MethodDeclarationOwner::Impl(_)));
-///     Ok(())
-/// }
-/// #[cfg(not(feature = "derive"))]
-/// fn main() {}
-/// ```
-#[derive(Clone, Copy, Debug)]
-pub enum MethodDeclarationOwner {
-    /// A method declared by a trait definition.
-    Trait(
-        /// Trait declaration that owns the method.
-        &'static TraitDefinitionDescriptor,
-    ),
-    /// A method explicitly declared by an impl definition.
-    Impl(
-        /// Impl declaration that owns the method.
-        &'static ImplDefinitionDescriptor,
-    ),
 }
 
 impl MethodDescriptor {

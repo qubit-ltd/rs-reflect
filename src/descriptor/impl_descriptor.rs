@@ -137,6 +137,14 @@ struct ImplAssociatedItems {
 /// One associated type explicitly bound by an impl definition.
 ///
 /// This descriptor is constructed by generated registration code.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ImplAssociatedTypeDescriptor;
+/// let binding = ImplAssociatedTypeDescriptor::new("Item");
+/// assert_eq!(binding.rust_name(), "Item");
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedTypeDescriptor {
@@ -175,6 +183,18 @@ impl ImplAssociatedTypeDescriptor {
 /// One associated constant explicitly bound by an impl definition.
 ///
 /// This descriptor is constructed by generated registration code.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ImplAssociatedConstDescriptor;
+/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+/// let binding = ImplAssociatedConstDescriptor::new(
+///     "LIMIT",
+///     TypeExpression::Concrete(ConcreteTypeExpression::new(["usize"], []).expect("non-empty path")),
+/// );
+/// assert_eq!(binding.rust_name(), "LIMIT");
+/// ```
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImplAssociatedConstDescriptor {
@@ -536,6 +556,17 @@ pub enum AssociatedConstReadUnavailableReason {
 ///
 /// A reader invokes its generated adapter each time, producing a fresh owned
 /// value without exposing a reference to static storage.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::AssociatedConstReader;
+/// use qubit_reflect::ReflectedOwned;
+///
+/// fn read_value() -> ReflectedOwned { ReflectedOwned::new(7_u8) }
+/// let reader = AssociatedConstReader::new(read_value);
+/// assert_eq!(reader.read().downcast_ref::<u8>(), Some(&7));
+/// ```
 pub struct AssociatedConstReader {
     /// Safe function or closure adapter that reads a fresh owned value.
     read: AssociatedConstReadAdapter,
@@ -630,6 +661,24 @@ impl fmt::Debug for AssociatedConstReader {
 /// One associated type binding contributed by a concrete impl.
 ///
 /// This descriptor is constructed by generated registration code.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{AssociatedTypeBindingDescriptor, AssociatedTypeDescriptor};
+/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+///
+/// static DECLARATION: LazyLock<AssociatedTypeDescriptor> = LazyLock::new(|| {
+///     AssociatedTypeDescriptor::new(0, "Item", "item", Box::new([]), None)
+/// });
+/// let binding = AssociatedTypeBindingDescriptor::new(
+///     &DECLARATION,
+///     TypeExpression::Concrete(ConcreteTypeExpression::new(["u8"], []).expect("non-empty path")),
+///     None,
+/// );
+/// assert_eq!(binding.declaration().rust_name(), "Item");
+/// ```
 #[must_use]
 #[derive(Clone, Debug)]
 pub struct AssociatedTypeBindingDescriptor {
@@ -707,6 +756,30 @@ impl AssociatedTypeBindingDescriptor {
 /// One associated constant binding contributed by a concrete impl.
 ///
 /// This descriptor is constructed by generated registration code.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{AssociatedConstBindingDescriptor, AssociatedConstDescriptor, AssociatedConstImplementationSource};
+/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+///
+/// static DECLARATION: LazyLock<AssociatedConstDescriptor> = LazyLock::new(|| {
+///     AssociatedConstDescriptor::new(
+///         0,
+///         "LIMIT",
+///         "limit",
+///         TypeExpression::Concrete(ConcreteTypeExpression::new(["usize"], []).expect("non-empty path")),
+///         false,
+///     )
+/// });
+/// let binding = AssociatedConstBindingDescriptor::new(
+///     &DECLARATION,
+///     AssociatedConstImplementationSource::Overridden,
+///     None,
+/// );
+/// assert!(!binding.is_readable());
+/// ```
 #[must_use]
 #[derive(Clone, Debug)]
 pub struct AssociatedConstBindingDescriptor {
