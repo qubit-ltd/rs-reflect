@@ -6,205 +6,22 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Stable, hierarchical categories for reflected Rust types.
 
-/// A Rust primitive represented by a root descriptor.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::PrimitiveKind;
-/// let kind = PrimitiveKind::Bool;
-/// assert_eq!(kind, PrimitiveKind::Bool);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum PrimitiveKind {
-    /// `bool`.
-    Bool,
-    /// `char`.
-    Char,
-    /// `i8`.
-    I8,
-    /// `i16`.
-    I16,
-    /// `i32`.
-    I32,
-    /// `i64`.
-    I64,
-    /// `i128`.
-    I128,
-    /// `isize`.
-    Isize,
-    /// `u8`.
-    U8,
-    /// `u16`.
-    U16,
-    /// `u32`.
-    U32,
-    /// `u64`.
-    U64,
-    /// `u128`.
-    U128,
-    /// `usize`.
-    Usize,
-    /// `f32`.
-    F32,
-    /// `f64`.
-    F64,
-}
+mod function_pointer_kind;
+mod mutability;
+mod primitive_kind;
+mod reference_kind;
+mod smart_pointer_kind;
+mod struct_kind;
+mod text_kind;
+mod type_kind;
 
-/// A UTF-8 text representation.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::TextKind;
-/// let text = TextKind::String;
-/// assert_eq!(text, TextKind::String);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum TextKind {
-    /// An owned [`String`].
-    String,
-    /// A borrowed `str` slice.
-    Str,
-}
-
-/// The declared shape of a Rust struct.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::StructKind;
-/// let shape = StructKind::Newtype;
-/// assert_eq!(shape, StructKind::Newtype);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum StructKind {
-    /// A struct with named fields.
-    Named,
-    /// A struct with two or more positional fields.
-    Tuple,
-    /// A tuple struct with exactly one field.
-    Newtype,
-    /// A struct with no fields.
-    Unit,
-}
-
-/// A standard smart-pointer family.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::SmartPointerKind;
-/// let pointer = SmartPointerKind::Box;
-/// assert_eq!(pointer, SmartPointerKind::Box);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SmartPointerKind {
-    /// [`Box<T>`](Box).
-    Box,
-    /// [`Rc<T>`](std::rc::Rc).
-    Rc,
-    /// [`Arc<T>`](std::sync::Arc).
-    Arc,
-}
-
-/// The borrowing mode of a reference.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::ReferenceKind;
-/// let reference = ReferenceKind::Shared;
-/// assert_eq!(reference, ReferenceKind::Shared);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ReferenceKind {
-    /// A shared reference.
-    Shared,
-    /// An exclusive mutable reference.
-    Mutable,
-}
-
-/// The mutability of a raw pointer.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::Mutability;
-/// let mutability = Mutability::Const;
-/// assert_eq!(mutability, Mutability::Const);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Mutability {
-    /// A const raw pointer.
-    Const,
-    /// A mutable raw pointer.
-    Mutable,
-}
-
-/// The safety qualifier of a function pointer.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::FunctionPointerKind;
-/// let kind = FunctionPointerKind::Safe;
-/// assert_eq!(kind, FunctionPointerKind::Safe);
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum FunctionPointerKind {
-    /// A safe function pointer.
-    Safe,
-    /// An unsafe function pointer.
-    Unsafe,
-}
-
-/// The stable top-level category of a reflected Rust type.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::{PrimitiveKind, TypeKind};
-/// let kind = TypeKind::Primitive(PrimitiveKind::Bool);
-/// assert!(matches!(kind, TypeKind::Primitive(PrimitiveKind::Bool)));
-/// ```
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum TypeKind {
-    /// A scalar primitive.
-    Primitive(PrimitiveKind),
-    /// An owned or borrowed UTF-8 text type.
-    Text(TextKind),
-    /// A declared struct and its precise shape.
-    Struct(StructKind),
-    /// A declared enum.
-    Enum,
-    /// A Rust tuple, including `()`.
-    Tuple,
-    /// A fixed-length array.
-    Array,
-    /// An optional value.
-    Optional,
-    /// An ordered sequence.
-    Sequence,
-    /// A set.
-    Set,
-    /// A key-value map.
-    Map,
-    /// A standard smart pointer.
-    SmartPointer(SmartPointerKind),
-    /// A shared or mutable reference.
-    Reference(ReferenceKind),
-    /// An unsized slice.
-    Slice,
-    /// A raw pointer.
-    RawPointer(Mutability),
-    /// A function pointer.
-    FunctionPointer(FunctionPointerKind),
-    /// A dyn-compatible trait object.
-    TraitObject,
-    /// A root type whose internal shape is intentionally hidden.
-    Opaque,
-}
+pub use function_pointer_kind::FunctionPointerKind;
+pub use mutability::Mutability;
+pub use primitive_kind::PrimitiveKind;
+pub use reference_kind::ReferenceKind;
+pub use smart_pointer_kind::SmartPointerKind;
+pub use struct_kind::StructKind;
+pub use text_kind::TextKind;
+pub use type_kind::TypeKind;
