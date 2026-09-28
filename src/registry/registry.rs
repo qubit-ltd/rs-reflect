@@ -583,7 +583,6 @@ impl ReflectRegistry {
     ///
     /// Returns the complete conflict if intrinsic capability declarations use
     /// the same ID more than once. Failure never changes this snapshot.
-    #[must_use]
     pub fn capabilities<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -627,7 +626,6 @@ impl ReflectRegistry {
     ///
     /// Returns the matching executable adapter, or `None` when the capability
     /// ID is missing.
-    #[must_use]
     ///
     /// # Examples
     ///
@@ -670,7 +668,6 @@ impl ReflectRegistry {
     /// # Returns
     ///
     /// Returns the diagnostic lookup state for `key`.
-    #[must_use]
     pub fn capability_lookup<'registry, A: 'static>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -698,7 +695,6 @@ impl ReflectRegistry {
     ///
     /// Returns the intrinsic capability conflict if the descriptor's provider
     /// cannot produce a valid capability set.
-    #[must_use]
     pub fn capability_by_id<'registry>(
         &'registry self,
         descriptor: &'registry TypeDescriptor,
@@ -726,7 +722,6 @@ impl ReflectRegistry {
     ///
     /// Returns the intrinsic capability conflict when the descriptor's
     /// provider cannot produce a valid capability set.
-    #[must_use]
     pub fn capability_origin(
         &self,
         descriptor: &TypeDescriptor,
@@ -909,7 +904,6 @@ impl ReflectRegistry {
     ///
     /// Returns members in stable type-fragment order. Every returned lookup is
     /// `Found`, `FactOnly`, or `AdapterTypeMismatch`.
-    #[must_use]
     pub fn type_capability_members<'registry, A: 'static>(
         &'registry self,
         key: CapabilityKey<A>,
@@ -957,7 +951,6 @@ impl ReflectRegistry {
     ///
     /// Returns members in stable definition-fragment order. Every returned
     /// lookup is `Found`, `FactOnly`, or `AdapterTypeMismatch`.
-    #[must_use]
     pub fn definition_capability_members<'registry, A: 'static>(
         &'registry self,
         key: CapabilityKey<A>,
