@@ -723,8 +723,12 @@ conflict error; these lookup states are distinct from an invalid set.
 `capability_origin` reports `CapabilityOrigin::Intrinsic { type_id }` or `CapabilityOrigin::Registered { source }`, while
 `capability_source` returns the contributing `FragmentIdentity` when one is registered. The corresponding
 `definition_capability_origin` and `definition_capability_source` methods apply to generic declarations.
-`types_with_capability` and definition queries read frozen
-indexes without executing factories and do not gain `Result`. Effective queries for unregistered
+`type_capability_members` and `definition_capability_members` iterate only frozen registry members
+and do not execute factories. Each result carries the lookup state, origin, and source; fact-only
+and adapter-mismatch entries remain visible, while capability-only targets are audited separately
+with `capability_only_type_targets` and `capability_only_definition_targets`. Intrinsic capability
+sources use the member declaration when it exists, otherwise the earliest fragment that triggered
+inspection. Effective queries for unregistered
 concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
 
 Providers must depend only on static type facts, never on snapshots, time, or mutable external

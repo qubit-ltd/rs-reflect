@@ -510,7 +510,7 @@ pub mod __private {
 
 旧集成若把能力查询当作简单 `Option`，需要改为先处理 `Result`：`capabilities` 返回 `Result<&TypeCapabilities, CapabilityConflict>`，类型键查询 `capability` 返回 `Result<Option<&A>, CapabilityAccessError>`，文本 ID 查询 `capability_by_id` 返回 `Result<Option<&CapabilityDescriptor>, CapabilityConflict>`。没有忽略错误的兼容入口。`FactOnly` 和 `AdapterTypeMismatch` 是错误状态，不等于能力缺失；需要完整四态时使用 `capability_lookup`。
 
-类型自身能力声明冲突会包装为 `CapabilityAccessError::IntrinsicConflict`。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可用 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 追踪原始原因。`capability_origin` 区分 `Intrinsic { type_id }` 与 `Registered { source }`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`types_with_capability` 与定义级索引查询只读冻结结果；未注册具体实例的有效能力查询可能执行其自身工厂，但不会将该实例加入快照。
+类型自身能力声明冲突会包装为 `CapabilityAccessError::IntrinsicConflict`。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可用 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 追踪原始原因。`capability_origin` 区分 `Intrinsic { type_id }` 与 `Registered { source }`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`type_capability_members` 与 `definition_capability_members` 只遍历冻结快照中的成员，不执行 provider；每项携带 lookup 状态、origin 和来源，fact-only 与适配器类型不匹配也会保留。孤儿目标应单独通过 `capability_only_type_targets` 和 `capability_only_definition_targets` 审计。内建能力有类型成员时以类型声明片段为来源，否则使用最早触发检查的片段；未注册具体实例的有效能力查询可能执行其自身工厂，但不会将该实例加入快照。
 
 所有 `invoke_*` 入口必须显式传入选定注册表。方法可见但返回 `ReceiverAdapterUnavailable` 时，检查该快照是否提供类型和模式都匹配的 `ReceiverAdapter`，调用不会自动回退到全局注册表。同一能力键可在不同快照中选择不同适配器；全局初始化失败也不影响有效的本地快照。输出和 Future 不借用注册表，但仍受输入生命周期约束。
 
