@@ -8,7 +8,9 @@
 
 //! Stable source-derived names for internal compiler-filtered carriers.
 
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use syn::Ident;
 
 /// Produces a private carrier name unique to a declaration token stream.
 ///
@@ -20,13 +22,10 @@ use proc_macro2::TokenStream;
 /// # Returns
 ///
 /// Returns a deterministic identifier suitable for the carrier item.
-pub(super) fn carrier_name(source: &TokenStream, arguments: &TokenStream) -> syn::Ident {
+pub(super) fn carrier_name(source: &TokenStream, arguments: &TokenStream) -> Ident {
     let source = format!("{source}{arguments}");
     let hash = source.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
     });
-    syn::Ident::new(
-        &format!("__QuBitReflectConfigured_{hash:016x}"),
-        proc_macro2::Span::call_site(),
-    )
+    Ident::new(&format!("__QuBitReflectConfigured_{hash:016x}"), Span::call_site())
 }

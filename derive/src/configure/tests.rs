@@ -13,8 +13,8 @@ use quote::quote;
 use syn::Path;
 use syn::parse2;
 
-use super::explicit_runtime_path;
-use super::make_carrier;
+use super::pipeline::explicit_runtime_path;
+use super::pipeline::make_carrier;
 use crate::ir::MacroKind;
 
 /// Converts one carrier result to normalized tokens for focused assertions.
