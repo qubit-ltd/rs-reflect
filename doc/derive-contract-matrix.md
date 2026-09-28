@@ -1,6 +1,6 @@
 # Derive contract and coverage matrix
 
-This matrix separates compiler-facing macro contracts from runtime coverage. The derive line percentages are observations from `scripts/check-derive-coverage.sh`; they have no percentage threshold yet. A missing or unexecuted configure/parse/validate/expand stage fails the report instead of being reported as full coverage. `cargo-llvm-cov` instruments derive library tests; UI tests remain the evidence for proc-macro behavior executed by rustc.
+This matrix separates compiler-facing macro contracts from runtime coverage. `scripts/check-derive-coverage.sh` runs all targets for both `qubit-reflect-derive` and the `qubit-reflect` consumer package, so its profile includes derive unit tests and proc-macro invocations exercised by the consumer's integration/UI tests. The report only aggregates files under the derive crate's configure, parse, validate, and expand stages. Its line-coverage floors are configure 70%, parse 85%, validate 80%, and expand 85%. Missing or unexecuted stages and stages below their floor fail the report.
 
 | Contract | Success/failure fixture | Feature or configuration | Expected result |
 | --- | --- | --- | --- |
@@ -12,4 +12,4 @@ This matrix separates compiler-facing macro contracts from runtime coverage. The
 | Facade and renamed/direct dependencies | `test-crates/model-facade-*`; `test-crates/macro-runtime-only` | facade; direct derive with runtime defaults disabled | Internal support macro resolves through the documented protocol. |
 | Runtime-only feature boundary | `test-crates/macro-runtime-only` | no runtime default features | Direct derive macro remains usable without enabling runtime derive exports. |
 
-The coverage collector reports per-stage source files, executed line counts, percentages, HTML, the raw llvm-cov JSON, and a machine-readable summary under `target/derive-coverage/`. It does not claim that coverage percentages prove every macro expansion path or replace the UI contract fixtures.
+The coverage collector reports per-stage source files, executed line counts, percentages and configured floors, HTML, the raw llvm-cov JSON, and a machine-readable summary under `target/derive-coverage/`. Passing a floor does not prove every macro expansion path or replace the UI contract fixtures.

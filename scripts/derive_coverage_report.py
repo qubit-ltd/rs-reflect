@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 STAGES = ("configure", "parse", "validate", "expand")
+MINIMUM_LINE_COVERAGE = {
+    "configure": 70.0,
+    "parse": 85.0,
+    "validate": 80.0,
+    "expand": 85.0,
+}
 
 
 def summarize(report: dict[str, Any], source_root: Path) -> dict[str, Any]:
@@ -43,11 +49,18 @@ def summarize(report: dict[str, Any], source_root: Path) -> dict[str, Any]:
         lines = sum(item["lines"] for item in stage_files.values())
         if covered == 0:
             failures.append(f"{stage}: no executed lines")
+        line_percent = (100.0 * covered / lines) if lines else 0.0
+        if line_percent < MINIMUM_LINE_COVERAGE[stage]:
+            failures.append(
+                f"{stage}: {line_percent:.1f}% is below the "
+                f"{MINIMUM_LINE_COVERAGE[stage]:.1f}% minimum"
+            )
         results["stages"][stage] = {
             "files": stage_files,
             "line_count": lines,
             "covered_lines": covered,
-            "line_percent": (100.0 * covered / lines) if lines else 0.0,
+            "line_percent": line_percent,
+            "minimum_line_percent": MINIMUM_LINE_COVERAGE[stage],
         }
     results["status"] = "failed" if failures else "complete"
     results["errors"] = failures
@@ -83,6 +96,7 @@ def main() -> int:
     args.output_json.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     for stage, facts in result["stages"].items():
         print(f"{stage}: {facts['covered_lines']}/{facts['line_count']} lines ({facts['line_percent']:.1f}%)")
+        print(f"  minimum: {facts['minimum_line_percent']:.1f}%")
     return 0
 
 
