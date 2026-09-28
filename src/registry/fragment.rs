@@ -215,6 +215,7 @@ impl CapabilityRegistration {
     ///
     /// Returns a registration payload for benchmark fixtures.
     #[doc(hidden)]
+    #[must_use]
     pub const fn for_type_id(target: TypeId, descriptors: Vec<CapabilityDescriptor>) -> Self {
         Self {
             target: CapabilityRegistrationTarget::TypeId(target),
@@ -286,6 +287,10 @@ pub enum FragmentPayload {
 
 impl FragmentPayload {
     /// Returns the payload category used to validate its static declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the stable category corresponding to this payload variant.
     #[must_use]
     #[inline]
     pub(crate) const fn kind(&self) -> FragmentKind {
@@ -300,6 +305,10 @@ impl FragmentPayload {
     }
 
     /// Computes the process-local target represented by this payload.
+    ///
+    /// # Returns
+    ///
+    /// Returns the runtime identity used to verify the static declaration.
     #[must_use]
     pub(crate) fn runtime_identity(&self) -> RuntimeIdentity {
         match self {
@@ -345,6 +354,7 @@ impl RegistrationFragment {
     ///
     /// Returns a static linker-discovered fragment record.
     #[doc(hidden)]
+    #[must_use]
     pub const fn new(
         kind: FragmentKind,
         identity: StaticFragmentIdentity,
@@ -399,11 +409,21 @@ macro_rules! register_builtin_type {
             use super::TypeId;
 
             /// Returns the exact process-local built-in type identity.
+            ///
+            /// # Returns
+            ///
+            /// Returns the runtime identity for the registered built-in type.
+            #[must_use]
             fn runtime_identity() -> RuntimeIdentity {
                 RuntimeIdentity::Type(TypeId::of::<$type>())
             }
 
             /// Returns the existing unique built-in descriptor root.
+            ///
+            /// # Returns
+            ///
+            /// Returns the canonical descriptor for the registered type.
+            #[must_use]
             fn payload() -> FragmentPayload {
                 FragmentPayload::Type(TypeDescriptor::of::<$type>())
             }
