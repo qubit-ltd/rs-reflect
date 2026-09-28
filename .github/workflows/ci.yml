@@ -235,6 +235,38 @@ jobs:
           path: target/doc
           retention-days: 14
           if-no-files-found: error
+      - name: Package staged release candidate
+        id: release-candidate
+        env:
+          RELEASE_EVIDENCE: ${{ runner.temp }}/reflect-release-staged
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          runtime = tomllib.loads(Path('Cargo.toml').read_text())
+          derive = tomllib.loads(Path('derive/Cargo.toml').read_text())
+          version = runtime['package']['version']
+          assert version == derive['package']['version']
+          assert runtime['dependencies']['qubit-reflect-derive']['version'] == '=' + version
+          import os
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('version=' + version + '\n')
+          PY
+          cargo +1.94.0 package --locked -p qubit-reflect-derive
+          cargo +1.94.0 --config "patch.crates-io.qubit-reflect-derive.path=\"$PWD/derive\"" package --locked -p qubit-reflect
+          release_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          python3 scripts/check_release_consumer.py --mode staged --version "$release_version" \
+            --runtime-archive "$PWD/target/package/qubit-reflect-$release_version.crate" \
+            --derive-archive "$PWD/target/package/qubit-reflect-derive-$release_version.crate" \
+            --evidence-dir "$RELEASE_EVIDENCE"
+      - name: Upload staged consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reflect-release-staged-${{ github.sha }}
+          path: ${{ runner.temp }}/reflect-release-staged
+          if-no-files-found: error
+          retention-days: 14
 
   feature-matrix:
     runs-on: ubuntu-latest
