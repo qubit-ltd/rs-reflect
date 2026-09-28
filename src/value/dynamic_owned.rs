@@ -42,23 +42,13 @@ use crate::value::storage::ThreadSafeOwnedStorage;
 /// assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("ready"));
 /// ```
 pub struct DynamicOwned<M: Mode> {
-    /// Mode-specific erased owned storage.
+    /// Mode-specific erased owner of the concrete value.
     storage: M::OwnedStorage,
-    /// Carries the mode's auto-trait boundary without storing a mode value.
+    /// Keeps the mode's auto-trait boundary in the wrapper type.
     marker: PhantomData<M::Marker>,
 }
 
 impl DynamicOwned<Local> {
-    /// Returns the exact identity of the owned value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    #[inline]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any().expect("owned values are Any-compatible").type_id()
-    }
     /// Wraps `value` as a local owned dynamic value.
     ///
     /// The value must be `'static` so it can participate in `Any` downcasts.
@@ -79,6 +69,17 @@ impl DynamicOwned<Local> {
             storage: LocalOwnedStorage::Any(Box::new(value)),
             marker: PhantomData,
         }
+    }
+
+    /// Returns the exact identity of the owned value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    #[inline]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any().expect("owned values are Any-compatible").type_id()
     }
 
     /// Borrows the owned erased value without exposing its concrete type.

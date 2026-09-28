@@ -22,11 +22,17 @@ use std::sync::Arc;
 /// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct FragmentIdentity {
+    /// Crate that owns the declaration.
     declaring_crate: Arc<str>,
+    /// Module containing the declaration.
     module_path: Arc<str>,
+    /// Source line of the declaration.
     line: u32,
+    /// Source column of the declaration.
     column: u32,
+    /// Registration member category.
     member_kind: Arc<str>,
+    /// Deterministic fingerprint of normalized declaration input.
     content_fingerprint: u64,
 }
 

@@ -68,30 +68,41 @@ impl ImplKind {
 ///
 /// # Examples
 ///
-/// ```no_run
-/// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
-/// use qubit_reflect::TypeDescriptor;
+/// Most applications get this declaration metadata from `#[reflect_impl]`.
+/// The example builds the source declaration explicitly so it does not need
+/// to initialize the global inventory registry.
+///
+/// ```
 /// mod example {
-///     use qubit_reflect::{Reflect, reflect_impl};
-///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
-///     pub struct Service;
-///     #[reflect_impl(crate = qubit_reflect)]
-///     impl Service {
-///         fn ping(&self) {}
-///     }
+///     use std::sync::LazyLock;
+///     use qubit_reflect::descriptor::ImplDefinitionDescriptor;
+///     use qubit_reflect::descriptor::ImplKind;
+///     use qubit_reflect::expression::ConcreteTypeExpression;
+///     use qubit_reflect::expression::GenericDefinitionDescriptor;
+///     use qubit_reflect::expression::TypeExpression;
+///     use qubit_reflect::identity::FragmentIdentity;
+///
+///     static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///         LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+///     pub static DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+///         ImplDefinitionDescriptor::new(
+///             FragmentIdentity::new("example", module_path!(), line!(), 1, "impl", 1),
+///             TypeExpression::Concrete(
+///                 ConcreteTypeExpression::new(["example", "Service"], [])
+///                     .expect("non-empty target path"),
+///             ),
+///             ImplKind::Inherent,
+///             None,
+///             &GENERICS,
+///         )
+///         .expect("valid inherent impl")
+///     });
 /// }
-/// let implementation = TypeDescriptor::of::<example::Service>()
-///     .impls()
-///     .expect("registered impls")
-///     .first()
-///     .expect("reflected implementation");
-/// assert_eq!(implementation.definition().kind(), qubit_reflect::descriptor::ImplKind::Inherent);
-/// }
-/// # #[cfg(not(feature = "derive"))]
-/// # fn main() {}
+/// assert_eq!(example::DEFINITION.kind(), qubit_reflect::descriptor::ImplKind::Inherent);
+/// assert!(matches!(
+///     example::DEFINITION.target_type(),
+///     qubit_reflect::expression::TypeExpression::Concrete(_),
+/// ));
 /// ```
 #[derive(Debug)]
 pub struct ImplDefinitionDescriptor {
@@ -1254,32 +1265,44 @@ impl fmt::Debug for ImplDescriptor {
 ///
 /// # Examples
 ///
-/// ```no_run
-/// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
-/// use qubit_reflect::TypeDescriptor;
-/// use qubit_reflect::descriptor::ImplDescriptor;
+/// Generated registration normally supplies the declaration descriptor. This
+/// example constructs the declaration facts directly and builds one concrete
+/// descriptor without initializing the global inventory registry.
+///
+/// ```
 /// mod example {
-///     use qubit_reflect::{Reflect, reflect_impl};
-///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
-///     pub struct Service;
-///     #[reflect_impl(crate = qubit_reflect)]
-///     impl Service {
-///         fn ping(&self) {}
-///     }
+///     use std::sync::LazyLock;
+///     use qubit_reflect::descriptor::ImplDefinitionDescriptor;
+///     use qubit_reflect::descriptor::ImplKind;
+///     use qubit_reflect::expression::ConcreteTypeExpression;
+///     use qubit_reflect::expression::GenericDefinitionDescriptor;
+///     use qubit_reflect::expression::TypeExpression;
+///     use qubit_reflect::identity::FragmentIdentity;
+///
+///     static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///         LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+///     pub static DEFINITION: LazyLock<ImplDefinitionDescriptor> = LazyLock::new(|| {
+///         ImplDefinitionDescriptor::new(
+///             FragmentIdentity::new("example", module_path!(), line!(), 1, "impl", 1),
+///             TypeExpression::Concrete(
+///                 ConcreteTypeExpression::new(["example", "Service"], [])
+///                     .expect("non-empty target path"),
+///             ),
+///             ImplKind::Inherent,
+///             None,
+///             &GENERICS,
+///         )
+///         .expect("valid inherent impl")
+///     });
 /// }
-/// let source = TypeDescriptor::of::<example::Service>();
-/// let definition = source.impls().expect("registered impls").first().expect("reflected implementation").definition();
-/// let rebuilt = ImplDescriptor::builder(definition, TypeDescriptor::of::<example::Service>)
-///     .arguments(Vec::new())
-///     .build()
-///     .expect("valid concrete impl");
-/// assert_eq!(rebuilt.target_type().type_id(), source.type_id());
-/// }
-/// # #[cfg(not(feature = "derive"))]
-/// # fn main() {}
+/// let target = qubit_reflect::TypeDescriptor::of::<u64>();
+/// let implementation = qubit_reflect::descriptor::ImplDescriptor::builder(
+///     &example::DEFINITION,
+///     qubit_reflect::TypeDescriptor::of::<u64>,
+/// )
+/// .build()
+/// .expect("valid concrete impl");
+/// assert_eq!(implementation.target_type().type_id(), target.type_id());
 /// ```
 #[derive(Debug)]
 pub struct ImplDescriptorBuilder {
