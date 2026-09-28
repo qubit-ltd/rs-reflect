@@ -172,11 +172,6 @@ reason = "The trait reference and its transitive closure are the paired represen
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/variant_descriptor.rs"
-reason = "Variant kind, numeric discriminant, and origin are the metadata fields interpreted together by VariantDescriptor."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/type_kind.rs"
 reason = "These classification enums are the closed kind vocabulary used by the root and typed view descriptors."
 
