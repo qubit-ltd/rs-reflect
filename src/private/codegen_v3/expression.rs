@@ -52,6 +52,14 @@ pub use crate::expression::TraitObjectExpression;
 pub use crate::expression::TypeExpression;
 
 /// Creates a named type-parameter expression from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty generic type parameter name.
+///
+/// # Returns
+///
+/// Returns a structural parameter expression.
 #[doc(hidden)]
 #[must_use]
 pub fn parameter(name: impl Into<Box<str>>) -> TypeExpression {
@@ -59,6 +67,14 @@ pub fn parameter(name: impl Into<Box<str>>) -> TypeExpression {
 }
 
 /// Creates a named lifetime expression from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty lifetime parameter name, without the leading apostrophe.
+///
+/// # Returns
+///
+/// Returns a named lifetime expression.
 #[doc(hidden)]
 #[must_use]
 pub fn named_lifetime(name: impl Into<Box<str>>) -> LifetimeExpression {
@@ -66,6 +82,14 @@ pub fn named_lifetime(name: impl Into<Box<str>>) -> LifetimeExpression {
 }
 
 /// Creates a named const-parameter expression from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty const generic parameter name.
+///
+/// # Returns
+///
+/// Returns a structural const parameter expression.
 #[doc(hidden)]
 #[must_use]
 pub fn const_parameter(name: impl Into<Box<str>>) -> ConstExpression {
@@ -73,6 +97,19 @@ pub fn const_parameter(name: impl Into<Box<str>>) -> ConstExpression {
 }
 
 /// Creates a const-item path from generator-validated segments.
+///
+/// # Type Parameters
+///
+/// - `P`: Iterator of path segments.
+/// - `S`: Segment type convertible to an owned string.
+///
+/// # Parameters
+///
+/// - `segments`: Non-empty const-item path segments.
+///
+/// # Returns
+///
+/// Returns the structural const path expression.
 #[doc(hidden)]
 #[must_use]
 pub fn const_path<P, S>(segments: P) -> ConstExpression
@@ -84,6 +121,15 @@ where
 }
 
 /// Creates an associated-type equality argument from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty associated type name.
+/// - `value`: Type expression assigned to the associated type.
+///
+/// # Returns
+///
+/// Returns an associated-type equality argument.
 #[doc(hidden)]
 #[must_use]
 pub fn associated_type(name: impl Into<Box<str>>, value: TypeExpression) -> GenericArgument {
@@ -94,6 +140,15 @@ pub fn associated_type(name: impl Into<Box<str>>, value: TypeExpression) -> Gene
 }
 
 /// Creates an associated-type bound argument from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty associated type name.
+/// - `bounds`: Structural predicates constraining the associated type.
+///
+/// # Returns
+///
+/// Returns an associated-type bound argument.
 #[doc(hidden)]
 #[must_use]
 pub fn associated_type_bound(name: impl Into<Box<str>>, bounds: Box<[PredicateDescriptor]>) -> GenericArgument {
@@ -104,6 +159,16 @@ pub fn associated_type_bound(name: impl Into<Box<str>>, bounds: Box<[PredicateDe
 }
 
 /// Creates a lifetime generic parameter from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty lifetime parameter name.
+/// - `bounds`: Lifetime bounds declared for the parameter.
+/// - `diagnostic`: Source text retained for diagnostics.
+///
+/// # Returns
+///
+/// Returns a lifetime generic parameter descriptor.
 #[doc(hidden)]
 #[must_use]
 pub fn lifetime_parameter(
@@ -119,6 +184,17 @@ pub fn lifetime_parameter(
 }
 
 /// Creates a type generic parameter from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty type parameter name.
+/// - `bounds`: Trait bounds declared for the parameter.
+/// - `default`: Optional default type expression.
+/// - `diagnostic`: Source text retained for diagnostics.
+///
+/// # Returns
+///
+/// Returns a type generic parameter descriptor.
 #[doc(hidden)]
 #[must_use]
 pub fn type_parameter(
@@ -136,6 +212,17 @@ pub fn type_parameter(
 }
 
 /// Creates a const generic parameter from generator-validated text.
+///
+/// # Parameters
+///
+/// - `name`: Non-empty const parameter name.
+/// - `ty`: Declared type of the const parameter.
+/// - `default`: Optional default const expression.
+/// - `diagnostic`: Source text retained for diagnostics.
+///
+/// # Returns
+///
+/// Returns a const generic parameter descriptor.
 #[doc(hidden)]
 #[must_use]
 pub fn const_generic_parameter(
@@ -153,6 +240,16 @@ pub fn const_generic_parameter(
 }
 
 /// Creates a concrete type expression from generator-validated path data.
+///
+/// # Parameters
+///
+/// - `path`: Non-empty path segments identifying the concrete type.
+/// - `arguments`: Generic arguments applied to the final path segment.
+/// - `diagnostic`: Source text retained for diagnostics.
+///
+/// # Returns
+///
+/// Returns the structural concrete type expression.
 #[doc(hidden)]
 #[must_use]
 pub fn concrete(
@@ -166,6 +263,16 @@ pub fn concrete(
 }
 
 /// Creates a concrete type expression from structural path segments.
+///
+/// # Parameters
+///
+/// - `segments`: Non-empty path segments with their associated generic
+///   arguments.
+/// - `diagnostic`: Source text retained for diagnostics.
+///
+/// # Returns
+///
+/// Returns the structural concrete type expression.
 #[doc(hidden)]
 #[must_use]
 pub fn concrete_segments(
@@ -179,6 +286,16 @@ pub fn concrete_segments(
 }
 
 /// Creates a typed const generic argument from generator-validated inputs.
+///
+/// # Parameters
+///
+/// - `declared_type`: Type expected for the const parameter.
+/// - `value`: Structural const expression.
+/// - `normalized_diagnostic`: Stable normalized text used for diagnostics.
+///
+/// # Returns
+///
+/// Returns a typed const generic argument.
 #[doc(hidden)]
 #[must_use]
 pub fn const_argument(
@@ -190,6 +307,15 @@ pub fn const_argument(
 }
 
 /// Creates an array type expression from generated structural inputs.
+///
+/// # Parameters
+///
+/// - `element`: Element type expression.
+/// - `length`: Const expression defining the array length.
+///
+/// # Returns
+///
+/// Returns the array type expression.
 #[doc(hidden)]
 #[must_use]
 pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpression {
@@ -197,6 +323,16 @@ pub fn array(element: TypeExpression, length: ConstExpression) -> ArrayTypeExpre
 }
 
 /// Creates a reference type expression from generated structural inputs.
+///
+/// # Parameters
+///
+/// - `lifetime`: Lifetime of the reference.
+/// - `mutable`: Whether the reference is mutable.
+/// - `target`: Referenced type expression.
+///
+/// # Returns
+///
+/// Returns the reference type expression.
 #[doc(hidden)]
 #[must_use]
 pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> ReferenceTypeExpression {
@@ -205,6 +341,17 @@ pub fn reference(lifetime: LifetimeExpression, mutable: bool, target: TypeExpres
 
 /// Creates a non-empty type-bound predicate from generator-validated parallel
 /// inputs.
+///
+/// # Parameters
+///
+/// - `subject`: Type expression constrained by the predicate.
+/// - `bounds`: Trait bounds applied to the subject.
+/// - `modifiers`: Bound modifiers corresponding one-to-one with `bounds`.
+/// - `higher_ranked_lifetimes`: Lifetimes introduced by a `for<...>` binder.
+///
+/// # Returns
+///
+/// Returns the validated type-bound predicate.
 #[doc(hidden)]
 #[must_use]
 pub fn type_bound(
@@ -219,6 +366,15 @@ pub fn type_bound(
 
 /// Creates a non-empty lifetime-outlives predicate from generator-validated
 /// inputs.
+///
+/// # Parameters
+///
+/// - `lifetime`: Lifetime required to outlive each bound.
+/// - `bounds`: One or more lifetime bounds.
+///
+/// # Returns
+///
+/// Returns the validated lifetime-outlives predicate.
 #[doc(hidden)]
 #[must_use]
 pub fn lifetime_outlives(lifetime: LifetimeExpression, bounds: Box<[LifetimeExpression]>) -> PredicateDescriptor {
