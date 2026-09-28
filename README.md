@@ -38,9 +38,16 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 Requires Rust 1.94 or later. Adjust `path` relative to your application's
 `Cargo.toml`.
 
-The crate is currently consumed only from Qubit's internal workspace or an
-approved internal Git revision. It is not published to crates.io. Keep the
-runtime and derive crate on the same repository revision.
+This checkout prepares the `0.1.0` release candidate; registry publication and
+registry-consumer verification are separate release steps. Until publication is
+confirmed, use the workspace path or an approved Git revision and keep the
+runtime and derive crate on the same repository revision. After publication,
+applications can use:
+
+```toml
+[dependencies]
+qubit-reflect = "0.1"
+```
 
 The reflection macros are enabled by default; the example below needs no extra
 features. For runtime-only use or third-party type implementations, see the

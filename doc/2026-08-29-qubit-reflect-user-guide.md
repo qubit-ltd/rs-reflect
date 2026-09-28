@@ -73,10 +73,11 @@ to use the macros:
 qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
 
-This crate is currently an internal Qubit dependency and is not published to
-crates.io. Use the workspace path shown above or an approved internal Git
-revision, and keep `qubit-reflect` and `qubit-reflect-derive` on that same
-revision.
+This checkout prepares the `0.1.0` release candidate. Until registry
+publication and consumer verification are complete, use the workspace path
+shown above or an approved Git revision, and keep `qubit-reflect` and
+`qubit-reflect-derive` on that same revision. After publication, use
+`qubit-reflect = "=0.1.0"` for a registry dependency.
 
 The default `derive` feature re-exports `Reflect`, `reflect`, and
 `reflect_impl` macros. `default-features = false` keeps the runtime and
@@ -542,7 +543,7 @@ registration linked into the process.
 | --- | --- |
 | `derive` (default) | The `Reflect`, `reflect`, and `reflect_impl` macros. |
 | `ecosystem-types` | Reflection implementations for `BigDecimal`, `DateTime<Utc>`, `NaiveDate`, `NaiveTime`, and `Uuid`. |
-| `qubit-types` | Reflection implementations for `qubit_id::Id` and `qubit_datatype::DataType`. |
+| `qubit-types` | Reflection implementations for `qubit_id::Id` and `qubit_datatype::DataType`; the `qubit-id` default generator feature is disabled. |
 
 Choose one of the following alternatives for the `qubit-reflect` entry in
 `[dependencies]`; do not paste all three into one manifest:
@@ -565,6 +566,9 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect", features = ["qubit-ty
 `ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to
 the default feature set, so a runtime-only consumer does not compile those
 dependency families or silently acquire their trait implementations.
+`qubit-types` only provides reflection for `qubit_id::Id`; if the application
+also uses ID generators, add a direct `qubit-id` dependency with the needed
+features instead of relying on features enabled transitively by this crate.
 If a facade or metadata crate generates descriptors for one of these external
 types, that crate must enable the matching feature on its own
 `qubit-reflect` dependency; re-exporting the macros does not enable type-family

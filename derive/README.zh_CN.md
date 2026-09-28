@@ -19,7 +19,15 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = fa
 qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
 ```
 
-两个 crate 目前都未发布到 crates.io。请保留本地检出布局，因为 `qubit-reflect` 还依赖同级的 `rust-common/rs-id` 与 `rust-common/rs-datatype`。它们都要求 Rust 1.94 或更高版本。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
+当前检出用于准备 `0.1.0` 发布候选；两个 crate 发布并通过验收后，才可直接从 registry 安装。在此之前请保留本地检出布局，因为 `qubit-reflect` 还依赖同级的 `rust-common/rs-id` 与 `rust-common/rs-datatype`。它们都要求 Rust 1.94 或更高版本。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
+
+发布后，请将两个 crate 固定到同一版本：
+
+```toml
+[dependencies]
+qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect-derive = "0.1"
+```
 
 ## 快速开始
 

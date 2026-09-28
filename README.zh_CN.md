@@ -24,7 +24,12 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 
 需要 Rust 1.94 或更高版本。请根据应用的 `Cargo.toml` 所在目录调整 `path`。
 
-当前仅允许从 Qubit 内部 workspace 或经过批准的内部 Git 版本引用本 crate，尚未发布到 crates.io。运行时 crate 与 derive crate 必须来自同一个仓库版本。
+当前检出用于准备 `0.1.0` 发布候选；发布到 registry 以及 registry 消费者验收是独立的后续步骤。在确认发布前，请使用 workspace 路径或经过批准的 Git 修订版，并确保 runtime 与 derive crate 来自同一仓库修订版。发布确认后，应用可使用：
+
+```toml
+[dependencies]
+qubit-reflect = "0.1"
+```
 
 默认已启用反射宏，下面的示例无需额外 feature。只使用运行时 API，或需要第三方类型的反射实现时，参阅手册的[依赖配置](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#选择依赖功能)。
 
