@@ -8,7 +8,9 @@ RS_CI_BUILD_TOOLCHAIN="${RS_CI_BUILD_TOOLCHAIN:-1.94.0}"
 # the lockfile's complete dependency set before those checks start.
 cargo +"$RS_CI_BUILD_TOOLCHAIN" fetch --locked
 
-python3 -m unittest discover -s "$PROJECT_ROOT/scripts/tests" -p check_markdown_examples_tests.py
+python3 -m unittest discover -s "$PROJECT_ROOT/scripts/tests" -p '*tests.py'
+bash "$PROJECT_ROOT/scripts/tests/requirements_traceability_check_tests.sh"
+bash "$PROJECT_ROOT/scripts/tests/critical_coverage_check_tests.sh"
 "$PROJECT_ROOT/scripts/check-markdown-examples.sh"
 "$PROJECT_ROOT/scripts/check-requirements-traceability.sh"
 RUSTFLAGS="${RUSTFLAGS:-} -C panic=abort" \

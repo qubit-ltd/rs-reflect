@@ -30,6 +30,161 @@ jobs:
       - name: Check dependency baseline
         run: ./dependency-update.sh --check
 
+  downstream-baseline:
+    name: Downstream baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require private dependency access
+        env:
+          DEPENDENCY_TOKEN: ${{ secrets.DEPENDENCY_TOKEN }}
+        run: test -n "$DEPENDENCY_TOKEN" || { echo 'DEPENDENCY_TOKEN is required for downstream validation.' >&2; exit 1; }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: rust-platform/rs-reflect
+          persist-credentials: false
+      - name: Validate baseline manifest and expose fixed revisions
+        id: revisions
+        working-directory: rust-platform/rs-reflect
+        run: |
+          python3 scripts/downstream_manifest.py validate --manifest .github/downstream-baseline.json
+          python3 scripts/downstream_manifest.py matrix --manifest .github/downstream-baseline.json --mode baseline > "$RUNNER_TEMP/downstream-matrix.json"
+          for key in rs_model_metadata rs_platform rs_id rs_datatype rs_redact rs_validator rs_validation_rules; do
+            printf '%s=%s\n' "$key" "$(jq -r ".repositories.$key.revision" "$RUNNER_TEMP/downstream-matrix.json")" >> "$GITHUB_OUTPUT"
+          done
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-model-metadata, ref: '${{ steps.revisions.outputs.rs_model_metadata }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-model-metadata, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-platform, ref: '${{ steps.revisions.outputs.rs_platform }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-platform, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-id, ref: '${{ steps.revisions.outputs.rs_id }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-id, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-datatype, ref: '${{ steps.revisions.outputs.rs_datatype }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-datatype, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-redact, ref: '${{ steps.revisions.outputs.rs_redact }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-redact, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-validator, ref: '${{ steps.revisions.outputs.rs_validator }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-validator, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-validation-rules, ref: '${{ steps.revisions.outputs.rs_validation_rules }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-validation-rules, persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.94.0
+      - name: Verify baseline revisions and Cargo path layout
+        working-directory: rust-platform/rs-reflect
+        run: |
+          python3 scripts/downstream_manifest.py verify --layout-root "$GITHUB_WORKSPACE" --manifest .github/downstream-baseline.json
+          python3 scripts/check_dependency_layout.py --layout-root "$GITHUB_WORKSPACE" --project "$GITHUB_WORKSPACE/rust-platform/rs-reflect"
+      - name: Cache baseline Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            rust-platform/rs-model-metadata/target
+            rust-platform/rs-platform/target
+            rust-common/rs-id/target
+            rust-common/rs-datatype/target
+            rust-common/rs-redact/target
+            rust-common/rs-validator/target
+            rust-common/rs-validation-rules/target
+          key: downstream-baseline-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/**/Cargo.toml', 'rust-common/**/Cargo.toml', 'rust-platform/rs-reflect/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/**/Cargo.lock', 'rust-common/**/Cargo.lock') }}
+      - name: Run all baseline downstream checks
+        working-directory: rust-platform/rs-reflect
+        env:
+          REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-downstream-baseline
+        run: ./scripts/check-downstream.sh
+      - name: Upload baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: downstream-baseline-evidence
+          path: ${{ runner.temp }}/rs-reflect-downstream-baseline
+          if-no-files-found: warn
+          retention-days: 14
+
+  downstream-head:
+    name: Downstream head
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require private dependency access
+        env:
+          DEPENDENCY_TOKEN: ${{ secrets.DEPENDENCY_TOKEN }}
+        run: test -n "$DEPENDENCY_TOKEN" || { echo 'DEPENDENCY_TOKEN is required for downstream validation.' >&2; exit 1; }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          path: rust-platform/rs-reflect
+          persist-credentials: false
+      - name: Resolve each main branch to a fixed SHA
+        id: revisions
+        working-directory: rust-platform/rs-reflect
+        env:
+          GH_TOKEN: ${{ secrets.DEPENDENCY_TOKEN }}
+        run: |
+          python3 scripts/downstream_manifest.py validate --manifest .github/downstream-baseline.json
+          python3 scripts/downstream_manifest.py matrix --manifest .github/downstream-baseline.json --mode head > "$RUNNER_TEMP/downstream-matrix.json"
+          while IFS=' ' read -r key repository; do
+            revision="$(gh api "repos/$repository/commits/main" --jq .sha)"
+            [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid main revision for $repository" >&2; exit 1; }
+            printf '%s=%s\n' "$key" "$revision" >> "$GITHUB_OUTPUT"
+          done <<EOF
+          rs_model_metadata qubit-ltd/rs-model-metadata
+          rs_platform qubit-ltd/rs-platform
+          rs_id qubit-ltd/rs-id
+          rs_datatype qubit-ltd/rs-datatype
+          rs_redact qubit-ltd/rs-redact
+          rs_validator qubit-ltd/rs-validator
+          rs_validation_rules qubit-ltd/rs-validation-rules
+          EOF
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-model-metadata, ref: '${{ steps.revisions.outputs.rs_model_metadata }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-model-metadata, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-platform, ref: '${{ steps.revisions.outputs.rs_platform }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-platform, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-id, ref: '${{ steps.revisions.outputs.rs_id }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-id, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-datatype, ref: '${{ steps.revisions.outputs.rs_datatype }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-datatype, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-redact, ref: '${{ steps.revisions.outputs.rs_redact }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-redact, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-validator, ref: '${{ steps.revisions.outputs.rs_validator }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-validator, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-validation-rules, ref: '${{ steps.revisions.outputs.rs_validation_rules }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-validation-rules, persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.94.0
+      - name: Record and verify resolved head revisions and path layout
+        working-directory: rust-platform/rs-reflect
+        env:
+          REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-downstream-head
+        run: |
+          mkdir -p "$REFLECT_DOWNSTREAM_EVIDENCE_DIR"
+          python3 scripts/downstream_manifest.py collect --layout-root "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/downstream-head.json"
+          python3 scripts/downstream_manifest.py verify --layout-root "$GITHUB_WORKSPACE" --manifest "$RUNNER_TEMP/downstream-head.json"
+          python3 scripts/check_dependency_layout.py --layout-root "$GITHUB_WORKSPACE" --project "$GITHUB_WORKSPACE/rust-platform/rs-reflect"
+          cp "$RUNNER_TEMP/downstream-head.json" "$REFLECT_DOWNSTREAM_EVIDENCE_DIR/resolved-manifest.json"
+      - name: Cache head Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            rust-platform/rs-model-metadata/target
+            rust-platform/rs-platform/target
+            rust-common/rs-id/target
+            rust-common/rs-datatype/target
+            rust-common/rs-redact/target
+            rust-common/rs-validator/target
+            rust-common/rs-validation-rules/target
+          key: downstream-head-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/**/Cargo.toml', 'rust-common/**/Cargo.toml', 'rust-platform/rs-reflect/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/**/Cargo.lock', 'rust-common/**/Cargo.lock') }}
+      - name: Run all head downstream checks
+        working-directory: rust-platform/rs-reflect
+        env:
+          REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-downstream-head
+        run: ./scripts/check-downstream.sh
+      - name: Upload head evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: downstream-head-evidence
+          path: ${{ runner.temp }}/rs-reflect-downstream-head
+          if-no-files-found: warn
+          retention-days: 14
+
   verify:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -163,9 +318,32 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  derive-coverage:
+    name: Derive coverage
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.94.0
+          components: llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --version 0.8.6 --locked
+      - name: Collect and check derive coverage
+        run: ./scripts/check-derive-coverage.sh
+      - name: Upload derive coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: derive-coverage-reports
+          path: target/derive-coverage
+          retention-days: 14
+          if-no-files-found: error
+
   pages:
-    if: ${{ always() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs.verify.result == 'success' && needs.coverage.result == 'success' && (needs.feature-matrix.result == 'success' || needs.feature-matrix.result == 'skipped') }}
-    needs: [verify, feature-matrix, coverage]
+    if: ${{ always() && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs.verify.result == 'success' && needs.coverage.result == 'success' && needs.derive-coverage.result == 'success' && (needs.feature-matrix.result == 'success' || needs.feature-matrix.result == 'skipped') }}
+    needs: [verify, feature-matrix, coverage, derive-coverage]
     outputs:
       deploy: ${{ steps.pages-config.outputs.deploy }}
     runs-on: ubuntu-latest
