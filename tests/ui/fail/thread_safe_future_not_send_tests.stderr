@@ -20,4 +20,4 @@ note: required by a bound in `ReflectedFuture::<'call, ThreadSafe>::new`
    |     where
    |         F: Future<Output = InvocationOutput<'call, ThreadSafe>> + Send + 'call,
    |                                                                   ^^^^ required by this bound in `ReflectedFuture::<'call, ThreadSafe>::new`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

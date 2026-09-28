@@ -10,7 +10,7 @@ note: required by a bound in `__qubit_reflect_assert_send_sync`
    |
 17 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_send_sync`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
   --> tests/ui/fail/thread_safe_owned_output_not_send_sync_tests.rs:20:17
@@ -24,7 +24,7 @@ note: required by a bound in `__qubit_reflect_assert_send_sync`
    |
 17 | #[reflect_impl]
    | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_send_sync`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `std::rc::Rc<u8>` cannot be sent between threads safely
   --> tests/ui/fail/thread_safe_owned_output_not_send_sync_tests.rs:17:1
@@ -38,11 +38,7 @@ note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
    |
    |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {
    |                             ^^^^ required by this bound in `DynamicOwned::<ThreadSafe>::new`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: consider dereferencing here
-   |
-17 | *#[reflect_impl]
-   | +
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
   --> tests/ui/fail/thread_safe_owned_output_not_send_sync_tests.rs:17:1
@@ -56,8 +52,4 @@ note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
    |
    |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {
    |                                    ^^^^ required by this bound in `DynamicOwned::<ThreadSafe>::new`
-   = note: this error originates in the attribute macro `reflect_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: consider dereferencing here
-   |
-17 | *#[reflect_impl]
-   | +
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -50,7 +50,7 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 ///
 /// Returns the augmented trait and generated support items or diagnostics.
 pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
-    entry::process_macro(MacroKind::Trait, attribute, item)
+    crate::configure::configure_attribute(MacroKind::Trait, attribute, item)
 }
 
 /// Reflects an inherent or trait implementation.
@@ -70,5 +70,5 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// Returns generated registration and invocation items or diagnostics.
 pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
-    entry::process_macro(MacroKind::Impl, attribute, item)
+    crate::configure::configure_attribute(MacroKind::Impl, attribute, item)
 }
