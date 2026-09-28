@@ -16,6 +16,13 @@ use crate::expression::TypeExpression;
 use crate::identity::Visibility;
 
 /// How a non-receiver parameter is passed to a reflected method.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ParameterPassingMode;
+/// assert_eq!(ParameterPassingMode::SharedBorrow, ParameterPassingMode::SharedBorrow);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ParameterPassingMode {
     /// The method consumes an owned argument.
@@ -27,6 +34,14 @@ pub enum ParameterPassingMode {
 }
 
 /// The source pattern category of a non-receiver parameter.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ParameterPatternDescriptor;
+/// let pattern = ParameterPatternDescriptor::Identifier;
+/// assert!(matches!(pattern, ParameterPatternDescriptor::Identifier));
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ParameterPatternDescriptor {
     /// A simple identifier that can participate in named binding.
@@ -38,6 +53,25 @@ pub enum ParameterPatternDescriptor {
 }
 
 /// One non-receiver method parameter in declaration order.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::{ParameterDescriptor, ParameterPassingMode, ParameterPatternDescriptor};
+/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+///
+/// let parameter = ParameterDescriptor::new(
+///     0,
+///     Some("value"),
+///     ParameterPatternDescriptor::Identifier,
+///     ParameterPassingMode::Owned,
+///     TypeExpression::Concrete(
+///         ConcreteTypeExpression::new(["u8"], []).expect("non-empty path"),
+///     ),
+///     None,
+/// );
+/// assert_eq!(parameter.name(), Some("value"));
+/// ```
 #[derive(Clone, Debug)]
 pub struct ParameterDescriptor {
     /// Zero-based position among non-receiver parameters.
@@ -165,6 +199,13 @@ impl ParameterDescriptor {
 }
 
 /// The receiver form written by a reflected method declaration.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ReceiverDescriptor;
+/// assert!(matches!(ReceiverDescriptor::Shared, ReceiverDescriptor::Shared));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ReceiverDescriptor {
     /// A by-value `self` receiver.
@@ -178,6 +219,13 @@ pub enum ReceiverDescriptor {
 }
 
 /// The structural category of a method return value.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::ReturnKind;
+/// assert_eq!(ReturnKind::Unit, ReturnKind::Unit);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ReturnKind {
     /// The unit return type `()`.
@@ -193,6 +241,14 @@ pub enum ReturnKind {
 }
 
 /// The return declaration of a reflected method.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::{ReturnDescriptor, ReturnKind};
+/// let output = ReturnDescriptor::new(ReturnKind::Unit, None, None);
+/// assert_eq!(output.kind(), ReturnKind::Unit);
+/// ```
 #[derive(Clone, Debug)]
 pub struct ReturnDescriptor {
     /// Structural category of the return value.
@@ -282,6 +338,15 @@ impl ReturnDescriptor {
 }
 
 /// Where a method declaration obtains its source visibility.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodVisibility;
+/// use qubit_reflect::identity::Visibility;
+/// let visibility = MethodVisibility::Declared(Visibility::Public);
+/// assert!(matches!(visibility, MethodVisibility::Declared(Visibility::Public)));
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum MethodVisibility {
     /// Visibility declared by an inherent or implementation method.
@@ -291,6 +356,14 @@ pub enum MethodVisibility {
 }
 
 /// Qualifiers that affect whether a declaration can have an invocation adapter.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::MethodQualifiers;
+/// let qualifiers = MethodQualifiers::new(false, false, false, None, false);
+/// assert!(!qualifiers.is_async());
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct MethodQualifiers {
     /// Whether the declaration is `async`.

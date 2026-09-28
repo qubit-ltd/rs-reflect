@@ -116,6 +116,30 @@ pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
 }
 
 /// A static reference used by direct and transitive supertrait views.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitDescriptorRef, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Example", "example::Example", "Example",
+///         TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// static APPLIED: LazyLock<TraitDescriptor> = LazyLock::new(|| {
+///     TraitDescriptor::builder(&DEFINITION).build().expect("valid application")
+/// });
+/// let reference = TraitDescriptorRef::new(&APPLIED);
+/// assert_eq!(reference.rust_name(), "Example");
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct TraitDescriptorRef(
     /// Process-lifetime applied trait descriptor retained by this reference.
@@ -166,6 +190,28 @@ impl Deref for TraitDescriptorRef {
 }
 
 /// A deterministic, duplicate-free transitive supertrait view.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Example", "example::Example", "Example",
+///         TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// let applied = TraitDescriptor::builder(&DEFINITION).build().expect("valid application");
+/// let closure = applied.all_supertraits();
+/// assert!(closure.is_empty());
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct SupertraitClosure<'a> {
     /// Sorted, duplicate-free applied supertraits.

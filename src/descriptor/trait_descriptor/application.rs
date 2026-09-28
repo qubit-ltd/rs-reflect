@@ -34,6 +34,16 @@ use crate::identity::ExternalTraitId;
 type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImplPayload>>>;
 
 /// The process-local identity source of a reflected or external trait.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use qubit_reflect::descriptor::TraitId;
+/// struct Marker;
+/// let identity = TraitId::Reflected(TypeId::of::<Marker>());
+/// assert!(matches!(identity, TraitId::Reflected(_)));
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TraitId {
     /// A marker type generated for a reflected trait declaration.
@@ -43,6 +53,27 @@ pub enum TraitId {
 }
 
 /// The complete identity of one concrete trait application.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Example", "example::Example", "Example",
+///         TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// let applied = TraitDescriptor::builder(&DEFINITION).build().expect("valid application");
+/// assert!(applied.trait_id().arguments().is_empty());
+/// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AppliedTraitId {
     /// Reflected marker or external declaration identity.
@@ -96,6 +127,30 @@ impl AppliedTraitId {
 /// requirements on the reflected trait. Implementation expansion enriches this
 /// payload with concrete application details before it becomes part of an
 /// implementation descriptor.
+///
+/// # Examples
+///
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitId, TraitImplPayload};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+///
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "Example", "example::Example", "Example",
+///         TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// static APPLIED: LazyLock<TraitDescriptor> = LazyLock::new(|| {
+///     TraitDescriptor::builder(&DEFINITION).build().expect("valid application")
+/// });
+/// let payload = TraitImplPayload::new(&DEFINITION, &APPLIED);
+/// assert_eq!(payload.applied().rust_name(), "Example");
+/// ```
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug)]
 pub struct TraitImplPayload {

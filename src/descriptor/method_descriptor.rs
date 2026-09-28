@@ -96,6 +96,34 @@ pub struct MethodDescriptor {
 }
 
 /// The declaration that owns a method descriptor.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// #[cfg(feature = "derive")]
+/// fn main() -> Result<(), qubit_reflect::error::RegistryError> {
+///     use qubit_reflect::TypeDescriptor;
+///     use qubit_reflect::descriptor::MethodDeclarationOwner;
+///     mod example {
+///         use qubit_reflect::{Reflect, reflect_impl};
+///         #[derive(Reflect)]
+///         #[reflect(crate = qubit_reflect)]
+///         pub struct Service;
+///         #[reflect_impl(crate = qubit_reflect)]
+///         impl Service { fn ping(&self) {} }
+///     }
+///     let implementation = TypeDescriptor::of::<example::Service>()
+///         .impls()?
+///         .first()
+///         .expect("reflected implementation");
+///     let owner = MethodDeclarationOwner::Impl(implementation.definition());
+///     assert!(matches!(owner, MethodDeclarationOwner::Impl(_)));
+///     Ok(())
+/// }
+/// #[cfg(not(feature = "derive"))]
+/// fn main() {}
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub enum MethodDeclarationOwner {
     /// A method declared by a trait definition.

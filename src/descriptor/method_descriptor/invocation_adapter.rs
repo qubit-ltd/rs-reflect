@@ -13,6 +13,14 @@ use std::any::Any;
 
 /// A stable reason why a concrete method instance cannot be invoked
 /// dynamically.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::InvocationUnavailableReason;
+/// let reason = InvocationUnavailableReason::UnsafeMethod;
+/// assert_eq!(reason, InvocationUnavailableReason::UnsafeMethod);
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvocationUnavailableReason {
     /// The receiver form has no safe adapter.
@@ -50,6 +58,14 @@ pub enum InvocationUnavailableReason {
 
 /// Availability of an explicitly requested panic-catching invocation entry
 /// point.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::CatchingAvailability;
+/// let availability = CatchingAvailability::Available;
+/// assert!(matches!(availability, CatchingAvailability::Available));
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum CatchingAvailability {
     /// No catching adapter was requested for this method.
@@ -68,6 +84,16 @@ pub enum CatchingAvailability {
 /// the registry selected for invocation. Missing capabilities yield a failure
 /// with recovery, not a missing entry. Ordinary entries propagate user panics;
 /// explicitly requested catching entries capture only supported user panics.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::descriptor::{CatchingAvailability, InvocationAdapter};
+///
+/// fn opaque_entry() {}
+/// let adapter = InvocationAdapter::new(opaque_entry);
+/// assert_eq!(adapter.catching_availability(), CatchingAvailability::NotRequested);
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct InvocationAdapter {
     /// Opaque identity retained by the method declaration.

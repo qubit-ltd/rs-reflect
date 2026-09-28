@@ -108,6 +108,8 @@ impl TraitDescriptor {
     /// # Returns
     ///
     /// Returns an empty builder for that trait declaration.
+    #[must_use]
+    #[inline]
     pub fn builder(definition: &'static TraitDefinitionDescriptor) -> TraitDescriptorBuilder {
         TraitDescriptorBuilder::new(definition)
     }
@@ -323,6 +325,18 @@ impl TraitDescriptor {
 
 impl fmt::Debug for TraitDescriptor {
     /// Formats local facts without recursively expanding supertraits.
+    ///
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the local trait application facts.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after writing the representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the formatter.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("TraitDescriptor")
