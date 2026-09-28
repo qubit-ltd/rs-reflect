@@ -31,6 +31,9 @@ use crate::configure::carrier::carrier_name;
 use crate::entry::process_macro;
 use crate::ir::MacroKind;
 
+#[cfg(test)]
+mod tests;
+
 /// Produces a carrier whose members are filtered by rustc before reflection.
 ///
 /// # Parameters

@@ -137,3 +137,44 @@ impl EnumReprIr {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    use super::EnumReprIr;
+
+    #[test]
+    fn test_all_enum_representations_emit_matching_descriptor_values() {
+        let representations = [
+            (EnumReprIr::Rust, "Rust", None),
+            (EnumReprIr::C, "C", None),
+            (EnumReprIr::Transparent, "Transparent", None),
+            (EnumReprIr::I8, "I8", Some("i8")),
+            (EnumReprIr::I16, "I16", Some("i16")),
+            (EnumReprIr::I32, "I32", Some("i32")),
+            (EnumReprIr::I64, "I64", Some("i64")),
+            (EnumReprIr::I128, "I128", Some("i128")),
+            (EnumReprIr::Isize, "Isize", Some("isize")),
+            (EnumReprIr::U8, "U8", Some("u8")),
+            (EnumReprIr::U16, "U16", Some("u16")),
+            (EnumReprIr::U32, "U32", Some("u32")),
+            (EnumReprIr::U64, "U64", Some("u64")),
+            (EnumReprIr::U128, "U128", Some("u128")),
+            (EnumReprIr::Usize, "Usize", Some("usize")),
+            (EnumReprIr::Align(16), "", None),
+        ];
+
+        for (representation, expected_variant, integer_name) in representations {
+            let tokens: TokenStream = representation.descriptor_tokens(&quote!(::qubit_reflect));
+            let expected = match representation {
+                EnumReprIr::Align(alignment) => format!("EnumRepr :: Align ({alignment}usize)"),
+                _ => format!("EnumRepr :: {expected_variant}"),
+            };
+
+            assert!(tokens.to_string().contains(&expected), "{representation:?}: {tokens}");
+            assert_eq!(representation.integer_name(), integer_name, "{representation:?}");
+        }
+    }
+}
