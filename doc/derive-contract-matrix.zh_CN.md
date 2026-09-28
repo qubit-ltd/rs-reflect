@@ -1,6 +1,6 @@
 # Derive 契约与覆盖矩阵
 
-此矩阵区分编译器侧宏契约和 runtime 覆盖率。`scripts/check-derive-coverage.sh` 产生的 derive 行覆盖率目前仅作观察，不设百分比门槛。configure/parse/validate/expand 任一阶段缺少可归属文件或执行计数时，报告必须失败，不能显示为满覆盖。`cargo-llvm-cov` 统计 derive 库测试；由 rustc 执行的过程宏行为仍以 UI 测试验证。
+此矩阵区分编译器侧宏契约和 runtime 覆盖率。`scripts/check-derive-coverage.sh` 会运行 `qubit-reflect-derive` 和 consumer 包 `qubit-reflect` 的全部测试目标，因此 profile 同时包含 derive 单元测试和 consumer integration/UI 测试触发的过程宏调用。报告只汇总 derive crate 的 configure、parse、validate、expand 源码。各阶段行覆盖率下限分别为 configure 70%、parse 85%、validate 80%、expand 85%；缺少阶段、没有执行计数或低于下限都会使报告失败。
 
 | 契约 | 成功/失败 fixture | feature 或配置 | 预期结果 |
 | --- | --- | --- | --- |
@@ -12,4 +12,4 @@
 | Facade 与重命名/直接依赖 | `test-crates/model-facade-*`；`test-crates/macro-runtime-only` | facade；关闭 runtime 默认 feature 的直接 derive | 内部支持宏按公开协议解析。 |
 | Runtime-only feature 边界 | `test-crates/macro-runtime-only` | runtime 不启用默认 feature | 仍可直接使用 derive 宏，不必启用 runtime derive 导出。 |
 
-覆盖采集器在 `target/derive-coverage/` 保存各阶段源码文件、执行行数、百分比、HTML、原始 llvm-cov JSON 和机器可读摘要。覆盖百分比不代表所有宏展开路径，也不能替代 UI 契约 fixture。
+覆盖采集器在 `target/derive-coverage/` 保存各阶段源码文件、执行行数、百分比及配置下限、HTML、原始 llvm-cov JSON 和机器可读摘要。达到下限不代表所有宏展开路径都已覆盖，也不能替代 UI 契约 fixture。
