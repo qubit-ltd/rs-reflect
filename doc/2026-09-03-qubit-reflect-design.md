@@ -108,7 +108,7 @@ Diagnostic text does not participate in `Eq` or `Hash`, so formatting cannot cha
 
 The registry collects all fragments, checks duplicate identities and type/trait/impl/capability conflicts, then
 publishes indexes once. Failure cannot expose partial state. Candidate and index order follows stable fragment order.
-Effective method views are built during freezing, and query paths do not execute user code.
+Effective method views are built during freezing. Frozen enumeration and lookups of already-frozen facts do not execute providers; an intrinsic-capability query for an unregistered concrete monomorph can still run its one-time factory.
 Aggregate navigation is available in both convenience and explicit-snapshot
 forms: `methods()` initializes the process-wide snapshot, while `methods_in`,
 `impls_in`, and `methods_named_in` use the caller-supplied immutable registry.
@@ -128,26 +128,33 @@ immutable query/index path is used after freezing, so `methods_in`,
 ## 4. Derive pipeline
 
 ```text
-proc-macro entry
+attribute macro entry
     │
     ▼
-parse ──> validate ──> domain IR
-                           │
-                           ▼
-                    expansion dispatcher
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
- descriptor orchestration          invocation analysis
-                                             │
-                                             ▼
-                                      InvocationPlan
-                                             │
-                                             ▼
-                                        token emitter
+configure carrier
+    │
+    ▼
+rustc cfg/cfg_attr filtering
+    │
+    ▼
+reconstruct active declaration ──> parse ──> validate ──> domain IR
+                                                           │
+                                                           ▼
+                                                  expansion dispatcher
+                                                           │
+                                 ┌─────────────────────────┴─────────────────────────┐
+                                 ▼                                                   ▼
+                      descriptor orchestration                            invocation analysis
+                                                                                     │
+                                                                                     ▼
+                                                                              InvocationPlan
+                                                                                     │
+                                                                                     ▼
+                                                                                token emitter
 ```
 
 - `derive/src/entry.rs` owns entry-point error aggregation.
+- `derive/src/configure/` projects conditional member attributes onto a hidden derive carrier. Rustc removes inactive members before semantic parsing, so names and types inside disabled items cannot cause reflection validation errors.
 - `parse/` converts `syn` input into domain IR.
 - `validate/` checks declaration shapes and attribute combinations.
 - `expand/context.rs` is the single owner of facade resolution and fragment fingerprints.
@@ -173,6 +180,15 @@ hooks only through the versioned protocol rooted at:
 ```text
 facade::__private::codegen_v3
 ```
+
+The attribute macros use the additive `codegen_v3::macro_support` export to
+invoke the hidden `ConfiguredReflection` derive. The runtime-only build gates
+this module behind the `derive` feature; a facade with a direct derive-macro
+dependency can still compile when the runtime dependency disables its default
+features. Public `#[reflect]` and `#[reflect_impl]` declarations pass through
+the carrier so rustc evaluates `cfg` and `cfg_attr` before reflection parses
+their members. This preserves the natural compiler ordering without evaluating
+configuration conditions inside the macro.
 
 The protocol exposes exact domain surfaces for `access`, `capability`,
 `construct`, `descriptor`, `error`, `expression`, `identity`, `invoke`,
@@ -340,6 +356,21 @@ are errors. The baseline channel uses the manifest's exact recorded SHA,
 while the head channel uses each dependency's `main` revision. Both channels
 record their feature selection, and private repositories may use
 `DEPENDENCY_TOKEN`.
+
+The baseline and head channels each execute the seven-repository downstream
+matrix and fail if the private-repository token is absent. Head revisions are
+resolved to exact commit SHAs once and recorded with the evidence. The
+measurement report is a versioned state machine (`collecting`, `failed`, or
+`complete`): it reports success only after all requested samples pass, the
+summary is valid, and the final report is atomically written. Repository and
+lockfile fingerprints before and after sampling make source drift explicit.
+
+Derive coverage is collected independently from runtime coverage into JSON and
+HTML reports. The summary groups instrumented files under configure, parse,
+validate, and expand, and fails when a stage has no file or executed line. It
+sets no percentage threshold until a stable baseline exists; compiler-driven
+macro behavior remains covered by UI fixtures rather than being inferred from
+library line coverage.
 
 ## 9. Explicit non-goals
 

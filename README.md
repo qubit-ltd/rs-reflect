@@ -23,6 +23,11 @@ Reflection is useful when the target is chosen at runtime or a framework must
 inspect different types uniformly. This crate does not convert form text into
 Rust values, serialize objects, or supply business validation rules.
 
+On reflected traits and impls, Rust applies `cfg` and `cfg_attr` before
+reflection validates helpers or emits metadata. A disabled member disappears;
+`#[reflect(no_invoke)]` instead keeps its metadata while disabling dynamic
+invocation. See the user guide for this distinction and its examples.
+
 ## Installation
 
 ```toml
@@ -127,6 +132,9 @@ Snapshot type membership controls model projection; capability-only targets stay
 queryable and can be inspected with `capability_only_type_targets`.
 For example, inspect metadata registrations with
 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
+If that capability points to a target missing from snapshot type membership,
+`ModelRegistry::from_reflect_registry` returns `UnregisteredModelTarget`; the
+user guide explains how to inspect and repair that registration.
 
 ```rust
 use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
@@ -135,27 +143,27 @@ use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::TypeDescriptor;
 
 fn main() -> Result<(), qubit_reflect::RegistryError> {
-let target = TypeDescriptor::of::<u32>();
-let key = CapabilityKey::<u32>::new(
-    CapabilityId::new("example.limit").expect("valid capability ID"),
-);
-let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
-let mut builder = RegistrySnapshotBuilder::new();
-builder.add_type_with_capabilities(
-    target,
-    vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-    source("type", 10),
-    source("capability", 11),
-);
-builder.add_type_capabilities(
-    TypeDescriptor::of::<u64>(),
-    vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
-    source("capability", 12),
-);
-let snapshot = builder.build()?;
-assert_eq!(snapshot.types().len(), 1);
-assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
-Ok(())
+    let target = TypeDescriptor::of::<u32>();
+    let key = CapabilityKey::<u32>::new(
+        CapabilityId::new("example.limit").expect("valid capability ID"),
+    );
+    let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_with_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+        source("type", 10),
+        source("capability", 11),
+    );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u64>(),
+        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+        source("capability", 12),
+    );
+    let snapshot = builder.build()?;
+    assert_eq!(snapshot.types().len(), 1);
+    assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
+    Ok(())
 }
 ```
 
@@ -167,6 +175,7 @@ Ok(())
   from the repository root with `cargo doc --all-features --no-deps --open`
 - [English design](doc/2026-09-03-qubit-reflect-design.md)
 - [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
+- [Derive contract matrix](doc/derive-contract-matrix.md) · [中文契约矩阵](doc/derive-contract-matrix.zh_CN.md)
 - [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md) · [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)

@@ -249,6 +249,8 @@ fn main() {
 
 `#[reflect]` 描述 trait，包括 supertrait、默认方法、关联类型和关联常量。`#[reflect_impl]` 描述 inherent impl 或 trait impl，并只为可以安全跨越动态边界的签名生成适配器。`#[reflect(rename = "...")]` 只改查询名，`rust_name()` 保留源码名；`skip`、`read_only`、`no_construct`、`no_invoke` 和 `opaque` 则限制相应动态操作，同时保留适用的结构信息。
 
+条件编译会先于反射校验。可在声明或成员上使用普通 `#[cfg(...)]` 和 `#[cfg_attr(...)]`；未启用的成员不会进入反射元数据，也不会进入编译后的 Rust 项目。例如，平台专属方法可以引用仅在该平台存在的类型，只要方法也受相同条件约束。`#[reflect(no_invoke)]` 用途不同：该方法仍保留在描述符中，但反射不会为其生成动态调用适配器。
+
 ### 为具体泛型实例生成调用入口
 
 泛型和 blanket impl 会登记定义级信息，但不能据此假定所有具体类型都有可调用入口。如果应用只需要动态调用 `Service<u8>`，在实现块上指定 `specialize(T = u8)`。下面的独立程序查找这个具体类型的方法，成功输出 `42_u8`：
@@ -368,6 +370,8 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 ```
 
 `u32` 可从 `types()` 中找到；`u64` 虽可查询 `example.limit`，却不是类型成员。`add_type_with_capabilities` 同时添加成员和能力，`add_type_capabilities` 只添加能力。空构建器的 `types()` 为空；仅添加能力也不会让目标出现在 `types()` 中。`capability_only_type_targets(id)` 按稳定能力 ID 枚举这些目标，即使适配器类型不一致也会返回，并按来源片段排序；审计模型元数据时可查 `"qubit.model.metadata.v1"`。
+
+反射本身不要求执行此审计，但模型投影有更严格的约束：若模型元数据能力指向的类型不是 snapshot 成员，`ModelRegistry::from_reflect_registry` 会返回 `UnregisteredModelTarget`。启用泛型模型元数据时，定义目标也遵循相同规则。应检查对应的 `capability_only_*_targets` 结果及其来源片段，再将预期的模型类型或定义加入 snapshot，或从该视图中移除相应元数据注册。能力可查询并不代表它已成为模型成员。
 
 其他入口包括 `add_type`、`add_definition`、`add_trait`、`add_impl_definition`、`add_impl`、`add_definition_capabilities`。模型层的 `ModelRegistry::from_reflect_registry` 只投影快照的类型成员；若只想纳入 `MyModel`，在拥有该类型和 `qubit-model-metadata` 依赖的外观库中按以下集成步骤构建快照：
 

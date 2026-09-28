@@ -296,6 +296,14 @@ fn main() {
   `no_invoke`, and `opaque` preserve the applicable structural fact while
   disabling or limiting the associated dynamic operation.
 
+Conditional compilation is applied before reflection validation. Put ordinary
+`#[cfg(...)]` and `#[cfg_attr(...)]` attributes on the declaration or member;
+inactive members are absent from both generated reflection metadata and the
+compiled Rust item. A platform-specific method may refer to a type that exists
+only on that platform, provided the same condition guards the method.
+`#[reflect(no_invoke)]` has a different purpose: the method remains in the
+descriptor, but reflection does not generate a dynamic call adapter.
+
 Look up a `MethodInstanceDescriptor` through the registry or an effective type
 view, then call `invoke_local(registry, invocation)` with the same explicit registry. Positional arguments are
 the canonical form. The runtime validates receiver, argument count, passing
@@ -477,6 +485,14 @@ targets absent from `types()`. The query matches the stable capability ID even
 when the adapter type differs, and orders results by their source fragment.
 For an optional metadata registration audit, query
 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
+The audit is optional for reflection itself, but model projection is stricter:
+`ModelRegistry::from_reflect_registry` returns `UnregisteredModelTarget` if a
+model-metadata capability points to a type that is not a member of the
+snapshot. When generic-model metadata is enabled, the same rule applies to
+definition targets. Inspect the matching `capability_only_*_targets` result
+and its source fragment, then either add the intended model type or definition
+to the snapshot or remove that metadata registration from this view. Capability
+queryability does not imply model membership.
 
 For generic declarations, `definition_capabilities(id)` reports capability
 facts independently from definition membership. It returns `None` when the
