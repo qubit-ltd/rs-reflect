@@ -315,7 +315,6 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Returns
     ///
     /// The structured reason the field-set operation failed.
-    #[must_use = "the field access error describes why recovery was required"]
     #[inline]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error

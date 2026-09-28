@@ -224,7 +224,6 @@ impl<M: Mode> ValidatedUpdateInput<M> {
     /// # Returns
     ///
     /// Returns the validated replacements in generated assignment order.
-    #[must_use = "the overrides describe the validated update inputs"]
     #[inline]
     pub fn overrides(&self) -> &[ValidatedOverride<M>] {
         &self.overrides
