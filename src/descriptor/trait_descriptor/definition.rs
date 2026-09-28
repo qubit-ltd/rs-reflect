@@ -44,11 +44,29 @@ pub enum TraitCompleteness {
 ///
 /// # Examples
 ///
-/// ```
-/// use qubit_reflect::descriptor::TraitCompleteness;
+/// ```rust,no_run
+/// # #[cfg(feature = "derive")]
+/// mod example {
+///     use qubit_reflect;
+///     use qubit_reflect::reflect;
 ///
-/// let completeness = TraitCompleteness::Complete;
-/// assert_eq!(completeness, TraitCompleteness::Complete);
+///     #[reflect(crate = ::qubit_reflect)]
+///     pub trait ExampleService {
+///         fn run(&self);
+///     }
+/// }
+///
+/// # #[cfg(feature = "derive")]
+/// let registry = qubit_reflect::ReflectRegistry::initialize()
+///     .expect("valid reflection registry");
+/// # #[cfg(feature = "derive")]
+/// let definition = registry
+///     .trait_definition_by_path(concat!(module_path!(), "::example::ExampleService"))
+///     .expect("reflected trait definition");
+/// # #[cfg(feature = "derive")]
+/// assert_eq!(definition.query_name(), "ExampleService");
+/// # #[cfg(feature = "derive")]
+/// assert_eq!(definition.methods()[0].rust_name(), "run");
 /// ```
 #[derive(Debug)]
 pub struct TraitDefinitionDescriptor {

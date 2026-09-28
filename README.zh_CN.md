@@ -13,6 +13,8 @@
 
 如果业务代码已经知道要访问哪个字段，直接使用 `user.name` 即可。只有操作目标需要在运行时确定，或框架需要统一检查多种类型时，反射才有必要。本库不负责将表单字符串转换成 Rust 值，也不提供序列化或业务校验规则。
 
+在反射 trait 与 impl 上，Rust 会先应用 `cfg` 和 `cfg_attr`，再校验反射 helper 并生成元数据。禁用成员会消失；`#[reflect(no_invoke)]` 则保留元数据，同时关闭动态调用。两者的区别与示例见用户指南。
+
 ## 安装
 
 ```toml
@@ -83,6 +85,8 @@ Rust 有意不提供不受限制的运行时反射。需要类型图、属性编
 `capability_only_type_targets` 检查。
 例如，可用 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`
 审计模型元数据能力的注册目标。
+若该能力指向的目标不是快照类型成员，`ModelRegistry::from_reflect_registry` 会返回
+`UnregisteredModelTarget`；用户指南说明了如何检查来源并修复注册。
 
 ```rust
 use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
@@ -90,27 +94,27 @@ use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::TypeDescriptor;
 fn main() -> Result<(), qubit_reflect::RegistryError> {
-let target = TypeDescriptor::of::<u32>();
-let key = CapabilityKey::<u32>::new(
-    CapabilityId::new("example.limit").expect("合法的 capability ID"),
-);
-let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
-let mut builder = RegistrySnapshotBuilder::new();
-builder.add_type_with_capabilities(
-    target,
-    vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-    source("type", 10),
-    source("capability", 11),
-);
-builder.add_type_capabilities(
-    TypeDescriptor::of::<u64>(),
-    vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
-    source("capability", 12),
-);
-let snapshot = builder.build()?;
-assert_eq!(snapshot.types().len(), 1);
-assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
-Ok(())
+    let target = TypeDescriptor::of::<u32>();
+    let key = CapabilityKey::<u32>::new(
+        CapabilityId::new("example.limit").expect("合法的 capability ID"),
+    );
+    let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type_with_capabilities(
+        target,
+        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
+        source("type", 10),
+        source("capability", 11),
+    );
+    builder.add_type_capabilities(
+        TypeDescriptor::of::<u64>(),
+        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
+        source("capability", 12),
+    );
+    let snapshot = builder.build()?;
+    assert_eq!(snapshot.types().len(), 1);
+    assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
+    Ok(())
 }
 ```
 
@@ -122,6 +126,7 @@ Ok(())
   `cargo doc --all-features --no-deps --open`，生成并打开完整参考文档
 - [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
 - [English design](doc/2026-09-03-qubit-reflect-design.md)
+- [中文 derive 契约矩阵](doc/derive-contract-matrix.zh_CN.md) · [Derive contract matrix](doc/derive-contract-matrix.md)
 - [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md) · [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md)
 - [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)

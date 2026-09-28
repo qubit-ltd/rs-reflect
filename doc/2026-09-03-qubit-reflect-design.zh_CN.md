@@ -102,7 +102,7 @@ descriptor 与 expression 的结构字段保持私有。公开构造器在边界
 
 registry 先收集全部 fragment，再检查重复 identity、类型/trait/impl/capability 冲突，最后一次性冻结索引。
 失败不会发布部分状态；候选和索引顺序由稳定 fragment 顺序决定。复杂有效方法视图在冻结阶段构造，
-查询路径不执行用户代码。
+冻结枚举和已冻结事实查找不会执行 provider；未注册具体 monomorph 的 intrinsic capability 查询仍可能执行其一次性 factory。
 聚合导航同时提供便捷入口与显式 snapshot 入口：`methods()` 会初始化进程全局 snapshot，
 `methods_in`、`impls_in`、`methods_named_in` 则只查询调用方传入的不可变 registry。
 因此，一个隔离 snapshot 的查询不会被无关的全局初始化缓存错误污染。
@@ -117,26 +117,33 @@ linker inventory，从空集合开始收集带 `FragmentIdentity` 的类型化 p
 ## 4. derive 流水线
 
 ```text
-proc-macro entry
+attribute macro entry
     │
     ▼
-parse ──> validate ──> domain IR
-                           │
-                           ▼
-                    expansion dispatcher
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
- descriptor orchestration          invocation analysis
-                                             │
-                                             ▼
-                                      InvocationPlan
-                                             │
-                                             ▼
-                                        token emitter
+configure carrier
+    │
+    ▼
+rustc cfg/cfg_attr 过滤
+    │
+    ▼
+重建启用声明 ──> parse ──> validate ──> domain IR
+                                       │
+                                       ▼
+                              expansion dispatcher
+                                       │
+             ┌─────────────────────────┴─────────────────────────┐
+             ▼                                                   ▼
+   descriptor orchestration                            invocation analysis
+                                                                   │
+                                                                   ▼
+                                                            InvocationPlan
+                                                                   │
+                                                                   ▼
+                                                              token emitter
 ```
 
 - `derive/src/entry.rs` 统一入口错误聚合。
+- `derive/src/configure/` 将条件成员属性投影到隐藏 derive carrier。rustc 会先移除未启用成员，再进行语义解析，因此禁用项中的类型名或名称不会触发反射校验错误。
 - `parse/` 只把 `syn` 输入转换为领域 IR。
 - `validate/` 检查声明形状与属性组合。
 - `expand/context.rs` 唯一负责 facade 路径和 fragment fingerprint。
@@ -159,6 +166,12 @@ trait 默认方法与 concrete impl 共用同一 invocation 分析和语义 emit
 ```text
 facade::__private::codegen_v3
 ```
+
+属性宏通过新增的 `codegen_v3::macro_support` 导出调用隐藏的
+`ConfiguredReflection` derive。runtime-only 构建会在未启用 `derive` feature 时隐藏该模块；
+外观库即使直接依赖 derive 宏、同时关闭 runtime 默认 feature，也可以正常编译。
+公开的 `#[reflect]` 与 `#[reflect_impl]` 声明先经过 carrier，使 rustc 在反射解析成员前应用
+`cfg` 与 `cfg_attr`。配置条件仍由编译器负责求值，宏本身不会重复模拟编译器配置。
 
 协议按领域精确暴露 `access`、`capability`、`construct`、`descriptor`、`error`、
 `expression`、`identity`、`invoke`、`registration`、`value`，以及生成 impl 所需的根反射类型。
@@ -286,6 +299,15 @@ Markdown 验收以独立 package 和进程执行每个 `rust` 程序。`rust,no_
 下游门禁校验真实 `rs-model-metadata` workspace（包含 `derive/`）和 `rs-platform`；缺少相邻仓库会报错。
 baseline 通道使用清单记录的精确 SHA，head 通道使用各依赖仓库的 `main` 修订；两条通道都显式记录
 feature 选择，私有仓库可使用 `DEPENDENCY_TOKEN`。
+
+baseline 与 head 通道都会执行包含七个仓库的下游矩阵；缺少私有仓库 token 时直接失败。
+head 修订只解析一次为精确 commit SHA，并写入验证证据。测量报告采用版本化状态
+（`collecting`、`failed`、`complete`）：只有全部样本成功、摘要有效且最终报告原子写入后才报告成功。
+采样前后的仓库及 lockfile 指纹用于明确检测源码漂移。
+
+Derive 覆盖独立于 runtime 覆盖采集 JSON 与 HTML 报告，并按 configure、parse、validate、expand 分组。
+阶段缺少可归属源码文件或执行行时报告失败；稳定基线建立前不设百分比门槛。编译器驱动的宏行为仍由 UI fixture
+验证，不能从 derive 库行覆盖率推断。
 
 ## 9. 明确不做的事情
 
