@@ -44,29 +44,22 @@ pub enum TraitCompleteness {
 ///
 /// # Examples
 ///
-/// ```no_run
-/// # #[cfg(feature = "derive")]
-/// mod example {
-///     use qubit_reflect;
-///     use qubit_reflect::reflect;
+/// ```
+/// use std::any::TypeId;
+/// use std::sync::LazyLock;
+/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitId};
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
 ///
-///     #[reflect(crate = ::qubit_reflect)]
-///     pub trait ExampleService {
-///         fn run(&self);
-///     }
-/// }
-///
-/// # #[cfg(feature = "derive")]
-/// let registry = qubit_reflect::ReflectRegistry::initialize()
-///     .expect("valid reflection registry");
-/// # #[cfg(feature = "derive")]
-/// let definition = registry
-///     .trait_definition_by_path(concat!(module_path!(), "::example::ExampleService"))
-///     .expect("reflected trait definition");
-/// # #[cfg(feature = "derive")]
-/// assert_eq!(definition.query_name(), "ExampleService");
-/// # #[cfg(feature = "derive")]
-/// assert_eq!(definition.methods()[0].rust_name(), "run");
+/// struct Marker;
+/// static GENERICS: LazyLock<GenericDefinitionDescriptor> =
+///     LazyLock::new(|| GenericDefinitionDescriptor::new([], []));
+/// static DEFINITION: LazyLock<TraitDefinitionDescriptor> = LazyLock::new(|| {
+///     TraitDefinitionDescriptor::new(
+///         TraitId::Reflected(TypeId::of::<Marker>()), "ExampleService", "example::ExampleService",
+///         "ExampleService", TraitCompleteness::Complete, &GENERICS,
+///     )
+/// });
+/// assert_eq!(DEFINITION.query_name(), "ExampleService");
 /// ```
 #[derive(Debug)]
 pub struct TraitDefinitionDescriptor {
