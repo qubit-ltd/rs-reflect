@@ -158,7 +158,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the structured error that stopped construction.
-    #[must_use = "the construction error describes why recovery was required"]
     #[inline]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
@@ -168,7 +167,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     ///
     /// Update recovery places the base first, followed by overrides in caller
     /// order.
-    #[must_use = "the recovered values are required to restore the construction inputs"]
     #[inline]
     pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
         &self.values
@@ -179,7 +177,6 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the error and all retained values in recovery order.
-    #[must_use = "the error and retained values are required to handle recovery"]
     pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }

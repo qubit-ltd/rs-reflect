@@ -127,7 +127,6 @@ impl<M: Mode + 'static> StructUpdater<M> {
     /// # Returns
     ///
     /// Returns the policies corresponding to direct fields by source index.
-    #[must_use = "the field descriptors define the updater inputs"]
     #[inline]
     pub const fn fields(&self) -> &'static [UpdateField] {
         self.fields

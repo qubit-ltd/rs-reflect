@@ -128,7 +128,6 @@ impl<M: Mode + 'static> StructConstructor<M> {
     /// # Returns
     ///
     /// Returns the policies corresponding to direct fields by source index.
-    #[must_use = "the field descriptors define the constructor inputs"]
     #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields
