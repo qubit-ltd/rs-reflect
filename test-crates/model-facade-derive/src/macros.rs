@@ -9,6 +9,7 @@
 //! Attribute macros exposed by the model facade test crate.
 
 use proc_macro::TokenStream;
+use quote::format_ident;
 use quote::quote;
 use syn::DeriveInput;
 use syn::parse_macro_input;
@@ -16,9 +17,15 @@ use syn::parse_macro_input;
 /// Derives the runtime facade's re-exported `Reflect` implementation.
 pub fn model_reflect(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as DeriveInput);
+    let reflect_attribute = if item.generics.params.is_empty() {
+        quote!(#[reflect(crate = model_facade_runtime)])
+    } else {
+        let provider = format_ident!("__model_facade_definition_{}", item.ident);
+        quote!(#[reflect(crate = model_facade_runtime, definition_provider_v2 = #provider)])
+    };
     quote! {
         #[derive(model_facade_runtime::Reflect)]
-        #[reflect(crate = model_facade_runtime)]
+        #reflect_attribute
         #item
     }
     .into()
