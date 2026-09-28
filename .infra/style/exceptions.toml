@@ -152,11 +152,6 @@ reason = "Impl kinds, associated bindings, method lookup, and builders form one 
 
 [[exceptions]]
 rule = "multiple-public-types"
-path = "src/descriptor/trait_descriptor/application.rs"
-reason = "Trait identity, application substitutions, and impl payload are the linked records for one applied trait."
-
-[[exceptions]]
-rule = "multiple-public-types"
 path = "src/descriptor/trait_descriptor/builder.rs"
 reason = "TraitDescriptorBuilder and its build error define one atomic validation and construction boundary."
 
