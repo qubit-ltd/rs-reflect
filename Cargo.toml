@@ -51,7 +51,7 @@ bigdecimal = { version = "^0.4", optional = true }
 chrono = { version = "^0.4", default-features = false, features = ["std"], optional = true }
 inventory = "^0.3"
 qubit-datatype = { version = "0.14.0", path = "../../rust-common/rs-datatype", optional = true }
-qubit-id = { version = "0.6.0", path = "../../rust-common/rs-id", optional = true }
+qubit-id = { version = "0.6.0", path = "../../rust-common/rs-id", default-features = false, optional = true }
 thiserror = "^2.0"
 uuid = { version = "^1.26", optional = true }
 qubit-reflect-derive = { version = "=0.1.0", path = "derive", optional = true }
