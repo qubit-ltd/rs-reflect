@@ -50,6 +50,7 @@ rs-id|$LAYOUT_ROOT/rust-common/rs-id
 rs-datatype|$LAYOUT_ROOT/rust-common/rs-datatype
 rs-redact|$LAYOUT_ROOT/rust-common/rs-redact
 rs-validator|$LAYOUT_ROOT/rust-common/rs-validator
+rs-validation-rules|$LAYOUT_ROOT/rust-common/rs-validation-rules
 EOF
 
     : > "$EVIDENCE_DIR/cargo-lock-sha256.txt"
