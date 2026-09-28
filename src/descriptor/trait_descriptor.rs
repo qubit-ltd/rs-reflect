@@ -19,7 +19,8 @@ mod definition;
 // Owns concrete applications and substitutions.
 mod application;
 // Owns validated construction.
-mod builder;
+mod trait_descriptor_build_error;
+mod trait_descriptor_builder;
 // Owns supertrait closure and external caching.
 mod supertrait;
 
@@ -27,9 +28,6 @@ pub use self::application::AppliedTraitId;
 pub(crate) use self::application::TraitApplicationSubstitutions;
 pub use self::application::TraitId;
 pub use self::application::TraitImplPayload;
-pub use self::builder::TraitDescriptorBuildError;
-pub use self::builder::TraitDescriptorBuilder;
-pub(super) use self::builder::generic_argument_is_concrete;
 pub use self::definition::AssociatedConstDescriptor;
 pub use self::definition::AssociatedTypeDescriptor;
 pub use self::definition::TraitCompleteness;
@@ -38,6 +36,9 @@ pub use self::supertrait::SupertraitClosure;
 pub use self::supertrait::TraitDescriptorRef;
 pub use self::supertrait::cached_trait_object_descriptor;
 pub use self::supertrait::external_supertrait;
+pub use self::trait_descriptor_build_error::TraitDescriptorBuildError;
+pub use self::trait_descriptor_builder::TraitDescriptorBuilder;
+pub(super) use self::trait_descriptor_builder::generic_argument_is_concrete;
 
 /// An applied trait descriptor with concrete generic arguments.
 ///
