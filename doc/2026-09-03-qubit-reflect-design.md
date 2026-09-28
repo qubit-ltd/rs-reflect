@@ -1,8 +1,7 @@
 # `qubit-reflect` Design
 
 - Date: 2026-09-03
-- Last reviewed: 2026-09-24
-- Status: breaking boundary redesign implemented; internal-repository consumption only, with release intentionally deferred
+- Status: `0.1.0` release candidate prepared; registry publication and post-publication consumer verification remain pending
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
@@ -59,10 +58,10 @@ share the reflect derive analyzer, so that threshold is not met.
 | `default = ["derive"]` | ordinary macro use | enables `qubit-reflect-derive` |
 | `default-features = false` | runtime only | compiles neither derive nor external type families |
 | `ecosystem-types` | ecosystem reflection | explicitly enables `bigdecimal`, `chrono`, and `uuid` |
-| `qubit-types` | Qubit type reflection | explicitly enables `qubit-datatype` and `qubit-id` |
+| `qubit-types` | Qubit type reflection | enables `qubit-datatype` and `qubit-id` with `qubit-id` default features disabled |
 | `bench-internals` | internal benchmark hooks | does not change the ordinary user API |
 
-The runtime kernel directly depends on `inventory` and `thiserror`; all external type dependencies are optional.
+The runtime kernel directly depends on `inventory` and `thiserror`; all external type dependencies are optional. The `qubit-types` feature adds reflection implementations only. Applications that also use `qubit-id` generator APIs must enable the required `qubit-id` features on their own direct dependency.
 Rust's orphan rule requires implementations of `Reflect` for external types to live in the crate that owns the
 trait. Feature modules satisfy that rule without forcing those implementations or dependencies into the default
 kernel.

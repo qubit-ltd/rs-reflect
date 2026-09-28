@@ -1,8 +1,7 @@
 # `qubit-reflect` 详细设计
 
 - 日期：2026-09-03
-- 最近审核：2026-09-24
-- 状态：破坏性边界重构已实现；当前只供内部仓库使用，发布流程明确暂缓
+- 状态：`0.1.0` 发布候选准备中；registry 发布及发布后的消费者验收尚待完成
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
 - 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
@@ -55,10 +54,10 @@ Rust 要求过程宏位于 `proc-macro` crate，因此 runtime 与 derive 保持
 | `default = ["derive"]` | 常规宏使用 | 启用 `qubit-reflect-derive` |
 | `default-features = false` | 纯 runtime | 不编译 derive 与外部类型族 |
 | `ecosystem-types` | 生态类型反射 | 显式启用 `bigdecimal`、`chrono`、`uuid` |
-| `qubit-types` | Qubit 类型反射 | 显式启用 `qubit-datatype`、`qubit-id` |
+| `qubit-types` | Qubit 类型反射 | 启用 `qubit-datatype`、`qubit-id`，其中 `qubit-id` 禁用默认 feature |
 | `bench-internals` | 内部基准入口 | 不改变普通用户 API |
 
-核心 runtime 的直接依赖是 `inventory` 与 `thiserror`。外部类型依赖全部 optional。Rust 的 orphan rule
+核心 runtime 的直接依赖是 `inventory` 与 `thiserror`。外部类型依赖全部 optional。`qubit-types` 只添加反射实现；如果应用还使用 `qubit-id` 的生成器 API，必须在自己的直接依赖上启用所需的 `qubit-id` feature。Rust 的 orphan rule
 要求 `Reflect` 的外部类型实现位于拥有 trait 的 `qubit-reflect` crate；feature 模块既满足该规则，
 又避免把这些实现和依赖塞入默认内核。
 

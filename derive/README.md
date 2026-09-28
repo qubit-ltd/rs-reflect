@@ -19,7 +19,15 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = fa
 qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
 ```
 
-Neither crate is published to crates.io. Keep the local checkout layout intact because `qubit-reflect` also uses the sibling `rust-common/rs-id` and `rust-common/rs-datatype` crates. Both crates require Rust 1.94 or later. For normal application code, depend on `qubit-reflect` with its default `derive` feature instead of adding the derive crate directly.
+This checkout prepares the `0.1.0` release candidate; direct registry installation becomes available after both crates are published and verified. Until then, keep the local checkout layout intact because `qubit-reflect` also uses the sibling `rust-common/rs-id` and `rust-common/rs-datatype` crates. Both crates require Rust 1.94 or later. For normal application code, depend on `qubit-reflect` with its default `derive` feature instead of adding the derive crate directly.
+
+After publication, select both crates from the same release line:
+
+```toml
+[dependencies]
+qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect-derive = "0.1"
+```
 
 ## Quick Start
 

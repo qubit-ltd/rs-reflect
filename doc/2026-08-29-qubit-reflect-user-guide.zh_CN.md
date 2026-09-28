@@ -35,7 +35,7 @@ cd reflect-editor
 qubit-reflect = { version = "0.1", path = "../rs-reflect" }
 ```
 
-本 crate 目前用于 Qubit 内部工作区，尚未发布到 crates.io。使用本地路径或内部 Git 修订版时，让运行时 crate 与 `qubit-reflect-derive` 来自同一仓库版本。本地检出还需保留清单引用的 `../../rust-common/rs-id` 与 `../../rust-common/rs-datatype` 路径布局。默认 feature 重导出 `Reflect`、`reflect`、`reflect_impl` 三个宏。
+当前检出用于准备 `0.1.0` 发布候选。在 registry 发布并完成消费者验收前，请使用上面的 workspace 路径或经过批准的 Git 修订版，并确保 runtime 与 `qubit-reflect-derive` 来自同一仓库修订版。本地检出还需保留清单引用的 `../../rust-common/rs-id` 与 `../../rust-common/rs-datatype` 路径布局。发布后可使用 `qubit-reflect = "=0.1.0"`。默认 feature 重导出 `Reflect`、`reflect`、`reflect_impl` 三个宏。
 
 下面是独立的入门程序。把它保存为 `src/main.rs`，运行 `cargo run`。程序先读取 `name`，替换为 `"Grace"`，再故意传入错误类型 `9_u64`，检查错误输入是否能取回。
 
@@ -407,7 +407,7 @@ let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registr
 | --- | --- |
 | `derive`（默认） | 需要 `Reflect`、`reflect`、`reflect_impl` 宏。 |
 | `ecosystem-types` | 需要 `BigDecimal`、`DateTime<Utc>`、`NaiveDate`、`NaiveTime`、`Uuid` 的反射实现。 |
-| `qubit-types` | 需要 `qubit_id::Id`、`qubit_datatype::DataType` 的反射实现。 |
+| `qubit-types` | 需要 `qubit_id::Id`、`qubit_datatype::DataType` 的反射实现；同时禁用 `qubit-id` 默认的生成器 feature。 |
 
 以下是互相替代的依赖配置。只把符合需求的一项放进 `[dependencies]`；`path` 仍相对于你的 `Cargo.toml`：
 
@@ -426,7 +426,7 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect", features = ["ecosyste
 qubit-reflect = { version = "0.1", path = "../rs-reflect", features = ["qubit-types"] }
 ```
 
-两个外部类型 feature 相互独立，均不在默认配置中。需要生成外部类型描述符的外观库或元数据 crate，须在自己的依赖上开启对应 feature；仅重导出宏不会启用这些实现。
+两个外部类型 feature 相互独立，均不在默认配置中。需要生成外部类型描述符的外观库或元数据 crate，须在自己的依赖上开启对应 feature；仅重导出宏不会启用这些实现。`qubit-types` 只为 `qubit_id::Id` 提供反射。如果应用还使用 ID 生成器，请直接依赖 `qubit-id` 并启用所需 feature，不要依赖本 crate 间接启用的 feature。
 
 ### 什么时候使用不透明边界
 

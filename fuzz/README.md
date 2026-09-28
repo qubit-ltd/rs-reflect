@@ -5,7 +5,7 @@ Build and smoke-test the fuzz workspace with a nightly toolchain on Linux:
 ```bash
 cargo +nightly fuzz build --fuzz-dir fuzz
 
-mkdir -p /tmp/qubit-reflect-fuzz/{corpus,artifacts}/{id_parser,type_expression,registry_model,dynamic_operations}
+mkdir -p /tmp/qubit-reflect-fuzz/{corpus,artifacts}/{id_parser,type_expression,registry_model,registry_snapshot,dynamic_operations}
 
 cargo +nightly fuzz run --fuzz-dir fuzz -s none id_parser \
   /tmp/qubit-reflect-fuzz/corpus/id_parser fuzz/corpus/id_parser -- \
@@ -23,6 +23,11 @@ cargo +nightly fuzz run --fuzz-dir fuzz -s none registry_model \
   -runs=1000 \
   -artifact_prefix=/tmp/qubit-reflect-fuzz/artifacts/registry_model/ \
   -dict=fuzz/dictionaries/registry_model.dict
+
+cargo +nightly fuzz run --fuzz-dir fuzz -s none registry_snapshot \
+  /tmp/qubit-reflect-fuzz/corpus/registry_snapshot -- \
+  -runs=1000 \
+  -artifact_prefix=/tmp/qubit-reflect-fuzz/artifacts/registry_snapshot/
 
 cargo +nightly fuzz run --fuzz-dir fuzz -s none dynamic_operations \
   /tmp/qubit-reflect-fuzz/corpus/dynamic_operations -- \

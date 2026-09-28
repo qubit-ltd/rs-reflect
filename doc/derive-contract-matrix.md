@@ -8,7 +8,7 @@ This matrix separates compiler-facing macro contracts from runtime coverage. `sc
 | Invalid helper on a disabled member | conditional compilation UI pass fixture | helper under `cfg(any())` | Disabled helper is not semantically validated. |
 | Invalid helper on an active member | existing `tests/ui/fail/` helper diagnostics | default features | Compilation fails at the source helper. |
 | Signature and invocation policies | `tests/ui/fail/` invocation, unwind, and thread-safety fixtures | all-features CI | Unsupported signatures fail with source-oriented diagnostics; supported policies compile. |
-| Generic specialization | `tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs`; integration fixtures | `generic-models` feature | Invalid specialization fails; registered concrete specialization preserves method/adapter mapping. |
+| Generic specialization | `tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs`; integration fixtures | all-features CI; no dedicated Cargo feature | Invalid specialization fails; registered concrete specialization preserves method/adapter mapping. |
 | Facade and renamed/direct dependencies | `test-crates/model-facade-*`; `test-crates/macro-runtime-only` | facade; direct derive with runtime defaults disabled | Internal support macro resolves through the documented protocol. |
 | Runtime-only feature boundary | `test-crates/macro-runtime-only` | no runtime default features | Direct derive macro remains usable without enabling runtime derive exports. |
 
