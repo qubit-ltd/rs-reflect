@@ -30,6 +30,20 @@ use crate::ir::TypeKindIr;
 
 /// Re-parses the generic syntax retained in the type IR and reports malformed
 /// internal syntax at the declaration name instead of dropping the derive.
+///
+/// # Parameters
+///
+/// - `declaration`: Validated type declaration containing retained generic
+///   syntax.
+///
+/// # Returns
+///
+/// Returns the parsed generic parameters and where clause.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the retained generic declaration or where
+/// clause cannot be parsed.
 pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Result<syn::Generics> {
     let kind = match declaration.kind {
         TypeDeclarationKindIr::Struct => "struct",
