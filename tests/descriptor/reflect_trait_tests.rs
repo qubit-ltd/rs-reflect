@@ -143,8 +143,8 @@ trait LifetimeAndLiteralDefaultService<
     fn borrowed(&'a self) -> &'b str;
 }
 
-#[reflect]
 /// Exercises reflection of a method with nested and function-pointer types.
+#[reflect]
 pub(crate) trait StructuralService {
     fn structural(&self, value: Vec<[u8; 4]>) -> fn(*const u8) -> usize;
 }

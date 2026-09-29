@@ -8,8 +8,11 @@
 
 //! AssociatedConstReader metadata and behavior.
 
+mod associated_const_read_adapter;
+
 use std::fmt;
 
+use self::associated_const_read_adapter::AssociatedConstReadAdapter;
 use crate::value::ReflectedOwned;
 
 /// A safe reader for one concrete associated constant value.
@@ -30,14 +33,6 @@ use crate::value::ReflectedOwned;
 pub struct AssociatedConstReader {
     /// Safe function or closure adapter that reads a fresh owned value.
     read: AssociatedConstReadAdapter,
-}
-
-/// Internal storage forms for generated associated constant readers.
-enum AssociatedConstReadAdapter {
-    /// Non-capturing generated reader.
-    Function(fn() -> ReflectedOwned),
-    /// Static closure used to adapt a concrete value getter.
-    Closure(&'static (dyn Fn() -> ReflectedOwned + Send + Sync)),
 }
 
 impl AssociatedConstReader {

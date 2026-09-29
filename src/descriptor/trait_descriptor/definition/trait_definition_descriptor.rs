@@ -8,8 +8,11 @@
 
 //! Shared declaration-level facts for a reflected trait.
 
+mod trait_definition_members;
+
 use std::sync::OnceLock;
 
+use self::trait_definition_members::TraitDefinitionMembers;
 use crate::descriptor::AssociatedConstDescriptor;
 use crate::descriptor::AssociatedTypeDescriptor;
 use crate::descriptor::MethodDescriptor;
@@ -60,17 +63,6 @@ pub struct TraitDefinitionDescriptor {
     visibility: Visibility,
     /// Lazily initialized associated-item facts shared across applications.
     members: OnceLock<TraitDefinitionMembers>,
-}
-
-/// Associated-item facts retained before a concrete trait application exists.
-#[derive(Debug)]
-struct TraitDefinitionMembers {
-    /// Declared methods in source order.
-    methods: Box<[MethodDescriptor]>,
-    /// Declared associated types in source order.
-    associated_types: Box<[AssociatedTypeDescriptor]>,
-    /// Declared associated constants in source order.
-    associated_consts: Box<[AssociatedConstDescriptor]>,
 }
 
 impl TraitDefinitionDescriptor {
