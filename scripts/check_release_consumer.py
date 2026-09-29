@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import runpy
 from pathlib import Path
 import subprocess
 import tarfile
@@ -69,12 +70,22 @@ def unpack(archive: Path, destination: Path, crate: str, version: str) -> Path:
     return result.resolve()
 
 
-def validate_sources(metadata: dict, allowed: dict[str, Path], version: str) -> None:
-    """Require registry provenance except for explicitly staged archive roots."""
+def validate_sources(metadata: dict, allowed: dict[str, Path], version: str, consumer_manifest: Path) -> None:
+    """Require registry provenance outside staged roots and the exact consumer root."""
+    root_id = metadata.get("resolve", {}).get("root")
+    root_packages = [package for package in metadata["packages"]
+                     if root_id is not None and package.get("id") == root_id]
+    if len(root_packages) != 1:
+        raise ValueError("consumer root package missing or ambiguous")
+    consumer = root_packages[0]
+    if (Path(consumer["manifest_path"]).resolve() != consumer_manifest.resolve()
+            or consumer["source"] is not None or consumer["name"] != "release-consumer"
+            or consumer["version"] != "0.0.0"):
+        raise ValueError("consumer root identity mismatch")
     seen = set()
     for package in metadata["packages"]:
         name = package["name"]
-        if name == "release-consumer":
+        if package is consumer:
             continue
         if name in allowed:
             actual = Path(package["manifest_path"]).resolve().parent
@@ -116,6 +127,65 @@ def fixture(version: str, profile: str, allowed: dict[str, Path]) -> tuple[str, 
         for name, path in sorted(allowed.items()):
             manifest += f'{name} = {{ path = {json.dumps(str(path))} }}\n'
     return manifest, BASE + body
+
+
+PACKAGED_EXAMPLES = ("field_patch", "customer_patch", "support_action")
+
+
+def packaged_examples_fixture(version: str, allowed: dict[str, Path]) -> str:
+    """Use three bin entry points from the staged runtime, never the checkout."""
+    if set(allowed) != {"qubit-reflect", "qubit-reflect-derive"}:
+        raise ValueError("packaged examples require both staged archive roots")
+    runtime = allowed["qubit-reflect"].resolve()
+    manifest, _ = fixture(version, "default", allowed)
+    for name in PACKAGED_EXAMPLES:
+        source = runtime / "examples" / f"{name}.rs"
+        if not source.is_file() or not source.resolve().is_relative_to(runtime):
+            raise ValueError(f"missing or escaping packaged example: {source}")
+        manifest += f'[[bin]]\nname = {json.dumps(name)}\npath = {json.dumps(str(source))}\n'
+    return manifest
+
+
+def check_packaged_examples(root, version, allowed, env, results):
+    """Record provenance and fail if any packaged example's main fails."""
+    runtime = allowed.get("qubit-reflect")
+    if runtime is not None:
+        # Check the archived documents against their archived examples before Cargo.
+        documents = [runtime / "README.md", runtime / "README.zh_CN.md",
+                     runtime / "doc/user_guide.md", runtime / "doc/user_guide.zh_CN.md"]
+        linked_documents = [document for document in documents if document.is_file()
+                            and "<!-- reflect-source:" in document.read_text(encoding="utf-8")]
+        if linked_documents:
+            checker = runpy.run_path(str(Path(__file__).with_name("check_markdown_examples.py")))
+            for document in linked_documents:
+                checker["parse_document"](document, runtime)
+    consumer = root / "packaged-examples"
+    consumer.mkdir(parents=True)
+    (consumer / "Cargo.toml").write_text(packaged_examples_fixture(version, allowed))
+    results["packaged_example_sources"] = {
+        name: str(allowed["qubit-reflect"].resolve() / "examples" / f"{name}.rs")
+        for name in PACKAGED_EXAMPLES
+    }
+    commands = [
+        ["cargo", "+1.94.0", "generate-lockfile"],
+        ["cargo", "+1.94.0", "metadata", "--locked", "--format-version", "1"],
+        *[["cargo", "+1.94.0", "run", "--locked", "--quiet", "--bin", name] for name in PACKAGED_EXAMPLES],
+    ]
+    for index, command in enumerate(commands):
+        result = subprocess.run(command, cwd=consumer, env=env, capture_output=True, text=True)
+        (consumer / f"{index}.stdout.log").write_text(result.stdout)
+        (consumer / f"{index}.stderr.log").write_text(result.stderr)
+        results["profiles"].setdefault("packaged-examples", []).append({"command": command, "exit_code": result.returncode})
+        (root / "summary.json").write_text(json.dumps(results, indent=2) + "\n")
+        if result.returncode:
+            raise RuntimeError(f"packaged-examples: command failed, see {consumer}")
+        if index == 1:
+            metadata = json.loads(result.stdout)
+            validate_sources(metadata, allowed, version, consumer / "Cargo.toml")
+            names = {package["name"] for package in metadata["packages"]}
+            if not set(allowed).issubset(names):
+                raise ValueError("packaged examples metadata missing staged reflection package")
+    print("staged: packaged-examples passed", flush=True)
 
 
 def main() -> int:
@@ -168,8 +238,10 @@ def main() -> int:
             if result.returncode:
                 raise RuntimeError(f'{profile}: command failed, see {consumer}')
             if index == 1:
-                validate_sources(json.loads(result.stdout), allowed, args.version)
+                validate_sources(json.loads(result.stdout), allowed, args.version, consumer / "Cargo.toml")
         print(f'{args.mode}: {profile} passed', flush=True)
+    if args.mode == 'staged':
+        check_packaged_examples(root, args.version, allowed, env, results)
     results['status'] = 'passed'
     summary.write_text(json.dumps(results, indent=2) + '\n')
     return 0

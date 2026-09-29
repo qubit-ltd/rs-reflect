@@ -69,6 +69,87 @@ fn main() {
         self.assertEqual(MODULE.check_examples(root, documents), 2)
 
 
+class SourceReferenceTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = pathlib.Path(self.directory.name)
+        (self.root / "examples").mkdir()
+        self.source = self.root / "examples/demo.rs"
+        self.source.write_text("// SPDX-License-Identifier: MIT\n// reflect-example-start\nfn main() {}\n// reflect-example-end\n")
+        self.document = self.root / "guide.md"
+
+    def parse(self, body="fn main() {}", reference="examples/demo.rs", mode="rust"):
+        self.document.write_text(f"<!-- reflect-source: {reference} -->\n\n```{mode}\n{body}\n```\n")
+        return MODULE.parse_document(self.document, self.root)
+
+    def test_reference_drift_is_not_silently_accepted(self):
+        self.assertEqual(self.parse()[0].source, "fn main() {}\n")
+        self.document.write_text("<!-- reflect-source: examples/demo.rs -->\n```rust\nfn main() { panic!(\"drift\"); }\n```\n")
+        with self.assertRaisesRegex(MODULE.ExampleError, "Markdown/source drift"):
+            MODULE.parse_document(self.document, self.root)
+
+    def test_license_separator_header_is_allowed(self):
+        self.source.write_text("// ========\n//    Copyright (c) 2026 Example.\n//\n//    SPDX-License-Identifier: Apache-2.0\n//\n//    Licensed under the Apache License, Version 2.0.\n// ========\n\n// reflect-example-start\nfn main() {}\n// reflect-example-end\n")
+        try:
+            blocks = self.parse()
+        except MODULE.ExampleError as error:
+            self.fail(f"a valid license header must be accepted: {error}")
+        self.assertEqual(blocks[0].source, "fn main() {}\n")
+
+    def test_equal_region_and_reference(self):
+        self.assertEqual(self.parse()[0].source_reference, "examples/demo.rs")
+
+    def test_translated_code_drift_has_document_and_source_location(self):
+        with self.assertRaisesRegex(MODULE.ExampleError, r"guide.md:3.*examples/demo.rs"):
+            self.parse("fn main() { assert!(false); }")
+
+    def test_whitespace_and_comments_are_not_stripped(self):
+        for body in ["fn main() {} ", "// translated comment\nfn main() {}", "fn main() {}\n"]:
+            with self.subTest(body=body), self.assertRaisesRegex(MODULE.ExampleError, "Markdown/source drift"):
+                self.parse(body)
+
+    def test_crlf_is_normalized(self):
+        self.source.write_bytes(self.source.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(self.parse()[0].source, "fn main() {}\n")
+        self.document.write_bytes(self.document.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertEqual(MODULE.parse_document(self.document, self.root)[0].source, "fn main() {}\n")
+
+    def test_unicode_line_separators_are_content_not_normalized_newlines(self):
+        for separator in ["\u2028", "\u2029", "\u0085", "\v", "\f", "\r"]:
+            with self.subTest(separator=repr(separator)):
+                program = f'fn main() {{ assert_eq!("a{separator}b".len(), {len(("a" + separator + "b").encode("utf-8"))}); }}'
+                self.source.write_text("// reflect-example-start\n" + program + "\n// reflect-example-end\n")
+                # A real, identical source/Markdown pair is accepted first.
+                self.assertEqual(self.parse(program)[0].source_reference, "examples/demo.rs")
+                with self.assertRaisesRegex(MODULE.ExampleError, r"guide.md:3.*examples/demo.rs.*Markdown/source drift"):
+                    self.parse(program.replace(separator, "\n"))
+                self.assertEqual(self.parse(program)[0].source, program + "\n")
+
+    def test_missing_duplicate_unclosed_regions_and_hidden_code(self):
+        for content in ["fn main() {}", "// reflect-example-start\nfn main() {}", self.source.read_text() * 2,
+                        "fn hidden() {}\n" + self.source.read_text()]:
+            with self.subTest(content=content):
+                self.source.write_text(content)
+                with self.assertRaisesRegex(MODULE.ExampleError, r"guide.md:3.*examples/demo.rs"):
+                    self.parse()
+
+    def test_paths_reject_absolute_parent_and_symlink_escape(self):
+        outside = self.root.parent / (self.root.name + "-outside.rs")
+        # A sibling target need not exist: resolving the link must still reject escape.
+        (self.root / "examples/link.rs").symlink_to(outside)
+        for reference in [str(self.source), "examples/../examples/demo.rs", "examples/link.rs", "examples/missing.rs"]:
+            with self.subTest(reference=reference), self.assertRaisesRegex(MODULE.ExampleError, r"guide.md:3"):
+                self.parse(reference=reference)
+
+    def test_reference_requires_adjacent_run_fence(self):
+        for body in ["text\n```rust\nfn main() {}\n```", "```rust,no_run\nfn main() {}\n```",
+                     "```rust,compile_fail\nfn main() {}\n```", "```text\nx\n```", "```rust\nfn main() {}", "```rust\n```", ""]:
+            self.document.write_text("<!-- reflect-source: examples/demo.rs -->\n" + body)
+            with self.subTest(body=body), self.assertRaisesRegex(MODULE.ExampleError, r"guide.md:\d+.*examples/demo.rs"):
+                MODULE.parse_document(self.document, self.root)
+
+
 class CargoTests(unittest.TestCase):
     """Real Cargo executions: compiler success alone is insufficient."""
 
