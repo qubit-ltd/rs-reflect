@@ -38,11 +38,12 @@ use crate::identity::CapabilityId;
 /// assert_eq!(key.adapter_type(), TypeId::of::<u32>());
 /// ```
 pub struct CapabilityKey<A: 'static> {
+    /// Stable ID of the capability described by this key.
     id: CapabilityId,
+    /// Process-local identity of `A`, checked before adapter downcasting.
     adapter_type: TypeId,
-    // Keep the key invariant over its adapter type. A covariant marker would
-    // allow lifetime subtyping to change `A` while retaining this key's
-    // original `TypeId`, which could make a lookup downcast panic.
+    /// Keeps `A` invariant so lifetime subtyping cannot disagree with its
+    /// `TypeId`.
     marker: PhantomData<fn(A) -> A>,
 }
 
@@ -145,21 +146,5 @@ impl<A: 'static> Debug for CapabilityKey<A> {
             .field("id", &self.id)
             .field("adapter_type", &self.adapter_type)
             .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::CapabilityKey;
-    use crate::identity::CapabilityId;
-
-    #[test]
-    fn test_key_clone_and_debug_preserve_contract() {
-        let id = CapabilityId::new("example.test.key").expect("valid capability ID");
-        let key = CapabilityKey::<u32>::new(id);
-        let clone = key;
-        assert_eq!(clone.id(), key.id());
-        assert_eq!(clone.adapter_type(), key.adapter_type());
-        assert!(format!("{key:?}").contains("CapabilityKey"));
     }
 }

@@ -565,13 +565,47 @@ impl ReflectRegistry {
     ///
     /// # Returns
     ///
-    /// Returns the adapter, or `None` when the declaration or capability is
-    /// absent.
+    /// Returns `Ok(Some(adapter))` when the capability facts contain an
+    /// adapter for `key`. Returns `Ok(None)` when the ID has neither snapshot
+    /// membership nor capability facts, or when its capability facts do not
+    /// contain `key`'s ID. Membership is independent of capability lookup: a
+    /// capability-only target can return an adapter while
+    /// [`Self::definition`] returns `None`.
+    ///
+    /// ```
+    /// use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
+    /// use qubit_reflect::descriptor::{TypeDefinitionDescriptor, TypeDefinitionId};
+    /// use qubit_reflect::expression::GenericDefinitionDescriptor;
+    /// use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+    /// use qubit_reflect::registry::RegistrySnapshotBuilder;
+    ///
+    /// struct Marker;
+    /// let id = TypeDefinitionId::of::<Marker>();
+    /// let generics = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
+    /// let definition = Box::leak(Box::new(TypeDefinitionDescriptor::opaque(
+    ///     id, "example::Record", "Record", generics,
+    /// )));
+    /// let key = CapabilityKey::<u32>::new(CapabilityId::new("example.record_adapter")?);
+    /// let mut builder = RegistrySnapshotBuilder::new();
+    /// builder.add_definition_capabilities(
+    ///     definition,
+    ///     vec![CapabilityDescriptor::with_adapter(key, 7)],
+    ///     FragmentIdentity::new("example", "record", 1, 1, "capability", 1),
+    /// );
+    /// let registry = builder.build()?;
+    ///
+    /// assert!(registry.definition(id).is_none());
+    /// assert_eq!(registry.definition_capability(id, key)?, Some(&7));
+    /// assert!(registry.definition_capability_by_id(id, "example.record_adapter").is_some());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     ///
     /// # Errors
     ///
-    /// Returns an adapter contract mismatch when the stored value has another
-    /// type.
+    /// Returns [`CapabilityAccessError::FactOnly`] when the matching capability
+    /// fact declares `key`'s adapter type but has no executable adapter.
+    /// Returns [`CapabilityAccessError::AdapterTypeMismatch`] when the fact
+    /// declares the same capability ID with a different adapter type.
     pub fn definition_capability<A: 'static>(
         &self,
         id: TypeDefinitionId,
@@ -592,8 +626,12 @@ impl ReflectRegistry {
     ///
     /// # Returns
     ///
-    /// Returns the descriptor, or `None` when the declaration or capability is
-    /// absent.
+    /// Returns the descriptor when the capability facts contain
+    /// `capability_id`, including a fact with no executable adapter. Returns
+    /// `None` when the ID has neither snapshot membership nor capability facts,
+    /// or when the capability facts do not contain `capability_id`. The target
+    /// need not be a snapshot member; use [`Self::definition`] to check
+    /// membership separately.
     #[must_use]
     pub fn definition_capability_by_id(
         &self,

@@ -15,8 +15,13 @@ use std::sync::OnceLock;
 
 use crate::descriptor::TypeDescriptor;
 
+/// Lazily initialized storage for one process-lifetime descriptor.
 type DescriptorCell = OnceLock<TypeDescriptor>;
 
+/// Process-wide descriptor cells, keyed by concrete Rust type identity.
+///
+/// Cells are leaked when inserted so the map can return stable `'static`
+/// references while factories run outside the map lock.
 static INTERNER: OnceLock<Mutex<HashMap<TypeId, &'static DescriptorCell>>> = OnceLock::new();
 
 /// Interns the descriptor built for `T` and returns its unique root.
