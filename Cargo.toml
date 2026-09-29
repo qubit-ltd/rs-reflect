@@ -20,6 +20,7 @@ include = [
     "/doc/**",
     "/tests/**",
     "/benches/**",
+    "/examples/**",
 ]
 
 [workspace]
@@ -36,7 +37,7 @@ members = [
     "test-crates/macro-runtime-only",
     "test-crates/conditional-feature",
 ]
-exclude = ["fuzz"]
+exclude = ["fuzz", "test-crates/readme-examples"]
 resolver = "3"
 
 [features]
@@ -105,6 +106,21 @@ name = "panic_abort_invocation_fixture"
 path = "tests/fixtures/panic_abort_invocation.rs"
 required-features = ["derive"]
 test = false
+
+[[example]]
+name = "field_patch"
+path = "examples/field_patch.rs"
+required-features = ["derive"]
+
+[[example]]
+name = "customer_patch"
+path = "examples/customer_patch.rs"
+required-features = ["derive"]
+
+[[example]]
+name = "support_action"
+path = "examples/support_action.rs"
+required-features = ["derive"]
 
 [[bench]]
 name = "descriptor_lookup"
