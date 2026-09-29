@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "files": {
     "src/descriptor/trait_descriptor.rs": {
       "functions": 90,
@@ -9,16 +10,6 @@
       "functions": 65,
       "lines": 75,
       "regions": 80
-    },
-    "src/invoke/invocation.rs": {
-      "functions": 93,
-      "lines": 88,
-      "regions": 90
-    },
-    "src/invoke/pinned.rs": {
-      "functions": 92,
-      "lines": 88,
-      "regions": 90
     },
     "src/private/lazy_type_ref_list.rs": {
       "functions": 95,
@@ -49,6 +40,20 @@
       "functions": 100,
       "lines": 100,
       "regions": 100
+    }
+  },
+  "groups": {
+    "invocation": {
+      "path_prefix": "src/invoke/invocation/",
+      "functions": 90,
+      "lines": 88,
+      "regions": 91
+    },
+    "pinned": {
+      "path_prefix": "src/invoke/pinned/",
+      "functions": 95,
+      "lines": 90,
+      "regions": 92
     }
   }
 }
