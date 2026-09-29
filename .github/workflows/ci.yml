@@ -208,6 +208,16 @@ jobs:
         run: rustup component add rust-src --toolchain 1.94.0
       - name: Run infrastructure CI orchestration
         run: ./ci-check.sh --only=verify
+      - name: Check standard Cargo entry points and run native examples
+        run: |
+          cargo +1.94.0 test --locked
+          cargo +1.94.0 check --locked --examples
+          cargo +1.94.0 check --locked --no-default-features --examples
+          cargo +1.94.0 run --locked --example field_patch
+          cargo +1.94.0 run --locked --example customer_patch
+          cargo +1.94.0 run --locked --example support_action
+      - name: Check bilingual documentation contracts
+        run: python3 scripts/check_document_contracts.py
       - name: Run style, hook, and coverage Clippy
         if: runner.os == 'Linux'
         run: ./ci-check.sh --only=style,clippy,coverage-cfg-clippy,project-hook
@@ -252,7 +262,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('version=' + version + '\n')
           PY
-          cargo +1.94.0 package --locked -p qubit-reflect-derive
+          cargo +1.94.0 --config "patch.crates-io.qubit-reflect.path=\"$PWD\"" package --locked -p qubit-reflect-derive
           cargo +1.94.0 --config "patch.crates-io.qubit-reflect-derive.path=\"$PWD/derive\"" package --locked -p qubit-reflect
           release_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
           python3 scripts/check_release_consumer.py --mode staged --version "$release_version" \

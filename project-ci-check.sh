@@ -13,6 +13,7 @@ bash "$PROJECT_ROOT/scripts/tests/requirements_traceability_check_tests.sh"
 bash "$PROJECT_ROOT/scripts/tests/critical_coverage_check_tests.sh"
 "$PROJECT_ROOT/scripts/check-markdown-examples.sh"
 "$PROJECT_ROOT/scripts/check-requirements-traceability.sh"
+python3 "$PROJECT_ROOT/scripts/check_document_contracts.py"
 RUSTFLAGS="${RUSTFLAGS:-} -C panic=abort" \
     cargo +"$RS_CI_BUILD_TOOLCHAIN" run --quiet --all-features \
         --bin panic_abort_invocation_fixture

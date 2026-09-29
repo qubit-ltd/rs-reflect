@@ -24,26 +24,74 @@ class Block:
     line: int
     mode: str
     source: str
+    source_reference: str | None = None
 
     @property
     def location(self):
         return f"{self.document}:{self.line}"
 
 
-def parse_document(document):
+def read_lines(path):
+    """Normalize CRLF only; keep Unicode separators and literal carriage returns."""
+    with path.open(encoding="utf-8", newline="") as source:
+        text = source.read().replace("\r\n", "\n")
+    return text.removesuffix("\n").split("\n")
+
+
+def source_region(root, reference, location):
+    """Read the single complete displayed program without allowing path escape."""
+    path = Path(reference)
+    label = f"{location}: source {reference}"
+    if path.is_absolute() or ".." in path.parts:
+        raise ExampleError(f"{label}: invalid source path")
+    resolved = (root / path).resolve()
+    if not resolved.is_relative_to(root.resolve()):
+        raise ExampleError(f"{label}: source escapes repository")
+    try:
+        lines = read_lines(resolved)
+    except OSError as error:
+        raise ExampleError(f"{label}: cannot read source: {error}") from error
+    starts = [index for index, line in enumerate(lines) if line == "// reflect-example-start"]
+    ends = [index for index, line in enumerate(lines) if line == "// reflect-example-end"]
+    if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
+        raise ExampleError(f"{label}: expected one closed source region")
+    # Only a leading license header and blank lines may sit outside the program.
+    prefix = "\n".join(lines[:starts[0]]).strip()
+    license_line = re.compile(r"//(?:\s*(?:SPDX-License-Identifier:|Copyright\b|Licensed under\b).*|\s*[=-]+\s*|\s*)")
+    if prefix and not all(not line.strip() or license_line.fullmatch(line) for line in lines[:starts[0]]):
+        raise ExampleError(f"{label}: code outside source region")
+    if any(line.strip() for line in lines[ends[0] + 1:]):
+        raise ExampleError(f"{label}: code outside source region")
+    return "\n".join(lines[starts[0] + 1:ends[0]]) + "\n"
+
+
+def parse_document(document, root=None):
     """Read fenced Rust programs; reject unsupported or incomplete examples."""
-    lines = document.read_text(encoding="utf-8").splitlines()
+    lines = read_lines(document)
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[1]
     blocks = []
     fence = None
+    pending = None
     for index, line in enumerate(lines, 1):
         match = re.match(r"^\s{0,3}(`{3,}|~{3,})(.*)$", line)
         if fence is None:
+            reference = re.fullmatch(r"\s*<!-- reflect-source:\s*(\S+)\s*-->\s*", line)
+            if reference:
+                if pending:
+                    raise ExampleError(f"{document}:{pending[1]}: source {pending[0]}: dangling source marker")
+                pending = (reference[1], index)
+                continue
+            if pending and line.strip() and not match:
+                raise ExampleError(f"{document}:{pending[1]}: source {pending[0]}: marker requires adjacent Rust fence")
             if not match:
                 continue
             marker, info = match.groups()
             info = info.strip()
             rust = re.match(r"^rust(?:\s|,|$)", info) is not None
             mode = None
+            source_reference = pending[0] if pending else None
+            if pending and (not rust or info != "rust"):
+                raise ExampleError(f"{document}:{index}: source {pending[0]}: source marker requires run Rust fence")
             if rust:
                 parts = [part.strip() for part in info.split(",")]
                 modes = {("rust",): "run", ("rust", "no_run"): "no_run", ("rust", "compile_fail"): "compile_fail"}
@@ -54,19 +102,27 @@ def parse_document(document):
                     previous = next((text.strip() for text in reversed(lines[:index - 1]) if text.strip()), "")
                     if not previous or previous.startswith(("```", "~~~", "#")):
                         raise ExampleError(f"{document}:{index}: {mode} requires a preceding explanation")
-            fence = (marker, index, mode, [])
+            fence = (marker, index, mode, [], source_reference)
+            pending = None
         else:
-            marker, start, mode, source = fence
+            marker, start, mode, source, source_reference = fence
             if match and match[1][0] == marker[0] and len(match[1]) >= len(marker) and not match[2].strip():
                 if mode:
                     if not any(text.strip() for text in source):
-                        raise ExampleError(f"{document}:{start}: empty Rust block")
-                    blocks.append(Block(document, start, mode, "\n".join(source) + "\n"))
+                        reference_label = f"source {source_reference}: " if source_reference else ""
+                        raise ExampleError(f"{document}:{start}: {reference_label}empty Rust block")
+                    program = "\n".join(source) + "\n"
+                    if source_reference and program != source_region(root, source_reference, f"{document}:{start}"):
+                        raise ExampleError(f"{document}:{start}: source {source_reference}: Markdown/source drift")
+                    blocks.append(Block(document, start, mode, program, source_reference))
                 fence = None
             else:
                 source.append(line)
+    if pending:
+        raise ExampleError(f"{document}:{pending[1]}: source {pending[0]}: dangling source marker")
     if fence is not None:
-        raise ExampleError(f"{document}:{fence[1]}: unclosed fence")
+        reference_label = f"source {fence[4]}: " if fence[4] else ""
+        raise ExampleError(f"{document}:{fence[1]}: {reference_label}unclosed fence")
     if not blocks:
         raise ExampleError(f"{document}:1: no Rust blocks found")
     return blocks
@@ -106,7 +162,7 @@ def command(args, workspace, label, timeout=None, env=None):
 
 def check_examples(root, documents, timeout=10, dependency_name="qubit-reflect"):
     """Run each block in its own package; retain owned evidence on failure."""
-    blocks = [block for document in documents for block in parse_document(document)]
+    blocks = [block for document in documents for block in parse_document(document, root)]
     workspace = Path(tempfile.mkdtemp(prefix="rs-reflect-markdown."))
     success = False
     try:
@@ -188,8 +244,8 @@ def main():
         "README.zh_CN.md",
         "derive/README.md",
         "derive/README.zh_CN.md",
-        "doc/2026-08-29-qubit-reflect-user-guide.md",
-        "doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md",
+        "doc/user_guide.md",
+        "doc/user_guide.zh_CN.md",
     ]]
     try:
         count = check_examples(root, documents)
