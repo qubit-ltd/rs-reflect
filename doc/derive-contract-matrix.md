@@ -1,5 +1,7 @@
 # Derive contract and coverage matrix
 
+Integration and macro usage: [User guide](user_guide.md) · [中文用户手册](user_guide.zh_CN.md)
+
 <!-- reflect-contract: coverage.configure=70 -->
 <!-- reflect-contract: coverage.parse=85 -->
 <!-- reflect-contract: coverage.validate=80 -->

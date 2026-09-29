@@ -1,5 +1,7 @@
 # Derive 契约与覆盖矩阵
 
+接入与宏用法见[用户手册](user_guide.zh_CN.md) · [English user guide](user_guide.md)
+
 <!-- reflect-contract: coverage.configure=70 -->
 <!-- reflect-contract: coverage.parse=85 -->
 <!-- reflect-contract: coverage.validate=80 -->

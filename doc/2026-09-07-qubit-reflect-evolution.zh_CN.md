@@ -2,6 +2,7 @@
 
 - 日期：2026-09-07
 - 相关设计：[中文设计](2026-09-03-qubit-reflect-design.zh_CN.md) · [English design](2026-09-03-qubit-reflect-design.md)
+- 用户手册：[中文版](user_guide.zh_CN.md) · [English](user_guide.md)
 
 本页保留按日期记录的实现与评审说明。当前契约统一维护在详细设计中；
 这里说明九月变更如何形成该契约。

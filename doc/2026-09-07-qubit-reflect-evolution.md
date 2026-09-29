@@ -2,6 +2,7 @@
 
 - Date: 2026-09-07
 - Related design: [Design](2026-09-03-qubit-reflect-design.md) · [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- User guide: [English](user_guide.md) · [简体中文](user_guide.zh_CN.md)
 
 This record preserves dated implementation and review notes. The current
 contracts are maintained in the design document; this page explains how the

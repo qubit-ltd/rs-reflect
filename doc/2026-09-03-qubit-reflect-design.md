@@ -12,6 +12,7 @@
 - Date: 2026-09-03
 - Status: source-checkout design for `0.1.0`; this document does not verify registry publication
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- User guide: [English](user_guide.md) · [简体中文](user_guide.zh_CN.md)
 - Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`

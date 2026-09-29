@@ -3,6 +3,7 @@
 - Date: 2026-09-03
 - Status: normative internal specification; publishing is intentionally deferred
 - Translation source: [简体中文需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
+- User guide: [English](user_guide.md) · [简体中文](user_guide.zh_CN.md)
 - Scope: declaration macros, descriptors, checked access, invocation, construction, and registry integration
 
 The key words **MUST**, **SHOULD**, **MUST NOT**, and **MAY** are normative.
