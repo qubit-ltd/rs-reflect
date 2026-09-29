@@ -117,7 +117,17 @@ fn main() {
 qubit-reflect = "0.1"
 ```
 
-同包 example 中，宏自动发现的 `crate` 可能指向示例程序，因此用 `#[reflect(crate = qubit_reflect)]` 与 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。在源码检出根目录运行原生示例：
+同包 example 中，宏自动发现的 `crate` 可能指向示例程序，因此用
+`#[reflect(crate = qubit_reflect)]` 与 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
+在源码检出中，即使未启用 `qubit-types`，Cargo 仍会解析可选的 `qubit-datatype` 与 `qubit-id`
+相邻路径 manifest。先准备依赖并验证解析结果：
+
+```bash
+./.infra/tools/prepare-local-path-dependencies.sh
+cargo metadata --locked --format-version 1
+```
+
+metadata 命令成功表示两个相邻 manifest 均可读取。这是源码检出的准备步骤；通过 registry 使用已发布 crate 无需运行该脚本。随后在源码检出根目录运行原生示例：
 
 ```bash
 cargo run --example field_patch
@@ -596,7 +606,7 @@ let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registr
 | `Some(empty)` | 定义是成员，但没有能力事实。 | 如需扩展操作，添加定义级能力。 |
 | `Some(nonempty)` | 有能力事实，定义可能是成员，也可能只是能力目标。 | 用 `definition(id).is_some()` 判断成员资格。 |
 
-例如只调用 `add_definition_capabilities` 而不调用 `add_definition`，就可能得到 `Some(nonempty)`，但 `definition(id)` 仍为 `None`。类型化与文本 ID 便捷查询也能读取能力专用目标；没有匹配事实时才表示能力缺失。
+例如只调用 `add_definition_capabilities` 而不调用 `add_definition`，就可能得到 `Some(nonempty)`，但 `definition(id)` 仍为 `None`。类型化的 `definition_capability` 与文本 ID 查询 `definition_capability_by_id` 也能从能力专用目标返回匹配的适配器或描述符；目标没有对应事实或能力时才返回 `None`。需要判断快照成员资格时，另行查询 `definition(id)`。存在能力事实但没有可执行适配器时，类型化查询返回 `CapabilityAccessError::FactOnly`；适配器类型与类型键不匹配时返回 `AdapterTypeMismatch`。
 
 ## 选择依赖功能与访问边界
 
@@ -670,6 +680,7 @@ fn main() {
 
 | 现象 | 检查顺序 |
 | --- | --- |
+| Cargo 提示找不到 `qubit-datatype` 或 `qubit-id` 路径 manifest | 源码检出时先运行 `./.infra/tools/prepare-local-path-dependencies.sh`，再运行 `cargo metadata --locked --format-version 1`。命令成功表示两个相邻 manifest 均能解析；registry 用户不需要此脚本。 |
 | `field("...")` 返回 `None` | 检查 `rename` 后的查询名；`rust_name()` 保留源码拼写。 |
 | 字段读取或替换失败 | 检查目标是否是声明类型、借用包装器、访问策略及替换值的精确类型；再看 `FieldSetFailure::recovery()`。 |
 | 构造失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |

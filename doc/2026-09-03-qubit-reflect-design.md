@@ -7,6 +7,8 @@
 <!-- reflect-contract: coverage.parse=85 -->
 <!-- reflect-contract: coverage.validate=80 -->
 <!-- reflect-contract: coverage.expand=85 -->
+<!-- reflect-contract: coverage.critical.invocation=90/88/91 -->
+<!-- reflect-contract: coverage.critical.pinned=95/90/92 -->
 <!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
 
 - Date: 2026-09-03
@@ -355,17 +357,22 @@ An internal `expect` may only state a fact proven earlier by the same generator;
 | ABI/facade | renamed dependencies, explicit facade, `codegen_v3`, and current model ABI `v7` |
 | robustness | coverage, bounded fuzz smoke, benchmark compile, Miri/sanitizers when available |
 
-Coverage verification enforces both crate-wide thresholds and the high-risk per-file thresholds in
-`.infra/ci/critical-coverage.json`, so well-covered simple modules cannot mask regressions in critical paths.
+Coverage verification enforces crate-wide thresholds, eight fixed file gates, and two weighted directory
+groups from `.infra/ci/critical-coverage.json`. The `src/invoke/invocation/` group requires
+90/88/91 percent functions/lines/regions; `src/invoke/pinned/` requires 95/90/92. After a fresh
+report succeeds, `coverage.sh` runs the critical checker; `ci-check.sh` does so on its default run or
+when `coverage` is selected explicitly; `align-ci.sh` checks only when
+`RUN_COVERAGE_IN_ALIGN=1`.
 
 Markdown acceptance executes each `rust` program in an independent package and
 process. `rust,no_run` compiles a library and `rust,compile_fail` must fail;
 both require an explanation. Unknown markers, empty blocks, and unclosed
 fences fail. A temporary workspace verifies `Cargo.lock` before `--locked`
 builds; each run times out after 10 seconds and retains failure logs and lock
-files. The original six coverage gates remain, with four thresholds floored
-from baseline d929d96: `set` 100/98/99, `registry` 92/92/89,
-`registry_builder` 100/97/96, and `snapshot_builder` 100/100/100.
+files. The eight fixed file gates include floors for `set` 100/98/99,
+`registry` 92/92/89, `registry_builder` 100/97/96, and `snapshot_builder`
+100/100/100; invocation and pinned implementation directories have separate
+weighted gates above.
 The registry floor is calibrated to the current all-feature report because
 generic and inlined lookup-view instantiations are not all attributable to
 the integration-test profiles; the public lookup-view regression test remains

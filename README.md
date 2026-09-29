@@ -87,7 +87,18 @@ These are native examples of the runtime package. In same-package example target
 automatic crate discovery can resolve the runtime to `crate`, which refers to the
 example executable. The declarations explicitly select the runtime facade with
 `#[reflect(crate = qubit_reflect)]` and `#[reflect_impl(crate = qubit_reflect)]`.
-Run them from this source checkout:
+In a source checkout, Cargo resolves the optional `qubit-datatype` and
+`qubit-id` path manifests even when `qubit-types` is disabled. Prepare those
+sibling checkouts first, then confirm Cargo can read both manifests:
+
+```bash
+./.infra/tools/prepare-local-path-dependencies.sh
+cargo metadata --locked --format-version 1
+```
+
+Successful metadata output confirms path resolution. Users of the published
+crate do not need this repository script. Now run the examples from this
+source checkout:
 
 ```bash
 cargo run --example field_patch
@@ -101,88 +112,11 @@ same commands work in an extracted package when `derive` is enabled. The version
 dependency above selects a published release; source-checkout execution does not
 prove that this checkout has been published or installed from a registry.
 
-The record type, the generic patch logic, and the service that owns loading and saving live in different modules. The listing below condenses those three modules into one library file; `CustomerRepository` is an application interface that you connect to your actual store. This is library code without a program entry point, so it is compiled without execution:
-
-```rust,no_run
-pub mod customers {
-    use qubit_reflect::Reflect;
-
-    /// The record edited by the support console.
-    #[derive(Reflect)]
-    pub struct Customer {
-        #[reflect(read_only)]
-        pub id: u64,
-        pub email: String,
-        pub display_name: String,
-        pub credit_limit_cents: u64,
-    }
-}
-
-pub mod patch {
-    use qubit_reflect::{FieldAccessError, Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
-
-    /// One change already decoded by the API layer into the field's Rust type.
-    pub struct FieldChange {
-        pub field: String,
-        pub value: ReflectedOwned,
-    }
-
-    pub enum PatchError {
-        UnknownField { field: String, value: ReflectedOwned },
-        ReadOnly { field: String, value: ReflectedOwned },
-        TypeMismatch { field: String, value: ReflectedOwned },
-        Failed { field: String, error: FieldAccessError },
-    }
-
-    pub fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
-        let descriptor = TypeDescriptor::of::<T>();
-        for change in changes {
-            let field_name = change.field;
-            let Some(field) = descriptor.field(&field_name) else {
-                return Err(PatchError::UnknownField { field: field_name, value: change.value });
-            };
-            if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
-                let (error, recovery) = failure.into_parts();
-                return Err(match (error, recovery) {
-                    (FieldAccessError::ReadOnly { .. }, Some(recovery)) => {
-                        PatchError::ReadOnly { field: field_name, value: recovery.into_value() }
-                    }
-                    (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => {
-                        PatchError::TypeMismatch { field: field_name, value: recovery.into_value() }
-                    }
-                    (error, _) => PatchError::Failed { field: field_name, error },
-                });
-            }
-        }
-        Ok(())
-    }
-}
-
-pub mod service {
-    use crate::customers::Customer;
-    use crate::patch::{FieldChange, PatchError, apply_patch};
-
-    pub trait CustomerRepository {
-        fn load(&self, id: u64) -> Result<Customer, Box<dyn std::error::Error>>;
-        fn save(&self, customer: &Customer) -> Result<(), Box<dyn std::error::Error>>;
-    }
-
-    pub enum UpdateError {
-        Patch(PatchError),
-        Repository(Box<dyn std::error::Error>),
-    }
-
-    pub fn update_customer(
-        repository: &dyn CustomerRepository,
-        id: u64,
-        changes: Vec<FieldChange>,
-    ) -> Result<(), UpdateError> {
-        let mut customer = repository.load(id).map_err(UpdateError::Repository)?;
-        apply_patch(&mut customer, changes).map_err(UpdateError::Patch)?;
-        repository.save(&customer).map_err(UpdateError::Repository)
-    }
-}
-```
+The complete load–patch–save service belongs in the [support-console guide
+scenario](doc/user_guide.md#integrate-a-support-console); it explains where
+`CustomerRepository` connects to application storage and how rejected changes
+are handled. The shorter [`customer_patch` example](examples/customer_patch.rs)
+shows the runnable path.
 
 The API layer decodes request text into each field's Rust type and checks that the caller may edit the record; `apply_patch` only verifies field names, access policy, and exact types. When a change is rejected, earlier changes may already sit in the in-memory struct, but nothing has been saved because `update_customer` returns before `save`. See the [user guide](doc/user_guide.md#errors-diagnostics-and-troubleshooting) for the full error model.
 
@@ -211,6 +145,11 @@ Reflection is deliberately bounded. It does not coerce numeric values, parse str
 - [中文 README](README.zh_CN.md) · [中文用户手册](doc/user_guide.zh_CN.md)
 
 ## Testing
+
+These commands run from the source checkout. Cargo resolves the optional
+`qubit-datatype` and `qubit-id` path manifests during workspace loading, so
+prepare local path dependencies first as shown above. Published-crate users do
+not need that script.
 
 ```bash
 # Run tests with the default feature set

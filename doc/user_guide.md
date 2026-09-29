@@ -117,7 +117,18 @@ qubit-reflect = "0.1"
 The same-package examples explicitly use `#[reflect(crate = qubit_reflect)]`
 and `#[reflect_impl(crate = qubit_reflect)]`: automatic crate discovery may
 otherwise select the example executable as `crate`. From this source checkout,
-run the native examples:
+Cargo still resolves the optional `qubit-datatype` and `qubit-id` sibling path
+manifests when `qubit-types` is disabled. Prepare them before Cargo commands
+and verify resolution:
+
+```bash
+./.infra/tools/prepare-local-path-dependencies.sh
+cargo metadata --locked --format-version 1
+```
+
+A successful metadata command confirms Cargo can read both sibling manifests.
+This repository setup applies only to source checkouts; users of the published
+crate need no preparation script. Now run the native examples:
 
 ```bash
 cargo run --example field_patch
@@ -712,9 +723,13 @@ snapshot has neither the definition nor capability facts for that ID,
 `Some(nonempty)` when capability facts exist. The last case also includes a
 capability-only target: `definition_capabilities(id)` can return facts while
 `definition(id)` is `None`. Use `definition(id).is_some()` to check snapshot
-membership. Typed and textual convenience lookups can read capabilities from
-capability-only targets; they report a missing capability for IDs with no
-matching facts.
+membership. The typed `definition_capability` and textual
+`definition_capability_by_id` queries can also return a matching adapter or
+descriptor from a capability-only target; they return `None` when the target
+has no matching facts or capability. Use `definition(id)` separately when
+membership matters. A fact without an executable adapter produces
+`CapabilityAccessError::FactOnly`, and a typed key with a different adapter
+type produces `AdapterTypeMismatch`.
 
 Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
 `methods_named_in` when a property or method query must use that exact set of
@@ -845,6 +860,7 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 
 | Symptom | What to check |
 | --- | --- |
+| Cargo reports a missing `qubit-datatype` or `qubit-id` path manifest | In a source checkout, run `./.infra/tools/prepare-local-path-dependencies.sh`, then `cargo metadata --locked --format-version 1`. Success confirms both sibling manifests resolve; registry users do not need this script. |
 | `field("...")` returns `None` | Use the query name; `rename` changes it while `rust_name()` retains the source spelling. |
 | A field operation fails | Verify the wrapper (`ReflectedRef` versus `ReflectedMut`), the field policy, and the replacement's exact type; then inspect `FieldSetFailure` recovery. |
 | Construction fails | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |
