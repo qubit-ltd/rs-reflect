@@ -22,6 +22,7 @@ use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::identity::ExternalTraitId;
 
+/// Lazily initialized applied descriptors keyed by concrete dyn-trait root.
 type DynTraitCache = HashMap<TypeId, &'static OnceLock<TraitDescriptor>>;
 
 /// Returns a cached incomplete descriptor for an explicitly mapped external

@@ -36,8 +36,12 @@ use crate::identity::CapabilityId;
 /// assert!(!descriptor.has_adapter());
 /// ```
 pub struct CapabilityDescriptor {
+    /// Stable capability identity used together with `adapter_type` for lookup.
     id: CapabilityId,
+    /// Process-local Rust type identity expected for the associated adapter.
     adapter_type: TypeId,
+    /// Optional type-erased adapter whose concrete type must match
+    /// `adapter_type`.
     adapter: Option<Arc<dyn Any + Send + Sync>>,
 }
 

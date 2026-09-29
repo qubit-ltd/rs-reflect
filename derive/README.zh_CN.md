@@ -4,7 +4,7 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
 [![Crates.io](https://img.shields.io/crates/v/qubit-reflect-derive.svg?color=blue)](https://crates.io/crates/qubit-reflect-derive)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
 <!-- reflect-contract: facade.explicit=qubit_reflect -->
@@ -90,7 +90,7 @@ cargo test --all-features
 Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 
 本项目基于 Apache License 2.0 授权。完整许可证文本请参阅
-[LICENSE](LICENSE)。
+[LICENSE](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)。
 
 ## 贡献
 

@@ -15,7 +15,9 @@ use crate::descriptor::TypeRef;
 
 /// An ordered relationship list resolved and frozen on first navigation.
 pub(crate) struct LazyTypeRefList {
+    /// Deferred target references in their original declaration order.
     references: &'static [LazyTypeRef],
+    /// The immutable resolved targets, initialized at most once on navigation.
     resolved: OnceLock<Box<[TypeRef]>>,
 }
 
