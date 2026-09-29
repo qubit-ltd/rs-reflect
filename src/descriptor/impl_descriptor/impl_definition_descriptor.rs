@@ -8,8 +8,11 @@
 
 //! ImplDefinitionDescriptor metadata and behavior.
 
+mod impl_associated_items;
+
 use std::sync::OnceLock;
 
+use self::impl_associated_items::ImplAssociatedItems;
 use super::impl_associated_const_descriptor::ImplAssociatedConstDescriptor;
 use super::impl_associated_type_descriptor::ImplAssociatedTypeDescriptor;
 use super::impl_kind::validate_kind;
@@ -84,14 +87,6 @@ pub struct ImplDefinitionDescriptor {
     methods: OnceLock<Box<[MethodDescriptor]>>,
     /// Lazily initialized associated-item facts.
     associated_items: OnceLock<ImplAssociatedItems>,
-}
-
-#[derive(Debug)]
-struct ImplAssociatedItems {
-    /// Explicit associated type bindings.
-    types: Box<[ImplAssociatedTypeDescriptor]>,
-    /// Explicit associated constant bindings.
-    consts: Box<[ImplAssociatedConstDescriptor]>,
 }
 
 impl ImplDefinitionDescriptor {
