@@ -12,6 +12,7 @@
 - 日期：2026-09-03
 - 状态：`0.1.0` 源码检出设计；本文不验证 registry 发布状态
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
+- 用户手册：[中文版](user_guide.zh_CN.md) · [English](user_guide.md)
 - 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
 - 适用仓库：`rs-reflect`

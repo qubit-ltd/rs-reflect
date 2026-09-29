@@ -5,6 +5,7 @@
 - 状态：需求确认稿；审核占位符已经全部关闭
 - 适用范围：`qubit-reflect` 的声明宏、运行时 descriptor、动态访问、动态调用与动态构造能力
 - 面向读者：架构审核者、实现者、测试者、下游框架开发者和后续用户手册维护者
+- 现行用户手册：[中文版](user_guide.zh_CN.md) · [English](user_guide.md)
 - 历史参考：原 `rs-model-derive` 最终需求规范与目标 API 手册；当前下游已整合至
   `rs-model-metadata`，现行接口见[模型用户指南](../../rs-model-metadata/doc/user_guide.zh_CN.md)。
 
