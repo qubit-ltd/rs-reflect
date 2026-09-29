@@ -90,89 +90,7 @@ cargo run --example support_action
 
 三个目标均声明 `required-features = ["derive"]`，仅运行时构建会跳过它们。运行时 crate 的分发包包含这些源码，启用 `derive` 后也可在解包目录运行相同命令。上面的版本依赖用于选择已发布版本；源码检出的运行结果不能证明当前检出已发布或可从 registry 安装。
 
-记录类型、通用补丁逻辑和负责加载与保存的服务分属不同模块。下面把 `src/customers/model.rs`、`src/patch.rs` 与 `src/customer_service.rs` 收进一个库文件展示衔接关系；`CustomerRepository` 由应用接到实际存储。
-
-```rust,no_run
-// src/customers/model.rs
-pub mod customers {
-    use qubit_reflect::Reflect;
-
-    #[derive(Reflect)]
-    pub struct Customer {
-        #[reflect(read_only)]
-        pub id: u64,
-        pub email: String,
-        pub display_name: String,
-        pub credit_limit_cents: u64,
-    }
-}
-
-// src/patch.rs
-pub mod patch {
-    use qubit_reflect::{FieldAccessError, Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
-
-    pub struct FieldChange {
-        pub field: String,
-        pub value: ReflectedOwned,
-    }
-
-    pub enum PatchError {
-        UnknownField { field: String, value: ReflectedOwned },
-        ReadOnly { field: String, value: ReflectedOwned },
-        TypeMismatch { field: String, value: ReflectedOwned },
-        Failed { field: String, error: FieldAccessError },
-    }
-
-    pub fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
-        let descriptor = TypeDescriptor::of::<T>();
-        for change in changes {
-            let field_name = change.field;
-            let Some(field) = descriptor.field(&field_name) else {
-                return Err(PatchError::UnknownField { field: field_name, value: change.value });
-            };
-            if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
-                let (error, recovery) = failure.into_parts();
-                return Err(match (error, recovery) {
-                    (FieldAccessError::ReadOnly { .. }, Some(recovery)) => {
-                        PatchError::ReadOnly { field: field_name, value: recovery.into_value() }
-                    }
-                    (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => {
-                        PatchError::TypeMismatch { field: field_name, value: recovery.into_value() }
-                    }
-                    (error, _) => PatchError::Failed { field: field_name, error },
-                });
-            }
-        }
-        Ok(())
-    }
-}
-
-// src/customer_service.rs
-pub mod customer_service {
-    use crate::customers::Customer;
-    use crate::patch::{FieldChange, PatchError, apply_patch};
-
-    pub trait CustomerRepository {
-        fn load(&self, id: u64) -> Result<Customer, Box<dyn std::error::Error>>;
-        fn save(&self, customer: &Customer) -> Result<(), Box<dyn std::error::Error>>;
-    }
-
-    pub enum UpdateError {
-        Patch(PatchError),
-        Repository(Box<dyn std::error::Error>),
-    }
-
-    pub fn update_customer(
-        repository: &dyn CustomerRepository,
-        id: u64,
-        changes: Vec<FieldChange>,
-    ) -> Result<(), UpdateError> {
-        let mut customer = repository.load(id).map_err(UpdateError::Repository)?;
-        apply_patch(&mut customer, changes).map_err(UpdateError::Patch)?;
-        repository.save(&customer).map_err(UpdateError::Repository)
-    }
-}
-```
+完整的加载–补丁–保存服务流程放在[客服控制台用户指南](doc/user_guide.zh_CN.md#接入客服控制台)中，其中说明 `CustomerRepository` 如何连接应用存储，以及如何处理被拒绝的变更。[`customer_patch` example](examples/customer_patch.rs) 提供可运行示例。
 
 把请求解码为字段的 Rust 类型、判断调用者是否有权编辑记录，属于 API 层职责；`apply_patch` 只核对字段名、访问策略与精确类型。某条变更被拒绝时，前面的变更可能已写入内存中的结构体，但尚未调用 `save`，调用方丢弃已加载对象即可。完整错误模型见[用户手册](doc/user_guide.zh_CN.md#错误诊断与排障)。
 
@@ -201,6 +119,10 @@ pub mod customer_service {
 - [English README](README.md) · [English user guide](doc/user_guide.md)
 
 ## 测试
+
+以下命令在源码检出根目录运行。加载 Cargo workspace 时，即使未启用相关 feature，也会解析可选的
+`qubit-datatype` 与 `qubit-id` 路径清单；请先按上文准备本地路径依赖。通过 registry 使用已发布 crate
+的用户无需运行该脚本。
 
 ```bash
 # 使用默认 feature 集运行测试
