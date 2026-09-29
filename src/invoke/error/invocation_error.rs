@@ -39,7 +39,9 @@ use crate::invoke::InvocationErrorKind;
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InvocationError {
+    /// Exact rejected member identity, retained independently of the registry.
     method_identity: Box<MemberId>,
+    /// Machine-readable validation facts stored without consuming call inputs.
     kind: Box<InvocationErrorKind>,
 }
 

@@ -30,11 +30,11 @@ use crate::expression::GenericArgument;
 ///
 /// # Examples
 ///
-/// ```
+/// ```standalone_crate
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
+/// # #[cfg(feature = "derive")]
 /// use qubit_reflect::TypeDescriptor;
+/// #[cfg(feature = "derive")]
 /// mod example {
 ///     use qubit_reflect::{Reflect, reflect_impl};
 ///     #[derive(Reflect)]
@@ -57,7 +57,6 @@ use crate::expression::GenericArgument;
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
-/// }
 /// ```
 pub struct ImplDescriptor {
     /// Source declaration represented by this concrete application.

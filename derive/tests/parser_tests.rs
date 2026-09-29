@@ -19,9 +19,9 @@ use qubit_reflect_derive::Reflect;
 use qubit_reflect_derive::reflect;
 use qubit_reflect_derive::reflect_impl;
 
-#[derive(Reflect)]
+#[derive(Clone, Default, Reflect)]
 #[reflect(rename = "Record", capabilities(Clone, Default))]
-struct Record<T> {
+struct Record<T: Clone + Default> {
     #[reflect(rename = "identifier", read_only, no_construct, default)]
     id: u64,
     #[reflect(opaque)]
@@ -55,7 +55,7 @@ trait Service: Send {
 }
 
 #[reflect_impl(specialize(T = String))]
-impl<T> Record<T> {
+impl<T: Clone + Default> Record<T> {
     #[reflect(rename = "current", skip)]
     fn value(&self) -> &T {
         &self.value
@@ -67,7 +67,7 @@ trait ExternalFormat {
 }
 
 #[reflect_impl(external_trait_id = "example.ExternalFormat")]
-impl<T> ExternalFormat for Record<T> {
+impl<T: Clone + Default> ExternalFormat for Record<T> {
     fn format(&self) -> String {
         String::new()
     }

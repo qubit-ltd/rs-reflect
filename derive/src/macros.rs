@@ -13,15 +13,8 @@ use crate::ir::MacroKind;
 
 /// Derives structural reflection for a struct or enum.
 ///
-/// Generic facade macros may request `definition_provider_v2 = identifier`.
-/// It emits the caller-named provider using the facade's codegen protocol.
-/// Type-level helpers include `rename`, `opaque`, `capabilities(...)`, and
-/// `crate = path`; fields and variants support their corresponding policies.
-/// The macro rejects unions, duplicate query names, invalid helper placements,
-/// and conflicting policies with source-oriented compiler diagnostics.
-///
-/// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.md)
-/// for construction, capability, generic, and facade examples.
+/// Public usage and helper scopes are documented on the crate-root macro.
+/// This entry lowers derive input through the shared expansion pipeline.
 ///
 /// # Parameters
 ///
@@ -55,11 +48,8 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Reflects an inherent or trait implementation.
 ///
-/// `specialize(...)` registers selected concrete instances of a generic impl;
-/// `external_trait_id` gives a stable identity to an external trait
-/// implementation; and `crate = path` selects a downstream runtime facade.
-/// `thread_safe` and `catch_unwind` validate the generated boundary before
-/// emitting invocation code.
+/// Public usage and helper scopes are documented on the crate-root macro.
+/// This entry configures the internal carrier before impl expansion.
 ///
 /// # Parameters
 ///

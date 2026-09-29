@@ -44,11 +44,11 @@ pub(super) use self::trait_descriptor_builder::generic_argument_is_concrete;
 ///
 /// # Examples
 ///
-/// ```
+/// ```standalone_crate
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
+/// # #[cfg(feature = "derive")]
 /// use qubit_reflect::TypeDescriptor;
+/// #[cfg(feature = "derive")]
 /// mod example {
 ///     use qubit_reflect::{reflect, reflect_impl, Reflect};
 ///     #[derive(Reflect)]
@@ -76,7 +76,6 @@ pub(super) use self::trait_descriptor_builder::generic_argument_is_concrete;
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
-/// }
 /// ```
 pub struct TraitDescriptor {
     /// Declaration shared by every concrete application.

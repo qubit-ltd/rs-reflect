@@ -13,6 +13,18 @@ use crate::descriptor::TypeDescriptor;
 /// The sole public generic contract for types that provide a static reflection
 /// descriptor.
 ///
+/// Implementations must return the same immutable, process-lifetime root on
+/// every call, with `descriptor.type_id() == std::any::TypeId::of::<Self>()`.
+/// The implementation owns descriptor construction and concrete type identity;
+/// registration and capability aggregation belong to the selected registry.
+///
+/// [`TypeDescriptor::of`] checks the returned `TypeId` and panics on a
+/// mismatch. Calling [`Reflect::type_descriptor`] directly does not add that
+/// check and does not repair an invalid handwritten implementation. Registry
+/// aggregation reports registration conflicts as structured
+/// [`crate::error::RegistryError`] values; invalid implementations are not
+/// guaranteed to fail in one uniform way.
+///
 /// # Examples
 ///
 /// ```
@@ -26,7 +38,8 @@ pub trait Reflect: 'static {
     ///
     /// # Returns
     ///
-    /// The process-lifetime root descriptor for this concrete type.
+    /// The unique immutable root for this concrete type, carrying its exact
+    /// `TypeId`. Repeated calls must return the same descriptor address.
     #[must_use]
     fn type_descriptor() -> &'static TypeDescriptor;
 }

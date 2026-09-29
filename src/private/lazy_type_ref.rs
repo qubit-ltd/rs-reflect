@@ -21,7 +21,11 @@ use crate::descriptor::TypeRef;
 /// immutable and shared by every subsequent query.
 #[doc(hidden)]
 pub struct LazyTypeRef {
+    /// Deferred target lookup, kept separate from root construction to avoid
+    /// recursively resolving relationships while roots are being initialized.
     resolver: fn() -> TypeRef,
+    /// Publishes the first successful immutable resolution to all callers; a
+    /// panic during lookup leaves this cache uninitialized for a later retry.
     resolved: OnceLock<TypeRef>,
 }
 
