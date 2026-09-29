@@ -1334,7 +1334,7 @@ fn test_explicit_receiver_rejection_recovers_named_arguments_in_caller_order() {
         ],
     );
 
-    let Some(Err(failure)) = instance.invoke_local(
+    let Ok(Err(failure)) = instance.invoke_local(
         ReflectRegistry::initialize().expect("valid fixture registry"),
         invocation,
     ) else {
@@ -2285,7 +2285,7 @@ fn test_reflect_impl_generates_explicit_thread_safe_adapter() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     let output = adapter
         .invoke_thread_safe(

@@ -1,0 +1,134 @@
+error[E0277]: `std::rc::Rc<()>` cannot be sent between threads safely
+  --> tests/ui/fail/dispatch_local_send_tests.rs:25:24
+   |
+25 |     std::thread::spawn(move || drop(unavailable));
+   |     ------------------ -------^^^^^^^^^^^^^^^^^^
+   |     |                  |
+   |     |                  `std::rc::Rc<()>` cannot be sent between threads safely
+   |     |                  within this `{closure@$DIR/tests/ui/fail/dispatch_local_send_tests.rs:25:24: 25:31}`
+   |     required by a bound introduced by this call
+   |
+   = help: within `{closure@$DIR/tests/ui/fail/dispatch_local_send_tests.rs:25:24: 25:31}`, the trait `Send` is not implemented for `std::rc::Rc<()>`
+note: required because it appears within the type `PhantomData<std::rc::Rc<()>>`
+  --> $RUST/core/src/marker.rs
+   |
+   | pub struct PhantomData<T: PointeeSized>;
+   |            ^^^^^^^^^^^
+note: required by a bound in `spawn`
+  --> $RUST/std/src/thread/functions.rs
+   |
+   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+   |        ----- required by a bound in this function
+...
+   |     F: Send + 'static,
+   |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `(dyn std::any::Any + 'static)` cannot be shared between threads safely
+  --> tests/ui/fail/dispatch_local_send_tests.rs:25:24
+   |
+25 |     std::thread::spawn(move || drop(unavailable));
+   |     ------------------ ^^^^^^^^^^^^^^^^^^^^^^^^^ `(dyn std::any::Any + 'static)` cannot be shared between threads safely
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = help: the trait `Sync` is not implemented for `(dyn std::any::Any + 'static)`
+   = note: required for `&(dyn std::any::Any + 'static)` to implement `Send`
+note: required because it appears within the type `qubit_reflect::value::storage::LocalRefStorage<'_>`
+  --> src/value/storage.rs
+   |
+   | pub enum LocalRefStorage<'a> {
+   |          ^^^^^^^^^^^^^^^
+note: required because it appears within the type `DynamicRef<'_, qubit_reflect::value::Local>`
+  --> src/value/dynamic_ref.rs
+   |
+   | pub struct DynamicRef<'a, M: Mode> {
+   |            ^^^^^^^^^^
+note: required because it appears within the type `InvocationReceiver<'_, qubit_reflect::value::Local>`
+  --> src/invoke/receiver.rs
+   |
+   | pub enum InvocationReceiver<'call, M: InvocationMode> {
+   |          ^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `Option<InvocationReceiver<'_, qubit_reflect::value::Local>>`
+  --> $RUST/core/src/option.rs
+   |
+   | pub enum Option<T> {
+   |          ^^^^^^
+note: required because it appears within the type `Invocation<'_, qubit_reflect::value::Local>`
+  --> src/invoke/invocation/invocation.rs
+   |
+   | pub struct Invocation<'call, M: InvocationMode> {
+   |            ^^^^^^^^^^
+note: required because it appears within the type `InvocationUnavailable<Invocation<'_, qubit_reflect::value::Local>>`
+  --> src/invoke/dispatch/invocation_unavailable.rs
+   |
+   | pub struct InvocationUnavailable<I> {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+note: required because it's used within this closure
+  --> tests/ui/fail/dispatch_local_send_tests.rs:25:24
+   |
+25 |     std::thread::spawn(move || drop(unavailable));
+   |                        ^^^^^^^
+note: required by a bound in `spawn`
+  --> $RUST/std/src/thread/functions.rs
+   |
+   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+   |        ----- required by a bound in this function
+...
+   |     F: Send + 'static,
+   |        ^^^^ required by this bound in `spawn`
+
+error[E0277]: `(dyn std::any::Any + 'static)` cannot be sent between threads safely
+  --> tests/ui/fail/dispatch_local_send_tests.rs:25:24
+   |
+25 |     std::thread::spawn(move || drop(unavailable));
+   |     ------------------ -------^^^^^^^^^^^^^^^^^^
+   |     |                  |
+   |     |                  `(dyn std::any::Any + 'static)` cannot be sent between threads safely
+   |     |                  within this `{closure@$DIR/tests/ui/fail/dispatch_local_send_tests.rs:25:24: 25:31}`
+   |     required by a bound introduced by this call
+   |
+   = help: within `{closure@$DIR/tests/ui/fail/dispatch_local_send_tests.rs:25:24: 25:31}`, the trait `Send` is not implemented for `(dyn std::any::Any + 'static)`
+   = note: required because it appears within the type `&mut (dyn std::any::Any + 'static)`
+note: required because it appears within the type `qubit_reflect::value::storage::LocalMutStorage<'_>`
+  --> src/value/storage.rs
+   |
+   | pub enum LocalMutStorage<'a> {
+   |          ^^^^^^^^^^^^^^^
+note: required because it appears within the type `DynamicMut<'_, qubit_reflect::value::Local>`
+  --> src/value/dynamic_mut.rs
+   |
+   | pub struct DynamicMut<'a, M: Mode> {
+   |            ^^^^^^^^^^
+note: required because it appears within the type `InvocationReceiver<'_, qubit_reflect::value::Local>`
+  --> src/invoke/receiver.rs
+   |
+   | pub enum InvocationReceiver<'call, M: InvocationMode> {
+   |          ^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `Option<InvocationReceiver<'_, qubit_reflect::value::Local>>`
+  --> $RUST/core/src/option.rs
+   |
+   | pub enum Option<T> {
+   |          ^^^^^^
+note: required because it appears within the type `Invocation<'_, qubit_reflect::value::Local>`
+  --> src/invoke/invocation/invocation.rs
+   |
+   | pub struct Invocation<'call, M: InvocationMode> {
+   |            ^^^^^^^^^^
+note: required because it appears within the type `InvocationUnavailable<Invocation<'_, qubit_reflect::value::Local>>`
+  --> src/invoke/dispatch/invocation_unavailable.rs
+   |
+   | pub struct InvocationUnavailable<I> {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+note: required because it's used within this closure
+  --> tests/ui/fail/dispatch_local_send_tests.rs:25:24
+   |
+25 |     std::thread::spawn(move || drop(unavailable));
+   |                        ^^^^^^^
+note: required by a bound in `spawn`
+  --> $RUST/std/src/thread/functions.rs
+   |
+   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
+   |        ----- required by a bound in this function
+...
+   |     F: Send + 'static,
+   |        ^^^^ required by this bound in `spawn`

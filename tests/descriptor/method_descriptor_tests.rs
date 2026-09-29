@@ -224,36 +224,36 @@ fn test_method_descriptor_builder_preserves_parameter_and_debug_field_order() {
 fn test_invocation_adapter_mode_availability_remains_distinct() {
     let registry = ReflectRegistry::initialize().expect("the fixture registry must initialize");
     let local = InvocationAdapter::local_with_catching(return_local, catch_local);
-    assert!(local.invoke_local(registry, Invocation::associated([])).is_some());
-    assert!(local.invoke_thread_safe(registry, Invocation::associated([])).is_none());
+    assert!(local.invoke_local(registry, Invocation::associated([])).is_ok());
+    assert!(local.invoke_thread_safe(registry, Invocation::associated([])).is_err());
     assert!(
         local
             .invoke_catching_local(registry, Invocation::associated([]))
-            .is_some()
+            .is_ok()
     );
     assert!(
         local
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
-            .is_none()
+            .is_err()
     );
     assert_eq!(local.catching_availability(), CatchingAvailability::Available);
 
     let thread_safe = InvocationAdapter::thread_safe_with_catching(return_thread_safe, catch_thread_safe);
-    assert!(thread_safe.invoke_local(registry, Invocation::associated([])).is_none());
+    assert!(thread_safe.invoke_local(registry, Invocation::associated([])).is_err());
     assert!(
         thread_safe
             .invoke_thread_safe(registry, Invocation::associated([]))
-            .is_some()
+            .is_ok()
     );
     assert!(
         thread_safe
             .invoke_catching_local(registry, Invocation::associated([]))
-            .is_none()
+            .is_err()
     );
     assert!(
         thread_safe
             .invoke_catching_thread_safe(registry, Invocation::associated([]))
-            .is_some()
+            .is_ok()
     );
     assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
 }

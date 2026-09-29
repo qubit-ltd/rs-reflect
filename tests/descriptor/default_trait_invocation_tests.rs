@@ -353,7 +353,7 @@ fn test_default_trait_adapter_supports_thread_safe_mode() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     let output = adapter
         .invoke_thread_safe(
@@ -409,7 +409,7 @@ fn test_default_trait_adapter_supports_catching_and_thread_safe_composition() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     let panic = match combined
         .invoke_catching_thread_safe(

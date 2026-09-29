@@ -166,7 +166,7 @@ fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none(),
+            .is_err(),
         "thread-safe capability must not be inferred as local"
     );
     let InvocationOutput::Future(future) = output else {
@@ -201,7 +201,7 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         ordinary
@@ -209,7 +209,7 @@ fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none(),
+            .is_err(),
         "thread-safe capability must require its explicit attribute"
     );
     let payload = match catch_unwind(AssertUnwindSafe(|| {
@@ -271,7 +271,7 @@ fn test_thread_safe_and_catching_attributes_compose_explicitly() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         catching
@@ -279,7 +279,7 @@ fn test_thread_safe_and_catching_attributes_compose_explicitly() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert_eq!(
         catching.adapter().unwrap().catching_availability(),

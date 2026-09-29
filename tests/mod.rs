@@ -12,7 +12,6 @@ mod access;
 #[cfg(feature = "derive")]
 mod construct;
 mod descriptor;
-#[cfg(feature = "derive")]
 mod invoke;
 mod registry;
 mod value;

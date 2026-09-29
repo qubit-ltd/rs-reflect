@@ -14,24 +14,31 @@ use crate::descriptor::method_descriptor::InvocationAdapter;
 use crate::descriptor::method_descriptor::InvocationUnavailableReason;
 use crate::descriptor::method_descriptor::MethodDescriptor;
 use crate::expression::GenericArgument;
+use crate::invoke::InvocationDispatchMode;
+use crate::invoke::InvocationDispatchReason;
+use crate::invoke::InvocationUnavailable;
 
 /// A concrete specialization of one method declaration.
 ///
 /// Invoke with the same registry used for lookup. Descriptor-aware entries
 /// bind named arguments before validating and adapting the receiver. A static
-/// mode without an entry returns `None`; pre-execution errors return
-/// `Some(Err(...))` with caller-ordered recovery. Outputs, futures, and
+/// mode without an entry returns `Err(InvocationUnavailable)` with unchanged
+/// input; selecting an entry returns `Ok(...)` containing its invocation
+/// result. Pre-execution validation failures are therefore `Ok(Err(...))`
+/// with caller-ordered recovery. Outputs, futures, and
 /// recovery retain input lifetimes without borrowing the selected registry.
 ///
 /// # Examples
 ///
-/// ```
+/// ```standalone_crate
 /// # #![allow(proc_macro_derive_resolution_fallback)]
-/// #[cfg(feature = "derive")]
-/// {
+/// # #[cfg(feature = "derive")]
 /// use qubit_reflect::TypeDescriptor;
+/// # #[cfg(feature = "derive")]
 /// use qubit_reflect::descriptor::MethodLookup;
+/// # #[cfg(feature = "derive")]
 /// use qubit_reflect::registry::ReflectRegistry;
+/// #[cfg(feature = "derive")]
 /// mod example {
 ///     use qubit_reflect::{Reflect, reflect_impl};
 ///     #[derive(Reflect)]
@@ -55,7 +62,6 @@ use crate::expression::GenericArgument;
 /// # }
 /// # #[cfg(not(feature = "derive"))]
 /// # fn main() {}
-/// }
 /// ```
 #[derive(Clone, Debug)]
 pub struct MethodInstanceDescriptor {
@@ -110,50 +116,6 @@ impl MethodInstanceDescriptor {
             adapter,
             Box::new([]),
             unavailable_reasons,
-        )
-    }
-
-    /// Binds and invokes this concrete method through its thread-safe
-    /// panic-catching adapter.
-    ///
-    /// Returns `None` when this instance has no explicitly generated
-    /// thread-safe catching adapter.
-    ///
-    /// `registry` selects receiver capabilities without global fallback.
-    /// Outputs, futures, and recovery borrow only invocation inputs, never
-    /// the registry.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `'call`: Lifetime of the receiver and argument borrows.
-    ///
-    /// # Parameters
-    ///
-    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
-    /// - `invocation`: Thread-safe receiver and arguments to bind and invoke.
-    ///
-    /// # Returns
-    ///
-    /// Returns `None` when no thread-safe catching adapter exists. Otherwise,
-    /// returns `Some(Ok(Ok(output)))` on success, `Some(Ok(Err(panic)))` when
-    /// the method panics, or `Some(Err(failure))` when validation fails.
-    ///
-    /// # Errors
-    ///
-    /// The outer error contains pre-execution binding or validation recovery;
-    /// the inner error contains a panic captured after validation.
-    #[must_use]
-    pub fn invoke_catching_thread_safe<'call>(
-        &self,
-        registry: &crate::registry::ReflectRegistry,
-        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
-    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>> {
-        let entry_point = self.adapter?.catching_thread_safe?;
-        Some(
-            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
-                Ok(invocation) => entry_point(registry, invocation),
-                Err(failure) => Err(failure),
-            },
         )
     }
 
@@ -329,9 +291,9 @@ impl MethodInstanceDescriptor {
     /// all occur before the generated adapter extracts any owned value. Their
     /// failures therefore retain the complete original invocation recovery.
     ///
-    /// Returns `None` when this instance has no local adapter. Otherwise the
-    /// result contains either the invocation output or a structured
-    /// pre-execution failure.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable. Otherwise the result contains either the
+    /// invocation output or a structured pre-execution failure.
     ///
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
@@ -348,9 +310,8 @@ impl MethodInstanceDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `None` when no local adapter exists, `Some(Ok(output))` on
-    /// success, or `Some(Err(failure))` when binding, validation, or adapter
-    /// execution reports a structured failure.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// # Errors
     ///
@@ -360,23 +321,44 @@ impl MethodInstanceDescriptor {
     /// # Panics
     ///
     /// Panics from the invoked Rust method propagate to the caller.
-    #[must_use]
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
     pub fn invoke_local<'call>(
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
-    ) -> Option<
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::Invocation<'call, crate::value::Local>,
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
             crate::invoke::InvocationFailure<'call, crate::value::Local>,
         >,
     > {
-        let entry_point = self.adapter?.local?;
-        Some(
-            invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(|invocation| entry_point(registry, invocation)),
-        )
+        let mode = InvocationDispatchMode::Local;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.local {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::MissingEntry,
+                    invocation,
+                ));
+            }
+        };
+        Ok(invocation
+            .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+            .and_then(|invocation| entry_point(registry, invocation)))
     }
 
     /// Binds and invokes this concrete method through its thread-safe adapter.
@@ -384,9 +366,9 @@ impl MethodInstanceDescriptor {
     /// Binding uses the same interleaved named/positional rules and complete
     /// pre-execution recovery contract as [`Self::invoke_local`].
     ///
-    /// Returns `None` when this instance has no explicitly generated
-    /// thread-safe adapter. Otherwise the result contains either the invocation
-    /// output or a structured pre-execution failure.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable. Otherwise the result contains either the
+    /// invocation output or a structured pre-execution failure.
     ///
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
@@ -403,9 +385,8 @@ impl MethodInstanceDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `None` when no thread-safe adapter exists, `Some(Ok(output))`
-    /// on success, or `Some(Err(failure))` when binding, validation, or adapter
-    /// execution reports a structured failure.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// # Errors
     ///
@@ -415,23 +396,44 @@ impl MethodInstanceDescriptor {
     /// # Panics
     ///
     /// Panics from the invoked Rust method propagate to the caller.
-    #[must_use]
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
     pub fn invoke_thread_safe<'call>(
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
-    ) -> Option<
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::ThreadSafe>,
             crate::invoke::InvocationFailure<'call, crate::value::ThreadSafe>,
         >,
     > {
-        let entry_point = self.adapter?.thread_safe?;
-        Some(
-            invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(|invocation| entry_point(registry, invocation)),
-        )
+        let mode = InvocationDispatchMode::ThreadSafe;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.thread_safe {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::MissingEntry,
+                    invocation,
+                ));
+            }
+        };
+        Ok(invocation
+            .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+            .and_then(|invocation| entry_point(registry, invocation)))
     }
 
     /// Binds and invokes this concrete method through its local panic-catching
@@ -443,12 +445,18 @@ impl MethodInstanceDescriptor {
     /// [`InvocationPanic`](crate::invoke::InvocationPanic), independently of
     /// binding or type-validation failures.
     ///
-    /// Returns `None` when this instance has no explicitly generated local
-    /// catching adapter.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
     /// the registry.
+    ///
+    /// Catching covers only the synchronous entry call. Panics while polling a
+    /// returned future propagate and are not captured by this entry.
+    /// Under `panic=abort`, a requested catching entry is unavailable. When the
+    /// ordinary entry for the same mode exists, dispatch reports `PanicAbort`;
+    /// if that ordinary entry is also missing, it reports `MissingEntry` first.
     ///
     /// # Type Parameters
     ///
@@ -461,22 +469,156 @@ impl MethodInstanceDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `None` when no local catching adapter exists. Otherwise,
-    /// returns `Some(Ok(Ok(output)))` on success, `Some(Ok(Err(panic)))` when
-    /// the method panics, or `Some(Err(failure))` when validation fails.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable. Otherwise, returns `Ok(Ok(Ok(output)))` on
+    /// success, `Ok(Ok(Err(panic)))` when the method panics, or
+    /// `Ok(Err(failure))` when validation fails.
     ///
     /// # Errors
     ///
-    /// The outer error contains pre-execution binding or validation recovery;
-    /// the inner error contains a panic captured after validation.
-    #[must_use]
+    /// The dispatch error retains the original input when no entry is
+    /// available. Within dispatched results, validation errors retain
+    /// pre-execution recovery; the innermost error contains a panic
+    /// captured after validation.
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
     pub fn invoke_catching_local<'call>(
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::Invocation<'call, crate::value::Local>,
-    ) -> Option<crate::invoke::CatchingInvocationResult<'call, crate::value::Local>> {
-        let entry_point = self.adapter?.catching_local?;
-        Some(
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::Invocation<'call, crate::value::Local>,
+        crate::invoke::CatchingInvocationResult<'call, crate::value::Local>,
+    > {
+        let mode = InvocationDispatchMode::CatchingLocal;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.catching_local {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    if adapter.local.is_none() {
+                        InvocationDispatchReason::MissingEntry
+                    } else {
+                        match adapter.catching_availability() {
+                            crate::descriptor::CatchingAvailability::NotRequested => {
+                                InvocationDispatchReason::CatchingNotRequested
+                            }
+                            crate::descriptor::CatchingAvailability::UnavailablePanicAbort => {
+                                InvocationDispatchReason::PanicAbort
+                            }
+                            crate::descriptor::CatchingAvailability::Available => {
+                                InvocationDispatchReason::MissingEntry
+                            }
+                        }
+                    },
+                    invocation,
+                ));
+            }
+        };
+        Ok(
+            match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
+                Ok(invocation) => entry_point(registry, invocation),
+                Err(failure) => Err(failure),
+            },
+        )
+    }
+
+    /// Binds and invokes this concrete method through its thread-safe
+    /// panic-catching adapter.
+    ///
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
+    ///
+    /// `registry` selects receiver capabilities without global fallback.
+    /// Outputs, futures, and recovery borrow only invocation inputs, never
+    /// the registry.
+    ///
+    /// Catching covers only the synchronous entry call. Panics while polling a
+    /// returned future propagate and are not captured by this entry.
+    /// Under `panic=abort`, a requested catching entry is unavailable. When the
+    /// ordinary entry for the same mode exists, dispatch reports `PanicAbort`;
+    /// if that ordinary entry is also missing, it reports `MissingEntry` first.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Lifetime of the receiver and argument borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `registry`: Immutable snapshot used to resolve receiver capabilities.
+    /// - `invocation`: Thread-safe receiver and arguments to bind and invoke.
+    ///
+    /// # Returns
+    ///
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable. Otherwise, returns `Ok(Ok(Ok(output)))` on
+    /// success, `Ok(Ok(Err(panic)))` when the method panics, or
+    /// `Ok(Err(failure))` when validation fails.
+    ///
+    /// # Errors
+    ///
+    /// The dispatch error retains the original input when no entry is
+    /// available. Within dispatched results, validation errors retain
+    /// pre-execution recovery; the innermost error contains a panic
+    /// captured after validation.
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
+    pub fn invoke_catching_thread_safe<'call>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::Invocation<'call, crate::value::ThreadSafe>,
+        crate::invoke::CatchingInvocationResult<'call, crate::value::ThreadSafe>,
+    > {
+        let mode = InvocationDispatchMode::CatchingThreadSafe;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.catching_thread_safe {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    if adapter.thread_safe.is_none() {
+                        InvocationDispatchReason::MissingEntry
+                    } else {
+                        match adapter.catching_availability() {
+                            crate::descriptor::CatchingAvailability::NotRequested => {
+                                InvocationDispatchReason::CatchingNotRequested
+                            }
+                            crate::descriptor::CatchingAvailability::UnavailablePanicAbort => {
+                                InvocationDispatchReason::PanicAbort
+                            }
+                            crate::descriptor::CatchingAvailability::Available => {
+                                InvocationDispatchReason::MissingEntry
+                            }
+                        }
+                    },
+                    invocation,
+                ));
+            }
+        };
+        Ok(
             match invocation.bind_arguments(self.effective_method().identity(), self.effective_method().parameters()) {
                 Ok(invocation) => entry_point(registry, invocation),
                 Err(failure) => Err(failure),
@@ -492,8 +634,8 @@ impl MethodInstanceDescriptor {
     /// The receiver remains typed and pinned throughout binding and adapter
     /// validation.
     ///
-    /// Returns `None` when this instance has no pinned shared adapter for the
-    /// exact receiver type `T`.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
@@ -511,9 +653,8 @@ impl MethodInstanceDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `None` when no adapter exists for `T`; otherwise returns
-    /// `Some(Ok(output))` on success or `Some(Err(failure))` when binding,
-    /// validation, or execution fails.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// # Errors
     ///
@@ -523,26 +664,56 @@ impl MethodInstanceDescriptor {
     /// # Panics
     ///
     /// Panics from the invoked Rust method propagate to the caller.
-    #[must_use]
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
+    // Keep dispatch and validation recovery explicit for the exact pinned T and call lifetime.
+    #[allow(clippy::type_complexity)]
     pub fn invoke_pinned_ref_local<'call, T: 'static>(
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
-    ) -> Option<
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
             crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
-        let entry_point = self
-            .adapter?
-            .pinned_ref_local?
-            .downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>()?;
-        Some(
-            invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(|invocation| entry_point(registry, invocation)),
-        )
+        let mode = InvocationDispatchMode::PinnedRefLocal;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.pinned_ref_local {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::MissingEntry,
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match entry_point.downcast_ref::<crate::invoke::PinnedRefAdapter<T, crate::value::Local>>() {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::PinnedReceiverTypeMismatch,
+                    invocation,
+                ));
+            }
+        };
+        Ok(invocation
+            .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+            .and_then(|invocation| entry_point(registry, invocation)))
     }
 
     /// Binds and invokes this concrete method through a typed local
@@ -553,8 +724,8 @@ impl MethodInstanceDescriptor {
     /// The receiver remains typed and pinned throughout binding and adapter
     /// validation.
     ///
-    /// Returns `None` when this instance has no pinned mutable adapter for the
-    /// exact receiver type `T`.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// `registry` selects receiver capabilities without global fallback.
     /// Outputs, futures, and recovery borrow only invocation inputs, never
@@ -573,9 +744,8 @@ impl MethodInstanceDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `None` when no adapter exists for `T`; otherwise returns
-    /// `Some(Ok(output))` on success or `Some(Err(failure))` when binding,
-    /// validation, or execution fails.
+    /// Returns an outer `Err` retaining the original input when the requested
+    /// entry is unavailable.
     ///
     /// # Errors
     ///
@@ -585,25 +755,55 @@ impl MethodInstanceDescriptor {
     /// # Panics
     ///
     /// Panics from the invoked Rust method propagate to the caller.
-    #[must_use]
+    #[must_use = "handle dispatch errors to recover the original invocation inputs"]
+    // Keep dispatch and validation recovery explicit for the exact pinned T and call lifetime.
+    #[allow(clippy::type_complexity)]
     pub fn invoke_pinned_mut_local<'call, T: 'static>(
         &self,
         registry: &crate::registry::ReflectRegistry,
         invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
-    ) -> Option<
+    ) -> crate::invoke::InvocationDispatchResult<
+        crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
         Result<
             crate::invoke::InvocationOutput<'call, crate::value::Local>,
             crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
         >,
     > {
-        let entry_point = self
-            .adapter?
-            .pinned_mut_local?
-            .downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>()?;
-        Some(
-            invocation
-                .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
-                .and_then(|invocation| entry_point(registry, invocation)),
-        )
+        let mode = InvocationDispatchMode::PinnedMutLocal;
+        let adapter = match self.adapter {
+            Some(adapter) => adapter,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::NoAdapter {
+                        reasons: self.unavailable_reasons.clone(),
+                    },
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match adapter.pinned_mut_local {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::MissingEntry,
+                    invocation,
+                ));
+            }
+        };
+        let entry_point = match entry_point.downcast_ref::<crate::invoke::PinnedMutAdapter<T, crate::value::Local>>() {
+            Some(entry_point) => entry_point,
+            None => {
+                return Err(InvocationUnavailable::new(
+                    mode,
+                    InvocationDispatchReason::PinnedReceiverTypeMismatch,
+                    invocation,
+                ));
+            }
+        };
+        Ok(invocation
+            .bind_arguments(self.effective_method().identity(), self.effective_method().parameters())
+            .and_then(|invocation| entry_point(registry, invocation)))
     }
 }
