@@ -1,5 +1,10 @@
 # Derive 契约与覆盖矩阵
 
+<!-- reflect-contract: coverage.configure=70 -->
+<!-- reflect-contract: coverage.parse=85 -->
+<!-- reflect-contract: coverage.validate=80 -->
+<!-- reflect-contract: coverage.expand=85 -->
+
 此矩阵区分编译器侧宏契约和 runtime 覆盖率。`scripts/check-derive-coverage.sh` 会运行 `qubit-reflect-derive` 和 consumer 包 `qubit-reflect` 的全部测试目标，因此 profile 同时包含 derive 单元测试和 consumer integration/UI 测试触发的过程宏调用。报告只汇总 derive crate 的 configure、parse、validate、expand 源码。各阶段行覆盖率下限分别为 configure 70%、parse 85%、validate 80%、expand 85%；缺少阶段、没有执行计数或低于下限都会使报告失败。
 
 | 契约 | 成功/失败 fixture | feature 或配置 | 预期结果 |

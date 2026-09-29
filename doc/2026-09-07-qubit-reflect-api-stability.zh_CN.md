@@ -1,11 +1,13 @@
 # `qubit-reflect` API 稳定性
 
+<!-- reflect-contract: dispatch.input_recovery=original-input -->
+
 - 日期：2026-09-07
-- 状态：适用于首个公开 `0.1` 候选的兼容性政策；该版本仍处于发布前阶段
+- 状态：内部 `0.1` 源码开发的兼容性政策；本文不验证 registry 发布状态
 - 范围：反射运行时、derive 生成代码、扩展 capability 与实现细节
 
 本政策明确 `qubit-reflect` 的四类使用者和扩展者所面对的兼容性边界。
-本 crate 当前以 `0.1` 版本供内部使用，尚无公开稳定版。在公开稳定版发布前，
+本政策针对内部 `0.1` 源码开发线；在明确公告稳定发布政策之前，
 可以协调实施破坏这些边界的变更，但必须同步更新运行时、派生宏、下游外观库
 及其契约测试。表中的路径是代表性示例；决定预期稳定级别的是边界及其承诺，
 而不是某一个文件名本身。只有未来稳定发布线的政策明确公告时，才承诺
@@ -18,6 +20,27 @@
 | Versioned Codegen | `derive/src/`、`src/private/codegen_v3/`、`derive/tests/`、`test-crates/model-facade-app/` | 生成代码与其私有协议成对版本化。`__private::codegen_v3` 这类协议只与声明它的运行时 generation 兼容；公共宏行为由 compile-pass/fail 测试持续覆盖。 | 公开稳定版发布前，协调后的变更可以替换或移除旧生成协议，无须保留兼容层。只有发布政策明确公告迁移窗口时，才在该窗口内保留旧 generation。 | 必须同步更新运行时、派生宏、下游 `rs-model-metadata` 外观库及其契约测试；重跑 derive 和下游 facade 测试、更新固定的 runtime/derive 配对，并在协议 generation 变化时迁移生成产物。 |
 | Internal | `src/private/`、`src/registry/interner.rs`、`tests/internal/`、`benches/` | 内部缓存、interner、登记 plumbing、benchmark 布局和仅测试使用的 helper 不承诺下游兼容性，但仍须保持已文档化的公共安全与确定性。 | 在公共行为和安全契约不变时，可以重构、拆分、替换或删除内部实现。 | 使用者无需迁移；维护者必须在同一变更中更新内部测试、benchmark 和追踪证据。 |
 
+## 2026-09-29：调用返回类型的破坏性变更
+
+本次变更破坏源码兼容性。`descriptor::InvocationAdapter` 和
+`MethodInstanceDescriptor` 各有六个消费调用方法，将外层 `Option` 改为
+`InvocationDispatchResult<I, R>`，共十二个：`invoke_local`、
+`invoke_thread_safe`、`invoke_catching_local`、`invoke_catching_thread_safe`、
+`invoke_pinned_ref_local`、`invoke_pinned_mut_local`。既有 `None`/`Some` 分支和
+`Option` 便利操作都必须迁移；此处不承诺兼容层。
+
+外层 `Err(InvocationUnavailable<I>)` 在绑定与执行前保留完整原始输入。
+`reason()` 给出分派原因，`into_invocation()` 或 `into_parts()` 用于取回输入。
+外层 `Ok` 保留原有校验和方法 panic 的结果层：普通校验失败仍走
+`InvocationRecovery` 或 pinned recovery，catching 仍将 `InvocationPanic`
+与校验错误分开。Pinned 接收者的 `T` 必须精确匹配；类型不符会返还原始
+`Pin` 和调用方顺序的绑定。进入方法后，不恢复已消费输入，也不撤销副作用。
+
+运行时函数指针别名（包括 `invoke::InvocationAdapter`）、生成适配器 ABI、
+`__private::codegen_v3`、模型 ABI v7 及 `definition_provider_v2` 均不变。
+描述符适配器类型与运行时函数指针别名是两个不同 API。本说明描述当前源码，
+不能作为候选版本已从 registry 发布的证据。
+
 ## 如何使用本政策
 
 普通使用者默认位于 Stable Application 边界。扩展作者应把 capability ID
@@ -27,5 +50,6 @@ runtime/derive/facade 版本变更。Internal 名称可以自由变化，但如�
 
 需求规范和追踪矩阵记录这些边界的可执行证据。特别是，`REQ-TYPE-030`
 要求严格 capability 查询保留 `Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`
-四种状态；旧的 `Option` 便利方法仍可以有意折叠这些状态。注册表的
+四种状态；可失败的便利查询将 `Missing` 映射为 `Ok(None)`、`Found` 映射为
+`Ok(Some(adapter))`，而 `FactOnly` 和 `AdapterTypeMismatch` 仍是错误。注册表的
 `capability_origin` 与 `capability_source` 另外保留能力来自 intrinsic 还是注册片段的来源信息。

@@ -119,7 +119,7 @@ Rust declarations
   不得产生未定义行为。
 - **REQ-SYS-007**：能从当前宏输入判断的错误必须在编译期报告；只有跨声明汇聚、运行时值和动态参数相关问题
   才可作为运行时错误。
-- **REQ-SYS-008**：公共 descriptor API、错误和宏行为必须具备 Rustdoc，且最终用户手册中的示例必须作为验收输入。 `rust` 示例必须逐块独立执行并验证断言；只编译和预期编译失败的例子须显式标记并说明理由。descriptor Debug 不得执行 provider。
+- **REQ-SYS-008**：公共 descriptor API、错误和宏行为必须具备 Rustdoc，且最终用户手册中的示例必须作为验收输入。 `rust` 示例必须逐块独立执行并验证断言；只编译和预期编译失败的例子须显式标记并说明理由。descriptor Debug 不得执行 provider。此前仅编译的 Rustdoc 边界示例必须实际执行断言；原生 example 必须在启用 derive 时运行，并随运行时包分发。
 - **REQ-SYS-009**：descriptor 图必须允许递归类型关系，但任何遍历或格式化都不得无限递归。
 - **REQ-SYS-010**：相同声明片段集合在不同编译、链接和查询中的成员次序必须确定；字段与 variant 采用源码顺序，
   分散 impl 不得采用链接器枚举顺序或首次查询线程决定次序。
@@ -476,8 +476,9 @@ assert_eq!(username.query_name(), Some("username"));
   capability。除 capability 自身提供的 adapter 外，它不支持逐字段/variant 构造。类型级 opaque 与字段级 opaque
   都必须是源码显式策略，禁止自动推断或降级。
 - **REQ-TYPE-030**：严格 capability 查询必须保留四种结构化状态：ID 缺失、仅有事实的 descriptor、adapter 契约类型
-  不匹配和找到可执行 adapter。旧的 `Option` 查询可以把非成功状态折叠为 `None`，但严格查询及其下游 provider
-  校验必须使用这些状态拒绝无效契约；不得仅凭缺失把契约错误解释为 capability 未登记。
+  不匹配和找到可执行 adapter。可失败的便利查询必须将 Missing 映射为 `Ok(None)`、Found 映射为
+  `Ok(Some(adapter))`，并将 FactOnly 与 AdapterTypeMismatch 保留为结构化 `Err`。下游 provider 校验必须
+  使用这些状态拒绝无效契约，不得把契约错误折叠为缺失。
 
 ## 4. 字段反射
 
@@ -522,7 +523,8 @@ impl FieldDescriptor {
 
 `ReflectedRef`、`ReflectedMut` 和 `ReflectedOwned` 是字段、构造等同步就地操作的规范本地 mode。线程安全 mode 的
 `SendReflectedRef`、`SendReflectedMut` 和 `SendReflectedOwned` 用于跨线程传递；类型显式标记 `thread_safe` 且
-编译期 bound 成立时，字段、构造、更新与调用均直接提供 `ThreadSafe` adapter。线程安全包装也可安全、不可逆地
+编译期 bound 成立时，字段、构造、更新与 owned-to-borrow bridge 提供 `ThreadSafe` adapter。线程安全方法
+调用必须在相关方法上独立标注 `#[reflect(thread_safe)]`，并满足生成代码的编译期 bound。线程安全包装也可安全、不可逆地
 降级为相应本地包装。不要求用户再实现或
 引用第二个公共 `ReflectValue` trait；这些包装类型必须通过受检泛型入口从 Rust 值构造。
 
@@ -641,10 +643,22 @@ impl MethodDescriptor {
 impl MethodInstanceDescriptor {
     pub fn declaration(&self) -> &'static MethodDescriptor;
     pub fn unavailable_reasons(&self) -> &[InvocationUnavailableReason];
-    pub fn invoke_local<'call>(&self, invocation: Invocation<'call, Local>)
-        -> Option<InvocationResult<'call, Local>>;
-    pub fn invoke_thread_safe<'call>(&self, invocation: Invocation<'call, ThreadSafe>)
-        -> Option<InvocationResult<'call, ThreadSafe>>;
+    pub fn invoke_local<'call>(
+        &self,
+        registry: &ReflectRegistry,
+        invocation: Invocation<'call, Local>,
+    ) -> InvocationDispatchResult<
+        Invocation<'call, Local>,
+        Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>>,
+    >;
+    pub fn invoke_thread_safe<'call>(
+        &self,
+        registry: &ReflectRegistry,
+        invocation: Invocation<'call, ThreadSafe>,
+    ) -> InvocationDispatchResult<
+        Invocation<'call, ThreadSafe>,
+        Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>>,
+    >;
 }
 
 impl ParameterDescriptor {
@@ -845,18 +859,64 @@ field.set(
 
 ## 10. 动态方法调用
 
-```rust,ignore
-let rename = TypeDescriptor::of::<User>()
-    .methods_named("rename")?
-    .exact_inherent()?;
+下面是使用当前公共 API 的完整独立程序：先从不可用的 catching 入口取回完整调用输入，明确选择普通本地入口；再故意传入错误类型，取回校验失败的原始参数，并确认用户对象没有被修改。
 
-rename.invoke(Invocation::borrowed_mut(
-    &mut user,
-    [ReflectedOwned::new(String::from("alice"))],
-))?;
+```rust
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::invoke::{InvocationArg, InvocationDispatchReason, InvocationErrorKind};
+use qubit_reflect::{Invocation, Reflect, ReflectRegistry, ReflectedMut, ReflectedOwned,
+                    TypeDescriptor, reflect_impl};
+
+#[derive(Reflect)]
+#[reflect(crate = qubit_reflect)]
+struct User { username: String }
+
+#[reflect_impl(crate = qubit_reflect)]
+impl User {
+    fn rename(&mut self, username: String) { self.username = username; }
+}
+
+fn main() {
+    let registry = ReflectRegistry::initialize().expect("valid declarations");
+    let MethodLookup::Unique(rename) = TypeDescriptor::of::<User>()
+        .methods_named_in(&registry, "rename") else { panic!("unique method") };
+    let mut user = User { username: String::from("bob") };
+    {
+        let input = Invocation::borrowed_mut(
+            ReflectedMut::new(&mut user),
+            [InvocationArg::Owned(ReflectedOwned::new(String::from("alice")))],
+        );
+        let Err(unavailable) = rename.invoke_catching_local(&registry, input) else {
+            panic!("catching was not requested")
+        };
+        assert!(matches!(unavailable.reason(), InvocationDispatchReason::CatchingNotRequested));
+        let input = unavailable.into_invocation();
+        rename.invoke_local(&registry, input)
+            .expect("ordinary entry exists")
+            .expect("valid receiver and arguments");
+    }
+    assert_eq!(user.username, "alice");
+    {
+        let invalid = Invocation::borrowed_mut(
+            ReflectedMut::new(&mut user),
+            [InvocationArg::Owned(ReflectedOwned::new(7_u64))],
+        );
+        let failure = rename.invoke_local(&registry, invalid)
+            .expect("ordinary entry exists")
+            .err().expect("exact String argument required");
+        assert!(matches!(failure.error().kind(), InvocationErrorKind::ArgumentTypeMismatch { .. }));
+        let (receiver, arguments) = failure.into_recovery().into_parts();
+        drop(receiver);
+        let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap() else {
+            panic!("original owned argument")
+        };
+        assert_eq!(value.downcast::<u64>().unwrap_or_else(|_| panic!("u64")), 7);
+    }
+    assert_eq!(user.username, "alice");
+}
 ```
 
-调用分为校验与执行两个阶段。实现必须在执行方法前完成 receiver、参数数量、顺序和值类型检查。
+调用依次包含入口选择与分派、绑定与校验、方法执行。入口不可用时，外层 `InvocationUnavailable` 在绑定前保留完整输入；入口存在但校验失败时，内层 `InvocationFailure` 保留既有 recovery。实现必须在执行方法前完成 receiver、参数数量、顺序和值类型检查。
 
 ```rust,ignore
 pub enum InvocationArg<'a, Mode> {
@@ -911,7 +971,7 @@ pub enum InvocationOutput<'call, Mode> {
 - **REQ-INV-012**：所有参与一次调用的借用必须安全重借用到共同的 `'call` 生命周期；借用输出使用该保守生命周期，
   同时必须记录 `BorrowOrigin::Receiver` 或参数索引集合。不得仅给出来源不明的单一生命周期；HRTB 在能以 `'call`
   实例化时生成适配器，否则只描述。
-- **REQ-INV-013**：进入用户代码前的任何校验失败都必须返回 `InvocationRecovery`：拥有 receiver 和参数按原顺序
+- **REQ-INV-013**：消费调用入口不可用时，必须在绑定与校验前通过外层 `InvocationUnavailable<I>` 原样返还完整输入，包括 pinned 精确 T 不符的拒绝。进入用户代码前的校验失败仍返回既有 `InvocationRecovery` 或 pinned recovery：拥有 receiver 和参数按原顺序
   返还，借用包装保持其原借用关系。进入用户代码后即遵循原签名的消费语义，不再承诺恢复已消费输入。
 - **REQ-INV-014**：非 receiver 参数必须由 `InvocationArg<'call, Mode>` 明确区分 owned、shared borrow 和
   mutable borrow。默认要求 passing mode 精确匹配；只允许把 mutable borrow 安全重借用为 shared borrow，不得把
@@ -1241,7 +1301,7 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
 - **REQ-ACCPT-036**：必须测试同一 external trait 通过不同源码别名但相同 `ExternalTraitId` 汇聚，并测试同一目标的
   重复 impl 身份或不可合并事实产生确定性错误。
 - **REQ-ACCPT-037**：必须测试 `qubit-reflect-derive` 的默认 re-export、直接依赖 derive crate 的高级用法，以及
-  Cargo 依赖重命名后的生成代码路径解析。
+  Cargo 依赖重命名后的生成代码路径解析，以及通过显式运行时外观库接入的同包原生 example。默认配置和分发包必须实际运行三个示例；无默认 feature 构建必须跳过要求 derive 的目标。
 - **REQ-ACCPT-038**：必须测试按 `TypeId`、重名 `type_name` 候选和全量枚举查询，并证明任意非 reflect attribute
   不会泄漏为底层 descriptor 或引入 `syn` 公共依赖。
 - **REQ-ACCPT-039**：必须测试 `str`、slice 和 `dyn Trait` 等 unsized descriptor、内建 `str` 借用包装与动态调用，

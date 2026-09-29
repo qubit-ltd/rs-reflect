@@ -1,4 +1,4 @@
-# qubit-reflect
+# Qubit Reflect（`rs-reflect`）
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
@@ -7,137 +7,198 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-`qubit-reflect` 让 Rust 程序在运行时按名称查询类型结构、访问字段和调用方法。它适合编写配置编辑器、通用框架和基础库的开发者：在类型声明处添加反射宏后，通用代码就能使用这些信息，无需再维护一份字段表或方法映射。反射代码由宏生成，可在稳定 Rust 上使用。
+<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: examples.native=cargo-example -->
 
-例如，配置编辑器收到字段名 `"name"` 时，可以读取 `User` 的当前名称，再用一个 `String` 修改它；类型不匹配时会返回错误，并保留尚未被消费的输入。业务程序仍然持有原来的 `User` 对象。
+`qubit-reflect` 帮助 Rust 后台服务用一套通用逻辑处理控制台发来的字段级 `PATCH`：请求只携带字段名（如 `email`、`credit_limit_cents`）和已由 API 层解码好的值，同一套界面还要能编辑客户、订单以及以后新增的记录类型。若每种类型各写一段 `match field_name { ... }`，分支很快就会和结构体定义脱节。本库让每种记录在声明处派生描述符，通用处理函数即可按名称查找字段、核对精确 Rust 类型与访问策略，再对应用仍持有的结构体读取或替换。反射代码由宏在稳定版 Rust 上生成。本库不负责把请求文本解析成 Rust 值，不提供序列化，也不替代业务校验与鉴权。
 
-如果业务代码已经知道要访问哪个字段，直接使用 `user.name` 即可。只有操作目标需要在运行时确定，或框架需要统一检查多种类型时，反射才有必要。本库不负责将表单字符串转换成 Rust 值，也不提供序列化或业务校验规则。
+## 客服控制台实战场景
 
-在反射 trait 与 impl 上，Rust 会先应用 `cfg` 和 `cfg_attr`，再校验反射 helper 并生成元数据。禁用成员会消失；`#[reflect(no_invoke)]` 则保留元数据，同时关闭动态调用。两者的区别与示例见用户指南。
+客户服务从仓储加载 `Customer { id, email, display_name, credit_limit_cents }`。API 层已把请求解码为带类型的变更，例如 `("email", String)`。通用 `apply_patch` 在 `TypeDescriptor::of::<Customer>()` 上按名称定位字段并调用 `set`。`id` 标注了 `#[reflect(read_only)]`，改主键会在触碰结构体前被拒绝；类型不匹配时同样拒绝，未消费的值会退回调用方。全部变更应用成功后，服务才保存客户。以后要让同一控制台编辑 `Order`，只需为 `Order` 派生 `Reflect`，`apply_patch` 与 HTTP 处理代码无须改动。
 
 ## 安装
-
-```toml
-[dependencies]
-qubit-reflect = { version = "0.1", path = "../rs-reflect" }
-```
-
-需要 Rust 1.94 或更高版本。请根据应用的 `Cargo.toml` 所在目录调整 `path`。
-
-当前检出用于准备 `0.1.0` 发布候选；发布到 registry 以及 registry 消费者验收是独立的后续步骤。在确认发布前，请使用 workspace 路径或经过批准的 Git 修订版，并确保 runtime 与 derive crate 来自同一仓库修订版。发布确认后，应用可使用：
 
 ```toml
 [dependencies]
 qubit-reflect = "0.1"
 ```
 
-默认已启用反射宏，下面的示例无需额外 feature。只使用运行时 API，或需要第三方类型的反射实现时，参阅手册的[依赖配置](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#选择依赖功能)。
+反射宏默认启用。仅使用运行时 API，或为第三方类型提供反射实现时，参阅用户手册的[依赖功能选择](doc/user_guide.zh_CN.md#选择依赖功能)。
 
 ## 快速开始
 
-假设正在编写一个根据类型结构生成表单的编辑器：它需要按字段名显示和修改对象，而业务代码仍然保有对象。只需在声明处派生描述符，按名称取得字段，再传入正确的借用包装器。真正执行前，适配器会检查目标类型、访问策略和替换值的精确 Rust 类型。
-
+<!-- reflect-source: examples/field_patch.rs -->
 ```rust
-use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
+use qubit_reflect::FieldAccessError;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectedMut;
+use qubit_reflect::ReflectedOwned;
+use qubit_reflect::ReflectedRef;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-struct User {
+#[reflect(crate = qubit_reflect)]
+struct Customer {
+    #[reflect(read_only)]
     id: u64,
-    name: String,
+    email: String,
+    credit_limit_cents: u64,
 }
 
+/// Runs the example and panics if a business assertion or reflection operation
+/// fails.
 fn main() {
-    let descriptor = TypeDescriptor::of::<User>();
-    let name = descriptor.field("name").expect("派生字段存在");
-    let mut user = User { id: 7, name: String::from("Ada") };
+    let descriptor = TypeDescriptor::of::<Customer>();
+    let mut customer = Customer {
+        id: 1001,
+        email: String::from("ada@example.com"),
+        credit_limit_cents: 50_000,
+    };
 
-    let current = name.get(ReflectedRef::new(&user)).expect("受检读取成功");
-    assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    let email = descriptor.field("email").expect("derived field");
+    email
+        .set(
+            ReflectedMut::new(&mut customer),
+            ReflectedOwned::new(String::from("ada@corp.example")),
+        )
+        .expect("exactly typed replacement");
+    assert_eq!(customer.email, "ada@corp.example");
 
-    name.set(
-        ReflectedMut::new(&mut user),
-        ReflectedOwned::new(String::from("Grace")),
-    )
-    .expect("替换值类型精确匹配");
-    assert_eq!(user.name, "Grace");
+    let current = email.get(ReflectedRef::new(&customer)).expect("shared read");
+    assert_eq!(
+        current.downcast_ref::<String>().map(String::as_str),
+        Some("ada@corp.example")
+    );
+
+    let id = descriptor.field("id").expect("derived field");
+    let failure = id
+        .set(ReflectedMut::new(&mut customer), ReflectedOwned::new(2002_u64))
+        .expect_err("read-only field rejects replacement");
+    assert!(matches!(failure.error(), FieldAccessError::ReadOnly { .. }));
+    assert_eq!(customer.id, 1001);
 }
 ```
 
-在采用上述依赖配置的二进制 crate 中，将示例保存为 `src/main.rs`，再运行 `cargo run`。程序会通过断言确认名称从 `Ada` 变为 `Grace`，随后正常退出。
 
-## 为什么需要它
+完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。同包 example 中，自动发现的 `crate` 会指向示例可执行程序，因此声明用 `#[reflect(crate = qubit_reflect)]` 和 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。在源码检出根目录运行：
 
-Rust 有意不提供不受限制的运行时反射。需要类型图、属性编辑器、插件发现或动态分发的框架，往往只能解析源码、另外维护一份类型结构定义，或在类型擦除时丢失所有权和线程安全边界。`qubit-reflect` 将这些约定留在 Rust 声明中：生成代码只暴露 Rust 能够证明安全的操作；即使某个操作不可用，描述符仍会保留结构事实。
+```bash
+cargo run --example field_patch
+cargo run --example customer_patch
+cargo run --example support_action
+```
 
-## 核心能力与边界
+三个目标均声明 `required-features = ["derive"]`，仅运行时构建会跳过它们。运行时 crate 的分发包包含这些源码，启用 `derive` 后也可在解包目录运行相同命令。上面的版本依赖用于选择已发布版本；源码检出的运行结果不能证明当前检出已发布或可从 registry 安装。
 
-- 分别描述具体运行时类型与泛型源码定义，并描述 trait、impl 及支持的内置类型族。
-- 受检字段读取、可变借用、字段替换、枚举分支判断和动态构造；执行前校验失败时，恢复对象会保留调用方传入并转移所有权的值。
-- 为受支持的方法生成调用适配器，区分本地模式与显式请求的线程安全模式。
-- 链接收集的注册片段与显式提供的注册片段使用同一套事务性校验，生成确定性的不可变注册表；它是解析具体类型与泛型定义有效能力的唯一公开入口，并提供类型安全的 `Clone`、`Default` 适配器。调用方也可以持有显式创建的不可变注册表快照。
-- 严格的类型化能力查询保留四种状态：`Missing`、`FactOnly`、`AdapterTypeMismatch` 和 `Found`。需要追溯来源时，注册表还会报告有效能力来自 `Intrinsic` 还是 `Registered`，并可返回贡献该能力的 `FragmentIdentity`。
-- 动态值明确区分 `Local` 与选择性启用的 `ThreadSafe` 边界；只有生成代码证明类型满足所需 `Send + Sync` 约束时，才会提供线程安全字段访问和构造。
+记录类型、通用补丁逻辑和负责加载与保存的服务分属不同模块。下面把 `src/customers/model.rs`、`src/patch.rs` 与 `src/customer_service.rs` 收进一个库文件展示衔接关系；`CustomerRepository` 由应用接到实际存储。
 
-反射能力有明确边界：不会转换数值、解析字符串、推导 `Into`，也不会把本地动态值升级为线程安全模式。`TypeId`、描述符地址和 trait 标记仅表示进程内身份，不能作为序列化或跨进程模型 ID。被禁用或暂不支持的操作仍可通过描述符发现，并给出结构化的不可用原因。
+```rust,no_run
+// src/customers/model.rs
+pub mod customers {
+    use qubit_reflect::Reflect;
 
-元组支持 0 到 32 个元素，可移植函数指针支持 0 到 32 个参数；超出该数量范围时不受支持，也不会获得 `Reflect` 实现。
+    #[derive(Reflect)]
+    pub struct Customer {
+        #[reflect(read_only)]
+        pub id: u64,
+        pub email: String,
+        pub display_name: String,
+        pub credit_limit_cents: u64,
+    }
+}
 
-当库或测试需要自行指定注册内容时，可以使用 `RegistrySnapshotBuilder`。
-[隔离快照](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#构建隔离的-registry-snapshot)、
-[能力冲突处理](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#迁移-effective-capability-查询)和
-[空结构体构造](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md#空结构体的构造方式)的操作步骤见用户指南。
-快照中的类型成员决定模型投影范围；能力专用目标仍可单独查询，并可通过
-`capability_only_type_targets` 检查。
-例如，可用 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`
-审计模型元数据能力的注册目标。
-若该能力指向的目标不是快照类型成员，`ModelRegistry::from_reflect_registry` 会返回
-`UnregisteredModelTarget`；用户指南说明了如何检查来源并修复注册。
+// src/patch.rs
+pub mod patch {
+    use qubit_reflect::{FieldAccessError, Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
 
-```rust
-use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-use qubit_reflect::TypeDescriptor;
-fn main() -> Result<(), qubit_reflect::RegistryError> {
-    let target = TypeDescriptor::of::<u32>();
-    let key = CapabilityKey::<u32>::new(
-        CapabilityId::new("example.limit").expect("合法的 capability ID"),
-    );
-    let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_type_with_capabilities(
-        target,
-        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-        source("type", 10),
-        source("capability", 11),
-    );
-    builder.add_type_capabilities(
-        TypeDescriptor::of::<u64>(),
-        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
-        source("capability", 12),
-    );
-    let snapshot = builder.build()?;
-    assert_eq!(snapshot.types().len(), 1);
-    assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
-    Ok(())
+    pub struct FieldChange {
+        pub field: String,
+        pub value: ReflectedOwned,
+    }
+
+    pub enum PatchError {
+        UnknownField { field: String, value: ReflectedOwned },
+        ReadOnly { field: String, value: ReflectedOwned },
+        TypeMismatch { field: String, value: ReflectedOwned },
+        Failed { field: String, error: FieldAccessError },
+    }
+
+    pub fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
+        let descriptor = TypeDescriptor::of::<T>();
+        for change in changes {
+            let field_name = change.field;
+            let Some(field) = descriptor.field(&field_name) else {
+                return Err(PatchError::UnknownField { field: field_name, value: change.value });
+            };
+            if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
+                let (error, recovery) = failure.into_parts();
+                return Err(match (error, recovery) {
+                    (FieldAccessError::ReadOnly { .. }, Some(recovery)) => {
+                        PatchError::ReadOnly { field: field_name, value: recovery.into_value() }
+                    }
+                    (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => {
+                        PatchError::TypeMismatch { field: field_name, value: recovery.into_value() }
+                    }
+                    (error, _) => PatchError::Failed { field: field_name, error },
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+// src/customer_service.rs
+pub mod customer_service {
+    use crate::customers::Customer;
+    use crate::patch::{FieldChange, PatchError, apply_patch};
+
+    pub trait CustomerRepository {
+        fn load(&self, id: u64) -> Result<Customer, Box<dyn std::error::Error>>;
+        fn save(&self, customer: &Customer) -> Result<(), Box<dyn std::error::Error>>;
+    }
+
+    pub enum UpdateError {
+        Patch(PatchError),
+        Repository(Box<dyn std::error::Error>),
+    }
+
+    pub fn update_customer(
+        repository: &dyn CustomerRepository,
+        id: u64,
+        changes: Vec<FieldChange>,
+    ) -> Result<(), UpdateError> {
+        let mut customer = repository.load(id).map_err(UpdateError::Repository)?;
+        apply_patch(&mut customer, changes).map_err(UpdateError::Patch)?;
+        repository.save(&customer).map_err(UpdateError::Repository)
+    }
 }
 ```
+
+把请求解码为字段的 Rust 类型、判断调用者是否有权编辑记录，属于 API 层职责；`apply_patch` 只核对字段名、访问策略与精确类型。某条变更被拒绝时，前面的变更可能已写入内存中的结构体，但尚未调用 `save`，调用方丢弃已加载对象即可。完整错误模型见[用户手册](doc/user_guide.zh_CN.md#错误诊断与排障)。
+
+### 启动时登记可反射的业务操作
+
+同一控制台还提供「冻结客户」等操作按钮：配置表存方法名，后端在已加载的记录上按名称调用。给 `impl` 块加上 `#[reflect_impl]`，在应用启动时调用 `ReflectRegistry::initialize()` 一次，后续通过 `TypeDescriptor::methods_named_in` 与 `invoke_local` 解析并执行操作。完整可运行代码见 [`examples/support_action.rs`](examples/support_action.rs)。`methods_named_in` 可能返回 `Missing`、`Unique` 或 `Ambiguous`，应用需分别处理。`invoke_local` 的外层 `Err(InvocationUnavailable)` 表示入口不可用，并保留完整原始输入；`Ok(Err(InvocationFailure))` 表示接收者或参数在方法体执行前未通过校验。普通调用会传播方法体内的 panic；捕获既要求方法标注 `#[reflect(catch_unwind)]`，也要求调用方选择可用的 catching 入口。可运行示例见 [`examples/support_action.rs`](examples/support_action.rs)；注册表初始化与方法查找见[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)。
+
+## 能力与边界
+
+- `#[derive(Reflect)]`、`#[reflect]`、`#[reflect_impl]` 在声明处为结构体、枚举、trait 和 impl 生成不可变描述符，可在稳定版 Rust 上使用。
+- `TypeDescriptor` 与 `FieldDescriptor` 通过 `ReflectedRef`、`ReflectedMut`、`ReflectedOwned` 提供受检的字段读取、可变借用和替换；`construct_struct`、`construct_tuple`、`construct_unit` 用命名或位置输入构造新值。
+- 字段属性 `rename`、`read_only`、`skip`、`no_construct`、`opaque` 和方法属性 `no_invoke` 只限制对应的动态操作，结构信息仍然可见；普通 `#[cfg]` 则会让成员整体消失。
+- 生成代码执行前的校验失败会返回结构化错误，并把调用方尚未被消费的输入一并退回：`FieldSetFailure`、`ConstructionRecovery`、`InvocationRecovery`。
+- `ReflectRegistry::initialize()` 把已链接的声明汇总成一份确定性的不可变注册表；`RegistrySnapshotBuilder` 让库和测试用显式事实构建隔离快照。两者都能解析方法以及 `Clone`、`Default` 等类型化能力，并区分能力处于 `Missing`、`FactOnly`、`AdapterTypeMismatch` 还是 `Found` 状态。
+- 泛型声明以定义的形式被描述；`#[reflect(specialize(...))]` 可为有限的具体实例生成调用入口。
+- 动态值默认是 `Local` 模式；`SendReflected*` 包装器和 `#[reflect(thread_safe)]` 只在生成代码能证明所需 `Send + Sync` 约束时提供线程安全边界。
+- 内置基础类型、文本、元组、数组、`Option`、序列、集合、映射、智能指针和函数指针的描述符；可选的 `ecosystem-types` 与 `qubit-types` feature 分别补充 `BigDecimal`、`chrono`、`Uuid` 以及 Qubit `Id`/`DataType` 的实现。
+
+反射能力有明确边界：不转换数值、不解析字符串、不推导 `Into`，也不会把本地动态值升级为线程安全模式。任意 Rust 类型不会自动可反射，必须派生或实现 `Reflect`。`TypeId`、描述符地址和 trait 标记只是进程内身份，不能用作序列化或跨进程的模型标识。生成的访问代码可以触及私有字段，因此反射策略不能替代应用鉴权。`unsafe` 函数、不支持的 ABI、可变参数、未特化的泛型和不透明的 `impl Trait` 返回值可以被描述，但不能动态调用。元组和函数指针描述符支持 0 到 32 个元素或参数。描述符和按类型缓存的能力会在整个进程生命周期内保留，初始化可能分配内存；关心开销时请按应用实际路径测量。详情见[用户手册](doc/user_guide.zh_CN.md#边界与实践清单)。
 
 ## 延伸阅读
 
-- [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
-- [Rustdoc 源码中的 API 概览](src/lib.rs)；在仓库根目录运行
-  `cargo doc --all-features --no-deps --open`，生成并打开完整参考文档
-- [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
-- [English design](doc/2026-09-03-qubit-reflect-design.md)
-- [中文 derive 契约矩阵](doc/derive-contract-matrix.zh_CN.md) · [Derive contract matrix](doc/derive-contract-matrix.md)
-- [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md) · [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md)
-- [中文版需求规范](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
-- [需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
-- [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)
-- [English traceability matrix](doc/2026-09-03-qubit-reflect-requirements-traceability.md)
-- [English README](README.md)
+- [用户手册](doc/user_guide.zh_CN.md)
+- [架构与详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md) · [derive 契约矩阵](doc/derive-contract-matrix.zh_CN.md)
+- [API 文档](https://docs.rs/qubit-reflect)
+- [English README](README.md) · [English user guide](doc/user_guide.md)
 
 ## 测试
 

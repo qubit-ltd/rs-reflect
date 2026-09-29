@@ -1,7 +1,16 @@
 # `qubit-reflect` 详细设计
 
+<!-- reflect-contract: panic.async_poll=not-caught -->
+<!-- reflect-contract: panic.abort=catching-unavailable -->
+<!-- reflect-contract: dispatch.input_recovery=original-input -->
+<!-- reflect-contract: coverage.configure=70 -->
+<!-- reflect-contract: coverage.parse=85 -->
+<!-- reflect-contract: coverage.validate=80 -->
+<!-- reflect-contract: coverage.expand=85 -->
+<!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
+
 - 日期：2026-09-03
-- 状态：`0.1.0` 发布候选准备中；registry 发布及发布后的消费者验收尚待完成
+- 状态：`0.1.0` 源码检出设计；本文不验证 registry 发布状态
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
 - 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
@@ -90,7 +99,7 @@ src/
 ├── registry/
 │   ├── registry_builder.rs     # 冲突检查与冻结前聚合
 │   ├── registry_snapshot_builder.rs      # 显式构建隔离 snapshot
-│   ├── registry.rs             # 只读查询
+│   ├── reflect_registry.rs     # 只读查询
 │   └── effective_type_view.rs  # 已解析的 impl/method 视图
 └── value/                      # local/thread-safe 动态值模式
 ```
@@ -242,8 +251,9 @@ derive IR 的 `FieldShapeIr` 记录 Unit/Named/Unnamed，具体描述符、泛�
 5. panic catching 只在显式声明且 unwind-safety bound 可证明时生成。
 
 库不做数值转换、字符串解析或 `Into` 推导。反射边界描述并执行准确 Rust 语义，不建立第二套隐式类型系统。
-类型级 ThreadSafe 生成覆盖字段 adapter、struct/variant 构造、struct update、owned-to-borrow bridge 与方法调用，
-共同形成一个 mode 契约。tuple 与可移植函数指针内建描述明确支持到 arity 32；arity 33 不提供 `Reflect` 实现。
+类型级 ThreadSafe 生成覆盖字段 adapter、struct/variant 构造、struct update 与 owned-to-borrow bridge。
+线程安全方法调用须在相关方法上单独标注 `#[reflect(thread_safe)]`，并满足生成代码的编译期 bound。
+tuple 与可移植函数指针内建描述明确支持到 arity 32；arity 33 不提供 `Reflect` 实现。
 
 所有普通、catching、thread-safe 和 pinned 调用入口都显式接受
 `&ReflectRegistry`。调用方先用 `methods_named_in(registry, ...)` 查找，
@@ -257,6 +267,12 @@ registry 借用，但仍受输入生命周期、Local/ThreadSafe 和 Pin 约束�
 并按调用者顺序保留全部输入；adapter 拒绝与 intrinsic 冲突分别保留结构化原因。
 静态不支持的签名仍无入口。`TypeDescriptor` 的 Debug 只输出结构事实，不查询
 capability，也不执行 provider。
+
+十二个消费调用入口（`descriptor::InvocationAdapter` 和 `MethodInstanceDescriptor` 各六个）以外层 `InvocationDispatchResult` 取代 `Option`。无入口时返回 `InvocationUnavailable<I>`，保存完整原始输入；分派在命名绑定、校验与执行之前拒绝，`into_invocation()` 可原样取回输入。普通调用的内层 `InvocationFailure` 仍携带既有 recovery；catching 的 `InvocationPanic` 层保持独立。Pinned 接收者要求精确 `T`，类型不符在绑定前返还完整 pinned 输入，不解除 pin。输出、Future、recovery 不借用 registry。
+
+异步 Future 在 poll 时的 panic 不由 invocation catching 捕获，反射也不执行 Future；异步方法不能声明 `catch_unwind`。`panic=abort` 下 catching 不可用：普通入口存在且请求捕获时返回 `PanicAbort`；捕获 panic 不撤销方法副作用。
+
+实际只读注册表实现路径是 `src/registry/reflect_registry.rs`。
 
 ## 7. 错误与诊断
 
@@ -305,8 +321,7 @@ head 修订只解析一次为精确 commit SHA，并写入验证证据。测量�
 采样前后的仓库及 lockfile 指纹用于明确检测源码漂移。
 
 Derive 覆盖独立于 runtime 覆盖采集 JSON 与 HTML 报告，并按 configure、parse、validate、expand 分组。
-阶段缺少可归属源码文件或执行行时报告失败；稳定基线建立前不设百分比门槛。编译器驱动的宏行为仍由 UI fixture
-验证，不能从 derive 库行覆盖率推断。
+阶段缺少可归属源码文件、没有执行行或低于行覆盖率下限时报告失败：configure 70%、parse 85%、validate 80%、expand 85%。实际门禁由 `scripts/check-derive-coverage.sh` 执行，详见[derive 契约矩阵](derive-contract-matrix.zh_CN.md)。编译器驱动的宏行为仍由 UI fixture 验证，不能从库行覆盖率推断。
 
 ## 9. 明确不做的事情
 

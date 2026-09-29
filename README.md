@@ -1,4 +1,4 @@
-# qubit-reflect
+# Qubit Reflect (`rs-reflect`)
 
 [![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
@@ -7,188 +7,208 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-`qubit-reflect` lets Rust programs inspect type structure, access fields, and
-invoke methods by name at runtime. It is for authors of configuration editors,
-frameworks, and libraries that need to work with multiple types without keeping
-a separate field table or method map. Reflection macros generate the required
-code at the declaration site and work on stable Rust.
+<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: examples.native=cargo-example -->
 
-For example, an editor receiving the field name `"name"` can read a `User`'s
-current name and replace it with a `String`. A type mismatch returns an error
-and preserves inputs that have not been consumed. The application continues
-to own the original `User` value.
+`qubit-reflect` solves a common problem inside a back-office service: a support console sends `PATCH` requests that name the field to change, such as `email` or `credit_limit_cents`, and the same screen must work for customers, orders, and every record type added later. Hand-written `match field_name { ... }` blocks per type drift out of sync with the structs they describe. This crate lets each record type derive its own descriptor at the declaration site, so one generic handler can find a field by name, check the exact Rust type and the declared access policy, and then read or replace the value on a struct the application still owns. Reflection macros generate the code on stable Rust. The crate does not parse request text into Rust values, serialize objects, or enforce business rules and authorization.
 
-If application code already knows the field, access `user.name` directly.
-Reflection is useful when the target is chosen at runtime or a framework must
-inspect different types uniformly. This crate does not convert form text into
-Rust values, serialize objects, or supply business validation rules.
+## A customer service example
 
-On reflected traits and impls, Rust applies `cfg` and `cfg_attr` before
-reflection validates helpers or emits metadata. A disabled member disappears;
-`#[reflect(no_invoke)]` instead keeps its metadata while disabling dynamic
-invocation. See the user guide for this distinction and its examples.
+A customer service loads `Customer { id, email, display_name, credit_limit_cents }` from its repository. The API layer has already decoded the request into typed changes, for example `("email", String)`. A generic `apply_patch` looks each field up by name on `TypeDescriptor::of::<Customer>()` and calls `set`. The `id` field is declared `#[reflect(read_only)]`, so the handler rejects attempts to change the primary key before touching the struct; a wrong value type is rejected the same way and the untouched value is handed back to the caller. Only after every change is applied does the service save the customer. Adding an `Order` type to the same console means deriving `Reflect` on it; the handler does not change.
 
 ## Installation
-
-```toml
-[dependencies]
-qubit-reflect = { version = "0.1", path = "../rs-reflect" }
-```
-
-Requires Rust 1.94 or later. Adjust `path` relative to your application's
-`Cargo.toml`.
-
-This checkout prepares the `0.1.0` release candidate; registry publication and
-registry-consumer verification are separate release steps. Until publication is
-confirmed, use the workspace path or an approved Git revision and keep the
-runtime and derive crate on the same repository revision. After publication,
-applications can use:
 
 ```toml
 [dependencies]
 qubit-reflect = "0.1"
 ```
 
-The reflection macros are enabled by default; the example below needs no extra
-features. For runtime-only use or third-party type implementations, see the
-[dependency profiles](doc/2026-08-29-qubit-reflect-user-guide.md#choose-dependency-features) in the guide.
+Reflection macros are enabled by default. For runtime-only use or reflection of third-party types, see the [dependency profiles](doc/user_guide.md#choose-dependency-features) in the user guide.
 
-## Quick Start
+## Quick start
 
-A schema-driven editor needs to display and replace a field selected by name,
-while ordinary application code continues to own the value. Derive the
-descriptor at the declaration site, find the field, then pass the appropriate
-borrow wrapper. The adapter validates the target, operation policy, and exact
-Rust type before it changes anything.
-
+<!-- reflect-source: examples/field_patch.rs -->
 ```rust
-use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, ReflectedRef, TypeDescriptor};
-
-#[derive(Reflect)]
-struct User {
-    id: u64,
-    name: String,
-}
-
-fn main() {
-    let descriptor = TypeDescriptor::of::<User>();
-    let name = descriptor.field("name").expect("derived field");
-    let mut user = User { id: 7, name: String::from("Ada") };
-
-    let current = name.get(ReflectedRef::new(&user)).expect("checked read");
-    assert_eq!(current.downcast_ref::<String>().map(String::as_str), Some("Ada"));
-
-    name.set(
-        ReflectedMut::new(&mut user),
-        ReflectedOwned::new(String::from("Grace")),
-    )
-    .expect("exactly typed replacement");
-    assert_eq!(user.name, "Grace");
-}
-```
-
-Save the example as `src/main.rs` in a binary crate using the dependency above,
-then run `cargo run`. It exits successfully after checking that the name changes
-from `Ada` to `Grace`.
-
-## Why This Project Exists
-
-Rust deliberately does not offer unrestricted runtime reflection. Frameworks
-that need a type graph, a property editor, plug-in discovery, or dynamic
-dispatch often end up parsing source, maintaining a duplicate schema, or
-erasing values without preserving their ownership and thread-safety boundary.
-`qubit-reflect` keeps the contract in Rust declarations: generated code supplies
-only operations that Rust can prove safe, and descriptors retain structural
-facts even where an operation is unavailable.
-
-## What It Provides
-
-- Separate immutable descriptors for concrete runtime types and generic source
-  definitions, plus traits, implementations, and supported built-in families.
-- Checked field reads, mutable borrows, replacements, enum-branch checks, and
-  dynamic construction. Pre-execution validation failures preserve
-  caller-owned inputs in recovery objects.
-- Generated invocation adapters for supported methods, with local and
-  explicitly requested thread-safe modes.
-- A deterministic registry assembled from linked inventory or explicit facts. It is
-  the only public resolver for effective concrete and definition capabilities,
-  including typed `Clone` and `Default` adapters. Every registration path
-  uses the same transactional validator; callers may hold an explicit,
-  immutable registry snapshot instead of consulting the process-global result.
-- Strict typed capability lookup preserves four states: `Missing`, `FactOnly`,
-  `AdapterTypeMismatch`, and `Found`. When provenance matters, the registry also
-  reports whether an effective capability is `Intrinsic` or `Registered` and can
-  return the contributing `FragmentIdentity`.
-- Explicit `Local` and opt-in `ThreadSafe` dynamic boundaries. Thread-safe
-  field access and construction exist only for types whose generated code
-  proves the required `Send + Sync` bounds.
-
-Reflection is deliberately bounded. It does not coerce numeric values, parse
-strings, infer `Into`, or upgrade a local dynamic value to thread-safe mode.
-`TypeId`, descriptor addresses, and trait markers are process-local identity,
-not serialization or cross-process model identifiers. Unsupported or disabled
-operations remain visible as descriptors with structured unavailable reasons.
-Tuple and portable function-pointer descriptors support arities 0 through 32;
-arity 33 and above are unsupported and intentionally have no `Reflect` impl.
-
-Use `RegistrySnapshotBuilder` when a library or test needs an explicit set of
-registrations. The guide covers [isolated snapshots](doc/2026-08-29-qubit-reflect-user-guide.md#build-an-isolated-registry-snapshot),
-[capability conflicts](doc/2026-08-29-qubit-reflect-user-guide.md#migrating-effective-capability-queries),
-and [empty struct construction](doc/2026-08-29-qubit-reflect-user-guide.md#constructing-empty-structs).
-Snapshot type membership controls model projection; capability-only targets stay
-queryable and can be inspected with `capability_only_type_targets`.
-For example, inspect metadata registrations with
-`snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
-If that capability points to a target missing from snapshot type membership,
-`ModelRegistry::from_reflect_registry` returns `UnregisteredModelTarget`; the
-user guide explains how to inspect and repair that registration.
-
-```rust
-use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
-use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::FieldAccessError;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectedMut;
+use qubit_reflect::ReflectedOwned;
+use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
-fn main() -> Result<(), qubit_reflect::RegistryError> {
-    let target = TypeDescriptor::of::<u32>();
-    let key = CapabilityKey::<u32>::new(
-        CapabilityId::new("example.limit").expect("valid capability ID"),
+#[derive(Reflect)]
+#[reflect(crate = qubit_reflect)]
+struct Customer {
+    #[reflect(read_only)]
+    id: u64,
+    email: String,
+    credit_limit_cents: u64,
+}
+
+/// Runs the example and panics if a business assertion or reflection operation
+/// fails.
+fn main() {
+    let descriptor = TypeDescriptor::of::<Customer>();
+    let mut customer = Customer {
+        id: 1001,
+        email: String::from("ada@example.com"),
+        credit_limit_cents: 50_000,
+    };
+
+    let email = descriptor.field("email").expect("derived field");
+    email
+        .set(
+            ReflectedMut::new(&mut customer),
+            ReflectedOwned::new(String::from("ada@corp.example")),
+        )
+        .expect("exactly typed replacement");
+    assert_eq!(customer.email, "ada@corp.example");
+
+    let current = email.get(ReflectedRef::new(&customer)).expect("shared read");
+    assert_eq!(
+        current.downcast_ref::<String>().map(String::as_str),
+        Some("ada@corp.example")
     );
-    let source = |kind, line| FragmentIdentity::new("example", "fixture", line, 1, kind, line.into());
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_type_with_capabilities(
-        target,
-        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-        source("type", 10),
-        source("capability", 11),
-    );
-    builder.add_type_capabilities(
-        TypeDescriptor::of::<u64>(),
-        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
-        source("capability", 12),
-    );
-    let snapshot = builder.build()?;
-    assert_eq!(snapshot.types().len(), 1);
-    assert_eq!(snapshot.capability_only_type_targets("example.limit").len(), 1);
-    Ok(())
+
+    let id = descriptor.field("id").expect("derived field");
+    let failure = id
+        .set(ReflectedMut::new(&mut customer), ReflectedOwned::new(2002_u64))
+        .expect_err("read-only field rejects replacement");
+    assert!(matches!(failure.error(), FieldAccessError::ReadOnly { .. }));
+    assert_eq!(customer.id, 1001);
 }
 ```
 
-## Learn More
 
-- [English user guide](doc/2026-08-29-qubit-reflect-user-guide.md)
-- [中文用户指南](doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
-- [API overview in Rustdoc source](src/lib.rs); generate and open the full reference
-  from the repository root with `cargo doc --all-features --no-deps --open`
-- [English design](doc/2026-09-03-qubit-reflect-design.md)
-- [中文详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md)
-- [Derive contract matrix](doc/derive-contract-matrix.md) · [中文契约矩阵](doc/derive-contract-matrix.zh_CN.md)
-- [Evolution history](doc/2026-09-07-qubit-reflect-evolution.md) · [中文演进历史](doc/2026-09-07-qubit-reflect-evolution.zh_CN.md)
-- [Simplified Chinese requirements](doc/2026-08-28-qubit-reflect-requirements.zh_CN.md)
-- [English requirements](doc/2026-09-03-qubit-reflect-requirements.md)
-- [English traceability matrix](doc/2026-09-03-qubit-reflect-requirements-traceability.md)
-- [中文需求追踪矩阵](doc/2026-08-29-qubit-reflect-requirements-traceability.zh_CN.md)
-- [简体中文 README](README.zh_CN.md)
+The complete, runnable load–patch–save flow lives in
+[`examples/customer_patch.rs`](examples/customer_patch.rs). Method lookup and
+invocation are shown in [`examples/support_action.rs`](examples/support_action.rs).
+These are native examples of the runtime package. In same-package example targets,
+automatic crate discovery can resolve the runtime to `crate`, which refers to the
+example executable. The declarations explicitly select the runtime facade with
+`#[reflect(crate = qubit_reflect)]` and `#[reflect_impl(crate = qubit_reflect)]`.
+Run them from this source checkout:
+
+```bash
+cargo run --example field_patch
+cargo run --example customer_patch
+cargo run --example support_action
+```
+
+All three targets declare `required-features = ["derive"]`; a runtime-only build
+skips them. Their source files are included in the packaged runtime crate, so the
+same commands work in an extracted package when `derive` is enabled. The version
+dependency above selects a published release; source-checkout execution does not
+prove that this checkout has been published or installed from a registry.
+
+The record type, the generic patch logic, and the service that owns loading and saving live in different modules. The listing below condenses those three modules into one library file; `CustomerRepository` is an application interface that you connect to your actual store. This is library code without a program entry point, so it is compiled without execution:
+
+```rust,no_run
+pub mod customers {
+    use qubit_reflect::Reflect;
+
+    /// The record edited by the support console.
+    #[derive(Reflect)]
+    pub struct Customer {
+        #[reflect(read_only)]
+        pub id: u64,
+        pub email: String,
+        pub display_name: String,
+        pub credit_limit_cents: u64,
+    }
+}
+
+pub mod patch {
+    use qubit_reflect::{FieldAccessError, Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
+
+    /// One change already decoded by the API layer into the field's Rust type.
+    pub struct FieldChange {
+        pub field: String,
+        pub value: ReflectedOwned,
+    }
+
+    pub enum PatchError {
+        UnknownField { field: String, value: ReflectedOwned },
+        ReadOnly { field: String, value: ReflectedOwned },
+        TypeMismatch { field: String, value: ReflectedOwned },
+        Failed { field: String, error: FieldAccessError },
+    }
+
+    pub fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
+        let descriptor = TypeDescriptor::of::<T>();
+        for change in changes {
+            let field_name = change.field;
+            let Some(field) = descriptor.field(&field_name) else {
+                return Err(PatchError::UnknownField { field: field_name, value: change.value });
+            };
+            if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
+                let (error, recovery) = failure.into_parts();
+                return Err(match (error, recovery) {
+                    (FieldAccessError::ReadOnly { .. }, Some(recovery)) => {
+                        PatchError::ReadOnly { field: field_name, value: recovery.into_value() }
+                    }
+                    (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => {
+                        PatchError::TypeMismatch { field: field_name, value: recovery.into_value() }
+                    }
+                    (error, _) => PatchError::Failed { field: field_name, error },
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+pub mod service {
+    use crate::customers::Customer;
+    use crate::patch::{FieldChange, PatchError, apply_patch};
+
+    pub trait CustomerRepository {
+        fn load(&self, id: u64) -> Result<Customer, Box<dyn std::error::Error>>;
+        fn save(&self, customer: &Customer) -> Result<(), Box<dyn std::error::Error>>;
+    }
+
+    pub enum UpdateError {
+        Patch(PatchError),
+        Repository(Box<dyn std::error::Error>),
+    }
+
+    pub fn update_customer(
+        repository: &dyn CustomerRepository,
+        id: u64,
+        changes: Vec<FieldChange>,
+    ) -> Result<(), UpdateError> {
+        let mut customer = repository.load(id).map_err(UpdateError::Repository)?;
+        apply_patch(&mut customer, changes).map_err(UpdateError::Patch)?;
+        repository.save(&customer).map_err(UpdateError::Repository)
+    }
+}
+```
+
+The API layer decodes request text into each field's Rust type and checks that the caller may edit the record; `apply_patch` only verifies field names, access policy, and exact types. When a change is rejected, earlier changes may already sit in the in-memory struct, but nothing has been saved because `update_customer` returns before `save`. See the [user guide](doc/user_guide.md#errors-diagnostics-and-troubleshooting) for the full error model.
+
+### Register reflected actions at startup
+
+The same console offers action buttons such as “Suspend customer”. Their configuration table stores a method name, and the backend invokes that method on the loaded record. Annotate the implementation with `#[reflect_impl]`, call `ReflectRegistry::initialize()` once during application startup, then resolve actions with `TypeDescriptor::methods_named_in` and `invoke_local`. The runnable flow is in [`examples/support_action.rs`](examples/support_action.rs). `methods_named_in` returns `Missing`, `Unique`, or `Ambiguous`; handle each case in application code. `invoke_local` returns an outer `Err(InvocationUnavailable)` when no entry is available, preserving the complete original input, and `Ok(Err(InvocationFailure))` when receiver or argument validation failed before the method body ran. Ordinary invocation propagates method-body panics; capture requires both `#[reflect(catch_unwind)]` and an available catching entry selected by the caller. A runnable version is in [`examples/support_action.rs`](examples/support_action.rs); registry initialization and method lookup are covered in the [user guide](doc/user_guide.md#invoke-methods).
+
+## What it provides
+
+- `#[derive(Reflect)]`, `#[reflect]`, and `#[reflect_impl]` generate immutable descriptors for structs, enums, traits, and implementations at the declaration site, on stable Rust.
+- `TypeDescriptor` and `FieldDescriptor` provide checked field reads, mutable borrows, and replacements through `ReflectedRef`, `ReflectedMut`, and `ReflectedOwned`; `construct_struct`, `construct_tuple`, and `construct_unit` build values from named or positional inputs.
+- Field attributes `rename`, `read_only`, `skip`, `no_construct`, `opaque`, and method attribute `no_invoke` limit a dynamic operation while keeping the structural fact visible; ordinary `#[cfg]` removes the member entirely.
+- Validation failures before generated code runs return structured errors together with the caller's untouched inputs: `FieldSetFailure`, `ConstructionRecovery`, and `InvocationRecovery`.
+- `ReflectRegistry::initialize()` assembles one deterministic, immutable registry from linked declarations; `RegistrySnapshotBuilder` builds an isolated snapshot from explicit facts for libraries and tests. Both resolve methods and typed capabilities such as `Clone` and `Default`, and report whether a capability is `Missing`, `FactOnly`, `AdapterTypeMismatch`, or `Found`.
+- Generic declarations are described as definitions; `#[reflect(specialize(...))]` makes a finite concrete instance callable.
+- `Local` dynamic values are the default; `SendReflected*` wrappers and `#[reflect(thread_safe)]` provide a thread-safe boundary only where generated code proves the required `Send + Sync` bounds.
+- Built-in descriptors for primitives, text, tuples, arrays, `Option`, sequences, sets, maps, smart pointers, and function pointers; optional `ecosystem-types` and `qubit-types` features add `BigDecimal`, `chrono`, `Uuid`, and Qubit `Id`/`DataType` implementations.
+
+Reflection is deliberately bounded. It does not coerce numeric values, parse strings, infer `Into`, or upgrade a local dynamic value to thread-safe mode. Arbitrary Rust types are not reflectable until they derive or implement `Reflect`. `TypeId`, descriptor addresses, and trait markers are process-local identity, not serialization or cross-process model identifiers. Generated access code can reach private fields, so reflection policies do not replace application authorization. Unsafe functions, unsupported ABIs, variadics, unspecialized generics, and opaque `impl Trait` returns are described but not callable. Tuple and function-pointer descriptors support arities 0 through 32. Descriptors and per-type capability caches stay alive for the whole process, and initialization may allocate; measure the paths your application uses if overhead matters. See the [user guide](doc/user_guide.md#boundaries-and-a-practice-checklist).
+
+## Learn more
+
+- [User guide](doc/user_guide.md)
+- [Architecture and design](doc/2026-09-03-qubit-reflect-design.md) · [Derive contract matrix](doc/derive-contract-matrix.md)
+- [API reference](https://docs.rs/qubit-reflect)
+- [中文 README](README.zh_CN.md) · [中文用户手册](doc/user_guide.zh_CN.md)
 
 ## Testing
 
