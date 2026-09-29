@@ -1,0 +1,22 @@
+# Retired: the root package now owns these native Cargo examples.
+# Kept as a historical auxiliary manifest; excluded from the workspace.
+[package]
+name = "qubit-reflect-readme-examples"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+qubit-reflect = { path = "../..", features = ["derive"] }
+
+[[bin]]
+name = "field_patch"
+path = "../../examples/field_patch.rs"
+
+[[bin]]
+name = "customer_patch"
+path = "../../examples/customer_patch.rs"
+
+[[bin]]
+name = "support_action"
+path = "../../examples/support_action.rs"
