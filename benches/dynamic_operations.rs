@@ -122,7 +122,7 @@ fn dynamic_operations(criterion: &mut Criterion) {
                     registry,
                     Invocation::borrowed_mut(DynamicMut::<Local>::new(&mut value), []),
                 );
-                black_box(output.is_some());
+                black_box(output.is_ok());
             },
             BatchSize::SmallInput,
         );

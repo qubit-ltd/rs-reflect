@@ -6,13 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Crate-internal tests for contracts that cannot be constructed through the
-//! public API.
+//! Crate-internal invocation dispatch contract tests.
 
-mod api_gap_tests;
-mod construct;
-mod descriptor;
-mod invoke;
-mod private;
-mod registry;
-mod value;
+mod invocation_unavailable_tests;

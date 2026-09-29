@@ -92,6 +92,6 @@ fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catch
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_none()
+            .is_err()
     );
 }

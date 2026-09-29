@@ -5,7 +5,7 @@ error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
    |          ^^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
    |
    = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
-note: required by a bound in `DynamicRef::<'a, ThreadSafe>::new`
+note: required by a bound in `DynamicRef::<'a, qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_ref.rs
    |
    |     pub fn new<T: Sized + 'static + Sync>(value: &'a T) -> Self {
@@ -19,7 +19,7 @@ error[E0277]: `std::rc::Rc<u8>` cannot be sent between threads safely
    |          ^^^^^^^ `std::rc::Rc<u8>` cannot be sent between threads safely
    |
    = help: the trait `Send` is not implemented for `std::rc::Rc<u8>`
-note: required by a bound in `DynamicMut::<'a, ThreadSafe>::new`
+note: required by a bound in `DynamicMut::<'a, qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_mut.rs
    |
    |     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
@@ -33,7 +33,7 @@ error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
    |          ^^^^^^^ `std::rc::Rc<u8>` cannot be shared between threads safely
    |
    = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
-note: required by a bound in `DynamicMut::<'a, ThreadSafe>::new`
+note: required by a bound in `DynamicMut::<'a, qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_mut.rs
    |
    |     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
@@ -52,7 +52,7 @@ note: required because it appears within the type `LocalOnly`
    |
 15 | struct LocalOnly {
    |        ^^^^^^^^^
-note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
+note: required by a bound in `DynamicOwned::<qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_owned.rs
    |
    |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {
@@ -71,7 +71,7 @@ note: required because it appears within the type `LocalOnly`
    |
 15 | struct LocalOnly {
    |        ^^^^^^^^^
-note: required by a bound in `DynamicOwned::<ThreadSafe>::new`
+note: required by a bound in `DynamicOwned::<qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_owned.rs
    |
    |     pub fn new<T: 'static + Send + Sync>(value: T) -> Self {

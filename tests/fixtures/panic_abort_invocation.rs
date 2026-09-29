@@ -11,6 +11,12 @@
 use qubit_reflect::Reflect as ReflectDerive;
 #[cfg(panic = "abort")]
 use qubit_reflect::descriptor;
+#[cfg(panic = "abort")]
+use qubit_reflect::invoke::Invocation;
+#[cfg(panic = "abort")]
+use qubit_reflect::invoke::InvocationDispatchMode;
+#[cfg(panic = "abort")]
+use qubit_reflect::invoke::InvocationDispatchReason;
 use qubit_reflect::reflect_impl as reflect_impl_macro;
 #[cfg(panic = "abort")]
 use qubit_reflect::registry;
@@ -42,4 +48,11 @@ fn main() {
         adapter.catching_availability(),
         descriptor::CatchingAvailability::UnavailablePanicAbort
     );
+    let result = method.invoke_catching_local(registry, Invocation::associated([]));
+    let Err(unavailable) = result else {
+        panic!("abort mode cannot dispatch catching")
+    };
+    assert_eq!(unavailable.mode(), InvocationDispatchMode::CatchingLocal);
+    assert_eq!(unavailable.reason(), &InvocationDispatchReason::PanicAbort);
+    assert!(unavailable.into_invocation().arguments().is_empty());
 }

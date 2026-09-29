@@ -476,7 +476,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<Local>::associated([])
             )
-            .is_some()
+            .is_ok()
     );
     assert_eq!(
         local_adapter.catching_availability(),
@@ -489,7 +489,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<ThreadSafe>::associated([])
             )
-            .is_some()
+            .is_ok()
     );
     assert_eq!(
         thread_safe_adapter.catching_availability(),
@@ -600,7 +600,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<Local>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         adapter
@@ -608,7 +608,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<ThreadSafe>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         adapter
@@ -616,7 +616,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<Local>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         adapter
@@ -624,7 +624,7 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<ThreadSafe>::associated([])
             )
-            .is_none()
+            .is_err()
     );
 }
 
@@ -967,7 +967,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<Local>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         instance
@@ -975,7 +975,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<ThreadSafe>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         instance
@@ -983,7 +983,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<Local>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert!(
         instance
@@ -991,7 +991,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 reflect::invoke::Invocation::<ThreadSafe>::associated([])
             )
-            .is_none()
+            .is_err()
     );
     assert_eq!(
         instance

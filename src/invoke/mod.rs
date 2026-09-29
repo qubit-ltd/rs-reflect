@@ -15,6 +15,7 @@
 
 mod adapter;
 mod argument;
+mod dispatch;
 mod error;
 mod future;
 mod invocation;
@@ -30,6 +31,10 @@ pub use argument::ArgumentExpectation;
 pub use argument::InvocationArg;
 pub use argument::InvocationBinding;
 pub use argument::InvocationInputMode;
+pub use dispatch::InvocationDispatchMode;
+pub use dispatch::InvocationDispatchReason;
+pub use dispatch::InvocationDispatchResult;
+pub use dispatch::InvocationUnavailable;
 pub use error::InvocationError;
 pub use error::InvocationErrorKind;
 pub use error::InvocationPanic;

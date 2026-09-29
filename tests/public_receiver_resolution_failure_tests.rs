@@ -102,7 +102,7 @@ fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
             InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
         ],
     );
-    let Some(Err(failure)) = method.invoke_local(&registry, invocation) else {
+    let Ok(Err(failure)) = method.invoke_local(&registry, invocation) else {
         panic!("must fail before execution")
     };
     assert!(matches!(

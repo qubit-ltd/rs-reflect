@@ -7,7 +7,7 @@ error[E0277]: `std::rc::Rc<u8>` cannot be shared between threads safely
    |             required by a bound introduced by this call
    |
    = help: the trait `Sync` is not implemented for `std::rc::Rc<u8>`
-note: required by a bound in `DynamicRef::<'a, ThreadSafe>::new`
+note: required by a bound in `DynamicRef::<'a, qubit_reflect::value::ThreadSafe>::new`
   --> src/value/dynamic_ref.rs
    |
    |     pub fn new<T: Sized + 'static + Sync>(value: &'a T) -> Self {

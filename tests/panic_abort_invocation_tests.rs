@@ -15,6 +15,9 @@ use qubit_reflect::Reflect;
 use qubit_reflect::descriptor::CatchingAvailability;
 use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::descriptor::MethodQualifier;
+use qubit_reflect::invoke::Invocation;
+use qubit_reflect::invoke::InvocationDispatchMode;
+use qubit_reflect::invoke::InvocationDispatchReason;
 use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
@@ -41,4 +44,11 @@ fn test_abort_configuration_reports_requested_catching_as_unavailable() {
         adapter.catching_availability(),
         CatchingAvailability::UnavailablePanicAbort
     );
+    let result = method.invoke_catching_local(registry, Invocation::associated([]));
+    let Err(unavailable) = result else {
+        panic!("abort mode cannot dispatch catching")
+    };
+    assert_eq!(unavailable.mode(), InvocationDispatchMode::CatchingLocal);
+    assert_eq!(unavailable.reason(), &InvocationDispatchReason::PanicAbort);
+    assert!(unavailable.into_invocation().arguments().is_empty());
 }
