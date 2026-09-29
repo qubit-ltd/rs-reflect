@@ -7,6 +7,9 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
+<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: provider.qualified=custom-provider -->
+
 `qubit-reflect-derive` provides the `Reflect`, `reflect`, and `reflect_impl` procedural macros used to generate reflection metadata and checked operation adapters. Most applications should depend on `qubit-reflect` with its default `derive` feature, which re-exports these macros together with the matching runtime API. This crate is useful when a facade or macro integration needs to depend on the procedural macros directly.
 
 ## Installation
@@ -19,9 +22,11 @@ qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = fa
 qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
 ```
 
-This checkout prepares the `0.1.0` release candidate; direct registry installation becomes available after both crates are published and verified. Until then, keep the local checkout layout intact because `qubit-reflect` also uses the sibling `rust-common/rs-id` and `rust-common/rs-datatype` crates. Both crates require Rust 1.94 or later. For normal application code, depend on `qubit-reflect` with its default `derive` feature instead of adding the derive crate directly.
+This source-checkout recipe does not verify registry publication of the current
+checkout. Keep the local checkout layout intact because `qubit-reflect` also uses
+the sibling `rust-common/rs-id` and `rust-common/rs-datatype` crates. Both crates require Rust 1.94 or later. For normal application code, depend on `qubit-reflect` with its default `derive` feature instead of adding the derive crate directly.
 
-After publication, select both crates from the same release line:
+For registry dependencies, select published versions from the same release line:
 
 ```toml
 [dependencies]
@@ -38,6 +43,7 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
 #[derive(Reflect)]
+#[reflect(crate = qubit_reflect)]
 struct User {
     name: String,
 }
@@ -52,10 +58,23 @@ fn main() {
 
 The derive supports structs and enums. The `reflect` attribute describes traits, and `reflect_impl` describes inherent or trait implementations. Unsupported operations remain unavailable with structured metadata instead of bypassing Rust's type and ownership checks. The macros do not provide reflection storage or runtime operations; those belong to `qubit-reflect`.
 
+In same-package runtime examples, automatic discovery may select `crate`, the
+example executable. Use `#[reflect(crate = qubit_reflect)]` for derives and
+`#[reflect_impl(crate = qubit_reflect)]` for implementations to choose the runtime
+facade explicitly. Native runtime examples declare `required-features = ["derive"]`
+and are shipped in the runtime package; from the checkout root run
+`cargo run --example field_patch`, `cargo run --example customer_patch`, or
+`cargo run --example support_action`.
+
+In `#[reflect(capabilities(...))]`, bare `Clone`, `Default`, `Send`, and `Sync`
+select built-in capabilities. Qualified paths always select custom providers:
+`my_crate::Clone` calls `my_crate::Clone::<Self>()`, even though
+its final segment has the same spelling as a built-in.
+
 ## Learn More
 
-- [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.md)
-- [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-08-29-qubit-reflect-user-guide.zh_CN.md)
+- [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
+- [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.zh_CN.md)
 - [Runtime crate overview](https://github.com/qubit-ltd/rs-reflect/blob/main/README.md) · [简体中文 README](https://github.com/qubit-ltd/rs-reflect/blob/main/README.zh_CN.md)
 - [Procedural macro API documentation](https://github.com/qubit-ltd/rs-reflect/blob/main/derive/src/lib.rs)
 

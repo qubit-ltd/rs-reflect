@@ -1,5 +1,10 @@
 # Derive contract and coverage matrix
 
+<!-- reflect-contract: coverage.configure=70 -->
+<!-- reflect-contract: coverage.parse=85 -->
+<!-- reflect-contract: coverage.validate=80 -->
+<!-- reflect-contract: coverage.expand=85 -->
+
 This matrix separates compiler-facing macro contracts from runtime coverage. `scripts/check-derive-coverage.sh` runs all targets for both `qubit-reflect-derive` and the `qubit-reflect` consumer package, so its profile includes derive unit tests and proc-macro invocations exercised by the consumer's integration/UI tests. The report only aggregates files under the derive crate's configure, parse, validate, and expand stages. Its line-coverage floors are configure 70%, parse 85%, validate 80%, and expand 85%. Missing or unexecuted stages and stages below their floor fail the report.
 
 | Contract | Success/failure fixture | Feature or configuration | Expected result |

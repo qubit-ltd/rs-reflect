@@ -1,7 +1,16 @@
 # `qubit-reflect` Design
 
+<!-- reflect-contract: panic.async_poll=not-caught -->
+<!-- reflect-contract: panic.abort=catching-unavailable -->
+<!-- reflect-contract: dispatch.input_recovery=original-input -->
+<!-- reflect-contract: coverage.configure=70 -->
+<!-- reflect-contract: coverage.parse=85 -->
+<!-- reflect-contract: coverage.validate=80 -->
+<!-- reflect-contract: coverage.expand=85 -->
+<!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
+
 - Date: 2026-09-03
-- Status: `0.1.0` release candidate prepared; registry publication and post-publication consumer verification remain pending
+- Status: source-checkout design for `0.1.0`; this document does not verify registry publication
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
@@ -96,7 +105,7 @@ src/
 ├── registry/
 │   ├── registry_builder.rs     # conflict checks and pre-freeze aggregation
 │   ├── registry_snapshot_builder.rs      # explicit isolated snapshot construction
-│   ├── registry.rs             # immutable queries
+│   ├── reflect_registry.rs     # immutable queries
 │   └── effective_type_view.rs  # resolved impl and method view
 └── value/                      # local and thread-safe dynamic modes
 ```
@@ -284,8 +293,10 @@ and `Send + Sync` bounds. Field access, invocation, and construction follow the 
 The library performs no numeric conversion, string parsing, or `Into` inference. Reflection describes and executes
 exact Rust semantics rather than creating a second implicit type system.
 Generated type-level ThreadSafe support covers field adapters, struct/variant
-construction, struct update, owned-to-borrow bridges, and method invocation as
-one mode contract. Tuple and portable function-pointer built-ins deliberately
+construction, struct update, and owned-to-borrow bridges. Thread-safe method
+invocation must be requested separately with `#[reflect(thread_safe)]` on each
+relevant method and satisfy its generated compile-time bounds. Tuple and
+portable function-pointer built-ins deliberately
 stop at arity 32; arity 33 has no `Reflect` implementation.
 
 Every ordinary, catching, thread-safe, and pinned invocation entry explicitly
@@ -303,6 +314,24 @@ mistyped, or fact-only receiver capability in the selected snapshot returns
 and intrinsic conflicts retain distinct structured causes. Statically
 unsupported signatures still have no entry point. `TypeDescriptor` debug output
 prints structural facts without capability queries or provider execution.
+
+The twelve consuming entries (six each on `descriptor::InvocationAdapter`
+and `MethodInstanceDescriptor`) replace outer `Option` with
+`InvocationDispatchResult`. An unavailable entry returns `InvocationUnavailable<I>`
+with the complete original input, before named binding, validation, or execution;
+`into_invocation()` retrieves it unchanged. Ordinary inner `InvocationFailure`
+uses the existing recovery, and catching keeps its separate `InvocationPanic`
+layer. Pinned dispatch requires exact receiver `T`; a mismatch returns the
+original pinned input before binding and never weakens its pin guarantee.
+Outputs, futures, and recovery do not borrow the registry.
+
+Panics while polling an async future are not caught by invocation catching,
+and reflection does not execute the future. Async methods cannot request
+`catch_unwind`. Under `panic=abort`, catching is unavailable: an ordinary entry
+with requested capture reports `PanicAbort`. A caught panic does not undo method
+side effects.
+
+The immutable registry implementation is `src/registry/reflect_registry.rs`.
 
 ## 7. Errors and diagnostics
 
@@ -367,9 +396,10 @@ lockfile fingerprints before and after sampling make source drift explicit.
 Derive coverage is collected independently from runtime coverage into JSON and
 HTML reports. The summary groups instrumented files under configure, parse,
 validate, and expand, and fails when a stage has no file or executed line. It
-sets no percentage threshold until a stable baseline exists; compiler-driven
-macro behavior remains covered by UI fixtures rather than being inferred from
-library line coverage.
+enforces line-coverage floors of configure 70%, parse 85%, validate 80%, and
+expand 85% through `scripts/check-derive-coverage.sh`; see the
+[derive contract matrix](derive-contract-matrix.md). Compiler-driven macro
+behavior remains covered by UI fixtures rather than inferred from library coverage.
 
 ## 9. Explicit non-goals
 
