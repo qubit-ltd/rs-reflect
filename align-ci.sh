@@ -11,3 +11,8 @@ elif [ -f "$project_root/rustfmt.toml" ]; then
 fi
 "$project_root/.infra/tools/prepare-local-path-dependencies.sh"
 "$project_root/.infra/tools/infra-tool.sh" rs-infra-style --project "$project_root" fix "$@"
+if [ "${RUN_COVERAGE_IN_ALIGN:-0}" = 1 ]; then
+    "$project_root/.infra/tools/infra-tool.sh" rs-infra-coverage --project "$project_root" collect
+    "$project_root/.infra/tools/coverage-report.sh"
+    "$project_root/scripts/check-critical-coverage-report.sh" "$project_root/coverage.json"
+fi
