@@ -13,5 +13,7 @@ mod access;
 mod construct;
 mod descriptor;
 mod invoke;
+mod public_api_accessors_tests;
+mod public_capability_key_tests;
 mod registry;
 mod value;
