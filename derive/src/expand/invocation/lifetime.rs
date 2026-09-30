@@ -24,6 +24,7 @@ use crate::ir::TypeKindIr;
 /// # Returns
 ///
 /// Returns whether its type contains any non-static lifetime.
+#[must_use]
 pub(super) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) -> bool {
     matches!(return_type, ReturnTypeIr::Type(ty) if type_contains_non_static_lifetime(ty))
 }
@@ -37,14 +38,15 @@ pub(super) fn return_contains_non_static_lifetime(return_type: &ReturnTypeIr) ->
 /// # Returns
 ///
 /// Returns whether a non-static or unknown lifetime occurs in the type.
+#[must_use]
 fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_non_static_lifetime(path),
         TypeKindIr::Reference { .. } => true,
         TypeKindIr::Tuple(items) => items.iter().any(type_contains_non_static_lifetime),
-        TypeKindIr::Slice(element) | TypeKindIr::Array { element, .. } | TypeKindIr::Pointer { element, .. } => {
-            type_contains_non_static_lifetime(element)
-        }
+        TypeKindIr::Slice(element)
+        | TypeKindIr::Array { element, .. }
+        | TypeKindIr::Pointer { element, .. } => type_contains_non_static_lifetime(element),
         TypeKindIr::BareFunction {
             lifetimes,
             inputs,
@@ -53,7 +55,9 @@ fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
         } => {
             lifetimes.iter().any(|lifetime| lifetime != "'static")
                 || inputs.iter().any(type_contains_non_static_lifetime)
-                || output.as_deref().is_some_and(type_contains_non_static_lifetime)
+                || output
+                    .as_deref()
+                    .is_some_and(type_contains_non_static_lifetime)
         }
         TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
             bounds.iter().any(bound_contains_non_static_lifetime)
@@ -72,26 +76,36 @@ fn type_contains_non_static_lifetime(ty: &TypeIr) -> bool {
 /// # Returns
 ///
 /// Returns whether a non-static or unknown lifetime occurs in the path.
+#[must_use]
 fn path_contains_non_static_lifetime(path: &crate::ir::PathIr) -> bool {
     path.qualified_self
         .as_ref()
         .is_some_and(|qualified| type_contains_non_static_lifetime(&qualified.ty))
-        || path.segments.iter().any(|segment| match &segment.arguments {
-            PathArgumentsIr::None => false,
-            PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-                PathArgumentIr::Lifetime(lifetime) => lifetime != "'static",
-                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
-                    type_contains_non_static_lifetime(ty)
+        || path
+            .segments
+            .iter()
+            .any(|segment| match &segment.arguments {
+                PathArgumentsIr::None => false,
+                PathArgumentsIr::AngleBracketed(arguments) => {
+                    arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Lifetime(lifetime) => lifetime != "'static",
+                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                            type_contains_non_static_lifetime(ty)
+                        }
+                        PathArgumentIr::Constraint { bounds, .. } => {
+                            bounds.iter().any(bound_contains_non_static_lifetime)
+                        }
+                        PathArgumentIr::Other(_) => true,
+                        PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } => false,
+                    })
                 }
-                PathArgumentIr::Constraint { bounds, .. } => bounds.iter().any(bound_contains_non_static_lifetime),
-                PathArgumentIr::Other(_) => true,
-                PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } => false,
-            }),
-            PathArgumentsIr::Parenthesized { inputs, output } => {
-                inputs.iter().any(type_contains_non_static_lifetime)
-                    || output.as_deref().is_some_and(type_contains_non_static_lifetime)
-            }
-        })
+                PathArgumentsIr::Parenthesized { inputs, output } => {
+                    inputs.iter().any(type_contains_non_static_lifetime)
+                        || output
+                            .as_deref()
+                            .is_some_and(type_contains_non_static_lifetime)
+                }
+            })
 }
 
 /// Returns whether a bound retains a non-static lifetime.
@@ -103,11 +117,15 @@ fn path_contains_non_static_lifetime(path: &crate::ir::PathIr) -> bool {
 /// # Returns
 ///
 /// Returns whether the bound contains a non-static or unknown lifetime.
+#[must_use]
 fn bound_contains_non_static_lifetime(bound: &GenericBoundIr) -> bool {
     match bound {
         GenericBoundIr::Lifetime(lifetime) => lifetime != "'static",
-        GenericBoundIr::Trait { path, lifetimes, .. } => {
-            lifetimes.iter().any(|lifetime| lifetime != "'static") || path_contains_non_static_lifetime(path)
+        GenericBoundIr::Trait {
+            path, lifetimes, ..
+        } => {
+            lifetimes.iter().any(|lifetime| lifetime != "'static")
+                || path_contains_non_static_lifetime(path)
         }
         GenericBoundIr::Other(_) => true,
     }
@@ -168,12 +186,19 @@ mod tests {
 
     #[test]
     fn test_return_lifetime_detection_accepts_default_and_owned_outputs() {
-        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Unit));
-        assert!(!return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(
-            quote!(String)
-        ),)));
-        assert!(return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(
-            quote!(Wrapper<'a>)
-        ),)));
+        assert!(
+            !return_contains_non_static_lifetime(&ReturnTypeIr::Unit),
+            "unit returns do not carry a lifetime"
+        );
+        assert!(
+            !return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(quote!(String)),)),
+            "owned returns do not carry a borrow lifetime"
+        );
+        assert!(
+            return_contains_non_static_lifetime(&ReturnTypeIr::Type(parsed_type(quote!(
+                Wrapper<'a>
+            )),)),
+            "a return type with a non-static argument lifetime must be detected"
+        );
     }
 }

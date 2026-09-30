@@ -57,6 +57,7 @@ impl EnumReprIr {
     ///
     /// Returns the integer type spelling, or `None` for non-integer
     /// representations.
+    #[must_use]
     pub(super) fn integer_name(&self) -> Option<&'static str> {
         match self {
             Self::I8 => Some("i8"),
@@ -84,6 +85,7 @@ impl EnumReprIr {
     /// # Returns
     ///
     /// Returns tokens for the corresponding runtime representation value.
+    #[must_use]
     pub(super) fn descriptor_tokens(&self, facade: &TokenStream) -> TokenStream {
         match self {
             Self::Rust => {
@@ -173,8 +175,15 @@ mod tests {
                 _ => format!("EnumRepr :: {expected_variant}"),
             };
 
-            assert!(tokens.to_string().contains(&expected), "{representation:?}: {tokens}");
-            assert_eq!(representation.integer_name(), integer_name, "{representation:?}");
+            assert!(
+                tokens.to_string().contains(&expected),
+                "{representation:?}: {tokens}"
+            );
+            assert_eq!(
+                representation.integer_name(),
+                integer_name,
+                "{representation:?}"
+            );
         }
     }
 }

@@ -10,6 +10,7 @@
 
 use proc_macro::TokenStream;
 
+use crate::expand::dispatch;
 use crate::ir::MacroKind;
 use crate::parse::parse_and_validate_declaration;
 
@@ -28,7 +29,7 @@ use crate::parse::parse_and_validate_declaration;
 #[must_use]
 pub(crate) fn process_macro(kind: MacroKind, args: TokenStream, input: TokenStream) -> TokenStream {
     match parse_and_validate_declaration(kind, args.into(), input.into()) {
-        Ok(validated) => match crate::expand::dispatch(validated.declaration) {
+        Ok(validated) => match dispatch(validated.declaration) {
             Ok(expanded) => expanded.into(),
             Err(error) => error.into_compile_error().into(),
         },

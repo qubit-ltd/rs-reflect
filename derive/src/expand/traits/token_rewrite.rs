@@ -23,6 +23,7 @@ use proc_macro2::TokenTree;
 /// # Returns
 ///
 /// Returns the rewritten stream with token groups and spans retained.
+#[must_use]
 pub(super) fn replace_self_with_owner(tokens: TokenStream, owner: &Ident) -> TokenStream {
     tokens
         .into_iter()
@@ -31,7 +32,10 @@ pub(super) fn replace_self_with_owner(tokens: TokenStream, owner: &Ident) -> Tok
                 TokenTree::Ident(Ident::new(&owner.to_string(), identifier.span()))
             }
             TokenTree::Group(group) => {
-                let mut replacement = Group::new(group.delimiter(), replace_self_with_owner(group.stream(), owner));
+                let mut replacement = Group::new(
+                    group.delimiter(),
+                    replace_self_with_owner(group.stream(), owner),
+                );
                 replacement.set_span(group.span());
                 TokenTree::Group(replacement)
             }

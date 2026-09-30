@@ -8,20 +8,36 @@
 
 //! Compiler-assisted conditional configuration for reflected traits and impls.
 
+use std::mem::take;
+
 use proc_macro::TokenStream as CompilerTokenStream;
+use proc_macro_crate::FoundCrate;
+use proc_macro_crate::crate_name;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Attribute;
+use syn::Data;
 use syn::DeriveInput;
 use syn::Error;
+use syn::Expr;
+use syn::Field;
+use syn::Fields;
+use syn::FieldsNamed;
+use syn::Ident;
+use syn::ImplItem;
 use syn::Item;
 use syn::ItemImpl;
+use syn::ItemStruct;
 use syn::ItemTrait;
 use syn::Meta;
 use syn::Path;
 use syn::Result;
 use syn::Token;
+use syn::TraitItem;
 use syn::parse::Parser;
+use syn::parse_quote;
+use syn::parse2;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
@@ -41,6 +57,7 @@ use crate::ir::MacroKind;
 /// # Returns
 ///
 /// Returns the compiler-filtered carrier or a source-oriented diagnostic.
+#[must_use]
 pub(crate) fn configure_attribute(
     kind: MacroKind,
     arguments: CompilerTokenStream,
@@ -61,6 +78,7 @@ pub(crate) fn configure_attribute(
 /// # Returns
 ///
 /// Returns reflected declaration tokens or compiler diagnostics.
+#[must_use]
 pub(crate) fn process_configured(input: CompilerTokenStream) -> CompilerTokenStream {
     match expand_configured(input.into()) {
         Ok(tokens) => tokens.into(),
@@ -83,18 +101,23 @@ pub(crate) fn process_configured(input: CompilerTokenStream) -> CompilerTokenStr
 /// # Errors
 ///
 /// Returns a syntax diagnostic when the input or support macro path is invalid.
-pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenStream) -> Result<TokenStream> {
+pub(super) fn make_carrier(
+    kind: MacroKind,
+    arguments: TokenStream,
+    item: TokenStream,
+) -> Result<TokenStream> {
     let source_tokens = item.clone();
     let (header, members, outer_attributes) = match kind {
         MacroKind::Trait => {
-            let mut declaration: ItemTrait = syn::parse2(item)?;
+            let mut declaration: ItemTrait = parse2(item)?;
             let mut members = Vec::with_capacity(declaration.items.len());
-            for mut member in std::mem::take(&mut declaration.items) {
+            for mut member in take(&mut declaration.items) {
                 let Some(attributes) = trait_item_attributes_mut(&mut member) else {
                     members.push((quote!(#member), Vec::new()));
                     continue;
                 };
-                let (projected, retained) = conditional_attributes::split_attributes(attributes.clone());
+                let (projected, retained) =
+                    conditional_attributes::split_attributes(attributes.clone());
                 if let Some(attributes) = trait_item_attributes_mut(&mut member) {
                     *attributes = retained;
                 }
@@ -104,19 +127,20 @@ pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenS
             (quote!(#declaration), members, attrs)
         }
         MacroKind::Impl => {
-            let Item::Impl(mut declaration) = syn::parse2(item.clone())? else {
+            let Item::Impl(mut declaration) = parse2(item.clone())? else {
                 return Err(Error::new_spanned(
                     item,
                     "`#[reflect_impl]` can only be applied to an impl block",
                 ));
             };
             let mut members = Vec::with_capacity(declaration.items.len());
-            for mut member in std::mem::take(&mut declaration.items) {
+            for mut member in take(&mut declaration.items) {
                 let Some(attributes) = impl_item_attributes_mut(&mut member) else {
                     members.push((quote!(#member), Vec::new()));
                     continue;
                 };
-                let (projected, retained) = conditional_attributes::split_attributes(attributes.clone());
+                let (projected, retained) =
+                    conditional_attributes::split_attributes(attributes.clone());
                 if let Some(attributes) = impl_item_attributes_mut(&mut member) {
                     *attributes = retained;
                 }
@@ -127,34 +151,34 @@ pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenS
         }
         MacroKind::Derive => {
             return Err(Error::new(
-                proc_macro2::Span::call_site(),
+                Span::call_site(),
                 "conditional carrier only supports trait and impl macros",
             ));
         }
     };
     let mut fields = Vec::with_capacity(members.len());
     for (ordinal, (member_tokens, projected)) in members.into_iter().enumerate() {
-        let marker: Attribute = syn::parse_quote!(#[reflect_configure_member(#member_tokens)]);
-        let name = syn::Ident::new(&format!("__member_{ordinal}"), proc_macro2::Span::call_site());
-        let field: syn::Field = syn::parse_quote!(#(#projected)* #marker #name: ());
+        let marker: Attribute = parse_quote!(#[reflect_configure_member(#member_tokens)]);
+        let name = Ident::new(&format!("__member_{ordinal}"), Span::call_site());
+        let field: Field = parse_quote!(#(#projected)* #marker #name: ());
         fields.push(field);
     }
     let support = support_path(&arguments)?;
     let name = carrier_name(&source_tokens, &arguments);
-    let header_attribute: Attribute = syn::parse_quote!(#[reflect_configure_header(#header)]);
-    let argument_attribute: Attribute = syn::parse_quote!(#[reflect_configure_args(#arguments)]);
+    let header_attribute: Attribute = parse_quote!(#[reflect_configure_header(#header)]);
+    let argument_attribute: Attribute = parse_quote!(#[reflect_configure_args(#arguments)]);
     let kind_name = match kind {
         MacroKind::Trait => quote!(trait),
         MacroKind::Impl => quote!(implementation),
         MacroKind::Derive => unreachable!(),
     };
-    let kind_attribute: Attribute = syn::parse_quote!(#[reflect_configure_kind(#kind_name)]);
-    let fields: syn::FieldsNamed = syn::parse_quote!({ #(#fields),* });
+    let kind_attribute: Attribute = parse_quote!(#[reflect_configure_kind(#kind_name)]);
+    let fields: FieldsNamed = parse_quote!({ #(#fields),* });
     let mut carrier_attributes = outer_attributes;
     carrier_attributes.push(header_attribute);
     carrier_attributes.push(argument_attribute);
     carrier_attributes.push(kind_attribute);
-    let carrier: syn::ItemStruct = syn::parse2(quote!(
+    let carrier: ItemStruct = parse2(quote!(
         #[derive(#support)]
         #(#carrier_attributes)*
         struct #name #fields
@@ -176,7 +200,7 @@ pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenS
 ///
 /// Returns an error when internal carrier metadata is missing or malformed.
 fn expand_configured(input: TokenStream) -> Result<TokenStream> {
-    let input: DeriveInput = syn::parse2(input)?;
+    let input: DeriveInput = parse2(input)?;
     let header = attribute_tokens(&input.attrs, "reflect_configure_header")?;
     let arguments = attribute_tokens(&input.attrs, "reflect_configure_args")?;
     let kind_attribute = input
@@ -184,19 +208,30 @@ fn expand_configured(input: TokenStream) -> Result<TokenStream> {
         .iter()
         .find(|attribute| attribute.path().is_ident("reflect_configure_kind"))
         .ok_or_else(|| Error::new_spanned(&input.ident, "missing internal reflection kind"))?;
-    let kind = match kind_attribute.meta.require_list()?.tokens.to_string().as_str() {
+    let kind = match kind_attribute
+        .meta
+        .require_list()?
+        .tokens
+        .to_string()
+        .as_str()
+    {
         "trait" => MacroKind::Trait,
         "implementation" => MacroKind::Impl,
-        _ => return Err(Error::new_spanned(kind_attribute, "invalid internal reflection kind")),
+        _ => {
+            return Err(Error::new_spanned(
+                kind_attribute,
+                "invalid internal reflection kind",
+            ));
+        }
     };
     let mut members = Vec::new();
-    let syn::Data::Struct(data) = input.data else {
+    let Data::Struct(data) = input.data else {
         return Err(Error::new_spanned(
             input.ident,
             "internal reflection carrier must be a struct",
         ));
     };
-    let syn::Fields::Named(fields) = data.fields else {
+    let Fields::Named(fields) = data.fields else {
         return Err(Error::new_spanned(
             input.ident,
             "internal reflection carrier must use named fields",
@@ -214,16 +249,16 @@ fn expand_configured(input: TokenStream) -> Result<TokenStream> {
     }
     match kind {
         MacroKind::Trait => {
-            let mut declaration: ItemTrait = syn::parse2(header)?;
+            let mut declaration: ItemTrait = parse2(header)?;
             for member in members {
-                declaration.items.push(syn::parse2(member)?);
+                declaration.items.push(parse2(member)?);
             }
             Ok(process_macro(kind, arguments.into(), quote!(#declaration).into()).into())
         }
         MacroKind::Impl => {
-            let mut declaration: ItemImpl = syn::parse2(header)?;
+            let mut declaration: ItemImpl = parse2(header)?;
             for member in members {
-                declaration.items.push(syn::parse2(member)?);
+                declaration.items.push(parse2(member)?);
             }
             Ok(process_macro(kind, arguments.into(), quote!(#declaration).into()).into())
         }
@@ -251,7 +286,7 @@ fn attribute_tokens(attributes: &[Attribute], name: &str) -> Result<TokenStream>
         .find(|attribute| attribute.path().is_ident(name))
         .ok_or_else(|| {
             Error::new(
-                proc_macro2::Span::call_site(),
+                Span::call_site(),
                 format!("missing internal attribute `{name}`"),
             )
         })?;
@@ -273,10 +308,14 @@ fn attribute_tokens(attributes: &[Attribute], name: &str) -> Result<TokenStream>
 /// # Errors
 ///
 /// Returns a syntax diagnostic if the member or helper cannot be parsed.
-fn restore_member(member: TokenStream, helpers: &[Attribute], kind: MacroKind) -> Result<TokenStream> {
+fn restore_member(
+    member: TokenStream,
+    helpers: &[Attribute],
+    kind: MacroKind,
+) -> Result<TokenStream> {
     match kind {
         MacroKind::Trait => {
-            let mut item: syn::TraitItem = syn::parse2(member)?;
+            let mut item: TraitItem = parse2(member)?;
             if let Some(attributes) = trait_item_attributes_mut(&mut item) {
                 attributes.extend_from_slice(helpers);
             } else if !helpers.is_empty() {
@@ -288,7 +327,7 @@ fn restore_member(member: TokenStream, helpers: &[Attribute], kind: MacroKind) -
             Ok(quote!(#item))
         }
         MacroKind::Impl => {
-            let mut item: syn::ImplItem = syn::parse2(member)?;
+            let mut item: ImplItem = parse2(member)?;
             if let Some(attributes) = impl_item_attributes_mut(&mut item) {
                 attributes.extend_from_slice(helpers);
             } else if !helpers.is_empty() {
@@ -311,14 +350,15 @@ fn restore_member(member: TokenStream, helpers: &[Attribute], kind: MacroKind) -
 ///
 /// # Returns
 ///
-/// Returns the member's mutable attribute vector.
-fn trait_item_attributes_mut(item: &mut syn::TraitItem) -> Option<&mut Vec<Attribute>> {
+/// Returns the member's mutable attribute vector, or `None` for verbatim items.
+#[must_use]
+fn trait_item_attributes_mut(item: &mut TraitItem) -> Option<&mut Vec<Attribute>> {
     match item {
-        syn::TraitItem::Const(value) => Some(&mut value.attrs),
-        syn::TraitItem::Fn(value) => Some(&mut value.attrs),
-        syn::TraitItem::Type(value) => Some(&mut value.attrs),
-        syn::TraitItem::Macro(value) => Some(&mut value.attrs),
-        syn::TraitItem::Verbatim(_) => None,
+        TraitItem::Const(value) => Some(&mut value.attrs),
+        TraitItem::Fn(value) => Some(&mut value.attrs),
+        TraitItem::Type(value) => Some(&mut value.attrs),
+        TraitItem::Macro(value) => Some(&mut value.attrs),
+        TraitItem::Verbatim(_) => None,
         _ => None,
     }
 }
@@ -331,14 +371,15 @@ fn trait_item_attributes_mut(item: &mut syn::TraitItem) -> Option<&mut Vec<Attri
 ///
 /// # Returns
 ///
-/// Returns the member's mutable attribute vector.
-fn impl_item_attributes_mut(item: &mut syn::ImplItem) -> Option<&mut Vec<Attribute>> {
+/// Returns the member's mutable attribute vector, or `None` for verbatim items.
+#[must_use]
+fn impl_item_attributes_mut(item: &mut ImplItem) -> Option<&mut Vec<Attribute>> {
     match item {
-        syn::ImplItem::Const(value) => Some(&mut value.attrs),
-        syn::ImplItem::Fn(value) => Some(&mut value.attrs),
-        syn::ImplItem::Type(value) => Some(&mut value.attrs),
-        syn::ImplItem::Macro(value) => Some(&mut value.attrs),
-        syn::ImplItem::Verbatim(_) => None,
+        ImplItem::Const(value) => Some(&mut value.attrs),
+        ImplItem::Fn(value) => Some(&mut value.attrs),
+        ImplItem::Type(value) => Some(&mut value.attrs),
+        ImplItem::Macro(value) => Some(&mut value.attrs),
+        ImplItem::Verbatim(_) => None,
         _ => None,
     }
 }
@@ -357,11 +398,11 @@ fn impl_item_attributes_mut(item: &mut syn::ImplItem) -> Option<&mut Vec<Attribu
 ///
 /// Returns a diagnostic if neither supported dependency path is available.
 fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
-    if let Ok(found) = proc_macro_crate::crate_name("qubit-reflect-derive") {
+    if let Ok(found) = crate_name("qubit-reflect-derive") {
         let path = match found {
-            proc_macro_crate::FoundCrate::Itself => quote!(crate),
-            proc_macro_crate::FoundCrate::Name(name) => {
-                let identifier = syn::Ident::new(&name, proc_macro2::Span::call_site());
+            FoundCrate::Itself => quote!(crate),
+            FoundCrate::Name(name) => {
+                let identifier = Ident::new(&name, Span::call_site());
                 quote!(::#identifier)
             }
         };
@@ -370,16 +411,16 @@ fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
     if let Some(path) = explicit_runtime_path(arguments)? {
         return Ok(quote!(#path::__private::codegen_v3::macro_support::ConfiguredReflection));
     }
-    match proc_macro_crate::crate_name("qubit-reflect") {
-        Ok(proc_macro_crate::FoundCrate::Itself) => Ok(quote!(
+    match crate_name("qubit-reflect") {
+        Ok(FoundCrate::Itself) => Ok(quote!(
             crate::__private::codegen_v3::macro_support::ConfiguredReflection
         )),
-        Ok(proc_macro_crate::FoundCrate::Name(name)) => {
-            let identifier = syn::Ident::new(&name, proc_macro2::Span::call_site());
+        Ok(FoundCrate::Name(name)) => {
+            let identifier = Ident::new(&name, Span::call_site());
             Ok(quote!(::#identifier::__private::codegen_v3::macro_support::ConfiguredReflection))
         }
         Err(_) => Err(Error::new(
-            proc_macro2::Span::call_site(),
+            Span::call_site(),
             "cannot resolve the internal reflection derive; add `qubit-reflect-derive` or enable the facade's `derive` feature",
         )),
     }
@@ -393,7 +434,7 @@ fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
 ///
 /// # Returns
 ///
-/// Returns the `crate = path` value when present.
+/// Returns the `crate = path` value when present, or `None` when absent.
 ///
 /// # Errors
 ///
@@ -405,8 +446,11 @@ pub(super) fn explicit_runtime_path(arguments: &TokenStream) -> Result<Option<Pa
         if let Meta::NameValue(name_value) = value
             && name_value.path.is_ident("crate")
         {
-            let syn::Expr::Path(path) = name_value.value else {
-                return Err(Error::new(name_value.value.span(), "`crate` must be a path"));
+            let Expr::Path(path) = name_value.value else {
+                return Err(Error::new(
+                    name_value.value.span(),
+                    "`crate` must be a path",
+                ));
             };
             return Ok(Some(path.path));
         }

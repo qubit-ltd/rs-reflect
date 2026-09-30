@@ -11,6 +11,7 @@
 use proc_macro2::TokenStream;
 
 /// Token groups used by both trait definitions and applied descriptors.
+#[must_use]
 pub(super) struct TraitMetadata {
     /// Method descriptor expressions.
     pub(super) methods: Vec<TokenStream>,

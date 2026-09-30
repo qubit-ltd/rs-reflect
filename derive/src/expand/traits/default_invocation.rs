@@ -39,6 +39,7 @@ use crate::ir::TypeKindIr;
 /// # Returns
 ///
 /// Returns generated adapter and descriptor entry when invocation is supported.
+#[must_use]
 pub(super) fn default_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
@@ -59,7 +60,10 @@ pub(super) fn default_method_invocation_adapter(
         );
     let invocation_plan = crate::expand::invocation::analysis::analyze_method(
         method,
-        crate::expand::invocation::analysis::MethodContext::trait_default(&target, has_unproven_associated_type),
+        crate::expand::invocation::analysis::MethodContext::trait_default(
+            &target,
+            has_unproven_associated_type,
+        ),
     )
     .expect("validated method analysis is infallible");
     let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
@@ -91,10 +95,20 @@ pub(super) fn default_method_invocation_adapter(
         quote!(#facade::__private::codegen_v3::value::Local)
     };
     let thread_safe_assertions = thread_safe.then(|| {
-        crate::expand::invocation::emit::thread_safe_assertions(method, &target, typed_owned_receiver.as_ref(), None)
+        crate::expand::invocation::emit::thread_safe_assertions(
+            method,
+            &target,
+            typed_owned_receiver.as_ref(),
+            None,
+        )
     });
     let catching_assertions = catching_requested.then(|| {
-        crate::expand::invocation::emit::catching_assertions(method, &target, typed_owned_receiver.as_ref(), None)
+        crate::expand::invocation::emit::catching_assertions(
+            method,
+            &target,
+            typed_owned_receiver.as_ref(),
+            None,
+        )
     });
     let receiver_expectation = if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
@@ -178,7 +192,9 @@ pub(super) fn default_method_invocation_adapter(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -246,9 +262,12 @@ pub(super) fn default_method_invocation_adapter(
         (
             false,
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }),
         ) => {
@@ -355,9 +374,12 @@ pub(super) fn default_method_invocation_adapter(
                 }
             }
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }) => {
                 let value = if crate::expand::invocation::analysis::is_str_type(element) {
@@ -521,6 +543,7 @@ pub(super) fn default_method_invocation_adapter(
 /// # Returns
 ///
 /// Returns the generated adapter item and descriptor entry.
+#[must_use]
 fn default_pinned_method_invocation_adapter(
     method: &MethodIr,
     index: usize,
@@ -541,7 +564,9 @@ fn default_pinned_method_invocation_adapter(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -644,12 +669,13 @@ fn default_pinned_method_invocation_adapter(
 /// # Returns
 ///
 /// Returns whether the type contains an associated type or unknown syntax.
+#[must_use]
 pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_associated_type(path),
-        TypeKindIr::Reference { element, .. } | TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
-            type_contains_associated_type(element)
-        }
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Pointer { element, .. } => type_contains_associated_type(element),
         TypeKindIr::Tuple(elements) => elements.iter().any(type_contains_associated_type),
         TypeKindIr::Array { element, .. } => type_contains_associated_type(element),
         TypeKindIr::BareFunction { inputs, output, .. } => {
@@ -673,26 +699,34 @@ pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
 /// # Returns
 ///
 /// Returns whether the path contains an associated type or unknown syntax.
+#[must_use]
 fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
     path.qualified_self.is_some()
         || (path.segments.len() > 1 && path.segments[0].name == "Self")
-        || path.segments.iter().any(|segment| match &segment.arguments {
-            PathArgumentsIr::None => false,
-            PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
-                    type_contains_associated_type(ty)
+        || path
+            .segments
+            .iter()
+            .any(|segment| match &segment.arguments {
+                PathArgumentsIr::None => false,
+                PathArgumentsIr::AngleBracketed(arguments) => {
+                    arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                            type_contains_associated_type(ty)
+                        }
+                        PathArgumentIr::Constraint { bounds, .. } => {
+                            bounds.iter().any(bound_contains_associated_type)
+                        }
+                        PathArgumentIr::Other(_) => true,
+                        PathArgumentIr::Lifetime(_)
+                        | PathArgumentIr::Const(_)
+                        | PathArgumentIr::AssociatedConst { .. } => false,
+                    })
                 }
-                PathArgumentIr::Constraint { bounds, .. } => bounds.iter().any(bound_contains_associated_type),
-                PathArgumentIr::Other(_) => true,
-                PathArgumentIr::Lifetime(_) | PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } => {
-                    false
+                PathArgumentsIr::Parenthesized { inputs, output } => {
+                    inputs.iter().any(type_contains_associated_type)
+                        || output.as_deref().is_some_and(type_contains_associated_type)
                 }
-            }),
-            PathArgumentsIr::Parenthesized { inputs, output } => {
-                inputs.iter().any(type_contains_associated_type)
-                    || output.as_deref().is_some_and(type_contains_associated_type)
-            }
-        })
+            })
 }
 
 /// Checks whether one trait or lifetime bound contains an associated binding.
@@ -704,6 +738,7 @@ fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
 /// # Returns
 ///
 /// Returns whether the bound contains an associated type or unknown syntax.
+#[must_use]
 fn bound_contains_associated_type(bound: &GenericBoundIr) -> bool {
     match bound {
         GenericBoundIr::Trait { path, .. } => path_contains_associated_type(path),

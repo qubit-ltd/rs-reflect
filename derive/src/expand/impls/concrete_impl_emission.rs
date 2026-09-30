@@ -15,6 +15,7 @@ use proc_macro2::TokenStream;
 ///
 /// Each field corresponds to one independently generated descriptor or
 /// registration component consumed by the final token emitter.
+#[must_use]
 pub(super) struct ConcreteImplEmission {
     /// Original impl tokens retained in generated output.
     pub(super) retained: TokenStream,

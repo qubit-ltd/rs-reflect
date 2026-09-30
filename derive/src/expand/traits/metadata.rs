@@ -40,7 +40,12 @@ use crate::ir::TypeKindIr;
 ///
 /// Returns token groups for methods, associated items, generic parameters and
 /// predicates.
-pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facade: &TokenStream) -> TraitMetadata {
+#[must_use]
+pub(super) fn build(
+    declaration: &TraitDeclarationIr,
+    trait_name: &LitStr,
+    facade: &TokenStream,
+) -> TraitMetadata {
     let trait_name_literal = trait_name;
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let methods: Vec<_> = declaration

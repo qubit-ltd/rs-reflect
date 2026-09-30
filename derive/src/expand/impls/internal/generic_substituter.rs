@@ -41,11 +41,13 @@ use syn::visit_mut::visit_type_path_mut;
 ///
 /// Panics if the validated specialization tokens cannot be parsed as type
 /// syntax.
+#[must_use]
 pub(in crate::expand::impls) fn substitute_type_syntax(
     tokens: &TokenStream,
     replacements: &[(Ident, TokenStream)],
 ) -> TokenStream {
-    let mut ty: Type = parse2(tokens.clone()).expect("validated specialization target must remain valid type syntax");
+    let mut ty: Type = parse2(tokens.clone())
+        .expect("validated specialization target must remain valid type syntax");
     GenericSubstituter { replacements }.visit_type_mut(&mut ty);
     ty.into_token_stream()
 }
@@ -61,7 +63,11 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
 /// # Returns
 ///
 /// Returns the rewritten path.
-pub(in crate::expand::impls) fn substitute_path_syntax(path: &Path, replacements: &[(Ident, TokenStream)]) -> Path {
+#[must_use]
+pub(in crate::expand::impls) fn substitute_path_syntax(
+    path: &Path,
+    replacements: &[(Ident, TokenStream)],
+) -> Path {
     let mut path = path.clone();
     GenericSubstituter { replacements }.visit_path_mut(&mut path);
     path
@@ -85,6 +91,7 @@ impl GenericSubstituter<'_> {
     ///
     /// Returns the matching replacement tokens, or `None` when it is not
     /// mapped.
+    #[must_use]
     fn replacement(&self, identifier: &Ident) -> Option<&TokenStream> {
         self.replacements
             .iter()
@@ -219,26 +226,34 @@ mod tests {
 
     #[test]
     fn test_substitute_path_syntax_rewrites_trait_type_and_const_arguments() {
-        let input: Path = parse2(quote!(Trait<T, N>)).expect("the trait path must be valid path syntax");
-        let expected: Path =
-            parse2(quote!(Trait<Vec<u8>, 4>)).expect("the expected trait path must be valid path syntax");
+        let input: Path =
+            parse2(quote!(Trait<T, N>)).expect("the trait path must be valid path syntax");
+        let expected: Path = parse2(quote!(Trait<Vec<u8>, 4>))
+            .expect("the expected trait path must be valid path syntax");
 
         let actual = substitute_path_syntax(&input, &replacements());
 
-        assert_eq!(actual, expected);
+        assert_eq!(
+            actual, expected,
+            "type and const path arguments should be substituted"
+        );
     }
 
     #[test]
     fn test_substitute_type_syntax_preserves_absolute_paths() {
         let cases = [
             (quote!(::T), quote!(::T)),
-            (quote!(::module::Wrapper<T, N>), quote!(::module::Wrapper<Vec<u8>, 4>)),
+            (
+                quote!(::module::Wrapper<T, N>),
+                quote!(::module::Wrapper<Vec<u8>, 4>),
+            ),
         ];
 
         for (input, expected) in cases {
             let actual: Type = parse2(substitute_type_syntax(&input, &replacements()))
                 .expect("substitution must retain valid type syntax");
-            let expected: Type = parse2(expected).expect("the expected result must be valid type syntax");
+            let expected: Type =
+                parse2(expected).expect("the expected result must be valid type syntax");
             assert_eq!(actual, expected, "input: {input}");
         }
     }
@@ -252,19 +267,28 @@ mod tests {
         let actual: Type = parse2(substitute_type_syntax(&input, &replacements()))
             .expect("substitution must retain valid type syntax");
 
-        assert_eq!(actual, expected);
+        assert_eq!(
+            actual, expected,
+            "qself types and const expressions should be substituted"
+        );
     }
 
     #[test]
     fn test_substitute_type_syntax_retains_absolute_replacement_roots() {
-        let replacements = [(Ident::new("T", Span::call_site()), quote!(::std::vec::Vec<u8>))];
+        let replacements = [(
+            Ident::new("T", Span::call_site()),
+            quote!(::std::vec::Vec<u8>),
+        )];
         let input = quote!(T::Item);
-        let expected: Type =
-            parse2(quote!(::std::vec::Vec<u8>::Item)).expect("the expected result must be valid type syntax");
+        let expected: Type = parse2(quote!(::std::vec::Vec<u8>::Item))
+            .expect("the expected result must be valid type syntax");
 
-        let actual: Type =
-            parse2(substitute_type_syntax(&input, &replacements)).expect("substitution must retain valid type syntax");
+        let actual: Type = parse2(substitute_type_syntax(&input, &replacements))
+            .expect("substitution must retain valid type syntax");
 
-        assert_eq!(actual, expected);
+        assert_eq!(
+            actual, expected,
+            "absolute replacement roots should be preserved"
+        );
     }
 }

@@ -25,6 +25,7 @@ use super::concrete_impl_emission::ConcreteImplEmission;
 /// # Returns
 ///
 /// Returns the retained impl and its hidden registration module as tokens.
+#[must_use]
 pub(super) fn emit(emission: ConcreteImplEmission) -> TokenStream {
     let ConcreteImplEmission {
         retained,

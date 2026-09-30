@@ -34,6 +34,7 @@ use crate::ir::TypeKindIr;
 /// # Returns
 ///
 /// Returns generated adapter tokens when the method is executable, or `None`.
+#[must_use]
 pub(super) fn definition(
     method: &MethodIr,
     index: usize,
@@ -42,7 +43,16 @@ pub(super) fn definition(
     target_source: &str,
     facade: &TokenStream,
 ) -> Option<TokenStream> {
-    definition_for_call(method, index, target, trait_call_path, target_source, facade, &[], None)
+    definition_for_call(
+        method,
+        index,
+        target,
+        trait_call_path,
+        target_source,
+        facade,
+        &[],
+        None,
+    )
 }
 
 /// Generates an adapter for a concrete method specialization through the same
@@ -63,6 +73,7 @@ pub(super) fn definition(
 ///
 /// Returns generated adapter tokens when the specialization is executable, or
 /// `None`.
+#[must_use]
 pub(super) fn specialization_definition(
     method: &MethodIr,
     method_index: usize,
@@ -96,8 +107,14 @@ pub(super) fn specialization_definition(
 /// # Returns
 ///
 /// Returns the stable static identifier used by both code generation phases.
-pub(super) fn specialization_descriptor_name(method_index: usize, specialization_index: usize) -> Ident {
-    format_ident!("__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}")
+#[must_use]
+pub(super) fn specialization_descriptor_name(
+    method_index: usize,
+    specialization_index: usize,
+) -> Ident {
+    format_ident!(
+        "__QUBIT_REFLECT_GENERIC_SPECIALIZATION_ADAPTER_{method_index}_{specialization_index}"
+    )
 }
 
 /// Builds one mode-specific adapter after analyzing its invocation contract.
@@ -117,6 +134,7 @@ pub(super) fn specialization_descriptor_name(method_index: usize, specialization
 ///
 /// Returns generated adapter tokens when executable, or `None` when blocked.
 #[allow(clippy::too_many_arguments)]
+#[must_use]
 fn definition_for_call(
     method: &MethodIr,
     index: usize,
@@ -127,7 +145,8 @@ fn definition_for_call(
     generic_arguments: &[TokenStream],
     specialization_index: Option<usize>,
 ) -> Option<TokenStream> {
-    let adapter_suffix = specialization_index.map_or_else(|| index.to_string(), |value| format!("{index}_{value}"));
+    let adapter_suffix =
+        specialization_index.map_or_else(|| index.to_string(), |value| format!("{index}_{value}"));
     let descriptor_name = specialization_index.map_or_else(
         || format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}"),
         |value| specialization_descriptor_name(index, value),
@@ -137,10 +156,12 @@ fn definition_for_call(
         .receiver
         .as_ref()
         .and_then(|receiver| typed_extension_receiver_type(receiver, target));
-    let mut method_context = crate::expand::invocation::analysis::MethodContext::implementation(target);
+    let mut method_context =
+        crate::expand::invocation::analysis::MethodContext::implementation(target);
     method_context.extension_receiver = typed_extension_receiver.clone();
-    let invocation_plan = crate::expand::invocation::analysis::analyze_method(method, method_context)
-        .expect("validated method analysis is infallible");
+    let invocation_plan =
+        crate::expand::invocation::analysis::analyze_method(method, method_context)
+            .expect("validated method analysis is infallible");
     debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
     let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
     let typed_extension_receiver = invocation_plan.extension_receiver_type().cloned();
@@ -151,17 +172,22 @@ fn definition_for_call(
         if is_safe_pinned_invocation {
             let method_name = &method.name;
             let adapter_name = format_ident!("__qubit_reflect_invoke_pinned_{adapter_suffix}");
-            let adapter_token_name = format_ident!("__QUBIT_REFLECT_PINNED_ADAPTER_{adapter_suffix}");
+            let adapter_token_name =
+                format_ident!("__QUBIT_REFLECT_PINNED_ADAPTER_{adapter_suffix}");
             let parameter_expectations: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| crate::expand::invocation::emit::argument_expectation(parameter, facade))
+                .map(|parameter| {
+                    crate::expand::invocation::emit::argument_expectation(parameter, facade)
+                })
                 .collect();
             let mode = quote!(#facade::__private::codegen_v3::value::Local);
             let argument_bindings: Vec<_> = method
                 .parameters
                 .iter()
-                .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+                .map(|parameter| {
+                    crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+                })
                 .collect();
             let call_arguments: Vec<_> = method
                 .parameters
@@ -413,7 +439,9 @@ fn definition_for_call(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -489,9 +517,12 @@ fn definition_for_call(
         (
             false,
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }),
         ) => {
@@ -598,9 +629,12 @@ fn definition_for_call(
                 }
             }
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }) => {
                 let value = if crate::expand::invocation::analysis::is_str_type(element) {
