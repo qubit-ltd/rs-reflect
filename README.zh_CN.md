@@ -80,7 +80,16 @@ fn main() {
 ```
 
 
-完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。同包 example 中，自动发现的 `crate` 会指向示例可执行程序，因此声明用 `#[reflect(crate = qubit_reflect)]` 和 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。在源码检出根目录运行：
+完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。同包 example 中，自动发现的 `crate` 会指向示例可执行程序，因此声明用 `#[reflect(crate = qubit_reflect)]` 和 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
+
+源码检出中，即使 `qubit-types` 被禁用，Cargo 仍会解析可选的 `qubit-datatype` 与 `qubit-id` path manifest。先准备这两个相邻检出，再确认 Cargo 能读取两个 manifest：
+
+```bash
+./.infra/tools/prepare-local-path-dependencies.sh
+cargo metadata --locked --format-version 1
+```
+
+`cargo metadata` 成功即表示路径依赖已解析。使用已发布 crate 的用户不需要运行本仓库脚本。然后从源码检出根目录运行示例：
 
 ```bash
 cargo run --example field_patch
