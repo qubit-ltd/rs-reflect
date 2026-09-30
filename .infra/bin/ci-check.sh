@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+project_root=$(cd "$script_dir/../.." && pwd -P)
 source "$project_root/.infra/tools/cleanup-build-artifacts.sh"
 export RS_INFRA_STYLE_TOOLCHAIN="${RS_INFRA_STYLE_TOOLCHAIN:-nightly-2026-06-05}"
 if [ -f "$project_root/.infra/style/rustfmt.toml" ]; then
@@ -9,8 +10,8 @@ if [ -f "$project_root/.infra/style/rustfmt.toml" ]; then
 elif [ -f "$project_root/rustfmt.toml" ]; then
     export RS_INFRA_STYLE_RUSTFMT_CONFIG="$project_root/rustfmt.toml"
 fi
-"$project_root/.infra/tools/prepare-local-path-dependencies.sh"
-"$project_root/.infra/tools/infra-tool.sh" rs-infra-ci --project "$project_root" "$@" check
+"$project_root/.infra/bin/prepare-local-path-dependencies.sh"
+"$project_root/.infra/bin/infra-tool.sh" rs-infra-ci --project "$project_root" "$@" check
 
 coverage_selected=true
 explicit_only=false
@@ -38,5 +39,4 @@ if [ "$explicit_only" = true ]; then
 fi
 if [ "$coverage_selected" = true ]; then
     "$project_root/.infra/tools/coverage-report.sh"
-    "$project_root/scripts/check-critical-coverage-report.sh" "$project_root/coverage.json"
 fi

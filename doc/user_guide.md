@@ -122,7 +122,7 @@ manifests when `qubit-types` is disabled. Prepare them before Cargo commands
 and verify resolution:
 
 ```bash
-./.infra/tools/prepare-local-path-dependencies.sh
+./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
@@ -860,7 +860,7 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 
 | Symptom | What to check |
 | --- | --- |
-| Cargo reports a missing `qubit-datatype` or `qubit-id` path manifest | In a source checkout, run `./.infra/tools/prepare-local-path-dependencies.sh`, then `cargo metadata --locked --format-version 1`. Success confirms both sibling manifests resolve; registry users do not need this script. |
+| Cargo reports a missing `qubit-datatype` or `qubit-id` path manifest | In a source checkout, run `./.infra/bin/prepare-local-path-dependencies.sh`, then `cargo metadata --locked --format-version 1`. Success confirms both sibling manifests resolve; registry users do not need this script. |
 | `field("...")` returns `None` | Use the query name; `rename` changes it while `rust_name()` retains the source spelling. |
 | A field operation fails | Verify the wrapper (`ReflectedRef` versus `ReflectedMut`), the field policy, and the replacement's exact type; then inspect `FieldSetFailure` recovery. |
 | Construction fails | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |
