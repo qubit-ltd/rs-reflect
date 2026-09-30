@@ -24,7 +24,6 @@ copy_fixture() {
     for directory in src derive tests test-crates scripts; do
         command ln -s "$REPOSITORY_ROOT/$directory" "$root/$directory"
     done
-    command ln -s "$REPOSITORY_ROOT/project-ci-check.sh" "$root/project-ci-check.sh"
     printf '%s\n' "$root"
 }
 

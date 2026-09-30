@@ -123,7 +123,7 @@ qubit-reflect = "0.1"
 相邻路径 manifest。先准备依赖并验证解析结果：
 
 ```bash
-./.infra/tools/prepare-local-path-dependencies.sh
+./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
@@ -680,7 +680,7 @@ fn main() {
 
 | 现象 | 检查顺序 |
 | --- | --- |
-| Cargo 提示找不到 `qubit-datatype` 或 `qubit-id` 路径 manifest | 源码检出时先运行 `./.infra/tools/prepare-local-path-dependencies.sh`，再运行 `cargo metadata --locked --format-version 1`。命令成功表示两个相邻 manifest 均能解析；registry 用户不需要此脚本。 |
+| Cargo 提示找不到 `qubit-datatype` 或 `qubit-id` 路径 manifest | 源码检出时先运行 `./.infra/bin/prepare-local-path-dependencies.sh`，再运行 `cargo metadata --locked --format-version 1`。命令成功表示两个相邻 manifest 均能解析；registry 用户不需要此脚本。 |
 | `field("...")` 返回 `None` | 检查 `rename` 后的查询名；`rust_name()` 保留源码拼写。 |
 | 字段读取或替换失败 | 检查目标是否是声明类型、借用包装器、访问策略及替换值的精确类型；再看 `FieldSetFailure::recovery()`。 |
 | 构造失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |

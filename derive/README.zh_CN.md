@@ -79,10 +79,10 @@ cargo test
 cargo test --all-features
 
 # 运行项目 CI 检查
-./ci-check.sh
+./.infra/bin/ci-check.sh
 
 # 检查代码覆盖率
-./coverage.sh
+./.infra/bin/coverage.sh
 ```
 
 ## 许可证
@@ -95,7 +95,7 @@ Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 ## 贡献
 
 欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并从
-`rs-reflect` 仓库根目录运行 `./align-ci.sh` 格式化代码、运行 `./ci-check.sh`
+`rs-reflect` 仓库根目录运行 `./.infra/bin/align-ci.sh` 格式化代码、运行 `./.infra/bin/ci-check.sh`
 通过 CI 检查，再提交 Pull Request。
 
 ## 作者

@@ -20,7 +20,7 @@ class DeriveCoverageWorkflowTests(unittest.TestCase):
         job = job_block(workflow, "derive-coverage", "pages")
 
         checkout = job.index("uses: actions/checkout@")
-        prepare = job.index("./.infra/tools/prepare-local-path-dependencies.sh")
+        prepare = job.index("./.infra/bin/prepare-local-path-dependencies.sh")
         toolchain = job.index("toolchain: 1.94.0")
         metadata = job.index("cargo +1.94.0 metadata --locked --format-version 1")
         llvm_cov = job.index("cargo install cargo-llvm-cov")
