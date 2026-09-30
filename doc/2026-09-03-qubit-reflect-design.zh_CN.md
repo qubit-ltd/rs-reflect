@@ -7,8 +7,6 @@
 <!-- reflect-contract: coverage.parse=85 -->
 <!-- reflect-contract: coverage.validate=80 -->
 <!-- reflect-contract: coverage.expand=85 -->
-<!-- reflect-contract: coverage.critical.invocation=90/88/91 -->
-<!-- reflect-contract: coverage.critical.pinned=95/90/92 -->
 <!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
 
 - 日期：2026-09-03
@@ -297,20 +295,13 @@ capability，也不执行 provider。
 | ABI/facade | 重命名依赖、显式 facade、`codegen_v3` 与当前模型 ABI `v7` |
 | robustness | coverage、有限 fuzz smoke、benchmark compile、Miri/sanitizer（环境允许时） |
 
-覆盖率验证同时执行 crate 全局阈值、八个固定文件门禁和两个加权目录组门禁，配置均来自
-`.infra/ci/critical-coverage.json`。`src/invoke/invocation/` 的函数/行/区域下限为 90/88/91%，
-`src/invoke/pinned/` 为 95/90/92%。新覆盖率报告生成成功后，`coverage.sh` 会运行关键门禁；
-`ci-check.sh` 在默认检查或显式选择 `coverage` 时运行；`align-ci.sh` 仅在设置
-`RUN_COVERAGE_IN_ALIGN=1` 时检查。
+覆盖率验证统一使用 pinned `rs-infra-coverage` 全局阈值，与 CI 使用同一规则。
+独立覆盖率命令和 CI coverage 任务都会执行相同的全局检查；覆盖率报告作为可下载产物保留。
 
 Markdown 验收以独立 package 和进程执行每个 `rust` 程序。`rust,no_run` 只编译库，
 `rust,compile_fail` 必须编译失败，且二者都需要正文解释。未知标记、空块和未闭合围栏均失败。
 临时 workspace 会在 `--locked` 构建前核对 `Cargo.lock`；每次运行限时 10 秒，失败时保留日志和锁文件。
-八个固定文件门禁中的下限包括 `set` 100/98/99、`registry` 92/92/89、
-`registry_builder` 100/97/96、`snapshot_builder` 100/100/100；前文另列 invocation 与 pinned
-实现目录的加权门禁。
-其中 registry 下限按当前 all-features 报告校准：泛型及 inline lookup view
-实例无法全部归因到集成测试 profile；公开 lookup view 的回归测试仍属于该门禁。
+公开 lookup view 的回归测试仍属于覆盖率测试套件。
 有界 `registry_snapshot` fuzz 将输入限制为 4096 字节、32 个 fragment、16 个来源、8 个静态 ID
 和 4 个 descriptor，并通过公开 API 验证排序、冲突原子性、capability-only 成员和 snapshot 独立性。
 

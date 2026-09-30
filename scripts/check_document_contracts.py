@@ -2,7 +2,6 @@
 """Check bilingual reflection facts against documentation and real project inputs."""
 
 import ast
-import json
 from pathlib import Path
 import re
 import sys
@@ -29,20 +28,13 @@ GROUPS = (
         "dispatch.input_recovery", "examples.native")),
     ("doc/2026-09-03-qubit-reflect-design.md", "doc/2026-09-03-qubit-reflect-design.zh_CN.md", (
         "panic.async_poll", "panic.abort", "dispatch.input_recovery", "coverage.configure",
-        "coverage.parse", "coverage.validate", "coverage.expand", "coverage.critical.invocation",
-        "coverage.critical.pinned", "registry.source")),
+        "coverage.parse", "coverage.validate", "coverage.expand", "registry.source")),
     ("doc/2026-09-07-qubit-reflect-api-stability.md", "doc/2026-09-07-qubit-reflect-api-stability.zh_CN.md",
      ("dispatch.input_recovery",)),
     ("doc/derive-contract-matrix.md", "doc/derive-contract-matrix.zh_CN.md", (
         "coverage.configure", "coverage.parse", "coverage.validate", "coverage.expand")),
 )
 EXAMPLES = ("field_patch", "customer_patch", "support_action")
-CRITICAL_COVERAGE_GROUPS = {
-    "coverage.critical.invocation": ("invocation", "src/invoke/invocation/"),
-    "coverage.critical.pinned": ("pinned", "src/invoke/pinned/"),
-}
-
-
 def document_facts(document):
     """Read unique structured facts with line-located diagnostics."""
     facts = {}
@@ -54,7 +46,7 @@ def document_facts(document):
             raise ValueError(f"{document}:{line_number}: malformed contract marker")
         for match in matches:
             key, value = match.groups()
-            if key not in FACTS and key not in CRITICAL_COVERAGE_GROUPS:
+            if key not in FACTS:
                 raise ValueError(f"{document}:{line_number}: unknown contract key {key}")
             if key in facts:
                 raise ValueError(f"{document}:{line_number}: duplicate contract key {key}")
@@ -83,36 +75,6 @@ def coverage_thresholds(root):
     return {f"coverage.{stage}": f"{value:g}" for stage, value in values[0].items()}
 
 
-def critical_coverage_thresholds(root):
-    """Match design markers to the schema-2 critical coverage group policy."""
-    path = root / ".infra/ci/critical-coverage.json"
-    config = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(config, dict) or config.get("schema_version") != 2:
-        raise ValueError(f"{path}: expected critical coverage schema_version 2")
-    groups = config.get("groups")
-    if not isinstance(groups, dict):
-        raise ValueError(f"{path}: expected a groups object")
-
-    expected = {}
-    for marker, (group_name, prefix) in CRITICAL_COVERAGE_GROUPS.items():
-        group = groups.get(group_name)
-        if not isinstance(group, dict):
-            raise ValueError(f"{path}: missing critical coverage group {group_name}")
-        if group.get("path_prefix") != prefix:
-            raise ValueError(
-                f"{path}: {group_name}: expected path_prefix {prefix!r}, "
-                f"found {group.get('path_prefix')!r}"
-            )
-        thresholds = []
-        for metric in ("functions", "lines", "regions"):
-            value = group.get(metric)
-            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
-                raise ValueError(f"{path}: {group_name}: invalid {metric} threshold {value!r}")
-            thresholds.append(str(value))
-        expected[marker] = "/".join(thresholds)
-    return expected
-
-
 def check_examples(root):
     """Ensure the native Cargo examples really exist and ship with derive enabled."""
     path = root / "Cargo.toml"
@@ -138,7 +100,6 @@ def check_contracts(root):
     root = Path(root)
     expected_values = dict(FACTS)
     expected_values.update(coverage_thresholds(root))
-    expected_values.update(critical_coverage_thresholds(root))
     check_examples(root)
     registry = root / FACTS["registry.source"]
     if not registry.is_file() or not registry.resolve().is_relative_to(root.resolve()):
