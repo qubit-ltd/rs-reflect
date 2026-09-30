@@ -8,6 +8,7 @@
 
 //! Criterion benchmark for hot external-supertrait cache lookup.
 
+use std::fmt::Display;
 use std::hint::black_box;
 
 use criterion::Criterion;
@@ -17,13 +18,16 @@ use qubit_reflect::__private::codegen_v3::descriptor::external_supertrait;
 
 /// Registers a hot lookup after priming the exact external application.
 fn trait_cache_lookup(criterion: &mut Criterion) {
-    let first =
-        external_supertrait::<dyn std::fmt::Display>("benchmark.external.display", "std::fmt::Display", Vec::new());
+    let first = external_supertrait::<dyn Display>(
+        "benchmark.external.display",
+        "std::fmt::Display",
+        Vec::new(),
+    );
     black_box(first);
 
     criterion.bench_function("trait_cache/hot_external_supertrait", |bench| {
         bench.iter(|| {
-            black_box(external_supertrait::<dyn std::fmt::Display>(
+            black_box(external_supertrait::<dyn Display>(
                 "benchmark.external.display",
                 "std::fmt::Display",
                 Vec::new(),
