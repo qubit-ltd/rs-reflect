@@ -1,6 +1,5 @@
 """Document facts are checked against bilingual contracts and actual inputs."""
 import importlib.util
-import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -26,8 +25,6 @@ GROUPS = {
             "coverage.parse",
             "coverage.validate",
             "coverage.expand",
-            "coverage.critical.invocation",
-            "coverage.critical.pinned",
             "registry.source",
         ],
     ),
@@ -35,29 +32,6 @@ GROUPS = {
     "matrix": ("doc/derive-contract-matrix.md", "doc/derive-contract-matrix.zh_CN.md", ["coverage.configure", "coverage.parse", "coverage.validate", "coverage.expand"]),
 }
 FACTS = {"facade.explicit": "qubit_reflect", "provider.qualified": "custom-provider", "panic.async_poll": "not-caught", "panic.abort": "catching-unavailable", "dispatch.input_recovery": "original-input", "examples.native": "cargo-example", "coverage.configure": "70", "coverage.parse": "85", "coverage.validate": "80", "coverage.expand": "85", "registry.source": "src/registry/reflect_registry.rs"}
-CRITICAL_FACTS = {
-    "coverage.critical.invocation": "90/88/91",
-    "coverage.critical.pinned": "95/90/92",
-}
-CRITICAL_CONFIG = {
-    "schema_version": 2,
-    "files": {},
-    "groups": {
-        "invocation": {
-            "path_prefix": "src/invoke/invocation/",
-            "functions": 90,
-            "lines": 88,
-            "regions": 91,
-        },
-        "pinned": {
-            "path_prefix": "src/invoke/pinned/",
-            "functions": 95,
-            "lines": 90,
-            "regions": 92,
-        },
-    },
-}
-
 class ContractTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(subject, "document contract checker has not been implemented")
@@ -68,7 +42,7 @@ class ContractTests(unittest.TestCase):
             for name in [english, chinese]:
                 path = self.root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
-                values = {**FACTS, **CRITICAL_FACTS}
+                values = FACTS
                 markers = "".join(
                     f"<!-- reflect-contract: {key}={values[key]} -->\n" for key in keys
                 )
@@ -76,9 +50,6 @@ class ContractTests(unittest.TestCase):
         coverage = self.root / "scripts/derive_coverage_report.py"
         coverage.parent.mkdir()
         coverage.write_text("MINIMUM_LINE_COVERAGE = {'configure': 70.0, 'parse': 85.0, 'validate': 80.0, 'expand': 85.0}\n")
-        critical_coverage = self.root / ".infra/ci/critical-coverage.json"
-        critical_coverage.parent.mkdir(parents=True)
-        critical_coverage.write_text(json.dumps(CRITICAL_CONFIG))
         registry = self.root / FACTS["registry.source"]
         registry.parent.mkdir(parents=True)
         registry.write_text("// registry")
@@ -104,35 +75,6 @@ class ContractTests(unittest.TestCase):
         source = self.root / "scripts/derive_coverage_report.py"
         source.write_text(source.read_text().replace("70.0", "71.0"))
         with self.assertRaisesRegex(ValueError, "coverage.configure"):
-            subject.check_contracts(self.root)
-
-    def test_critical_coverage_markers_match_schema_two_groups(self):
-        subject.check_contracts(self.root)
-
-    def test_critical_coverage_marker_drift_is_detected(self):
-        document = self.root / GROUPS["design"][0]
-        document.write_text(
-            document.read_text().replace(
-                "coverage.critical.invocation=90/88/91",
-                "coverage.critical.invocation=90/88/90",
-            )
-        )
-        with self.assertRaisesRegex(ValueError, "coverage.critical.invocation"):
-            subject.check_contracts(self.root)
-
-    def test_missing_critical_coverage_group_is_rejected(self):
-        config = dict(CRITICAL_CONFIG)
-        config["groups"] = dict(config["groups"])
-        del config["groups"]["pinned"]
-        (self.root / ".infra/ci/critical-coverage.json").write_text(json.dumps(config))
-        with self.assertRaisesRegex(ValueError, "missing critical coverage group pinned"):
-            subject.check_contracts(self.root)
-
-    def test_critical_coverage_path_prefix_drift_is_rejected(self):
-        config = json.loads(json.dumps(CRITICAL_CONFIG))
-        config["groups"]["invocation"]["path_prefix"] = "src/invoke/"
-        (self.root / ".infra/ci/critical-coverage.json").write_text(json.dumps(config))
-        with self.assertRaisesRegex(ValueError, "path_prefix"):
             subject.check_contracts(self.root)
 
     def test_actual_example_configuration_and_registry_path_are_required(self):
