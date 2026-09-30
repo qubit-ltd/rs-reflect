@@ -13,6 +13,7 @@ use syn::Meta;
 use syn::Result;
 use syn::Token;
 use syn::parse::Parser;
+use syn::parse_quote;
 use syn::punctuated::Punctuated;
 
 /// Separates attributes projected onto the carrier from those retained on an
@@ -25,6 +26,7 @@ use syn::punctuated::Punctuated;
 /// # Returns
 ///
 /// Returns `(carrier_attributes, retained_attributes)` in source order.
+#[must_use]
 pub(super) fn split_attributes(attributes: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     let mut projected = Vec::new();
     let mut retained = Vec::new();
@@ -51,6 +53,7 @@ pub(super) fn split_attributes(attributes: Vec<Attribute>) -> (Vec<Attribute>, V
 /// # Returns
 ///
 /// Returns its carrier and retained forms, when either form is required.
+#[must_use]
 fn split_attribute(attribute: &Attribute) -> (Option<Attribute>, Option<Attribute>) {
     if attribute.path().is_ident("cfg") {
         return (Some(attribute.clone()), Some(attribute.clone()));
@@ -128,9 +131,12 @@ fn split_meta(meta: &Meta) -> Result<(Option<Meta>, Option<Meta>)> {
         return Ok((Some(meta.clone()), None));
     }
     if meta.path().is_ident("cfg_attr") {
-        let attribute: Attribute = syn::parse_quote!(#[#meta]);
+        let attribute: Attribute = parse_quote!(#[#meta]);
         let (carrier, item) = split_cfg_attr(&attribute)?;
-        return Ok((carrier.map(|value| value.meta), item.map(|value| value.meta)));
+        return Ok((
+            carrier.map(|value| value.meta),
+            item.map(|value| value.meta),
+        ));
     }
     Ok((None, Some(meta.clone())))
 }
@@ -150,11 +156,15 @@ fn split_meta(meta: &Meta) -> Result<(Option<Meta>, Option<Meta>)> {
 /// # Errors
 ///
 /// Returns a syntax error when the reconstructed attribute is malformed.
-fn make_cfg_attr(source: &Attribute, predicate: &Meta, attributes: Vec<Meta>) -> Result<Option<Attribute>> {
+fn make_cfg_attr(
+    source: &Attribute,
+    predicate: &Meta,
+    attributes: Vec<Meta>,
+) -> Result<Option<Attribute>> {
     if attributes.is_empty() {
         return Ok(None);
     }
-    let mut rebuilt: Attribute = syn::parse_quote!(#[cfg_attr(#predicate, #(#attributes),*)]);
+    let mut rebuilt: Attribute = parse_quote!(#[cfg_attr(#predicate, #(#attributes),*)]);
     rebuilt.style = source.style;
     Ok(Some(rebuilt))
 }
@@ -173,15 +183,36 @@ mod tests {
             parse_quote!(#[reflect(rename = "active")]),
             parse_quote!(#[inline]),
         ]);
-        assert_eq!(carrier.len(), 2);
-        assert_eq!(retained.len(), 2);
-        assert_eq!(carrier[0].meta.to_token_stream().to_string(), "cfg (unix)");
+        assert_eq!(
+            carrier.len(),
+            2,
+            "cfg and reflect attributes must be projected"
+        );
+        assert_eq!(
+            retained.len(),
+            2,
+            "cfg and inline attributes must be retained"
+        );
+        assert_eq!(
+            carrier[0].meta.to_token_stream().to_string(),
+            "cfg (unix)",
+            "cfg must be projected to the carrier",
+        );
         assert_eq!(
             carrier[1].meta.to_token_stream().to_string(),
-            "reflect (rename = \"active\")"
+            "reflect (rename = \"active\")",
+            "reflect policy must be projected to the carrier",
         );
-        assert_eq!(retained[0].meta.to_token_stream().to_string(), "cfg (unix)");
-        assert_eq!(retained[1].meta.to_token_stream().to_string(), "inline");
+        assert_eq!(
+            retained[0].meta.to_token_stream().to_string(),
+            "cfg (unix)",
+            "cfg must remain on the original item",
+        );
+        assert_eq!(
+            retained[1].meta.to_token_stream().to_string(),
+            "inline",
+            "item attributes must remain on the original item",
+        );
     }
 
     #[test]
@@ -189,18 +220,48 @@ mod tests {
         let (carrier, retained) = split_attributes(vec![parse_quote!(
             #[cfg_attr(feature = "special", cfg(any()), reflect(no_invoke), inline)]
         )]);
-        assert_eq!(carrier.len(), 1);
-        assert_eq!(retained.len(), 1);
-        assert!(carrier[0].meta.to_token_stream().to_string().contains("cfg (any ())"));
+        assert_eq!(
+            carrier.len(),
+            1,
+            "nested cfg branch must produce one carrier attribute"
+        );
+        assert_eq!(
+            retained.len(),
+            1,
+            "nested item branch must produce one retained attribute"
+        );
         assert!(
             carrier[0]
                 .meta
                 .to_token_stream()
                 .to_string()
-                .contains("reflect (no_invoke)")
+                .contains("cfg (any ())"),
+            "nested cfg predicate must be projected to the carrier",
         );
-        assert!(retained[0].meta.to_token_stream().to_string().contains("inline"));
-        assert!(!retained[0].meta.to_token_stream().to_string().contains("reflect"));
+        assert!(
+            carrier[0]
+                .meta
+                .to_token_stream()
+                .to_string()
+                .contains("reflect (no_invoke)"),
+            "reflection policy must be projected to the carrier",
+        );
+        assert!(
+            retained[0]
+                .meta
+                .to_token_stream()
+                .to_string()
+                .contains("inline"),
+            "item-only attributes must remain in the retained branch",
+        );
+        assert!(
+            !retained[0]
+                .meta
+                .to_token_stream()
+                .to_string()
+                .contains("reflect"),
+            "reflection policy must not remain on the original item",
+        );
     }
 
     #[test]
@@ -210,11 +271,29 @@ mod tests {
         )]);
         let carrier = carrier[0].meta.to_token_stream().to_string();
         let retained = retained[0].meta.to_token_stream().to_string();
-        assert!(carrier.contains("feature = \"outer\""));
-        assert!(carrier.contains("target_os = \"linux\""));
-        assert!(carrier.contains("reflect (no_invoke)"));
-        assert!(retained.contains("cfg_attr"));
-        assert!(retained.contains("inline"));
-        assert!(retained.contains("doc = \"active\""));
+        assert!(
+            carrier.contains("feature = \"outer\""),
+            "outer predicate must be preserved on the carrier"
+        );
+        assert!(
+            carrier.contains("target_os = \"linux\""),
+            "nested predicate must be preserved on the carrier"
+        );
+        assert!(
+            carrier.contains("reflect (no_invoke)"),
+            "nested reflection policy must be projected"
+        );
+        assert!(
+            retained.contains("cfg_attr"),
+            "retained nested attributes must keep cfg_attr"
+        );
+        assert!(
+            retained.contains("inline"),
+            "item attribute must be retained"
+        );
+        assert!(
+            retained.contains("doc = \"active\""),
+            "documentation attribute must be retained"
+        );
     }
 }

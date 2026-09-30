@@ -14,6 +14,7 @@ use crate::ir::ParsedDeclaration;
 
 /// Holds parser diagnostics alongside IR until the validation pipeline
 /// completes.
+#[must_use]
 pub(super) struct ParsedPipeline {
     /// The declaration produced by syntax parsing.
     pub(super) declaration: ParsedDeclaration,

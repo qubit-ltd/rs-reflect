@@ -44,6 +44,7 @@ use crate::ir::TypeKindIr;
 ///
 /// Returns a syntax diagnostic when the retained generic declaration or where
 /// clause cannot be parsed.
+#[must_use]
 pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Result<syn::Generics> {
     let kind = match declaration.kind {
         TypeDeclarationKindIr::Struct => "struct",
@@ -59,11 +60,13 @@ pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Resul
             ),
         )
     };
-    let mut generics: syn::Generics =
-        syn::parse2(declaration.generics.declaration.clone()).map_err(|cause| error("generics", cause))?;
+    let mut generics: syn::Generics = syn::parse2(declaration.generics.declaration.clone())
+        .map_err(|cause| error("generics", cause))?;
     if !declaration.generics.where_clause.is_empty() {
-        generics.where_clause =
-            Some(syn::parse2(declaration.generics.where_clause.clone()).map_err(|cause| error("where clause", cause))?);
+        generics.where_clause = Some(
+            syn::parse2(declaration.generics.where_clause.clone())
+                .map_err(|cause| error("where clause", cause))?,
+        );
     }
     Ok(generics)
 }
@@ -79,13 +82,18 @@ pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Resul
 ///
 /// Returns generated concrete generic metadata, or an empty stream for
 /// non-generic declarations.
-pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+#[must_use]
+pub(crate) fn concrete_descriptor(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     let codegen = quote!(#facade::__private::codegen_v3);
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
-    let definition = super::traits::generic_definition(&declaration.generics, declaration.span, facade);
+    let definition =
+        super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     let mut arguments = Vec::new();
     let mut definition_indices = Vec::new();
     let mut type_arguments = Vec::new();
@@ -115,7 +123,8 @@ pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &Toke
                     .expect("const generic parameters retain their declared type");
                 let const_type_tokens = &const_type.tokens;
                 let name = Ident::new(&parameter.name, parameter.span);
-                let declared_type = super::traits::type_expression(const_type, &environment, facade);
+                let declared_type =
+                    super::traits::type_expression(const_type, &environment, facade);
                 arguments.push(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
                     #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
                         #declared_type,
@@ -156,6 +165,7 @@ pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &Toke
 /// # Returns
 ///
 /// Returns the generated provider identifier shared across macro expansions.
+#[must_use]
 pub(crate) fn definition_provider_name(name: &Ident) -> Ident {
     format_ident!("__qubit_reflect_generic_definition_{}", name)
 }
@@ -170,6 +180,7 @@ pub(crate) fn definition_provider_name(name: &Ident) -> Ident {
 /// # Returns
 ///
 /// Returns the configured provider identifier or the canonical generated name.
+#[must_use]
 pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> Ident {
     for attribute in &declaration.attributes {
         if let crate::ir::HelperValueIr::DefinitionProviderV2(name) = &attribute.value {
@@ -195,12 +206,17 @@ pub(crate) fn type_definition_provider_name(declaration: &TypeDeclarationIr) -> 
 ///
 /// Returns a hidden provider function, or an empty stream for non-generic
 /// declarations.
-pub(crate) fn definition_provider(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+#[must_use]
+pub(crate) fn definition_provider(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     if declaration.generics.params.is_empty() {
         return TokenStream::new();
     }
     let function = definition_provider_name(&declaration.name);
-    let definition = super::traits::generic_definition(&declaration.generics, declaration.span, facade);
+    let definition =
+        super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     quote! {
         #[doc(hidden)]
         #[allow(non_snake_case)]
@@ -227,6 +243,7 @@ pub(crate) fn definition_provider(declaration: &TypeDeclarationIr, facade: &Toke
 ///
 /// Returns provider, marker, and registration tokens, or an empty stream for
 /// non-generic declarations.
+#[must_use]
 pub(crate) fn type_definition_provider(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
@@ -239,7 +256,8 @@ pub(crate) fn type_definition_provider(
     let generic_function = definition_provider_name(&declaration.name);
     let declaration_name = &declaration.name;
     let marker = format_ident!("__QubitReflectTypeDefinition{}", declaration.name);
-    let registration_module = format_ident!("__qubit_reflect_type_definition_registration_{fingerprint:016x}");
+    let registration_module =
+        format_ident!("__qubit_reflect_type_definition_registration_{fingerprint:016x}");
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let query_name = declaration
         .attributes
@@ -419,6 +437,7 @@ pub(crate) fn type_definition_provider(
 /// # Returns
 ///
 /// Returns tokens representing the visibility category and restricted path.
+#[must_use]
 fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStream) -> TokenStream {
     match visibility {
         crate::ir::VisibilityIr::Public => {
@@ -451,6 +470,7 @@ fn symbolic_visibility(visibility: &crate::ir::VisibilityIr, facade: &TokenStrea
 ///
 /// Returns complete field types that mention one of the declaration's generic
 /// parameters.
+#[must_use]
 pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&TypeIr> {
     if declaration
         .attributes
@@ -460,9 +480,11 @@ pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&Typ
         return Vec::new();
     }
     let mut fields: Vec<_> = match declaration.kind {
-        TypeDeclarationKindIr::Struct | TypeDeclarationKindIr::Union => {
-            declaration.fields.iter().filter_map(reflected_field_type).collect()
-        }
+        TypeDeclarationKindIr::Struct | TypeDeclarationKindIr::Union => declaration
+            .fields
+            .iter()
+            .filter_map(reflected_field_type)
+            .collect(),
         TypeDeclarationKindIr::Enum => declaration
             .variants
             .iter()
@@ -492,6 +514,7 @@ pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&Typ
 /// # Returns
 ///
 /// Returns its complete type, or `None` for opaque fields.
+#[must_use]
 fn reflected_field_type(field: &crate::ir::FieldIr) -> Option<&TypeIr> {
     (!field
         .attributes
@@ -511,7 +534,10 @@ fn reflected_field_type(field: &crate::ir::FieldIr) -> Option<&TypeIr> {
 /// # Returns
 ///
 /// Returns type parameters that occur through known transparent containers.
-pub(crate) fn transparently_reflected_type_parameters(declaration: &TypeDeclarationIr) -> Vec<Ident> {
+#[must_use]
+pub(crate) fn transparently_reflected_type_parameters(
+    declaration: &TypeDeclarationIr,
+) -> Vec<Ident> {
     declaration
         .generics
         .params
@@ -538,6 +564,7 @@ pub(crate) fn transparently_reflected_type_parameters(declaration: &TypeDeclarat
 ///
 /// Returns `true` when the parameter occurs in a supported transparent
 /// position.
+#[must_use]
 fn transparent_type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
     if type_is_parameter(ty, parameter) {
         return true;
@@ -600,8 +627,13 @@ fn transparent_type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
 ///
 /// Returns its reflected type-argument arity, or `None` when the path is
 /// unsupported or ambiguous.
+#[must_use]
 fn transparent_constructor_arity(path: &crate::ir::PathIr) -> Option<usize> {
-    let segments: Vec<_> = path.segments.iter().map(|segment| segment.name.as_str()).collect();
+    let segments: Vec<_> = path
+        .segments
+        .iter()
+        .map(|segment| segment.name.as_str())
+        .collect();
     match segments.as_slice() {
         ["std" | "alloc", "vec", "Vec"]
         | ["std" | "alloc", "boxed", "Box"]
@@ -626,32 +658,40 @@ fn transparent_constructor_arity(path: &crate::ir::PathIr) -> Option<usize> {
 ///
 /// Returns `true` when the parameter occurs in a type, path argument, or bound
 /// position.
+#[must_use]
 fn type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
             path.qualified_self
                 .as_ref()
                 .is_some_and(|qualified| type_uses_parameter(&qualified.ty, parameter))
-                || path.segments.first().is_some_and(|segment| segment.name == parameter)
+                || path
+                    .segments
+                    .first()
+                    .is_some_and(|segment| segment.name == parameter)
                 || path
                     .segments
                     .iter()
                     .any(|segment| path_arguments_use_parameter(&segment.arguments, parameter))
         }
-        TypeKindIr::Reference { element, .. } | TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
-            type_uses_parameter(element, parameter)
-        }
-        TypeKindIr::Tuple(elements) => elements.iter().any(|element| type_uses_parameter(element, parameter)),
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Pointer { element, .. } => type_uses_parameter(element, parameter),
+        TypeKindIr::Tuple(elements) => elements
+            .iter()
+            .any(|element| type_uses_parameter(element, parameter)),
         TypeKindIr::Array { element, .. } => type_uses_parameter(element, parameter),
         TypeKindIr::BareFunction { inputs, output, .. } => {
-            inputs.iter().any(|input| type_uses_parameter(input, parameter))
+            inputs
+                .iter()
+                .any(|input| type_uses_parameter(input, parameter))
                 || output
                     .as_deref()
                     .is_some_and(|output| type_uses_parameter(output, parameter))
         }
-        TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
-            bounds.iter().any(|bound| bound_uses_parameter(bound, parameter))
-        }
+        TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => bounds
+            .iter()
+            .any(|bound| bound_uses_parameter(bound, parameter)),
         TypeKindIr::Never | TypeKindIr::Infer | TypeKindIr::Macro | TypeKindIr::Other => false,
     }
 }
@@ -666,21 +706,28 @@ fn type_uses_parameter(ty: &TypeIr, parameter: &str) -> bool {
 /// # Returns
 ///
 /// Returns `true` when the parameter occurs in a type-valued argument or bound.
+#[must_use]
 fn path_arguments_use_parameter(arguments: &PathArgumentsIr, parameter: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
-        PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-            PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => type_uses_parameter(ty, parameter),
-            PathArgumentIr::Constraint { bounds, .. } => {
-                bounds.iter().any(|bound| bound_uses_parameter(bound, parameter))
-            }
-            PathArgumentIr::Lifetime(_)
-            | PathArgumentIr::Const(_)
-            | PathArgumentIr::AssociatedConst { .. }
-            | PathArgumentIr::Other(_) => false,
-        }),
+        PathArgumentsIr::AngleBracketed(arguments) => {
+            arguments.iter().any(|argument| match argument {
+                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                    type_uses_parameter(ty, parameter)
+                }
+                PathArgumentIr::Constraint { bounds, .. } => bounds
+                    .iter()
+                    .any(|bound| bound_uses_parameter(bound, parameter)),
+                PathArgumentIr::Lifetime(_)
+                | PathArgumentIr::Const(_)
+                | PathArgumentIr::AssociatedConst { .. }
+                | PathArgumentIr::Other(_) => false,
+            })
+        }
         PathArgumentsIr::Parenthesized { inputs, output } => {
-            inputs.iter().any(|input| type_uses_parameter(input, parameter))
+            inputs
+                .iter()
+                .any(|input| type_uses_parameter(input, parameter))
                 || output
                     .as_deref()
                     .is_some_and(|output| type_uses_parameter(output, parameter))
@@ -698,6 +745,7 @@ fn path_arguments_use_parameter(arguments: &PathArgumentsIr, parameter: &str) ->
 /// # Returns
 ///
 /// Returns `true` when the trait path or its arguments mention the parameter.
+#[must_use]
 fn bound_uses_parameter(bound: &GenericBoundIr, parameter: &str) -> bool {
     let GenericBoundIr::Trait { path, .. } = bound else {
         return false;
@@ -722,6 +770,7 @@ fn bound_uses_parameter(bound: &GenericBoundIr, parameter: &str) -> bool {
 ///
 /// Returns `true` when the lifetime occurs outside a shadowing higher-ranked
 /// scope.
+#[must_use]
 fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -743,8 +792,12 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
                 .is_some_and(|candidate| candidate.trim_start_matches('\'') == lifetime)
                 || type_uses_lifetime(element, lifetime)
         }
-        TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => type_uses_lifetime(element, lifetime),
-        TypeKindIr::Tuple(elements) => elements.iter().any(|element| type_uses_lifetime(element, lifetime)),
+        TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
+            type_uses_lifetime(element, lifetime)
+        }
+        TypeKindIr::Tuple(elements) => elements
+            .iter()
+            .any(|element| type_uses_lifetime(element, lifetime)),
         TypeKindIr::Array { element, .. } => type_uses_lifetime(element, lifetime),
         TypeKindIr::BareFunction {
             lifetimes,
@@ -752,8 +805,12 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
             output,
             ..
         } => {
-            !lifetimes.iter().any(|bound| bound.trim_start_matches('\'') == lifetime)
-                && (inputs.iter().any(|input| type_uses_lifetime(input, lifetime))
+            !lifetimes
+                .iter()
+                .any(|bound| bound.trim_start_matches('\'') == lifetime)
+                && (inputs
+                    .iter()
+                    .any(|input| type_uses_lifetime(input, lifetime))
                     || output
                         .as_deref()
                         .is_some_and(|output| type_uses_lifetime(output, lifetime)))
@@ -778,19 +835,28 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
 ///
 /// Returns `true` when the lifetime occurs in an argument type or lifetime
 /// slot.
+#[must_use]
 fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
-        PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-            PathArgumentIr::Lifetime(candidate) => candidate.trim_start_matches('\'') == lifetime,
-            PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => type_uses_lifetime(ty, lifetime),
-            PathArgumentIr::Const(_)
-            | PathArgumentIr::AssociatedConst { .. }
-            | PathArgumentIr::Constraint { .. }
-            | PathArgumentIr::Other(_) => false,
-        }),
+        PathArgumentsIr::AngleBracketed(arguments) => {
+            arguments.iter().any(|argument| match argument {
+                PathArgumentIr::Lifetime(candidate) => {
+                    candidate.trim_start_matches('\'') == lifetime
+                }
+                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                    type_uses_lifetime(ty, lifetime)
+                }
+                PathArgumentIr::Const(_)
+                | PathArgumentIr::AssociatedConst { .. }
+                | PathArgumentIr::Constraint { .. }
+                | PathArgumentIr::Other(_) => false,
+            })
+        }
         PathArgumentsIr::Parenthesized { inputs, output } => {
-            inputs.iter().any(|input| type_uses_lifetime(input, lifetime))
+            inputs
+                .iter()
+                .any(|input| type_uses_lifetime(input, lifetime))
                 || output
                     .as_deref()
                     .is_some_and(|output| type_uses_lifetime(output, lifetime))
@@ -809,6 +875,7 @@ fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> b
 ///
 /// Returns `true` when the parameter occurs in a type or const argument
 /// position.
+#[must_use]
 fn type_uses_const(ty: &TypeIr, parameter: &str) -> bool {
     if type_is_parameter(ty, parameter) {
         return true;
@@ -823,10 +890,12 @@ fn type_uses_const(ty: &TypeIr, parameter: &str) -> bool {
                     .iter()
                     .any(|segment| path_arguments_use_const(&segment.arguments, parameter))
         }
-        TypeKindIr::Reference { element, .. } | TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
-            type_uses_const(element, parameter)
-        }
-        TypeKindIr::Tuple(elements) => elements.iter().any(|element| type_uses_const(element, parameter)),
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Pointer { element, .. } => type_uses_const(element, parameter),
+        TypeKindIr::Tuple(elements) => elements
+            .iter()
+            .any(|element| type_uses_const(element, parameter)),
         TypeKindIr::Array { element, length } => {
             token_is_parameter(length, parameter) || type_uses_const(element, parameter)
         }
@@ -856,16 +925,23 @@ fn type_uses_const(ty: &TypeIr, parameter: &str) -> bool {
 ///
 /// Returns `true` when a const-valued argument or nested type mentions the
 /// parameter.
+#[must_use]
 fn path_arguments_use_const(arguments: &PathArgumentsIr, parameter: &str) -> bool {
     match arguments {
         PathArgumentsIr::None => false,
-        PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-            PathArgumentIr::Const(value) | PathArgumentIr::AssociatedConst { value, .. } => {
-                token_is_parameter(value, parameter)
-            }
-            PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => type_uses_const(ty, parameter),
-            PathArgumentIr::Lifetime(_) | PathArgumentIr::Constraint { .. } | PathArgumentIr::Other(_) => false,
-        }),
+        PathArgumentsIr::AngleBracketed(arguments) => {
+            arguments.iter().any(|argument| match argument {
+                PathArgumentIr::Const(value) | PathArgumentIr::AssociatedConst { value, .. } => {
+                    token_is_parameter(value, parameter)
+                }
+                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                    type_uses_const(ty, parameter)
+                }
+                PathArgumentIr::Lifetime(_)
+                | PathArgumentIr::Constraint { .. }
+                | PathArgumentIr::Other(_) => false,
+            })
+        }
         PathArgumentsIr::Parenthesized { inputs, output } => {
             inputs.iter().any(|input| type_uses_const(input, parameter))
                 || output
@@ -886,8 +962,10 @@ fn path_arguments_use_const(arguments: &PathArgumentsIr, parameter: &str) -> boo
 ///
 /// Returns `true` only when the expression is exactly the unqualified parameter
 /// path.
+#[must_use]
 fn token_is_parameter(tokens: &TokenStream, parameter: &str) -> bool {
-    parse2::<ExprPath>(tokens.clone()).is_ok_and(|path| path.qself.is_none() && path.path.is_ident(parameter))
+    parse2::<ExprPath>(tokens.clone())
+        .is_ok_and(|path| path.qself.is_none() && path.path.is_ident(parameter))
 }
 
 /// Returns whether `ty` is the direct generic parameter named `parameter`.
@@ -900,6 +978,7 @@ fn token_is_parameter(tokens: &TokenStream, parameter: &str) -> bool {
 /// # Returns
 ///
 /// Returns `true` when the type is exactly that unqualified parameter.
+#[must_use]
 fn type_is_parameter(ty: &TypeIr, parameter: &str) -> bool {
     let TypeKindIr::Path(path) = &ty.kind else {
         return false;
@@ -952,7 +1031,11 @@ mod tests {
             .map(|field_type| field_type.source.as_str())
             .collect();
 
-        assert_eq!(field_types, ["& 'a str", "[u8 ; N]", "Conditional < N >"]);
+        assert_eq!(
+            field_types,
+            ["& 'a str", "[u8 ; N]", "Conditional < N >"],
+            "const and lifetime parameters should retain complete field types",
+        );
     }
 
     #[test]
@@ -1029,6 +1112,10 @@ mod tests {
             .map(|parameter| parameter.to_string())
             .collect();
 
-        assert_eq!(parameters, ["T"]);
+        assert_eq!(
+            parameters,
+            ["T"],
+            "only parameters under known transparent containers should be reflected",
+        );
     }
 }

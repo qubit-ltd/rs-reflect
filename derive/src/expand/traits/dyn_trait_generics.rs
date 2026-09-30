@@ -11,6 +11,7 @@
 use proc_macro2::TokenStream;
 
 /// Generated generic syntax and associated-type identities for one dyn root.
+#[must_use]
 pub(super) struct DynTraitGenerics {
     /// Generic parameters used by the generated impl declaration.
     pub(super) impl_declaration: TokenStream,

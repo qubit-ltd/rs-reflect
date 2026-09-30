@@ -39,6 +39,7 @@ use crate::ir::TypeKindIr;
 /// # Returns
 ///
 /// Returns structured path IR with its diagnostic source and span.
+#[must_use]
 pub(crate) fn convert_path(path: &Path) -> PathIr {
     let tokens = path.to_token_stream();
     PathIr {
@@ -68,6 +69,7 @@ pub(crate) fn convert_path(path: &Path) -> PathIr {
 /// # Returns
 ///
 /// Returns structured type IR with retained source tokens and span.
+#[must_use]
 pub(crate) fn convert_type(ty: &Type) -> TypeIr {
     let tokens = ty.to_token_stream();
     let kind = match ty {
@@ -105,20 +107,27 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),
-            inputs: function.inputs.iter().map(|input| convert_type(&input.ty)).collect(),
+            inputs: function
+                .inputs
+                .iter()
+                .map(|input| convert_type(&input.ty))
+                .collect(),
             output: match &function.output {
                 ReturnType::Default => None,
                 ReturnType::Type(_, ty) => Some(Box::new(convert_type(ty))),
             },
             is_unsafe: function.unsafety.is_some(),
-            abi: function
-                .abi
-                .as_ref()
-                .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), LitStr::value)),
+            abi: function.abi.as_ref().map(|abi| {
+                abi.name
+                    .as_ref()
+                    .map_or_else(|| "C".to_owned(), LitStr::value)
+            }),
             is_variadic: function.variadic.is_some(),
         },
         Type::TraitObject(object) => TypeKindIr::TraitObject {
@@ -152,6 +161,7 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
 /// # Returns
 ///
 /// Returns the corresponding structured path argument representation.
+#[must_use]
 fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
     match arguments {
         SynPathArguments::None => PathArgumentsIr::None,
@@ -200,9 +210,12 @@ fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
 /// # Returns
 ///
 /// Returns the matching generic bound IR variant.
+#[must_use]
 pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
     match bound {
-        TypeParamBound::Lifetime(lifetime) => GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string()),
+        TypeParamBound::Lifetime(lifetime) => {
+            GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string())
+        }
         TypeParamBound::Trait(trait_bound) => GenericBoundIr::Trait {
             path: convert_path(&trait_bound.path),
             modifier: match trait_bound.modifier {
@@ -214,7 +227,9 @@ pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
                 .iter()
                 .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                 .filter_map(|parameter| match parameter {
-                    GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                    GenericParam::Lifetime(lifetime) => {
+                        Some(lifetime.lifetime.to_token_stream().to_string())
+                    }
                     _ => None,
                 })
                 .collect(),

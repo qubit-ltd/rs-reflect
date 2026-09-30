@@ -14,6 +14,7 @@ use proc_macro2::TokenStream;
 
 /// Complete invocation facts shared by impl and trait expansion.
 #[derive(Clone, Debug)]
+#[must_use]
 pub(crate) struct InvocationPlan {
     /// Classified receiver shape, when the method has a receiver.
     pub(crate) receiver: Option<ReceiverPlan>,
@@ -33,6 +34,8 @@ impl InvocationPlan {
     /// # Returns
     ///
     /// Returns `true` when the availability plan is executable.
+    #[must_use]
+    #[inline]
     pub(crate) fn is_executable(&self) -> bool {
         matches!(self.availability, AvailabilityPlan::Executable)
     }
@@ -43,6 +46,8 @@ impl InvocationPlan {
     ///
     /// Returns `Some(true)` for mutable pin, `Some(false)` for shared pin, or
     /// `None`.
+    #[must_use]
+    #[inline]
     pub(crate) fn pinned_receiver_mutability(&self) -> Option<bool> {
         match self.receiver.as_ref() {
             Some(ReceiverPlan::Pinned { mutable }) => Some(*mutable),
@@ -55,6 +60,8 @@ impl InvocationPlan {
     /// # Returns
     ///
     /// Returns the owned container type, or `None` for other receiver plans.
+    #[must_use]
+    #[inline]
     pub(crate) fn owned_receiver_type(&self) -> Option<&TokenStream> {
         match self.receiver.as_ref() {
             Some(ReceiverPlan::OwnedContainer(receiver)) => Some(receiver),
@@ -67,6 +74,8 @@ impl InvocationPlan {
     /// # Returns
     ///
     /// Returns the extension receiver type, or `None` for other receiver plans.
+    #[must_use]
+    #[inline]
     pub(crate) fn extension_receiver_type(&self) -> Option<&TokenStream> {
         match self.receiver.as_ref() {
             Some(ReceiverPlan::Extension(receiver)) => Some(receiver),
@@ -79,6 +88,8 @@ impl InvocationPlan {
     /// # Returns
     ///
     /// Returns the parameter count retained by this plan.
+    #[must_use]
+    #[inline]
     pub(crate) fn parameter_count(&self) -> usize {
         self.parameters.len()
     }
@@ -86,6 +97,7 @@ impl InvocationPlan {
 
 /// Receiver facts retained for adapter emission.
 #[derive(Clone, Debug)]
+#[must_use]
 pub(crate) enum ReceiverPlan {
     /// Method consumes its receiver by value.
     Value,
@@ -106,6 +118,7 @@ pub(crate) enum ReceiverPlan {
 
 /// One parameter's validated invocation facts.
 #[derive(Clone, Debug)]
+#[must_use]
 pub(crate) struct ParameterPlan {
     /// Zero-based position in the method signature.
     pub(crate) index: usize,
@@ -117,6 +130,7 @@ pub(crate) struct ParameterPlan {
 
 /// Validated output category retained for adapter emission.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[must_use]
 pub(crate) enum OutputPlan {
     /// Method returns `()`.
     Unit,
@@ -136,6 +150,7 @@ pub(crate) enum OutputPlan {
 
 /// Requested local, thread-safe, catching, and asynchronous modes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[must_use]
 pub(crate) struct AdapterModes {
     /// Whether the adapter must enforce thread-safe bounds.
     pub(crate) thread_safe: bool,
@@ -147,6 +162,7 @@ pub(crate) struct AdapterModes {
 
 /// Whether code can emit an executable adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[must_use]
 pub(crate) enum AvailabilityPlan {
     /// The method can be called through a generated adapter.
     Executable,
@@ -156,6 +172,7 @@ pub(crate) enum AvailabilityPlan {
 
 /// One stable reason an adapter cannot be emitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[must_use]
 pub(crate) enum UnavailableReasonPlan {
     /// Receiver shape cannot be adapted safely.
     UnsupportedReceiver,

@@ -106,6 +106,7 @@ impl GenericEnvironment {
 
     /// Adds one type parameter for focused generator tests.
     #[cfg(test)]
+    #[must_use]
     pub(crate) fn with_type_parameter(mut self, name: impl Into<String>) -> Self {
         self.type_parameters.insert(name.into());
         self
@@ -113,6 +114,7 @@ impl GenericEnvironment {
 
     /// Adds one const parameter for focused generator tests.
     #[cfg(test)]
+    #[must_use]
     pub(crate) fn with_const_parameter(mut self, name: impl Into<String>) -> Self {
         self.const_parameters.insert(name.into());
         self

@@ -493,6 +493,7 @@ impl TypeDeclarationIr {
     /// # Returns
     ///
     /// Returns the number of matching type-level helper attributes.
+    #[must_use]
     pub(crate) fn helper_count(&self, name: crate::ir::HelperName) -> usize {
         self.attributes
             .iter()

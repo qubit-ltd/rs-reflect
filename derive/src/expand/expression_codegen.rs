@@ -42,6 +42,7 @@ use crate::ir::WherePredicateIr;
 /// # Returns
 ///
 /// Returns tokens naming the corresponding runtime ABI value.
+#[must_use]
 pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) -> TokenStream {
     match abi {
         Some("Rust") | None => {
@@ -72,7 +73,12 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
 /// # Returns
 ///
 /// Returns tokens constructing the runtime generic definition descriptor.
-pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
+#[must_use]
+pub(crate) fn generic_definition(
+    generics: &GenericsIr,
+    span: Span,
+    facade: &TokenStream,
+) -> TokenStream {
     let environment = GenericEnvironment::from_generics(generics);
     let parameters = generics.params.iter().map(|parameter| {
         let name = LitStr::new(&parameter.name, parameter.span);
@@ -190,6 +196,7 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
 /// # Returns
 ///
 /// Returns the supported trait and lifetime predicates in source order.
+#[must_use]
 fn generic_bounds(
     bounds: &[GenericBoundIr],
     subject: &LitStr,
@@ -251,6 +258,7 @@ fn generic_bounds(
 ///
 /// Returns tokens for the static, named, or otherwise named lifetime
 /// expression.
+#[must_use]
 pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStream) -> TokenStream {
     if lifetime == "'static" {
         return quote!(#facade::__private::codegen_v3::expression::LifetimeExpression::Static);
@@ -271,7 +279,12 @@ pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStre
 /// # Returns
 ///
 /// Returns tokens representing the type expression in runtime metadata.
-pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
+#[must_use]
+pub(crate) fn type_expression(
+    ty: &TypeIr,
+    environment: &GenericEnvironment,
+    facade: &TokenStream,
+) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => {
             quote!(#facade::__private::codegen_v3::expression::TypeExpression::Never)
@@ -333,7 +346,9 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
-            let parameters = inputs.iter().map(|value| type_expression(value, environment, facade));
+            let parameters = inputs
+                .iter()
+                .map(|value| type_expression(value, environment, facade));
             let return_type = output
                 .as_deref()
                 .map(|value| type_expression(value, environment, facade))
@@ -403,6 +418,7 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
 ///
 /// Panics if a qualified path has no associated item segment, which violates
 /// the parser's validated path invariant.
+#[must_use]
 fn path_expression(
     path: &crate::ir::PathIr,
     ty: &TypeIr,
@@ -410,7 +426,8 @@ fn path_expression(
     facade: &TokenStream,
 ) -> TokenStream {
     let diagnostic = LitStr::new(&ty.source, ty.span);
-    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self" {
+    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
+    {
         return quote!(#facade::__private::codegen_v3::expression::TypeExpression::SelfType);
     }
     if path.qualified_self.is_none()
@@ -511,6 +528,7 @@ fn path_expression(
 /// # Returns
 ///
 /// Returns the trait path as a runtime type expression.
+#[must_use]
 pub(crate) fn path_type_expression(
     path: &crate::ir::PathIr,
     environment: &GenericEnvironment,
@@ -537,6 +555,7 @@ pub(crate) fn path_type_expression(
 /// # Returns
 ///
 /// Returns supported arguments in source order; unsupported forms are omitted.
+#[must_use]
 pub(crate) fn path_arguments(
     arguments: &PathArgumentsIr,
     environment: &GenericEnvironment,
@@ -594,6 +613,7 @@ pub(crate) fn path_arguments(
 /// # Returns
 ///
 /// Returns runtime generic arguments with direct trait parameters materialized.
+#[must_use]
 pub(super) fn external_supertrait_arguments(
     arguments: &PathArgumentsIr,
     declaration: &TraitDeclarationIr,
@@ -664,6 +684,7 @@ pub(super) fn external_supertrait_arguments(
 /// # Returns
 ///
 /// Returns supported trait and outlives predicates in source order.
+#[must_use]
 fn bound_predicates(
     bounds: &[GenericBoundIr],
     environment: &GenericEnvironment,
@@ -722,7 +743,12 @@ fn bound_predicates(
 ///
 /// Returns structural tokens for supported expressions or a compile error for
 /// unsupported syntax.
-fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
+#[must_use]
+fn const_expression_value(
+    value: &TokenStream,
+    environment: &GenericEnvironment,
+    facade: &TokenStream,
+) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = parse2::<Ident>(value.clone()) {
         let name = LitStr::new(&identifier.to_string(), identifier.span());
@@ -783,8 +809,9 @@ fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment,
 ///
 /// # Returns
 ///
-/// Returns an optional structural const expression or a compile error for
+/// Returns tokens for `Some(const expression)`, or compile-error tokens for
 /// unsupported defaults.
+#[must_use]
 pub(super) fn const_expression(
     value: &TokenStream,
     environment: &GenericEnvironment,
@@ -809,14 +836,16 @@ pub(super) fn const_expression(
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => match expression.expr.as_ref() {
-            Expr::Lit(expression) => match &expression.lit {
-                Lit::Int(value) => integer_const_expression(value, true, facade)
-                    .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
+        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => {
+            match expression.expr.as_ref() {
+                Expr::Lit(expression) => match &expression.lit {
+                    Lit::Int(value) => integer_const_expression(value, true, facade)
+                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
+                    _ => unsupported_const_default(value),
+                },
                 _ => unsupported_const_default(value),
-            },
-            _ => unsupported_const_default(value),
-        },
+            }
+        }
         Expr::Path(path) if path.path.segments.len() == 1 => {
             let identifier = path.path.segments[0].ident.to_string();
             let name = LitStr::new(&identifier, path.path.segments[0].ident.span());
@@ -851,16 +880,29 @@ pub(super) fn const_expression(
 ///
 /// Returns signed or unsigned structural tokens when the value fits, or `None`
 /// when parsing overflows.
-fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
+#[must_use]
+fn integer_const_expression(
+    value: &LitInt,
+    negative: bool,
+    facade: &TokenStream,
+) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
-        let value = if negative { magnitude.checked_neg()? } else { magnitude };
-        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))))
+        let value = if negative {
+            magnitude.checked_neg()?
+        } else {
+            magnitude
+        };
+        Some(
+            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))),
+        )
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))))
+        Some(
+            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))),
+        )
     }
 }
 
@@ -874,6 +916,7 @@ fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream
 /// # Returns
 ///
 /// Returns tokens that produce a compile-time error at the user's invocation.
+#[must_use]
 fn unsupported_const_default(value: impl ToTokens) -> TokenStream {
     let source = LitStr::new(&value.into_token_stream().to_string(), Span::call_site());
     quote!(compile_error!(
@@ -905,10 +948,22 @@ mod tests {
     fn test_type_expression_uses_explicit_generic_environment() {
         let environment = GenericEnvironment::new().with_type_parameter("item");
 
-        assert!(render_type("item", &environment).contains("parameter"));
-        assert!(render_type("HTTP", &environment).contains("Concrete"));
-        assert!(render_type("item::Output", &environment).contains("Associated"));
-        assert!(render_type("Self::Output", &environment).contains("Associated"));
+        assert!(
+            render_type("item", &environment).contains("parameter"),
+            "generated expression should contain parameter"
+        );
+        assert!(
+            render_type("HTTP", &environment).contains("Concrete"),
+            "generated expression should contain Concrete"
+        );
+        assert!(
+            render_type("item::Output", &environment).contains("Associated"),
+            "generated expression should contain Associated"
+        );
+        assert!(
+            render_type("Self::Output", &environment).contains("Associated"),
+            "generated expression should contain Associated"
+        );
     }
 
     /// Verifies generic arguments remain attached to every path segment.
@@ -916,9 +971,18 @@ mod tests {
     fn test_type_expression_preserves_arguments_on_each_path_segment() {
         let rendered = render_type("Outer<u8>::Inner<u16>", &GenericEnvironment::new());
 
-        assert!(rendered.matches("ConcretePathSegment :: new").count() >= 2);
-        assert!(rendered.contains("u8"));
-        assert!(rendered.contains("u16"));
+        assert!(
+            rendered.matches("ConcretePathSegment :: new").count() >= 2,
+            "each path segment should emit a concrete path segment node"
+        );
+        assert!(
+            rendered.contains("u8"),
+            "generated expression should contain u8"
+        );
+        assert!(
+            rendered.contains("u16"),
+            "generated expression should contain u16"
+        );
     }
 
     /// Verifies qualified projections and associated constraints stay
@@ -929,23 +993,52 @@ mod tests {
         let projection = render_type("<item as Trait<u8>>::Output", &environment);
         let constraint = render_type("Iterator<Item: Display>", &environment);
 
-        assert!(projection.contains("AssociatedTypeExpression"));
-        assert!(projection.contains("Trait"));
-        assert!(projection.contains("u8"));
-        assert!(constraint.contains("associated_type_bound"));
-        assert!(constraint.contains("Display"));
+        assert!(
+            projection.contains("AssociatedTypeExpression"),
+            "generated expression should contain AssociatedTypeExpression"
+        );
+        assert!(
+            projection.contains("Trait"),
+            "generated expression should contain Trait"
+        );
+        assert!(
+            projection.contains("u8"),
+            "generated expression should contain u8"
+        );
+        assert!(
+            constraint.contains("associated_type_bound"),
+            "generated expression should contain associated_type_bound"
+        );
+        assert!(
+            constraint.contains("Display"),
+            "generated expression should contain Display"
+        );
     }
 
     /// Verifies const parameters and const item paths remain distinct.
     #[test]
     fn test_const_expression_uses_explicit_generic_environment() {
         let environment = GenericEnvironment::new().with_const_parameter("limit");
-        let parameter = const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
-        let item = const_expression_value(&quote!(limits::DEFAULT), &environment, &quote!(qubit_reflect));
+        let parameter =
+            const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
+        let item = const_expression_value(
+            &quote!(limits::DEFAULT),
+            &environment,
+            &quote!(qubit_reflect),
+        );
 
-        assert!(parameter.to_string().contains("const_parameter"));
-        assert!(item.to_string().contains("const_path"));
-        assert!(item.to_string().contains("DEFAULT"));
+        assert!(
+            parameter.to_string().contains("const_parameter"),
+            "generated expression should contain const_parameter"
+        );
+        assert!(
+            item.to_string().contains("const_path"),
+            "generated expression should contain const_path"
+        );
+        assert!(
+            item.to_string().contains("DEFAULT"),
+            "generated expression should contain DEFAULT"
+        );
     }
 
     /// Verifies that literals retain their structural value rather than their
@@ -958,21 +1051,46 @@ mod tests {
         let unsigned = const_expression(&quote!(42u8), &environment, &facade).to_string();
         let escaped = const_expression(&quote!('\n'), &environment, &facade).to_string();
 
-        assert!(signed.contains("SignedInteger"));
-        assert!(signed.contains("- 7i128"));
-        assert!(unsigned.contains("UnsignedInteger"));
-        assert!(unsigned.contains("42u128"));
-        assert!(escaped.contains("Character"));
-        assert!(escaped.contains("'\\n'"));
+        assert!(
+            signed.contains("SignedInteger"),
+            "generated expression should contain SignedInteger"
+        );
+        assert!(
+            signed.contains("- 7i128"),
+            "generated expression should contain - 7i128"
+        );
+        assert!(
+            unsigned.contains("UnsignedInteger"),
+            "generated expression should contain UnsignedInteger"
+        );
+        assert!(
+            unsigned.contains("42u128"),
+            "generated expression should contain 42u128"
+        );
+        assert!(
+            escaped.contains("Character"),
+            "generated expression should contain Character"
+        );
+        assert!(
+            escaped.contains("'\\n'"),
+            "generated expression should contain '\\n'"
+        );
     }
 
     /// Verifies that symbolic defaults retain const-item path identity.
     #[test]
     fn test_const_default_preserves_const_item_path() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);
-        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect)).to_string();
+        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect))
+            .to_string();
 
-        assert!(rendered.contains("const_path"));
-        assert!(rendered.contains("DEFAULT_LIMIT"));
+        assert!(
+            rendered.contains("const_path"),
+            "generated expression should contain const_path"
+        );
+        assert!(
+            rendered.contains("DEFAULT_LIMIT"),
+            "generated expression should contain DEFAULT_LIMIT"
+        );
     }
 }

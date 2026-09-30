@@ -41,6 +41,7 @@ use crate::ir::TypeKindIr;
 /// # Returns
 ///
 /// Returns generated resolver match arms in declaration order.
+#[must_use]
 pub(super) fn specialization_associated_type_resolver_arms(
     declaration: &ImplDeclarationIr,
     replacements: &[(Ident, TokenStream)],
@@ -95,14 +96,18 @@ pub(super) fn specialization_associated_type_resolver_arms(
 /// # Returns
 ///
 /// Returns generic identifiers paired with their concrete syntax tokens.
-pub(super) fn specialization_replacements(specialization: &SpecializationIr) -> Vec<(Ident, TokenStream)> {
+#[must_use]
+pub(super) fn specialization_replacements(
+    specialization: &SpecializationIr,
+) -> Vec<(Ident, TokenStream)> {
     specialization
         .bindings
         .iter()
         .map(|binding| {
             let tokens = match &binding.value {
                 SpecializationValueIr::Type(ty) => ty.tokens.clone(),
-                SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => tokens.clone(),
+                SpecializationValueIr::Const(tokens)
+                | SpecializationValueIr::AmbiguousPath(tokens) => tokens.clone(),
             };
             (Ident::new(&binding.name, binding.span), tokens)
         })
@@ -121,7 +126,11 @@ pub(super) fn specialization_replacements(specialization: &SpecializationIr) -> 
 /// # Returns
 ///
 /// Returns the rewritten type syntax.
-pub(super) fn substitute_type_syntax(tokens: &TokenStream, replacements: &[(Ident, TokenStream)]) -> TokenStream {
+#[must_use]
+pub(super) fn substitute_type_syntax(
+    tokens: &TokenStream,
+    replacements: &[(Ident, TokenStream)],
+) -> TokenStream {
     super::internal::generic_substituter::substitute_type_syntax(tokens, replacements)
 }
 
@@ -132,7 +141,10 @@ pub(super) fn substitute_type_syntax(tokens: &TokenStream, replacements: &[(Iden
 ///
 /// - `declaration`: Concrete impl declaration whose method types are rewritten.
 /// - `replacements`: Generic identifiers and concrete type or const tokens.
-pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, replacements: &[(Ident, TokenStream)]) {
+pub(super) fn substitute_impl_method_types(
+    declaration: &mut ImplDeclarationIr,
+    replacements: &[(Ident, TokenStream)],
+) {
     for method in &mut declaration.methods {
         let replacements = replacements
             .iter()
@@ -191,8 +203,8 @@ pub(super) fn substitute_impl_associated_item_types(
 /// syntax.
 fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
     let tokens = substitute_type_syntax(&ty.tokens, replacements);
-    let parsed: syn::Type =
-        syn::parse2(tokens).expect("validated specialization must retain valid associated-item type syntax");
+    let parsed: syn::Type = syn::parse2(tokens)
+        .expect("validated specialization must retain valid associated-item type syntax");
     *ty = crate::parse::convert_type(&parsed);
 }
 
@@ -203,7 +215,10 @@ fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream
 /// - `declaration`: Concrete impl declaration whose generic lifetimes become
 ///   `'static`.
 /// - `lifetime_names`: Impl lifetime names selected for substitution.
-pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names: &[&str]) {
+pub(super) fn substitute_impl_lifetimes(
+    declaration: &mut ImplDeclarationIr,
+    lifetime_names: &[&str],
+) {
     substitute_type_lifetimes(&mut declaration.target_type, lifetime_names);
     if let Some(trait_path) = &mut declaration.trait_path {
         substitute_path_lifetimes(trait_path, lifetime_names);
@@ -211,7 +226,8 @@ pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lif
     for method in &mut declaration.methods {
         if let Some(receiver) = &mut method.receiver {
             substitute_type_lifetimes(&mut receiver.ty, lifetime_names);
-            receiver.declaration = substitute_lifetime_tokens(&receiver.declaration, lifetime_names);
+            receiver.declaration =
+                substitute_lifetime_tokens(&receiver.declaration, lifetime_names);
         }
         for parameter in &mut method.parameters {
             substitute_type_lifetimes(&mut parameter.ty, lifetime_names);
@@ -241,7 +257,9 @@ fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
     ty.source = ty.tokens.to_string();
     match &mut ty.kind {
         TypeKindIr::Path(path) => substitute_path_lifetimes(path, lifetime_names),
-        TypeKindIr::Reference { lifetime, element, .. } => {
+        TypeKindIr::Reference {
+            lifetime, element, ..
+        } => {
             if lifetime
                 .as_deref()
                 .is_some_and(|lifetime| lifetime_names.contains(&lifetime.trim_start_matches('\'')))
@@ -336,6 +354,7 @@ fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&st
 /// # Returns
 ///
 /// Returns a token stream with matching lifetime tokens rewritten.
+#[must_use]
 fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> TokenStream {
     let trees: Vec<_> = tokens.clone().into_iter().collect();
     let mut output = TokenStream::new();
@@ -386,9 +405,12 @@ pub(super) fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, To
 /// # Panics
 ///
 /// Panics if validated specialization tokens no longer parse as a Rust path.
-pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
-    let mut parsed: syn::Path =
-        syn::parse2(path.tokens.clone()).expect("validated specialization must retain valid trait path syntax");
+pub(super) fn substitute_trait_path_tokens(
+    path: &mut crate::ir::PathIr,
+    replacements: &[(Ident, TokenStream)],
+) {
+    let mut parsed: syn::Path = syn::parse2(path.tokens.clone())
+        .expect("validated specialization must retain valid trait path syntax");
     parsed = super::internal::generic_substituter::substitute_path_syntax(&parsed, replacements);
     *path = crate::parse::convert_path(&parsed);
 }
@@ -405,13 +427,15 @@ pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replace
 ///
 /// Returns the substituted extension receiver type, or `None` for core
 /// receivers.
+#[must_use]
 pub(super) fn typed_extension_receiver_type(
     receiver: &crate::ir::ReceiverIr,
     target: &TokenStream,
 ) -> Option<TokenStream> {
     if receiver.kind != ReceiverKindIr::Typed
         || crate::expand::invocation::analysis::typed_pinned_receiver_mutable(receiver).is_some()
-        || crate::expand::invocation::analysis::typed_owned_receiver_type(receiver, &quote!(Self)).is_some()
+        || crate::expand::invocation::analysis::typed_owned_receiver_type(receiver, &quote!(Self))
+            .is_some()
     {
         return None;
     }
@@ -433,12 +457,14 @@ pub(super) fn typed_extension_receiver_type(
 /// # Returns
 ///
 /// Returns generated runtime generic-argument tokens.
+#[must_use]
 pub(super) fn specialization_arguments(
     specialization: &SpecializationIr,
     generics: &crate::ir::GenericsIr,
     facade: &TokenStream,
 ) -> TokenStream {
-    let environment = crate::expand::generic_environment::GenericEnvironment::from_generics(generics);
+    let environment =
+        crate::expand::generic_environment::GenericEnvironment::from_generics(generics);
     let arguments = generics.params.iter().filter_map(|parameter| {
         if parameter.kind == GenericKindIr::Lifetime {
             return None;
@@ -508,6 +534,7 @@ pub(super) fn specialization_arguments(
 ///
 /// Returns concrete method IR and call arguments, or `None` for incomplete
 /// bindings.
+#[must_use]
 pub(super) fn specialized_method(
     method: &MethodIr,
     specialization: &SpecializationIr,
@@ -552,7 +579,11 @@ pub(super) fn specialized_method(
 ///
 /// Returns the corresponding type tokens, or `None` for a missing/non-type
 /// binding.
-fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
+#[must_use]
+fn specialization_type_argument(
+    specialization: &SpecializationIr,
+    name: &str,
+) -> Option<TokenStream> {
     match &specialization
         .bindings
         .iter()
@@ -576,14 +607,20 @@ fn specialization_type_argument(specialization: &SpecializationIr, name: &str) -
 ///
 /// Returns the corresponding const tokens, or `None` for a missing/non-const
 /// binding.
-fn specialization_const_argument(specialization: &SpecializationIr, name: &str) -> Option<TokenStream> {
+#[must_use]
+fn specialization_const_argument(
+    specialization: &SpecializationIr,
+    name: &str,
+) -> Option<TokenStream> {
     match &specialization
         .bindings
         .iter()
         .find(|binding| binding.name == name)?
         .value
     {
-        SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => Some(tokens.clone()),
+        SpecializationValueIr::Const(tokens) | SpecializationValueIr::AmbiguousPath(tokens) => {
+            Some(tokens.clone())
+        }
         SpecializationValueIr::Type(_) => None,
     }
 }
@@ -597,16 +634,23 @@ mod tests {
 
     #[test]
     fn test_substitute_type_syntax_rewrites_only_generic_type_and_const_paths() {
-        let replacements = [(quote!(T), quote!(u8)), (quote!(N), quote!(4))].map(|(name, value)| {
-            (
-                syn::parse2(name).expect("the replacement name must be an identifier"),
-                value,
-            )
-        });
+        let replacements =
+            [(quote!(T), quote!(u8)), (quote!(N), quote!(4))].map(|(name, value)| {
+                (
+                    syn::parse2(name).expect("the replacement name must be an identifier"),
+                    value,
+                )
+            });
         let cases: [(TokenStream, TokenStream); 6] = [
             (quote!(Vec<T>), quote!(Vec<u8>)),
-            (quote!(<T as Iterator>::Item), quote!(<u8 as Iterator>::Item)),
-            (quote!(Option<Result<T, Vec<T>>>), quote!(Option<Result<u8, Vec<u8>>>)),
+            (
+                quote!(<T as Iterator>::Item),
+                quote!(<u8 as Iterator>::Item),
+            ),
+            (
+                quote!(Option<Result<T, Vec<T>>>),
+                quote!(Option<Result<u8, Vec<u8>>>),
+            ),
             (quote!([T; N + 1]), quote!([u8; 4 + 1])),
             (quote!(Wrapper<Unmatched>), quote!(Wrapper<Unmatched>)),
             (quote!(T::T), quote!(u8::T)),
@@ -614,8 +658,10 @@ mod tests {
 
         for (input, expected) in cases {
             let actual = substitute_type_syntax(&input, &replacements);
-            let actual: syn::Type = syn::parse2(actual).expect("substitution must retain valid type syntax");
-            let expected: syn::Type = syn::parse2(expected).expect("the expected result must be valid type syntax");
+            let actual: syn::Type =
+                syn::parse2(actual).expect("substitution must retain valid type syntax");
+            let expected: syn::Type =
+                syn::parse2(expected).expect("the expected result must be valid type syntax");
             assert_eq!(actual, expected, "input: {input}");
         }
     }

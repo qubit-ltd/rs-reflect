@@ -42,6 +42,11 @@ use syn::parse2;
 use token_rewrite::replace_self_with_owner;
 
 use self::default_method_expansion::DefaultMethodExpansion;
+use self::dyn_compatibility::associated_type_requires_dyn_binding;
+use self::dyn_compatibility::dyn_inherited_arguments_for_supertrait;
+use self::dyn_compatibility::dyn_inherited_associated_types;
+use self::dyn_compatibility::dyn_reflected_supertrait_path;
+use self::dyn_compatibility::is_provably_dyn_compatible;
 use self::dyn_trait_generics::DynTraitGenerics;
 use super::expression_codegen::external_supertrait_arguments;
 pub(crate) use super::expression_codegen::generic_definition;
@@ -63,6 +68,7 @@ use crate::ir::WherePredicateIr;
 /// # Returns
 ///
 /// Returns the corresponding runtime visibility expression.
+#[must_use]
 fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
     match &declaration.visibility {
         crate::ir::VisibilityIr::Public => {
@@ -94,6 +100,7 @@ fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> T
 /// # Returns
 ///
 /// Returns expressions for each supported direct supertrait.
+#[must_use]
 fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     declaration
         .supertraits
@@ -139,6 +146,7 @@ fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) ->
 /// # Returns
 ///
 /// Returns supported concrete type and const generic argument expressions.
+#[must_use]
 fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     declaration
         .generics
@@ -202,6 +210,7 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
 /// # Returns
 ///
 /// Returns bounds for every type parameter.
+#[must_use]
 fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
     declaration
         .generics
@@ -229,6 +238,7 @@ fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
 /// # Returns
 ///
 /// Returns generated adapter items and corresponding descriptor entries.
+#[must_use]
 fn default_method_expansion(
     declaration: &TraitDeclarationIr,
     suffix: &str,
@@ -301,7 +311,11 @@ fn default_method_expansion(
 /// # Returns
 ///
 /// Returns resolver expressions, using `None` for generic associated types.
-fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
+#[must_use]
+fn associated_type_resolver_entries(
+    declaration: &TraitDeclarationIr,
+    facade: &TokenStream,
+) -> Vec<TokenStream> {
     let codegen = quote!(#facade::__private::codegen_v3);
     declaration
         .associated_types
@@ -333,18 +347,32 @@ fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &T
 ///
 /// Returns the original trait augmented with hidden reflection hooks and
 /// generated support items.
+#[must_use]
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
     let codegen = quote!(#facade::__private::codegen_v3);
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let suffix = format!("{fingerprint:016x}");
-    let marker = Ident::new(&format!("__QubitReflectTraitMarker_{suffix}"), declaration.span);
+    let marker = Ident::new(
+        &format!("__QubitReflectTraitMarker_{suffix}"),
+        declaration.span,
+    );
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
-    let definition_provider = format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
+    let definition_provider =
+        format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
     let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
-    let generic_factory = Ident::new(&format!("__qubit_reflect_trait_generics_{suffix}"), declaration.span);
-    let definition_factory = Ident::new(&format!("__qubit_reflect_trait_definition_{suffix}"), declaration.span);
-    let identity_factory = Ident::new(&format!("__qubit_reflect_trait_identity_{suffix}"), declaration.span);
+    let generic_factory = Ident::new(
+        &format!("__qubit_reflect_trait_generics_{suffix}"),
+        declaration.span,
+    );
+    let definition_factory = Ident::new(
+        &format!("__qubit_reflect_trait_definition_{suffix}"),
+        declaration.span,
+    );
+    let identity_factory = Ident::new(
+        &format!("__qubit_reflect_trait_identity_{suffix}"),
+        declaration.span,
+    );
     let payload_factory = Ident::new(
         &format!("__qubit_reflect_trait_fragment_payload_{suffix}"),
         declaration.span,
@@ -353,7 +381,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         &format!("__qubit_reflect_dyn_trait_descriptor_{suffix}"),
         declaration.span,
     );
-    let support = Ident::new(&format!("__qubit_reflect_trait_support_{suffix}"), declaration.span);
+    let support = Ident::new(
+        &format!("__qubit_reflect_trait_support_{suffix}"),
+        declaration.span,
+    );
     let rust_path = Ident::new(
         &format!("__QUBIT_REFLECT_TRAIT_PATH_{}", suffix.to_ascii_uppercase()),
         declaration.span,
@@ -485,13 +516,16 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             (provider_item, reader_entry)
         })
         .collect();
-    let associated_const_provider_items = associated_const_providers.iter().map(|(provider, _)| provider);
+    let associated_const_provider_items = associated_const_providers
+        .iter()
+        .map(|(provider, _)| provider);
     let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
         quote! {
             use super::*;
         }
     });
-    let associated_const_reader_entries = associated_const_providers.iter().map(|(_, reader)| reader);
+    let associated_const_reader_entries =
+        associated_const_providers.iter().map(|(_, reader)| reader);
     let trait_metadata::TraitMetadata {
         methods,
         associated_types,
@@ -755,7 +789,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 ///
 /// Returns generated impl parameters, trait arguments, bounds and associated
 /// type expressions.
-fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade: &TokenStream) -> DynTraitGenerics {
+#[must_use]
+fn dyn_trait_generics(
+    item: &ItemTrait,
+    declaration: &TraitDeclarationIr,
+    facade: &TokenStream,
+) -> DynTraitGenerics {
     let mut impl_parameters = Vec::new();
     let mut impl_predicates = Vec::new();
     let mut application_arguments = Vec::new();
@@ -786,7 +825,9 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
     }
     let mut associated_type_arguments = Vec::new();
     for associated in item.items.iter().filter_map(|item| match item {
-        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => Some(associated),
+        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
+            Some(associated)
+        }
         _ => None,
     }) {
         let name = &associated.ident;
@@ -865,7 +906,8 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
         .iter()
         .flat_map(|clause| &clause.predicates)
         .map(|predicate| {
-            let predicate = replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
+            let predicate =
+                replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
             replace_self_associated_types(predicate, item, declaration)
         })
         .collect();
@@ -894,7 +936,11 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
 /// # Returns
 ///
 /// Returns rewritten tokens with token group spans retained.
-fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &TraitDeclarationIr) -> TokenStream {
+#[must_use]
+fn replace_declared_lifetimes_with_static(
+    tokens: TokenStream,
+    declaration: &TraitDeclarationIr,
+) -> TokenStream {
     let lifetime_names: std::collections::HashSet<_> = declaration
         .generics
         .params
@@ -942,6 +988,7 @@ fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &Tra
 /// # Returns
 ///
 /// Returns rewritten tokens with token group spans retained.
+#[must_use]
 fn replace_self_associated_types(
     tokens: TokenStream,
     item: &ItemTrait,
@@ -1001,9 +1048,4 @@ fn replace_self_associated_types(
     output
 }
 
-use self::dyn_compatibility::associated_type_requires_dyn_binding;
-use self::dyn_compatibility::dyn_inherited_arguments_for_supertrait;
-use self::dyn_compatibility::dyn_inherited_associated_types;
-use self::dyn_compatibility::dyn_reflected_supertrait_path;
-use self::dyn_compatibility::is_provably_dyn_compatible;
 // Expression generation lives in `expand::expression_codegen`.

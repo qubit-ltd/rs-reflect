@@ -52,7 +52,10 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
         DeclarationIr::Type(declaration) => match declaration.kind {
             TypeDeclarationKindIr::Struct => super::structs::expand(declaration, &context),
             TypeDeclarationKindIr::Enum => super::enums::expand(declaration, &context),
-            TypeDeclarationKindIr::Union => Err(syn::Error::new(declaration.span, "cannot expand Reflect for union")),
+            TypeDeclarationKindIr::Union => Err(syn::Error::new(
+                declaration.span,
+                "cannot expand Reflect for union",
+            )),
         },
         DeclarationIr::Trait(declaration) => Ok(super::traits::expand(declaration, &context)),
         DeclarationIr::Impl(declaration) => Ok(super::impls::expand_impl(declaration, &context)),
@@ -98,10 +101,23 @@ mod tests {
     /// - `expected`: Expected diagnostic prefix.
     /// - `detail`: Expected diagnostic detail.
     fn assert_diagnostic(declaration: TypeDeclarationIr, expected: &str, detail: &str) {
-        let error = dispatch(DeclarationIr::Type(declaration)).expect_err("malformed IR must be diagnosed");
-        assert!(error.to_string().contains(expected), "{error}");
-        assert!(error.to_string().contains(detail), "{error}");
-        assert!(error.into_compile_error().to_string().contains("compile_error"));
+        let error =
+            dispatch(DeclarationIr::Type(declaration)).expect_err("malformed IR must be diagnosed");
+        assert!(
+            error.to_string().contains(expected),
+            "diagnostic should include the expected prefix: {error}",
+        );
+        assert!(
+            error.to_string().contains(detail),
+            "diagnostic should include the expected detail: {error}",
+        );
+        assert!(
+            error
+                .into_compile_error()
+                .to_string()
+                .contains("compile_error"),
+            "diagnostic should convert to a compile_error token",
+        );
     }
 
     #[test]
@@ -113,7 +129,11 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid generics");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for struct",
+            "invalid generics",
+        );
     }
 
     #[test]
@@ -125,7 +145,11 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid generics");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for enum",
+            "invalid generics",
+        );
     }
 
     #[test]
@@ -140,7 +164,11 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid where clause");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for struct",
+            "invalid where clause",
+        );
     }
 
     #[test]
@@ -155,7 +183,11 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid where clause");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for enum",
+            "invalid where clause",
+        );
     }
 
     #[test]
@@ -166,7 +198,18 @@ mod tests {
         declaration.kind = TypeDeclarationKindIr::Union;
 
         let error = dispatch(DeclarationIr::Type(declaration)).expect_err("union must be rejected");
-        assert!(error.to_string().contains("cannot expand Reflect for union"));
-        assert!(error.into_compile_error().to_string().contains("compile_error"));
+        assert!(
+            error
+                .to_string()
+                .contains("cannot expand Reflect for union"),
+            "union declarations should report the unsupported type",
+        );
+        assert!(
+            error
+                .into_compile_error()
+                .to_string()
+                .contains("compile_error"),
+            "diagnostic should convert to a compile_error token",
+        );
     }
 }

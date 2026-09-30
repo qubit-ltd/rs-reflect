@@ -61,6 +61,7 @@ impl HelperName {
     /// # Returns
     ///
     /// Returns the canonical attribute key spelling.
+    #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Rename => "rename",
@@ -92,6 +93,7 @@ impl HelperName {
     /// # Returns
     ///
     /// Returns the matching helper name, or `None` when unrecognized.
+    #[must_use]
     pub(crate) fn from_str(value: &str) -> Option<Self> {
         HELPER_RULES
             .iter()
@@ -108,6 +110,7 @@ impl HelperName {
     /// # Returns
     ///
     /// Returns whether the shared legality matrix permits the placement.
+    #[must_use]
     pub(crate) fn supports(self, target: HelperTarget) -> bool {
         HELPER_RULES
             .iter()
@@ -141,6 +144,7 @@ impl HelperTarget {
     /// # Returns
     ///
     /// Returns the human-readable target label.
+    #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Type => "type",
@@ -158,6 +162,7 @@ impl HelperTarget {
     /// # Returns
     ///
     /// Returns the target's unique bit mask.
+    #[must_use]
     const fn bit(self) -> u16 {
         1 << (self as u16)
     }
@@ -180,6 +185,7 @@ impl TargetSet {
     /// # Returns
     ///
     /// Returns the compact target set.
+    #[must_use]
     const fn new(bits: u16) -> Self {
         Self(bits)
     }
@@ -193,6 +199,7 @@ impl TargetSet {
     /// # Returns
     ///
     /// Returns whether its bit is set.
+    #[must_use]
     const fn contains(self, target: HelperTarget) -> bool {
         let Self(bits) = self;
         bits & target.bit() != 0
@@ -398,6 +405,7 @@ impl HelperAttributeIr {
     /// # Returns
     ///
     /// Returns the rename string, or `None` for other helper values.
+    #[must_use]
     pub(crate) fn rename(&self) -> Option<&str> {
         match &self.value {
             HelperValueIr::Rename(value) => Some(value),
@@ -410,6 +418,7 @@ impl HelperAttributeIr {
     /// # Returns
     ///
     /// Returns the specialization data, or `None` for other helper values.
+    #[must_use]
     pub(crate) fn specialization(&self) -> Option<&SpecializationIr> {
         match &self.value {
             HelperValueIr::Specialization(value) => Some(value),

@@ -11,6 +11,7 @@
 use proc_macro2::TokenStream;
 
 /// Generated pieces associated with reflected trait default methods.
+#[must_use]
 pub(super) struct DefaultMethodExpansion {
     /// Generated adapter items appended to the reflected trait.
     pub(super) adapter_items: Vec<TokenStream>,

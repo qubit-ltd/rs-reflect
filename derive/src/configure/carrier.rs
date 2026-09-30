@@ -22,10 +22,14 @@ use syn::Ident;
 /// # Returns
 ///
 /// Returns a deterministic identifier suitable for the carrier item.
+#[must_use]
 pub(super) fn carrier_name(source: &TokenStream, arguments: &TokenStream) -> Ident {
     let source = format!("{source}{arguments}");
     let hash = source.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
     });
-    Ident::new(&format!("__QuBitReflectConfigured_{hash:016x}"), Span::call_site())
+    Ident::new(
+        &format!("__QuBitReflectConfigured_{hash:016x}"),
+        Span::call_site(),
+    )
 }
