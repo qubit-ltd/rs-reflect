@@ -1,9 +1,0 @@
-{
-  "scope": "workspace",
-  "exclude_packages": [
-    "qubit-reflect-derive",
-    "registry-types",
-    "model-facade-runtime",
-    "conditional-feature"
-  ]
-}
