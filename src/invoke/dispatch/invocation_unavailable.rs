@@ -8,6 +8,7 @@
 
 //! Recoverable invocation dispatch failures with unconstrained input types.
 
+use std::error::Error;
 use std::fmt;
 
 use crate::invoke::InvocationDispatchMode;
@@ -139,9 +140,9 @@ impl<I> fmt::Display for InvocationUnavailable<I> {
     }
 }
 
-impl<I> std::error::Error for InvocationUnavailable<I> {
+impl<I> Error for InvocationUnavailable<I> {
     /// Returns `None`: entry unavailability has no underlying error source.
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
 }
