@@ -141,7 +141,8 @@ fn test_inactive_trait_member_is_absent_but_active_no_invoke_member_remains() {
     assert!(
         registry
             .trait_definition_by_path(concat!(module_path!(), "::EntirelyDisabledTrait"))
-            .is_none()
+            .is_none(),
+        "a fully cfg-disabled trait must not be registered",
     );
 }
 
