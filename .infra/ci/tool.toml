@@ -1,5 +1,5 @@
 # Pinned installation metadata for rs-infra-ci.
 source = "https://github.com/qubit-ltd/rs-infra-ci.git"
-revision = "1c1187c15d0bd15d90688f25d7aceef65a91be03"
+revision = "f796961216763dc1f5e0c98918ee815a1cc4b9dc"
 binary = "rs-infra-ci"
 package = "qubit-infra-ci"
