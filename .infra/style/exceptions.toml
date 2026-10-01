@@ -1,101 +1,271 @@
 format = 1
 
 [[exceptions]]
-rule = "multiple-public-types"
-path = "src/private/descriptor.rs"
-reason = "Generated-code probes and descriptor factories form one hidden macro protocol."
+rule = "explicit-imports"
+path = "derive/src/expand/impls.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
 
 [[exceptions]]
-rule = "multiple-public-types"
+rule = "explicit-imports"
+path = "derive/src/expand/impls/concrete_emission.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "derive/src/expand/structs.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "derive/src/expand/traits.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/access/field_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/access/policy_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/access/variant_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/builtin_registry_concurrency_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/builtin_registry_freeze_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/construct/runtime_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/builtin_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/capability_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/derive_enum_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/derive_struct_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/expression_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/generic_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/identity_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/method_descriptor_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/reflect_impl_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/reflect_trait_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/trait_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/descriptor/type_descriptor_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/invocation_capability_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/invocation_macro_contract_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/invoke/adapter_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/invoke/runtime_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/registry/runtime_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/registry/stress_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/type_descriptor_registry_failure_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/value/dynamic_owned_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/value/dynamic_ref_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/value/str_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "explicit-imports"
+path = "tests/value/thread_mode_tests.rs"
+reason = "This file intentionally uses a legacy import shape required by its module boundary."
+
+[[exceptions]]
+rule = "public-type-layout"
 path = "derive/src/expand/invocation/plan.rs"
 reason = "Invocation plan facts form one closed analysis-to-emission protocol."
 
 [[exceptions]]
-rule = "multiple-public-types"
-path = "derive/src/ir/attribute.rs"
-reason = "Attribute keys, values, and specialization records share one helper-grammar invariant."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "derive/src/ir/declaration.rs"
-reason = "Declaration nodes form one closed semantic tree consumed as a unit by validation and expansion."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "derive/src/ir/type_ir.rs"
-reason = "Type and path nodes form one recursive syn-independent type representation."
-
-[[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
 path = "derive/src/expand/traits.rs"
 reason = "Trait expansion records and emits one closed declaration protocol."
 
 [[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
+path = "derive/src/ir/attribute.rs"
+reason = "Attribute keys, values, and specialization records share one helper-grammar invariant."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "derive/src/ir/declaration.rs"
+reason = "Declaration nodes form one closed semantic tree consumed as a unit by validation and expansion."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "derive/src/ir/type_ir.rs"
+reason = "Type and path nodes form one recursive syn-independent type representation."
+
+[[exceptions]]
+rule = "public-type-layout"
 path = "derive/src/parse/attributes.rs"
 reason = "Helper parser syntax nodes share one grammar and are consumed together."
 
 [[exceptions]]
-rule = "multiple-public-types"
-path = "src/value/mode.rs"
-reason = "The sealed mode trait and its two marker implementations jointly define the associated storage and auto-trait contract."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/value/storage.rs"
-reason = "Owned, shared, and mutable storage for local and thread-safe modes form one six-cell representation matrix."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/expression/generic_argument.rs"
-reason = "Generic arguments and const-expression nodes form one recursive grammar used to represent generic instantiations."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/capability/set.rs"
-reason = "Set construction, typed lookup, conflict details, and the lazy result alias form one immutable capability-set contract."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/construct/recovery.rs"
-reason = "The recovered value and aggregate recovery object jointly preserve ownership across failed construction."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/construct/validated.rs"
-reason = "Validated construction, override, and update tokens define the shared preflight boundary before extraction."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/construct/error.rs"
-reason = "Construction error kinds and field identifiers are the structured context carried by ConstructionError."
-
-[[exceptions]]
-rule = "multiple-public-types"
-path = "src/construct/input.rs"
-reason = "Field policies and named, tuple, and update inputs make up one input model consumed by construction validation."
-
-[[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
 path = "src/access/field_set_recovery.rs"
 reason = "Field-set failure metadata and retained recovery values form one ownership-preserving failure result."
 
 [[exceptions]]
-rule = "multiple-public-types"
-path = "src/invoke/receiver.rs"
-reason = "Receiver expectations and adapters jointly validate and adapt the receiver before invoking a method."
+rule = "public-type-layout"
+path = "src/capability/set.rs"
+reason = "Set construction, typed lookup, conflict details, and the lazy result alias form one immutable capability-set contract."
 
 [[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
+path = "src/construct/error.rs"
+reason = "Construction error kinds and field identifiers are the structured context carried by ConstructionError."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/construct/input.rs"
+reason = "Field policies and named, tuple, and update inputs make up one input model consumed by construction validation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/construct/recovery.rs"
+reason = "The recovered value and aggregate recovery object jointly preserve ownership across failed construction."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/construct/validated.rs"
+reason = "Validated construction, override, and update tokens define the shared preflight boundary before extraction."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/expression/generic_argument.rs"
+reason = "Generic arguments and const-expression nodes form one recursive grammar used to represent generic instantiations."
+
+[[exceptions]]
+rule = "public-type-layout"
 path = "src/invoke/future.rs"
 reason = "InvocationMode selects the execution contract represented by ReflectedFuture."
 
 [[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
 path = "src/invoke/output.rs"
 reason = "BorrowOrigin and InvocationOutput jointly retain the source lifetime contract of a returned value."
 
 [[exceptions]]
-rule = "multiple-public-types"
+rule = "public-type-layout"
+path = "src/invoke/pinned.rs"
+reason = "Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/invoke/receiver.rs"
+reason = "Receiver expectations and adapters jointly validate and adapt the receiver before invoking a method."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/private/descriptor.rs"
+reason = "Generated-code probes and descriptor factories form one hidden macro protocol."
+
+[[exceptions]]
+rule = "public-type-layout"
 path = "src/registry/fragment.rs"
 reason = "Identity, target, payload, and kind types form the closed registration-fragment protocol consumed by aggregation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/value/mode.rs"
+reason = "The sealed mode trait and its two marker implementations jointly define the associated storage and auto-trait contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/value/storage.rs"
+reason = "Owned, shared, and mutable storage for local and thread-safe modes form one six-cell representation matrix."
