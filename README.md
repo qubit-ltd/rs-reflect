@@ -135,6 +135,13 @@ The same console offers action buttons such as “Suspend customer”. Their con
 - `Local` dynamic values are the default; `SendReflected*` wrappers and `#[reflect(thread_safe)]` provide a thread-safe boundary only where generated code proves the required `Send + Sync` bounds.
 - Built-in descriptors for primitives, text, tuples, arrays, `Option`, sequences, sets, maps, smart pointers, and function pointers; optional `ecosystem-types` and `qubit-types` features add `BigDecimal`, `chrono`, `Uuid`, and Qubit `Id`/`DataType` implementations.
 
+`Option<T>` descriptors expose their element type and a checked borrowed
+projection for built-in `Option<T>` values. The projection returns the inner
+borrow for `Some`, `None` for an absent value, and a type mismatch for an
+unrelated value. Descriptors assembled from structural facts expose the same
+shape but report projection as unavailable because they have no runtime
+adapter. See [optional values](doc/user_guide.md#optional-values).
+
 Reflection is deliberately bounded. It does not coerce numeric values, parse strings, infer `Into`, or upgrade a local dynamic value to thread-safe mode. Arbitrary Rust types are not reflectable until they derive or implement `Reflect`. `TypeId`, descriptor addresses, and trait markers are process-local identity, not serialization or cross-process model identifiers. Generated access code can reach private fields, so reflection policies do not replace application authorization. Unsafe functions, unsupported ABIs, variadics, unspecialized generics, and opaque `impl Trait` returns are described but not callable. Tuple and function-pointer descriptors support arities 0 through 32. Descriptors and per-type capability caches stay alive for the whole process, and initialization may allocate; measure the paths your application uses if overhead matters. See the [user guide](doc/user_guide.md#boundaries-and-a-practice-checklist).
 
 ## Learn more

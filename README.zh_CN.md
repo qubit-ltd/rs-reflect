@@ -118,6 +118,8 @@ cargo run --example support_action
 - 动态值默认是 `Local` 模式；`SendReflected*` 包装器和 `#[reflect(thread_safe)]` 只在生成代码能证明所需 `Send + Sync` 约束时提供线程安全边界。
 - 内置基础类型、文本、元组、数组、`Option`、序列、集合、映射、智能指针和函数指针的描述符；可选的 `ecosystem-types` 与 `qubit-types` feature 分别补充 `BigDecimal`、`chrono`、`Uuid` 以及 Qubit `Id`/`DataType` 的实现。
 
+`Option<T>` 描述符既能返回元素类型，也能对内置 `Option<T>` 值执行经过类型检查的借用投影。`Some` 返回内部借用，`None` 返回空值，不相关的值返回类型不匹配错误。由结构事实构造的描述符保留相同的类型形状，但因没有运行时适配器而报告投影不可用。详见[可选值](doc/user_guide.zh_CN.md#可选值)。
+
 反射能力有明确边界：不转换数值、不解析字符串、不推导 `Into`，也不会把本地动态值升级为线程安全模式。任意 Rust 类型不会自动可反射，必须派生或实现 `Reflect`。`TypeId`、描述符地址和 trait 标记只是进程内身份，不能用作序列化或跨进程的模型标识。生成的访问代码可以触及私有字段，因此反射策略不能替代应用鉴权。`unsafe` 函数、不支持的 ABI、可变参数、未特化的泛型和不透明的 `impl Trait` 返回值可以被描述，但不能动态调用。元组和函数指针描述符支持 0 到 32 个元素或参数。描述符和按类型缓存的能力会在整个进程生命周期内保留，初始化可能分配内存；关心开销时请按应用实际路径测量。详情见[用户手册](doc/user_guide.zh_CN.md#边界与实践清单)。
 
 ## 延伸阅读

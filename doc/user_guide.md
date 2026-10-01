@@ -563,6 +563,44 @@ an explicit fact set. A capability is a type extension, such as a typed `Clone`
 or `Default` operation. Resolving capabilities and registering type membership
 are separate concerns.
 
+### Optional values
+
+An optional descriptor separates structural knowledge from runtime access.
+`element_type()` describes `T`; `has_ref_projection()` tells whether this
+descriptor also carries an adapter for inspecting a borrowed `Option<T>`.
+Built-in `Option<T>` descriptors provide that adapter:
+
+```rust
+use qubit_reflect::{OptionalProjectionError, ReflectedRef, TypeDescriptor};
+
+fn main() -> Result<(), OptionalProjectionError> {
+let value = Some(12_u32);
+let optional = TypeDescriptor::of::<Option<u32>>()
+    .as_optional()
+    .expect("Option descriptor");
+let inner = optional
+    .project_ref(ReflectedRef::new(&value))?
+    .expect("Some value");
+assert_eq!(inner.downcast_ref::<u32>(), Some(&12));
+
+let absent: Option<u32> = None;
+assert!(optional.project_ref(ReflectedRef::new(&absent))?.is_none());
+assert!(matches!(
+    optional.project_ref(ReflectedRef::new(&Some(12_u8))),
+    Err(OptionalProjectionError::TypeMismatch(_)),
+));
+Ok(())
+}
+```
+
+Descriptors built from structural facts can describe an optional element
+without holding the concrete `Option<T>` adapter. Their `project_ref` call
+returns `OptionalProjectionError::Unavailable`; callers should check
+`has_ref_projection()` when adapter availability determines whether an
+operation can be bound. Projection uses the local shared borrow boundary; a
+`SendReflectedRef` can be explicitly converted with `into_local()` before
+projection. This API does not provide mutable or thread-safe projection.
+
 ### Capabilities and registry discovery
 
 Call `ReflectRegistry::initialize()` after the relevant crates are linked. The
