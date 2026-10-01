@@ -74,11 +74,7 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
 ///
 /// Returns tokens constructing the runtime generic definition descriptor.
 #[must_use]
-pub(crate) fn generic_definition(
-    generics: &GenericsIr,
-    span: Span,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let environment = GenericEnvironment::from_generics(generics);
     let parameters = generics.params.iter().map(|parameter| {
         let name = LitStr::new(&parameter.name, parameter.span);
@@ -280,11 +276,7 @@ pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStre
 ///
 /// Returns tokens representing the type expression in runtime metadata.
 #[must_use]
-pub(crate) fn type_expression(
-    ty: &TypeIr,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
         TypeKindIr::Never => {
             quote!(#facade::__private::codegen_v3::expression::TypeExpression::Never)
@@ -346,9 +338,7 @@ pub(crate) fn type_expression(
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
-            let parameters = inputs
-                .iter()
-                .map(|value| type_expression(value, environment, facade));
+            let parameters = inputs.iter().map(|value| type_expression(value, environment, facade));
             let return_type = output
                 .as_deref()
                 .map(|value| type_expression(value, environment, facade))
@@ -426,8 +416,7 @@ fn path_expression(
     facade: &TokenStream,
 ) -> TokenStream {
     let diagnostic = LitStr::new(&ty.source, ty.span);
-    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
-    {
+    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self" {
         return quote!(#facade::__private::codegen_v3::expression::TypeExpression::SelfType);
     }
     if path.qualified_self.is_none()
@@ -744,11 +733,7 @@ fn bound_predicates(
 /// Returns structural tokens for supported expressions or a compile error for
 /// unsupported syntax.
 #[must_use]
-fn const_expression_value(
-    value: &TokenStream,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = parse2::<Ident>(value.clone()) {
         let name = LitStr::new(&identifier.to_string(), identifier.span());
@@ -836,16 +821,14 @@ pub(super) fn const_expression(
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => {
-            match expression.expr.as_ref() {
-                Expr::Lit(expression) => match &expression.lit {
-                    Lit::Int(value) => integer_const_expression(value, true, facade)
-                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
-                    _ => unsupported_const_default(value),
-                },
+        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => match expression.expr.as_ref() {
+            Expr::Lit(expression) => match &expression.lit {
+                Lit::Int(value) => integer_const_expression(value, true, facade)
+                    .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
                 _ => unsupported_const_default(value),
-            }
-        }
+            },
+            _ => unsupported_const_default(value),
+        },
         Expr::Path(path) if path.path.segments.len() == 1 => {
             let identifier = path.path.segments[0].ident.to_string();
             let name = LitStr::new(&identifier, path.path.segments[0].ident.span());
@@ -881,28 +864,16 @@ pub(super) fn const_expression(
 /// Returns signed or unsigned structural tokens when the value fits, or `None`
 /// when parsing overflows.
 #[must_use]
-fn integer_const_expression(
-    value: &LitInt,
-    negative: bool,
-    facade: &TokenStream,
-) -> Option<TokenStream> {
+fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
-        let value = if negative {
-            magnitude.checked_neg()?
-        } else {
-            magnitude
-        };
-        Some(
-            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))),
-        )
+        let value = if negative { magnitude.checked_neg()? } else { magnitude };
+        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#value))))
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(
-            quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))),
-        )
+        Some(quote!(Some(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#value))))
     }
 }
 
@@ -975,14 +946,8 @@ mod tests {
             rendered.matches("ConcretePathSegment :: new").count() >= 2,
             "each path segment should emit a concrete path segment node"
         );
-        assert!(
-            rendered.contains("u8"),
-            "generated expression should contain u8"
-        );
-        assert!(
-            rendered.contains("u16"),
-            "generated expression should contain u16"
-        );
+        assert!(rendered.contains("u8"), "generated expression should contain u8");
+        assert!(rendered.contains("u16"), "generated expression should contain u16");
     }
 
     /// Verifies qualified projections and associated constraints stay
@@ -1001,10 +966,7 @@ mod tests {
             projection.contains("Trait"),
             "generated expression should contain Trait"
         );
-        assert!(
-            projection.contains("u8"),
-            "generated expression should contain u8"
-        );
+        assert!(projection.contains("u8"), "generated expression should contain u8");
         assert!(
             constraint.contains("associated_type_bound"),
             "generated expression should contain associated_type_bound"
@@ -1019,13 +981,8 @@ mod tests {
     #[test]
     fn test_const_expression_uses_explicit_generic_environment() {
         let environment = GenericEnvironment::new().with_const_parameter("limit");
-        let parameter =
-            const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
-        let item = const_expression_value(
-            &quote!(limits::DEFAULT),
-            &environment,
-            &quote!(qubit_reflect),
-        );
+        let parameter = const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
+        let item = const_expression_value(&quote!(limits::DEFAULT), &environment, &quote!(qubit_reflect));
 
         assert!(
             parameter.to_string().contains("const_parameter"),
@@ -1071,18 +1028,14 @@ mod tests {
             escaped.contains("Character"),
             "generated expression should contain Character"
         );
-        assert!(
-            escaped.contains("'\\n'"),
-            "generated expression should contain '\\n'"
-        );
+        assert!(escaped.contains("'\\n'"), "generated expression should contain '\\n'");
     }
 
     /// Verifies that symbolic defaults retain const-item path identity.
     #[test]
     fn test_const_default_preserves_const_item_path() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);
-        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect))
-            .to_string();
+        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect)).to_string();
 
         assert!(
             rendered.contains("const_path"),

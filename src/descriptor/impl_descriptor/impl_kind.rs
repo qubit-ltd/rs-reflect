@@ -56,8 +56,9 @@ impl ImplKind {
 /// # Errors
 ///
 /// Returns [`ImplDescriptorBuildError::InherentImplHasTrait`] when an inherent
-/// implementation names a trait, or [`ImplDescriptorBuildError::TraitImplMissingTrait`]
-/// when a trait implementation does not name one.
+/// implementation names a trait, or
+/// [`ImplDescriptorBuildError::TraitImplMissingTrait`] when a trait
+/// implementation does not name one.
 #[inline]
 pub(in crate::descriptor::impl_descriptor) fn validate_kind(
     kind: ImplKind,
