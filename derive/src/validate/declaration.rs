@@ -53,9 +53,7 @@ use crate::ir::ValidatedDeclaration;
     dead_code,
     reason = "the staged validation API is exercised directly by unit tests and later expansion tasks"
 )]
-pub(crate) fn validate_declaration(
-    declaration: ParsedDeclaration,
-) -> syn::Result<ValidatedDeclaration> {
+pub(crate) fn validate_declaration(declaration: ParsedDeclaration) -> syn::Result<ValidatedDeclaration> {
     match validation_error(&declaration.declaration) {
         Some(error) => Err(error),
         None => Ok(ValidatedDeclaration {
@@ -107,11 +105,7 @@ fn validate_type(declaration: &TypeDeclarationIr, errors: &mut ErrorCollector) {
             "Reflect cannot be derived for unions",
         ));
     }
-    validate_query_name(
-        &declaration.attributes,
-        &declaration.name.to_string(),
-        errors,
-    );
+    validate_query_name(&declaration.attributes, &declaration.name.to_string(), errors);
     validate_fields(&declaration.fields, errors);
     validate_query_name_scope(
         declaration.fields.iter().filter_map(|field| {
@@ -185,11 +179,7 @@ fn validate_fields(fields: &[crate::ir::FieldIr], errors: &mut ErrorCollector) {
 /// - `errors`: Collector for independent diagnostics.
 fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector) {
     validate_attributes(&declaration.attributes, errors);
-    validate_query_name(
-        &declaration.attributes,
-        &declaration.name.to_string(),
-        errors,
-    );
+    validate_query_name(&declaration.attributes, &declaration.name.to_string(), errors);
     validate_external_traits(declaration, errors);
     let mut inherited_dyn_items = std::collections::HashSet::new();
     for attribute in &declaration.attributes {
@@ -223,11 +213,7 @@ fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector)
                 ));
                 continue;
             }
-            let item = &path
-                .segments
-                .last()
-                .expect("a path with two segments has an item")
-                .name;
+            let item = &path.segments.last().expect("a path with two segments has an item").name;
             if !inherited_dyn_items.insert(item.clone()) {
                 errors.push(syn::Error::new(
                     attribute.value_span,
@@ -332,10 +318,7 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
                 ),
             ));
         }
-        let repeatable = matches!(
-            attribute.name,
-            HelperName::Specialize | HelperName::ExternalTrait
-        );
+        let repeatable = matches!(attribute.name, HelperName::Specialize | HelperName::ExternalTrait);
         if !repeatable && seen.insert(attribute.name, attribute.span).is_some() {
             errors.push(syn::Error::new(
                 attribute.span,
@@ -364,21 +347,13 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
 /// - `attributes`: Helper occurrences attached to one declaration.
 /// - `errors`: Collector for independent diagnostics.
 fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
-    if let Some(skip) = attributes
-        .iter()
-        .find(|attribute| attribute.name == HelperName::Skip)
-    {
+    if let Some(skip) = attributes.iter().find(|attribute| attribute.name == HelperName::Skip) {
         let conflicts = match skip.target {
-            crate::ir::HelperTarget::Field => {
-                [HelperName::ReadOnly, HelperName::NoConstruct].as_slice()
-            }
+            crate::ir::HelperTarget::Field => [HelperName::ReadOnly, HelperName::NoConstruct].as_slice(),
             crate::ir::HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
-            crate::ir::HelperTarget::Method => [
-                HelperName::NoInvoke,
-                HelperName::CatchUnwind,
-                HelperName::ThreadSafe,
-            ]
-            .as_slice(),
+            crate::ir::HelperTarget::Method => {
+                [HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe].as_slice()
+            }
             _ => [].as_slice(),
         };
         for conflict in conflicts {
@@ -389,18 +364,8 @@ fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollec
         .iter()
         .any(|attribute| attribute.name == HelperName::NoInvoke)
     {
-        report_conflict(
-            attributes,
-            HelperName::NoInvoke,
-            HelperName::CatchUnwind,
-            errors,
-        );
-        report_conflict(
-            attributes,
-            HelperName::NoInvoke,
-            HelperName::ThreadSafe,
-            errors,
-        );
+        report_conflict(attributes, HelperName::NoInvoke, HelperName::CatchUnwind, errors);
+        report_conflict(attributes, HelperName::NoInvoke, HelperName::ThreadSafe, errors);
     }
 }
 
@@ -412,20 +377,11 @@ fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollec
 /// - `left`: First policy in the diagnostic pair.
 /// - `right`: Conflicting policy to find.
 /// - `errors`: Collector for independent diagnostics.
-fn report_conflict(
-    attributes: &[HelperAttributeIr],
-    left: HelperName,
-    right: HelperName,
-    errors: &mut ErrorCollector,
-) {
+fn report_conflict(attributes: &[HelperAttributeIr], left: HelperName, right: HelperName, errors: &mut ErrorCollector) {
     if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == right) {
         errors.push(syn::Error::new(
             attribute.span,
-            format!(
-                "`{}` cannot be combined with `{}`",
-                left.as_str(),
-                right.as_str()
-            ),
+            format!("`{}` cannot be combined with `{}`", left.as_str(), right.as_str()),
         ));
     }
 }
@@ -437,14 +393,8 @@ fn report_conflict(
 /// - `attributes`: Helper occurrences attached to one declaration.
 /// - `rust_name`: Source member name used in diagnostics.
 /// - `errors`: Collector for independent diagnostics.
-fn validate_query_name(
-    attributes: &[HelperAttributeIr],
-    rust_name: &str,
-    errors: &mut ErrorCollector,
-) {
-    if let Some(rename) = attributes
-        .iter()
-        .find(|attribute| attribute.name == HelperName::Rename)
+fn validate_query_name(attributes: &[HelperAttributeIr], rust_name: &str, errors: &mut ErrorCollector) {
+    if let Some(rename) = attributes.iter().find(|attribute| attribute.name == HelperName::Rename)
         && rename.rename().is_some_and(str::is_empty)
     {
         errors.push(syn::Error::new(
@@ -468,17 +418,13 @@ fn validate_query_name_scope<'a>(
 ) {
     let mut names = HashMap::new();
     for (rust_name, attributes, span) in members {
-        let rename = attributes
-            .iter()
-            .find(|attribute| attribute.name == HelperName::Rename);
+        let rename = attributes.iter().find(|attribute| attribute.name == HelperName::Rename);
         let query_name = rename
             .and_then(HelperAttributeIr::rename)
             .unwrap_or(&rust_name)
             .to_owned();
         let diagnostic_span = rename.map_or(span, |attribute| attribute.value_span);
-        if let Some((existing_rust_name, _)) =
-            names.insert(query_name.clone(), (rust_name.clone(), diagnostic_span))
-        {
+        if let Some((existing_rust_name, _)) = names.insert(query_name.clone(), (rust_name.clone(), diagnostic_span)) {
             errors.push(syn::Error::new(
                 diagnostic_span,
                 format!(
@@ -536,19 +482,13 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
         if !paths.insert(mapping.path.source.clone()) {
             errors.push(syn::Error::new(
                 mapping.span,
-                format!(
-                    "external trait path `{}` is mapped more than once",
-                    mapping.path.source
-                ),
+                format!("external trait path `{}` is mapped more than once", mapping.path.source),
             ));
         }
         if !ids.insert(mapping.id.clone()) {
             errors.push(syn::Error::new(
                 mapping.id_span,
-                format!(
-                    "external trait ID `{}` is mapped more than once",
-                    mapping.id
-                ),
+                format!("external trait ID `{}` is mapped more than once", mapping.id),
             ));
         }
     }
@@ -566,10 +506,7 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
         if !reflected_paths.insert(path.source.clone()) {
             errors.push(syn::Error::new(
                 path.span,
-                format!(
-                    "reflected supertrait `{}` is listed more than once",
-                    path.source
-                ),
+                format!("reflected supertrait `{}` is listed more than once", path.source),
             ));
         }
     }
@@ -624,11 +561,7 @@ fn validate_stable_id(value: &str, span: Span, errors: &mut ErrorCollector) {
 /// - `specialization`: Named concrete bindings to validate.
 /// - `generics`: Generic parameter declaration to compare against.
 /// - `errors`: Collector for independent diagnostics.
-fn validate_specialization(
-    specialization: &SpecializationIr,
-    generics: &GenericsIr,
-    errors: &mut ErrorCollector,
-) {
+fn validate_specialization(specialization: &SpecializationIr, generics: &GenericsIr, errors: &mut ErrorCollector) {
     let expected: HashMap<_, _> = generics
         .params
         .iter()

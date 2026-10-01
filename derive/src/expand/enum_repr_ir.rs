@@ -175,15 +175,8 @@ mod tests {
                 _ => format!("EnumRepr :: {expected_variant}"),
             };
 
-            assert!(
-                tokens.to_string().contains(&expected),
-                "{representation:?}: {tokens}"
-            );
-            assert_eq!(
-                representation.integer_name(),
-                integer_name,
-                "{representation:?}"
-            );
+            assert!(tokens.to_string().contains(&expected), "{representation:?}: {tokens}");
+            assert_eq!(representation.integer_name(), integer_name, "{representation:?}");
         }
     }
 }

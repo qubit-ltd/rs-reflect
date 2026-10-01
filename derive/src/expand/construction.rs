@@ -32,10 +32,7 @@ use crate::ir::VariantKindIr;
 ///
 /// Returns generated local adapters and any requested thread-safe adapters.
 #[must_use]
-pub(crate) fn struct_adapters(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let local = struct_mode_adapters(declaration, facade, false);
     let thread_safe = declaration
         .attributes
@@ -58,11 +55,7 @@ pub(crate) fn struct_adapters(
 /// Returns generated items for the selected dynamic mode, or an empty stream
 /// for non-structs.
 #[must_use]
-fn struct_mode_adapters(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return TokenStream::new();
     }
@@ -224,10 +217,7 @@ fn struct_mode_adapters(
 ///
 /// Returns the generated construction descriptor expression.
 #[must_use]
-pub(crate) fn struct_descriptor(
-    declaration: &TypeDeclarationIr,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn struct_descriptor(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     let thread_safe = declaration
         .attributes
         .iter()
@@ -257,14 +247,9 @@ pub(crate) fn struct_descriptor(
 ///
 /// Returns generated local and optional thread-safe variant adapters.
 #[must_use]
-pub(crate) fn variant_adapters(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+pub(crate) fn variant_adapters(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     let local = variant_adapters_for_mode(variant, facade, false);
-    let thread_safe_adapters =
-        thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
+    let thread_safe_adapters = thread_safe.then(|| variant_adapters_for_mode(variant, facade, true));
     quote!(#local #thread_safe_adapters)
 }
 
@@ -281,11 +266,7 @@ pub(crate) fn variant_adapters(
 /// Returns generated items, or an empty stream when construction is disabled
 /// for the variant.
 #[must_use]
-fn variant_adapters_for_mode(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes
         .iter()
@@ -407,11 +388,7 @@ fn variant_adapters_for_mode(
 /// Returns generated descriptor tokens, or an empty stream when construction is
 /// disabled.
 #[must_use]
-pub(crate) fn variant_descriptor(
-    variant: &VariantIr,
-    facade: &TokenStream,
-    thread_safe: bool,
-) -> TokenStream {
+pub(crate) fn variant_descriptor(variant: &VariantIr, facade: &TokenStream, thread_safe: bool) -> TokenStream {
     if variant
         .attributes
         .iter()
@@ -421,10 +398,7 @@ pub(crate) fn variant_descriptor(
     }
     let constructor = format_ident!("__qubit_reflect_variant_constructor_{}", variant.index);
     let thread_safe = thread_safe.then(|| {
-        let constructor = format_ident!(
-            "__qubit_reflect_variant_constructor_{}_thread_safe",
-            variant.index
-        );
+        let constructor = format_ident!("__qubit_reflect_variant_constructor_{}_thread_safe", variant.index);
         quote!(.with_thread_safe(Self::#constructor))
     });
     quote!(.with_construction(

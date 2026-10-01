@@ -71,10 +71,7 @@ pub(crate) enum PathArgumentIr {
     /// Associated const equality binding.
     AssociatedConst { name: String, value: TokenStream },
     /// Associated type bounds constraint.
-    Constraint {
-        name: String,
-        bounds: Vec<GenericBoundIr>,
-    },
+    Constraint { name: String, bounds: Vec<GenericBoundIr> },
     /// Argument syntax not represented by the known structured forms.
     Other(TokenStream),
 }
