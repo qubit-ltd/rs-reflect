@@ -230,7 +230,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-OUT-006 | T01, T05, T06, T07, T12, T23, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-OUT-007 | T01, T05, T06, T07, T12, T23, T26 | `src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/registry/model_facade_tests.rs` |
 | REQ-OUT-008 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/validated.rs`, `src/construct/struct_constructor.rs` | `tests/construct/runtime_tests.rs` |
-| REQ-OUT-009 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-ci/cargo-feature-check.sh` |
+| REQ-OUT-009 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-infra-ci/cargo-feature-check.sh` |
 | REQ-OUT-010 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/struct_construction_descriptor.rs`, `src/descriptor/type_categories.rs` | `tests/construct/adapter_tests.rs` |
 | REQ-SYS-001 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-002 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
@@ -242,7 +242,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-SYS-008 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs`, `scripts/check-markdown-examples.sh` | `tests/registry/runtime_tests.rs`, `scripts/project-ci-check.sh`  `scripts/tests/check_markdown_examples_tests.py`, `tests/descriptor_debug_tests.rs`, `scripts/tests/check_document_contracts_tests.py`, `src/descriptor/impl_descriptor/associated_const_reader.rs`, `src/descriptor/impl_descriptor/impl_definition_descriptor.rs`, `src/descriptor/trait_descriptor/definition/trait_definition_descriptor.rs`; Executed type-level doctest source owners: `src/descriptor/trait_descriptor.rs`, `src/descriptor/impl_descriptor/impl_descriptor.rs`, `src/descriptor/method_descriptor/instance/method_instance_descriptor.rs` |
 | REQ-SYS-009 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-010 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
-| REQ-SYS-011 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-ci/cargo-feature-check.sh` |
+| REQ-SYS-011 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-infra-ci/cargo-feature-check.sh` |
 | REQ-SYS-012 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-SYS-013 | T01, T04, T05, T06, T12, T23, T26 | `src/lib.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-TRT-001 | T11, T16, T17, T20, T21 | `src/descriptor/trait_descriptor.rs`, `src/descriptor/impl_descriptor.rs`, `src/registry/effective_type_view.rs` | `tests/descriptor/trait_tests.rs`, `tests/descriptor/reflect_trait_tests.rs`, `test-crates/registry-app/src/lib.rs` |

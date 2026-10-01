@@ -101,3 +101,9 @@ __pycache__/
 /.infra/coverage/*
 !/.infra/coverage/coverage.json
 !/.infra/coverage/tool.toml
+
+# Shared Rust project ignore entries (rs-infra)
+**/target/
+*.profdata
+*.profraw
+/pages-artifact.tar.gz
