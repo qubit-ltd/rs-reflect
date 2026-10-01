@@ -35,6 +35,7 @@ use crate::descriptor::MethodLookup;
 use crate::descriptor::MethodQualifier;
 use crate::descriptor::Mutability;
 use crate::descriptor::OpaqueTypeView;
+use crate::descriptor::OptionalRefProjector;
 use crate::descriptor::OptionalTypeDescriptor;
 use crate::descriptor::PrimitiveKind;
 use crate::descriptor::PrimitiveTypeDescriptor;
@@ -606,29 +607,15 @@ impl TypeDescriptor {
         )
     }
 
-    /// Creates an optional root whose element relationship is resolved on
-    /// first navigation.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `T`: Rust optional type represented by the root.
-    ///
-    /// # Parameters
-    ///
-    /// - `query_name`: Reflection lookup name.
-    /// - `element`: Lazy optional element reference.
-    ///
-    /// # Returns
-    ///
-    /// Returns an optional root with a lazily resolved element type.
     #[doc(hidden)]
-    pub(crate) const fn new_optional_lazy<T: ?Sized + 'static>(
+    pub(crate) const fn new_optional_lazy<T: Reflect>(
         query_name: &'static str,
         element: &'static LazyTypeRef,
+        projector: OptionalRefProjector,
     ) -> Self {
-        Self::new::<T>(
+        Self::new::<Option<T>>(
             query_name,
-            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(element)),
+            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(element, projector)),
             &[],
             &[],
         )

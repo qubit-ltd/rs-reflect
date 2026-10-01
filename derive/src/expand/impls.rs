@@ -62,10 +62,7 @@ use crate::ir::VisibilityIr;
 ///
 /// Returns the retained impl and generated registration metadata.
 #[must_use]
-pub(crate) fn expand_impl(
-    declaration: ImplDeclarationIr,
-    context: &ExpansionContext,
-) -> TokenStream {
+pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if !declaration.generics.params.is_empty() {
         return expand_generic_impl_specializations(declaration, context);
     }
@@ -96,10 +93,7 @@ pub(crate) fn expand_impl(
 /// Returns the retained impl, generic definition and selected concrete
 /// fragments.
 #[must_use]
-fn expand_generic_impl_specializations(
-    declaration: ImplDeclarationIr,
-    context: &ExpansionContext,
-) -> TokenStream {
+fn expand_generic_impl_specializations(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let retained = declaration.retained_tokens.clone();
     let facade = context.facade().clone();
     let definition = expand_generic_impl_definition(&declaration, &facade, context);
@@ -108,8 +102,7 @@ fn expand_generic_impl_specializations(
     }
     let shared_definition = generic_impl_definition_module(&declaration);
     let fragments = declaration.specializations.iter().map(|specialization| {
-        let specialization_arguments =
-            specialization_arguments(specialization, &declaration.generics, &facade);
+        let specialization_arguments = specialization_arguments(specialization, &declaration.generics, &facade);
         let arguments = quote!(#specialization_arguments.into_vec());
         let replacements = specialization_replacements(specialization);
         let associated_type_resolver_arms =
@@ -174,8 +167,7 @@ fn expand_generic_impl_definition(
     let module = generic_impl_definition_module(declaration);
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let target = super::traits::type_expression(&declaration.target_type, &environment, facade);
-    let generics =
-        super::traits::generic_definition(&declaration.generics, declaration.span, facade);
+    let generics = super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     let methods = definition_method_entries(declaration, facade);
     let associated_types = declaration.associated_types.iter().map(|item| {
         let rust_name = syn::LitStr::new(&item.name.to_string(), item.span);
@@ -196,16 +188,14 @@ fn expand_generic_impl_definition(
             HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
             _ => None,
         });
-    let reflected_provider =
-        declaration
-            .attributes
-            .iter()
-            .find_map(|attribute| match &attribute.value {
-                HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
-                _ => None,
-            });
-    let reflected_provider_import =
-        reflected_provider.map(|provider| quote!(use super::#provider;));
+    let reflected_provider = declaration
+        .attributes
+        .iter()
+        .find_map(|attribute| match &attribute.value {
+            HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
+            _ => None,
+        });
+    let reflected_provider_import = reflected_provider.map(|provider| quote!(use super::#provider;));
     let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
         let path = trait_path
             .segments
@@ -221,13 +211,11 @@ fn expand_generic_impl_definition(
                         .expect("validated external trait ID"),
                 )))
             }
-            None => reflected_provider.map_or_else(
-                || quote!(None),
-                |provider| quote!(Some(#provider().trait_id().clone())),
-            ),
+            None => {
+                reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider().trait_id().clone())))
+            }
         };
-        let trait_definition =
-            reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider())));
+        let trait_definition = reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider())));
         if external_id.is_none() && reflected_provider.is_some() {
             quote! {
                 #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new(
@@ -432,10 +420,7 @@ fn impl_specialization_applicability_witness(
 ///
 /// Returns method descriptor expressions in declaration order.
 #[must_use]
-fn definition_method_entries(
-    declaration: &ImplDeclarationIr,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
+fn definition_method_entries(declaration: &ImplDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
     let target_source = declaration.target_type.source.as_str();
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     declaration
@@ -623,12 +608,7 @@ fn expand_concrete_impl(
             .segments
             .last()
             .map(|segment| {
-                super::expression_codegen::path_arguments(
-                    &segment.arguments,
-                    &environment,
-                    &facade,
-                    path.span,
-                )
+                super::expression_codegen::path_arguments(&segment.arguments, &environment, &facade, path.span)
             })
             .unwrap_or_default();
         (
@@ -639,12 +619,8 @@ fn expand_concrete_impl(
     });
     let retained = declaration.retained_tokens;
     let target = declaration.target_type.tokens;
-    let impl_generic_definition =
-        super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
-    let trait_path = declaration
-        .trait_path
-        .as_ref()
-        .map(|path| path.tokens.clone());
+    let impl_generic_definition = super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
+    let trait_path = declaration.trait_path.as_ref().map(|path| path.tokens.clone());
     let trait_call_path = trait_path.clone();
     let has_trait = trait_path.is_some();
     let external_id = declaration
@@ -665,80 +641,67 @@ fn expand_concrete_impl(
         .iter()
         .enumerate()
         .filter_map(|(index, method)| {
-            invocation_adapter::definition(
-                method,
-                index,
-                &target,
-                &trait_call_path,
-                &target_source,
-                &facade,
-            )
+            invocation_adapter::definition(method, index, &target, &trait_call_path, &target_source, &facade)
         })
         .collect();
-    let invocation_adapter_entries =
-        declaration
-            .methods
-            .iter()
-            .enumerate()
-            .map(|(index, method)| {
-                let typed_extension_receiver = method
-                    .receiver
-                    .as_ref()
-                    .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
-                let mut method_context =
-                    super::invocation::analysis::MethodContext::implementation(&target);
-                method_context.extension_receiver = typed_extension_receiver.clone();
-                let invocation_plan =
-                    super::invocation::analysis::analyze_method(method, method_context)
-                        .expect("validated method analysis is infallible");
-                debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
-                if invocation_plan.pinned_receiver_mutability().is_some() {
-                    let is_safe_pinned_invocation = invocation_plan.is_executable();
-                    if is_safe_pinned_invocation {
-                        let descriptor_name =
-                            format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-                        return quote!(Some(&#descriptor_name));
-                    }
-                    return quote!(None);
-                }
-                let is_safe_invocation = invocation_plan.is_executable();
-                if is_safe_invocation {
-                    let descriptor_name =
-                        format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-                    quote!(Some(&#descriptor_name))
-                } else {
-                    quote!(None)
-                }
-            });
+    let invocation_adapter_entries = declaration.methods.iter().enumerate().map(|(index, method)| {
+        let typed_extension_receiver = method
+            .receiver
+            .as_ref()
+            .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
+        let mut method_context = super::invocation::analysis::MethodContext::implementation(&target);
+        method_context.extension_receiver = typed_extension_receiver.clone();
+        let invocation_plan = super::invocation::analysis::analyze_method(method, method_context)
+            .expect("validated method analysis is infallible");
+        debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
+        if invocation_plan.pinned_receiver_mutability().is_some() {
+            let is_safe_pinned_invocation = invocation_plan.is_executable();
+            if is_safe_pinned_invocation {
+                let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+                return quote!(Some(&#descriptor_name));
+            }
+            return quote!(None);
+        }
+        let is_safe_invocation = invocation_plan.is_executable();
+        if is_safe_invocation {
+            let descriptor_name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+            quote!(Some(&#descriptor_name))
+        } else {
+            quote!(None)
+        }
+    });
     let invocation_unavailable_reason_entries: Vec<_> = declaration
         .methods
         .iter()
         .map(|method| invocation_unavailable_reason_entry(method, &target, context))
         .collect();
-    let generic_specialization_adapter_definitions = declaration
-        .methods
-        .iter()
-        .enumerate()
-        .flat_map(|(method_index, method)| {
-            let target = target.clone();
-            let target_source = target_source.clone();
-            let facade = facade.clone();
-            let trait_call_path = trait_call_path.clone();
-            method.specializations.iter().enumerate().filter_map(
-                move |(specialization_index, specialization)| {
-                    let (method, generic_arguments) = specialized_method(method, specialization)?;
-                    invocation_adapter::specialization_definition(
-                        &method,
-                        method_index,
-                        (specialization_index, &generic_arguments),
-                        &target,
-                        &trait_call_path,
-                        &target_source,
-                        &facade,
-                    )
-                },
-            )
-        });
+    let generic_specialization_adapter_definitions =
+        declaration
+            .methods
+            .iter()
+            .enumerate()
+            .flat_map(|(method_index, method)| {
+                let target = target.clone();
+                let target_source = target_source.clone();
+                let facade = facade.clone();
+                let trait_call_path = trait_call_path.clone();
+                method
+                    .specializations
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(specialization_index, specialization)| {
+                        let (method, generic_arguments) = specialized_method(method, specialization)?;
+                        invocation_adapter::specialization_definition(
+                            &method,
+                            method_index,
+                            (specialization_index, &generic_arguments),
+                            &target,
+                            &trait_call_path,
+                            &target_source,
+                            &facade,
+                        )
+                    })
+            });
     let method_specialization_entries = declaration.methods.iter().enumerate().map(|(method_index, method)| {
         let entries = method
             .specializations
@@ -1159,8 +1122,7 @@ fn expand_concrete_impl(
             ))
         }
     });
-    let generic_specialization_adapter_definitions =
-        generic_specialization_adapter_definitions.collect();
+    let generic_specialization_adapter_definitions = generic_specialization_adapter_definitions.collect();
     let method_entries = method_entries.collect();
     let invocation_adapter_entries = invocation_adapter_entries.collect();
     let method_specialization_entries = method_specialization_entries.collect();

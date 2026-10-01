@@ -40,10 +40,7 @@ fn test_trait_carrier_projects_conditional_reflection_helpers() {
 
     assert!(carrier.contains("trait Service"), "{carrier}");
     assert!(carrier.contains("reflect_configure_member"), "{carrier}");
-    assert!(
-        carrier.contains("cfg (feature = \"extended\")"),
-        "{carrier}"
-    );
+    assert!(carrier.contains("cfg (feature = \"extended\")"), "{carrier}");
     assert!(carrier.contains("rename = \"read\""), "{carrier}");
     assert!(carrier.contains("__member_0"), "{carrier}");
 }
@@ -61,10 +58,7 @@ fn test_impl_carrier_preserves_method_tokens_for_reconstruction() {
     );
 
     assert!(carrier.contains("impl Service for Example"), "{carrier}");
-    assert!(
-        carrier.contains("fn read_value (& self) -> u32 { 7 }"),
-        "{carrier}"
-    );
+    assert!(carrier.contains("fn read_value (& self) -> u32 { 7 }"), "{carrier}");
     assert!(carrier.contains("reflect_configure_header"), "{carrier}");
 }
 
@@ -96,9 +90,7 @@ fn test_impl_carrier_rejects_non_impl_items() {
     .expect_err("reflect_impl only accepts impl blocks");
 
     assert!(
-        error
-            .to_string()
-            .contains("can only be applied to an impl block"),
+        error.to_string().contains("can only be applied to an impl block"),
         "non-impl input must report the attribute macro restriction",
     );
 }
@@ -115,9 +107,7 @@ fn test_carrier_rejects_derive_macro_kind() {
     .expect_err("derive macros do not use declaration carriers");
 
     assert!(
-        error
-            .to_string()
-            .contains("only supports trait and impl macros"),
+        error.to_string().contains("only supports trait and impl macros"),
         "derive macro kind must report unsupported carrier usage",
     );
 }
@@ -127,15 +117,10 @@ fn test_explicit_runtime_path_requires_a_path_expression() {
     let path = explicit_runtime_path(&quote!(crate = ::reflection_facade))
         .expect("valid facade arguments should parse")
         .expect("the explicit crate argument should be retained");
-    let expected: Path =
-        parse2(quote!(::reflection_facade)).expect("the expected path should parse");
-    assert_eq!(
-        path, expected,
-        "the explicit runtime path must be preserved"
-    );
+    let expected: Path = parse2(quote!(::reflection_facade)).expect("the expected path should parse");
+    assert_eq!(path, expected, "the explicit runtime path must be preserved");
 
-    let error = explicit_runtime_path(&quote!(crate = 42))
-        .expect_err("a scalar is not a valid runtime facade path");
+    let error = explicit_runtime_path(&quote!(crate = 42)).expect_err("a scalar is not a valid runtime facade path");
     assert!(
         error.to_string().contains("`crate` must be a path"),
         "non-path crate arguments must report the path requirement",

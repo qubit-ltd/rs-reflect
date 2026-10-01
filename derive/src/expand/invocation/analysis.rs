@@ -270,7 +270,6 @@ fn unavailable_reasons(
 /// # Returns
 ///
 /// Returns the corresponding output plan.
-#[must_use]
 fn output_plan(return_type: &ReturnTypeIr) -> OutputPlan {
     match return_type {
         ReturnTypeIr::Unit => OutputPlan::Unit,

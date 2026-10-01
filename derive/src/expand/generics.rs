@@ -44,7 +44,6 @@ use crate::ir::TypeKindIr;
 ///
 /// Returns a syntax diagnostic when the retained generic declaration or where
 /// clause cannot be parsed.
-#[must_use]
 pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Result<syn::Generics> {
     let kind = match declaration.kind {
         TypeDeclarationKindIr::Struct => "struct",
