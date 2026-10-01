@@ -8,8 +8,6 @@
 
 //! Shared facts required by every expansion backend.
 
-// qubit-style: allow type-file-name
-
 use proc_macro_crate::FoundCrate;
 use proc_macro_crate::crate_name;
 use proc_macro2::Ident;

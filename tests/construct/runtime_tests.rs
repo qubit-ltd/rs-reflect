@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for the reflected construction runtime.
 mod construction_runtime {
     use std::any::TypeId;

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Isolated-process coverage for statically frozen built-in registry roots.
 
 use std::any::TypeId;

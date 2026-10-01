@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Source policies controlling reflected field access.
 
 /// The source policy controlling which field adapters callers may use.

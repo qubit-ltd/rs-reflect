@@ -8,9 +8,6 @@
 
 //! Expansion of reflected trait declarations and their registration fragments.
 
-// qubit-style: allow multiple-public-types
-// qubit-style: allow explicit-imports
-
 mod associated_const;
 mod default_invocation;
 mod default_method_expansion;

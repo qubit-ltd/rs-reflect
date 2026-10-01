@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for thread-safe dynamic value mode.
 use qubit_reflect::value::SendReflectedMut;
 use qubit_reflect::value::SendReflectedOwned;

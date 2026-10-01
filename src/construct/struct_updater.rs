@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Atomic owned-struct update validation and adapter dispatch.
 
 use std::any::TypeId;

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Deterministic concurrency, registry-model, and ownership stress coverage.
 
 use std::any::TypeId;

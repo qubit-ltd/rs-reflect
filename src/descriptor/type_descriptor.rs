@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! The unique root descriptor and [`Reflect`] query trait.
 
 use std::any::TypeId;

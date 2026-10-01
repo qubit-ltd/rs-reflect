@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Built-in capability identities and safe dynamic operation adapters.
 
 use super::clone_adapter::CloneAdapter;

@@ -8,8 +8,6 @@
 
 //! `syn`-independent type and path representation.
 
-// qubit-style: allow multiple-public-types
-
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 

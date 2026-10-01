@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Generic parameter declarations and their where predicates.
 
 use std::hash::Hash;

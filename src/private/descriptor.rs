@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow multiple-public-types
 //! Hidden factories for immutable static descriptor data.
 
 use crate::__private::LazyTypeRef;

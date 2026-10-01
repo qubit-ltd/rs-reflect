@@ -8,8 +8,6 @@
 
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
-// qubit-style: allow explicit-imports
-
 mod concrete_emission;
 mod concrete_impl_emission;
 mod internal;

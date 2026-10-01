@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Caller-owned construction input and per-field policy declarations.
 
 use std::fmt;

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Macro-level contracts for panic, async borrowing, and invocation modes.
 
 use std::cell::Cell;

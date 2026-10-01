@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Isolated-process coverage for concurrent first registry initialization.
 
 use std::sync::Arc;

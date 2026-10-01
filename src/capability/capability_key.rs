@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Typed keys for retrieving capability operation contracts.
 
 use std::any::TypeId;

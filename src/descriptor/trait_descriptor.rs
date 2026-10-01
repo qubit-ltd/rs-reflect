@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Trait definitions, concrete applications, supertraits, and associated items.
 
 use std::fmt;

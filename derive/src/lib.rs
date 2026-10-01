@@ -19,7 +19,6 @@ mod macros;
 mod parse;
 mod validate;
 
-// qubit-style: allow all
 use proc_macro::TokenStream;
 
 /// Derives structural reflection for a struct or enum.

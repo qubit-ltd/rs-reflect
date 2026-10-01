@@ -8,8 +8,6 @@
 
 //! Pure invocation analysis shared by impl and trait expansion.
 
-// qubit-style: allow type-file-name
-
 use proc_macro2::TokenStream;
 use quote::quote;
 

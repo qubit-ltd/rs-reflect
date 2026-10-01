@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration coverage for callable invocation adapter descriptors.
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::InvocationAdapter;

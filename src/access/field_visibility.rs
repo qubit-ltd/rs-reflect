@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Visibility origin of reflected struct and enum-variant fields.
 
 use crate::identity::Visibility;

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Complete ownership recovery for pre-execution construction failures.
 
 use std::fmt;

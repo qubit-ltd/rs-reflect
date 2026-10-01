@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Immutable errors reported while aggregating registration fragments.
 
 use std::sync::Arc;

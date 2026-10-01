@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Frozen registry snapshot and public deterministic lookup views.
 
 use std::any::TypeId;

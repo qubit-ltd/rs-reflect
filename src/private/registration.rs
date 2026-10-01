@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow type-file-name
 //! Hidden distributed-registration protocol for generated macro output.
 
 use std::sync::OnceLock;

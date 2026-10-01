@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Concrete generic-instance navigation shared by root descriptors.
 
 use crate::__private::LazyTypeRef;

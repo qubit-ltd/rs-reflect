@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for owned dynamic values.
 use qubit_reflect::value::ReflectedOwned;
 use qubit_reflect::value::SendReflectedOwned;

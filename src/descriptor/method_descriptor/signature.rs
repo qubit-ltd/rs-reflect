@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Method parameter, receiver, return, visibility, and qualifier facts.
 
 mod method_qualifiers;

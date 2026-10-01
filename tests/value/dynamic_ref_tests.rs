@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for borrowed dynamic values.
 use qubit_reflect::value::ReflectedMut;
 use qubit_reflect::value::ReflectedRef;

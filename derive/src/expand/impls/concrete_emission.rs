@@ -8,8 +8,6 @@
 
 //! Final token emission for one concrete reflected impl.
 
-// qubit-style: allow explicit-imports
-
 use proc_macro2::TokenStream;
 use quote::quote;
 
