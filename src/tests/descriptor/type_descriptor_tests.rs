@@ -72,6 +72,14 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
         optional.as_optional().expect("optional view").element_type(),
         element,
     ));
+    assert!(!optional.as_optional().expect("optional view").has_ref_projection());
+    assert!(matches!(
+        optional
+            .as_optional()
+            .expect("optional view")
+            .project_ref(crate::value::ReflectedRef::new(&Some(()))),
+        Err(crate::descriptor::OptionalProjectionError::Unavailable),
+    ));
     assert_eq!(sequence.as_sequence().expect("sequence view").kind(), SequenceKind::Vec,);
     assert_eq!(set.as_set().expect("set view").kind(), SetKind::BTreeSet);
     assert!(std::ptr::eq(map.as_map().expect("map view").key_type(), element));

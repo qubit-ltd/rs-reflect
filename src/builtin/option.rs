@@ -22,9 +22,10 @@ impl<T: Reflect> Reflect for Option<T> {
     /// The shared descriptor with a deferred relationship to `T`.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_optional_lazy::<Self>(
+            TypeDescriptor::new_optional_lazy::<T>(
                 type_name::<Self>(),
                 crate::__private::descriptor::lazy_type_ref::<T>(),
+                crate::descriptor::project_option_ref::<T>,
             )
         })
     }

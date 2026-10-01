@@ -92,6 +92,10 @@ pub use descriptor::ConcreteGenericDescriptor;
 pub use descriptor::FieldDefinitionDescriptor;
 /// One reflected field declaration.
 pub use descriptor::FieldDescriptor;
+/// Error returned when a reflected optional value cannot be projected.
+pub use descriptor::OptionalProjectionError;
+/// Structural and projection operations for optional root descriptors.
+pub use descriptor::OptionalTypeDescriptor;
 /// The static reflection contract implemented by reflected Rust types.
 pub use descriptor::Reflect;
 /// The immutable source-level descriptor for a generic type declaration.
