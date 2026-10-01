@@ -8,8 +8,6 @@
 
 //! Parser-independent invocation plan produced before token emission.
 
-// qubit-style: allow multiple-public-types
-
 use proc_macro2::TokenStream;
 
 /// Complete invocation facts shared by impl and trait expansion.

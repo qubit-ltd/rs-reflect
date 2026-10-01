@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Standalone coverage for invocation capability descriptor state.
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::CatchingAvailability;

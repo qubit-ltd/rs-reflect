@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for `Reflect` enum derives.
 use std::cell::Cell;
 use std::rc::Rc;

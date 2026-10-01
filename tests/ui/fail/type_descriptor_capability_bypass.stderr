@@ -1,7 +1,7 @@
 error[E0599]: no method named `capabilities` found for reference `&TypeDescriptor` in the current scope
-  --> tests/ui/fail/type_descriptor_capability_bypass.rs:14:24
+  --> tests/ui/fail/type_descriptor_capability_bypass.rs:13:24
    |
-14 |     let _ = descriptor.capabilities();
+13 |     let _ = descriptor.capabilities();
    |                        ^^^^^^^^^^^^ private field, not a method
    |
 help: there is a method `with_capabilities` with a similar name, but with different arguments

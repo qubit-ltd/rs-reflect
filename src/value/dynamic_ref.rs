@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Shared borrowed dynamic values with mode-specific erased storage.
 
 use std::any::Any;

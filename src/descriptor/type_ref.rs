@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Resolved, opaque, and symbolic references between descriptors.
 
 use std::any::TypeId;

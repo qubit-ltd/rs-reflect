@@ -8,8 +8,6 @@
 
 //! Helper-attribute IR and the shared helper target matrix.
 
-// qubit-style: allow multiple-public-types
-
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Errors produced while validating stable textual IDs.
 
 /// An invalid stable reflection ID.

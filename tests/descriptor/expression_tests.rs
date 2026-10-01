@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for structural Rust type expressions.
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;

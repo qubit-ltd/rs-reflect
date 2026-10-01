@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for type identity and base error APIs.
 use std::any::TypeId;
 use std::str::FromStr;

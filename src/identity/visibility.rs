@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Stable visibility categories for source declarations.
 
 use super::visibility_kind::VisibilityKind;

@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Struct construction adapter contract and descriptor-bound dispatch.
 
 use std::any::Any;

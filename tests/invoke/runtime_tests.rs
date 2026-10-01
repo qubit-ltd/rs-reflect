@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for the reflected invocation runtime.
 mod invocation_runtime {
     use std::any::TypeId;

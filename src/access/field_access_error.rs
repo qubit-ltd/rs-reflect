@@ -6,9 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Structured errors raised before or during reflected field access.
-// qubit-style: allow type-file-name
 
 use crate::access::FieldAccessOperation;
 use crate::access::FieldIdentity;

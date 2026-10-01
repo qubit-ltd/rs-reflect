@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for `Reflect` struct derives.
 use std::process::Command;
 use std::process::Stdio;

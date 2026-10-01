@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Errors for dynamic values with an unexpected Rust type.
 
 use std::any::TypeId;

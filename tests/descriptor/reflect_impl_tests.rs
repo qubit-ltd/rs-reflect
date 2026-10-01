@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration coverage for implementation registration expansion.
 use std::any::TypeId;
 use std::future::Future;

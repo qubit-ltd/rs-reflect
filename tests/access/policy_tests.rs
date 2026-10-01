@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for reflected field access policies.
 use qubit_reflect::__private::codegen_v3::descriptor;
 use qubit_reflect::access::FieldAccessError;

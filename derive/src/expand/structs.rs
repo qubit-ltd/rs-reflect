@@ -8,8 +8,6 @@
 
 //! Expansion of reflected struct declarations.
 
-// qubit-style: allow explicit-imports
-
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::format_ident;

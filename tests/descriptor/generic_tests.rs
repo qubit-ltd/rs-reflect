@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow explicit-imports
 //! Integration tests for concrete generic reflection instances.
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;

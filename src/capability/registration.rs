@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Public macros for explicit concrete reflection registrations.
 
 /// Converts one supported trait token into a bound-checked descriptor.

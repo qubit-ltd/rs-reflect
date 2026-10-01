@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-// qubit-style: allow public-type-layout
 //! Construction of immutable method declarations.
 
 use super::MethodDeclarationOwner;
