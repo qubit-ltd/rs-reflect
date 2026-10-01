@@ -238,7 +238,6 @@ fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
 /// # Returns
 ///
 /// Returns generated adapter items and corresponding descriptor entries.
-#[must_use]
 fn default_method_expansion(
     declaration: &TraitDeclarationIr,
     suffix: &str,
@@ -767,7 +766,6 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 ///
 /// Returns generated impl parameters, trait arguments, bounds and associated
 /// type expressions.
-#[must_use]
 fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade: &TokenStream) -> DynTraitGenerics {
     let mut impl_parameters = Vec::new();
     let mut impl_predicates = Vec::new();

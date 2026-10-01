@@ -130,69 +130,45 @@ pub(super) fn parse_helper_tokens(
 ///
 /// Returns the converted helper when its key and value are valid.
 #[must_use]
-fn convert_meta(
-    meta: Meta,
-    target: HelperTarget,
-    errors: &mut ErrorCollector,
-) -> Option<HelperAttributeIr> {
+fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -> Option<HelperAttributeIr> {
     let span = meta.span();
     let path_text = meta.path().to_token_stream().to_string();
     let Some(source_name) = meta.path().get_ident().map(ToString::to_string) else {
-        errors.push(Error::new(
-            span,
-            format!("unknown reflection helper `{path_text}`"),
-        ));
+        errors.push(Error::new(span, format!("unknown reflection helper `{path_text}`")));
         return None;
     };
     let Some(name) = HelperName::from_str(&source_name) else {
-        errors.push(Error::new(
-            span,
-            format!("unknown reflection helper `{source_name}`"),
-        ));
+        errors.push(Error::new(span, format!("unknown reflection helper `{source_name}`")));
         return None;
     };
     let value = match name {
         HelperName::DefinitionProviderV2 => match &meta {
-            Meta::NameValue(value) => {
-                parse2(value.value.to_token_stream()).map(HelperValueIr::DefinitionProviderV2)
-            }
+            Meta::NameValue(value) => parse2(value.value.to_token_stream()).map(HelperValueIr::DefinitionProviderV2),
             _ => Err(Error::new(
                 span,
                 "definition_provider_v2 requires one function identifier",
             )),
         },
-        HelperName::Rename => {
-            parse_string_value(&meta, "rename").map(crate::ir::HelperValueIr::Rename)
-        }
+        HelperName::Rename => parse_string_value(&meta, "rename").map(crate::ir::HelperValueIr::Rename),
         HelperName::Opaque
         | HelperName::Skip
         | HelperName::ReadOnly
         | HelperName::NoConstruct
         | HelperName::NoInvoke
         | HelperName::CatchUnwind
-        | HelperName::ThreadSafe => {
-            parse_flag(&meta, name.as_str()).map(|()| crate::ir::HelperValueIr::Flag)
+        | HelperName::ThreadSafe => parse_flag(&meta, name.as_str()).map(|()| crate::ir::HelperValueIr::Flag),
+        HelperName::Capabilities => parse_path_list(&meta, "capabilities").map(crate::ir::HelperValueIr::Paths),
+        HelperName::Supertrait => parse_path_list(&meta, "supertrait").map(crate::ir::HelperValueIr::Paths),
+        HelperName::DynCompatible => {
+            parse_optional_path_list(&meta, "dyn_compatible").map(crate::ir::HelperValueIr::DynCompatible)
         }
-        HelperName::Capabilities => {
-            parse_path_list(&meta, "capabilities").map(crate::ir::HelperValueIr::Paths)
-        }
-        HelperName::Supertrait => {
-            parse_path_list(&meta, "supertrait").map(crate::ir::HelperValueIr::Paths)
-        }
-        HelperName::DynCompatible => parse_optional_path_list(&meta, "dyn_compatible")
-            .map(crate::ir::HelperValueIr::DynCompatible),
         HelperName::Default => parse_default(&meta).map(crate::ir::HelperValueIr::DefaultPath),
-        HelperName::Specialize => {
-            parse_specialization(&meta).map(crate::ir::HelperValueIr::Specialization)
+        HelperName::Specialize => parse_specialization(&meta).map(crate::ir::HelperValueIr::Specialization),
+        HelperName::ExternalTraitId => {
+            parse_string_value(&meta, "external_trait_id").map(crate::ir::HelperValueIr::ExternalTraitId)
         }
-        HelperName::ExternalTraitId => parse_string_value(&meta, "external_trait_id")
-            .map(crate::ir::HelperValueIr::ExternalTraitId),
-        HelperName::ExternalTrait => {
-            parse_external_trait(&meta).map(crate::ir::HelperValueIr::ExternalTrait)
-        }
-        HelperName::RuntimeCrate => {
-            parse_runtime_crate(&meta).map(crate::ir::HelperValueIr::RuntimeCrate)
-        }
+        HelperName::ExternalTrait => parse_external_trait(&meta).map(crate::ir::HelperValueIr::ExternalTrait),
+        HelperName::RuntimeCrate => parse_runtime_crate(&meta).map(crate::ir::HelperValueIr::RuntimeCrate),
     };
     match value {
         Ok(value) => {
@@ -252,10 +228,7 @@ fn parse_optional_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
 /// Returns a syntax diagnostic when the helper is not a Rust path expression.
 fn parse_runtime_crate(meta: &Meta) -> SynResult<PathIr> {
     let Meta::NameValue(name_value) = meta else {
-        return Err(Error::new(
-            meta.span(),
-            "`crate` requires a Rust facade path",
-        ));
+        return Err(Error::new(meta.span(), "`crate` requires a Rust facade path"));
     };
     let Expr::Path(path) = &name_value.value else {
         return Err(Error::new(
@@ -284,10 +257,7 @@ fn parse_flag(meta: &Meta, name: &str) -> SynResult<()> {
     if matches!(meta, Meta::Path(_)) {
         Ok(())
     } else {
-        Err(Error::new(
-            meta.span(),
-            format!("`{name}` does not accept a value"),
-        ))
+        Err(Error::new(meta.span(), format!("`{name}` does not accept a value")))
     }
 }
 
@@ -313,8 +283,7 @@ fn parse_string_value(meta: &Meta, name: &str) -> SynResult<String> {
         ));
     };
     let Expr::Lit(ExprLit {
-        lit: Lit::Str(value),
-        ..
+        lit: Lit::Str(value), ..
     }) = &name_value.value
     else {
         return Err(Error::new(
@@ -348,10 +317,7 @@ fn parse_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
     };
     let paths = list.parse_args_with(Punctuated::<Path, Token![,]>::parse_terminated)?;
     if paths.is_empty() {
-        return Err(Error::new(
-            list.span(),
-            format!("`{name}` requires at least one path"),
-        ));
+        return Err(Error::new(list.span(), format!("`{name}` requires at least one path")));
     }
     Ok(paths.iter().map(convert_path).collect())
 }
@@ -403,10 +369,7 @@ fn parse_default(meta: &Meta) -> SynResult<Option<PathIr>> {
 /// Returns a syntax diagnostic for malformed or empty specialization lists.
 fn parse_specialization(meta: &Meta) -> SynResult<SpecializationIr> {
     let Meta::List(list) = meta else {
-        return Err(Error::new(
-            meta.span(),
-            "`specialize` requires named arguments",
-        ));
+        return Err(Error::new(meta.span(), "`specialize` requires named arguments"));
     };
     let SpecializationBindings(bindings) = parse2::<SpecializationBindings>(list.tokens.clone())?;
     if bindings.is_empty() {
@@ -476,32 +439,28 @@ impl Parse for SpecializationBindings {
             let span = name.span();
             input.parse::<Token![=]>()?;
             let type_fork = input.fork();
-            let (value, value_span) = if type_fork.parse::<Type>().is_ok()
-                && (type_fork.is_empty() || type_fork.peek(Token![,]))
-            {
-                let ty = input.parse::<Type>()?;
-                let span = ty.span();
-                let value = if matches!(
-                    &ty,
-                    Type::Path(path)
-                        if path.qself.is_none()
-                            && path.path.segments.iter().all(|segment| {
-                                matches!(segment.arguments, SynPathArguments::None)
-                            })
-                ) {
-                    SpecializationValueIr::AmbiguousPath(ty.to_token_stream())
+            let (value, value_span) =
+                if type_fork.parse::<Type>().is_ok() && (type_fork.is_empty() || type_fork.peek(Token![,])) {
+                    let ty = input.parse::<Type>()?;
+                    let span = ty.span();
+                    let value = if matches!(
+                        &ty,
+                        Type::Path(path)
+                            if path.qself.is_none()
+                                && path.path.segments.iter().all(|segment| {
+                                    matches!(segment.arguments, SynPathArguments::None)
+                                })
+                    ) {
+                        SpecializationValueIr::AmbiguousPath(ty.to_token_stream())
+                    } else {
+                        SpecializationValueIr::Type(convert_type(&ty))
+                    };
+                    (value, span)
                 } else {
-                    SpecializationValueIr::Type(convert_type(&ty))
+                    let expression = input.parse::<Expr>()?;
+                    let span = expression.span();
+                    (SpecializationValueIr::Const(expression.to_token_stream()), span)
                 };
-                (value, span)
-            } else {
-                let expression = input.parse::<Expr>()?;
-                let span = expression.span();
-                (
-                    SpecializationValueIr::Const(expression.to_token_stream()),
-                    span,
-                )
-            };
             bindings.push(SpecializationBindingIr {
                 name: name.to_string(),
                 value,

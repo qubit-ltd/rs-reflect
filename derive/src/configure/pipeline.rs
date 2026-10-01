@@ -101,11 +101,7 @@ pub(crate) fn process_configured(input: CompilerTokenStream) -> CompilerTokenStr
 /// # Errors
 ///
 /// Returns a syntax diagnostic when the input or support macro path is invalid.
-pub(super) fn make_carrier(
-    kind: MacroKind,
-    arguments: TokenStream,
-    item: TokenStream,
-) -> Result<TokenStream> {
+pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenStream) -> Result<TokenStream> {
     let source_tokens = item.clone();
     let (header, members, outer_attributes) = match kind {
         MacroKind::Trait => {
@@ -116,8 +112,7 @@ pub(super) fn make_carrier(
                     members.push((quote!(#member), Vec::new()));
                     continue;
                 };
-                let (projected, retained) =
-                    conditional_attributes::split_attributes(attributes.clone());
+                let (projected, retained) = conditional_attributes::split_attributes(attributes.clone());
                 if let Some(attributes) = trait_item_attributes_mut(&mut member) {
                     *attributes = retained;
                 }
@@ -139,8 +134,7 @@ pub(super) fn make_carrier(
                     members.push((quote!(#member), Vec::new()));
                     continue;
                 };
-                let (projected, retained) =
-                    conditional_attributes::split_attributes(attributes.clone());
+                let (projected, retained) = conditional_attributes::split_attributes(attributes.clone());
                 if let Some(attributes) = impl_item_attributes_mut(&mut member) {
                     *attributes = retained;
                 }
@@ -208,20 +202,11 @@ fn expand_configured(input: TokenStream) -> Result<TokenStream> {
         .iter()
         .find(|attribute| attribute.path().is_ident("reflect_configure_kind"))
         .ok_or_else(|| Error::new_spanned(&input.ident, "missing internal reflection kind"))?;
-    let kind = match kind_attribute
-        .meta
-        .require_list()?
-        .tokens
-        .to_string()
-        .as_str()
-    {
+    let kind = match kind_attribute.meta.require_list()?.tokens.to_string().as_str() {
         "trait" => MacroKind::Trait,
         "implementation" => MacroKind::Impl,
         _ => {
-            return Err(Error::new_spanned(
-                kind_attribute,
-                "invalid internal reflection kind",
-            ));
+            return Err(Error::new_spanned(kind_attribute, "invalid internal reflection kind"));
         }
     };
     let mut members = Vec::new();
@@ -284,12 +269,7 @@ fn attribute_tokens(attributes: &[Attribute], name: &str) -> Result<TokenStream>
     let attribute = attributes
         .iter()
         .find(|attribute| attribute.path().is_ident(name))
-        .ok_or_else(|| {
-            Error::new(
-                Span::call_site(),
-                format!("missing internal attribute `{name}`"),
-            )
-        })?;
+        .ok_or_else(|| Error::new(Span::call_site(), format!("missing internal attribute `{name}`")))?;
     Ok(attribute.meta.require_list()?.tokens.clone())
 }
 
@@ -308,11 +288,7 @@ fn attribute_tokens(attributes: &[Attribute], name: &str) -> Result<TokenStream>
 /// # Errors
 ///
 /// Returns a syntax diagnostic if the member or helper cannot be parsed.
-fn restore_member(
-    member: TokenStream,
-    helpers: &[Attribute],
-    kind: MacroKind,
-) -> Result<TokenStream> {
+fn restore_member(member: TokenStream, helpers: &[Attribute], kind: MacroKind) -> Result<TokenStream> {
     match kind {
         MacroKind::Trait => {
             let mut item: TraitItem = parse2(member)?;
@@ -447,10 +423,7 @@ pub(super) fn explicit_runtime_path(arguments: &TokenStream) -> Result<Option<Pa
             && name_value.path.is_ident("crate")
         {
             let Expr::Path(path) = name_value.value else {
-                return Err(Error::new(
-                    name_value.value.span(),
-                    "`crate` must be a path",
-                ));
+                return Err(Error::new(name_value.value.span(), "`crate` must be a path"));
             };
             return Ok(Some(path.path));
         }

@@ -495,6 +495,35 @@ fn main() {
 
 已知 `Customer` 时，直接调用 `TypeDescriptor::of::<Customer>()` 即可。框架若要列出已链接类型、按名称查找方法或获取某种扩展操作，就初始化 `ReflectRegistry`。调用 `initialize()` 后，注册片段通过一次校验汇总为不可变快照；冲突返回 `RegistryError`，不会留下部分结果。下面的独立程序确认 `Service` 已进入类型索引，并检查它没有声明 `qubit.reflect.clone` 能力：
 
+### 可选值
+
+可选类型描述符将结构信息与运行时访问能力分开。`element_type()` 描述 `T`；`has_ref_projection()` 表示描述符是否带有检查借用 `Option<T>` 的适配器。内置 `Option<T>` 描述符提供此适配器：
+
+```rust
+use qubit_reflect::{OptionalProjectionError, ReflectedRef, TypeDescriptor};
+
+fn main() -> Result<(), OptionalProjectionError> {
+let value = Some(12_u32);
+let optional = TypeDescriptor::of::<Option<u32>>()
+    .as_optional()
+    .expect("Option 描述符");
+let inner = optional
+    .project_ref(ReflectedRef::new(&value))?
+    .expect("Some 值");
+assert_eq!(inner.downcast_ref::<u32>(), Some(&12));
+
+let absent: Option<u32> = None;
+assert!(optional.project_ref(ReflectedRef::new(&absent))?.is_none());
+assert!(matches!(
+    optional.project_ref(ReflectedRef::new(&Some(12_u8))),
+    Err(OptionalProjectionError::TypeMismatch(_)),
+));
+Ok(())
+}
+```
+
+由结构事实构造的描述符也能描述可选元素，但不持有具体 `Option<T>` 适配器。调用其 `project_ref` 会返回 `OptionalProjectionError::Unavailable`；当适配器可用性决定操作能否绑定时，应先检查 `has_ref_projection()`。投影使用本地共享借用边界；可先显式将 `SendReflectedRef` 转为本地包装器（`into_local()`）再投影。本 API 不提供可变或线程安全投影。
+
 ```rust
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::{Reflect, TypeDescriptor};

@@ -41,10 +41,7 @@ use crate::ir::VisibilityIr;
 ///
 /// Returns a syntax diagnostic when the declaration is not a struct or retained
 /// generic syntax cannot be parsed.
-pub(crate) fn expand(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> syn::Result<TokenStream> {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return Err(syn::Error::new(
             declaration.span,
@@ -64,8 +61,7 @@ pub(crate) fn expand(
         .iter()
         .any(|attribute| attribute.name == HelperName::ThreadSafe);
     let reflected_field_types = super::generics::reflected_field_types(&declaration);
-    let transparently_reflected_parameters =
-        super::generics::transparently_reflected_type_parameters(&declaration);
+    let transparently_reflected_parameters = super::generics::transparently_reflected_type_parameters(&declaration);
     let type_parameter_names: Vec<_> = declaration
         .generics
         .params
@@ -83,14 +79,10 @@ pub(crate) fn expand(
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in &type_parameter_names {
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field_type in &reflected_field_types {
             let field_type = &field_type.tokens;
@@ -307,8 +299,7 @@ pub(crate) fn expand(
         !declaration.generics.params.is_empty(),
     );
     let generic_definition_provider = super::generics::definition_provider(&declaration, &facade);
-    let type_definition_provider =
-        super::generics::type_definition_provider(&declaration, &facade, fingerprint);
+    let type_definition_provider = super::generics::type_definition_provider(&declaration, &facade, fingerprint);
     Ok(quote! {
         impl #impl_generics #name #type_generics #where_clause {
             #capability_definition

@@ -28,8 +28,5 @@ pub(super) fn carrier_name(source: &TokenStream, arguments: &TokenStream) -> Ide
     let hash = source.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
     });
-    Ident::new(
-        &format!("__QuBitReflectConfigured_{hash:016x}"),
-        Span::call_site(),
-    )
+    Ident::new(&format!("__QuBitReflectConfigured_{hash:016x}"), Span::call_site())
 }

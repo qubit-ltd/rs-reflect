@@ -48,7 +48,6 @@ use crate::ir::TraitDeclarationIr;
 /// # Returns
 ///
 /// Returns each declared inherited associated type path in source order.
-#[must_use]
 pub(super) fn dyn_inherited_associated_types(
     declaration: &TraitDeclarationIr,
 ) -> impl Iterator<Item = &crate::ir::PathIr> {

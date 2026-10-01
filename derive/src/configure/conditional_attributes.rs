@@ -133,10 +133,7 @@ fn split_meta(meta: &Meta) -> Result<(Option<Meta>, Option<Meta>)> {
     if meta.path().is_ident("cfg_attr") {
         let attribute: Attribute = parse_quote!(#[#meta]);
         let (carrier, item) = split_cfg_attr(&attribute)?;
-        return Ok((
-            carrier.map(|value| value.meta),
-            item.map(|value| value.meta),
-        ));
+        return Ok((carrier.map(|value| value.meta), item.map(|value| value.meta)));
     }
     Ok((None, Some(meta.clone())))
 }
@@ -156,11 +153,7 @@ fn split_meta(meta: &Meta) -> Result<(Option<Meta>, Option<Meta>)> {
 /// # Errors
 ///
 /// Returns a syntax error when the reconstructed attribute is malformed.
-fn make_cfg_attr(
-    source: &Attribute,
-    predicate: &Meta,
-    attributes: Vec<Meta>,
-) -> Result<Option<Attribute>> {
+fn make_cfg_attr(source: &Attribute, predicate: &Meta, attributes: Vec<Meta>) -> Result<Option<Attribute>> {
     if attributes.is_empty() {
         return Ok(None);
     }
@@ -183,16 +176,8 @@ mod tests {
             parse_quote!(#[reflect(rename = "active")]),
             parse_quote!(#[inline]),
         ]);
-        assert_eq!(
-            carrier.len(),
-            2,
-            "cfg and reflect attributes must be projected"
-        );
-        assert_eq!(
-            retained.len(),
-            2,
-            "cfg and inline attributes must be retained"
-        );
+        assert_eq!(carrier.len(), 2, "cfg and reflect attributes must be projected");
+        assert_eq!(retained.len(), 2, "cfg and inline attributes must be retained");
         assert_eq!(
             carrier[0].meta.to_token_stream().to_string(),
             "cfg (unix)",
@@ -220,22 +205,14 @@ mod tests {
         let (carrier, retained) = split_attributes(vec![parse_quote!(
             #[cfg_attr(feature = "special", cfg(any()), reflect(no_invoke), inline)]
         )]);
-        assert_eq!(
-            carrier.len(),
-            1,
-            "nested cfg branch must produce one carrier attribute"
-        );
+        assert_eq!(carrier.len(), 1, "nested cfg branch must produce one carrier attribute");
         assert_eq!(
             retained.len(),
             1,
             "nested item branch must produce one retained attribute"
         );
         assert!(
-            carrier[0]
-                .meta
-                .to_token_stream()
-                .to_string()
-                .contains("cfg (any ())"),
+            carrier[0].meta.to_token_stream().to_string().contains("cfg (any ())"),
             "nested cfg predicate must be projected to the carrier",
         );
         assert!(
@@ -247,19 +224,11 @@ mod tests {
             "reflection policy must be projected to the carrier",
         );
         assert!(
-            retained[0]
-                .meta
-                .to_token_stream()
-                .to_string()
-                .contains("inline"),
+            retained[0].meta.to_token_stream().to_string().contains("inline"),
             "item-only attributes must remain in the retained branch",
         );
         assert!(
-            !retained[0]
-                .meta
-                .to_token_stream()
-                .to_string()
-                .contains("reflect"),
+            !retained[0].meta.to_token_stream().to_string().contains("reflect"),
             "reflection policy must not remain on the original item",
         );
     }
@@ -287,10 +256,7 @@ mod tests {
             retained.contains("cfg_attr"),
             "retained nested attributes must keep cfg_attr"
         );
-        assert!(
-            retained.contains("inline"),
-            "item attribute must be retained"
-        );
+        assert!(retained.contains("inline"), "item attribute must be retained");
         assert!(
             retained.contains("doc = \"active\""),
             "documentation attribute must be retained"

@@ -26,6 +26,7 @@ mod expression_tests;
 mod generic_tests;
 mod identity_tests;
 mod method_descriptor_tests;
+mod optional_projection_tests;
 #[cfg(feature = "derive")]
 mod reflect_impl_tests;
 #[cfg(feature = "derive")]
