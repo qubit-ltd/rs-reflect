@@ -174,9 +174,11 @@ class DownstreamManifestTests(unittest.TestCase):
         for channel in ("baseline", "head"):
             with self.subTest(channel=channel):
                 start = workflow.index(f"  downstream-{channel}:")
-                following_job = "\n  downstream-head:" if channel == "baseline" else "\n  verify:"
-                end = workflow.index(following_job, start + 1)
-                job = workflow[start:end]
+                if channel == "baseline":
+                    end = workflow.index("\n  downstream-head:", start + 1)
+                    job = workflow[start:end]
+                else:
+                    job = workflow[start:]
                 self.assertIn("scripts/check-downstream.sh", job)
                 self.assertIn("scripts/check_dependency_layout.py", job)
                 self.assertIn("secrets.DEPENDENCY_TOKEN", job)
@@ -196,16 +198,13 @@ class DownstreamManifestTests(unittest.TestCase):
         matrix = job.index("downstream_manifest.py matrix")
         self.assertLess(validation, matrix)
 
-    def test_derive_coverage_has_an_independent_required_job(self):
+    def test_derive_coverage_is_enabled_in_reusable_ci_job(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        start = workflow.index("  derive-coverage:")
-        end = workflow.index("\n  pages:", start)
+        start = workflow.index("  rust-ci:")
+        end = workflow.index("\n  downstream-baseline:", start)
         job = workflow[start:end]
-        self.assertIn("needs: [verify]", job)
-        self.assertIn("cargo install cargo-llvm-cov", job)
-        self.assertIn("scripts/check-derive-coverage.sh", job)
-        self.assertIn("name: derive-coverage-reports", job)
-        self.assertIn("needs: [verify, feature-matrix, coverage, derive-coverage]", workflow)
+        self.assertIn("uses: qubit-ltd/rs-infra-ci/.github/workflows/github-ci.yml@", job)
+        self.assertIn("derive-coverage: true", job)
 
     def test_collect_rejects_dirty_checkout_without_writing_output(self):
         clean_heads = iter(REVISIONS)
