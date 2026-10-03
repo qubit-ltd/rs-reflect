@@ -64,7 +64,4 @@ pub(super) struct RegistryIndexes {
     pub(super) capability_fragments: HashMap<(CapabilityTarget, CapabilityId), FragmentIdentity>,
     /// Effective semantic origin for each registered capability.
     pub(super) capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
-    /// All unique fragments in deterministic order.
-    #[allow(dead_code, reason = "retained for registry conflict auditing")]
-    pub(super) fragment_identities: Box<[FragmentIdentity]>,
 }
