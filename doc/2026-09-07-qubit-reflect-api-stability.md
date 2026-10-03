@@ -3,12 +3,12 @@
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 
 - Date: 2026-09-07
-- Status: internal `0.1` source-development compatibility policy; registry publication is not verified here
+- Status: current internal `0.2.0` source-development compatibility policy; registry publication is not verified here
 - Scope: the reflection runtime, derive output, extension capabilities, and implementation details
 - User guide: [English](user_guide.md) · [简体中文](user_guide.zh_CN.md)
 
 This policy makes compatibility expectations explicit for the four audiences that
-consume or extend `qubit-reflect`. This policy treats the internal `0.1` source-development line as requiring
+consume or extend `qubit-reflect`. This policy treats the current internal `0.2.0` source-development line as requiring
 coordinated breaking changes. Until a stable release policy is explicitly
 announced, changes may break the boundaries below, provided the runtime, derive crate, downstream
 facades, and their contract tests are updated together. A path in the table is

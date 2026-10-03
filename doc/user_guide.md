@@ -9,7 +9,7 @@
 
 [Chinese user guide](user_guide.zh_CN.md) · [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 
-This guide covers `qubit-reflect` 0.1.0 on Rust 1.94 or later. It is for Rust application and framework developers who need to read and update structs by field name at runtime. Maintainers of dependency facades should read [Facade integration and migration](#facade-integration-and-migration). Reading through [Check the PATCH result](#check-the-patch-result) is enough to integrate field-level PATCH handling in a support console. Later sections cover construction, method invocation, registries, capabilities, and thread-safe boundaries.
+This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust application and framework developers who need to read and update structs by field name at runtime. Maintainers of dependency facades should read [Facade integration and migration](#facade-integration-and-migration). Reading through [Check the PATCH result](#check-the-patch-result) is enough to integrate field-level PATCH handling in a support console. Later sections cover construction, method invocation, registries, capabilities, and thread-safe boundaries.
 
 ## Contents
 
@@ -314,6 +314,11 @@ error, never a value of a different type or an internal assertion failure.
 
 When the console must trigger a business operation, use `#[reflect_impl]` to
 generate method metadata, then use the same registry for lookup and invocation.
+`TypeDescriptor` queries ending in `_global` initialize and read the process-global
+registry; queries ending in `_in` read the explicitly supplied registry snapshot.
+When invoking a query result, use the same registry for lookup and invocation:
+for a global query, initialize the registry and pass that registry to invocation;
+for an isolated snapshot, pass that snapshot to both.
 The independent counter example below adds `2` to `1`, producing `3`. Passing
 the string `"2"` fails, returns that string, and leaves the counter at `3`.
 Converting UI input to `u64` remains the application's responsibility.
@@ -629,9 +634,14 @@ fn main() {
 }
 ```
 
-Passing the snapshot to `impls_in`, `methods_in`, or `methods_named_in` makes
-the lookup dependency explicit. The snapshot is immutable; a failed global
-initialization never exposes a partially built registry.
+`impls_global()`, `methods_global()`, and `methods_named_global(name)` initialize
+and query the process-global registry. Their `_in` counterparts
+(`impls_in(&snapshot)`, `methods_in(&snapshot)`, and
+`methods_named_in(&snapshot, name)`) query the explicitly supplied snapshot.
+Use the same registry for method lookup and invocation: initialize once and pass
+that registry to both operations, or pass the same explicit snapshot to both.
+The snapshot is immutable; a failed global initialization never exposes a
+partially built registry.
 
 `snapshot.definitions()` enumerates generic declarations even when no concrete
 instance is registered. Query them by `TypeDefinitionId`, Rust path, or query
@@ -771,7 +781,8 @@ type produces `AdapterTypeMismatch`.
 
 Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
 `methods_named_in` when a property or method query must use that exact set of
-facts. `build()` validates all identities, links, and capability conflicts as
+facts. Global queries use the process-global registry instead. A method lookup
+and its invocation must use the same registry snapshot. `build()` validates all identities, links, and capability conflicts as
 one transaction. It returns a `RegistryError` without publishing partial
 state; provide stable `FragmentIdentity` values so duplicate or changed source
 identities are diagnosable. For a conflict, inspect

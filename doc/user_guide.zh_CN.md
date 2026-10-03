@@ -9,7 +9,7 @@
 
 [中文 README](../README.zh_CN.md) · [English user guide](user_guide.md) · [API 文档](https://docs.rs/qubit-reflect)
 
-本文适用于 `qubit-reflect` 0.1.0，要求 Rust 1.94 或更高版本。它面向需要在运行时按字段名读写 Rust 结构体的后台服务与框架开发者；维护统一依赖入口或外观库的开发者按需查阅[外观库与迁移](#外观库与迁移)。读到[核对 PATCH 结果](#核对-patch-结果)，就能完成客服控制台的字段级 PATCH；后续章节按需介绍构造、方法调用、注册表、能力与线程安全。
+本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本。它面向需要在运行时按字段名读写 Rust 结构体的后台服务与框架开发者；维护统一依赖入口或外观库的开发者按需查阅[外观库与迁移](#外观库与迁移)。读到[核对 PATCH 结果](#核对-patch-结果)，就能完成客服控制台的字段级 PATCH；后续章节按需介绍构造、方法调用、注册表、能力与线程安全。
 
 ## 目录
 
@@ -304,6 +304,8 @@ Rust 中三种“空结构体”的形状不同。构造时按声明选择入口
 
 控制台若要按名称触发对象操作，就需要方法元数据。下面用独立的 `Counter` 展示调用过程：在实现块上标注 `#[reflect_impl]`，从 `ReflectRegistry` 查找 `add`，再用同一个注册表执行。应用仍负责把界面上的 `"2"` 解析为 `u64`；故意把字符串直接传入时，调用应失败并返还字符串。
 
+`TypeDescriptor` 中以 `_global` 结尾的查询会初始化并读取进程全局注册表；以 `_in` 结尾的查询读取显式传入的注册表快照。查找结果用于调用时必须使用同一个注册表：全局查询应初始化注册表，并把该注册表传给调用；隔离快照则在查找和调用时都传入同一快照。
+
 ```rust
 use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::invoke::{InvocationArg, InvocationErrorKind};
@@ -542,7 +544,7 @@ fn main() {
 }
 ```
 
-快照固定类型、名称、trait、实现、能力和有效方法索引；静态内置类型也在结果中。之后按需生成的复合类型描述符不会成为新的快照成员。把同一快照显式传给 `impls_in`、`methods_in` 或 `methods_named_in`，才能明确这些查询使用哪一组注册事实。
+快照固定类型、名称、trait、实现、能力和有效方法索引；静态内置类型也在结果中。之后按需生成的复合类型描述符不会成为新的快照成员。`impls_global()`、`methods_global()` 和 `methods_named_global(name)` 会初始化并查询进程全局注册表；对应的 `impls_in(&snapshot)`、`methods_in(&snapshot)` 和 `methods_named_in(&snapshot, name)` 查询显式传入的快照。方法查找与调用必须使用同一注册表：全局查询应初始化一次并将该注册表用于调用，显式快照则在两处都传入同一快照。
 
 `snapshot.definitions()` 用于枚举泛型定义，即使没有任何具体实例注册；可按 `TypeDefinitionId`、Rust 路径或查询名定位。`TypeDefinitionDescriptor` 描述声明，具体实例保留解析后的类型实参。定义字段中的 `TypeExpression` 只表达类型关系，不提供值访问适配器；`TypeRef` 仅在生成代码能证明具体类型时解析，不会根据字符串猜测。
 
