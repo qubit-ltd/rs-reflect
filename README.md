@@ -20,7 +20,7 @@ A customer service loads `Customer { id, email, display_name, credit_limit_cents
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = "0.2"
 ```
 
 Reflection macros are enabled by default. For runtime-only use or reflection of third-party types, see the [dependency profiles](doc/user_guide.md#choose-dependency-features) in the user guide.

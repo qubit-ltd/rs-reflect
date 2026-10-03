@@ -18,8 +18,8 @@ Direct use requires the matching runtime crate because generated code calls its 
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }
-qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
+qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = false }
+qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
 ```
 
 This source-checkout recipe does not verify registry publication of the current
@@ -30,8 +30,8 @@ For registry dependencies, select published versions from the same release line:
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.1", default-features = false }
-qubit-reflect-derive = "0.1"
+qubit-reflect = { version = "0.2", default-features = false }
+qubit-reflect-derive = "0.2"
 ```
 
 ## Quick Start
