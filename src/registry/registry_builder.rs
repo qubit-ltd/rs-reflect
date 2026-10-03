@@ -71,8 +71,6 @@ struct RegistryBuilder {
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
     /// Candidate intrinsic capabilities awaiting conflict validation.
     intrinsic_candidates: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
-    /// All accepted fragment identities in input order.
-    fragment_identities: Vec<FragmentIdentity>,
 }
 
 impl RegistryBuilder {
@@ -108,7 +106,6 @@ impl RegistryBuilder {
                 self.push_capability_registration(&registration, &built.identity)?;
             }
         }
-        self.fragment_identities.push(built.identity);
         Ok(())
     }
 
@@ -565,7 +562,6 @@ impl RegistryBuilder {
             capabilities_by_definition,
             capability_fragments,
             capability_origins: self.capability_origins,
-            fragment_identities: self.fragment_identities.into_boxed_slice(),
         };
         ReflectRegistry {
             types: self.types.into_boxed_slice(),
