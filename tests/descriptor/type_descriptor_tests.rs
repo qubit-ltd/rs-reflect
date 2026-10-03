@@ -220,10 +220,10 @@ fn test_type_descriptor_graph_is_send_and_sync() {
 fn test_type_descriptor_navigates_registered_implementations_and_methods() {
     let descriptor = TypeDescriptor::of::<AggregatedNavigationTarget>();
     let implementations = descriptor
-        .impls()
+        .impls_global()
         .expect("the linked reflection registry should initialize");
     let methods = descriptor
-        .methods()
+        .methods_global()
         .expect("effective methods should be available through the root descriptor");
 
     assert_eq!(implementations.len(), 2);
@@ -254,19 +254,19 @@ fn test_type_descriptor_methods_named_reports_ambiguity() {
 
     assert!(matches!(
         descriptor
-            .methods_named("missing")
+            .methods_named_global("missing")
             .expect("registry initialization should succeed"),
         MethodLookup::Missing
     ));
     assert!(matches!(
         descriptor
-            .methods_named("inherent_only")
+            .methods_named_global("inherent_only")
             .expect("registry initialization should succeed"),
         MethodLookup::Unique(_)
     ));
     assert!(matches!(
         descriptor
-            .methods_named("repeated")
+            .methods_named_global("repeated")
             .expect("registry initialization should succeed"),
         MethodLookup::Ambiguous
     ));

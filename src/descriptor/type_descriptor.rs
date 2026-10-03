@@ -1761,7 +1761,7 @@ impl TypeDescriptor {
     }
 
     /// Returns every linked reflected implementation targeting this exact
-    /// root in deterministic registry order.
+    /// root in the process-wide registry's deterministic order.
     ///
     /// Both the returned slice and its descriptors belong to the immutable
     /// process-wide registry. A cached [`RegistryError`] is returned when
@@ -1776,7 +1776,7 @@ impl TypeDescriptor {
     /// Returns the cached registry initialization error if registration could
     /// not be aggregated.
     #[must_use = "inspect the reflected implementations or handle the registry error"]
-    pub fn impls(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
+    pub fn impls_global(&self) -> Result<&'static [&'static ImplDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.impls_in(registry))
     }
@@ -1798,7 +1798,8 @@ impl TypeDescriptor {
         registry.implementations(self.type_id())
     }
 
-    /// Returns the frozen effective method instances for this exact root.
+    /// Returns the process-wide frozen effective method instances for this
+    /// exact root.
     ///
     /// The view includes inherent methods and concrete trait methods, with
     /// defaulted trait methods replaced by their effective override where
@@ -1814,7 +1815,7 @@ impl TypeDescriptor {
     /// Returns the cached registry initialization error if registration could
     /// not be aggregated.
     #[must_use = "inspect the effective methods or handle the registry error"]
-    pub fn methods(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
+    pub fn methods_global(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.methods_in(registry))
     }
@@ -1838,7 +1839,8 @@ impl TypeDescriptor {
         registry.effective_view(self.type_id()).methods()
     }
 
-    /// Looks up an effective method by query name across all namespaces.
+    /// Looks up an effective method by query name across all namespaces in
+    /// the process-wide registry.
     ///
     /// [`MethodLookup::Missing`] means no method matched, while
     /// [`MethodLookup::Ambiguous`] means multiple inherent or trait namespaces
@@ -1859,7 +1861,7 @@ impl TypeDescriptor {
     /// Returns the cached registry initialization error if registration could
     /// not be aggregated.
     #[must_use = "inspect the method lookup result or handle the registry error"]
-    pub fn methods_named(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
+    pub fn methods_named_global(&self, name: &str) -> Result<MethodLookup<'static>, RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.methods_named_in(registry, name))
     }

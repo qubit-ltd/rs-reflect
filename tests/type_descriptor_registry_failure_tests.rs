@@ -106,13 +106,13 @@ fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
     let value = RegistryIndependentShape { value: 7 };
     let descriptor = TypeDescriptor::of::<RegistryIndependentShape>();
     let first = descriptor
-        .impls()
+        .impls_global()
         .expect_err("duplicate registration fragments must fail initialization");
     let second = descriptor
-        .methods()
+        .methods_global()
         .expect_err("method aggregation must propagate the cached error");
     let third = descriptor
-        .methods_named("anything")
+        .methods_named_global("anything")
         .expect_err("method lookup must propagate the cached error");
 
     assert_eq!(value.value, 7);
