@@ -111,7 +111,7 @@ Add the dependency:
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = "0.2"
 ```
 
 The same-package examples explicitly use `#[reflect(crate = qubit_reflect)]`
@@ -814,17 +814,17 @@ Choose one of the following alternatives for the `qubit-reflect` entry in
 
 ```toml
 # Runtime descriptors, dynamic values, and handwritten registration only.
-qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect = { version = "0.2", default-features = false }
 ```
 
 ```toml
 # Macros plus BigDecimal, chrono, and UUID reflection implementations.
-qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+qubit-reflect = { version = "0.2", features = ["ecosystem-types"] }
 ```
 
 ```toml
 # Macros plus Qubit DataType and Id reflection implementations.
-qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 ```
 
 `ecosystem-types` and `qubit-types` are independent opt-ins. Neither belongs to

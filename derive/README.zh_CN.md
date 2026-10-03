@@ -18,8 +18,8 @@
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.1", path = "../rs-reflect", default-features = false }
-qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
+qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = false }
+qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
 ```
 
 此处只说明源码检出的接入方式，不代表已验证当前检出的 registry 发布状态。请保留本地检出布局，因为 `qubit-reflect` 还依赖同级的 `rust-common/rs-id` 与 `rust-common/rs-datatype`。它们都要求 Rust 1.94 或更高版本。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
@@ -28,8 +28,8 @@ qubit-reflect-derive = { version = "0.1", path = "../rs-reflect/derive" }
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.1", default-features = false }
-qubit-reflect-derive = "0.1"
+qubit-reflect = { version = "0.2", default-features = false }
+qubit-reflect-derive = "0.2"
 ```
 
 ## 快速开始

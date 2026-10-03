@@ -114,7 +114,7 @@ fn main() {
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = "0.2"
 ```
 
 同包 example 中，宏自动发现的 `crate` 可能指向示例程序，因此用
@@ -651,17 +651,17 @@ let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registr
 
 ```toml
 # 只使用运行时描述符、动态值和手写注册 API。
-qubit-reflect = { version = "0.1", default-features = false }
+qubit-reflect = { version = "0.2", default-features = false }
 ```
 
 ```toml
 # 使用宏，并为 BigDecimal、chrono、UUID 类型提供反射实现。
-qubit-reflect = { version = "0.1", features = ["ecosystem-types"] }
+qubit-reflect = { version = "0.2", features = ["ecosystem-types"] }
 ```
 
 ```toml
 # 使用宏，并为 Qubit DataType、Id 类型提供反射实现。
-qubit-reflect = { version = "0.1", features = ["qubit-types"] }
+qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 ```
 
 两个外部类型 feature 相互独立，均不在默认配置中。需要生成外部类型描述符的外观库或元数据 crate，须在自己的依赖上开启对应 feature；仅重导出宏不会启用这些实现。`qubit-types` 只为 `qubit_id::Id` 提供反射。如果应用还使用 ID 生成器，请直接依赖 `qubit-id` 并启用所需 feature，不要依赖本 crate 间接启用的 feature。

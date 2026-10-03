@@ -485,14 +485,16 @@ dependencies = [
 
 [[package]]
 name = "qubit-id"
-version = "0.6.0"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d861eb71f4ce5e46d1a956cc631859e9f9f45a5a4dd310a2e0acb570acd34d8"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "qubit-reflect"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bigdecimal",
  "chrono",
@@ -508,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-reflect-derive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",

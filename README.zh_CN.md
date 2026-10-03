@@ -20,7 +20,7 @@
 
 ```toml
 [dependencies]
-qubit-reflect = "0.1"
+qubit-reflect = "0.2"
 ```
 
 反射宏默认启用。仅使用运行时 API，或为第三方类型提供反射实现时，参阅用户手册的[依赖功能选择](doc/user_guide.zh_CN.md#选择依赖功能)。
