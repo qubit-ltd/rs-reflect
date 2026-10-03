@@ -49,7 +49,7 @@ use crate::expression::GenericArgument;
 /// # #[cfg(feature = "derive")]
 /// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
 /// let implementation = TypeDescriptor::of::<example::Service>()
-///     .impls()?
+///     .impls_global()?
 ///     .first()
 ///     .expect("reflected implementation");
 /// assert_eq!(implementation.target_type().query_name(), "Service");

@@ -66,7 +66,7 @@ pub(super) use self::trait_descriptor_builder::generic_argument_is_concrete;
 /// # #[cfg(feature = "derive")]
 /// # fn main() -> Result<(), qubit_reflect::error::RegistryError> {
 /// let applied = TypeDescriptor::of::<example::Service>()
-///     .impls()?
+///     .impls_global()?
 ///     .iter()
 ///     .find_map(|implementation| implementation.implemented_trait())
 ///     .expect("reflected trait implementation");

@@ -140,7 +140,7 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 ///     fn name(&self) -> &'static str { "service" }
 /// }
 /// # fn main() {
-/// let implementations = TypeDescriptor::of::<Service>().impls()
+/// let implementations = TypeDescriptor::of::<Service>().impls_global()
 ///     .expect("valid registrations");
 /// assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
 /// # }
@@ -204,7 +204,7 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn ping(&self) {}
 /// }
 /// # fn main() {
-/// let implementations = TypeDescriptor::of::<Service>().impls()
+/// let implementations = TypeDescriptor::of::<Service>().impls_global()
 ///     .expect("valid registrations");
 /// assert!(implementations.iter().any(|item| item.method("ping").is_some()));
 /// # }
