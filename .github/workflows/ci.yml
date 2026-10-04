@@ -175,6 +175,27 @@ jobs:
         env:
           REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-downstream-head
         run: ./scripts/check-downstream.sh
+      - name: Package and validate staged reflect consumers
+        working-directory: rust-platform/rs-reflect
+        env:
+          REFLECT_RELEASE_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-release-consumer
+        run: |
+          version="$(python3 -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"])')"
+          cargo +1.94.0 package -p qubit-reflect-derive --no-verify --locked
+          cargo +1.94.0 --config "patch.crates-io.qubit-reflect-derive.path=\"$PWD/derive\"" package -p qubit-reflect --no-verify --locked
+          package_dir="${CARGO_TARGET_DIR:-target}/package"
+          python3 scripts/check_release_consumer.py --mode staged --version "$version" \
+            --runtime-archive "$package_dir/qubit-reflect-$version.crate" \
+            --derive-archive "$package_dir/qubit-reflect-derive-$version.crate" \
+            --evidence-dir "$REFLECT_RELEASE_EVIDENCE_DIR"
+      - name: Upload staged consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-consumer-evidence
+          path: ${{ runner.temp }}/rs-reflect-release-consumer
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload head evidence
         if: always()
         uses: actions/upload-artifact@v7

@@ -190,6 +190,19 @@ class DownstreamManifestTests(unittest.TestCase):
         self.assertIn('gh api "repos/$repository/commits/main"', head)
         self.assertIn("downstream_manifest.py collect", head)
 
+    def test_downstream_head_runs_staged_release_consumer(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        head = workflow.split("\n  downstream-head:\n", 1)[1]
+        for required in (
+            "package -p qubit-reflect-derive",
+            "package -p qubit-reflect",
+            "--mode staged",
+            "--runtime-archive",
+            "--derive-archive",
+            "release-consumer-evidence",
+        ):
+            self.assertIn(required, head)
+
     def test_head_resolve_validates_manifest_before_matrix(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         start = workflow.index("  downstream-head:")
