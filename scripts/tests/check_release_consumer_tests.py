@@ -80,6 +80,25 @@ class ConsumerTests(unittest.TestCase):
             self.assertNotIn('path =', manifest)
             self.assertIn('exercise();', source)
 
+    def test_qubit_profile_uses_staged_runtime_dependency_versions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory)
+            (runtime / "Cargo.toml").write_text(
+                '[package]\nname="qubit-reflect"\nversion="0.2.0"\n'
+                '[dependencies]\nqubit-id={version="0.7.9"}\n'
+                'qubit-datatype={version="0.14.3"}\n', encoding="utf-8")
+            manifest, _ = subject.fixture("0.2.0", "qubit-only", {"qubit-reflect": runtime})
+            dependencies = tomllib.loads(manifest)["dependencies"]
+            self.assertEqual(dependencies["qubit-id"]["version"], "0.7.9")
+            self.assertEqual(dependencies["qubit-datatype"], "0.14.3")
+
+    def test_rejects_duplicate_qubit_id_versions(self):
+        first = self.package(name="qubit-id")
+        second = self.package(name="qubit-id")
+        first["version"], second["version"] = "0.6.0", "0.7.0"
+        with self.assertRaisesRegex(ValueError, "multiple qubit-id versions"):
+            self.validate_sources({"packages": [self.package(), first, second]}, {}, "0.1.0")
+
     def test_profile_exercises_requested_builtins(self):
         manifest, source = subject.fixture('0.1.0', 'public-all', {})
         self.assertIn('default-features = false', manifest)
@@ -132,6 +151,10 @@ class PackagedExampleTests(unittest.TestCase):
         self.allowed = {name: self.root / name for name in ["qubit-reflect", "qubit-reflect-derive"]}
         for root in self.allowed.values():
             root.mkdir()
+        (self.allowed["qubit-reflect"] / "Cargo.toml").write_text(
+            '[package]\nname="qubit-reflect"\nversion="0.1.0"\n'
+            '[dependencies]\nqubit-id={version="0.7"}\n'
+            'qubit-datatype={version="0.14.0"}\n', encoding="utf-8")
         examples = self.allowed["qubit-reflect"] / "examples"
         examples.mkdir()
         for name in ["field_patch", "customer_patch", "support_action"]:

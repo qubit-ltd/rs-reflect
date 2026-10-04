@@ -99,8 +99,27 @@ def validate_sources(metadata: dict, allowed: dict[str, Path], version: str, con
             if package["version"] != version:
                 raise ValueError(f"reflection version mismatch: {name}")
             seen.add(name)
+    for dependency in ("qubit-id", "qubit-datatype"):
+        versions = {package["version"] for package in metadata["packages"]
+                    if package["name"] == dependency}
+        if len(versions) > 1:
+            raise ValueError(f"multiple {dependency} versions: {sorted(versions)}")
     if "qubit-reflect" not in seen:
         raise ValueError("runtime package missing")
+
+
+def runtime_dependency_version(allowed: dict[str, Path], name: str) -> str:
+    """Read one upstream requirement from the runtime being consumed."""
+    runtime = allowed.get("qubit-reflect", Path(__file__).resolve().parents[1])
+    try:
+        manifest = tomllib.loads((runtime / "Cargo.toml").read_text(encoding="utf-8"))
+        dependency = manifest["dependencies"][name]
+        version = dependency["version"] if isinstance(dependency, dict) else dependency
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError(f"missing runtime dependency version: {name}") from error
+    if not isinstance(version, str) or not version:
+        raise ValueError(f"missing runtime dependency version: {name}")
+    return version
 
 
 def fixture(version: str, profile: str, allowed: dict[str, Path]) -> tuple[str, str]:
@@ -118,7 +137,10 @@ def fixture(version: str, profile: str, allowed: dict[str, Path]) -> tuple[str, 
     let _ = TypeDescriptor::of::<chrono::NaiveDate>();
     let _ = TypeDescriptor::of::<uuid::Uuid>();''')
     if "qubit-types" in features:
-        manifest += 'qubit-id = { version = "0.6.0", default-features = false }\nqubit-datatype = "0.14.0"\n'
+        id_version = runtime_dependency_version(allowed, "qubit-id")
+        datatype_version = runtime_dependency_version(allowed, "qubit-datatype")
+        manifest += (f'qubit-id = {{ version = {json.dumps(id_version)}, default-features = false }}\n'
+                     f'qubit-datatype = {json.dumps(datatype_version)}\n')
         body = body.replace('fn exercise() {', '''fn exercise() {
     let _ = TypeDescriptor::of::<qubit_id::Id>();
     let _ = TypeDescriptor::of::<qubit_datatype::DataType>();''')
