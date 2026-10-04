@@ -1,3 +1,3 @@
 # relative git root<TAB>repository URL<TAB>default branch
-../rs-datatype	https://github.com/qubit-ltd/rs-datatype	main
-../rs-id	https://github.com/qubit-ltd/rs-id	main
+../../rust-common/rs-datatype	https://github.com/qubit-ltd/rs-datatype	main
+../../rust-common/rs-id	https://github.com/qubit-ltd/rs-id	main
