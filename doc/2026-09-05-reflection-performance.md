@@ -70,7 +70,7 @@ macro-annotated impl blocks in `rs-platform`, excluding the test-only fixture.
 They are a source-level workload estimate, not counts read from a successfully
 linked runtime registry; trait defaults or method overrides may change the
 effective-view count. The attempted downstream
-`ci-check.sh` is currently blocked by an unrelated exhaustive-match error in
+`.infra/bin/ci-check.sh` is currently blocked by an unrelated exhaustive-match error in
 `modules/core/src/mixin/validation_violation.rs` for the non-exhaustive
 `qubit_validator::PathSegment` enum.
 
@@ -107,7 +107,7 @@ construction or 1 ms at a real workload size.
 ## 2026-09-06 contract-refactoring measurements
 
 The following measurements were taken after the capability-error and struct-shape
-changes, with all three repositories' `align-ci.sh` and `ci-check.sh` passing.
+changes, with all three repositories' `align-ci.sh` and `.infra/bin/ci-check.sh` passing.
 The machine and compiler match the environment above: Rust 1.94.0 (LLVM 21.1.8),
 x86_64 Linux, Intel Core i5-9600K, six physical cores. Benchmarks ran serially
 after compiling all benchmark executables; no concurrent CI was launched during
