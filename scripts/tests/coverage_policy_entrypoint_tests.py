@@ -9,17 +9,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class CoveragePolicyEntrypointTests(unittest.TestCase):
-    def test_standalone_coverage_uses_global_check_after_report(self):
+    def test_standalone_coverage_delegates_to_shared_infrastructure(self):
         coverage = PROJECT_ROOT / ".infra/bin/coverage.sh"
         self.assertTrue(coverage.is_file(), "missing .infra/bin/coverage.sh")
         if not coverage.is_file():
             return
         source = coverage.read_text(encoding="utf-8")
-        collect = source.index("rs-infra-coverage")
-        report = source.index("coverage-report.sh")
-        check = source.index("check --input")
-        self.assertLess(collect, report)
-        self.assertLess(report, check)
+        self.assertIn('.infra/bootstrap.sh" .infra/bin/coverage.sh', source)
         self.assertNotIn("check-critical-coverage-report.sh", source)
 
     def test_ci_and_alignment_do_not_apply_project_only_thresholds(self):
