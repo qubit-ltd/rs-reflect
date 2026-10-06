@@ -125,6 +125,7 @@ required-features = ["derive"]
 [[bench]]
 name = "descriptor_lookup"
 harness = false
+required-features = ["derive"]
 
 [[bench]]
 name = "registry_init"

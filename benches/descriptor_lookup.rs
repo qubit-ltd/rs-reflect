@@ -17,8 +17,38 @@ use criterion::Criterion;
 use criterion::criterion_group;
 use qubit_reflect::TypeDescriptor;
 
+#[derive(qubit_reflect::Reflect)]
+struct FieldLookupRecord {
+    f00: u8,
+    f01: u8,
+    f02: u8,
+    f03: u8,
+    f04: u8,
+    f05: u8,
+    f06: u8,
+    f07: u8,
+    f08: u8,
+    f09: u8,
+    f10: u8,
+    f11: u8,
+    f12: u8,
+    f13: u8,
+    f14: u8,
+    f15: u8,
+}
+
 /// Registers cold-shape and hot-interner descriptor cases.
 fn descriptor_lookup(criterion: &mut Criterion) {
+    let fields = TypeDescriptor::of::<FieldLookupRecord>();
+    assert!(fields.field("f00").is_some());
+    assert!(fields.field("f15").is_some());
+    assert!(fields.field("absent").is_none());
+    for (label, name) in [("first", "f00"), ("last", "f15"), ("missing", "absent")] {
+        criterion.bench_function(&format!("field_lookup/{label}"), |bench| {
+            bench.iter(|| black_box(fields.field(black_box(name))));
+        });
+    }
+
     criterion.bench_function("descriptor/hot_nested_shape", |bench| {
         bench.iter(|| black_box(TypeDescriptor::of::<Vec<Option<String>>>()));
     });
