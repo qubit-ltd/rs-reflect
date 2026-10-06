@@ -125,7 +125,7 @@ cargo run --example support_action
 ## 延伸阅读
 
 - [用户手册](doc/user_guide.zh_CN.md)
-- [架构与详细设计](doc/2026-09-03-qubit-reflect-design.zh_CN.md) · [derive 契约矩阵](doc/derive-contract-matrix.zh_CN.md)
+- [当前设计（0.2）](doc/2026-10-07-qubit-reflect-current-design.zh_CN.md) · [历史设计（0.1）](doc/2026-09-03-qubit-reflect-design.zh_CN.md) · [derive 契约矩阵](doc/derive-contract-matrix.zh_CN.md)
 - [API 文档](https://docs.rs/qubit-reflect)
 - [English README](README.md) · [English user guide](doc/user_guide.md)
 

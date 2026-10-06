@@ -147,7 +147,7 @@ Reflection is deliberately bounded. It does not coerce numeric values, parse str
 ## Learn more
 
 - [User guide](doc/user_guide.md)
-- [Architecture and design](doc/2026-09-03-qubit-reflect-design.md) · [Derive contract matrix](doc/derive-contract-matrix.md)
+- [Current design (0.2)](doc/2026-10-07-qubit-reflect-current-design.md) · [Historical design (0.1)](doc/2026-09-03-qubit-reflect-design.md) · [Derive contract matrix](doc/derive-contract-matrix.md)
 - [API reference](https://docs.rs/qubit-reflect)
 - [中文 README](README.zh_CN.md) · [中文用户手册](doc/user_guide.zh_CN.md)
 
