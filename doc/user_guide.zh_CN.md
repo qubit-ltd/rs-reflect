@@ -611,6 +611,8 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 
 `u32` 可从 `types()` 中找到；`u64` 虽可查询 `example.limit`，却不是类型成员。`add_type_with_capabilities` 同时添加成员和能力，`add_type_capabilities` 只添加能力。空构建器的 `types()` 为空；仅添加能力也不会让目标出现在 `types()` 中。`capability_only_type_targets(id)` 按稳定能力 ID 枚举这些目标，即使适配器类型不一致也会返回，并按来源片段排序；审计模型元数据时可查 `"qubit.model.metadata.v1"`。
 
+需要能力查询同时要求快照成员资格时，使用 `member_capabilities(type_id)`：上例中的 `u32` 返回 `Some(...)`，仅登记能力的 `u64` 返回 `None`。没有有效能力事实的成员会返回 `Some(empty)`。该入口仅读取快照中已冻结的能力集，不会执行 provider；原有 `capabilities(descriptor)` 和 `capability(...)` 仍可查询 capability-only 目标。
+
 反射本身不要求执行此审计，但模型投影有更严格的约束：若模型元数据能力指向的类型不是 snapshot 成员，`ModelRegistry::from_reflect_registry` 会返回 `UnregisteredModelTarget`。启用泛型模型元数据时，定义目标也遵循相同规则。应检查对应的 `capability_only_*_targets` 结果及其来源片段，再将预期的模型类型或定义加入 snapshot，或从该视图中移除相应元数据注册。能力可查询并不代表它已成为模型成员。
 
 其他入口包括 `add_type`、`add_definition`、`add_trait`、`add_impl_definition`、`add_impl`、`add_definition_capabilities`。模型层的 `ModelRegistry::from_reflect_registry` 只投影快照的类型成员；若只想纳入 `MyModel`，在拥有该类型和 `qubit-model-metadata` 依赖的外观库中按以下集成步骤构建快照：
@@ -638,6 +640,8 @@ let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registr
 | `Some(nonempty)` | 有能力事实，定义可能是成员，也可能只是能力目标。 | 用 `definition(id).is_some()` 判断成员资格。 |
 
 例如只调用 `add_definition_capabilities` 而不调用 `add_definition`，就可能得到 `Some(nonempty)`，但 `definition(id)` 仍为 `None`。类型化的 `definition_capability` 与文本 ID 查询 `definition_capability_by_id` 也能从能力专用目标返回匹配的适配器或描述符；目标没有对应事实或能力时才返回 `None`。需要判断快照成员资格时，另行查询 `definition(id)`。存在能力事实但没有可执行适配器时，类型化查询返回 `CapabilityAccessError::FactOnly`；适配器类型与类型键不匹配时返回 `AdapterTypeMismatch`。
+
+`member_definition_capabilities(id)` 将定义成员资格与能力集查询合并：仅作为能力目标的定义返回 `None`，无能力的定义成员返回 `Some(empty)`，有能力的定义成员返回其能力集。该入口只读取快照中冻结的数据，不会执行 provider。
 
 ## 选择依赖功能与访问边界
 

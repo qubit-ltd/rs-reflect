@@ -129,6 +129,28 @@ static INTRINSIC_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(|| {
 static INTRINSIC_DESCRIPTOR: TypeDescriptor =
     opaque_root_with_capabilities::<IntrinsicTarget>("IntrinsicTarget", intrinsic_capabilities_for_test);
 
+struct MemberLookupProviderTarget;
+static MEMBER_LOOKUP_PROVIDER_CALLS: AtomicUsize = AtomicUsize::new(0);
+static MEMBER_LOOKUP_PROVIDER_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(TypeCapabilities::default);
+static MEMBER_LOOKUP_PROVIDER_DESCRIPTOR: TypeDescriptor = opaque_root_with_capabilities::<MemberLookupProviderTarget>(
+    "MemberLookupProviderTarget",
+    member_lookup_provider_capabilities,
+);
+
+fn member_lookup_provider_capabilities() -> TypeCapabilitiesResult {
+    MEMBER_LOOKUP_PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
+    Ok(&MEMBER_LOOKUP_PROVIDER_CAPABILITIES)
+}
+
+struct EmptyCapabilitiesTarget;
+static EMPTY_CAPABILITIES: LazyLock<TypeCapabilities> = LazyLock::new(TypeCapabilities::default);
+static EMPTY_CAPABILITIES_DESCRIPTOR: TypeDescriptor =
+    opaque_root_with_capabilities::<EmptyCapabilitiesTarget>("EmptyCapabilitiesTarget", empty_capabilities);
+
+fn empty_capabilities() -> TypeCapabilitiesResult {
+    Ok(&EMPTY_CAPABILITIES)
+}
+
 fn intrinsic_capabilities() -> TypeCapabilitiesResult {
     PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
     Ok(&PROVIDER_CAPABILITIES)
@@ -186,6 +208,69 @@ fn test_capability_only_snapshots_do_not_register_or_share_members() {
     assert_eq!(second.capability(descriptor, capability_key).unwrap(), Some(&9));
     assert!(first.types().is_empty());
     assert!(second.get(descriptor.type_id()).is_none());
+}
+
+#[test]
+fn test_member_capabilities_distinguishes_members_from_capability_only_targets() {
+    let empty = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
+    assert!(empty.member_capabilities(TypeId::of::<u32>()).is_none());
+
+    let mut member_builder = RegistrySnapshotBuilder::new();
+    member_builder.add_type(&EMPTY_CAPABILITIES_DESCRIPTOR, source(3, "type", 3));
+    let member = member_builder.build().expect("member snapshot");
+    assert!(member
+        .member_capabilities(TypeId::of::<EmptyCapabilitiesTarget>())
+        .expect("registered member")
+        .descriptors()
+        .is_empty());
+
+    let capability_key = key::<u32>("example.snapshot.member_lookup");
+    let mut capability_only_builder = RegistrySnapshotBuilder::new();
+    capability_only_builder.add_type_capabilities(
+        TypeDescriptor::of::<u32>(),
+        vec![CapabilityDescriptor::with_adapter(capability_key, 29_u32)],
+        source(4, "capability", 4),
+    );
+    let capability_only = capability_only_builder.build().expect("capability-only snapshot");
+    assert!(capability_only.member_capabilities(TypeId::of::<u32>()).is_none());
+    assert!(capability_only
+        .capabilities(TypeDescriptor::of::<u32>())
+        .expect("legacy capability lookup")
+        .contains(capability_key));
+    assert_eq!(capability_only.capability(TypeDescriptor::of::<u32>(), capability_key), Ok(Some(&29)));
+    assert!(capability_only.type_capability_members(capability_key).next().is_none());
+
+    let mut combined_builder = RegistrySnapshotBuilder::new();
+    combined_builder
+        .add_type(TypeDescriptor::of::<u32>(), source(5, "type", 5))
+        .add_type_capabilities(
+            TypeDescriptor::of::<u32>(),
+            vec![CapabilityDescriptor::with_adapter(capability_key, 31_u32)],
+            source(6, "capability", 6),
+        );
+    let combined = combined_builder.build().expect("member with capabilities");
+    assert_eq!(
+        combined
+            .member_capabilities(TypeId::of::<u32>())
+            .and_then(|capabilities| capabilities.get(capability_key).ok().flatten()),
+        Some(&31),
+    );
+    assert_eq!(combined.type_capability_members(capability_key).count(), 1);
+}
+
+#[test]
+fn test_member_capability_queries_do_not_execute_intrinsic_providers() {
+    let before_build = MEMBER_LOOKUP_PROVIDER_CALLS.load(Ordering::SeqCst);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.add_type(&MEMBER_LOOKUP_PROVIDER_DESCRIPTOR, source(7, "type", 7));
+    let registry = builder.build().expect("provider member snapshot");
+    let after_build = MEMBER_LOOKUP_PROVIDER_CALLS.load(Ordering::SeqCst);
+
+    assert!(registry
+        .member_capabilities(TypeId::of::<MemberLookupProviderTarget>())
+        .is_some());
+    assert_eq!(MEMBER_LOOKUP_PROVIDER_CALLS.load(Ordering::SeqCst), after_build);
+    assert!(after_build >= before_build);
 }
 
 #[test]
@@ -608,11 +693,17 @@ fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
     let unknown = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
     assert!(unknown.definition(DEFINITION.id()).is_none());
     assert!(unknown.definition_capabilities(DEFINITION.id()).is_none());
+    assert!(unknown.member_definition_capabilities(DEFINITION.id()).is_none());
 
     let mut member_only = RegistrySnapshotBuilder::new();
     member_only.add_definition(&DEFINITION, source(56, "type-definition", 56));
     let member_only = member_only.build().expect("member-only snapshot");
     assert!(member_only.definition(DEFINITION.id()).is_some());
+    assert!(member_only
+        .member_definition_capabilities(DEFINITION.id())
+        .expect("registered definition")
+        .descriptors()
+        .is_empty());
     assert!(
         member_only
             .definition_capabilities(DEFINITION.id())
@@ -629,6 +720,7 @@ fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
     );
     let capability_only = capability_only.build().expect("capability-only snapshot");
     assert!(capability_only.definition(DEFINITION.id()).is_none());
+    assert!(capability_only.member_definition_capabilities(DEFINITION.id()).is_none());
     assert_eq!(
         capability_only
             .definition_capabilities(DEFINITION.id())
@@ -645,6 +737,11 @@ fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
     );
     let both = both.build().expect("member with capabilities snapshot");
     assert!(both.definition(DEFINITION.id()).is_some());
+    assert_eq!(
+        both.member_definition_capabilities(DEFINITION.id())
+            .and_then(|capabilities| capabilities.get(capability_key).ok().flatten()),
+        Some(&23),
+    );
     assert_eq!(
         both.definition_capability(DEFINITION.id(), capability_key),
         Ok(Some(&23)),

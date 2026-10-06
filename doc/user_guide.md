@@ -753,6 +753,13 @@ example registers `u64` only for a capability and confirms it remains outside
 `capability_only_type_targets(capability_id)` to list registered capability
 targets absent from `types()`. The query matches the stable capability ID even
 when the adapter type differs, and orders results by their source fragment.
+Use `member_capabilities(type_id)` when a query must require snapshot
+membership: it returns `None` for the capability-only `u64`, while
+`member_capabilities(TypeId::of::<u32>())` returns `Some(...)` for the
+registered `u32` above. A member without effective facts returns
+`Some(empty)`. This lookup reads the frozen snapshot and never runs a
+provider. The existing `capabilities(descriptor)` and `capability(...)`
+queries continue to resolve capability-only targets.
 For an optional metadata registration audit, query
 `snapshot.capability_only_type_targets("qubit.model.metadata.v1")`.
 The audit is optional for reflection itself, but model projection is stricter:
@@ -778,6 +785,12 @@ has no matching facts or capability. Use `definition(id)` separately when
 membership matters. A fact without an executable adapter produces
 `CapabilityAccessError::FactOnly`, and a typed key with a different adapter
 type produces `AdapterTypeMismatch`.
+
+Use `member_definition_capabilities(id)` to combine the membership check and
+capability-set lookup. It returns `None` for a definition registered only as a
+capability target, `Some(empty)` for a member without capabilities, and the
+member's facts otherwise. Like the type-member query, it reads only frozen
+snapshot data and never executes a provider.
 
 Pass the resulting snapshot explicitly to `impls_in`, `methods_in`, or
 `methods_named_in` when a property or method query must use that exact set of

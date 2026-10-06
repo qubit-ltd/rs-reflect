@@ -313,6 +313,32 @@ impl ReflectRegistry {
         descriptor.declared_capabilities()
     }
 
+    /// Returns capabilities only when `type_id` is a member of this snapshot.
+    ///
+    /// `None` means the type is not a snapshot member, even if capability
+    /// facts were registered for it. `Some(empty)` means the type is a member
+    /// without effective capability facts. This frozen lookup never executes
+    /// an intrinsic capability provider.
+    ///
+    /// # Parameters
+    ///
+    /// - `type_id`: Exact process-local type identity to query.
+    ///
+    /// # Returns
+    ///
+    /// Returns the member's effective capability set, or `None` when the type
+    /// is not a member of this snapshot.
+    #[must_use]
+    #[inline]
+    pub fn member_capabilities(&self, type_id: TypeId) -> Option<&TypeCapabilities> {
+        self.indexes.types_by_id.contains_key(&type_id).then(|| {
+            self.indexes
+                .capabilities_by_target
+                .get(&type_id)
+                .unwrap_or(&self.empty_capabilities)
+        })
+    }
+
     /// Retrieves an effective adapter matching the exact typed key.
     ///
     /// Returns `Ok(Some(adapter))` when found and `Ok(None)` when missing.
@@ -548,6 +574,33 @@ impl ReflectRegistry {
                 .definitions_by_id
                 .contains_key(&id)
                 .then_some(&self.empty_capabilities)
+        })
+    }
+
+    /// Returns capabilities only when `id` is a member of this snapshot.
+    ///
+    /// `None` means the definition is not a snapshot member, even if
+    /// capability facts were registered for it. `Some(empty)` means the
+    /// definition is a member without capability facts. Definition
+    /// capabilities are frozen in the snapshot, so this lookup never executes
+    /// a provider.
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: Process-local generic definition identity to query.
+    ///
+    /// # Returns
+    ///
+    /// Returns the member's capability set, or `None` when the definition is
+    /// not a member of this snapshot.
+    #[must_use]
+    #[inline]
+    pub fn member_definition_capabilities(&self, id: TypeDefinitionId) -> Option<&TypeCapabilities> {
+        self.indexes.definitions_by_id.contains_key(&id).then(|| {
+            self.indexes
+                .capabilities_by_definition
+                .get(&id)
+                .unwrap_or(&self.empty_capabilities)
         })
     }
 
