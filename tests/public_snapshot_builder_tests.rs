@@ -218,11 +218,13 @@ fn test_member_capabilities_distinguishes_members_from_capability_only_targets()
     let mut member_builder = RegistrySnapshotBuilder::new();
     member_builder.add_type(&EMPTY_CAPABILITIES_DESCRIPTOR, source(3, "type", 3));
     let member = member_builder.build().expect("member snapshot");
-    assert!(member
-        .member_capabilities(TypeId::of::<EmptyCapabilitiesTarget>())
-        .expect("registered member")
-        .descriptors()
-        .is_empty());
+    assert!(
+        member
+            .member_capabilities(TypeId::of::<EmptyCapabilitiesTarget>())
+            .expect("registered member")
+            .descriptors()
+            .is_empty()
+    );
 
     let capability_key = key::<u32>("example.snapshot.member_lookup");
     let mut capability_only_builder = RegistrySnapshotBuilder::new();
@@ -233,11 +235,16 @@ fn test_member_capabilities_distinguishes_members_from_capability_only_targets()
     );
     let capability_only = capability_only_builder.build().expect("capability-only snapshot");
     assert!(capability_only.member_capabilities(TypeId::of::<u32>()).is_none());
-    assert!(capability_only
-        .capabilities(TypeDescriptor::of::<u32>())
-        .expect("legacy capability lookup")
-        .contains(capability_key));
-    assert_eq!(capability_only.capability(TypeDescriptor::of::<u32>(), capability_key), Ok(Some(&29)));
+    assert!(
+        capability_only
+            .capabilities(TypeDescriptor::of::<u32>())
+            .expect("legacy capability lookup")
+            .contains(capability_key)
+    );
+    assert_eq!(
+        capability_only.capability(TypeDescriptor::of::<u32>(), capability_key),
+        Ok(Some(&29))
+    );
     assert!(capability_only.type_capability_members(capability_key).next().is_none());
 
     let mut combined_builder = RegistrySnapshotBuilder::new();
@@ -266,9 +273,11 @@ fn test_member_capability_queries_do_not_execute_intrinsic_providers() {
     let registry = builder.build().expect("provider member snapshot");
     let after_build = MEMBER_LOOKUP_PROVIDER_CALLS.load(Ordering::SeqCst);
 
-    assert!(registry
-        .member_capabilities(TypeId::of::<MemberLookupProviderTarget>())
-        .is_some());
+    assert!(
+        registry
+            .member_capabilities(TypeId::of::<MemberLookupProviderTarget>())
+            .is_some()
+    );
     assert_eq!(MEMBER_LOOKUP_PROVIDER_CALLS.load(Ordering::SeqCst), after_build);
     assert!(after_build >= before_build);
 }
@@ -699,11 +708,13 @@ fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
     member_only.add_definition(&DEFINITION, source(56, "type-definition", 56));
     let member_only = member_only.build().expect("member-only snapshot");
     assert!(member_only.definition(DEFINITION.id()).is_some());
-    assert!(member_only
-        .member_definition_capabilities(DEFINITION.id())
-        .expect("registered definition")
-        .descriptors()
-        .is_empty());
+    assert!(
+        member_only
+            .member_definition_capabilities(DEFINITION.id())
+            .expect("registered definition")
+            .descriptors()
+            .is_empty()
+    );
     assert!(
         member_only
             .definition_capabilities(DEFINITION.id())
@@ -720,7 +731,11 @@ fn test_definition_capability_lookup_distinguishes_membership_from_facts() {
     );
     let capability_only = capability_only.build().expect("capability-only snapshot");
     assert!(capability_only.definition(DEFINITION.id()).is_none());
-    assert!(capability_only.member_definition_capabilities(DEFINITION.id()).is_none());
+    assert!(
+        capability_only
+            .member_definition_capabilities(DEFINITION.id())
+            .is_none()
+    );
     assert_eq!(
         capability_only
             .definition_capabilities(DEFINITION.id())
