@@ -35,7 +35,7 @@
     {
       "repository": "qubit-ltd/rs-validation-rules",
       "path": "rust-common/rs-validation-rules",
-      "revision": "5d07fa919e6a6be2333be07c3c4c59770e13d320"
+      "revision": "25c15f9660d0e7c903181b43b521bc7f78789916"
     }
   ]
 }
