@@ -125,6 +125,7 @@ jobs:
           done <<EOF
           rs_model_metadata qubit-ltd/rs-model-metadata
           rs_platform qubit-ltd/rs-platform
+          rs_codec qubit-ltd/rs-codec
           rs_id qubit-ltd/rs-id
           rs_datatype qubit-ltd/rs-datatype
           rs_redact qubit-ltd/rs-redact
@@ -135,6 +136,8 @@ jobs:
         with: {repository: qubit-ltd/rs-model-metadata, ref: '${{ steps.revisions.outputs.rs_model_metadata }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-model-metadata, persist-credentials: false}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with: {repository: qubit-ltd/rs-platform, ref: '${{ steps.revisions.outputs.rs_platform }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-platform, persist-credentials: false}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-codec, ref: '${{ steps.revisions.outputs.rs_codec }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-codec, persist-credentials: false}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with: {repository: qubit-ltd/rs-id, ref: '${{ steps.revisions.outputs.rs_id }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-common/rs-id, persist-credentials: false}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
