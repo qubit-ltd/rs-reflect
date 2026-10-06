@@ -38,17 +38,20 @@ jobs:
         run: test -n "$DEPENDENCY_TOKEN" || { echo 'DEPENDENCY_TOKEN is required for downstream validation.' >&2; exit 1; }
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          path: rust-platform/rs-reflect
+          path: rust-platform/rs-reflect-ci
           persist-credentials: false
       - name: Validate baseline manifest and expose fixed revisions
         id: revisions
-        working-directory: rust-platform/rs-reflect
+        working-directory: rust-platform/rs-reflect-ci
         run: |
           python3 scripts/downstream_manifest.py validate --manifest .github/downstream-baseline.json
           python3 scripts/downstream_manifest.py matrix --manifest .github/downstream-baseline.json --mode baseline > "$RUNNER_TEMP/downstream-matrix.json"
           for key in rs_model_metadata rs_platform rs_id rs_datatype rs_redact rs_validator rs_validation_rules; do
             printf '%s=%s\n' "$key" "$(jq -r ".repositories.$key.revision" "$RUNNER_TEMP/downstream-matrix.json")" >> "$GITHUB_OUTPUT"
           done
+          printf 'rs_reflect=%s\n' "$(jq -r '.reflect_baseline_revision' .github/downstream-baseline.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with: {repository: qubit-ltd/rs-reflect, ref: '${{ steps.revisions.outputs.rs_reflect }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-reflect, persist-credentials: false}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with: {repository: qubit-ltd/rs-model-metadata, ref: '${{ steps.revisions.outputs.rs_model_metadata }}', token: '${{ secrets.DEPENDENCY_TOKEN }}', path: rust-platform/rs-model-metadata, persist-credentials: false}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -67,24 +70,25 @@ jobs:
         with:
           toolchain: 1.94.0
       - name: Verify baseline revisions and Cargo path layout
-        working-directory: rust-platform/rs-reflect
+        working-directory: rust-platform/rs-reflect-ci
         run: |
           python3 scripts/downstream_manifest.py verify --layout-root "$GITHUB_WORKSPACE" --manifest .github/downstream-baseline.json
-          python3 scripts/check_dependency_layout.py --layout-root "$GITHUB_WORKSPACE" --project "$GITHUB_WORKSPACE/rust-platform/rs-reflect"
+          python3 scripts/check_dependency_layout.py --layout-root "$GITHUB_WORKSPACE" --project "$GITHUB_WORKSPACE/rust-platform/rs-reflect-ci"
       - name: Cache baseline Cargo state
         uses: actions/cache@v4
         with:
           path: |
             rust-platform/rs-model-metadata/target
             rust-platform/rs-platform/target
+            rust-platform/rs-reflect/target
             rust-common/rs-id/target
             rust-common/rs-datatype/target
             rust-common/rs-redact/target
             rust-common/rs-validator/target
             rust-common/rs-validation-rules/target
-          key: downstream-baseline-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/**/Cargo.toml', 'rust-common/**/Cargo.toml', 'rust-platform/rs-reflect/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/**/Cargo.lock', 'rust-common/**/Cargo.lock') }}
+          key: downstream-baseline-toolchain-1.94.0-manifest-${{ hashFiles('rust-platform/**/Cargo.toml', 'rust-common/**/Cargo.toml', 'rust-platform/rs-reflect-ci/.github/downstream-baseline.json') }}-locks-${{ hashFiles('rust-platform/**/Cargo.lock', 'rust-common/**/Cargo.lock') }}
       - name: Run all baseline downstream checks
-        working-directory: rust-platform/rs-reflect
+        working-directory: rust-platform/rs-reflect-ci
         env:
           REFLECT_DOWNSTREAM_EVIDENCE_DIR: ${{ runner.temp }}/rs-reflect-downstream-baseline
         run: ./scripts/check-downstream.sh

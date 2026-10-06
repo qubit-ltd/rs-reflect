@@ -78,6 +78,20 @@ class DownstreamManifestTests(unittest.TestCase):
         )
         self.assertEqual(return_code, 0, stderr)
 
+    def test_validate_accepts_a_fixed_reflect_baseline_revision(self):
+        manifest = self.manifest()
+        manifest["reflect_baseline_revision"] = "a" * 40
+        self.write_manifest(manifest)
+        return_code, _, stderr = self.invoke(
+            "validate", "--manifest", str(self.manifest_path)
+        )
+        self.assertEqual(return_code, 0, stderr)
+
+    def test_validate_rejects_an_invalid_reflect_baseline_revision(self):
+        manifest = self.manifest()
+        manifest["reflect_baseline_revision"] = "main"
+        self.assert_invalid(manifest, "reflect_baseline_revision")
+
     def test_validate_rejects_missing_repository(self):
         manifest = self.manifest()
         manifest["repositories"].pop()
@@ -189,6 +203,16 @@ class DownstreamManifestTests(unittest.TestCase):
         head = workflow[workflow.index("  downstream-head:"):]
         self.assertIn('gh api "repos/$repository/commits/main"', head)
         self.assertIn("downstream_manifest.py collect", head)
+
+    def test_baseline_checks_the_pinned_reflect_version_at_its_cargo_path(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        baseline = workflow[
+            workflow.index("  downstream-baseline:"):workflow.index("\n  downstream-head:")
+        ]
+        self.assertIn('path: rust-platform/rs-reflect-ci', baseline)
+        self.assertIn("reflect_baseline_revision", baseline)
+        self.assertIn("path: rust-platform/rs-reflect,", baseline)
+        self.assertIn("working-directory: rust-platform/rs-reflect-ci", baseline)
 
     def test_downstream_head_runs_staged_release_consumer(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")

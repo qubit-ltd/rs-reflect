@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "reflect_baseline_revision": "a72548d756509c030986c8e0672792c7042fc726",
   "repositories": [
     {
       "repository": "qubit-ltd/rs-model-metadata",

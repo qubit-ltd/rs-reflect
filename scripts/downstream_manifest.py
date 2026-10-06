@@ -38,14 +38,21 @@ def _read_manifest(path):
 def _validate_manifest(value):
     if not isinstance(value, dict):
         raise ManifestError("manifest: expected an object")
-    unknown = set(value) - {"schema_version", "repositories"}
+    unknown = set(value) - {"schema_version", "repositories", "reflect_baseline_revision"}
     if unknown:
         raise ManifestError(f"manifest: unknown field {sorted(unknown)[0]}")
-    if set(value) != {"schema_version", "repositories"}:
-        missing = sorted({"schema_version", "repositories"} - set(value))[0]
+    required_fields = {"schema_version", "repositories"}
+    if not required_fields.issubset(value):
+        missing = sorted(required_fields - set(value))[0]
         raise ManifestError(f"manifest: missing field {missing}")
     if type(value["schema_version"]) is not int or value["schema_version"] != SCHEMA_VERSION:
         raise ManifestError("manifest.schema_version: expected 1")
+    reflect_baseline_revision = value.get("reflect_baseline_revision")
+    if reflect_baseline_revision is not None and (
+        not isinstance(reflect_baseline_revision, str)
+        or SHA_PATTERN.fullmatch(reflect_baseline_revision) is None
+    ):
+        raise ManifestError("manifest.reflect_baseline_revision: expected a full 40-character Git SHA")
     entries = value["repositories"]
     if not isinstance(entries, list):
         raise ManifestError("manifest.repositories: expected an array")
