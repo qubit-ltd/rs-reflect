@@ -34,3 +34,4 @@ mod reflect_trait_tests;
 mod trait_tests;
 #[cfg(feature = "derive")]
 mod type_descriptor_tests;
+mod type_ref_tests;

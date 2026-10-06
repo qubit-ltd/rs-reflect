@@ -66,7 +66,7 @@ impl fmt::Debug for LazyTypeRef {
 
 /// Resolves `T` through its unique interned root descriptor.
 fn resolve<T: Reflect + ?Sized>() -> TypeRef {
-    TypeRef::Resolved(T::type_descriptor())
+    TypeRef::of::<T>()
 }
 
 #[cfg(test)]
@@ -92,6 +92,14 @@ mod tests {
         }
     }
 
+    struct BadTarget;
+
+    impl Reflect for BadTarget {
+        fn type_descriptor() -> &'static TypeDescriptor {
+            TypeDescriptor::of::<u8>()
+        }
+    }
+
     #[test]
     fn test_concurrent_first_navigation_executes_resolver_once() {
         static RELATION: LazyTypeRef = LazyTypeRef::resolved::<CountedTarget>();
@@ -112,5 +120,13 @@ mod tests {
 
         assert!(pointers.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(RESOLUTIONS.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_failed_first_navigation_panics_again_on_retry() {
+        static RELATION: LazyTypeRef = LazyTypeRef::resolved::<BadTarget>();
+
+        assert!(std::panic::catch_unwind(|| RELATION.get()).is_err());
+        assert!(std::panic::catch_unwind(|| RELATION.get()).is_err());
     }
 }

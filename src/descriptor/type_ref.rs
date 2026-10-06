@@ -12,6 +12,7 @@ use std::any::TypeId;
 use std::fmt;
 
 use super::opaque_type_descriptor::OpaqueTypeDescriptor;
+use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
 use crate::expression::TypeExpression;
 
@@ -47,6 +48,20 @@ pub enum TypeRef {
 }
 
 impl TypeRef {
+    /// Creates an owning reference to the unique root descriptor for `T`.
+    ///
+    /// Constructing the returned value does not allocate or initialize the
+    /// global type registry. The first call may initialize `T`'s root
+    /// descriptor through [`TypeDescriptor::of`], and that initialization
+    /// may allocate. A manual [`Reflect`] implementation whose descriptor has
+    /// the wrong Rust type identity panics, as it does when calling
+    /// [`TypeDescriptor::of`] directly.
+    #[must_use]
+    #[inline]
+    pub fn of<T: Reflect + ?Sized>() -> Self {
+        Self::Resolved(TypeDescriptor::of::<T>())
+    }
+
     /// Returns the exact identity for a concrete reference.
     ///
     /// # Returns
