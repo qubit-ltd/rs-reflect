@@ -91,7 +91,10 @@ class ContractTests(unittest.TestCase):
             subject.check_contracts(self.root)
 
     def test_source_checkout_docs_describe_standalone_registry_resolution(self):
-        for name in ("README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md"):
+        for name in (
+            "README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md",
+            "derive/README.md", "derive/README.zh_CN.md",
+        ):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("Run `cargo metadata --locked --format-version 1` from this checkout.\n")
@@ -99,6 +102,12 @@ class ContractTests(unittest.TestCase):
         document = self.root / "doc/user_guide.md"
         document.write_text("Run `./.infra/bin/prepare-local-path-dependencies.sh` first.\n")
         with self.assertRaisesRegex(ValueError, "prepare-local-path-dependencies"):
+            subject.check_source_checkout_docs(self.root)
+        document.write_text(
+            "Keep the sibling rust-common/rs-id and rust-common/rs-datatype checkouts.\n"
+            "Run `cargo metadata --locked --format-version 1`.\n"
+        )
+        with self.assertRaisesRegex(ValueError, "registry dependencies"):
             subject.check_source_checkout_docs(self.root)
 
 if __name__ == "__main__":

@@ -22,9 +22,19 @@ qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = fa
 qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
 ```
 
-This source-checkout recipe does not verify registry publication of the current
-checkout. Keep the local checkout layout intact because `qubit-reflect` also uses
-the sibling `rust-common/rs-id` and `rust-common/rs-datatype` crates. Both crates require Rust 1.94 or later. For normal application code, depend on `qubit-reflect` with its default `derive` feature instead of adding the derive crate directly.
+In this source-checkout recipe, the two `path` entries refer only to the
+`qubit-reflect` runtime and its matching in-repository derive crate. The
+runtime's external dependencies, including `qubit-id` and `qubit-datatype`, are
+resolved from crates.io; no sibling `rs-id` or `rs-datatype` checkout is needed.
+Verify the source checkout's locked dependency graph from the repository root:
+
+```bash
+cargo metadata --locked --format-version 1
+```
+
+This check does not establish that the current runtime or derive checkout has
+been published. For normal application code, depend on `qubit-reflect` with its
+default `derive` feature instead of adding the derive crate directly.
 
 For registry dependencies, select published versions from the same release line:
 
