@@ -7,6 +7,9 @@
 // =============================================================================
 
 //! Criterion benchmarks for descriptor lookup.
+//!
+//! The first, last, and missing-field cases measure lookup position costs;
+//! they do not represent production query frequencies.
 
 use std::hint::black_box;
 use std::sync::Barrier;
