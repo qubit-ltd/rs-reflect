@@ -21,7 +21,7 @@ use syn::ItemTrait;
 use syn::LitStr;
 use syn::Path;
 use syn::Receiver;
-use syn::TraitBoundModifier;
+use syn::ReceiverKind;
 use syn::TraitItem;
 use syn::TraitItemFn;
 use syn::TraitItemType;
@@ -237,7 +237,7 @@ pub(super) fn is_known_dyn_compatible_bound(bound: &TypeParamBound) -> bool {
     match bound {
         TypeParamBound::Lifetime(_) => true,
         TypeParamBound::Trait(bound) => {
-            if !matches!(bound.modifier, TraitBoundModifier::None) || tokens_contain_self(bound.to_token_stream()) {
+            if bound.maybe.is_some() || tokens_contain_self(bound.to_token_stream()) {
                 return false;
             }
             let path = bound.path.to_token_stream().to_string().replace(' ', "");
@@ -354,10 +354,11 @@ pub(super) fn method_is_dyn_dispatchable(method: &TraitItemFn) -> bool {
 /// Returns whether the receiver syntax is supported for trait-object dispatch.
 #[must_use]
 pub(super) fn receiver_is_dyn_dispatchable(receiver: &Receiver) -> bool {
-    if receiver.colon_token.is_none() {
-        return true;
+    match &receiver.kind {
+        ReceiverKind::Typed(_, ty) => receiver_type_is_dyn_dispatchable(ty),
+        ReceiverKind::Value | ReceiverKind::Reference(..) => true,
+        _ => false,
     }
-    receiver_type_is_dyn_dispatchable(&receiver.ty)
 }
 
 /// Checks explicit `Self`, reference, smart-pointer, and pinned receiver types.
@@ -442,7 +443,7 @@ pub(super) fn where_clause_requires_sized_self(where_clause: Option<&WhereClause
             matches!(predicate.bounded_ty, Type::Path(ref path) if path.qself.is_none() && path.path.is_ident("Self"))
                 && predicate.bounds.iter().any(|bound| {
                     matches!(bound, TypeParamBound::Trait(bound)
-                        if matches!(bound.modifier, TraitBoundModifier::None)
+                        if bound.maybe.is_none()
                             && bound.path.is_ident("Sized"))
                 })
         })

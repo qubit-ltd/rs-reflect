@@ -367,7 +367,7 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
         .cloned()
         .collect();
     let (methods, associated_types, associated_consts) = convert_impl_items(&item, &mut errors);
-    let trait_path = item.trait_.as_ref().map(|(_, path, _)| convert_path(path));
+    let trait_path = item.trait_.as_ref().map(|(path, _)| convert_path(path));
     let target_type = convert_type(&item.self_ty);
     strip_impl_helpers(&mut item);
     Ok(ParsedPipeline {
@@ -449,7 +449,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     name: ty.ident.to_string(),
                     kind: GenericKindIr::Type,
                     bounds: ty.bounds.iter().map(convert_bound).collect(),
-                    default: ty.default.as_ref().map(convert_type).map(GenericDefaultIr::Type),
+                    default: ty.default.as_ref().map(|(_, value)| convert_type(value)).map(GenericDefaultIr::Type),
                     const_type: None,
                     declaration: ty.to_token_stream(),
                     span: ty.span(),
@@ -461,7 +461,7 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     default: constant
                         .default
                         .as_ref()
-                        .map(ToTokens::to_token_stream)
+                        .map(|(_, value)| value.to_token_stream())
                         .map(GenericDefaultIr::Const),
                     const_type: Some(convert_type(&constant.ty)),
                     declaration: constant.to_token_stream(),
@@ -664,18 +664,28 @@ fn convert_method(
     for argument in &signature.inputs {
         match argument {
             FnArg::Receiver(value) => {
-                let kind = if value.colon_token.is_some() {
-                    ReceiverKindIr::Typed
-                } else if value.reference.is_some() && value.mutability.is_some() {
-                    ReceiverKindIr::MutableReference
-                } else if value.reference.is_some() {
-                    ReceiverKindIr::SharedReference
-                } else {
-                    ReceiverKindIr::Value
+                let (kind, ty) = match &value.kind {
+                    syn::ReceiverKind::Typed(_, ty) => (ReceiverKindIr::Typed, convert_type(ty)),
+                    syn::ReceiverKind::Reference(_, lifetime, Some(_)) => {
+                        let ty: Type = syn::parse_quote!(& #lifetime mut Self);
+                        (ReceiverKindIr::MutableReference, convert_type(&ty))
+                    }
+                    syn::ReceiverKind::Reference(_, lifetime, None) => {
+                        let ty: Type = syn::parse_quote!(& #lifetime Self);
+                        (ReceiverKindIr::SharedReference, convert_type(&ty))
+                    }
+                    syn::ReceiverKind::Value => {
+                        let ty: Type = syn::parse_quote!(Self);
+                        (ReceiverKindIr::Value, convert_type(&ty))
+                    }
+                    _ => {
+                        let ty: Type = syn::parse_quote!(Self);
+                        (ReceiverKindIr::Typed, convert_type(&ty))
+                    }
                 };
                 receiver = Some(ReceiverIr {
                     kind,
-                    ty: convert_type(&value.ty),
+                    ty,
                     declaration: value.to_token_stream(),
                     span: value.span(),
                 });
@@ -714,7 +724,7 @@ fn convert_method(
     let qualifiers = MethodQualifiersIr {
         is_const: signature.constness.is_some(),
         is_async: signature.asyncness.is_some(),
-        is_unsafe: signature.unsafety.is_some(),
+        is_unsafe: matches!(signature.safety, syn::Safety::Unsafe(_)),
         abi: signature
             .abi
             .as_ref()

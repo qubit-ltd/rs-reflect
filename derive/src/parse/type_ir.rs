@@ -14,8 +14,8 @@ use syn::GenericParam;
 use syn::LitStr;
 use syn::Path;
 use syn::PathArguments as SynPathArguments;
+use syn::PointerMutability;
 use syn::ReturnType;
-use syn::TraitBoundModifier;
 use syn::Type;
 use syn::TypeParamBound;
 use syn::spanned::Spanned;
@@ -98,10 +98,10 @@ pub(crate) fn convert_type(ty: &Type) -> TypeIr {
             length: array.len.to_token_stream(),
         },
         Type::Ptr(pointer) => TypeKindIr::Pointer {
-            mutable: pointer.mutability.is_some(),
+            mutable: matches!(pointer.mutability, PointerMutability::Mut(_)),
             element: Box::new(convert_type(&pointer.elem)),
         },
-        Type::BareFn(function) => TypeKindIr::BareFunction {
+        Type::FnPtr(function) => TypeKindIr::BareFunction {
             lifetimes: function
                 .lifetimes
                 .iter()
@@ -185,7 +185,7 @@ fn convert_path_arguments(arguments: &SynPathArguments) -> PathArgumentsIr {
                 .collect(),
         ),
         SynPathArguments::Parenthesized(arguments) => PathArgumentsIr::Parenthesized {
-            inputs: arguments.inputs.iter().map(convert_type).collect(),
+            inputs: arguments.inputs.iter().map(|input| convert_type(&input.ty)).collect(),
             output: match &arguments.output {
                 ReturnType::Default => None,
                 ReturnType::Type(_, output) => Some(Box::new(convert_type(output))),
@@ -209,9 +209,10 @@ pub(super) fn convert_bound(bound: &TypeParamBound) -> GenericBoundIr {
         TypeParamBound::Lifetime(lifetime) => GenericBoundIr::Lifetime(lifetime.to_token_stream().to_string()),
         TypeParamBound::Trait(trait_bound) => GenericBoundIr::Trait {
             path: convert_path(&trait_bound.path),
-            modifier: match trait_bound.modifier {
-                TraitBoundModifier::None => TraitBoundModifierIr::None,
-                TraitBoundModifier::Maybe(_) => TraitBoundModifierIr::Maybe,
+            modifier: if trait_bound.maybe.is_some() {
+                TraitBoundModifierIr::Maybe
+            } else {
+                TraitBoundModifierIr::None
             },
             lifetimes: trait_bound
                 .lifetimes
