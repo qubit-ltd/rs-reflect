@@ -61,19 +61,10 @@ use proc_macro::TokenStream;
 ///
 /// # Examples
 ///
-/// ```
-/// use qubit_reflect::TypeDescriptor;
-/// use qubit_reflect_derive::Reflect;
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect, rename = "account")]
-/// struct Account {
-///     #[reflect(read_only)]
-///     id: u32,
-/// }
-/// # fn main() {
-/// assert_eq!(TypeDescriptor::of::<Account>().query_name(), "account");
-/// # }
-/// ```
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// derives `Reflect` for an account, renames its query name, and checks the
+/// resulting descriptor. See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
+/// for complete usage examples.
 ///
 /// # Parameters
 ///
@@ -124,27 +115,10 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```standalone_crate
-/// # use qubit_reflect_derive::ConfiguredReflection;
-/// use qubit_reflect::TypeDescriptor;
-/// use qubit_reflect_derive::{Reflect, reflect, reflect_impl};
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct Service;
-/// #[reflect(crate = qubit_reflect)]
-/// trait Named {
-///     fn name(&self) -> &'static str;
-/// }
-/// #[reflect_impl(crate = qubit_reflect)]
-/// impl Named for Service {
-///     fn name(&self) -> &'static str { "service" }
-/// }
-/// # fn main() {
-/// let implementations = TypeDescriptor::of::<Service>().impls_global()
-///     .expect("valid registrations");
-/// assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
-/// # }
-/// ```
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// reflects a trait and its implementation, then checks their registration.
+/// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
+/// for facade integration and supertrait examples.
 ///
 /// # Parameters
 ///
@@ -191,24 +165,10 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```standalone_crate
-/// # use qubit_reflect_derive::ConfiguredReflection;
-/// use qubit_reflect::TypeDescriptor;
-/// use qubit_reflect_derive::{Reflect, reflect_impl};
-/// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
-/// struct Service;
-/// #[reflect_impl(crate = qubit_reflect)]
-/// impl Service {
-///     #[reflect(no_invoke)]
-///     fn ping(&self) {}
-/// }
-/// # fn main() {
-/// let implementations = TypeDescriptor::of::<Service>().impls_global()
-///     .expect("valid registrations");
-/// assert!(implementations.iter().any(|item| item.method("ping").is_some()));
-/// # }
-/// ```
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// reflects an inherent method with `no_invoke` and checks its registration.
+/// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
+/// for more method options.
 ///
 /// # Parameters
 ///

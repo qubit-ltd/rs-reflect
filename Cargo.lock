@@ -516,7 +516,6 @@ version = "0.2.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
- "qubit-reflect",
  "quote",
  "syn 3.0.6",
 ]

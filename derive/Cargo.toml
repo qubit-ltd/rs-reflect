@@ -20,6 +20,3 @@ proc-macro-crate = "3.5.0"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 quote = "1.0.47"
 syn = { version = "3.0.6", features = ["full", "extra-traits", "visit-mut"] }
-
-[dev-dependencies]
-qubit-reflect = { path = "..", default-features = false }
