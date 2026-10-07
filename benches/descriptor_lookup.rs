@@ -46,11 +46,15 @@ struct FieldLookupRecord {
     f15: u8,
 }
 
-// Widths reflect production model counts: 1/2 cover small shapes; 9/16/51
-// cover the platform p50, p90, and maximum. Keep the original 16-field case.
+// Widths reflect production model counts: 1/2 cover small shapes; 9/17/51
+// cover the platform p50, nearest-rank p90, and maximum. Keep the original
+// 16-field case as a historical comparison.
 define_lookup_record!(FieldLookupOne; f00);
 define_lookup_record!(FieldLookupTwo; f00, f01);
 define_lookup_record!(FieldLookupNine; f00, f01, f02, f03, f04, f05, f06, f07, f08);
+define_lookup_record!(FieldLookupSeventeen;
+    f00, f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12, f13, f14, f15, f16,
+);
 define_lookup_record!(FieldLookupFiftyOne;
     f00, f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11,
     f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23,
@@ -88,7 +92,7 @@ fn benchmark_field_cases(
 fn descriptor_lookup(criterion: &mut Criterion) {
     let fields = TypeDescriptor::of::<FieldLookupRecord>();
     let field_descriptor_bytes = std::mem::size_of_val(fields.field("f00").expect("first field"));
-    for width in [1_usize, 2, 9, 16, 51] {
+    for width in [1_usize, 2, 9, 16, 17, 51] {
         let descriptor_bytes = width * field_descriptor_bytes;
         // Approximate a HashMap<&str, usize> table: fat key + index per bucket,
         // one control byte per bucket, 7/8 maximum occupancy, and power-of-two
@@ -104,6 +108,12 @@ fn descriptor_lookup(criterion: &mut Criterion) {
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupOne>(), 1, false);
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupTwo>(), 2, false);
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupNine>(), 9, false);
+    benchmark_field_cases(
+        criterion,
+        TypeDescriptor::of::<FieldLookupSeventeen>(),
+        17,
+        false,
+    );
     benchmark_field_cases(
         criterion,
         TypeDescriptor::of::<FieldLookupFiftyOne>(),
