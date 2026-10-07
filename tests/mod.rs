@@ -12,6 +12,7 @@ mod access;
 #[cfg(feature = "derive")]
 mod construct;
 #[cfg(feature = "derive")]
+#[path = "derive_examples/derive_examples_tests.rs"]
 mod derive_examples_tests;
 mod descriptor;
 mod invoke;

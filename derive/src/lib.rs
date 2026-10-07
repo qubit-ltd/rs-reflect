@@ -61,7 +61,7 @@ use proc_macro::TokenStream;
 ///
 /// # Examples
 ///
-/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples/derive_examples_tests.rs)
 /// derives `Reflect` for an account, renames its query name, and checks the
 /// resulting descriptor. See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
 /// for complete usage examples.
@@ -115,7 +115,7 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples/derive_examples_tests.rs)
 /// reflects a trait and its implementation, then checks their registration.
 /// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
 /// for facade integration and supertrait examples.
@@ -165,7 +165,7 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples_tests.rs)
+/// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples/derive_examples_tests.rs)
 /// reflects an inherent method with `no_invoke` and checks its registration.
 /// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
 /// for more method options.
