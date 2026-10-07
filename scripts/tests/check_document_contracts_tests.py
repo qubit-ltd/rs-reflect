@@ -110,5 +110,25 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "registry dependencies"):
             subject.check_source_checkout_docs(self.root)
 
+    def test_derive_readmes_reject_obsolete_sibling_dependency_guidance(self):
+        cases = {
+            "derive/README.md": "Keep the sibling rust-common/rs-id and rust-common/rs-datatype checkouts.",
+            "derive/README.zh_CN.md": "请检出相邻 rust-common/rs-id 与 rust-common/rs-datatype 仓库。",
+        }
+        for name, obsolete_guidance in cases.items():
+            for document in (
+                "README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md",
+                "derive/README.md", "derive/README.zh_CN.md",
+            ):
+                valid = self.root / document
+                valid.parent.mkdir(parents=True, exist_ok=True)
+                valid.write_text("Run `cargo metadata --locked --format-version 1`.\n")
+            path = self.root / name
+            path.write_text(
+                obsolete_guidance + "\nRun `cargo metadata --locked --format-version 1`.\n"
+            )
+            with self.subTest(document=name), self.assertRaisesRegex(ValueError, "registry dependencies"):
+                subject.check_source_checkout_docs(self.root)
+
 if __name__ == "__main__":
     unittest.main()
