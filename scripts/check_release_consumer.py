@@ -131,7 +131,12 @@ def fixture(version: str, profile: str, allowed: dict[str, Path]) -> tuple[str, 
                  f'{str(default).lower()}, features = {json.dumps(features)} }}\n')
     body = DERIVE if default or "derive" in features else RUNTIME
     if "ecosystem-types" in features:
-        manifest += 'bigdecimal = "0.4"\nchrono = { version = "0.4", default-features = false, features = ["std"] }\nuuid = "1.26"\n'
+        bigdecimal_version = runtime_dependency_version(allowed, "bigdecimal")
+        chrono_version = runtime_dependency_version(allowed, "chrono")
+        uuid_version = runtime_dependency_version(allowed, "uuid")
+        manifest += (f'bigdecimal = {json.dumps(bigdecimal_version)}\n'
+                     f'chrono = {{ version = {json.dumps(chrono_version)}, default-features = false, features = ["std"] }}\n'
+                     f'uuid = {json.dumps(uuid_version)}\n')
         body = body.replace('fn exercise() {', '''fn exercise() {
     let _ = TypeDescriptor::of::<bigdecimal::BigDecimal>();
     let _ = TypeDescriptor::of::<chrono::NaiveDate>();

@@ -22,7 +22,13 @@ qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = fa
 qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
 ```
 
-此处只说明源码检出的接入方式，不代表已验证当前检出的 registry 发布状态。请保留本地检出布局，因为 `qubit-reflect` 还依赖同级的 `rust-common/rs-id` 与 `rust-common/rs-datatype`。它们都要求 Rust 1.94 或更高版本。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
+此源码接入示例中的两个 `path` 只指向 `qubit-reflect` runtime 与仓库内配套的 derive crate。runtime 的外部依赖（包括 `qubit-id` 和 `qubit-datatype`）从 crates.io 解析，无需检出相邻的 `rs-id` 或 `rs-datatype` 仓库。请在仓库根目录检查源码检出的锁定依赖图：
+
+```bash
+cargo metadata --locked --format-version 1
+```
+
+此检查不能证明当前 runtime 或 derive 检出已发布。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
 
 使用 registry 依赖时，请选择同一发布线中已经发布的版本：
 

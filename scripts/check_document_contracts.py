@@ -95,12 +95,30 @@ def check_examples(root):
             raise ValueError(f"{path}: examples.native: missing or escaping {expected_path}")
 
 
+def check_source_checkout_docs(root):
+    """Keep source-checkout instructions independent from sibling crate clones."""
+    documents = (
+        "README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md",
+        "derive/README.md", "derive/README.zh_CN.md",
+    )
+    for name in documents:
+        path = root / name
+        text = path.read_text(encoding="utf-8")
+        if "prepare-local-path-dependencies.sh" in text:
+            raise ValueError(f"{path}: source checkout must not require prepare-local-path-dependencies.sh")
+        if "cargo metadata --locked --format-version 1" not in text:
+            raise ValueError(f"{path}: source checkout must document cargo metadata --locked --format-version 1")
+        if "rust-common/rs-id" in text or "rust-common/rs-datatype" in text:
+            raise ValueError(f"{path}: use registry dependencies for external crates; sibling checkouts are not required")
+
+
 def check_contracts(root):
     """Validate the required keys, bilingual values, and actual source contracts."""
     root = Path(root)
     expected_values = dict(FACTS)
     expected_values.update(coverage_thresholds(root))
     check_examples(root)
+    check_source_checkout_docs(root)
     registry = root / FACTS["registry.source"]
     if not registry.is_file() or not registry.resolve().is_relative_to(root.resolve()):
         raise ValueError(f"registry.source: missing or escaping {registry}")

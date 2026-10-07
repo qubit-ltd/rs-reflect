@@ -46,7 +46,7 @@ class ContractTests(unittest.TestCase):
                 markers = "".join(
                     f"<!-- reflect-contract: {key}={values[key]} -->\n" for key in keys
                 )
-                path.write_text(markers)
+                path.write_text(markers + "Run `cargo metadata --locked --format-version 1`.\n")
         coverage = self.root / "scripts/derive_coverage_report.py"
         coverage.parent.mkdir()
         coverage.write_text("MINIMUM_LINE_COVERAGE = {'configure': 70.0, 'parse': 85.0, 'validate': 80.0, 'expand': 85.0}\n")
@@ -89,6 +89,46 @@ class ContractTests(unittest.TestCase):
         (self.root / FACTS["registry.source"]).unlink()
         with self.assertRaisesRegex(ValueError, "registry.source"):
             subject.check_contracts(self.root)
+
+    def test_source_checkout_docs_describe_standalone_registry_resolution(self):
+        for name in (
+            "README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md",
+            "derive/README.md", "derive/README.zh_CN.md",
+        ):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Run `cargo metadata --locked --format-version 1` from this checkout.\n")
+        subject.check_source_checkout_docs(self.root)
+        document = self.root / "doc/user_guide.md"
+        document.write_text("Run `./.infra/bin/prepare-local-path-dependencies.sh` first.\n")
+        with self.assertRaisesRegex(ValueError, "prepare-local-path-dependencies"):
+            subject.check_source_checkout_docs(self.root)
+        document.write_text(
+            "Keep the sibling rust-common/rs-id and rust-common/rs-datatype checkouts.\n"
+            "Run `cargo metadata --locked --format-version 1`.\n"
+        )
+        with self.assertRaisesRegex(ValueError, "registry dependencies"):
+            subject.check_source_checkout_docs(self.root)
+
+    def test_derive_readmes_reject_obsolete_sibling_dependency_guidance(self):
+        cases = {
+            "derive/README.md": "Keep the sibling rust-common/rs-id and rust-common/rs-datatype checkouts.",
+            "derive/README.zh_CN.md": "请检出相邻 rust-common/rs-id 与 rust-common/rs-datatype 仓库。",
+        }
+        for name, obsolete_guidance in cases.items():
+            for document in (
+                "README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md",
+                "derive/README.md", "derive/README.zh_CN.md",
+            ):
+                valid = self.root / document
+                valid.parent.mkdir(parents=True, exist_ok=True)
+                valid.write_text("Run `cargo metadata --locked --format-version 1`.\n")
+            path = self.root / name
+            path.write_text(
+                obsolete_guidance + "\nRun `cargo metadata --locked --format-version 1`.\n"
+            )
+            with self.subTest(document=name), self.assertRaisesRegex(ValueError, "registry dependencies"):
+                subject.check_source_checkout_docs(self.root)
 
 if __name__ == "__main__":
     unittest.main()
