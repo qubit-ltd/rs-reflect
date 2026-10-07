@@ -82,14 +82,13 @@ fn main() {
 
 完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。同包 example 中，自动发现的 `crate` 会指向示例可执行程序，因此声明用 `#[reflect(crate = qubit_reflect)]` 和 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
 
-源码检出中，即使 `qubit-types` 被禁用，Cargo 仍会解析可选的 `qubit-datatype` 与 `qubit-id` path manifest。先准备这两个相邻检出，再确认 Cargo 能读取两个 manifest：
+可选的 `qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。在仓库根目录确认依赖解析：
 
 ```bash
-./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
-`cargo metadata` 成功即表示路径依赖已解析。使用已发布 crate 的用户不需要运行本仓库脚本。然后从源码检出根目录运行示例：
+`cargo metadata` 成功即表示锁定的依赖图已解析。然后从源码检出根目录运行示例：
 
 ```bash
 cargo run --example field_patch
@@ -131,9 +130,7 @@ cargo run --example support_action
 
 ## 测试
 
-以下命令在源码检出根目录运行。加载 Cargo workspace 时，即使未启用相关 feature，也会解析可选的
-`qubit-datatype` 与 `qubit-id` 路径清单；请先按上文准备本地路径依赖。通过 registry 使用已发布 crate
-的用户无需运行该脚本。
+以下命令在源码检出根目录运行。Cargo 会从 crates.io 解析可选的 `qubit-datatype` 与 `qubit-id` 依赖，无需准备相邻仓库；如需先确认依赖解析，请运行上文的 metadata 命令。
 
 ```bash
 # 使用默认 feature 集运行测试

@@ -119,15 +119,13 @@ qubit-reflect = "0.2"
 
 同包 example 中，宏自动发现的 `crate` 可能指向示例程序，因此用
 `#[reflect(crate = qubit_reflect)]` 与 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
-在源码检出中，即使未启用 `qubit-types`，Cargo 仍会解析可选的 `qubit-datatype` 与 `qubit-id`
-相邻路径 manifest。先准备依赖并验证解析结果：
+`qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。先确认锁定的依赖图可以解析：
 
 ```bash
-./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
-metadata 命令成功表示两个相邻 manifest 均可读取。这是源码检出的准备步骤；通过 registry 使用已发布 crate 无需运行该脚本。随后在源码检出根目录运行原生示例：
+metadata 命令成功表示锁文件中的依赖图可以解析。随后在源码检出根目录运行原生示例：
 
 ```bash
 cargo run --example field_patch
@@ -715,7 +713,7 @@ fn main() {
 
 | 现象 | 检查顺序 |
 | --- | --- |
-| Cargo 提示找不到 `qubit-datatype` 或 `qubit-id` 路径 manifest | 源码检出时先运行 `./.infra/bin/prepare-local-path-dependencies.sh`，再运行 `cargo metadata --locked --format-version 1`。命令成功表示两个相邻 manifest 均能解析；registry 用户不需要此脚本。 |
+| Cargo 无法解析 `qubit-datatype` 或 `qubit-id` | 检查 registry 网络访问，并运行 `cargo metadata --locked --format-version 1` 查看锁定的依赖图；不需要检出相邻仓库。 |
 | `field("...")` 返回 `None` | 检查 `rename` 后的查询名；`rust_name()` 保留源码拼写。 |
 | 字段读取或替换失败 | 检查目标是否是声明类型、借用包装器、访问策略及替换值的精确类型；再看 `FieldSetFailure::recovery()`。 |
 | 构造失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |

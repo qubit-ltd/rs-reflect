@@ -116,19 +116,17 @@ qubit-reflect = "0.2"
 
 The same-package examples explicitly use `#[reflect(crate = qubit_reflect)]`
 and `#[reflect_impl(crate = qubit_reflect)]`: automatic crate discovery may
-otherwise select the example executable as `crate`. From this source checkout,
-Cargo still resolves the optional `qubit-datatype` and `qubit-id` sibling path
-manifests when `qubit-types` is disabled. Prepare them before Cargo commands
-and verify resolution:
+otherwise select the example executable as `crate`. Optional `qubit-datatype`
+and `qubit-id` dependencies resolve from crates.io, so a source checkout does
+not require adjacent repositories. Verify dependency resolution from the
+repository root:
 
 ```bash
-./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
-A successful metadata command confirms Cargo can read both sibling manifests.
-This repository setup applies only to source checkouts; users of the published
-crate need no preparation script. Now run the native examples:
+A successful metadata command confirms the locked dependency graph resolves.
+Now run the native examples:
 
 ```bash
 cargo run --example field_patch
@@ -922,7 +920,7 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 
 | Symptom | What to check |
 | --- | --- |
-| Cargo reports a missing `qubit-datatype` or `qubit-id` path manifest | In a source checkout, run `./.infra/bin/prepare-local-path-dependencies.sh`, then `cargo metadata --locked --format-version 1`. Success confirms both sibling manifests resolve; registry users do not need this script. |
+| Cargo cannot resolve `qubit-datatype` or `qubit-id` | Check registry access and the resolved dependency graph with `cargo metadata --locked --format-version 1`; adjacent repository checkouts are not required. |
 | `field("...")` returns `None` | Use the query name; `rename` changes it while `rust_name()` retains the source spelling. |
 | A field operation fails | Verify the wrapper (`ReflectedRef` versus `ReflectedMut`), the field policy, and the replacement's exact type; then inspect `FieldSetFailure` recovery. |
 | Construction fails | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |

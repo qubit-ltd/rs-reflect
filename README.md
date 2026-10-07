@@ -87,18 +87,16 @@ These are native examples of the runtime package. In same-package example target
 automatic crate discovery can resolve the runtime to `crate`, which refers to the
 example executable. The declarations explicitly select the runtime facade with
 `#[reflect(crate = qubit_reflect)]` and `#[reflect_impl(crate = qubit_reflect)]`.
-In a source checkout, Cargo resolves the optional `qubit-datatype` and
-`qubit-id` path manifests even when `qubit-types` is disabled. Prepare those
-sibling checkouts first, then confirm Cargo can read both manifests:
+Cargo resolves the optional `qubit-datatype` and `qubit-id` dependencies from
+crates.io, so a source checkout does not need adjacent repositories. Verify
+dependency resolution from the repository root:
 
 ```bash
-./.infra/bin/prepare-local-path-dependencies.sh
 cargo metadata --locked --format-version 1
 ```
 
-Successful metadata output confirms path resolution. Users of the published
-crate do not need this repository script. Now run the examples from this
-source checkout:
+Successful metadata output confirms the locked dependency graph resolves. Now
+run the examples from this source checkout:
 
 ```bash
 cargo run --example field_patch
@@ -153,10 +151,10 @@ Reflection is deliberately bounded. It does not coerce numeric values, parse str
 
 ## Testing
 
-These commands run from the source checkout. Cargo resolves the optional
-`qubit-datatype` and `qubit-id` path manifests during workspace loading, so
-prepare local path dependencies first as shown above. Published-crate users do
-not need that script.
+These commands run from the source checkout. Cargo resolves optional
+`qubit-datatype` and `qubit-id` dependencies from crates.io; no sibling checkout
+preparation is required. Run the metadata command shown above first if you want
+to verify dependency resolution.
 
 ```bash
 # Run tests with the default feature set

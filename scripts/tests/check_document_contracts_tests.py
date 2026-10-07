@@ -46,7 +46,7 @@ class ContractTests(unittest.TestCase):
                 markers = "".join(
                     f"<!-- reflect-contract: {key}={values[key]} -->\n" for key in keys
                 )
-                path.write_text(markers)
+                path.write_text(markers + "Run `cargo metadata --locked --format-version 1`.\n")
         coverage = self.root / "scripts/derive_coverage_report.py"
         coverage.parent.mkdir()
         coverage.write_text("MINIMUM_LINE_COVERAGE = {'configure': 70.0, 'parse': 85.0, 'validate': 80.0, 'expand': 85.0}\n")
@@ -89,6 +89,17 @@ class ContractTests(unittest.TestCase):
         (self.root / FACTS["registry.source"]).unlink()
         with self.assertRaisesRegex(ValueError, "registry.source"):
             subject.check_contracts(self.root)
+
+    def test_source_checkout_docs_describe_standalone_registry_resolution(self):
+        for name in ("README.md", "README.zh_CN.md", "doc/user_guide.md", "doc/user_guide.zh_CN.md"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("Run `cargo metadata --locked --format-version 1` from this checkout.\n")
+        subject.check_source_checkout_docs(self.root)
+        document = self.root / "doc/user_guide.md"
+        document.write_text("Run `./.infra/bin/prepare-local-path-dependencies.sh` first.\n")
+        with self.assertRaisesRegex(ValueError, "prepare-local-path-dependencies"):
+            subject.check_source_checkout_docs(self.root)
 
 if __name__ == "__main__":
     unittest.main()
