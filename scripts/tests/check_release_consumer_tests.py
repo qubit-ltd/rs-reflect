@@ -58,6 +58,15 @@ class ConsumerTests(unittest.TestCase):
             with self.subTest(source=source), self.assertRaises(ValueError):
                 self.validate_sources({'packages': [self.package(source=source)]}, {}, '0.1.0')
 
+    def test_rejects_non_registry_external_path_and_git_dependencies(self):
+        for name in ("serde", "qubit-datatype", "qubit-id"):
+            for source in (None, "git+https://example.com/dependency"):
+                package = self.package(name=name, source=source)
+                with self.subTest(name=name, source=source), self.assertRaisesRegex(
+                    ValueError, f"non-registry dependency: {name}"
+                ):
+                    self.validate_sources({"packages": [self.package(), package]}, {}, "0.1.0")
+
     def test_staged_rejects_unapproved_local_upstream(self):
         packages = [self.package(source=None), self.package(name='qubit-id', source=None)]
         with self.assertRaises(ValueError):
@@ -92,11 +101,33 @@ class ConsumerTests(unittest.TestCase):
             self.assertEqual(dependencies["qubit-id"]["version"], "0.7.9")
             self.assertEqual(dependencies["qubit-datatype"], "0.14.3")
 
+    def test_ecosystem_profile_uses_staged_runtime_dependency_versions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory)
+            (runtime / "Cargo.toml").write_text(
+                '[package]\nname="qubit-reflect"\nversion="0.2.0"\n'
+                '[dependencies]\n'
+                'bigdecimal={version="0.4.11", optional=true}\n'
+                'chrono={version="0.4.45", default-features=false, features=["std"], optional=true}\n'
+                'uuid={version="1.27.0", optional=true}\n', encoding="utf-8")
+            manifest, _ = subject.fixture("0.2.0", "ecosystem-only", {"qubit-reflect": runtime})
+            dependencies = tomllib.loads(manifest)["dependencies"]
+            self.assertEqual(dependencies["bigdecimal"], "0.4.11")
+            self.assertEqual(dependencies["chrono"]["version"], "0.4.45")
+            self.assertEqual(dependencies["uuid"], "1.27.0")
+
     def test_rejects_duplicate_qubit_id_versions(self):
         first = self.package(name="qubit-id")
         second = self.package(name="qubit-id")
         first["version"], second["version"] = "0.6.0", "0.7.0"
         with self.assertRaisesRegex(ValueError, "multiple qubit-id versions"):
+            self.validate_sources({"packages": [self.package(), first, second]}, {}, "0.1.0")
+
+    def test_rejects_duplicate_qubit_datatype_versions(self):
+        first = self.package(name="qubit-datatype")
+        second = self.package(name="qubit-datatype")
+        first["version"], second["version"] = "0.13.0", "0.14.0"
+        with self.assertRaisesRegex(ValueError, "multiple qubit-datatype versions"):
             self.validate_sources({"packages": [self.package(), first, second]}, {}, "0.1.0")
 
     def test_profile_exercises_requested_builtins(self):
@@ -154,7 +185,10 @@ class PackagedExampleTests(unittest.TestCase):
         (self.allowed["qubit-reflect"] / "Cargo.toml").write_text(
             '[package]\nname="qubit-reflect"\nversion="0.1.0"\n'
             '[dependencies]\nqubit-id={version="0.7"}\n'
-            'qubit-datatype={version="0.14.0"}\n', encoding="utf-8")
+            'qubit-datatype={version="0.14.0"}\n'
+            'bigdecimal={version="0.4.11"}\n'
+            'chrono={version="0.4.45"}\n'
+            'uuid={version="1.27.0"}\n', encoding="utf-8")
         examples = self.allowed["qubit-reflect"] / "examples"
         examples.mkdir()
         for name in ["field_patch", "customer_patch", "support_action"]:
