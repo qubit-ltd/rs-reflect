@@ -48,18 +48,19 @@ ecosystem-types = ["dep:bigdecimal", "dep:chrono", "dep:uuid"]
 qubit-types = ["dep:qubit-datatype", "dep:qubit-id"]
 
 [dependencies]
-bigdecimal = { version = "^0.4", optional = true }
-chrono = { version = "^0.4", default-features = false, features = ["std"], optional = true }
-inventory = "^0.3"
-qubit-datatype = { version = "0.14.0", path = "../../rust-common/rs-datatype", optional = true }
-qubit-id = { version = "0.7", default-features = false, optional = true }
-thiserror = "^2.0"
-uuid = { version = "^1.26", optional = true }
+bigdecimal = { version = "^0.4.11", optional = true }
+chrono = { version = "^0.4.45", default-features = false, features = ["std"], optional = true }
+inventory = "^0.3.24"
+qubit-datatype = { version = "0.14.0", optional = true }
+qubit-id = { version = "^0.7.0", default-features = false, optional = true }
+thiserror = "^2.0.21"
+uuid = { version = "^1.27.0", optional = true }
+# Pre-publication exception: qubit-reflect-derive 0.2.0 is not on crates.io yet.
 qubit-reflect-derive = { version = "=0.2.0", path = "derive", optional = true }
 
 [dev-dependencies]
-criterion = "^0.8"
-trybuild = "^1.0"
+criterion = "^0.8.2"
+trybuild = "^1.0.121"
 
 [[test]]
 name = "integration_tests"
