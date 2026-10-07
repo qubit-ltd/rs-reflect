@@ -6,16 +6,4 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Unified integration-test entry point for `qubit-reflect`.
-
-mod access;
-#[cfg(feature = "derive")]
-mod construct;
-#[cfg(feature = "derive")]
-mod derive_examples;
-mod descriptor;
-mod invoke;
-mod public_api_accessors_tests;
-mod public_capability_key_tests;
-mod registry;
-mod value;
+mod derive_examples_tests;
