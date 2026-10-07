@@ -7,6 +7,9 @@
 // =============================================================================
 
 //! Criterion benchmarks for descriptor lookup.
+//!
+//! The first, last, and missing-field cases measure lookup position costs;
+//! they do not represent production query frequencies.
 
 use std::hint::black_box;
 use std::sync::Barrier;
@@ -16,6 +19,15 @@ use std::time::Instant;
 use criterion::Criterion;
 use criterion::criterion_group;
 use qubit_reflect::TypeDescriptor;
+
+macro_rules! define_lookup_record {
+    ($name:ident; $($field:ident),+ $(,)?) => {
+        #[derive(qubit_reflect::Reflect)]
+        struct $name {
+            $($field: u8,)+
+        }
+    };
+}
 
 #[derive(qubit_reflect::Reflect)]
 struct FieldLookupRecord {
@@ -37,17 +49,80 @@ struct FieldLookupRecord {
     f15: u8,
 }
 
+// Widths reflect production model counts: 1/2 cover small shapes; 9/17/51
+// cover the platform p50, nearest-rank p90, and maximum. Keep the original
+// 16-field case as a historical comparison.
+define_lookup_record!(FieldLookupOne; f00);
+define_lookup_record!(FieldLookupTwo; f00, f01);
+define_lookup_record!(FieldLookupNine; f00, f01, f02, f03, f04, f05, f06, f07, f08);
+define_lookup_record!(FieldLookupSeventeen;
+    f00, f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11, f12, f13, f14, f15, f16,
+);
+define_lookup_record!(FieldLookupFiftyOne;
+    f00, f01, f02, f03, f04, f05, f06, f07, f08, f09, f10, f11,
+    f12, f13, f14, f15, f16, f17, f18, f19, f20, f21, f22, f23,
+    f24, f25, f26, f27, f28, f29, f30, f31, f32, f33, f34, f35,
+    f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47,
+    f48, f49, f50,
+);
+
+fn benchmark_field_cases(
+    criterion: &mut Criterion,
+    descriptor: &'static TypeDescriptor,
+    width: usize,
+    legacy_labels: bool,
+) {
+    let first = "f00";
+    let last = Box::leak(format!("f{:02}", width - 1).into_boxed_str());
+    let missing = "absent";
+    assert!(descriptor.field(first).is_some());
+    assert!(descriptor.field(last).is_some());
+    assert!(descriptor.field(missing).is_none());
+
+    for (label, name) in [("first", first), ("last", last), ("missing", missing)] {
+        let id = if legacy_labels {
+            format!("field_lookup/{label}")
+        } else {
+            format!("field_lookup/{width}_fields/{label}")
+        };
+        criterion.bench_function(&id, |bench| {
+            bench.iter(|| black_box(descriptor.field(black_box(name))));
+        });
+    }
+}
+
 /// Registers cold-shape and hot-interner descriptor cases.
 fn descriptor_lookup(criterion: &mut Criterion) {
     let fields = TypeDescriptor::of::<FieldLookupRecord>();
-    assert!(fields.field("f00").is_some());
-    assert!(fields.field("f15").is_some());
-    assert!(fields.field("absent").is_none());
-    for (label, name) in [("first", "f00"), ("last", "f15"), ("missing", "absent")] {
-        criterion.bench_function(&format!("field_lookup/{label}"), |bench| {
-            bench.iter(|| black_box(fields.field(black_box(name))));
-        });
+    let field_descriptor_bytes = std::mem::size_of_val(fields.field("f00").expect("first field"));
+    for width in [1_usize, 2, 9, 16, 17, 51] {
+        let descriptor_bytes = width * field_descriptor_bytes;
+        // Approximate a HashMap<&str, usize> table: fat key + index per bucket,
+        // one control byte per bucket, 7/8 maximum occupancy, and power-of-two
+        // capacity. This estimates table storage; it does not measure an index.
+        let required_buckets = (width * 8).div_ceil(7).next_power_of_two().max(4);
+        let estimated_index_bytes =
+            required_buckets * std::mem::size_of::<(&str, usize)>() + required_buckets + 16;
+        eprintln!(
+            "field_memory width={width} descriptor_array_bytes={descriptor_bytes} estimated_index_bytes={estimated_index_bytes}"
+        );
     }
+    benchmark_field_cases(criterion, fields, 16, true);
+    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupOne>(), 1, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupTwo>(), 2, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupNine>(), 9, false);
+    benchmark_field_cases(
+        criterion,
+        TypeDescriptor::of::<FieldLookupSeventeen>(),
+        17,
+        false,
+    );
+    benchmark_field_cases(
+        criterion,
+        TypeDescriptor::of::<FieldLookupFiftyOne>(),
+        51,
+        false,
+    );
 
     criterion.bench_function("descriptor/hot_nested_shape", |bench| {
         bench.iter(|| black_box(TypeDescriptor::of::<Vec<Option<String>>>()));
