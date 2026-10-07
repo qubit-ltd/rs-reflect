@@ -11,9 +11,9 @@
 mod access;
 #[cfg(feature = "derive")]
 mod construct;
-mod descriptor;
 #[cfg(feature = "derive")]
 mod derive_examples_tests;
+mod descriptor;
 mod invoke;
 mod public_api_accessors_tests;
 mod public_capability_key_tests;

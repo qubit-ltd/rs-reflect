@@ -101,8 +101,7 @@ fn descriptor_lookup(criterion: &mut Criterion) {
         // one control byte per bucket, 7/8 maximum occupancy, and power-of-two
         // capacity. This estimates table storage; it does not measure an index.
         let required_buckets = (width * 8).div_ceil(7).next_power_of_two().max(4);
-        let estimated_index_bytes =
-            required_buckets * std::mem::size_of::<(&str, usize)>() + required_buckets + 16;
+        let estimated_index_bytes = required_buckets * std::mem::size_of::<(&str, usize)>() + required_buckets + 16;
         eprintln!(
             "field_memory width={width} descriptor_array_bytes={descriptor_bytes} estimated_index_bytes={estimated_index_bytes}"
         );
@@ -111,18 +110,8 @@ fn descriptor_lookup(criterion: &mut Criterion) {
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupOne>(), 1, false);
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupTwo>(), 2, false);
     benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupNine>(), 9, false);
-    benchmark_field_cases(
-        criterion,
-        TypeDescriptor::of::<FieldLookupSeventeen>(),
-        17,
-        false,
-    );
-    benchmark_field_cases(
-        criterion,
-        TypeDescriptor::of::<FieldLookupFiftyOne>(),
-        51,
-        false,
-    );
+    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupSeventeen>(), 17, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupFiftyOne>(), 51, false);
 
     criterion.bench_function("descriptor/hot_nested_shape", |bench| {
         bench.iter(|| black_box(TypeDescriptor::of::<Vec<Option<String>>>()));

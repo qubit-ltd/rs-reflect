@@ -50,11 +50,7 @@ fn test_reflect_trait_example() {
     let implementations = TypeDescriptor::of::<NamedService>()
         .impls_global()
         .expect("valid trait registrations");
-    assert!(
-        implementations
-            .iter()
-            .any(|item| item.implemented_trait().is_some())
-    );
+    assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
 }
 
 #[derive(Reflect)]
@@ -74,9 +70,5 @@ fn test_reflect_impl_example() {
     let implementations = TypeDescriptor::of::<InherentService>()
         .impls_global()
         .expect("valid inherent method registrations");
-    assert!(
-        implementations
-            .iter()
-            .any(|item| item.method("ping").is_some())
-    );
+    assert!(implementations.iter().any(|item| item.method("ping").is_some()));
 }

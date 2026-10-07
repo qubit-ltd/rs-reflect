@@ -449,7 +449,11 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                     name: ty.ident.to_string(),
                     kind: GenericKindIr::Type,
                     bounds: ty.bounds.iter().map(convert_bound).collect(),
-                    default: ty.default.as_ref().map(|(_, value)| convert_type(value)).map(GenericDefaultIr::Type),
+                    default: ty
+                        .default
+                        .as_ref()
+                        .map(|(_, value)| convert_type(value))
+                        .map(GenericDefaultIr::Type),
                     const_type: None,
                     declaration: ty.to_token_stream(),
                     span: ty.span(),
