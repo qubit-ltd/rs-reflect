@@ -767,5 +767,5 @@ pub mod __private {
 
 ## 延伸阅读
 
-- [README](../README.zh_CN.md) · [架构设计](2026-09-03-qubit-reflect-design.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
+- [README](../README.zh_CN.md) · [当前设计（0.2）](2026-10-07-qubit-reflect-current-design.zh_CN.md) · [历史 0.1 设计](2026-09-03-qubit-reflect-design.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
 - [English user guide](user_guide.md) · [English README](../README.md)
