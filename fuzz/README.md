@@ -1,5 +1,11 @@
 # Bounded fuzz smoke
 
+The regular CI builds all five fuzz targets. The weekly **Fuzz smoke** workflow
+runs each target for 30 seconds with the default sanitizer; it can also be
+started with `workflow_dispatch`. A failure uploads `fuzz/artifacts/` when
+libFuzzer produces a crash input. Run `./scripts/cargo-fuzz-check.sh` with
+`RS_CI_FUZZ_MODE=smoke` to reproduce the bounded check locally.
+
 Build and smoke-test the fuzz workspace with a nightly toolchain on Linux:
 
 ```bash
