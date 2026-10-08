@@ -772,17 +772,15 @@ fn test_trait_descriptor_applied_associated_type_substitutes_bound_without_mutat
         0,
         "Item",
         "item",
-        Box::new([
-            PredicateDescriptor::type_bound(
-                TypeExpression::Parameter("T".into()),
-                [TypeExpression::Concrete(
-                    ConcreteTypeExpression::new(["Bound"], []).expect("fixture bound path is non-empty"),
-                )],
-                [reflect::expression::TraitBoundModifier::None],
-                [],
-            )
-            .expect("fixture bound metadata matches"),
-        ]),
+        Box::new([PredicateDescriptor::type_bound(
+            TypeExpression::Parameter("T".into()),
+            [TypeExpression::Concrete(
+                ConcreteTypeExpression::new(["Bound"], []).expect("fixture bound path is non-empty"),
+            )],
+            [reflect::expression::TraitBoundModifier::None],
+            [],
+        )
+        .expect("fixture bound metadata matches")]),
         None,
     );
     let original_bound = declared.bounds()[0].clone();
