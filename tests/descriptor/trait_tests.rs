@@ -747,6 +747,67 @@ fn test_trait_descriptor_rejects_non_concrete_or_incomplete_applications() {
 }
 
 #[test]
+fn test_trait_descriptor_applied_associated_type_substitutes_generic_default() {
+    let declared = AssociatedTypeDescriptor::new(
+        0,
+        "Item",
+        "item",
+        Box::new([]),
+        Some(TypeExpression::Parameter("T".into())),
+    );
+    let applied = TraitDescriptor::builder(&GENERIC_DEFINITION)
+        .arguments(vec![GenericArgument::Type(concrete_u32_expression())])
+        .associated_types(vec![declared])
+        .build()
+        .expect("concrete trait application must build");
+
+    let expected = concrete_u32_expression();
+    let item = applied.associated_type("item").expect("applied item exists");
+    assert_eq!(item.default(), Some(&expected));
+}
+
+#[test]
+fn test_trait_descriptor_applied_associated_type_substitutes_bound_without_mutating_declaration() {
+    let declared = AssociatedTypeDescriptor::new(
+        0,
+        "Item",
+        "item",
+        Box::new([
+            PredicateDescriptor::type_bound(
+                TypeExpression::Parameter("T".into()),
+                [TypeExpression::Concrete(
+                    ConcreteTypeExpression::new(["Bound"], []).expect("fixture bound path is non-empty"),
+                )],
+                [reflect::expression::TraitBoundModifier::None],
+                [],
+            )
+            .expect("fixture bound metadata matches"),
+        ]),
+        None,
+    );
+    let original_bound = declared.bounds()[0].clone();
+    let applied = TraitDescriptor::builder(&GENERIC_DEFINITION)
+        .arguments(vec![GenericArgument::Type(concrete_u32_expression())])
+        .associated_types(vec![declared.clone()])
+        .build()
+        .expect("concrete trait application must build");
+
+    let item = applied.associated_type("item").expect("applied item exists");
+    let expected = PredicateDescriptor::type_bound(
+        concrete_u32_expression(),
+        [TypeExpression::Concrete(
+            ConcreteTypeExpression::new(["Bound"], []).expect("fixture bound path is non-empty"),
+        )],
+        [reflect::expression::TraitBoundModifier::None],
+        [],
+    )
+    .expect("fixture bound metadata matches");
+    assert_eq!(item.bounds(), &[expected]);
+    assert_eq!(declared.bounds(), &[original_bound]);
+    assert_eq!(declared.default(), None);
+}
+
+#[test]
 fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_lookup() {
     let arguments = vec![GenericArgument::Type(concrete_u32_expression())];
     let associated_type =

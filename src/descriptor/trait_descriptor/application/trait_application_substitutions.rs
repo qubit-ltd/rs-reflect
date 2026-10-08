@@ -13,6 +13,7 @@ use std::collections::HashSet;
 
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::expression::ConstExpression;
+use crate::expression::ConcretePathSegment;
 use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::GenericParameterDescriptor;
@@ -217,11 +218,24 @@ impl TraitApplicationSubstitutions {
                 let mut result = expression.clone();
                 match &mut result {
                     TypeExpression::Concrete(concrete) => {
-                        concrete.arguments = concrete
-                            .arguments
+                        concrete.segments = concrete
+                            .segments
                             .iter()
-                            .map(|argument| self.generic_argument(argument))
+                            .map(|segment| {
+                                ConcretePathSegment::new(
+                                    segment.name(),
+                                    segment
+                                        .arguments()
+                                        .iter()
+                                        .map(|argument| self.generic_argument(argument))
+                                        .collect::<Box<[_]>>(),
+                                )
+                            })
                             .collect();
+                        concrete.arguments = concrete
+                            .segments
+                            .last()
+                            .map_or_else(Box::default, |segment| segment.arguments().to_vec().into_boxed_slice());
                     }
                     TypeExpression::Associated(associated) => {
                         *associated.self_type = self.type_expression(&associated.self_type);
@@ -384,5 +398,293 @@ impl TraitApplicationSubstitutions {
             }
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::any::TypeId;
+
+    use super::TraitApplicationSubstitutions;
+    use crate::descriptor::TraitCompleteness;
+    use crate::descriptor::TraitDefinitionDescriptor;
+    use crate::descriptor::TraitId;
+    use crate::expression::ArrayTypeExpression;
+    use crate::expression::AssociatedTypeExpression;
+    use crate::expression::ConcreteTypeExpression;
+    use crate::expression::ConcretePathSegment;
+    use crate::expression::ConstExpression;
+    use crate::expression::ConstGenericArgument;
+    use crate::expression::DiagnosticText;
+    use crate::expression::FunctionAbi;
+    use crate::expression::FunctionPointerExpression;
+    use crate::expression::FunctionSafety;
+    use crate::expression::GenericArgument;
+    use crate::expression::GenericDefinitionDescriptor;
+    use crate::expression::GenericParameterDescriptor;
+    use crate::expression::LifetimeExpression;
+    use crate::expression::OpaqueTypeExpression;
+    use crate::expression::PredicateDescriptor;
+    use crate::expression::RawPointerTypeExpression;
+    use crate::expression::ReferenceTypeExpression;
+    use crate::expression::TraitBoundModifier;
+    use crate::expression::TraitObjectExpression;
+    use crate::expression::TypeExpression;
+
+    /// Creates a trait application with type, const, lifetime, and associated-type bindings.
+    fn substitutions_for<Marker: 'static>() -> TraitApplicationSubstitutions {
+        let usize_type = concrete("usize", []);
+        let generic = Box::leak(Box::new(GenericDefinitionDescriptor::new(
+            [
+                GenericParameterDescriptor::Lifetime {
+                    name: "a".into(),
+                    bounds: Box::new([]),
+                    diagnostic: DiagnosticText::default(),
+                },
+                GenericParameterDescriptor::Type {
+                    name: "T".into(),
+                    bounds: Box::new([]),
+                    default: None,
+                    diagnostic: DiagnosticText::default(),
+                },
+                GenericParameterDescriptor::Const {
+                    name: "N".into(),
+                    ty: Box::new(usize_type.clone()),
+                    default: None,
+                    diagnostic: DiagnosticText::default(),
+                },
+            ],
+            [],
+        )));
+        let definition = TraitDefinitionDescriptor::new(
+            TraitId::Reflected(TypeId::of::<Marker>()),
+            "Fixture",
+            "fixture::Fixture",
+            "fixture",
+            TraitCompleteness::Complete,
+            generic,
+        );
+        TraitApplicationSubstitutions::new(
+            &definition,
+            &[
+                GenericArgument::Type(concrete("u32", [])),
+                GenericArgument::Const(ConstGenericArgument::new(
+                    usize_type,
+                    ConstExpression::UnsignedInteger(4),
+                    "4",
+                )),
+            ],
+            &[GenericArgument::AssociatedType {
+                name: "Item".into(),
+                value: Box::new(concrete("String", [])),
+            }],
+        )
+    }
+
+    /// Builds a single-segment concrete type with the supplied generic arguments.
+    fn concrete(name: &str, arguments: impl IntoIterator<Item = GenericArgument>) -> TypeExpression {
+        TypeExpression::Concrete(ConcreteTypeExpression::new([name], arguments).expect("fixture type path is non-empty"))
+    }
+
+    /// Builds a type-bound predicate with one ordered trait bound.
+    fn bound(subject: TypeExpression, bound_type: TypeExpression) -> PredicateDescriptor {
+        PredicateDescriptor::type_bound(subject, [bound_type], [TraitBoundModifier::None], [])
+            .expect("fixture bound metadata matches")
+    }
+
+    #[test]
+    fn test_trait_application_substitutions_nested_types() {
+        struct NestedTypes;
+        let substitutions = substitutions_for::<NestedTypes>();
+        let t = TypeExpression::Parameter("T".into());
+        let u32_type = concrete("u32", []);
+        let input = [
+            TypeExpression::RawPointer(RawPointerTypeExpression::new(false, t.clone())),
+            TypeExpression::Slice(Box::new(t.clone())),
+            TypeExpression::Array(ArrayTypeExpression::new(t.clone(), ConstExpression::Parameter("N".into()))),
+            concrete("Vec", [GenericArgument::Type(t.clone())]),
+            TypeExpression::Concrete(ConcreteTypeExpression::from_segments([
+                ConcretePathSegment::new("Outer", [GenericArgument::Type(t.clone())]),
+                ConcretePathSegment::new("Inner", [GenericArgument::Const(ConstGenericArgument::new(
+                    concrete("usize", []),
+                    ConstExpression::Parameter("N".into()),
+                    "N",
+                ))]),
+            ]).expect("fixture path is non-empty")),
+            TypeExpression::Reference(ReferenceTypeExpression::new(
+                LifetimeExpression::Named("a".into()),
+                false,
+                t.clone(),
+            )),
+            TypeExpression::Tuple(vec![t.clone(), concrete("bool", [])].into_boxed_slice()),
+            TypeExpression::FunctionPointer(FunctionPointerExpression::new(
+                FunctionAbi::Rust,
+                FunctionSafety::Safe,
+                false,
+                [],
+                [t.clone()],
+                t.clone(),
+            )),
+            TypeExpression::TraitObject(TraitObjectExpression::new([bound(
+                TypeExpression::SelfType,
+                concrete("Bound", [GenericArgument::Type(t.clone())]),
+            )])),
+            TypeExpression::Opaque(OpaqueTypeExpression::new([bound(
+                TypeExpression::SelfType,
+                concrete("Bound", [GenericArgument::Type(t)]),
+            )])),
+        ];
+        let expected = [
+            TypeExpression::RawPointer(RawPointerTypeExpression::new(false, u32_type.clone())),
+            TypeExpression::Slice(Box::new(u32_type.clone())),
+            TypeExpression::Array(ArrayTypeExpression::new(u32_type.clone(), ConstExpression::UnsignedInteger(4))),
+            concrete("Vec", [GenericArgument::Type(u32_type.clone())]),
+            TypeExpression::Concrete(ConcreteTypeExpression::from_segments([
+                ConcretePathSegment::new("Outer", [GenericArgument::Type(u32_type.clone())]),
+                ConcretePathSegment::new("Inner", [GenericArgument::Const(ConstGenericArgument::new(
+                    concrete("usize", []),
+                    ConstExpression::UnsignedInteger(4),
+                    "4",
+                ))]),
+            ]).expect("fixture path is non-empty")),
+            TypeExpression::Reference(ReferenceTypeExpression::new(LifetimeExpression::Static, false, u32_type.clone())),
+            TypeExpression::Tuple(vec![u32_type.clone(), concrete("bool", [])].into_boxed_slice()),
+            TypeExpression::FunctionPointer(FunctionPointerExpression::new(
+                FunctionAbi::Rust,
+                FunctionSafety::Safe,
+                false,
+                [],
+                [u32_type.clone()],
+                u32_type.clone(),
+            )),
+            TypeExpression::TraitObject(TraitObjectExpression::new([bound(
+                TypeExpression::SelfType,
+                concrete("Bound", [GenericArgument::Type(u32_type.clone())]),
+            )])),
+            TypeExpression::Opaque(OpaqueTypeExpression::new([bound(
+                TypeExpression::SelfType,
+                concrete("Bound", [GenericArgument::Type(u32_type)]),
+            )])),
+        ];
+        for (original, expected) in input.iter().zip(expected) {
+            let before = original.clone();
+            assert_eq!(substitutions.type_expression(original), expected);
+            assert_eq!(*original, before);
+        }
+    }
+
+    #[test]
+    fn test_trait_application_substitutions_associated_and_shadowed_names() {
+        struct AssociatedAndShadowed;
+        let substitutions = substitutions_for::<AssociatedAndShadowed>();
+        let string_type = concrete("String", []);
+        assert_eq!(substitutions.type_expression(&concrete("Self", [])), concrete("Self", []));
+        assert_eq!(
+            substitutions.type_expression(&TypeExpression::Concrete(
+                ConcreteTypeExpression::new(["Self", "Item"], []).expect("fixture path is non-empty"),
+            )),
+            string_type,
+        );
+        assert_eq!(
+            substitutions.type_expression(&TypeExpression::Associated(AssociatedTypeExpression::new(
+                TypeExpression::SelfType,
+                None,
+                "Item",
+                [],
+            ))),
+            concrete("String", []),
+        );
+
+        let inner = GenericDefinitionDescriptor::new(
+            [
+                GenericParameterDescriptor::Lifetime {
+                    name: "a".into(),
+                    bounds: Box::new([LifetimeExpression::Named("a".into())]),
+                    diagnostic: DiagnosticText::default(),
+                },
+                GenericParameterDescriptor::Type {
+                    name: "T".into(),
+                    bounds: Box::new([bound(TypeExpression::Parameter("T".into()), concrete("Bound", []))]),
+                    default: Some(TypeExpression::Parameter("T".into())),
+                    diagnostic: DiagnosticText::default(),
+                },
+                GenericParameterDescriptor::Const {
+                    name: "N".into(),
+                    ty: Box::new(concrete("usize", [])),
+                    default: Some(ConstExpression::Parameter("N".into())),
+                    diagnostic: DiagnosticText::default(),
+                },
+            ],
+            [PredicateDescriptor::TypeEquality {
+                left: TypeExpression::Parameter("T".into()),
+                right: TypeExpression::Associated(AssociatedTypeExpression::new(
+                    TypeExpression::SelfType,
+                    None,
+                    "Item",
+                    [],
+                )),
+                diagnostic: DiagnosticText::default(),
+            }],
+        );
+        let transformed = substitutions.generic_definition(&inner);
+        assert_eq!(transformed.parameters(), inner.parameters());
+        assert_eq!(
+            transformed.predicates(),
+            &[PredicateDescriptor::TypeEquality {
+                left: TypeExpression::Parameter("T".into()),
+                right: concrete("String", []),
+                diagnostic: DiagnosticText::default(),
+            }],
+        );
+        assert_eq!(inner.predicates()[0], PredicateDescriptor::TypeEquality {
+            left: TypeExpression::Parameter("T".into()),
+            right: TypeExpression::Associated(AssociatedTypeExpression::new(TypeExpression::SelfType, None, "Item", [])),
+            diagnostic: DiagnosticText::default(),
+        });
+    }
+
+    #[test]
+    fn test_trait_application_substitutions_predicates() {
+        struct Predicates;
+        let substitutions = substitutions_for::<Predicates>();
+        let a = LifetimeExpression::Named("a".into());
+        let b = LifetimeExpression::Named("b".into());
+        let t = TypeExpression::Parameter("T".into());
+        let u32_type = concrete("u32", []);
+        let input = [
+            bound(t.clone(), concrete("Bound", [GenericArgument::Type(t.clone())])),
+            PredicateDescriptor::lifetime_outlives(a.clone(), [a.clone(), b.clone()])
+                .expect("fixture has lifetime bounds"),
+            PredicateDescriptor::TypeOutlives {
+                ty: t.clone(),
+                lifetime: a.clone(),
+                diagnostic: DiagnosticText::default(),
+            },
+            PredicateDescriptor::TypeEquality {
+                left: t,
+                right: concrete("Vec", [GenericArgument::Type(TypeExpression::Parameter("T".into()))]),
+                diagnostic: DiagnosticText::default(),
+            },
+        ];
+        let expected = [
+            bound(u32_type.clone(), concrete("Bound", [GenericArgument::Type(u32_type.clone())])),
+            PredicateDescriptor::lifetime_outlives(LifetimeExpression::Static, [LifetimeExpression::Static, b])
+                .expect("fixture has lifetime bounds"),
+            PredicateDescriptor::TypeOutlives {
+                ty: u32_type.clone(),
+                lifetime: LifetimeExpression::Static,
+                diagnostic: DiagnosticText::default(),
+            },
+            PredicateDescriptor::TypeEquality {
+                left: u32_type.clone(),
+                right: concrete("Vec", [GenericArgument::Type(u32_type)]),
+                diagnostic: DiagnosticText::default(),
+            },
+        ];
+        for (original, expected) in input.iter().zip(expected) {
+            let before = original.clone();
+            assert_eq!(substitutions.predicate(original), expected);
+            assert_eq!(*original, before);
+        }
     }
 }
