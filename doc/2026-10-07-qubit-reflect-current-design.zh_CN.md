@@ -6,12 +6,14 @@
 
 ## 类型引用与身份
 
+<!-- reflect-contract: typeref.constructor=owned-resolved -->
 `TypeRef::of<T: Reflect + ?Sized>()` 通过 `TypeDescriptor::of::<T>()` 创建拥有值
 `TypeRef::Resolved`。构造这个枚举值本身不分配内存。初始化 `T` 的根描述符可能
 分配内存；描述符还会检查手写 `Reflect` 实现报告的 Rust `TypeId` 是否与 `T` 一致。
 身份不一致时会 panic，与直接调用 `TypeDescriptor::of` 的行为相同。该方法不承诺
 `TypeRef` 值在进程内全局驻留；身份由根描述符承载。
 
+<!-- reflect-contract: lazy.retry=panic-retry -->
 `LazyTypeRef` 首次解析也使用此构造器。每个 slot 的 `OnceLock` 会向并发读取者发布
 一次成功解析的结果。如果 resolver panic，slot 仍未初始化，后续调用会重试。
 
@@ -24,6 +26,7 @@ provider 会缓存其结果，因此这是初始化开销，而不是每次读�
 
 ## 字段名查找
 
+<!-- reflect-contract: field.lookup=linear -->
 `TypeDescriptor::field` 当前按名称线性扫描描述符的字段。下面的 Criterion 微基准使用
 一个包含 16 个 `u8` 字段的派生类型；取得描述符后只测量 `field(name)`。Criterion
 应用字段基准过滤条件前，自定义 `main` 仍会执行现有的 20 个进程冷启动测量。

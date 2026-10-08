@@ -6,6 +6,7 @@ describes the 0.1 design and remains unchanged; this note supplements it.
 
 ## Type references and identity
 
+<!-- reflect-contract: typeref.constructor=owned-resolved -->
 `TypeRef::of<T: Reflect + ?Sized>()` creates an owned `TypeRef::Resolved`
 value around `TypeDescriptor::of::<T>()`. Constructing the enum value adds no
 allocation. Initializing `T`'s root descriptor may allocate, and the descriptor
@@ -14,6 +15,7 @@ as `T`. A mismatched implementation panics, matching direct use of
 `TypeDescriptor::of`. The method does not promise process-wide interning of
 the `TypeRef` value itself; identity belongs to the root descriptor.
 
+<!-- reflect-contract: lazy.retry=panic-retry -->
 `LazyTypeRef` uses this same constructor for first resolution. Its per-slot
 `OnceLock` publishes one successful result to concurrent readers. If the
 resolver panics, the slot remains uninitialized and a later call retries.
@@ -28,6 +30,7 @@ per-property-read allocation. The helper does not claim global interning.
 
 ## Field-name lookup
 
+<!-- reflect-contract: field.lookup=linear -->
 `TypeDescriptor::field` currently scans the descriptor's fields linearly by
 name. The Criterion microbenchmark below uses a derived record with 16 `u8`
 fields and measures only `field(name)` after obtaining the descriptor. The

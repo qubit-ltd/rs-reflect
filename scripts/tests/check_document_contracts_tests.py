@@ -30,8 +30,13 @@ GROUPS = {
     ),
     "stability": ("doc/2026-09-07-qubit-reflect-api-stability.md", "doc/2026-09-07-qubit-reflect-api-stability.zh_CN.md", ["dispatch.input_recovery"]),
     "matrix": ("doc/derive-contract-matrix.md", "doc/derive-contract-matrix.zh_CN.md", ["coverage.configure", "coverage.parse", "coverage.validate", "coverage.expand"]),
+    "current_design": (
+        "doc/2026-10-07-qubit-reflect-current-design.md",
+        "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md",
+        ["typeref.constructor", "lazy.retry", "field.lookup"],
+    ),
 }
-FACTS = {"facade.explicit": "qubit_reflect", "provider.qualified": "custom-provider", "panic.async_poll": "not-caught", "panic.abort": "catching-unavailable", "dispatch.input_recovery": "original-input", "examples.native": "cargo-example", "coverage.configure": "70", "coverage.parse": "85", "coverage.validate": "80", "coverage.expand": "85", "registry.source": "src/registry/reflect_registry.rs"}
+FACTS = {"facade.explicit": "qubit_reflect", "provider.qualified": "custom-provider", "panic.async_poll": "not-caught", "panic.abort": "catching-unavailable", "dispatch.input_recovery": "original-input", "examples.native": "cargo-example", "coverage.configure": "70", "coverage.parse": "85", "coverage.validate": "80", "coverage.expand": "85", "registry.source": "src/registry/reflect_registry.rs", "typeref.constructor": "owned-resolved", "lazy.retry": "panic-retry", "field.lookup": "linear"}
 class ContractTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(subject, "document contract checker has not been implemented")
@@ -60,6 +65,21 @@ class ContractTests(unittest.TestCase):
 
     def test_valid_bilingual_facts_and_real_inputs(self):
         subject.check_contracts(self.root)
+
+    def test_current_design_rejects_missing_and_drifted_facts(self):
+        document = self.root / "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md"
+        original = document.read_text()
+        cases = (
+            original.replace("<!-- reflect-contract: field.lookup=linear -->\n", ""),
+            original.replace("typeref.constructor=owned-resolved", "typeref.constructor=symbolic"),
+        )
+        for changed in cases:
+            with self.subTest(changed=changed), self.assertRaisesRegex(
+                ValueError, "2026-10-07-qubit-reflect-current-design.zh_CN.md"
+            ):
+                document.write_text(changed)
+                subject.check_contracts(self.root)
+        document.write_text(original)
 
     def test_duplicate_missing_unknown_and_bilingual_value_drift(self):
         document = self.root / "README.zh_CN.md"

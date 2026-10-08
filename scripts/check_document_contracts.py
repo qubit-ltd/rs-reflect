@@ -19,6 +19,9 @@ FACTS = {
     "coverage.validate": "80",
     "coverage.expand": "85",
     "registry.source": "src/registry/reflect_registry.rs",
+    "typeref.constructor": "owned-resolved",
+    "lazy.retry": "panic-retry",
+    "field.lookup": "linear",
 }
 GROUPS = (
     ("README.md", "README.zh_CN.md", ("facade.explicit", "examples.native")),
@@ -33,6 +36,8 @@ GROUPS = (
      ("dispatch.input_recovery",)),
     ("doc/derive-contract-matrix.md", "doc/derive-contract-matrix.zh_CN.md", (
         "coverage.configure", "coverage.parse", "coverage.validate", "coverage.expand")),
+    ("doc/2026-10-07-qubit-reflect-current-design.md", "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md", (
+        "typeref.constructor", "lazy.retry", "field.lookup")),
 )
 EXAMPLES = ("field_patch", "customer_patch", "support_action")
 def document_facts(document):
