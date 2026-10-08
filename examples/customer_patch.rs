@@ -147,4 +147,55 @@ fn main() {
     assert_eq!(updated.email, "ada@corp.example");
     assert_eq!(updated.display_name, "Ada Lovelace");
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    use qubit_reflect::ReflectedOwned;
+
+    use super::Customer;
+    use super::CustomerRepository;
+    use super::FieldChange;
+    use super::PatchError;
+    use super::apply_patch;
+
+    #[test]
+    fn test_earlier_change_remains_in_memory_when_later_change_is_read_only() {
+        let repository = CustomerRepository(Mutex::new(HashMap::from([(
+            1001,
+            Customer {
+                id: 1001,
+                email: String::from("ada@example.com"),
+                display_name: String::from("Ada Lovelace"),
+                credit_limit_cents: 50_000,
+            },
+        )])));
+        let mut customer = repository.load(1001).expect("seed customer");
+        let result = apply_patch(
+            &mut customer,
+            vec![
+                FieldChange {
+                    field: String::from("email"),
+                    value: ReflectedOwned::new(String::from("ada@corp.example")),
+                },
+                FieldChange {
+                    field: String::from("id"),
+                    value: ReflectedOwned::new(2002_u64),
+                },
+            ],
+        );
+        let Err(PatchError::ReadOnly { field, value }) = result else {
+            panic!("read-only id must reject the second change");
+        };
+        assert_eq!(field, "id");
+        assert_eq!(value.downcast_ref::<u64>(), Some(&2002));
+        assert_eq!(customer.email, "ada@corp.example");
+        assert_eq!(customer.id, 1001);
+        let stored = repository.load(1001).expect("stored customer");
+        assert_eq!(stored.email, "ada@example.com");
+        assert_eq!(stored.id, 1001);
+    }
+}
 // reflect-example-end
