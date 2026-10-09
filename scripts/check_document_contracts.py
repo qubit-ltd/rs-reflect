@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import sys
 import tomllib
+from urllib.parse import unquote
+from urllib.parse import urlsplit
 
 FACTS = {
     "facade.explicit": "qubit_reflect",
@@ -117,6 +119,54 @@ def check_source_checkout_docs(root):
             raise ValueError(f"{path}: use registry dependencies for external crates; sibling checkouts are not required")
 
 
+def check_local_links(root):
+    """Reject broken and machine-local links in maintained Markdown documents."""
+    names = (
+        "README.md",
+        "README.zh_CN.md",
+        "derive/README.md",
+        "derive/README.zh_CN.md",
+        "doc/user_guide.md",
+        "doc/user_guide.zh_CN.md",
+        "doc/2026-09-03-qubit-reflect-design.md",
+        "doc/2026-09-03-qubit-reflect-design.zh_CN.md",
+        "doc/2026-10-07-qubit-reflect-current-design.md",
+        "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md",
+        "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md",
+    )
+    root = Path(root).resolve()
+    documents = [root / name for name in names]
+    for document in documents:
+        if not document.is_file():
+            raise ValueError(f"missing maintained document: {document}")
+        fence = None
+        for line_number, line in enumerate(document.read_text(encoding="utf-8").splitlines(), 1):
+            fence_match = re.match(r"^\s{0,3}(`{3,}|~{3,})", line)
+            if fence_match:
+                kind = fence_match.group(1)[0]
+                if fence is None:
+                    fence = kind
+                elif fence == kind:
+                    fence = None
+                continue
+            if fence is not None:
+                continue
+            for raw_target in re.findall(r"\]\(([^)\s]+)(?:\s+[^)]*)?\)", line):
+                if raw_target.startswith("#"):
+                    continue
+                target_url = urlsplit(raw_target)
+                if target_url.scheme in {"http", "https", "mailto"}:
+                    continue
+                relative_path = Path(unquote(target_url.path))
+                target = (document.parent / relative_path).resolve()
+                if (
+                    relative_path.is_absolute()
+                    or not target.is_relative_to(root)
+                    or not target.exists()
+                ):
+                    raise ValueError(f"{document}:{line_number}: invalid local link: {raw_target}")
+
+
 def check_contracts(root):
     """Validate the required keys, bilingual values, and actual source contracts."""
     root = Path(root)
@@ -124,6 +174,7 @@ def check_contracts(root):
     expected_values.update(coverage_thresholds(root))
     check_examples(root)
     check_source_checkout_docs(root)
+    check_local_links(root)
     registry = root / FACTS["registry.source"]
     if not registry.is_file() or not registry.resolve().is_relative_to(root.resolve()):
         raise ValueError(f"registry.source: missing or escaping {registry}")

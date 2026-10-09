@@ -52,6 +52,8 @@ class ContractTests(unittest.TestCase):
                     f"<!-- reflect-contract: {key}={values[key]} -->\n" for key in keys
                 )
                 path.write_text(markers + "Run `cargo metadata --locked --format-version 1`.\n")
+        report = self.root / "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md"
+        report.write_text("[source](../README.md)\n", encoding="utf-8")
         coverage = self.root / "scripts/derive_coverage_report.py"
         coverage.parent.mkdir()
         coverage.write_text("MINIMUM_LINE_COVERAGE = {'configure': 70.0, 'parse': 85.0, 'validate': 80.0, 'expand': 85.0}\n")
@@ -65,6 +67,32 @@ class ContractTests(unittest.TestCase):
 
     def test_valid_bilingual_facts_and_real_inputs(self):
         subject.check_contracts(self.root)
+
+    def test_local_links_accept_existing_relative_and_external_targets(self):
+        report = self.root / "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md"
+        report.write_text(
+            "[readme](../README.md) [web](https://example.com) "
+            "[email](mailto:help@example.com) [section](#results)\n",
+            encoding="utf-8",
+        )
+        subject.check_local_links(self.root)
+
+    def test_local_links_report_missing_relative_target_and_line(self):
+        report = self.root / "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md"
+        report.write_text("line one\n[missing](missing.json)\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, r"2026-09-27.*:2: invalid local link: missing.json"):
+            subject.check_local_links(self.root)
+
+    def test_local_links_reject_absolute_machine_paths(self):
+        report = self.root / "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md"
+        report.write_text("[temporary](/tmp/superpowers-session/data.json)\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, r"2026-09-27.*:1: invalid local link: /tmp/"):
+            subject.check_local_links(self.root)
+
+    def test_local_links_ignore_fenced_code_examples(self):
+        report = self.root / "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md"
+        report.write_text("```markdown\n[example](/tmp/not-a-link.json)\n```\n", encoding="utf-8")
+        subject.check_local_links(self.root)
 
     def test_current_design_rejects_missing_and_drifted_facts(self):
         document = self.root / "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md"
