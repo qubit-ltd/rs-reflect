@@ -1,8 +1,8 @@
-# 当前设计说明（2026-10-07）
+# 设计复核记录（2026-10-07）
 
-本文记录反射引用设计复核后的 `qubit-reflect` 0.2.0 当前设计。原有的
-[2026-09-03 设计文档](2026-09-03-qubit-reflect-design.zh_CN.md) 描述的是 0.1
-设计且保持不变；本文作为当前设计增补。
+本文记录 `qubit-reflect` 0.2.0 在 2026-10-07 复核时的观察与字段查找基准。完整的当前
+设计维护在[2026-09-03 设计文档](2026-09-03-qubit-reflect-design.zh_CN.md)中；该文档
+起稿于 2026-09-03，之后已更新为 0.2.0 设计。
 
 ## 类型引用与身份
 
@@ -50,6 +50,6 @@ profile。Criterion 每项采集 100 个样本，预热 3 秒，测量约 5 秒�
 
 ## 延伸阅读
 
-- [历史 0.1 设计](2026-09-03-qubit-reflect-design.zh_CN.md)
+- [当前完整设计（0.2）](2026-09-03-qubit-reflect-design.zh_CN.md)
 - [用户手册](user_guide.zh_CN.md)
 - [derive 契约矩阵](derive-contract-matrix.zh_CN.md)

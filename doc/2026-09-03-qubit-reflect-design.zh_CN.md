@@ -10,13 +10,13 @@
 <!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
 
 - 日期：2026-09-03
-- 状态：`0.1.0` 源码检出设计；本文不验证 registry 发布状态
+- 状态：持续维护的 `0.2.0` 源码版完整设计；初稿日期为 2026-09-03
 - 英文版：[English design](2026-09-03-qubit-reflect-design.md)
 - 用户手册：[中文版](user_guide.zh_CN.md) · [English](user_guide.md)
 - 演进历史：[中文](2026-09-07-qubit-reflect-evolution.zh_CN.md) · [English](2026-09-07-qubit-reflect-evolution.md)
 - 依据：[最终需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)与[English requirements](2026-09-03-qubit-reflect-requirements.md)
 - 适用仓库：`rs-reflect`
-- 对应协议：`qubit-reflect 0.1` / `__private::codegen_v3`
+- 对应协议：`qubit-reflect 0.2.0` / `__private::codegen_v3`
 
 ## 1. 目的与边界
 
@@ -122,6 +122,24 @@ linker inventory，从空集合开始收集带 `FragmentIdentity` 的类型化 p
 可以被查询，但不会进入 snapshot 的根成员枚举。构建失败时返回完整的 `RegistryError`，不会发布
 部分 snapshot。冻结后仍使用同一套不可变查询和索引路径，因此 `methods_in`、`impls_in`、有效类型视图
 及 capability 查询都保持在当前 snapshot 内。
+
+### 类型引用与成员查找
+
+`TypeRef::of<T: Reflect + ?Sized>()` 通过 `TypeDescriptor::of::<T>()` 创建拥有值
+`TypeRef::Resolved`。创建枚举值本身不分配内存，初始化根描述符则可能分配。
+`TypeDescriptor::of` 会检查手写 `Reflect` 实现报告的 `TypeId` 是否与 `T` 一致；不一致时
+会 panic。`TypeRef` 值不会全局驻留，身份由根描述符承载。
+
+`LazyTypeRef` 使用相同的构造方式。每个 slot 的 `OnceLock` 会向并发读取者发布一次成功
+解析的结果；如果 resolver panic，slot 仍未初始化，后续访问会重试。模型 v7 适配器在
+需要 `&'static TypeRef` 的元数据边界创建并泄漏一个 `TypeRef`。生成的元数据 provider
+会缓存结果，因此这项分配发生在元数据初始化期间，而不是每次读取属性时；适配器不承诺
+全局驻留 `TypeRef`。
+
+`TypeDescriptor::field` 当前按查询名线性扫描直接字段。16 字段 Criterion 微基准记录在
+[2026-10-07 设计复核记录](2026-10-07-qubit-reflect-current-design.zh_CN.md)中；它是合成
+数据，不能证明真实下游的端到端收益。只有代表性的下游模型结构和查询频率证明索引能降低
+延迟，且收益足以抵消索引的存储与构建成本时，才应改变当前线性查找。
 
 ## 4. derive 流水线
 

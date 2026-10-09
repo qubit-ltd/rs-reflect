@@ -10,13 +10,13 @@
 <!-- reflect-contract: registry.source=src/registry/reflect_registry.rs -->
 
 - Date: 2026-09-03
-- Status: source-checkout design for `0.1.0`; this document does not verify registry publication
+- Status: current living design for the `0.2.0` source checkout; originally drafted 2026-09-03
 - Translation: [简体中文设计](2026-09-03-qubit-reflect-design.zh_CN.md)
 - User guide: [English](user_guide.md) · [简体中文](user_guide.zh_CN.md)
 - Evolution history: [English](2026-09-07-qubit-reflect-evolution.md) · [简体中文](2026-09-07-qubit-reflect-evolution.zh_CN.md)
 - Source requirements: [English requirements](2026-09-03-qubit-reflect-requirements.md) and [中文版需求规范](2026-08-28-qubit-reflect-requirements.zh_CN.md)
 - Repository: `rs-reflect`
-- Protocol: `qubit-reflect 0.1` / `__private::codegen_v3`
+- Protocol: `qubit-reflect 0.2.0` / `__private::codegen_v3`
 
 ## 1. Purpose and boundary
 
@@ -133,6 +133,30 @@ is not added to the snapshot's root enumeration. A failed build returns the
 complete `RegistryError` without publishing a partial snapshot. The same
 immutable query/index path is used after freezing, so `methods_in`,
 `impls_in`, effective views, and capability queries all remain snapshot-local.
+
+### Type references and member lookup
+
+`TypeRef::of<T: Reflect + ?Sized>()` creates an owned `TypeRef::Resolved`
+around `TypeDescriptor::of::<T>()`. Creating the enum value does not allocate;
+initializing the root descriptor may allocate. `TypeDescriptor::of` verifies
+that a manual `Reflect` implementation reports the same `TypeId` as `T` and
+panics on a mismatch. A `TypeRef` value is not globally interned; identity is
+carried by the root descriptor.
+
+`LazyTypeRef` uses the same constructor. Each slot's `OnceLock` publishes one
+successful resolution to concurrent readers. If the resolver panics, the slot
+remains uninitialized and a later access retries. The model v7 adapter creates
+and leaks a `TypeRef` at its `&'static TypeRef` metadata boundary. Generated
+metadata providers cache their result, so that allocation belongs to metadata
+initialization rather than every property read; the adapter does not promise
+global `TypeRef` interning.
+
+`TypeDescriptor::field` scans direct fields linearly by query name. The
+16-field Criterion benchmark recorded in the [2026-10-07 review notes](2026-10-07-qubit-reflect-current-design.md)
+is synthetic and does not establish an end-to-end downstream benefit for an
+index. Keep the linear lookup unless representative downstream model shapes
+and lookup frequency demonstrate a latency improvement that justifies index
+storage and construction cost.
 
 ## 4. Derive pipeline
 

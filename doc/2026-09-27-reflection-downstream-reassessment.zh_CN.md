@@ -39,9 +39,4 @@
 
 ## 证据
 
-- 基线十次采样：[baseline-layoutfix2/measurements.json](/tmp/superpowers-4_mn2csx/baseline-layoutfix2/measurements.json)
-- 协议 v2 优化前十次采样：[after-v2/measurements.json](/tmp/superpowers-4_mn2csx/after-v2/measurements.json)
-- 协议 v2 最终十次采样：[after-v2-cold-projection/measurements.json](/tmp/superpowers-4_mn2csx/after-v2-cold-projection/measurements.json)
-- 共享身份优化前 v2 十次采样：[after-v2/measurements.json](/tmp/superpowers-4_mn2csx/after-v2/measurements.json)
-- DHAT 临时 profile：[reflection-heap.json](/tmp/superpowers-4_mn2csx/reflection-heap.json)
-- 实施计划：[2026-09-27-rs-reflect-reassessment-plan.md](/tmp/superpowers-4_mn2csx/2026-09-27-rs-reflect-reassessment-plan.md)
+本报告记录的是 2026-09-27 的 v2 测量；原始十次采样、DHAT profile 和当时的临时实施计划未随仓库归档，原 `/tmp` 目录现已不存在，因此无法从当前仓库复核。表中的汇总数值保留为当时记录，不应当作可由当前 v3 测量脚本重算的原始证据。

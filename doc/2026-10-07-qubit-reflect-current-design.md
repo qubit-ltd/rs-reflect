@@ -1,8 +1,9 @@
-# Current Design Notes (2026-10-07)
+# Design Review Notes (2026-10-07)
 
-This document records the current design of `qubit-reflect` 0.2.0 after the
-reflection-reference review. The original [2026-09-03 design](2026-09-03-qubit-reflect-design.md)
-describes the 0.1 design and remains unchanged; this note supplements it.
+This note records the 2026-10-07 review observations and field-lookup benchmark
+for `qubit-reflect` 0.2.0. The complete current design is maintained in the
+[2026-09-03 design document](2026-09-03-qubit-reflect-design.md), which was
+originally drafted on that date and has since been updated to describe 0.2.0.
 
 ## Type references and identity
 
@@ -60,6 +61,6 @@ and descriptor memory before changing the data structure.
 
 ## Further reading
 
-- [Historical 0.1 design](2026-09-03-qubit-reflect-design.md)
+- [Complete current design (0.2)](2026-09-03-qubit-reflect-design.md)
 - [User guide](user_guide.md)
 - [Derive contract matrix](derive-contract-matrix.md)

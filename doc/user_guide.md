@@ -1037,5 +1037,5 @@ themselves must not re-enter initialization.
 
 ## Further reading
 
-- [README](../README.md) · [Current design (0.2)](2026-10-07-qubit-reflect-current-design.md) · [Historical 0.1 design](2026-09-03-qubit-reflect-design.md) · [API reference](https://docs.rs/qubit-reflect)
+- [README](../README.md) · [Current complete design (0.2)](2026-09-03-qubit-reflect-design.md) · [2026-10-07 design review notes](2026-10-07-qubit-reflect-current-design.md) · [API reference](https://docs.rs/qubit-reflect)
 - [Chinese user guide](user_guide.zh_CN.md) · [中文 README](../README.zh_CN.md)
