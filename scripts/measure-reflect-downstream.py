@@ -6,15 +6,14 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
-import os
 import json
 import os
 import platform
 from pathlib import Path
 import re
+import shutil
 import stat
 import statistics
-import shutil
 import subprocess
 import sys
 from typing import Any, Sequence
