@@ -89,6 +89,18 @@ log_and_run() {
     return "$status"
 }
 
+fetch_runtime_fixture_dependencies() {
+    local manifest
+    for manifest in "$MODEL_ROOT"/derive/tests/runtime-fixtures/*/Cargo.toml; do
+        [[ -f "$manifest" ]] || continue
+        if [[ -n "$EVIDENCE_DIR" ]]; then
+            log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" fetch --locked --manifest-path "$manifest"
+        else
+            cargo +"$RS_CI_BUILD_TOOLCHAIN" fetch --locked --manifest-path "$manifest"
+        fi
+    done
+}
+
 if [[ -n "$EVIDENCE_DIR" ]]; then
     mkdir -p "$EVIDENCE_DIR"
     : > "$EVIDENCE_DIR/commands.txt"
@@ -113,6 +125,10 @@ fi
 # checkouts are symlinks to isolated worktrees.
 MODEL_ROOT=$(cd "$PLATFORM_ROOT/rs-model-metadata" && pwd -P)
 DOWNSTREAM_ROOT=$(cd "$PLATFORM_ROOT/rs-platform" && pwd -P)
+OPTIONAL_MODEL_FEATURES=$(python3 "$REFLECT_ROOT/scripts/downstream_features.py" \
+    "$MODEL_ROOT/Cargo.toml" qubit-model-metadata generic codec validation)
+
+fetch_runtime_fixture_dependencies
 
 if [[ -n "$EVIDENCE_DIR" ]]; then
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
@@ -121,15 +137,11 @@ if [[ -n "$EVIDENCE_DIR" ]]; then
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
         --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
         --lib --no-default-features
-    log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
-        --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
-        --lib --no-default-features --features generic
-    log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
-        --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
-        --lib --no-default-features --features codec
-    log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
-        --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
-        --lib --no-default-features --features validation
+    for feature in $OPTIONAL_MODEL_FEATURES; do
+        log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
+            --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
+            --lib --no-default-features --features "$feature"
+    done
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
         --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
@@ -138,9 +150,11 @@ if [[ -n "$EVIDENCE_DIR" ]]; then
 else
     cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$MODEL_ROOT/Cargo.toml" --workspace --all-features --lib --tests
     cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata --lib --no-default-features
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata --lib --no-default-features --features generic
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata --lib --no-default-features --features codec
-    cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata --lib --no-default-features --features validation
+    for feature in $OPTIONAL_MODEL_FEATURES; do
+        cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked \
+            --manifest-path "$MODEL_ROOT/Cargo.toml" -p qubit-model-metadata \
+            --lib --no-default-features --features "$feature"
+    done
     cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
     cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" -p qubit-platform-testkit
 fi
