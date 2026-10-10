@@ -39,8 +39,6 @@ static EXTERNAL_SUPERTRAITS: LazyLock<Mutex<HashMap<ExternalSupertraitKey, Exter
 ///
 /// Returns the shared cell that initializes and retains the trait descriptor.
 pub(in crate::descriptor) fn external_supertrait_cell(key: ExternalSupertraitKey) -> ExternalSupertraitCell {
-    let mut cache = EXTERNAL_SUPERTRAITS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut cache = EXTERNAL_SUPERTRAITS.lock().unwrap_or_else(PoisonError::into_inner);
     cache.entry(key).or_insert_with(|| Arc::new(OnceLock::new())).clone()
 }

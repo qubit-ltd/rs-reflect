@@ -8,9 +8,9 @@
 
 //! Integration tests for construction adapters emitted by `#[derive(Reflect)]`.
 
+use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::construct::ConstructionError;

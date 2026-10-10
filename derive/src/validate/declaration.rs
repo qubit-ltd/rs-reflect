@@ -355,9 +355,7 @@ fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollec
         let conflicts = match skip.target {
             HelperTarget::Field => [HelperName::ReadOnly, HelperName::NoConstruct].as_slice(),
             HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
-            HelperTarget::Method => {
-                [HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe].as_slice()
-            }
+            HelperTarget::Method => [HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe].as_slice(),
             _ => [].as_slice(),
         };
         for conflict in conflicts {
@@ -431,12 +429,10 @@ fn validate_query_name_scope<'a>(
         if let Some((existing_rust_name, _)) = names.insert(query_name.clone(), (rust_name.clone(), diagnostic_span)) {
             errors.push(syn::Error::new(
                 diagnostic_span,
-                format!(
-                    concat!(
-                        "{member_kind} query name `{query_name}` for Rust member `{rust_name}` ",
-                        "conflicts with Rust member `{existing_rust_name}`"
-                    )
-                ),
+                format!(concat!(
+                    "{member_kind} query name `{query_name}` for Rust member `{rust_name}` ",
+                    "conflicts with Rust member `{existing_rust_name}`"
+                )),
             ));
         }
     }
@@ -521,12 +517,10 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
         if !paths.contains(path) && !reflected_paths.contains(path) {
             errors.push(syn::Error::new(
                 declaration.span,
-                format!(
-                    concat!(
-                        "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or ",
-                        "#[reflect(external_trait({path}, id = \"...\"))]"
-                    )
-                ),
+                format!(concat!(
+                    "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or ",
+                    "#[reflect(external_trait({path}, id = \"...\"))]"
+                )),
             ));
         }
     }

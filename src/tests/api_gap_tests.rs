@@ -144,10 +144,7 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
         TypeId::of::<u16>(),
     );
     let owned = DynamicOwned::<Local>::new(9_u32);
-    assert_eq!(
-        dynamic_owned_type_id(&owned),
-        TypeId::of::<u32>(),
-    );
+    assert_eq!(dynamic_owned_type_id(&owned), TypeId::of::<u32>(),);
 
     let capabilities = TypeCapabilities::try_new(vec![
         default_descriptor::<String>(),

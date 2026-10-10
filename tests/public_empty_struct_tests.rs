@@ -9,6 +9,12 @@
 //! Empty field lists retain their original construction syntax.
 #![cfg(feature = "derive")]
 
+use qubit_reflect::NamedConstructionInput;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectedOwned;
+use qubit_reflect::StructUpdateInput;
+use qubit_reflect::TupleConstructionInput;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::construct::ConstructionError;
 use qubit_reflect::construct::ConstructionShape;
 use qubit_reflect::descriptor::StructKind;
@@ -16,12 +22,6 @@ use qubit_reflect::descriptor::TypeDefinitionData;
 use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::ThreadSafe;
-use qubit_reflect::NamedConstructionInput;
-use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::StructUpdateInput;
-use qubit_reflect::TupleConstructionInput;
-use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 #[reflect(thread_safe)]

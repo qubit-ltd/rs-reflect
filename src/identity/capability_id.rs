@@ -167,9 +167,7 @@ impl IdAuthority {
 /// namespace.
 pub(crate) fn validate(value: &str, authority: IdAuthority) -> Result<(), IdError> {
     validate_segments(value)?;
-    if authority != IdAuthority::CORE
-        && (value == "qubit.reflect" || value.starts_with("qubit.reflect."))
-    {
+    if authority != IdAuthority::CORE && (value == "qubit.reflect" || value.starts_with("qubit.reflect.")) {
         return Err(IdError::ReservedNamespace { value: value.into() });
     }
     Ok(())

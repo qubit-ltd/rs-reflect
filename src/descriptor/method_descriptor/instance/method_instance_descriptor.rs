@@ -10,7 +10,6 @@
 
 use super::method_implementation_source::MethodImplementationSource;
 use super::method_instance_build_error::MethodInstanceBuildError;
-
 use crate::descriptor::method_descriptor::InvocationAdapter;
 use crate::descriptor::method_descriptor::InvocationUnavailableReason;
 use crate::descriptor::method_descriptor::MethodDescriptor;

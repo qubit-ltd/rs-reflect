@@ -39,7 +39,8 @@ pub struct RegistryError(
     Arc<RegistryErrorData>,
 );
 
-/// Stores the category and optional registration context behind a registry error.
+/// Stores the category and optional registration context behind a registry
+/// error.
 #[derive(Debug, Eq, PartialEq)]
 struct RegistryErrorData {
     /// Stable error category.
@@ -414,7 +415,6 @@ impl Error for RegistryError {
     /// Returns the retained capability conflict as the source, or `None` when
     /// absent.
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.capability_details()
-            .map(|conflict| conflict as &dyn Error)
+        self.capability_details().map(|conflict| conflict as &dyn Error)
     }
 }

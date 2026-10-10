@@ -12,9 +12,9 @@ use std::any::type_name;
 
 use crate::__private::descriptor::lazy_type_ref;
 use crate::builtin::interner;
-use crate::descriptor::project_option_ref;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
+use crate::descriptor::project_option_ref;
 
 impl<T: Reflect> Reflect for Option<T> {
     /// Returns the interned descriptor for this optional-value specialization.
@@ -24,11 +24,7 @@ impl<T: Reflect> Reflect for Option<T> {
     /// The shared descriptor with a deferred relationship to `T`.
     fn type_descriptor() -> &'static TypeDescriptor {
         interner::intern::<Self>(|| {
-            TypeDescriptor::new_optional_lazy::<T>(
-                type_name::<Self>(),
-                lazy_type_ref::<T>(),
-                project_option_ref::<T>,
-            )
+            TypeDescriptor::new_optional_lazy::<T>(type_name::<Self>(), lazy_type_ref::<T>(), project_option_ref::<T>)
         })
     }
 }

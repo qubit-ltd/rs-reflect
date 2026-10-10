@@ -209,11 +209,11 @@ impl TraitDescriptorBuilder {
     pub fn build(self) -> Result<TraitDescriptor, TraitDescriptorBuildError> {
         self.validate_arguments()?;
         self.validate_associated_type_arguments()?;
-        if self.methods.iter().any(|method| {
-            !method
-                .declaring_trait()
-                .is_some_and(|owner| eq(owner, self.definition))
-        }) {
+        if self
+            .methods
+            .iter()
+            .any(|method| !method.declaring_trait().is_some_and(|owner| eq(owner, self.definition)))
+        {
             return Err(TraitDescriptorBuildError::ForeignMethod);
         }
         if self.definition.completeness() == TraitCompleteness::ExternalIncomplete

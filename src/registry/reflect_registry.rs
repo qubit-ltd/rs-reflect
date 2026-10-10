@@ -504,10 +504,9 @@ impl ReflectRegistry {
     pub fn capability_source(&self, descriptor: &TypeDescriptor, capability_id: &str) -> Option<&FragmentIdentity> {
         let capabilities = self.indexes.capabilities_by_target.get(&descriptor.type_id())?;
         let capability = capabilities.descriptor(capability_id)?;
-        self.indexes.capability_fragments.get(&(
-            CapabilityTarget::Type(descriptor.type_id()),
-            *capability.id(),
-        ))
+        self.indexes
+            .capability_fragments
+            .get(&(CapabilityTarget::Type(descriptor.type_id()), *capability.id()))
     }
 
     /// Returns the owned origin of a generic declaration capability by
@@ -551,10 +550,9 @@ impl ReflectRegistry {
     pub fn definition_capability_source(&self, id: TypeDefinitionId, capability_id: &str) -> Option<&FragmentIdentity> {
         let capabilities = self.indexes.capabilities_by_definition.get(&id)?;
         let capability = capabilities.descriptor(capability_id)?;
-        self.indexes.capability_fragments.get(&(
-            CapabilityTarget::TypeDefinition(id),
-            *capability.id(),
-        ))
+        self.indexes
+            .capability_fragments
+            .get(&(CapabilityTarget::TypeDefinition(id), *capability.id()))
     }
 
     /// Returns the effective capabilities of one generic declaration.
@@ -807,10 +805,7 @@ impl ReflectRegistry {
                 let source = self
                     .indexes
                     .capability_fragments
-                    .get(&(
-                        CapabilityTarget::Type(*type_id),
-                        *capability.id(),
-                    ))
+                    .get(&(CapabilityTarget::Type(*type_id), *capability.id()))
                     .expect("every effective capability has a retained source fragment");
                 Some((*type_id, source))
             })
@@ -852,10 +847,7 @@ impl ReflectRegistry {
                 let source = self
                     .indexes
                     .capability_fragments
-                    .get(&(
-                        CapabilityTarget::TypeDefinition(*id),
-                        *capability.id(),
-                    ))
+                    .get(&(CapabilityTarget::TypeDefinition(*id), *capability.id()))
                     .expect("every effective definition capability has a retained source fragment");
                 Some((*id, source))
             })

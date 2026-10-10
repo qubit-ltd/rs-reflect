@@ -624,13 +624,11 @@ fn test_reflect_trait_registers_generic_definition_without_dyn_descriptor() {
     else {
         panic!("generic method must retain its const parameter")
     };
-    assert!(
-        matches!(
-            ty.as_ref(),
-            reflect::expression::TypeExpression::Concrete(value)
-                if value.path()[0].as_ref() == "usize"
-        )
-    );
+    assert!(matches!(
+        ty.as_ref(),
+        reflect::expression::TypeExpression::Concrete(value)
+            if value.path()[0].as_ref() == "usize"
+    ));
     assert!(matches!(
         generic_method.parameters()[0].signature_type(),
         reflect::expression::TypeExpression::Reference(value)

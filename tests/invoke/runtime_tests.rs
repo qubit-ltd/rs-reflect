@@ -15,10 +15,10 @@ mod invocation_runtime {
     use std::panic::catch_unwind;
     use std::pin::Pin;
     use std::rc::Rc;
-    use std::sync::atomic::AtomicUsize;
-    use std::sync::atomic::Ordering;
     use std::sync::Mutex;
     use std::sync::MutexGuard;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
     use std::task::Context;
     use std::task::Poll;
     use std::task::Waker;

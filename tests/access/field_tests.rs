@@ -476,10 +476,7 @@ fn test_field_set_recovery_inspection_and_consuming_paths() {
         .into_recovery()
         .unwrap_or_else(|_| panic!("pre-execution failure should retain recovery"));
     assert_eq!(recovery.field().declaring_type(), TypeId::of::<RecoveryRecord>());
-    assert_eq!(
-        recovery.field().declaring_type_name(),
-        type_name::<RecoveryRecord>()
-    );
+    assert_eq!(recovery.field().declaring_type_name(), type_name::<RecoveryRecord>());
     assert_eq!(recovery.field().rust_name(), Some("value"));
     assert_eq!(recovery.field().variant_index(), None);
     assert_eq!(recovery.field().variant_rust_name(), None);

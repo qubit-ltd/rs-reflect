@@ -83,10 +83,7 @@ fn test_construction_field_id_preserves_source_identity_forms() {
         .collect();
 
     assert_eq!(ids[0].declaring_type(), TypeId::of::<ConstructionErrorFixture>());
-    assert_eq!(
-        ids[0].declaring_type_name(),
-        type_name::<ConstructionErrorFixture>()
-    );
+    assert_eq!(ids[0].declaring_type_name(), type_name::<ConstructionErrorFixture>());
     assert_eq!(ids[0].index(), 0);
     assert_eq!(ids[0].rust_name(), Some("named"));
     assert_eq!(ids[0].query_name(), Some("renamed"));

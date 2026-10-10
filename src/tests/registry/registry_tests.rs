@@ -11,13 +11,13 @@
 use std::any::TypeId;
 
 use crate::TypeDescriptor;
-use crate::capability::clone_key;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
+use crate::capability::clone_key;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::TraitId;
-use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDefinitionDescriptor;
+use crate::descriptor::TypeDefinitionId;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::TypeExpression;
 use crate::identity::CapabilityId;
@@ -140,16 +140,8 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .definition_capability_by_id(TypeDefinitionId::of::<u8>(), "missing")
             .is_none()
     );
-    assert_eq!(
-        registry.type_capability_members(clone_key()).count(),
-        0
-    );
-    assert_eq!(
-        registry
-            .definition_capability_members(clone_key())
-            .count(),
-        0
-    );
+    assert_eq!(registry.type_capability_members(clone_key()).count(), 0);
+    assert_eq!(registry.definition_capability_members(clone_key()).count(), 0);
 
     assert!(registry.implementations(TypeId::of::<u8>()).is_empty());
     assert!(registry.impl_definitions().is_empty());

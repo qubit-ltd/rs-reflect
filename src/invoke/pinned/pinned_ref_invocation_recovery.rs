@@ -11,8 +11,8 @@
 use std::pin::Pin;
 
 use super::pinned_ref_invocation::PinnedRefInvocation;
-use crate::invoke::InvocationArg;
 use crate::invoke::Invocation;
+use crate::invoke::InvocationArg;
 use crate::invoke::InvocationMode;
 
 /// Complete input retained after a pinned shared invocation fails validation.

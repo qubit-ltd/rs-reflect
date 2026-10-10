@@ -92,10 +92,14 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
     });
     let construction_fields = fields.iter().map(|field| {
         let index = Index::from(field.index);
-        let default = field.attributes.iter().any(|attribute| attribute.name == HelperName::Default);
-        let restricted = field.attributes.iter().any(|attribute| {
-            matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-        });
+        let default = field
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == HelperName::Default);
+        let restricted = field
+            .attributes
+            .iter()
+            .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct));
         if default {
             let provider = format_ident!("__qubit_reflect_default_field_{}{suffix}", field.index);
             if restricted {
@@ -118,7 +122,11 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
     });
     let update_fields = fields.iter().map(|field| {
         let index = Index::from(field.index);
-        if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
+        if field
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == HelperName::Skip)
+        {
             quote!(#facade::__private::codegen_v3::construct::UpdateField::unavailable(
                 &descriptor.fields()[#index],
                 #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::UpdateForbidden,
@@ -325,10 +333,14 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
     let fields = variant.fields.iter();
     let policies = fields.clone().map(|field| {
         let index = Index::from(field.index);
-        let default = field.attributes.iter().any(|attribute| attribute.name == HelperName::Default);
-        let restricted = field.attributes.iter().any(|attribute| {
-            matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
-        });
+        let default = field
+            .attributes
+            .iter()
+            .any(|attribute| attribute.name == HelperName::Default);
+        let restricted = field
+            .attributes
+            .iter()
+            .any(|attribute| matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct));
         if default {
             let provider = format_ident!(
                 "__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}",

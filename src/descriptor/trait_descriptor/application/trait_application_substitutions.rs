@@ -98,10 +98,7 @@ impl TraitApplicationSubstitutions {
     #[must_use]
     #[inline]
     pub(in crate::descriptor::trait_descriptor) fn is_empty(&self) -> bool {
-        self.types.is_empty()
-            && self.consts.is_empty()
-            && self.lifetimes.is_empty()
-            && self.associated_types.is_empty()
+        self.types.is_empty() && self.consts.is_empty() && self.lifetimes.is_empty() && self.associated_types.is_empty()
     }
 
     /// Applies outer trait arguments inside a nested item generic definition

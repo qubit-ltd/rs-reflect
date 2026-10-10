@@ -6,7 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-/// A zero-sized typed view returned for a root descriptor whose type is marked opaque.
+/// A zero-sized typed view returned for a root descriptor whose type is marked
+/// opaque.
 ///
 /// # Examples
 ///

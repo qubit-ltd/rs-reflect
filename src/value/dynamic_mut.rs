@@ -293,7 +293,6 @@ impl<'a> DynamicMut<'a, Local> {
             LocalMutStorage::Str(value) => Ok(value),
         }
     }
-
 }
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
@@ -563,5 +562,4 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
             marker: PhantomData,
         }
     }
-
 }

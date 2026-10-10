@@ -56,7 +56,8 @@ pub enum CapabilityConflictKind {
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("conflicting reflection capability `{id}`: {kind:?}")]
 pub struct CapabilityConflict {
-    /// Identifies whether the conflict is an exact duplicate or an adapter mismatch.
+    /// Identifies whether the conflict is an exact duplicate or an adapter
+    /// mismatch.
     kind: CapabilityConflictKind,
     /// Stable capability ID claimed by both descriptors.
     id: CapabilityId,

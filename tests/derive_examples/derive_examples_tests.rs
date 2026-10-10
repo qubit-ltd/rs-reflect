@@ -54,9 +54,7 @@ fn test_reflect_trait_example() {
         .impls_global()
         .expect("valid trait registrations");
     assert!(
-        implementations
-            .iter()
-            .any(|item| item.implemented_trait().is_some()),
+        implementations.iter().any(|item| item.implemented_trait().is_some()),
         "the service descriptor should register its implemented trait"
     );
 }
@@ -79,9 +77,7 @@ fn test_reflect_impl_example() {
         .impls_global()
         .expect("valid inherent method registrations");
     assert!(
-        implementations
-            .iter()
-            .any(|item| item.method("ping").is_some()),
+        implementations.iter().any(|item| item.method("ping").is_some()),
         "the service descriptor should register its ping method"
     );
 }

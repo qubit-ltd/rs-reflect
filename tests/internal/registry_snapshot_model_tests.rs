@@ -155,10 +155,7 @@ pub fn check(unbounded: &[u8]) {
     duplicate
         .add_type(descriptor(0), source(0))
         .add_type(descriptor(0), source(0));
-    assert!(
-        duplicate.build().is_err(),
-        "duplicate type facts must be rejected"
-    );
+    assert!(duplicate.build().is_err(), "duplicate type facts must be rejected");
     let mut conflicting = RegistrySnapshotBuilder::new();
     for id in 0..2 {
         conflicting.add_type_capabilities(

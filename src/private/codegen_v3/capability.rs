@@ -15,7 +15,6 @@ use std::sync::OnceLock;
 use std::sync::PoisonError;
 
 use crate::capability::CapabilityConflict;
-
 #[doc(hidden)]
 pub use crate::capability::TypeCapabilities;
 #[doc(hidden)]

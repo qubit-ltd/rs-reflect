@@ -17,8 +17,7 @@ use crate::error::TypeMismatch;
 use crate::value::ReflectedRef;
 
 /// Projects a borrowed optional value into its contained element, when present.
-pub(crate) type OptionalRefProjector =
-    for<'a> fn(ReflectedRef<'a>) -> Result<Option<ReflectedRef<'a>>, TypeMismatch>;
+pub(crate) type OptionalRefProjector = for<'a> fn(ReflectedRef<'a>) -> Result<Option<ReflectedRef<'a>>, TypeMismatch>;
 
 /// The typed view of an optional descriptor.
 ///
@@ -33,7 +32,8 @@ pub(crate) type OptionalRefProjector =
 pub struct OptionalTypeDescriptor {
     /// Eager or lazily resolved optional element type.
     element: TypeRefSource,
-    /// Optional function that inspects a borrowed value of the represented type.
+    /// Optional function that inspects a borrowed value of the represented
+    /// type.
     projector: Option<OptionalRefProjector>,
 }
 
@@ -65,10 +65,7 @@ impl OptionalTypeDescriptor {
     ///
     /// Returns an optional view that resolves its element type on first access
     /// and can project borrowed values.
-    pub(crate) const fn new_lazy(
-        element: &'static LazyTypeRef,
-        projector: OptionalRefProjector,
-    ) -> Self {
+    pub(crate) const fn new_lazy(element: &'static LazyTypeRef, projector: OptionalRefProjector) -> Self {
         Self {
             element: TypeRefSource::Lazy(element),
             projector: Some(projector),

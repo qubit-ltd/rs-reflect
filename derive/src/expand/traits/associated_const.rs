@@ -44,11 +44,7 @@ pub(super) fn has_proven_static_shape(ty: &TypeIr) -> bool {
 ///
 /// Returns whether the type has a provably static shape.
 #[must_use]
-fn has_proven_static_shape_in(
-    ty: &TypeIr,
-    bound_lifetimes: &HashSet<String>,
-    callable_elision: bool,
-) -> bool {
+fn has_proven_static_shape_in(ty: &TypeIr, bound_lifetimes: &HashSet<String>, callable_elision: bool) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
             path.qualified_self.is_none()

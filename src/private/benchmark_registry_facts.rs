@@ -10,10 +10,10 @@
 //! benchmarks.
 
 use crate::error::RegistryError;
-use crate::registry::aggregate_benchmark_registry_facts;
 use crate::registry::BenchmarkRegistryFacts as RegistryBenchmarkFacts;
-use crate::registry::prepare_benchmark_registry_facts as prepare_registry_benchmark_facts;
 use crate::registry::ReflectRegistry;
+use crate::registry::aggregate_benchmark_registry_facts;
+use crate::registry::prepare_benchmark_registry_facts as prepare_registry_benchmark_facts;
 
 /// Prepared synthetic facts for post-materialization registry aggregation
 /// benchmarks.

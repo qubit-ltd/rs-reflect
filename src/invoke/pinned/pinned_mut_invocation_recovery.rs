@@ -46,7 +46,8 @@ use crate::invoke::InvocationMode;
 /// assert_eq!(*recovery.receiver().as_ref().get_ref(), 7);
 /// ```
 pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
-    /// Pinned receiver retained from the failed invocation for inspection or retry.
+    /// Pinned receiver retained from the failed invocation for inspection or
+    /// retry.
     pub(in crate::invoke::pinned) receiver: Pin<&'call mut T>,
     /// Original caller arguments retained in their caller-supplied order.
     pub(in crate::invoke::pinned) invocation: Invocation<'call, M>,

@@ -260,10 +260,7 @@ impl ImplDefinitionDescriptor {
     /// Returns the snapshot-resolved trait declaration, or `None` when
     /// unavailable.
     #[must_use]
-    pub fn implemented_trait_in(
-        &self,
-        registry: &ReflectRegistry,
-    ) -> Option<&'static TraitDefinitionDescriptor> {
+    pub fn implemented_trait_in(&self, registry: &ReflectRegistry) -> Option<&'static TraitDefinitionDescriptor> {
         registry.impl_definition_trait(self)
     }
 

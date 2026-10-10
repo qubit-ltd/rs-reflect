@@ -455,8 +455,7 @@ pub(super) fn specialization_arguments(
             .find(|binding| binding.name == parameter.name)?;
         match (parameter.kind, &binding.value) {
             (GenericKindIr::Type, SpecializationValueIr::Type(ty)) => {
-                let expression =
-                    crate::expand::traits::type_expression(ty, &environment, facade);
+                let expression = crate::expand::traits::type_expression(ty, &environment, facade);
                 Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(#expression)))
             }
             (GenericKindIr::Type, SpecializationValueIr::AmbiguousPath(tokens)) => Some(quote!(

@@ -2374,10 +2374,7 @@ impl Sample {
 #[test]
 fn test_slice_output_retains_described_signature() {
     let values = [1, 2];
-    assert!(eq(
-        Sample::reflected_slice_output(&values).as_ptr(),
-        values.as_ptr()
-    ));
+    assert!(eq(Sample::reflected_slice_output(&values).as_ptr(), values.as_ptr()));
     let registry = ReflectRegistry::initialize().expect("reflection registry");
     let implementations = registry.implementations(Sample::type_descriptor().type_id());
     let MethodLookup::Unique(instance) =

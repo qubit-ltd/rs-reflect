@@ -8,8 +8,8 @@
 
 //! Invocation receiver values and receiver expectations.
 
-use std::any::type_name;
 use std::any::TypeId;
+use std::any::type_name;
 
 use crate::capability::CapabilityKey;
 use crate::invoke::InvocationInputMode;

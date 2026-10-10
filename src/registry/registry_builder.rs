@@ -589,7 +589,8 @@ fn group_definitions(
         .collect()
 }
 
-/// Builds an immutable registry from every linker-discovered registration fragment.
+/// Builds an immutable registry from every linker-discovered registration
+/// fragment.
 ///
 /// # Returns
 ///
@@ -623,8 +624,10 @@ pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Res
 ///
 /// # Parameters
 ///
-/// - `cache`: Process-wide cache that receives the registry or its validation error.
-/// - `fragments`: Static registration fragments used for the one-time initialization.
+/// - `cache`: Process-wide cache that receives the registry or its validation
+///   error.
+/// - `fragments`: Static registration fragments used for the one-time
+///   initialization.
 ///
 /// # Returns
 ///
@@ -632,7 +635,8 @@ pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Res
 ///
 /// # Errors
 ///
-/// Returns a clone of the validation error stored in the cache when initialization fails.
+/// Returns a clone of the validation error stored in the cache when
+/// initialization fails.
 pub(crate) fn initialize_registry(
     cache: &'static OnceLock<Result<ReflectRegistry, RegistryError>>,
     fragments: &'static [&'static RegistrationFragment],
@@ -676,7 +680,8 @@ pub(super) fn initialize_cached(
 ///
 /// # Errors
 ///
-/// Returns an error when fragment identities or their materialized registrations conflict.
+/// Returns an error when fragment identities or their materialized
+/// registrations conflict.
 fn build_registry_from_iter(
     fragments: impl Iterator<Item = &'static RegistrationFragment>,
 ) -> Result<ReflectRegistry, RegistryError> {
@@ -716,7 +721,8 @@ fn build_registry_from_iter(
 ///
 /// # Errors
 ///
-/// Returns an error when identities, declared payload metadata, or registered facts conflict.
+/// Returns an error when identities, declared payload metadata, or registered
+/// facts conflict.
 pub(crate) fn validate_and_freeze_materialized(
     mut fragments: Vec<MaterializedFragment>,
 ) -> Result<ReflectRegistry, RegistryError> {
@@ -755,7 +761,8 @@ pub(crate) fn validate_and_freeze_materialized(
 ///
 /// # Errors
 ///
-/// Returns an error when two fragments duplicate or conflict on a source identity.
+/// Returns an error when two fragments duplicate or conflict on a source
+/// identity.
 fn validate_fragment_identities(fragments: &[PendingFragment]) -> Result<(), RegistryError> {
     validate_identities(fragments.iter().map(|fragment| &fragment.identity))
 }
@@ -772,7 +779,8 @@ fn validate_fragment_identities(fragments: &[PendingFragment]) -> Result<(), Reg
 ///
 /// # Errors
 ///
-/// Returns an error when adjacent identities are duplicates or conflict on their source.
+/// Returns an error when adjacent identities are duplicates or conflict on
+/// their source.
 fn validate_identities<'identity>(
     identities: impl IntoIterator<Item = &'identity FragmentIdentity>,
 ) -> Result<(), RegistryError> {

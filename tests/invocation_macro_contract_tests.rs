@@ -163,9 +163,7 @@ fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability
         method("send_future")
             .invoke_local(
                 ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(Arc::clone(
-                    &polls,
-                )))]),
+                Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(Arc::clone(&polls,)))]),
             )
             .is_err(),
         "thread-safe capability must not be inferred as local"

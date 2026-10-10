@@ -776,10 +776,7 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
         TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
             bounds.iter().any(|bound| bound_uses_lifetime(bound, lifetime))
         }
-        TypeKindIr::Never
-        | TypeKindIr::Infer
-        | TypeKindIr::Macro
-        | TypeKindIr::Other => false,
+        TypeKindIr::Never | TypeKindIr::Infer | TypeKindIr::Macro | TypeKindIr::Other => false,
     }
 }
 
@@ -830,9 +827,7 @@ fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> b
 fn bound_uses_lifetime(bound: &GenericBoundIr, lifetime: &str) -> bool {
     match bound {
         GenericBoundIr::Lifetime(candidate) => candidate.trim_start_matches('\'') == lifetime,
-        GenericBoundIr::Trait {
-            path, lifetimes, ..
-        } => {
+        GenericBoundIr::Trait { path, lifetimes, .. } => {
             !lifetimes.iter().any(|bound| bound.trim_start_matches('\'') == lifetime)
                 && (path
                     .qualified_self

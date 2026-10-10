@@ -17,6 +17,8 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::StructKind;
 use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::descriptor::TypeRef;
@@ -24,8 +26,6 @@ use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::ReflectedMut;
 use qubit_reflect::value::ReflectedOwned;
 use qubit_reflect::value::ReflectedRef;
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 struct DerivedNamed {
@@ -395,9 +395,7 @@ fn test_derive_reflect_preserves_non_named_struct_shapes() {
 #[test]
 fn test_derive_reflect_type_level_opaque_supports_unreflectable_generic_members() {
     let descriptor = TypeDescriptor::of::<DerivedOpaque<Rc<()>>>();
-    let opaque = DerivedOpaque {
-        value: Rc::new(()),
-    };
+    let opaque = DerivedOpaque { value: Rc::new(()) };
 
     assert_eq!(descriptor.kind(), TypeKind::Opaque);
     assert!(descriptor.fields().is_empty());
