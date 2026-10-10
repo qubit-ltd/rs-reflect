@@ -484,7 +484,9 @@ pub(super) fn specialization_arguments(
                                 #facade::__private::codegen_v3::expression::concrete(
                                     vec![#declared_type_literal.into()].into_boxed_slice(),
                                     vec![].into_boxed_slice(),
-                                    #facade::__private::codegen_v3::expression::DiagnosticText::from(#declared_type_literal),
+                                    #facade::__private::codegen_v3::expression::DiagnosticText::from(
+                                        #declared_type_literal,
+                                    ),
                                 ),
                             ),
                             #facade::__private::codegen_v3::expression::const_path([

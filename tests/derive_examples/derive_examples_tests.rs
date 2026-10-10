@@ -25,7 +25,10 @@ struct Account {
 fn test_derive_reflect_example() {
     let descriptor = TypeDescriptor::of::<Account>();
     assert_eq!(descriptor.query_name(), "account");
-    assert!(descriptor.field("id").is_some());
+    assert!(
+        descriptor.field("id").is_some(),
+        "the renamed account descriptor should expose its id field"
+    );
 }
 
 #[derive(Reflect)]
@@ -50,7 +53,12 @@ fn test_reflect_trait_example() {
     let implementations = TypeDescriptor::of::<NamedService>()
         .impls_global()
         .expect("valid trait registrations");
-    assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
+    assert!(
+        implementations
+            .iter()
+            .any(|item| item.implemented_trait().is_some()),
+        "the service descriptor should register its implemented trait"
+    );
 }
 
 #[derive(Reflect)]
@@ -70,5 +78,10 @@ fn test_reflect_impl_example() {
     let implementations = TypeDescriptor::of::<InherentService>()
         .impls_global()
         .expect("valid inherent method registrations");
-    assert!(implementations.iter().any(|item| item.method("ping").is_some()));
+    assert!(
+        implementations
+            .iter()
+            .any(|item| item.method("ping").is_some()),
+        "the service descriptor should register its ping method"
+    );
 }

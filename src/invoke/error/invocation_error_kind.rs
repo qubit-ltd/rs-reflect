@@ -20,6 +20,7 @@ use crate::invoke::InvocationInputMode;
 /// let kind = InvocationErrorKind::ArgumentCountMismatch { expected: 2, actual: 1 };
 /// assert!(kind.to_string().contains("expected 2, got 1"));
 /// ```
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum InvocationErrorKind {
     /// Intrinsic explicit receiver capabilities contain conflicting facts.

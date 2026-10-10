@@ -10,7 +10,9 @@
 
 use std::any::type_name;
 
+use crate::__private::descriptor::lazy_type_ref;
 use crate::builtin::interner;
+use crate::descriptor::project_option_ref;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeDescriptor;
 
@@ -24,8 +26,8 @@ impl<T: Reflect> Reflect for Option<T> {
         interner::intern::<Self>(|| {
             TypeDescriptor::new_optional_lazy::<T>(
                 type_name::<Self>(),
-                crate::__private::descriptor::lazy_type_ref::<T>(),
-                crate::descriptor::project_option_ref::<T>,
+                lazy_type_ref::<T>(),
+                project_option_ref::<T>,
             )
         })
     }

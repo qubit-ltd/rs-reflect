@@ -8,6 +8,8 @@
 
 //! Owned candidate sets for structural impl-target queries.
 
+use std::vec::IntoIter;
+
 use crate::descriptor::ImplDefinitionDescriptor;
 
 /// An owned, deterministic set of references to impl definitions matching
@@ -83,7 +85,7 @@ impl ImplDefinitionCandidates {
 
 impl IntoIterator for ImplDefinitionCandidates {
     type Item = &'static ImplDefinitionDescriptor;
-    type IntoIter = std::vec::IntoIter<&'static ImplDefinitionDescriptor>;
+    type IntoIter = IntoIter<&'static ImplDefinitionDescriptor>;
 
     /// Iterates over matching definitions in stable fragment order.
     ///

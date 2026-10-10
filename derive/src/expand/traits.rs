@@ -8,6 +8,8 @@
 
 //! Expansion of reflected trait declarations and their registration fragments.
 
+use std::collections::HashSet;
+
 mod associated_const;
 mod default_invocation;
 mod default_method_expansion;
@@ -36,7 +38,6 @@ use syn::TraitItem;
 use syn::WherePredicate as SynWherePredicate;
 use syn::parse_quote_spanned;
 use syn::parse2;
-use token_rewrite::replace_self_with_owner;
 
 use self::default_method_expansion::DefaultMethodExpansion;
 use self::dyn_compatibility::associated_type_requires_dyn_binding;
@@ -45,6 +46,7 @@ use self::dyn_compatibility::dyn_inherited_associated_types;
 use self::dyn_compatibility::dyn_reflected_supertrait_path;
 use self::dyn_compatibility::is_provably_dyn_compatible;
 use self::dyn_trait_generics::DynTraitGenerics;
+use self::token_rewrite::replace_self_with_owner;
 use super::expression_codegen::external_supertrait_arguments;
 pub(crate) use super::expression_codegen::generic_definition;
 pub(crate) use super::expression_codegen::type_expression;
@@ -53,6 +55,7 @@ use crate::ir::GenericBoundIr;
 use crate::ir::GenericKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TraitDeclarationIr;
+use crate::ir::VisibilityIr;
 use crate::ir::WherePredicateIr;
 
 /// Emits the normalized visibility carried by one reflected trait.
@@ -68,19 +71,19 @@ use crate::ir::WherePredicateIr;
 #[must_use]
 fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
     match &declaration.visibility {
-        crate::ir::VisibilityIr::Public => {
+        VisibilityIr::Public => {
             quote!(#facade::__private::codegen_v3::identity::Visibility::Public)
         }
-        crate::ir::VisibilityIr::Crate => {
+        VisibilityIr::Crate => {
             quote!(#facade::__private::codegen_v3::identity::Visibility::Crate)
         }
-        crate::ir::VisibilityIr::Super => {
+        VisibilityIr::Super => {
             quote!(#facade::__private::codegen_v3::identity::Visibility::Super)
         }
-        crate::ir::VisibilityIr::SelfValue | crate::ir::VisibilityIr::Inherited => {
+        VisibilityIr::SelfValue | VisibilityIr::Inherited => {
             quote!(#facade::__private::codegen_v3::identity::Visibility::Private)
         }
-        crate::ir::VisibilityIr::Restricted(path) => {
+        VisibilityIr::Restricted(path) => {
             let path = LitStr::new(&path.source, declaration.span);
             quote!(#facade::__private::codegen_v3::identity::Visibility::Restricted(#path.into()))
         }
@@ -822,7 +825,7 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
             )
         ));
     }
-    let direct_associated_names: std::collections::HashSet<_> = item
+    let direct_associated_names: HashSet<_> = item
         .items
         .iter()
         .filter_map(|item| match item {
@@ -904,7 +907,7 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
 /// Returns rewritten tokens with token group spans retained.
 #[must_use]
 fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &TraitDeclarationIr) -> TokenStream {
-    let lifetime_names: std::collections::HashSet<_> = declaration
+    let lifetime_names: HashSet<_> = declaration
         .generics
         .params
         .iter()
@@ -957,7 +960,7 @@ fn replace_self_associated_types(
     item: &ItemTrait,
     declaration: &TraitDeclarationIr,
 ) -> TokenStream {
-    let mut associated: std::collections::HashSet<_> = item
+    let mut associated: HashSet<_> = item
         .items
         .iter()
         .filter_map(|item| match item {

@@ -76,6 +76,7 @@ impl TraitDefinitionDescriptor {
     /// # Returns
     ///
     /// Returns `true` when both declarations have compatible facts.
+    #[must_use]
     pub(crate) fn is_compatible_with(&self, other: &Self) -> bool {
         self.completeness() == other.completeness() && self.generic_definition() == other.generic_definition()
     }
@@ -233,6 +234,7 @@ impl TraitDefinitionDescriptor {
     /// Returns initialized declaration methods, or an empty slice before
     /// generated member initialization.
     #[must_use]
+    #[inline]
     pub fn methods(&self) -> &[MethodDescriptor] {
         self.members.get().map_or(&[], |members| members.methods.as_ref())
     }

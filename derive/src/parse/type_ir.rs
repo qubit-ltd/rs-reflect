@@ -59,8 +59,8 @@ pub(crate) fn convert_path(path: &Path) -> PathIr {
     }
 }
 
-/// Converts a `Type` at the parser boundary so later stages never store
-/// it.
+/// Converts a parsed `Type` into IR so later stages do not need to retain
+/// the `syn` node.
 ///
 /// # Parameters
 ///

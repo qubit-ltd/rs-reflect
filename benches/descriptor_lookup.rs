@@ -103,7 +103,9 @@ fn descriptor_lookup(criterion: &mut Criterion) {
         let required_buckets = (width * 8).div_ceil(7).next_power_of_two().max(4);
         let estimated_index_bytes = required_buckets * std::mem::size_of::<(&str, usize)>() + required_buckets + 16;
         eprintln!(
-            "field_memory width={width} descriptor_array_bytes={descriptor_bytes} estimated_index_bytes={estimated_index_bytes}"
+            "field_memory width={width} \
+            descriptor_array_bytes={descriptor_bytes} \
+            estimated_index_bytes={estimated_index_bytes}"
         );
     }
     benchmark_field_cases(criterion, fields, 16, true);

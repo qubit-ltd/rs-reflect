@@ -8,6 +8,10 @@
 
 //! Immutable errors reported while aggregating registration fragments.
 
+use std::error::Error;
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::Result;
 use std::sync::Arc;
 
 use super::registry_error_kind::RegistryErrorKind;
@@ -35,6 +39,7 @@ pub struct RegistryError(
     Arc<RegistryErrorData>,
 );
 
+/// Stores the category and optional registration context behind a registry error.
 #[derive(Debug, Eq, PartialEq)]
 struct RegistryErrorData {
     /// Stable error category.
@@ -350,7 +355,7 @@ impl RegistryError {
     }
 }
 
-impl std::fmt::Display for RegistryError {
+impl Display for RegistryError {
     /// Formats the category and available registration context.
     ///
     /// # Parameters
@@ -364,7 +369,7 @@ impl std::fmt::Display for RegistryError {
     /// # Errors
     ///
     /// Returns an error reported by the formatter.
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         let Self(data) = self;
         write!(formatter, "reflection registry error: {:?}", data.kind)?;
         if let Some(conflict) = &data.capability_details {
@@ -401,15 +406,15 @@ impl std::fmt::Display for RegistryError {
     }
 }
 
-impl std::error::Error for RegistryError {
+impl Error for RegistryError {
     /// Preserves complete capability conflict details as the underlying cause.
     ///
     /// # Returns
     ///
     /// Returns the retained capability conflict as the source, or `None` when
     /// absent.
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.capability_details()
-            .map(|conflict| conflict as &dyn std::error::Error)
+            .map(|conflict| conflict as &dyn Error)
     }
 }

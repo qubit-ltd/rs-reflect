@@ -36,7 +36,9 @@ use crate::identity::MemberId;
 /// ```
 #[must_use]
 pub struct InvocationPanic {
+    /// Identifies the method whose invocation panicked.
     method_identity: Box<MemberId>,
+    /// Preserves the original opaque payload produced by the panic.
     payload: Box<dyn Any + Send>,
 }
 
@@ -51,7 +53,6 @@ impl InvocationPanic {
     /// # Returns
     ///
     /// Returns a panic record retaining the identity and payload.
-    #[must_use = "the panic record retains the method identity and payload"]
     pub fn new(method_identity: MemberId, payload: Box<dyn Any + Send>) -> Self {
         Self {
             method_identity: Box::new(method_identity),

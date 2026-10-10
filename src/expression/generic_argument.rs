@@ -56,6 +56,19 @@ pub enum GenericArgument {
 /// The declared type and structural value determine identity. The normalized
 /// text is retained only for diagnostics and is deliberately excluded from
 /// equality and hashing.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::expression::{ConstExpression, ConstGenericArgument, TypeExpression};
+///
+/// let argument = ConstGenericArgument::new(
+///     TypeExpression::parameter("usize").expect("valid type parameter"),
+///     ConstExpression::UnsignedInteger(4),
+///     "4",
+/// );
+/// assert_eq!(argument.normalized_diagnostic(), "4");
+/// ```
 #[derive(Clone, Debug)]
 pub struct ConstGenericArgument {
     /// The const parameter's declared type.
@@ -80,6 +93,7 @@ impl ConstGenericArgument {
     ///
     /// Returns the typed const argument. Diagnostic text does not affect
     /// identity.
+    #[must_use]
     pub fn new(
         declared_type: TypeExpression,
         value: ConstExpression,
@@ -98,6 +112,7 @@ impl ConstGenericArgument {
     ///
     /// Returns the type declared for this const argument.
     #[must_use]
+    #[inline]
     pub fn declared_type(&self) -> &TypeExpression {
         &self.declared_type
     }
@@ -119,6 +134,7 @@ impl ConstGenericArgument {
     ///
     /// Returns the retained diagnostic rendering.
     #[must_use]
+    #[inline]
     pub fn normalized_diagnostic(&self) -> &str {
         &self.normalized_diagnostic
     }

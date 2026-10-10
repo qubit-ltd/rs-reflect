@@ -71,7 +71,10 @@ fn test_frozen_empty_and_populated_queries_never_execute_factories() {
         EMPTY_CALLS.load(Ordering::SeqCst),
         POPULATED_CALLS.load(Ordering::SeqCst),
     );
-    assert!(before.0 > 0 && before.1 > 0);
+    assert!(
+        before.0 > 0 && before.1 > 0,
+        "initialization must execute both capability factories"
+    );
     for _ in 0..10 {
         for descriptor in [Empty::type_descriptor(), Populated::type_descriptor()] {
             let _ = registry
@@ -84,13 +87,18 @@ fn test_frozen_empty_and_populated_queries_never_execute_factories() {
                 .capability_by_id(descriptor, "example.frozen")
                 .expect("identifier capability lookup must be valid");
         }
-        assert_eq!(registry.type_capability_members(key()).count(), 1);
+        assert_eq!(
+            registry.type_capability_members(key()).count(),
+            1,
+            "the fixture capability must belong to exactly one type"
+        );
     }
     assert_eq!(
         before,
         (
             EMPTY_CALLS.load(Ordering::SeqCst),
             POPULATED_CALLS.load(Ordering::SeqCst)
-        )
+        ),
+        "frozen capability queries must not rerun either factory"
     );
 }

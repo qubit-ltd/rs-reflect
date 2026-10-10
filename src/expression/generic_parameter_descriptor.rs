@@ -18,7 +18,10 @@ use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
 
-/// A single parameter declared by a generic definition.
+/// Describes one lifetime, type, or const parameter declared by a generic definition.
+///
+/// Equality and hashing compare the parameter's semantic declaration, including its
+/// bounds and default value, while ignoring source-oriented diagnostic text.
 ///
 /// # Examples
 ///

@@ -63,7 +63,10 @@ trait SymbolicAssociatedContract {
     type Projected;
 }
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_SymbolicAssociatedContract, specialize(T = u8))]
+#[reflect_impl(
+    definition_provider_v2 = __qubit_reflect_trait_definition_SymbolicAssociatedContract,
+    specialize(T = u8)
+)]
 impl<T> SymbolicAssociatedContract for GenericAssociatedItemTarget<T>
 where
     T: Projection + 'static,
@@ -76,7 +79,10 @@ trait SymbolicAssociatedConstContract<T: Projection + 'static> {
     const PROJECTED: <T as Projection>::Output = T::VALUE;
 }
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_SymbolicAssociatedConstContract, specialize(T = u8))]
+#[reflect_impl(
+    definition_provider_v2 = __qubit_reflect_trait_definition_SymbolicAssociatedConstContract,
+    specialize(T = u8)
+)]
 impl<T> SymbolicAssociatedConstContract<T> for GenericAssociatedItemTarget<T> where T: Projection + 'static {}
 
 #[derive(Reflect)]

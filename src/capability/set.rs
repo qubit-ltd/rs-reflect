@@ -56,9 +56,13 @@ pub enum CapabilityConflictKind {
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("conflicting reflection capability `{id}`: {kind:?}")]
 pub struct CapabilityConflict {
+    /// Identifies whether the conflict is an exact duplicate or an adapter mismatch.
     kind: CapabilityConflictKind,
+    /// Stable capability ID claimed by both descriptors.
     id: CapabilityId,
+    /// Process-local adapter contract identity of the first descriptor.
     first_adapter_type: TypeId,
+    /// Process-local adapter contract identity of the second descriptor.
     second_adapter_type: TypeId,
 }
 
@@ -153,6 +157,7 @@ impl CapabilityConflict {
 /// ```
 #[derive(Clone, Debug)]
 pub struct TypeCapabilities {
+    /// Descriptors sorted by stable capability ID.
     descriptors: Box<[CapabilityDescriptor]>,
 }
 
@@ -298,7 +303,6 @@ impl TypeCapabilities {
     /// # Returns
     ///
     /// Returns the matching descriptor, or `None` if the ID is absent.
-    #[must_use]
     pub fn descriptor(&self, id: &str) -> Option<&CapabilityDescriptor> {
         let index = self
             .descriptors

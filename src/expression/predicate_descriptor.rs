@@ -162,7 +162,7 @@ impl PredicateDescriptor {
     /// # Returns
     ///
     /// Returns the retained diagnostic text, or `None` when absent.
-    #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         match self {
             Self::TypeBound { diagnostic, .. }

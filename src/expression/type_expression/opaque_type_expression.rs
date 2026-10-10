@@ -40,6 +40,8 @@ impl OpaqueTypeExpression {
     /// # Returns
     ///
     /// Returns an opaque type expression with empty diagnostic text.
+    #[must_use]
+    #[inline]
     pub fn new(bounds: impl Into<Box<[PredicateDescriptor]>>) -> Self {
         Self {
             bounds: bounds.into(),
@@ -52,6 +54,7 @@ impl OpaqueTypeExpression {
     ///
     /// Returns trait and lifetime predicates in declaration order.
     #[must_use]
+    #[inline]
     pub fn bounds(&self) -> &[PredicateDescriptor] {
         &self.bounds
     }
@@ -61,6 +64,7 @@ impl OpaqueTypeExpression {
     ///
     /// Returns the source-oriented spelling, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

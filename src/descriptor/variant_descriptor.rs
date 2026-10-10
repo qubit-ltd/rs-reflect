@@ -21,6 +21,7 @@ use crate::descriptor::FieldDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::error::TypeMismatch;
+use crate::value::Local;
 use crate::value::ReflectedOwned;
 use crate::value::ReflectedRef;
 
@@ -170,8 +171,8 @@ impl VariantDescriptor {
     /// validation fails or this variant has no constructor.
     pub fn construct_struct(
         &self,
-        input: NamedConstructionInput<crate::value::Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        input: NamedConstructionInput<Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
         match self.construction() {
             Some(construction) => construction.local_constructor().construct_named(input),
             None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
@@ -194,8 +195,8 @@ impl VariantDescriptor {
     /// validation fails or this variant has no constructor.
     pub fn construct_tuple(
         &self,
-        input: TupleConstructionInput<crate::value::Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+        input: TupleConstructionInput<Local>,
+    ) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
         match self.construction() {
             Some(construction) => construction.local_constructor().construct_tuple(input),
             None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
@@ -212,7 +213,7 @@ impl VariantDescriptor {
     ///
     /// Returns the construction error if validation fails or this variant has
     /// no constructor.
-    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
         match self.construction() {
             Some(construction) => construction.local_constructor().construct_unit(),
             None => Err(ConstructionRecovery::new(
@@ -348,6 +349,10 @@ impl VariantDescriptor {
     /// A target of another type returns [`TypeMismatch`] without invoking the
     /// generated adapter.
     ///
+    /// # Parameters
+    ///
+    /// - `value`: Dynamic reference expected to contain the declaring enum.
+    ///
     /// # Returns
     ///
     /// Returns whether this variant is active for `value`.
@@ -356,10 +361,6 @@ impl VariantDescriptor {
     ///
     /// Returns [`TypeMismatch`] if `value` does not contain the declaring enum
     /// type.
-    ///
-    /// # Parameters
-    ///
-    /// - `value`: Dynamic reference expected to contain the declaring enum.
     pub fn is_active(&self, value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
         let expected = self.declaring_type().type_id();
         let actual = dynamic_ref_type_id(&value);

@@ -17,6 +17,9 @@ mod validated_invocation;
 pub use invocation_data::Invocation;
 pub use validated_invocation::ValidatedInvocation;
 
+use crate::invoke::InvocationArg;
+use crate::invoke::InvocationFailure;
+
 /// Result of converting a validated dynamic receiver through a typed adapter.
 ///
 /// # Type Parameters
@@ -35,4 +38,4 @@ pub use validated_invocation::ValidatedInvocation;
 /// assert!(matches!(result, Ok((7, arguments)) if arguments.is_empty()));
 /// ```
 pub type ReceiverAdaptationResult<'call, R, M> =
-    Result<(R, Box<[crate::invoke::InvocationArg<'call, M>]>), crate::invoke::InvocationFailure<'call, M>>;
+    Result<(R, Box<[InvocationArg<'call, M>]>), InvocationFailure<'call, M>>;

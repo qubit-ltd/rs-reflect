@@ -42,6 +42,8 @@ impl ConcretePathSegment {
     /// # Returns
     ///
     /// Returns the structural path segment.
+    #[must_use]
+    #[inline]
     pub fn new(name: impl Into<Box<str>>, arguments: impl Into<Box<[GenericArgument]>>) -> Self {
         Self {
             name: name.into(),
@@ -55,6 +57,7 @@ impl ConcretePathSegment {
     ///
     /// Returns the segment name.
     #[must_use]
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -65,6 +68,7 @@ impl ConcretePathSegment {
     ///
     /// Returns the arguments retained at this segment.
     #[must_use]
+    #[inline]
     pub fn arguments(&self) -> &[GenericArgument] {
         &self.arguments
     }

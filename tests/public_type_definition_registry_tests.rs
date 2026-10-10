@@ -10,6 +10,9 @@
 
 #![cfg(feature = "derive")]
 
+use std::any::TypeId;
+use std::thread;
+
 use qubit_reflect::__private::codegen_v3::inventory;
 use qubit_reflect::__private::codegen_v3::registration::CapabilityRegistration;
 use qubit_reflect::__private::codegen_v3::registration::CapabilityTarget;
@@ -375,7 +378,7 @@ enum CapabilityEnum<T: Clone> {
 
 /// Returns the exact concrete identity through a custom typed adapter.
 fn concrete_provider<T: 'static>() -> CapabilityDescriptor {
-    CapabilityDescriptor::with_adapter(concrete_key(), std::any::TypeId::of::<T> as fn() -> std::any::TypeId)
+    CapabilityDescriptor::with_adapter(concrete_key(), TypeId::of::<T> as fn() -> TypeId)
 }
 
 /// Identifies the custom provider contract shared by all concrete instances.
@@ -399,7 +402,7 @@ fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &Reflect
             .capability(descriptor, concrete_key())
             .expect("valid capability declarations")
             .expect("custom provider")(),
-        std::any::TypeId::of::<T>()
+        TypeId::of::<T>()
     );
     if let Some(default) = registry
         .capability(descriptor, default_key())
@@ -425,7 +428,7 @@ fn test_generic_capabilities_preserve_each_monomorph() {
     );
     assert_concrete_capabilities(CapabilityEnum::Value(String::from("first")), registry);
     assert_concrete_capabilities(CapabilityEnum::Value(9_u32), registry);
-    std::thread::scope(|scope| {
+    thread::scope(|scope| {
         for _ in 0..8 {
             scope.spawn(|| {
                 assert_concrete_capabilities(CapabilityRecord { value: 3_u64 }, registry);

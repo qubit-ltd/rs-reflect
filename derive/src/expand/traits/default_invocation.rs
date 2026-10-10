@@ -387,30 +387,33 @@ pub(super) fn default_method_invocation_adapter(
         };
         quote! {
             #[cfg(panic = "unwind")]
-            let catching_adapter: #facade::__private::codegen_v3::invoke::CatchingInvocationAdapter<#mode> = |_registry, invocation| {
-                #catching_assertions
-                let identity = #facade::__private::codegen_v3::identity::MemberId::new(
-                    #trait_name,
-                    "default-method",
-                    #index,
-                    #facade::__private::codegen_v3::identity::FragmentIdentity::new(
-                        env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(),
-                        "default-method", #index as u64,
-                    ),
-                );
-                let validated = invocation.validate(
-                    &identity,
-                    #receiver_expectation,
-                    &[#(#parameter_expectations),*],
-                )?;
-                #receiver_binding
-                let mut arguments = arguments.into_vec().into_iter();
-                #(#argument_bindings)*
-                match ::std::panic::catch_unwind(|| { #catching_call }) {
-                    Ok(output) => Ok(Ok(output)),
-                    Err(payload) => Ok(Err(#facade::__private::codegen_v3::invoke::InvocationPanic::new(identity, payload))),
-                }
-            };
+            let catching_adapter: #facade::__private::codegen_v3::invoke::CatchingInvocationAdapter<#mode> =
+                |_registry, invocation| {
+                    #catching_assertions
+                    let identity = #facade::__private::codegen_v3::identity::MemberId::new(
+                        #trait_name,
+                        "default-method",
+                        #index,
+                        #facade::__private::codegen_v3::identity::FragmentIdentity::new(
+                            env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(),
+                            "default-method", #index as u64,
+                        ),
+                    );
+                    let validated = invocation.validate(
+                        &identity,
+                        #receiver_expectation,
+                        &[#(#parameter_expectations),*],
+                    )?;
+                    #receiver_binding
+                    let mut arguments = arguments.into_vec().into_iter();
+                    #(#argument_bindings)*
+                    match ::std::panic::catch_unwind(|| { #catching_call }) {
+                        Ok(output) => Ok(Ok(output)),
+                        Err(payload) => Ok(Err(
+                            #facade::__private::codegen_v3::invoke::InvocationPanic::new(identity, payload),
+                        )),
+                    }
+                };
         }
     } else {
         TokenStream::new()

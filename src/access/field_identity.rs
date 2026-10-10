@@ -14,12 +14,19 @@ use std::fmt;
 /// Stable runtime identity retained in every field access error.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FieldIdentity {
+    /// Process-local type identity of the root that declares the field.
     declaring_type: TypeId,
+    /// Static diagnostic name of the declaring root type.
     declaring_type_name: &'static str,
+    /// Zero-based source position of the field in its struct or variant.
     index: usize,
+    /// Source identifier for a named field; positional fields have no name.
     rust_name: Option<&'static str>,
+    /// Reflection lookup name, which may differ from the source identifier.
     query_name: Option<&'static str>,
+    /// Zero-based source position of the containing enum variant, if any.
     variant_index: Option<usize>,
+    /// Source identifier of the containing enum variant, if any.
     variant_rust_name: Option<&'static str>,
 }
 

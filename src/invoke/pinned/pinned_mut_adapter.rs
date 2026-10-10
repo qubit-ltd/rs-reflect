@@ -15,6 +15,11 @@ use crate::registry::ReflectRegistry;
 
 /// A generated entry point for a method whose receiver is `Pin<&mut T>`.
 ///
+/// The function pointer accepts an invocation scoped to the current call and
+/// may borrow the registry for a separate lifetime. Its result can retain
+/// call-scoped data through `InvocationOutput` or
+/// `PinnedMutInvocationFailure`.
+///
 /// # Type Parameters
 ///
 /// - `T`: Concrete receiver type accepted by the generated method.
@@ -23,7 +28,10 @@ use crate::registry::ReflectRegistry;
 /// # Examples
 ///
 /// ```
-/// use qubit_reflect::invoke::{InvocationOutput, PinnedMutAdapter, PinnedMutInvocation, PinnedMutInvocationFailure};
+/// use qubit_reflect::invoke::InvocationOutput;
+/// use qubit_reflect::invoke::PinnedMutAdapter;
+/// use qubit_reflect::invoke::PinnedMutInvocation;
+/// use qubit_reflect::invoke::PinnedMutInvocationFailure;
 /// use qubit_reflect::registry::ReflectRegistry;
 /// use qubit_reflect::value::Local;
 ///

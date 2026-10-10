@@ -25,6 +25,7 @@ use crate::error::TypeMismatch;
 /// };
 /// assert!(matches!(error, OptionalProjectionError::TypeMismatch(_)));
 /// ```
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum OptionalProjectionError {
     /// This descriptor has no runtime projection function.

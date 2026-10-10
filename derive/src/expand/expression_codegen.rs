@@ -114,7 +114,19 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                 ))
             }
             GenericKindIr::Const => {
-                let ty = parameter.const_type.as_ref().map(|ty| type_expression(ty, &environment, facade)).unwrap_or_else(|| quote!(#facade::__private::codegen_v3::expression::TypeExpression::Concrete(#facade::__private::codegen_v3::expression::concrete(vec!["_".into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::__private::codegen_v3::expression::DiagnosticText::default()))));
+                let ty = parameter
+                    .const_type
+                    .as_ref()
+                    .map(|ty| type_expression(ty, &environment, facade))
+                    .unwrap_or_else(|| {
+                        quote!(#facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                            #facade::__private::codegen_v3::expression::concrete(
+                                vec!["_".into()].into_boxed_slice(),
+                                vec![].into_boxed_slice(),
+                                #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                            )
+                        ))
+                    });
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Const(value)) => const_expression(value, &environment, facade),
                     _ => quote!(None),
@@ -148,8 +160,12 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
             }).collect();
             let modifiers: Vec<_> = bounds.iter().filter_map(|bound| match bound {
                 GenericBoundIr::Trait { modifier, .. } => Some(match modifier {
-                    crate::ir::TraitBoundModifierIr::None => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None),
-                    crate::ir::TraitBoundModifierIr::Maybe => quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe),
+                    crate::ir::TraitBoundModifierIr::None => {
+                        quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                    }
+                    crate::ir::TraitBoundModifierIr::Maybe => {
+                        quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                    }
                 }),
                 _ => None,
             }).collect();
@@ -165,7 +181,11 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                 GenericBoundIr::Lifetime(lifetime) => {
                     let lifetime = lifetime_expression(lifetime, span, facade);
                     let subject = type_expression(bounded_type, &environment, facade);
-                    Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives { ty: #subject, lifetime: #lifetime, diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default() }))
+                    Some(quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                        ty: #subject,
+                        lifetime: #lifetime,
+                        diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                    }))
                 }
                 _ => None,
             });
@@ -557,7 +577,12 @@ pub(crate) fn path_arguments(
             let inputs = inputs
                 .iter()
                 .map(|value| type_expression(value, environment, facade));
-            let output = output.as_deref().map(|value| type_expression(value, environment, facade)).unwrap_or_else(|| quote!(#facade::__private::codegen_v3::expression::TypeExpression::Tuple(Box::new([]))));
+            let output = output
+                .as_deref()
+                .map(|value| type_expression(value, environment, facade))
+                .unwrap_or_else(|| {
+                    quote!(#facade::__private::codegen_v3::expression::TypeExpression::Tuple(Box::new([])))
+                });
             vec![quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(
                 #facade::__private::codegen_v3::expression::TypeExpression::FunctionPointer(
                     #facade::__private::codegen_v3::expression::FunctionPointerExpression::new(
@@ -572,10 +597,42 @@ pub(crate) fn path_arguments(
             ))]
         }
         PathArgumentsIr::AngleBracketed(values) => values.iter().filter_map(|value| match value {
-            PathArgumentIr::Lifetime(value) => { let value = lifetime_expression(value, span, facade); Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Lifetime(#value))) }
-            PathArgumentIr::Type(value) => { let value = type_expression(value, environment, facade); Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(#value))) }
-            PathArgumentIr::Const(value) => { let value = const_expression_value(value, environment, facade); let source = LitStr::new(&value.to_string(), span); Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(#facade::__private::codegen_v3::expression::ConstGenericArgument::new(#facade::__private::codegen_v3::expression::TypeExpression::Concrete(#facade::__private::codegen_v3::expression::concrete(vec!["_".into()].into_boxed_slice(), vec![].into_boxed_slice(), #facade::__private::codegen_v3::expression::DiagnosticText::default())), #value, #source)))) }
-            PathArgumentIr::AssociatedType { name, ty } => { let name = LitStr::new(name, span); let value = type_expression(ty, environment, facade); Some(quote!(#facade::__private::codegen_v3::expression::associated_type(#name, #value))) }
+            PathArgumentIr::Lifetime(value) => {
+                let value = lifetime_expression(value, span, facade);
+                Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Lifetime(
+                    #value
+                )))
+            }
+            PathArgumentIr::Type(value) => {
+                let value = type_expression(value, environment, facade);
+                Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(
+                    #value
+                )))
+            }
+            PathArgumentIr::Const(value) => {
+                let value = const_expression_value(value, environment, facade);
+                let source = LitStr::new(&value.to_string(), span);
+                Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
+                        #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                            #facade::__private::codegen_v3::expression::concrete(
+                                vec!["_".into()].into_boxed_slice(),
+                                vec![].into_boxed_slice(),
+                                #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                            )
+                        ),
+                        #value,
+                        #source,
+                    )
+                )))
+            }
+            PathArgumentIr::AssociatedType { name, ty } => {
+                let name = LitStr::new(name, span);
+                let value = type_expression(ty, environment, facade);
+                Some(quote!(#facade::__private::codegen_v3::expression::associated_type(
+                    #name, #value
+                )))
+            }
             PathArgumentIr::Constraint { name, bounds } => {
                 let name = LitStr::new(name, span);
                 let bounds = bound_predicates(bounds, environment, facade, span);
@@ -634,7 +691,9 @@ pub(super) fn external_supertrait_arguments(
                             #facade::__private::codegen_v3::expression::concrete(
                                 vec![std::any::type_name::<#identifier>().into()].into_boxed_slice(),
                                 vec![].into_boxed_slice(),
-                                #facade::__private::codegen_v3::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
+                                #facade::__private::codegen_v3::expression::DiagnosticText::from(
+                                    std::any::type_name::<#identifier>()
+                                ),
                             ),
                         ),
                     )))

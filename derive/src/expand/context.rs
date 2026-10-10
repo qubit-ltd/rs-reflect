@@ -61,6 +61,7 @@ impl ExpansionContext {
     ///
     /// Returns the runtime facade token stream used in generated paths.
     #[must_use]
+    #[inline]
     pub(crate) fn facade(&self) -> &TokenStream {
         &self.facade
     }
@@ -75,6 +76,7 @@ impl ExpansionContext {
     ///
     /// Returns the deterministic 64-bit FNV-1a fingerprint.
     #[must_use]
+    #[inline]
     pub(crate) fn fingerprint(&self, source: &str) -> u64 {
         fingerprint(source)
     }

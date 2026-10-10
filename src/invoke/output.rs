@@ -34,6 +34,11 @@ pub enum BorrowOrigin {
 
 /// The result produced after a reflected method begins execution.
 ///
+/// # Type Parameters
+///
+/// - `'call` ties borrowed outputs to the lifetime of the invocation.
+/// - `M` preserves the invocation mode of owned values and futures.
+///
 /// # Examples
 ///
 /// ```
@@ -46,6 +51,7 @@ pub enum BorrowOrigin {
 /// };
 /// assert_eq!(value.downcast_ref::<u32>(), Some(&42));
 /// ```
+#[must_use = "the reflected invocation output must be handled"]
 pub enum InvocationOutput<'call, M: InvocationMode + 'call> {
     /// The method returned `()`.
     Unit,

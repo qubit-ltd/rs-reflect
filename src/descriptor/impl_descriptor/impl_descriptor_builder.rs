@@ -126,6 +126,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with the trait namespace set.
     #[must_use]
+    #[inline]
     pub fn implemented_trait(mut self, implemented_trait: &'static TraitDescriptor) -> Self {
         self.implemented_trait = Some(implemented_trait);
         self
@@ -141,6 +142,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with its declared methods set.
     #[must_use]
+    #[inline]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
         self
@@ -156,6 +158,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with its effective method instances set.
     #[must_use]
+    #[inline]
     pub fn method_instances(mut self, instances: Vec<MethodInstanceDescriptor>) -> Self {
         self.method_instances = instances;
         self
@@ -171,6 +174,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with its associated type bindings set.
     #[must_use]
+    #[inline]
     pub fn associated_types(mut self, bindings: Vec<AssociatedTypeBindingDescriptor>) -> Self {
         self.associated_types = bindings;
         self
@@ -186,6 +190,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with its associated constant bindings set.
     #[must_use]
+    #[inline]
     pub fn associated_consts(mut self, bindings: Vec<AssociatedConstBindingDescriptor>) -> Self {
         self.associated_consts = bindings;
         self
@@ -201,6 +206,7 @@ impl ImplDescriptorBuilder {
     ///
     /// Returns the builder with its generic arguments set.
     #[must_use]
+    #[inline]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;
         self

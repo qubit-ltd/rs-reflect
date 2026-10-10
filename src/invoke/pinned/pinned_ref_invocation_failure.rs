@@ -26,7 +26,9 @@ use crate::invoke::InvocationMode;
 ///
 /// ```
 /// use qubit_reflect::identity::{FragmentIdentity, MemberId};
-/// use qubit_reflect::invoke::{ArgumentExpectation, PinnedRefInvocationFailure, PinnedRefInvocation};
+/// use qubit_reflect::invoke::ArgumentExpectation;
+/// use qubit_reflect::invoke::PinnedRefInvocation;
+/// use qubit_reflect::invoke::PinnedRefInvocationFailure;
 /// use qubit_reflect::value::Local;
 ///
 /// let identity = MemberId::new(

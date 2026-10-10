@@ -33,6 +33,8 @@ impl TextTypeDescriptor {
     /// # Returns
     ///
     /// Returns the typed view for `kind`.
+    #[must_use]
+    #[inline]
     pub(crate) const fn new(kind: TextKind) -> Self {
         Self { kind }
     }

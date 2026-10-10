@@ -18,7 +18,8 @@ use crate::expression::TypeExpression;
 ///
 /// ```
 /// use qubit_reflect::descriptor::ImplAssociatedConstDescriptor;
-/// use qubit_reflect::expression::{ConcreteTypeExpression, TypeExpression};
+/// use qubit_reflect::expression::ConcreteTypeExpression;
+/// use qubit_reflect::expression::TypeExpression;
 /// let binding = ImplAssociatedConstDescriptor::new(
 ///     "LIMIT",
 ///     TypeExpression::Concrete(ConcreteTypeExpression::new(["usize"], []).expect("non-empty path")),

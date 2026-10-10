@@ -8,6 +8,7 @@
 
 //! Integration tests for safe reflected field access.
 use std::any::TypeId;
+use std::any::type_name;
 use std::cell::Cell;
 use std::error::Error;
 use std::rc::Rc;
@@ -111,7 +112,7 @@ fn reject_probe(_target: ReflectedMut<'_>, _value: ReflectedOwned) -> Result<(),
     Err(FieldAccessError::Unavailable {
         field: FieldIdentity::new(
             TypeId::of::<RecoveryRecord>(),
-            std::any::type_name::<RecoveryRecord>(),
+            type_name::<RecoveryRecord>(),
             0,
             Some("value"),
         ),
@@ -477,7 +478,7 @@ fn test_field_set_recovery_inspection_and_consuming_paths() {
     assert_eq!(recovery.field().declaring_type(), TypeId::of::<RecoveryRecord>());
     assert_eq!(
         recovery.field().declaring_type_name(),
-        std::any::type_name::<RecoveryRecord>()
+        type_name::<RecoveryRecord>()
     );
     assert_eq!(recovery.field().rust_name(), Some("value"));
     assert_eq!(recovery.field().variant_index(), None);

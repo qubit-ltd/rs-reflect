@@ -41,7 +41,9 @@ use crate::invoke::InvocationMode;
 /// assert!(validated.into_parts().1.is_empty());
 /// ```
 pub struct PinnedValidatedRefInvocation<'call, T: ?Sized, M: InvocationMode> {
+    /// The receiver reference whose pinning was validated for the invocation.
     pub(in crate::invoke::pinned) receiver: Pin<&'call T>,
+    /// The arguments accepted by validation, in their original order.
     pub(in crate::invoke::pinned) arguments: Box<[InvocationArg<'call, M>]>,
 }
 
@@ -51,6 +53,8 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedValidatedRefInvocation<'call, T,
     /// # Returns
     ///
     /// Returns the pinned receiver and validated arguments.
+    #[must_use = "the validated receiver and arguments are needed to perform the invocation"]
+    #[inline]
     pub fn into_parts(self) -> (Pin<&'call T>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }

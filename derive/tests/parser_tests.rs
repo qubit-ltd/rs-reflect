@@ -10,6 +10,7 @@
 
 #![allow(dead_code)]
 
+use std::env;
 use std::fs;
 use std::process::Command;
 use std::time::SystemTime;
@@ -91,7 +92,7 @@ fn test_macro_diagnostic_points_to_the_conflicting_rename_literal() {
         .duration_since(UNIX_EPOCH)
         .expect("the system clock should follow the Unix epoch")
         .as_nanos();
-    let fixture = std::env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
+    let fixture = env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
     let source_dir = fixture.join("src");
     fs::create_dir_all(&source_dir).expect("the temporary fixture should be created");
     let dependency_path = env!("CARGO_MANIFEST_DIR").replace('\\', "\\\\").replace('"', "\\\"");
@@ -128,7 +129,7 @@ second: u8,
     )
     .expect("the temporary source should be written");
 
-    let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+    let output = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
         .args(["check", "--offline", "--quiet", "--manifest-path"])
         .arg(fixture.join("Cargo.toml"))
         .env("CARGO_TARGET_DIR", fixture.join("target"))

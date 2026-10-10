@@ -9,6 +9,8 @@
 //! Invalid intrinsic facts on unregistered monomorphs must remain errors.
 #![cfg(feature = "derive")]
 
+use std::any::TypeId;
+
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectRegistry;
 use qubit_reflect::ReflectedOwned;
@@ -18,6 +20,13 @@ use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::capability::CapabilityLookup;
 use qubit_reflect::identity::CapabilityId;
+use qubit_reflect::identity::FragmentIdentity;
+use qubit_reflect::identity::MemberId;
+use qubit_reflect::invoke::ArgumentExpectation;
+use qubit_reflect::invoke::Invocation;
+use qubit_reflect::invoke::InvocationArg;
+use qubit_reflect::invoke::InvocationErrorKind;
+use qubit_reflect::invoke::ReceiverExpectation;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 
 /// The shared capability contract intentionally registered twice.
@@ -103,7 +112,6 @@ struct Mismatch<T> {
 
 #[test]
 fn test_mismatch_preserves_both_contracts_and_snapshot_membership() {
-    use std::any::TypeId;
     let registry = ReflectRegistry::initialize().expect("fixture registrations must initialize");
     let before = registry.types().len();
     let descriptor = TypeDescriptor::of::<Mismatch<String>>();
@@ -223,14 +231,6 @@ fn test_concurrent_monomorph_initialization_is_cached_and_missing_keys_remain_ab
 
 #[test]
 fn test_receiver_capability_conflict_preserves_validated_inputs() {
-    use qubit_reflect::identity::FragmentIdentity;
-    use qubit_reflect::identity::MemberId;
-    use qubit_reflect::invoke::ArgumentExpectation;
-    use qubit_reflect::invoke::Invocation;
-    use qubit_reflect::invoke::InvocationArg;
-    use qubit_reflect::invoke::InvocationErrorKind;
-    use qubit_reflect::invoke::ReceiverExpectation;
-
     let registry = RegistrySnapshotBuilder::new()
         .build()
         .expect("an empty isolated snapshot must build");

@@ -7,6 +7,7 @@
 // =============================================================================
 
 use std::cell::Cell;
+use std::future::ready;
 use std::rc::Rc;
 
 use qubit_reflect::Reflect;
@@ -19,7 +20,7 @@ struct Worker;
 impl Worker {
     async fn run(value: u8) -> u8 {
         let local = Rc::new(Cell::new(value));
-        std::future::ready(()).await;
+        ready(()).await;
         local.get()
     }
 }

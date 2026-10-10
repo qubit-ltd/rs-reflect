@@ -58,6 +58,7 @@ impl RawPointerTypeExpression {
     ///
     /// Returns `true` for `*mut` and `false` for `*const`.
     #[must_use]
+    #[inline]
     pub fn is_mutable(&self) -> bool {
         self.mutable
     }
@@ -67,6 +68,7 @@ impl RawPointerTypeExpression {
     ///
     /// Returns the pointed-to type expression.
     #[must_use]
+    #[inline]
     pub fn target(&self) -> &TypeExpression {
         &self.target
     }
@@ -76,6 +78,7 @@ impl RawPointerTypeExpression {
     ///
     /// Returns the source-oriented spelling, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

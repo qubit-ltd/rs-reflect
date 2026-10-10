@@ -188,7 +188,10 @@ macro_rules! register_type_capabilities {
 /// use std::sync::OnceLock;
 /// use qubit_reflect::capability::{CapabilityKey, TypeCapabilities};
 /// use qubit_reflect::descriptor::{TypeDefinitionDescriptor, TypeDefinitionId};
-/// use qubit_reflect::expression::{DiagnosticText, ExpressionName, GenericDefinitionDescriptor, GenericParameterDescriptor};
+/// use qubit_reflect::expression::DiagnosticText;
+/// use qubit_reflect::expression::ExpressionName;
+/// use qubit_reflect::expression::GenericDefinitionDescriptor;
+/// use qubit_reflect::expression::GenericParameterDescriptor;
 /// use qubit_reflect::identity::CapabilityId;
 /// use qubit_reflect::register_definition_capabilities;
 ///
@@ -217,7 +220,9 @@ macro_rules! register_type_capabilities {
 /// register_definition_capabilities! {
 ///     definition = example_type_definition,
 ///     capabilities = [
-///         CapabilityKey::<ExampleAdapter>::new(CapabilityId::new("example.generic").expect("valid ID")) => ExampleAdapter,
+///         CapabilityKey::<ExampleAdapter>::new(
+///             CapabilityId::new("example.generic").expect("valid ID"),
+///         ) => ExampleAdapter,
 ///     ],
 /// }
 ///
@@ -231,13 +236,23 @@ macro_rules! register_definition_capabilities {
     (
         definition = $definition:path,
         capabilities = [$($key:expr => $adapter:expr),+ $(,)?],
-        source = ($declaring_crate:expr, $module_path:expr, $line:expr, $column:expr, $member_kind:expr, $fingerprint:expr $(,)?),
+        source = (
+            $declaring_crate:expr,
+            $module_path:expr,
+            $line:expr,
+            $column:expr,
+            $member_kind:expr,
+            $fingerprint:expr $(,)?
+        ),
     ) => {
         const _: () = {
             fn __qubit_reflect_definition() -> &'static $crate::descriptor::TypeDefinitionDescriptor { $definition() }
             fn __qubit_reflect_runtime_identity() -> $crate::__private::codegen_v3::registration::RuntimeIdentity {
                 $crate::__private::codegen_v3::registration::RuntimeIdentity::Capabilities(
-                    $crate::__private::codegen_v3::registration::CapabilityTarget::TypeDefinition(__qubit_reflect_definition().id()))
+                    $crate::__private::codegen_v3::registration::CapabilityTarget::TypeDefinition(
+                        __qubit_reflect_definition().id(),
+                    ),
+                )
             }
             fn __qubit_reflect_payload() -> $crate::__private::codegen_v3::registration::FragmentPayload {
                 $crate::__private::codegen_v3::registration::FragmentPayload::Capability(

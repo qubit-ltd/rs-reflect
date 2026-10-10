@@ -43,6 +43,8 @@ impl StructTypeDescriptor {
     /// # Returns
     ///
     /// Returns the typed view for `kind`.
+    #[must_use]
+    #[inline]
     pub(crate) const fn new(kind: StructKind) -> Self {
         Self { kind }
     }

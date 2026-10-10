@@ -24,6 +24,7 @@ use crate::descriptor::TraitId;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::TypeExpression;
 use crate::identity::FragmentIdentity;
+use crate::registry::ReflectRegistry;
 
 /// Declaration facts for a generic, blanket, or concrete impl block.
 ///
@@ -261,7 +262,7 @@ impl ImplDefinitionDescriptor {
     #[must_use]
     pub fn implemented_trait_in(
         &self,
-        registry: &crate::registry::ReflectRegistry,
+        registry: &ReflectRegistry,
     ) -> Option<&'static TraitDefinitionDescriptor> {
         registry.impl_definition_trait(self)
     }

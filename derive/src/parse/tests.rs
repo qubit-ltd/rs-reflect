@@ -12,6 +12,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ir::DeclarationIr;
+use crate::ir::FieldShapeIr;
 use crate::ir::GenericDefaultIr;
 use crate::ir::HelperName;
 use crate::ir::HelperTarget;
@@ -674,7 +675,10 @@ fn test_definition_provider_v2_validates_target_and_identifier() {
             "unexpected token",
         ),
         (
-            quote! { #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)] struct Duplicate<T>(T); },
+            quote! {
+                #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)]
+                struct Duplicate<T>(T);
+            },
             "duplicate",
         ),
         (
@@ -692,7 +696,6 @@ fn test_definition_provider_v2_validates_target_and_identifier() {
 /// Empty fields must retain their source container before any code generation.
 #[test]
 fn test_empty_struct_ir_retains_source_field_shape() {
-    use crate::ir::FieldShapeIr;
     for (input, expected) in [
         (
             quote!(

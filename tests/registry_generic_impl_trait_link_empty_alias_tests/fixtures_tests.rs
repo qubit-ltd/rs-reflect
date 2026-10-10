@@ -19,7 +19,9 @@ use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
 #[reflect]
-trait EmptyTrait {}
+trait EmptyTrait {
+    // empty
+}
 
 struct EmptyTarget<T>(PhantomData<T>);
 

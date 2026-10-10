@@ -8,6 +8,9 @@
 
 //! Validated construction of applied trait descriptors.
 
+use std::collections::HashSet;
+use std::ptr::eq;
+
 use super::AppliedTraitId;
 use super::AssociatedConstDescriptor;
 use super::AssociatedTypeDescriptor;
@@ -77,6 +80,7 @@ impl TraitDescriptorBuilder {
     /// # Returns
     ///
     /// Returns a builder with no application-specific facts.
+    #[inline]
     pub(super) fn new(definition: &'static TraitDefinitionDescriptor) -> Self {
         Self {
             definition,
@@ -99,6 +103,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with the generic arguments replaced.
     #[must_use]
+    #[inline]
     pub fn arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.arguments = arguments;
         self
@@ -114,6 +119,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with the bindings replaced.
     #[must_use]
+    #[inline]
     pub fn associated_type_arguments(mut self, arguments: Vec<GenericArgument>) -> Self {
         self.associated_type_arguments = arguments;
         self
@@ -133,6 +139,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with its direct supertraits replaced.
     #[must_use]
+    #[inline]
     pub fn direct_supertraits<const N: usize>(mut self, direct_supertraits: [&'static TraitDescriptor; N]) -> Self {
         self.direct_supertraits = direct_supertraits.into_iter().map(TraitDescriptorRef::new).collect();
         self
@@ -148,6 +155,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with its methods replaced.
     #[must_use]
+    #[inline]
     pub fn methods(mut self, methods: &'static [MethodDescriptor]) -> Self {
         self.methods = methods;
         self
@@ -163,6 +171,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with its associated types replaced.
     #[must_use]
+    #[inline]
     pub fn associated_types(mut self, associated_types: Vec<AssociatedTypeDescriptor>) -> Self {
         self.associated_types = associated_types;
         self
@@ -178,6 +187,7 @@ impl TraitDescriptorBuilder {
     ///
     /// Returns this builder with its associated constants replaced.
     #[must_use]
+    #[inline]
     pub fn associated_consts(mut self, associated_consts: Vec<AssociatedConstDescriptor>) -> Self {
         self.associated_consts = associated_consts;
         self
@@ -202,7 +212,7 @@ impl TraitDescriptorBuilder {
         if self.methods.iter().any(|method| {
             !method
                 .declaring_trait()
-                .is_some_and(|owner| std::ptr::eq(owner, self.definition))
+                .is_some_and(|owner| eq(owner, self.definition))
         }) {
             return Err(TraitDescriptorBuildError::ForeignMethod);
         }
@@ -368,7 +378,7 @@ impl TraitDescriptorBuilder {
     /// Returns `InvalidAssociatedTypeArgument` for an unknown, duplicate,
     /// symbolic, or malformed binding.
     fn validate_associated_type_arguments(&self) -> Result<(), TraitDescriptorBuildError> {
-        let mut names = std::collections::HashSet::new();
+        let mut names = HashSet::new();
         for argument in &self.associated_type_arguments {
             let GenericArgument::AssociatedType { name, value } = argument else {
                 return Err(TraitDescriptorBuildError::InvalidAssociatedTypeArgument);

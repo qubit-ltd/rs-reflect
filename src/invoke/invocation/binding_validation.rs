@@ -10,12 +10,23 @@
 
 use crate::invoke::InvocationInputMode;
 
-/// Returns whether `actual` can safely satisfy `expected`.
+/// Checks whether an argument supplied in `actual` mode can satisfy `expected`.
+///
+/// A mutable reference can satisfy a shared-reference expectation; all other
+/// modes must match exactly.
+#[must_use]
+#[inline]
 pub(in crate::invoke::invocation) fn mode_matches(expected: InvocationInputMode, actual: InvocationInputMode) -> bool {
     expected == actual || (expected == InvocationInputMode::Ref && actual == InvocationInputMode::Mut)
 }
 
-/// Applies argument mode compatibility to optional receiver modes.
+/// Checks whether optional receiver modes are compatible.
+///
+/// Two absent modes are compatible, and two present modes use the same
+/// compatibility rule as [`mode_matches`]. A present mode cannot satisfy an
+/// absent mode, or vice versa.
+#[must_use]
+#[inline]
 pub(in crate::invoke::invocation) fn receiver_mode_matches(
     expected: Option<InvocationInputMode>,
     actual: Option<InvocationInputMode>,

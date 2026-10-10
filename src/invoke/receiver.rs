@@ -8,6 +8,7 @@
 
 //! Invocation receiver values and receiver expectations.
 
+use std::any::type_name;
 use std::any::TypeId;
 
 use crate::capability::CapabilityKey;
@@ -137,7 +138,7 @@ impl ReceiverExpectation {
     pub fn owned<T: ?Sized + 'static>() -> Self {
         Self::Owned {
             type_id: TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
+            type_name: type_name::<T>(),
         }
     }
 
@@ -146,7 +147,7 @@ impl ReceiverExpectation {
     pub fn borrowed<T: ?Sized + 'static>() -> Self {
         Self::Ref {
             type_id: TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
+            type_name: type_name::<T>(),
         }
     }
 
@@ -155,7 +156,7 @@ impl ReceiverExpectation {
     pub fn borrowed_mut<T: ?Sized + 'static>() -> Self {
         Self::Mut {
             type_id: TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
+            type_name: type_name::<T>(),
         }
     }
 

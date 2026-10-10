@@ -20,6 +20,7 @@ use crate::ir::GenericKindIr;
 use crate::ir::GenericsIr;
 use crate::ir::HelperAttributeIr;
 use crate::ir::HelperName;
+use crate::ir::HelperTarget;
 use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
@@ -181,7 +182,7 @@ fn validate_trait(declaration: &TraitDeclarationIr, errors: &mut ErrorCollector)
     validate_attributes(&declaration.attributes, errors);
     validate_query_name(&declaration.attributes, &declaration.name.to_string(), errors);
     validate_external_traits(declaration, errors);
-    let mut inherited_dyn_items = std::collections::HashSet::new();
+    let mut inherited_dyn_items = HashSet::new();
     for attribute in &declaration.attributes {
         let HelperValueIr::DynCompatible(paths) = &attribute.value else {
             continue;
@@ -289,7 +290,10 @@ fn validate_method(method: &MethodIr, errors: &mut ErrorCollector) {
     {
         errors.push(syn::Error::new(
             attribute.span,
-            "`catch_unwind` cannot be used on an async method; panics raised while polling follow ordinary Future semantics",
+            concat!(
+                "`catch_unwind` cannot be used on an async method; panics raised while polling ",
+                "follow ordinary Future semantics"
+            ),
         ));
     }
     validate_query_name(&method.attributes, &method.name.to_string(), errors);
@@ -349,9 +353,9 @@ fn validate_attributes(attributes: &[HelperAttributeIr], errors: &mut ErrorColle
 fn validate_conflicts(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) {
     if let Some(skip) = attributes.iter().find(|attribute| attribute.name == HelperName::Skip) {
         let conflicts = match skip.target {
-            crate::ir::HelperTarget::Field => [HelperName::ReadOnly, HelperName::NoConstruct].as_slice(),
-            crate::ir::HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
-            crate::ir::HelperTarget::Method => {
+            HelperTarget::Field => [HelperName::ReadOnly, HelperName::NoConstruct].as_slice(),
+            HelperTarget::Variant => [HelperName::NoConstruct].as_slice(),
+            HelperTarget::Method => {
                 [HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe].as_slice()
             }
             _ => [].as_slice(),
@@ -428,7 +432,10 @@ fn validate_query_name_scope<'a>(
             errors.push(syn::Error::new(
                 diagnostic_span,
                 format!(
-                    "{member_kind} query name `{query_name}` for Rust member `{rust_name}` conflicts with Rust member `{existing_rust_name}`"
+                    concat!(
+                        "{member_kind} query name `{query_name}` for Rust member `{rust_name}` ",
+                        "conflicts with Rust member `{existing_rust_name}`"
+                    )
                 ),
             ));
         }
@@ -462,7 +469,7 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
         .supertraits
         .iter()
         .filter_map(|bound| match bound {
-            crate::ir::GenericBoundIr::Trait { path, .. } => Some(path.source.as_str()),
+            GenericBoundIr::Trait { path, .. } => Some(path.source.as_str()),
             _ => None,
         })
         .collect();
@@ -515,7 +522,10 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
             errors.push(syn::Error::new(
                 declaration.span,
                 format!(
-                    "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or #[reflect(external_trait({path}, id = \"...\"))]"
+                    concat!(
+                        "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or ",
+                        "#[reflect(external_trait({path}, id = \"...\"))]"
+                    )
                 ),
             ));
         }

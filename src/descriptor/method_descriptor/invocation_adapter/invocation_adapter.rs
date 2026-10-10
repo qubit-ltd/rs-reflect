@@ -766,4 +766,7 @@ impl InvocationAdapter {
 
 /// Serves as a stable opaque token for adapters whose real entry point is
 /// typed.
+///
+/// This placeholder is stored only when a typed adapter is the callable entry;
+/// invoking it directly is not supported.
 fn unavailable_entry_point() {}

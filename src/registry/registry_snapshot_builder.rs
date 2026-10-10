@@ -35,8 +35,10 @@ use crate::registry::reflect_registry::ReflectRegistry;
 ///
 /// ```
 /// use qubit_reflect::TypeDescriptor;
-/// use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-/// use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
+/// use qubit_reflect::capability::CapabilityDescriptor;
+/// use qubit_reflect::capability::CapabilityKey;
+/// use qubit_reflect::identity::CapabilityId;
+/// use qubit_reflect::identity::FragmentIdentity;
 /// use qubit_reflect::registry::RegistrySnapshotBuilder;
 ///
 /// let key = CapabilityKey::<u32>::new(CapabilityId::new("example.limit")?);

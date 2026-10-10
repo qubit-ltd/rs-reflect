@@ -13,8 +13,10 @@ use std::pin::Pin;
 use super::pinned_mut_invocation_failure::PinnedMutInvocationFailure;
 use super::pinned_mut_invocation_recovery::PinnedMutInvocationRecovery;
 use super::pinned_validated_mut_invocation::PinnedValidatedMutInvocation;
+use crate::descriptor::ParameterDescriptor;
 use crate::identity::MemberId;
 use crate::invoke::ArgumentExpectation;
+use crate::invoke::Invocation;
 use crate::invoke::InvocationArg;
 use crate::invoke::InvocationBinding;
 use crate::invoke::InvocationMode;
@@ -38,8 +40,10 @@ use crate::invoke::InvocationMode;
 /// assert!(invocation.arguments().is_empty());
 /// ```
 pub struct PinnedMutInvocation<'call, T: ?Sized, M: InvocationMode> {
+    /// Pinned mutable receiver retained until invocation or recovery completes.
     pub(in crate::invoke::pinned) receiver: Pin<&'call mut T>,
-    pub(in crate::invoke::pinned) invocation: crate::invoke::Invocation<'call, M>,
+    /// Ordered arguments and bindings associated with the receiver call.
+    pub(in crate::invoke::pinned) invocation: Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
@@ -58,13 +62,15 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     /// # Returns
     ///
     /// Returns a typed pinned invocation.
+    #[must_use]
+    #[inline]
     pub fn new<I>(receiver: Pin<&'call mut T>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated(arguments),
+            invocation: Invocation::associated(arguments),
         }
     }
 
@@ -86,13 +92,15 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     /// # Returns
     ///
     /// Returns a typed pinned invocation retaining those bindings.
+    #[must_use]
+    #[inline]
     pub fn from_bindings<I>(receiver: Pin<&'call mut T>, bindings: I) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated_bindings(bindings),
+            invocation: Invocation::associated_bindings(bindings),
         }
     }
 
@@ -138,7 +146,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocation<'call, T, M> {
     pub(crate) fn bind_arguments(
         self,
         method_identity: &MemberId,
-        parameters: &[crate::descriptor::ParameterDescriptor],
+        parameters: &[ParameterDescriptor],
     ) -> Result<Self, PinnedMutInvocationFailure<'call, T, M>> {
         let Self { receiver, invocation } = self;
         match invocation.bind_arguments(method_identity, parameters) {

@@ -169,7 +169,9 @@ macro_rules! impl_function_pointers {
             }
         }
 
-        impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "C-unwind" fn($($argument),*) -> Return {
+        impl<$($argument: Reflect,)* Return: Reflect> Reflect
+            for unsafe extern "C-unwind" fn($($argument),*) -> Return
+        {
             /// Returns the interned descriptor for this unsafe C-unwind function pointer.
             ///
             /// # Returns
@@ -237,7 +239,9 @@ macro_rules! impl_function_pointers {
             }
         }
 
-        impl<$($argument: Reflect,)* Return: Reflect> Reflect for unsafe extern "system-unwind" fn($($argument),*) -> Return {
+        impl<$($argument: Reflect,)* Return: Reflect> Reflect
+            for unsafe extern "system-unwind" fn($($argument),*) -> Return
+        {
             /// Returns the interned descriptor for this unsafe system-unwind function pointer.
             ///
             /// # Returns

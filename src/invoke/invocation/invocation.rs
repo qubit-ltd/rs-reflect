@@ -22,6 +22,7 @@ use crate::invoke::InvocationError;
 use crate::invoke::InvocationErrorKind;
 use crate::invoke::InvocationFailure;
 use crate::invoke::InvocationMode;
+use crate::invoke::InvocationRecovery;
 use crate::invoke::InvocationReceiver;
 use crate::invoke::ReceiverExpectation;
 use crate::value::DynamicMut;
@@ -70,6 +71,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation containing those arguments.
+    #[must_use]
     pub fn associated<I>(arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -97,6 +99,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation retaining those bindings.
+    #[must_use]
     pub fn associated_bindings<I>(bindings: I) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
@@ -118,6 +121,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation containing the receiver and arguments.
+    #[must_use]
     pub fn owned<I>(receiver: DynamicOwned<M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -139,6 +143,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation containing the receiver and arguments.
+    #[must_use]
     pub fn borrowed<I>(receiver: DynamicRef<'call, M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -160,6 +165,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation containing the receiver and arguments.
+    #[must_use]
     pub fn borrowed_mut<I>(receiver: DynamicMut<'call, M>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -181,6 +187,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation containing the supplied inputs.
+    #[must_use]
     pub fn new<I>(receiver: Option<InvocationReceiver<'call, M>>, arguments: I) -> Self
     where
         I: IntoIterator<Item = InvocationArg<'call, M>>,
@@ -213,6 +220,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// # Returns
     ///
     /// Returns an invocation retaining the supplied inputs.
+    #[must_use]
     pub fn from_bindings<I>(receiver: Option<InvocationReceiver<'call, M>>, bindings: I) -> Self
     where
         I: IntoIterator<Item = InvocationBinding<'call, M>>,
@@ -266,6 +274,7 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
     /// Returns the original binding name, or `None` for positional or
     /// out-of-range input.
     #[must_use]
+    #[inline]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.argument_names.get(index).and_then(|name| name.as_deref())
     }
@@ -568,6 +577,8 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
 
     /// Creates an invocation from parts previously returned by validation or
     /// recovery.
+    #[must_use]
+    #[inline]
     pub(crate) fn from_parts(
         receiver: Option<InvocationReceiver<'call, M>>,
         arguments: Box<[InvocationArg<'call, M>]>,
@@ -645,13 +656,15 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
         };
         InvocationFailure {
             error: InvocationError::new(method_identity.clone(), kind),
-            recovery: crate::invoke::InvocationRecovery::new(receiver, arguments, argument_names),
+            recovery: InvocationRecovery::new(receiver, arguments, argument_names),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::any::type_name;
+
     use crate::descriptor::ParameterDescriptor;
     use crate::descriptor::ParameterPassingMode;
     use crate::descriptor::ParameterPatternDescriptor;
@@ -733,7 +746,7 @@ mod tests {
         assert!(matches!(
             failure.error.kind(),
             InvocationErrorKind::ReceiverAdapterUnavailable { expected_name }
-                if expected_name == &std::any::type_name::<String>()
+                if expected_name == &type_name::<String>()
         ));
         assert_eq!(failure.recovery.argument_name(0), Some("second"));
         assert_eq!(failure.recovery.argument_name(1), None);
@@ -770,7 +783,7 @@ mod tests {
         assert!(matches!(
             failure.error.kind(),
             InvocationErrorKind::ReceiverAdapterRejected { expected_name }
-                if expected_name == &std::any::type_name::<String>()
+                if expected_name == &type_name::<String>()
         ));
         assert_eq!(failure.recovery.argument_name(0), Some("second"));
         assert_eq!(failure.recovery.argument_name(1), None);

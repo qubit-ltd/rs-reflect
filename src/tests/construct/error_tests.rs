@@ -10,6 +10,7 @@
 //! creation.
 
 use std::any::TypeId;
+use std::any::type_name;
 
 use crate::__private::descriptor;
 use crate::construct::ConstructionError;
@@ -84,7 +85,7 @@ fn test_construction_field_id_preserves_source_identity_forms() {
     assert_eq!(ids[0].declaring_type(), TypeId::of::<ConstructionErrorFixture>());
     assert_eq!(
         ids[0].declaring_type_name(),
-        std::any::type_name::<ConstructionErrorFixture>()
+        type_name::<ConstructionErrorFixture>()
     );
     assert_eq!(ids[0].index(), 0);
     assert_eq!(ids[0].rust_name(), Some("named"));

@@ -367,58 +367,6 @@ impl TypeDescriptor {
         )
     }
 
-    /// Attaches generated struct construction entry points to this root.
-    ///
-    /// # Parameters
-    ///
-    /// - `construction`: Generated local and optional thread-safe constructor
-    ///   metadata.
-    ///
-    /// # Returns
-    ///
-    /// Returns the root with its struct construction entry points attached.
-    #[doc(hidden)]
-    #[must_use]
-    #[inline]
-    pub fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
-        self.construction = Some(construction);
-        self
-    }
-
-    /// Attaches generic declaration and concrete-instance facts to this root.
-    ///
-    /// # Parameters
-    ///
-    /// - `generic`: Concrete generic metadata for this root instance.
-    ///
-    /// # Returns
-    ///
-    /// Returns the root linked to its concrete generic metadata.
-    #[doc(hidden)]
-    #[must_use]
-    #[inline]
-    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
-        self.generic = Some(generic);
-        self
-    }
-
-    /// Links this concrete descriptor to its source-level generic declaration.
-    ///
-    /// # Parameters
-    ///
-    /// - `definition`: Resolver for the static source-level declaration.
-    ///
-    /// # Returns
-    ///
-    /// Returns the root linked to that generic declaration.
-    #[doc(hidden)]
-    #[must_use]
-    #[inline]
-    pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
-        self.definition = Some(definition);
-        self
-    }
-
     /// Creates an enum root for generated descriptor data.
     ///
     /// # Type Parameters
@@ -606,6 +554,22 @@ impl TypeDescriptor {
         )
     }
 
+    /// Creates an optional root whose element relationship is resolved on
+    /// first navigation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Reflected type contained by the optional value.
+    ///
+    /// # Parameters
+    ///
+    /// - `query_name`: Reflection lookup name for the optional root.
+    /// - `element`: Lazy reference to the contained type.
+    /// - `projector`: Projection used to expose an optional borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns an optional root for `Option<T>` with a lazily resolved element.
     #[doc(hidden)]
     pub(crate) const fn new_optional_lazy<T: Reflect>(
         query_name: &'static str,
@@ -1313,6 +1277,58 @@ impl TypeDescriptor {
             generic: None,
             definition: None,
         }
+    }
+
+    /// Attaches generated struct construction entry points to this root.
+    ///
+    /// # Parameters
+    ///
+    /// - `construction`: Generated local and optional thread-safe constructor
+    ///   metadata.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root with its struct construction entry points attached.
+    #[doc(hidden)]
+    #[must_use]
+    #[inline]
+    pub fn with_struct_construction(mut self, construction: StructConstructionDescriptor) -> Self {
+        self.construction = Some(construction);
+        self
+    }
+
+    /// Attaches generic declaration and concrete-instance facts to this root.
+    ///
+    /// # Parameters
+    ///
+    /// - `generic`: Concrete generic metadata for this root instance.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root linked to its concrete generic metadata.
+    #[doc(hidden)]
+    #[must_use]
+    #[inline]
+    pub const fn with_concrete_generic(mut self, generic: &'static ConcreteGenericDescriptor) -> Self {
+        self.generic = Some(generic);
+        self
+    }
+
+    /// Links this concrete descriptor to its source-level generic declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `definition`: Resolver for the static source-level declaration.
+    ///
+    /// # Returns
+    ///
+    /// Returns the root linked to that generic declaration.
+    #[doc(hidden)]
+    #[must_use]
+    #[inline]
+    pub const fn with_type_definition(mut self, definition: fn() -> &'static TypeDefinitionDescriptor) -> Self {
+        self.definition = Some(definition);
+        self
     }
 
     /// Replaces this descriptor's immutable capability resolver.

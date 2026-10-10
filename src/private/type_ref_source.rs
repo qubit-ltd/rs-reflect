@@ -20,7 +20,11 @@ pub(crate) enum TypeRefSource {
 }
 
 impl TypeRefSource {
-    /// Returns the stable public relationship object.
+    /// Returns the descriptor relationship represented by this source.
+    ///
+    /// An eager source returns its stored reference directly. A lazy source resolves
+    /// its deferred reference when called. In both cases, the returned descriptor
+    /// has a `'static` lifetime.
     #[must_use]
     #[inline]
     pub(crate) fn get(self) -> &'static TypeRef {

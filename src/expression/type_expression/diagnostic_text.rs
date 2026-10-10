@@ -36,6 +36,7 @@ impl DiagnosticText {
     ///
     /// Returns the retained text, or `None` when no diagnostic was attached.
     #[must_use]
+    #[inline]
     pub fn as_deref(&self) -> Option<&str> {
         self.0.as_deref()
     }
@@ -51,6 +52,7 @@ impl From<Box<str>> for DiagnosticText {
     /// # Returns
     ///
     /// Returns diagnostic text containing `value`.
+    #[inline]
     fn from(value: Box<str>) -> Self {
         Self(Some(value))
     }

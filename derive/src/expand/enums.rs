@@ -17,8 +17,8 @@ use syn::Lifetime;
 use syn::LitInt;
 use syn::Meta;
 use syn::Token;
-use syn::parse_quote;
 use syn::parse2;
+use syn::parse_quote;
 use syn::punctuated::Punctuated;
 
 use super::enum_repr_ir::EnumReprIr;

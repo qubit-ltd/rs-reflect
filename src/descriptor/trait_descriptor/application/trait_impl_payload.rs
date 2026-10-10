@@ -41,7 +41,11 @@ type AppliedTraitCache = HashMap<(TypeId, AppliedTraitId), Arc<OnceLock<TraitImp
 /// ```
 /// use std::any::TypeId;
 /// use std::sync::LazyLock;
-/// use qubit_reflect::descriptor::{TraitCompleteness, TraitDefinitionDescriptor, TraitDescriptor, TraitId, TraitImplPayload};
+/// use qubit_reflect::descriptor::TraitCompleteness;
+/// use qubit_reflect::descriptor::TraitDefinitionDescriptor;
+/// use qubit_reflect::descriptor::TraitDescriptor;
+/// use qubit_reflect::descriptor::TraitId;
+/// use qubit_reflect::descriptor::TraitImplPayload;
 /// use qubit_reflect::expression::GenericDefinitionDescriptor;
 ///
 /// struct Marker;
@@ -88,6 +92,7 @@ impl TraitImplPayload {
     ///
     /// Returns a payload with no generated implementation adapters attached.
     #[doc(hidden)]
+    #[inline]
     pub const fn new(definition: &'static TraitDefinitionDescriptor, applied: &'static TraitDescriptor) -> Self {
         Self {
             definition,
@@ -106,6 +111,7 @@ impl TraitImplPayload {
     /// Returns the source declaration descriptor.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn definition(self) -> &'static TraitDefinitionDescriptor {
         self.definition
     }
@@ -117,6 +123,7 @@ impl TraitImplPayload {
     /// Returns the concrete trait application.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn applied(self) -> &'static TraitDescriptor {
         self.applied
     }
@@ -128,6 +135,7 @@ impl TraitImplPayload {
     /// Returns one optional adapter slot for each default method.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn default_method_adapters(self) -> &'static [Option<&'static InvocationAdapter>] {
         self.default_method_adapters
     }
@@ -140,6 +148,7 @@ impl TraitImplPayload {
     /// Returns unavailable reasons paired with default methods.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn default_method_unavailable_reasons(self) -> &'static [&'static [InvocationUnavailableReason]] {
         self.default_method_unavailable_reasons
     }
@@ -151,6 +160,7 @@ impl TraitImplPayload {
     /// Returns one optional resolver slot for each associated type.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn associated_type_resolvers(self) -> &'static [Option<TypeDescriptorResolver>] {
         self.associated_type_resolvers
     }
@@ -162,6 +172,7 @@ impl TraitImplPayload {
     /// Returns one optional reader slot for each associated constant.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn associated_const_readers(self) -> &'static [Option<&'static AssociatedConstReader>] {
         self.associated_const_readers
     }

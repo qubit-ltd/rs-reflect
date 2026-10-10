@@ -51,6 +51,8 @@ impl GenericDefinitionDescriptor {
     ///
     /// Returns the generic declaration descriptor. Diagnostic text starts
     /// empty.
+    #[must_use]
+    #[inline]
     pub fn new(
         parameters: impl Into<Box<[GenericParameterDescriptor]>>,
         predicates: impl Into<Box<[PredicateDescriptor]>>,
@@ -68,6 +70,7 @@ impl GenericDefinitionDescriptor {
     ///
     /// Returns the declared lifetime, type, and const parameters.
     #[must_use]
+    #[inline]
     pub fn parameters(&self) -> &[GenericParameterDescriptor] {
         &self.parameters
     }
@@ -78,6 +81,7 @@ impl GenericDefinitionDescriptor {
     ///
     /// Returns the structural where-clause predicates.
     #[must_use]
+    #[inline]
     pub fn predicates(&self) -> &[PredicateDescriptor] {
         &self.predicates
     }
@@ -88,6 +92,7 @@ impl GenericDefinitionDescriptor {
     ///
     /// Returns source-oriented diagnostic text, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

@@ -6,13 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-/// A standard ordered-sequence family.
+/// Identifies a standard ordered-sequence family.
 ///
 /// # Examples
 ///
 /// ```
 /// use qubit_reflect::descriptor::SequenceKind;
-/// assert_eq!(SequenceKind::Vec, SequenceKind::Vec);
+/// let kind = SequenceKind::Vec;
+/// assert!(matches!(kind, SequenceKind::Vec));
 /// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SequenceKind {

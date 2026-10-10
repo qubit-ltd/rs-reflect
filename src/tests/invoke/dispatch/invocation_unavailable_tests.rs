@@ -10,6 +10,7 @@
 
 use std::error::Error;
 
+use crate::descriptor::InvocationUnavailableReason;
 use crate::invoke::InvocationDispatchMode;
 use crate::invoke::InvocationDispatchReason;
 use crate::invoke::InvocationUnavailable;
@@ -57,7 +58,6 @@ fn test_into_invocation_preserves_original_allocation() {
 
 #[test]
 fn test_into_parts_preserves_ordered_no_adapter_reasons() {
-    use crate::descriptor::InvocationUnavailableReason;
     let reasons = Box::new([
         InvocationUnavailableReason::UnsafeMethod,
         InvocationUnavailableReason::DisabledByPolicy,

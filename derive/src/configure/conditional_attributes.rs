@@ -127,7 +127,10 @@ fn split_cfg_attr(attribute: &Attribute) -> Result<(Option<Attribute>, Option<At
 ///
 /// Returns a syntax error for malformed nested cfg_attr syntax.
 fn split_meta(meta: &Meta) -> Result<(Option<Meta>, Option<Meta>)> {
-    if meta.path().is_ident("cfg") || meta.path().is_ident("reflect") {
+    if meta.path().is_ident("cfg") {
+        return Ok((Some(meta.clone()), Some(meta.clone())));
+    }
+    if meta.path().is_ident("reflect") {
         return Ok((Some(meta.clone()), None));
     }
     if meta.path().is_ident("cfg_attr") {

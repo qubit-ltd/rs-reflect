@@ -101,6 +101,7 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     ///
     /// Returns the original name, or `None` for positional or out-of-range
     /// input.
+    #[inline]
     #[must_use]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.argument_names.get(index).and_then(|name| name.as_deref())
@@ -112,6 +113,7 @@ impl<'call, M: InvocationMode> InvocationRecovery<'call, M> {
     /// # Returns
     ///
     /// Returns the optional receiver and caller-ordered arguments.
+    #[must_use = "the recovered invocation parts should be inspected or reconstituted"]
     pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }

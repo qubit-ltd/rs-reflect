@@ -773,9 +773,10 @@ fn type_uses_lifetime(ty: &TypeIr, lifetime: &str) -> bool {
                         .as_deref()
                         .is_some_and(|output| type_uses_lifetime(output, lifetime)))
         }
-        TypeKindIr::TraitObject { .. }
-        | TypeKindIr::ImplTrait { .. }
-        | TypeKindIr::Never
+        TypeKindIr::TraitObject { bounds, .. } | TypeKindIr::ImplTrait { bounds } => {
+            bounds.iter().any(|bound| bound_uses_lifetime(bound, lifetime))
+        }
+        TypeKindIr::Never
         | TypeKindIr::Infer
         | TypeKindIr::Macro
         | TypeKindIr::Other => false,
@@ -800,10 +801,10 @@ fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> b
         PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
             PathArgumentIr::Lifetime(candidate) => candidate.trim_start_matches('\'') == lifetime,
             PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => type_uses_lifetime(ty, lifetime),
-            PathArgumentIr::Const(_)
-            | PathArgumentIr::AssociatedConst { .. }
-            | PathArgumentIr::Constraint { .. }
-            | PathArgumentIr::Other(_) => false,
+            PathArgumentIr::Constraint { bounds, .. } => {
+                bounds.iter().any(|bound| bound_uses_lifetime(bound, lifetime))
+            }
+            PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } | PathArgumentIr::Other(_) => false,
         }),
         PathArgumentsIr::Parenthesized { inputs, output } => {
             inputs.iter().any(|input| type_uses_lifetime(input, lifetime))
@@ -811,6 +812,38 @@ fn path_arguments_use_lifetime(arguments: &PathArgumentsIr, lifetime: &str) -> b
                     .as_deref()
                     .is_some_and(|output| type_uses_lifetime(output, lifetime))
         }
+    }
+}
+
+/// Returns whether one bound refers to an outer lifetime.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed generic bound to inspect.
+/// - `lifetime`: Lifetime name without its leading apostrophe.
+///
+/// # Returns
+///
+/// Returns `true` when the bound mentions the lifetime outside a shadowing
+/// higher-ranked scope.
+#[must_use]
+fn bound_uses_lifetime(bound: &GenericBoundIr, lifetime: &str) -> bool {
+    match bound {
+        GenericBoundIr::Lifetime(candidate) => candidate.trim_start_matches('\'') == lifetime,
+        GenericBoundIr::Trait {
+            path, lifetimes, ..
+        } => {
+            !lifetimes.iter().any(|bound| bound.trim_start_matches('\'') == lifetime)
+                && (path
+                    .qualified_self
+                    .as_ref()
+                    .is_some_and(|qualified| type_uses_lifetime(&qualified.ty, lifetime))
+                    || path
+                        .segments
+                        .iter()
+                        .any(|segment| path_arguments_use_lifetime(&segment.arguments, lifetime)))
+        }
+        GenericBoundIr::Other(_) => false,
     }
 }
 

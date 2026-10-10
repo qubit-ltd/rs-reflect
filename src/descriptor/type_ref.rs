@@ -77,6 +77,7 @@ impl TypeRef {
             Self::Symbolic(_) => None,
         }
     }
+
     /// Returns the root descriptor for a resolved reference.
     ///
     /// `None` means this reference is explicitly opaque or still symbolic.

@@ -37,5 +37,8 @@ fn test_register_reflected_type_adds_type_to_reflect_registry() {
         .get(TypeId::of::<ManuallyReflected>())
         .expect("the manually registered type must be discoverable");
 
-    assert!(std::ptr::eq(registered, ManuallyReflected::type_descriptor()));
+    assert!(
+        std::ptr::eq(registered, ManuallyReflected::type_descriptor()),
+        "the registry must retain the manually authored descriptor"
+    );
 }

@@ -30,7 +30,7 @@ mod tests {
     use super::FacadeUser;
 
     #[test]
-    fn downstream_facade_delegates_reflect_derive() {
+    fn test_downstream_facade_delegates_reflect_derive() {
         let descriptor = FacadeUser::type_descriptor();
         assert!(descriptor.type_name().ends_with("FacadeUser"));
 

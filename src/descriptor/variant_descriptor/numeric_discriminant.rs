@@ -14,7 +14,7 @@
 ///
 /// ```
 /// use qubit_reflect::descriptor::NumericDiscriminant;
-/// assert_eq!(NumericDiscriminant::U8(3), NumericDiscriminant::U8(3));
+/// assert_ne!(NumericDiscriminant::U8(3), NumericDiscriminant::U16(3));
 /// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum NumericDiscriminant {

@@ -10,6 +10,9 @@
 //! benchmarks.
 
 use crate::error::RegistryError;
+use crate::registry::aggregate_benchmark_registry_facts;
+use crate::registry::BenchmarkRegistryFacts as RegistryBenchmarkFacts;
+use crate::registry::prepare_benchmark_registry_facts as prepare_registry_benchmark_facts;
 use crate::registry::ReflectRegistry;
 
 /// Prepared synthetic facts for post-materialization registry aggregation
@@ -17,7 +20,7 @@ use crate::registry::ReflectRegistry;
 #[doc(hidden)]
 pub struct BenchmarkRegistryFacts(
     /// Precomputed adapter-free fragments used by the aggregation benchmark.
-    crate::registry::BenchmarkRegistryFacts,
+    RegistryBenchmarkFacts,
 );
 
 /// Prepares adapter-free capability facts outside the measured aggregation.
@@ -32,7 +35,7 @@ pub struct BenchmarkRegistryFacts(
 #[doc(hidden)]
 #[must_use]
 pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegistryFacts {
-    BenchmarkRegistryFacts(crate::registry::prepare_benchmark_registry_facts(fragment_count))
+    BenchmarkRegistryFacts(prepare_registry_benchmark_facts(fragment_count))
 }
 
 /// Runs production post-materialization validation, indexing, and freezing on
@@ -53,5 +56,5 @@ pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegis
 #[doc(hidden)]
 pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
     let BenchmarkRegistryFacts(facts) = facts;
-    crate::registry::aggregate_benchmark_registry_facts(facts)
+    aggregate_benchmark_registry_facts(facts)
 }

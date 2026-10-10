@@ -29,7 +29,7 @@ use crate::capability::CapabilityDescriptor;
 /// use qubit_reflect::capability::CapabilityLookup;
 ///
 /// let lookup: CapabilityLookup<'_, u32> = CapabilityLookup::Missing;
-/// assert!(matches!(lookup, CapabilityLookup::Missing));
+/// assert!(matches!(lookup.into_adapter(), Ok(None)));
 /// ```
 #[derive(Debug)]
 pub enum CapabilityLookup<'a, A: 'static> {

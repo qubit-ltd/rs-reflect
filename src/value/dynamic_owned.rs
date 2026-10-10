@@ -9,6 +9,7 @@
 //! Owned dynamic values with mode-specific erased storage.
 
 use std::any::Any;
+use std::any::TypeId;
 use std::marker::PhantomData;
 
 use crate::value::DynamicMut;
@@ -222,16 +223,6 @@ impl DynamicOwned<Local> {
 }
 
 impl DynamicOwned<ThreadSafe> {
-    /// Returns the exact identity of the owned value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    #[inline]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any().expect("owned values are Any-compatible").type_id()
-    }
     /// Wraps `value` as a thread-safe owned dynamic value.
     ///
     /// The value must be `'static + Send + Sync` so the wrapper can retain its
@@ -253,6 +244,17 @@ impl DynamicOwned<ThreadSafe> {
             storage: ThreadSafeOwnedStorage::Any(Box::new(value)),
             marker: PhantomData,
         }
+    }
+
+    /// Returns the exact identity of the owned value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    #[inline]
+    pub fn value_type_id(&self) -> TypeId {
+        self.as_any().expect("owned values are Any-compatible").type_id()
     }
 
     /// Borrows the owned value while preserving the thread-safe erased mode.

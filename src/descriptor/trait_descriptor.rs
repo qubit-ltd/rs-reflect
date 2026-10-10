@@ -248,7 +248,6 @@ impl TraitDescriptor {
     /// # Returns
     ///
     /// Returns the method declaration, or `None` when no method matches.
-    #[must_use]
     pub fn method(&self, name: &str) -> Option<&MethodDescriptor> {
         self.methods.iter().find(|method| method.query_name() == name)
     }
@@ -275,7 +274,6 @@ impl TraitDescriptor {
     /// # Returns
     ///
     /// Returns the associated type, or `None` when no item matches.
-    #[must_use]
     pub fn associated_type(&self, name: &str) -> Option<&AssociatedTypeDescriptor> {
         self.associated_types.iter().find(|item| item.query_name() == name)
     }
@@ -302,7 +300,6 @@ impl TraitDescriptor {
     /// # Returns
     ///
     /// Returns the associated constant, or `None` when no item matches.
-    #[must_use]
     pub fn associated_const(&self, name: &str) -> Option<&AssociatedConstDescriptor> {
         self.associated_consts.iter().find(|item| item.query_name() == name)
     }

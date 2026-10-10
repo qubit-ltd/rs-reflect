@@ -128,7 +128,6 @@ impl StructConstructionDescriptor {
     ///
     /// Returns the cached updater, or `None` when no local updater was
     /// generated.
-    #[must_use]
     pub fn local_updater(&self) -> Option<&'static StructUpdater<Local>> {
         *self
             .cached_local_updater
@@ -142,7 +141,6 @@ impl StructConstructionDescriptor {
     ///
     /// Returns the cached thread-safe constructor, or `None` when it is
     /// unavailable.
-    #[must_use]
     pub fn thread_safe_constructor(&self) -> Option<&'static StructConstructor<ThreadSafe>> {
         *self
             .cached_thread_safe_constructor
@@ -155,7 +153,6 @@ impl StructConstructionDescriptor {
     ///
     /// Returns the cached thread-safe updater, or `None` when it was not
     /// generated.
-    #[must_use]
     pub fn thread_safe_updater(&self) -> Option<&'static StructUpdater<ThreadSafe>> {
         *self
             .cached_thread_safe_updater

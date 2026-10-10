@@ -58,6 +58,7 @@ impl EnumReprIr {
     /// Returns the integer type spelling, or `None` for non-integer
     /// representations.
     #[must_use]
+    #[inline]
     pub(super) fn integer_name(&self) -> Option<&'static str> {
         match self {
             Self::I8 => Some("i8"),

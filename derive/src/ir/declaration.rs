@@ -14,6 +14,7 @@ use proc_macro2::TokenStream;
 
 use crate::ir::ExternalTraitIr;
 use crate::ir::HelperAttributeIr;
+use crate::ir::HelperName;
 use crate::ir::PathIr;
 use crate::ir::SpecializationIr;
 use crate::ir::TypeIr;
@@ -492,7 +493,7 @@ impl TypeDeclarationIr {
     ///
     /// Returns the number of matching type-level helper attributes.
     #[must_use]
-    pub(crate) fn helper_count(&self, name: crate::ir::HelperName) -> usize {
+    pub(crate) fn helper_count(&self, name: HelperName) -> usize {
         self.attributes
             .iter()
             .filter(|attribute| attribute.name == name)

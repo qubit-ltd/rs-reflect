@@ -8,14 +8,22 @@
 
 //! Integration coverage for implementation registration expansion.
 use std::any::TypeId;
+use std::borrow::Cow;
+use std::fmt::Debug;
 use std::future::Future;
+use std::iter::empty;
+use std::marker::PhantomData;
 use std::marker::PhantomPinned;
+use std::mem::size_of;
+use std::mem::size_of_val;
 use std::pin::Pin;
+use std::ptr::eq;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::task::Context;
 use std::task::Poll;
+use std::task::Waker;
 
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
@@ -177,7 +185,7 @@ impl Sample {
     }
 
     #[allow(dead_code)]
-    fn reflected_dyn_debug(value: &dyn std::fmt::Debug) -> usize {
+    fn reflected_dyn_debug(value: &dyn Debug) -> usize {
         format!("{value:?}").len()
     }
 
@@ -250,7 +258,7 @@ impl Sample {
     #[reflect(specialize(T = u8))]
     #[allow(dead_code)]
     fn reflected_borrowed_generic<T>(value: &T) -> u8 {
-        std::mem::size_of_val(value) as u8
+        size_of_val(value) as u8
     }
 
     #[reflect(specialize(T = u8))]
@@ -295,8 +303,8 @@ impl Sample {
         19
     }
 
-    fn reflected_borrowed_path(&self) -> std::borrow::Cow<'_, str> {
-        std::borrow::Cow::Borrowed("borrowed")
+    fn reflected_borrowed_path(&self) -> Cow<'_, str> {
+        Cow::Borrowed("borrowed")
     }
 
     extern "C" fn reflected_c_abi() -> u8 {
@@ -352,7 +360,7 @@ struct UnadaptedReceiver;
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
-struct SpecializedGenericImpl<T>(std::marker::PhantomData<T>);
+struct SpecializedGenericImpl<T>(PhantomData<T>);
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
@@ -360,20 +368,20 @@ struct SpecializedConstGenericImpl<const N: usize>;
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
-struct MultipleSpecializedGenericImpl<T>(std::marker::PhantomData<T>);
+struct MultipleSpecializedGenericImpl<T>(PhantomData<T>);
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
-struct ConstrainedSpecializedGenericImpl<T>(std::marker::PhantomData<T>);
+struct ConstrainedSpecializedGenericImpl<T>(PhantomData<T>);
 
 #[derive(reflect::Reflect)]
 #[reflect(opaque)]
-struct LifetimeSpecializedGenericImpl<'a, T>(std::marker::PhantomData<&'a T>);
+struct LifetimeSpecializedGenericImpl<'a, T>(PhantomData<&'a T>);
 
-struct GenericImplDefinitionOnly<'a, T, const N: usize>(std::marker::PhantomData<&'a T>);
+struct GenericImplDefinitionOnly<'a, T, const N: usize>(PhantomData<&'a T>);
 
 #[allow(dead_code)]
-struct GenericTraitImplDefinitionOnly<T>(std::marker::PhantomData<T>);
+struct GenericTraitImplDefinitionOnly<T>(PhantomData<T>);
 
 #[reflect]
 #[allow(dead_code)]
@@ -441,7 +449,7 @@ trait NestedAssociatedDefault<'a> {
 
     #[allow(dead_code)]
     fn nested_values(&'a self) -> Box<dyn Iterator<Item = Self::Value> + 'a> {
-        Box::new(std::iter::empty())
+        Box::new(empty())
     }
 }
 
@@ -581,7 +589,7 @@ impl<const N: usize> SpecializedConstGenericImpl<N> {
 #[reflect_impl(specialize(T = u8), specialize(T = u16))]
 impl<T> MultipleSpecializedGenericImpl<T> {
     fn type_size() -> usize {
-        ::std::mem::size_of::<T>()
+        size_of::<T>()
     }
 }
 
@@ -1409,16 +1417,16 @@ fn test_reflect_impl_registers_explicit_generic_impl_specialization() {
             implementation
                 .method_instances()
                 .iter()
-                .any(|candidate| std::ptr::eq(candidate, instance))
+                .any(|candidate| eq(candidate, instance))
         })
         .expect("method instance must belong to one registered generic impl");
     let registered_definition = registry
         .impl_definitions()
         .iter()
         .copied()
-        .find(|definition| std::ptr::eq(*definition, implementation.definition()))
+        .find(|definition| eq(*definition, implementation.definition()))
         .expect("the concrete specialization must share its registered definition");
-    assert!(std::ptr::eq(registered_definition, implementation.definition()));
+    assert!(eq(registered_definition, implementation.definition()));
     assert_eq!(implementation.definition().generic_definition().parameters().len(), 1);
     assert_eq!(implementation.arguments().len(), 1);
     let adapter = instance
@@ -1478,7 +1486,7 @@ fn test_reflect_impl_registers_explicit_const_generic_impl_specialization() {
             implementation
                 .method_instances()
                 .iter()
-                .any(|candidate| std::ptr::eq(candidate, instance))
+                .any(|candidate| eq(candidate, instance))
         })
         .expect("method instance must belong to one registered const generic impl");
     assert_eq!(implementation.definition().generic_definition().parameters().len(), 1);
@@ -1510,12 +1518,12 @@ fn test_reflect_impl_shares_one_definition_across_multiple_specializations() {
 
     assert_eq!(u8_impls.len(), 1);
     assert_eq!(u16_impls.len(), 1);
-    assert!(std::ptr::eq(u8_impls[0].definition(), u16_impls[0].definition()));
+    assert!(eq(u8_impls[0].definition(), u16_impls[0].definition()));
     assert_eq!(
         registry
             .impl_definitions()
             .iter()
-            .filter(|definition| std::ptr::eq(**definition, u8_impls[0].definition()))
+            .filter(|definition| eq(**definition, u8_impls[0].definition()))
             .count(),
         1,
     );
@@ -1560,7 +1568,7 @@ fn test_reflect_impl_registers_generic_definition_without_concrete_instance() {
     let candidates = registry.find_impl_definitions_by_target(definition.target_type());
     assert_eq!(candidates.len(), 1);
     assert!(!candidates.is_empty());
-    assert!(std::ptr::eq(
+    assert!(eq(
         candidates.iter().next().expect("the exact target must match"),
         definition,
     ));
@@ -2340,7 +2348,7 @@ fn test_reflect_impl_generates_explicit_catching_adapter() {
 ///
 /// Returns the result of the single poll.
 fn poll_once<F: Future + Unpin>(future: &mut F) -> Poll<F::Output> {
-    let waker = std::task::Waker::noop();
+    let waker = Waker::noop();
     let mut context = Context::from_waker(waker);
     Pin::new(future).poll(&mut context)
 }
@@ -2366,7 +2374,7 @@ impl Sample {
 #[test]
 fn test_slice_output_retains_described_signature() {
     let values = [1, 2];
-    assert!(std::ptr::eq(
+    assert!(eq(
         Sample::reflected_slice_output(&values).as_ptr(),
         values.as_ptr()
     ));

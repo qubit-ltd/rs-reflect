@@ -48,24 +48,6 @@ pub struct DynamicMut<'a, M: Mode> {
 }
 
 impl<'a> DynamicMut<'a, Local> {
-    /// Returns the exact identity of the mutably borrowed value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any()
-            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
-    }
-    /// Reuses an existing local erased mutable borrow.
-    pub(crate) fn from_any(value: &'a mut dyn Any) -> Self {
-        Self {
-            storage: LocalMutStorage::Any(value),
-            marker: PhantomData,
-        }
-    }
-
     /// Wraps a sized `'static` value as a local mutable dynamic borrow.
     ///
     /// # Type Parameters
@@ -79,6 +61,8 @@ impl<'a> DynamicMut<'a, Local> {
     /// # Returns
     ///
     /// Returns a local dynamic wrapper for `value`.
+    #[must_use]
+    #[inline]
     pub fn new<T: Sized + 'static>(value: &'a mut T) -> Self {
         Self {
             storage: LocalMutStorage::Any(value),
@@ -98,11 +82,34 @@ impl<'a> DynamicMut<'a, Local> {
     /// # Returns
     ///
     /// Returns a local dynamic wrapper using the dedicated string variant.
+    #[must_use]
+    #[inline]
     pub fn new_str_mut(value: &'a mut str) -> Self {
         Self {
             storage: LocalMutStorage::Str(value),
             marker: PhantomData,
         }
+    }
+
+    /// Reuses an existing local erased mutable borrow.
+    #[must_use]
+    pub(crate) fn from_any(value: &'a mut dyn Any) -> Self {
+        Self {
+            storage: LocalMutStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
+    /// Returns the exact identity of the mutably borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    #[inline]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Returns whether the stored `Any` value has the exact type `T`.
@@ -286,27 +293,10 @@ impl<'a> DynamicMut<'a, Local> {
             LocalMutStorage::Str(value) => Ok(value),
         }
     }
+
 }
 
 impl<'a> DynamicMut<'a, ThreadSafe> {
-    /// Returns the exact identity of the mutably borrowed value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any()
-            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
-    }
-    /// Reuses an existing thread-safe erased mutable borrow.
-    pub(crate) fn from_any(value: &'a mut (dyn Any + Send + Sync)) -> Self {
-        Self {
-            storage: ThreadSafeMutStorage::Any(value),
-            marker: PhantomData,
-        }
-    }
-
     /// Wraps a sized, `'static`, `Send`, and `Sync` value as a thread-safe
     /// mutable borrow.
     ///
@@ -321,6 +311,8 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     /// # Returns
     ///
     /// Returns a thread-safe dynamic wrapper for `value`.
+    #[must_use]
+    #[inline]
     pub fn new<T: Sized + 'static + Send + Sync>(value: &'a mut T) -> Self {
         Self {
             storage: ThreadSafeMutStorage::Any(value),
@@ -341,11 +333,34 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
     ///
     /// Returns a thread-safe dynamic wrapper using the dedicated string
     /// variant.
+    #[must_use]
+    #[inline]
     pub fn new_str_mut(value: &'a mut str) -> Self {
         Self {
             storage: ThreadSafeMutStorage::Str(value),
             marker: PhantomData,
         }
+    }
+
+    /// Reuses an existing thread-safe erased mutable borrow.
+    #[must_use]
+    pub(crate) fn from_any(value: &'a mut (dyn Any + Send + Sync)) -> Self {
+        Self {
+            storage: ThreadSafeMutStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
+    /// Returns the exact identity of the mutably borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    #[inline]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Returns whether the stored `Any` value has the exact type `T`.
@@ -548,4 +563,5 @@ impl<'a> DynamicMut<'a, ThreadSafe> {
             marker: PhantomData,
         }
     }
+
 }

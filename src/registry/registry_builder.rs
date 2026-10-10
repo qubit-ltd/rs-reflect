@@ -589,17 +589,50 @@ fn group_definitions(
         .collect()
 }
 
-/// Builds a registry from all linker-discovered fragments.
+/// Builds an immutable registry from every linker-discovered registration fragment.
+///
+/// # Returns
+///
+/// Returns the fully validated registry snapshot.
+///
+/// # Errors
+///
+/// Returns the first conflict found while validating the discovered fragments.
 pub(crate) fn build_inventory_registry() -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(inventory::iter::<RegistrationFragment>.into_iter())
 }
 
-/// Builds a registry from an explicit static fragment slice.
+/// Builds an immutable registry from an explicit static fragment slice.
+///
+/// # Parameters
+///
+/// - `fragments`: Static registration fragments to validate and include.
+///
+/// # Returns
+///
+/// Returns the fully validated registry snapshot.
+///
+/// # Errors
+///
+/// Returns the first conflict found while validating the supplied fragments.
 pub(crate) fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     build_registry_from_iter(fragments.iter().copied())
 }
 
 /// Initializes a supplied cache from an explicit static fragment slice.
+///
+/// # Parameters
+///
+/// - `cache`: Process-wide cache that receives the registry or its validation error.
+/// - `fragments`: Static registration fragments used for the one-time initialization.
+///
+/// # Returns
+///
+/// Returns a shared reference to the cached registry.
+///
+/// # Errors
+///
+/// Returns a clone of the validation error stored in the cache when initialization fails.
 pub(crate) fn initialize_registry(
     cache: &'static OnceLock<Result<ReflectRegistry, RegistryError>>,
     fragments: &'static [&'static RegistrationFragment],
@@ -608,6 +641,19 @@ pub(crate) fn initialize_registry(
 }
 
 /// Returns the cached registry or a clone of its cached immutable error.
+///
+/// # Parameters
+///
+/// - `cache`: Process-wide cache to inspect or initialize.
+/// - `initialize`: One-time initializer invoked only when the cache is empty.
+///
+/// # Returns
+///
+/// Returns a shared reference to the cached registry.
+///
+/// # Errors
+///
+/// Returns a clone of the immutable error stored by the initializer.
 pub(super) fn initialize_cached(
     cache: &'static OnceLock<Result<ReflectRegistry, RegistryError>>,
     initialize: impl FnOnce() -> Result<ReflectRegistry, RegistryError>,
@@ -619,6 +665,18 @@ pub(super) fn initialize_cached(
 }
 
 /// Sorts, materializes, fully validates, and freezes a fragment iterator.
+///
+/// # Parameters
+///
+/// - `fragments`: Static fragments to materialize in stable identity order.
+///
+/// # Returns
+///
+/// Returns the immutable registry snapshot built from the fragments.
+///
+/// # Errors
+///
+/// Returns an error when fragment identities or their materialized registrations conflict.
 fn build_registry_from_iter(
     fragments: impl Iterator<Item = &'static RegistrationFragment>,
 ) -> Result<ReflectRegistry, RegistryError> {
@@ -647,6 +705,18 @@ fn build_registry_from_iter(
 
 /// Validates and freezes already materialized fragments through the common
 /// post-factory registry path.
+///
+/// # Parameters
+///
+/// - `fragments`: Materialized registrations to validate and freeze.
+///
+/// # Returns
+///
+/// Returns the immutable registry snapshot.
+///
+/// # Errors
+///
+/// Returns an error when identities, declared payload metadata, or registered facts conflict.
 pub(crate) fn validate_and_freeze_materialized(
     mut fragments: Vec<MaterializedFragment>,
 ) -> Result<ReflectRegistry, RegistryError> {
@@ -674,11 +744,35 @@ pub(crate) fn validate_and_freeze_materialized(
 }
 
 /// Detects exact duplicates and content changes before any payload is built.
+///
+/// # Parameters
+///
+/// - `fragments`: Pending fragments in stable identity order.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when all source identities are unique and consistent.
+///
+/// # Errors
+///
+/// Returns an error when two fragments duplicate or conflict on a source identity.
 fn validate_fragment_identities(fragments: &[PendingFragment]) -> Result<(), RegistryError> {
     validate_identities(fragments.iter().map(|fragment| &fragment.identity))
 }
 
 /// Validates sorted stable identities without inspecting their payloads.
+///
+/// # Parameters
+///
+/// - `identities`: Stable fragment identities in sorted order.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when every identity is unique and consistent.
+///
+/// # Errors
+///
+/// Returns an error when adjacent identities are duplicates or conflict on their source.
 fn validate_identities<'identity>(
     identities: impl IntoIterator<Item = &'identity FragmentIdentity>,
 ) -> Result<(), RegistryError> {

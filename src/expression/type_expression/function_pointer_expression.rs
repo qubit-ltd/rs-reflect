@@ -93,6 +93,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns the function ABI.
     #[must_use]
+    #[inline]
     pub fn abi(&self) -> &FunctionAbi {
         &self.abi
     }
@@ -102,6 +103,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns whether the function pointer is safe or unsafe.
     #[must_use]
+    #[inline]
     pub fn safety(&self) -> &FunctionSafety {
         &self.safety
     }
@@ -111,6 +113,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns `true` when the final parameter is variadic.
     #[must_use]
+    #[inline]
     pub fn is_variadic(&self) -> bool {
         self.variadic
     }
@@ -120,6 +123,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns lifetimes declared by the function pointer's binder.
     #[must_use]
+    #[inline]
     pub fn higher_ranked_lifetimes(&self) -> &[LifetimeExpression] {
         &self.higher_ranked_lifetimes
     }
@@ -129,6 +133,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns function parameter types in declaration order.
     #[must_use]
+    #[inline]
     pub fn parameters(&self) -> &[TypeExpression] {
         &self.parameters
     }
@@ -138,6 +143,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns the function result type expression.
     #[must_use]
+    #[inline]
     pub fn return_type(&self) -> &TypeExpression {
         &self.return_type
     }
@@ -147,6 +153,7 @@ impl FunctionPointerExpression {
     ///
     /// Returns the source-oriented spelling, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

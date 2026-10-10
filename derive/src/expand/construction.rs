@@ -99,13 +99,18 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         if default {
             let provider = format_ident!("__qubit_reflect_default_field_{}{suffix}", field.index);
             if restricted {
-                quote!(#facade::__private::codegen_v3::construct::ConstructionField::provider_only(&descriptor.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v3::construct::ConstructionField::provider_only(
+                    &descriptor.fields()[#index], Self::#provider,
+                ))
             } else {
-                quote!(#facade::__private::codegen_v3::construct::ConstructionField::defaulted(&descriptor.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v3::construct::ConstructionField::defaulted(
+                    &descriptor.fields()[#index], Self::#provider,
+                ))
             }
         } else if restricted {
             quote!(#facade::__private::codegen_v3::construct::ConstructionField::unavailable(
-                &descriptor.fields()[#index], #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::MissingDefaultProvider,
+                &descriptor.fields()[#index],
+                #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::MissingDefaultProvider,
             ))
         } else {
             quote!(#facade::__private::codegen_v3::construct::ConstructionField::required(&descriptor.fields()[#index]))
@@ -115,7 +120,8 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         let index = Index::from(field.index);
         if field.attributes.iter().any(|attribute| attribute.name == HelperName::Skip) {
             quote!(#facade::__private::codegen_v3::construct::UpdateField::unavailable(
-                &descriptor.fields()[#index], #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::UpdateForbidden,
+                &descriptor.fields()[#index],
+                #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::UpdateForbidden,
             ))
         } else {
             quote!(#facade::__private::codegen_v3::construct::UpdateField::allowed(&descriptor.fields()[#index]))
@@ -152,7 +158,9 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         };
         quote! {
             #index => {
-                value.#target = <#facade::__private::codegen_v3::value::DynamicOwned<#mode>>::downcast::<#ty>(replacement)
+                value.#target = <#facade::__private::codegen_v3::value::DynamicOwned<#mode>>::downcast::<#ty>(
+                    replacement,
+                )
                     .unwrap_or_else(|_| unreachable!("validated update field type"));
             }
         }
@@ -174,9 +182,11 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         fn #construct() -> &'static #facade::__private::codegen_v3::construct::StructConstructor<#mode> {
             let descriptor = <Self as #facade::__private::codegen_v3::Reflect>::type_descriptor();
             let fields = ::std::boxed::Box::leak(::std::vec![#(#construction_fields),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v3::construct::StructConstructor::new(
-                descriptor, fields, Self::#construct_adapter,
-            )))
+            ::std::boxed::Box::leak(::std::boxed::Box::new(
+                #facade::__private::codegen_v3::construct::StructConstructor::new(
+                    descriptor, fields, Self::#construct_adapter,
+                ),
+            ))
         }
 
         fn #update_adapter(input: #facade::__private::codegen_v3::construct::ValidatedUpdateInput<#mode>)
@@ -198,9 +208,11 @@ fn struct_mode_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream, t
         fn #update() -> &'static #facade::__private::codegen_v3::construct::StructUpdater<#mode> {
             let descriptor = <Self as #facade::__private::codegen_v3::Reflect>::type_descriptor();
             let fields = ::std::boxed::Box::leak(::std::vec![#(#update_fields),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v3::construct::StructUpdater::new(
-                descriptor, fields, Self::#update_adapter,
-            )))
+            ::std::boxed::Box::leak(::std::boxed::Box::new(
+                #facade::__private::codegen_v3::construct::StructUpdater::new(
+                    descriptor, fields, Self::#update_adapter,
+                ),
+            ))
         }
     }
 }
@@ -318,15 +330,23 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
             matches!(attribute.name, HelperName::Skip | HelperName::NoConstruct)
         });
         if default {
-            let provider = format_ident!("__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}", field.index);
+            let provider = format_ident!(
+                "__qubit_reflect_default_variant_{variant_index}_field_{}{suffix}",
+                field.index,
+            );
             if restricted {
-                quote!(#facade::__private::codegen_v3::construct::ConstructionField::provider_only(&variant.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v3::construct::ConstructionField::provider_only(
+                    &variant.fields()[#index], Self::#provider,
+                ))
             } else {
-                quote!(#facade::__private::codegen_v3::construct::ConstructionField::defaulted(&variant.fields()[#index], Self::#provider))
+                quote!(#facade::__private::codegen_v3::construct::ConstructionField::defaulted(
+                    &variant.fields()[#index], Self::#provider,
+                ))
             }
         } else if restricted {
             quote!(#facade::__private::codegen_v3::construct::ConstructionField::unavailable(
-                &variant.fields()[#index], #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::MissingDefaultProvider,
+                &variant.fields()[#index],
+                #facade::__private::codegen_v3::construct::ConstructionUnavailableReason::MissingDefaultProvider,
             ))
         } else {
             quote!(#facade::__private::codegen_v3::construct::ConstructionField::required(&variant.fields()[#index]))
@@ -368,9 +388,11 @@ fn variant_adapters_for_mode(variant: &VariantIr, facade: &TokenStream, thread_s
                 .variant_at(#variant_index)
                 .unwrap_or_else(|| unreachable!("generated variant source index must exist"));
             let fields = ::std::boxed::Box::leak(::std::vec![#(#policies),*].into_boxed_slice());
-            ::std::boxed::Box::leak(::std::boxed::Box::new(#facade::__private::codegen_v3::construct::VariantConstructor::new(
-                variant, fields, Self::#adapter,
-            )))
+            ::std::boxed::Box::leak(::std::boxed::Box::new(
+                #facade::__private::codegen_v3::construct::VariantConstructor::new(
+                    variant, fields, Self::#adapter,
+                ),
+            ))
         }
     }
 }

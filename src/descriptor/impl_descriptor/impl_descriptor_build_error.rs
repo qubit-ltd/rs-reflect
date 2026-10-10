@@ -8,6 +8,7 @@
 
 //! ImplDescriptorBuildError metadata and behavior.
 
+use std::error::Error;
 use std::fmt;
 
 /// An invalid impl definition or concrete application.
@@ -63,4 +64,4 @@ impl fmt::Display for ImplDescriptorBuildError {
     }
 }
 
-impl std::error::Error for ImplDescriptorBuildError {}
+impl Error for ImplDescriptorBuildError {}

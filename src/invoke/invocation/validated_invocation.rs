@@ -235,7 +235,9 @@ impl<'call, M: InvocationMode> ValidatedInvocation<'call, M> {
     ///
     /// # Returns
     ///
-    /// Returns the optional receiver and declaration-ordered arguments.
+    /// Returns the receiver and declaration-ordered arguments. The receiver is
+    /// `Some` for a receiver method and `None` for an associated function.
+    #[must_use]
     pub fn into_parts(self) -> (Option<InvocationReceiver<'call, M>>, Box<[InvocationArg<'call, M>]>) {
         (self.receiver, self.arguments)
     }

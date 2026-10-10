@@ -11,6 +11,7 @@
 use std::pin::Pin;
 
 use super::pinned_mut_invocation::PinnedMutInvocation;
+use crate::invoke::Invocation;
 use crate::invoke::InvocationArg;
 use crate::invoke::InvocationMode;
 
@@ -45,8 +46,10 @@ use crate::invoke::InvocationMode;
 /// assert_eq!(*recovery.receiver().as_ref().get_ref(), 7);
 /// ```
 pub struct PinnedMutInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
+    /// Pinned receiver retained from the failed invocation for inspection or retry.
     pub(in crate::invoke::pinned) receiver: Pin<&'call mut T>,
-    pub(in crate::invoke::pinned) invocation: crate::invoke::Invocation<'call, M>,
+    /// Original caller arguments retained in their caller-supplied order.
+    pub(in crate::invoke::pinned) invocation: Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, M> {
@@ -82,6 +85,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationRecovery<'call, T, 
     ///
     /// Returns the original name, or `None` for positional/out-of-range input.
     #[must_use]
+    #[inline]
     pub fn argument_name(&self, index: usize) -> Option<&str> {
         self.invocation.argument_name(index)
     }

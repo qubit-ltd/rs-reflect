@@ -43,7 +43,6 @@ impl LazyTypeRefList {
     /// Concurrent callers receive the same immutable slice. A resolver panic
     /// propagates and leaves the list available for a later retry.
     #[must_use]
-    #[inline]
     pub(crate) fn get(&'static self) -> &'static [TypeRef] {
         self.resolved
             .get_or_init(|| {

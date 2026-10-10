@@ -56,6 +56,7 @@ impl<T: ?Sized> ReflectArgumentProbe<T> {
     /// Returns a zero-sized probe for `T`.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn new() -> Self {
         Self(std::marker::PhantomData)
     }
@@ -75,6 +76,7 @@ pub trait ResolveReflectArgument {
 }
 
 impl<T: ?Sized + 'static> ResolveReflectArgument for &&ReflectArgumentProbe<T> {
+    #[inline]
     fn resolve_reflect_argument(self) -> Option<&'static LazyTypeRef> {
         None
     }
@@ -101,6 +103,7 @@ pub trait ResolveReflectTypeDescriptor {
 }
 
 impl<T: ?Sized> ResolveReflectTypeDescriptor for &&ReflectArgumentProbe<T> {
+    #[inline]
     fn resolve_reflect_type_descriptor(self) -> Option<TypeDescriptorResolver> {
         None
     }
@@ -165,6 +168,7 @@ impl<P: AssociatedConstProvider> AssociatedConstProbe<P> {
     ///
     /// Returns a probe for the provider `P`.
     #[must_use]
+    #[inline]
     pub const fn new() -> Self {
         Self {
             marker: std::marker::PhantomData,
@@ -173,6 +177,7 @@ impl<P: AssociatedConstProvider> AssociatedConstProbe<P> {
 }
 
 impl<P: AssociatedConstProvider> Default for AssociatedConstProbe<P> {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -192,6 +197,7 @@ pub trait ResolveAssociatedConstReader {
 }
 
 impl<P: AssociatedConstProvider> ResolveAssociatedConstReader for &&AssociatedConstProbe<P> {
+    #[inline]
     fn resolve_associated_const_reader(self) -> Option<&'static AssociatedConstReader> {
         None
     }
@@ -246,6 +252,7 @@ impl_integer_const_argument!(SignedInteger, i128; i8, i16, i32, i64, i128, isize
 impl_integer_const_argument!(UnsignedInteger, u128; u8, u16, u32, u64, u128, usize);
 
 impl ConstArgumentValue for bool {
+    #[inline]
     fn expression(self) -> ConstExpression {
         ConstExpression::Boolean(self)
     }
@@ -256,6 +263,7 @@ impl ConstArgumentValue for bool {
 }
 
 impl ConstArgumentValue for char {
+    #[inline]
     fn expression(self) -> ConstExpression {
         ConstExpression::Character(self)
     }

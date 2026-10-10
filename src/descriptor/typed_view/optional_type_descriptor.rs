@@ -6,14 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::any::TypeId;
+
 use super::OptionalProjectionError;
 use crate::__private::LazyTypeRef;
 use crate::__private::TypeRefSource;
+use crate::descriptor::Reflect;
 use crate::descriptor::TypeRef;
 use crate::error::TypeMismatch;
 use crate::value::ReflectedRef;
 
-pub(crate) type OptionalRefProjector = for<'a> fn(ReflectedRef<'a>) -> Result<Option<ReflectedRef<'a>>, TypeMismatch>;
+/// Projects a borrowed optional value into its contained element, when present.
+pub(crate) type OptionalRefProjector =
+    for<'a> fn(ReflectedRef<'a>) -> Result<Option<ReflectedRef<'a>>, TypeMismatch>;
 
 /// The typed view of an optional descriptor.
 ///
@@ -28,6 +33,7 @@ pub(crate) type OptionalRefProjector = for<'a> fn(ReflectedRef<'a>) -> Result<Op
 pub struct OptionalTypeDescriptor {
     /// Eager or lazily resolved optional element type.
     element: TypeRefSource,
+    /// Optional function that inspects a borrowed value of the represented type.
     projector: Option<OptionalRefProjector>,
 }
 
@@ -48,7 +54,21 @@ impl OptionalTypeDescriptor {
         }
     }
 
-    pub(crate) const fn new_lazy(element: &'static LazyTypeRef, projector: OptionalRefProjector) -> Self {
+    /// Creates an optional view backed by a lazily resolved element type.
+    ///
+    /// # Parameters
+    ///
+    /// - `element`: Static lazy reference to the optional element type.
+    /// - `projector`: Function that checks and borrows the contained value.
+    ///
+    /// # Returns
+    ///
+    /// Returns an optional view that resolves its element type on first access
+    /// and can project borrowed values.
+    pub(crate) const fn new_lazy(
+        element: &'static LazyTypeRef,
+        projector: OptionalRefProjector,
+    ) -> Self {
         Self {
             element: TypeRefSource::Lazy(element),
             projector: Some(projector),
@@ -56,6 +76,10 @@ impl OptionalTypeDescriptor {
     }
 
     /// Returns whether this descriptor can inspect borrowed optional values.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when a projector was registered during construction.
     #[must_use]
     pub const fn has_ref_projection(&self) -> bool {
         self.projector.is_some()
@@ -116,11 +140,9 @@ impl OptionalTypeDescriptor {
 ///
 /// Returns a `TypeMismatch` with the expected `Option<T>` and actual value
 /// type IDs when the supplied borrow has another concrete type.
-pub(crate) fn project_option_ref<'a, T: crate::descriptor::Reflect>(
+pub(crate) fn project_option_ref<'a, T: Reflect>(
     value: ReflectedRef<'a>,
 ) -> Result<Option<ReflectedRef<'a>>, TypeMismatch> {
-    use std::any::TypeId;
-
     let actual = value.value_type_id();
     let option = value
         .downcast::<Option<T>>()

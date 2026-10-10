@@ -12,6 +12,7 @@ use std::pin::Pin;
 
 use super::pinned_ref_invocation::PinnedRefInvocation;
 use crate::invoke::InvocationArg;
+use crate::invoke::Invocation;
 use crate::invoke::InvocationMode;
 
 /// Complete input retained after a pinned shared invocation fails validation.
@@ -45,8 +46,10 @@ use crate::invoke::InvocationMode;
 /// assert_eq!(*recovery.receiver().get_ref(), 7);
 /// ```
 pub struct PinnedRefInvocationRecovery<'call, T: ?Sized, M: InvocationMode> {
+    /// Original pinned shared receiver retained for recovery.
     pub(in crate::invoke::pinned) receiver: Pin<&'call T>,
-    pub(in crate::invoke::pinned) invocation: crate::invoke::Invocation<'call, M>,
+    /// Original invocation arguments and their caller binding names.
+    pub(in crate::invoke::pinned) invocation: Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocationRecovery<'call, T, M> {

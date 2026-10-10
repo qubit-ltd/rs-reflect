@@ -31,6 +31,7 @@ use crate::value::Local;
 /// ```
 #[derive(Clone, Copy)]
 pub struct CloneAdapter {
+    /// Stores the monomorphized clone operation for the registered type.
     clone_owned: fn(&DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch>,
 }
 

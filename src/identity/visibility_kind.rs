@@ -22,10 +22,10 @@ pub enum VisibilityKind {
     Public,
     /// Visible throughout the declaring crate.
     Crate,
-    /// Visible to the immediate parent module.
+    /// Visible from the parent module and its descendants.
     Super,
-    /// Visible only in an explicitly named source scope.
+    /// Visible from an explicitly named source scope and its descendants.
     Restricted,
-    /// Visible only in the declaring module.
+    /// Visible within the declaring module and its descendants.
     Private,
 }

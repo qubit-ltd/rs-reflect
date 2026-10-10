@@ -9,21 +9,28 @@
 //! Empty field lists retain their original construction syntax.
 #![cfg(feature = "derive")]
 
+use qubit_reflect::construct::ConstructionError;
+use qubit_reflect::construct::ConstructionShape;
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeDefinitionData;
+use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::ThreadSafe;
 use qubit_reflect::NamedConstructionInput;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectedOwned;
 use qubit_reflect::StructUpdateInput;
 use qubit_reflect::TupleConstructionInput;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeKind;
 
 #[derive(Reflect)]
 #[reflect(thread_safe)]
 struct EmptyUnit;
 #[derive(Reflect)]
 #[reflect(thread_safe)]
-struct EmptyNamed {}
+struct EmptyNamed {
+    // empty
+}
 #[derive(Reflect)]
 #[reflect(thread_safe)]
 struct EmptyTuple();
@@ -51,10 +58,6 @@ struct GenericUnit<const N: usize>;
 /// Checks construction and rejection in both modes without erasing type
 /// identity.
 fn assert_empty_shape<T: Reflect>(kind: StructKind) {
-    use qubit_reflect::construct::ConstructionError;
-    use qubit_reflect::construct::ConstructionShape;
-    use qubit_reflect::value::DynamicOwned;
-    use qubit_reflect::value::ThreadSafe;
     let descriptor = TypeDescriptor::of::<T>();
     assert_eq!(descriptor.kind(), TypeKind::Struct(kind));
     let local = [
@@ -140,7 +143,6 @@ fn test_all_empty_shapes_construct_in_both_modes_and_reject_wrong_shapes() {
 
 /// Checks that the source definition and both concrete const instances agree.
 fn assert_generic_shape<T: Reflect, U: Reflect>(kind: StructKind) {
-    use qubit_reflect::descriptor::TypeDefinitionData;
     assert_empty_shape::<T>(kind);
     assert_empty_shape::<U>(kind);
     let first = TypeDescriptor::of::<T>();

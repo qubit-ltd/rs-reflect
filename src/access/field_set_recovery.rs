@@ -8,6 +8,7 @@
 
 //! Ownership recovery for reflected field replacement failures.
 
+use std::error::Error;
 use std::fmt;
 
 use crate::access::FieldAccessError;
@@ -314,6 +315,7 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Returns
     ///
     /// The structured reason the field-set operation failed.
+    #[must_use]
     #[inline]
     pub const fn error(&self) -> &FieldAccessError {
         &self.error
@@ -415,13 +417,13 @@ impl<M: Mode> fmt::Display for FieldSetFailure<M> {
     }
 }
 
-impl<M: Mode> std::error::Error for FieldSetFailure<M> {
+impl<M: Mode> Error for FieldSetFailure<M> {
     /// Returns the underlying machine-readable access error.
     ///
     /// # Returns
     ///
     /// The structured field-access error that caused this failure.
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(self.error.as_ref())
     }
 }

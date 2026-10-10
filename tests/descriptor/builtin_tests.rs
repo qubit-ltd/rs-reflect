@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
+use std::sync::Barrier;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
@@ -507,8 +508,6 @@ fn test_builtin_interner_is_concurrent_and_distinguishes_generic_arguments() {
 /// the same instant without cross-contaminating their identities or roots.
 #[test]
 fn test_builtin_interner_concurrently_initializes_multiple_composite_types() {
-    use std::sync::Barrier;
-
     type SequenceA = Vec<ConcurrentElementA>;
     type SequenceB = Vec<ConcurrentElementB>;
     type OptionalA = Option<Box<ConcurrentElementA>>;

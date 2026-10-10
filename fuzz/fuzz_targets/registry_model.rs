@@ -8,6 +8,9 @@
 
 #![no_main]
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use libfuzzer_sys::fuzz_target;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::identity::CapabilityId;
@@ -32,10 +35,10 @@ fn selected_descriptor(index: u8) -> &'static TypeDescriptor {
         9 => TypeDescriptor::of::<Vec<String>>(),
         10 => TypeDescriptor::of::<Option<Vec<u8>>>(),
         11 => TypeDescriptor::of::<Box<u64>>(),
-        12 => TypeDescriptor::of::<std::sync::Arc<u64>>(),
+        12 => TypeDescriptor::of::<Arc<u64>>(),
         13 => TypeDescriptor::of::<(u8, String)>(),
         14 => TypeDescriptor::of::<[u8; 4]>(),
-        _ => TypeDescriptor::of::<std::collections::BTreeMap<String, u64>>(),
+        _ => TypeDescriptor::of::<BTreeMap<String, u64>>(),
     }
 }
 

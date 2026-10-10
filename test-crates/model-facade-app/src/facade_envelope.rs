@@ -9,6 +9,8 @@
 //! Generic model facade fixture declaration.
 
 use model_facade_derive::model_reflect;
+use model_facade_runtime::Reflect;
+use model_facade_runtime::ReflectRegistry;
 
 /// A generic facade fixture that exercises generated expression metadata.
 #[model_reflect]
@@ -20,9 +22,7 @@ pub struct FacadeEnvelope<T> {
 /// Verifies the selected provider resolves to the registered generic
 /// definition.
 #[cfg(test)]
-pub(crate) fn assert_selected_definition_contract(registry: &model_facade_runtime::ReflectRegistry) {
-    use model_facade_runtime::Reflect;
-
+pub(crate) fn assert_selected_definition_contract(registry: &ReflectRegistry) {
     let selected = __model_facade_definition_FacadeEnvelope();
     let registered = registry
         .definition(selected.id())

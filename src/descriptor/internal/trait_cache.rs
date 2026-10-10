@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 use std::sync::OnceLock;
+use std::sync::PoisonError;
 
 use crate::descriptor::TraitDescriptor;
 use crate::expression::GenericArgument;
@@ -40,6 +41,6 @@ static EXTERNAL_SUPERTRAITS: LazyLock<Mutex<HashMap<ExternalSupertraitKey, Exter
 pub(in crate::descriptor) fn external_supertrait_cell(key: ExternalSupertraitKey) -> ExternalSupertraitCell {
     let mut cache = EXTERNAL_SUPERTRAITS
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+        .unwrap_or_else(PoisonError::into_inner);
     cache.entry(key).or_insert_with(|| Arc::new(OnceLock::new())).clone()
 }

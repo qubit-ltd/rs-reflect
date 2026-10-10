@@ -6,18 +6,20 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-/// A standard set family.
+/// Identifies the standard collection family used to represent a set.
 ///
 /// # Examples
 ///
 /// ```
 /// use qubit_reflect::descriptor::SetKind;
-/// assert_eq!(SetKind::HashSet, SetKind::HashSet);
+///
+/// let kind = SetKind::BTreeSet;
+/// assert!(matches!(kind, SetKind::BTreeSet));
 /// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SetKind {
-    /// `HashSet<T>`.
+    /// Selects the hash-based `HashSet<T>` collection family.
     HashSet,
-    /// `BTreeSet<T>`.
+    /// Selects the tree-based `BTreeSet<T>` collection family.
     BTreeSet,
 }

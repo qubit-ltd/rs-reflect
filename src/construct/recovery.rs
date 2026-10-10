@@ -145,6 +145,7 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns a recovery object owning the error and all supplied values.
+    #[must_use]
     pub(crate) fn new(error: ConstructionError, values: Vec<RecoveredConstructionValue<M>>) -> Self {
         Self {
             error: Box::new(error),
@@ -157,6 +158,7 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the structured error that stopped construction.
+    #[must_use]
     #[inline]
     pub const fn error(&self) -> &ConstructionError {
         &self.error
@@ -166,6 +168,7 @@ impl<M: Mode> ConstructionRecovery<M> {
     ///
     /// Update recovery places the base first, followed by overrides in caller
     /// order.
+    #[must_use]
     #[inline]
     pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
         &self.values
@@ -176,6 +179,7 @@ impl<M: Mode> ConstructionRecovery<M> {
     /// # Returns
     ///
     /// Returns the error and all retained values in recovery order.
+    #[must_use]
     pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }

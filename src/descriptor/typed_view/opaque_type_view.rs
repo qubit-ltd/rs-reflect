@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-/// The typed view of an intentionally opaque root descriptor.
+/// A zero-sized typed view returned for a root descriptor whose type is marked opaque.
 ///
 /// # Examples
 ///

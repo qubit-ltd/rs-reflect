@@ -211,6 +211,7 @@ impl MethodDescriptor {
     ///
     /// Returns the parameter at that position, or `None` when out of range.
     #[must_use]
+    #[inline]
     pub fn parameter_at(&self, index: usize) -> Option<&ParameterDescriptor> {
         self.parameters.get(index)
     }

@@ -10,7 +10,20 @@
 
 use std::fmt;
 
-/// The dynamic field operation that was requested.
+/// Identifies the kind of dynamic access requested from a reflected field.
+///
+/// Field adapters use this value to describe reads, mutable borrows, and whole-
+/// value replacements in access errors and diagnostics.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::access::FieldAccessOperation;
+///
+/// assert_eq!(FieldAccessOperation::Get.to_string(), "get");
+/// assert_eq!(FieldAccessOperation::GetMut.to_string(), "get_mut");
+/// assert_eq!(FieldAccessOperation::Set.to_string(), "set");
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum FieldAccessOperation {
     /// Shared field access.

@@ -25,13 +25,11 @@ fn conflicting_key() -> CapabilityKey<fn()> {
 
 /// Provides the first conflicting capability declaration.
 fn first_provider<T: 'static>() -> CapabilityDescriptor {
-    let _ = std::marker::PhantomData::<T>;
     CapabilityDescriptor::with_adapter(conflicting_key(), first_adapter as fn())
 }
 
 /// Provides the second conflicting capability declaration.
 fn second_provider<T: 'static>() -> CapabilityDescriptor {
-    let _ = std::marker::PhantomData::<T>;
     CapabilityDescriptor::with_adapter(conflicting_key(), second_adapter as fn())
 }
 

@@ -14,9 +14,11 @@ use std::collections::HashSet;
 use crate::descriptor::TraitDefinitionDescriptor;
 use crate::expression::ConcretePathSegment;
 use crate::expression::ConstExpression;
+use crate::expression::ExpressionName;
 use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::GenericParameterDescriptor;
+use crate::expression::LifetimeExpression;
 use crate::expression::PredicateDescriptor;
 use crate::expression::TypeExpression;
 
@@ -24,13 +26,13 @@ use crate::expression::TypeExpression;
 #[derive(Clone)]
 pub(crate) struct TraitApplicationSubstitutions {
     /// Concrete type arguments indexed by declaration parameter name.
-    types: HashMap<crate::expression::ExpressionName, TypeExpression>,
+    types: HashMap<ExpressionName, TypeExpression>,
     /// Concrete const arguments indexed by declaration parameter name.
-    consts: HashMap<crate::expression::ExpressionName, ConstExpression>,
+    consts: HashMap<ExpressionName, ConstExpression>,
     /// Lifetime parameters represented by the static trait-object root.
-    lifetimes: HashSet<crate::expression::ExpressionName>,
+    lifetimes: HashSet<ExpressionName>,
     /// Concrete associated-type equalities indexed by associated item name.
-    associated_types: HashMap<crate::expression::ExpressionName, TypeExpression>,
+    associated_types: HashMap<ExpressionName, TypeExpression>,
 }
 
 impl TraitApplicationSubstitutions {
@@ -93,8 +95,13 @@ impl TraitApplicationSubstitutions {
     ///
     /// Returns `true` when no type, const, lifetime, or associated-type
     /// substitution is present.
+    #[must_use]
+    #[inline]
     pub(in crate::descriptor::trait_descriptor) fn is_empty(&self) -> bool {
-        self.types.is_empty() && self.consts.is_empty() && self.lifetimes.is_empty() && self.associated_types.is_empty()
+        self.types.is_empty()
+            && self.consts.is_empty()
+            && self.lifetimes.is_empty()
+            && self.associated_types.is_empty()
     }
 
     /// Applies outer trait arguments inside a nested item generic definition
@@ -358,11 +365,10 @@ impl TraitApplicationSubstitutions {
     ///
     /// Returns `'static` for a declared lifetime parameter, or the original
     /// lifetime expression when it is not substituted.
-    fn lifetime(&self, lifetime: &crate::expression::LifetimeExpression) -> crate::expression::LifetimeExpression {
+    #[inline]
+    fn lifetime(&self, lifetime: &LifetimeExpression) -> LifetimeExpression {
         match lifetime {
-            crate::expression::LifetimeExpression::Named(name) if self.lifetimes.contains(name.as_str()) => {
-                crate::expression::LifetimeExpression::Static
-            }
+            LifetimeExpression::Named(name) if self.lifetimes.contains(name.as_str()) => LifetimeExpression::Static,
             _ => lifetime.clone(),
         }
     }

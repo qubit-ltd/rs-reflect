@@ -8,9 +8,9 @@
 
 //! Stable source-derived names for internal compiler-filtered carriers.
 
+use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use syn::Ident;
 
 /// Produces a private carrier name unique to a declaration token stream.
 ///

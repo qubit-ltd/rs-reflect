@@ -68,7 +68,6 @@ impl AssociatedConstBindingDescriptor {
     ///
     /// Returns the associated constant binding facts.
     #[doc(hidden)]
-    #[must_use = "the associated constant binding facts are required by generated registration"]
     pub const fn new(
         declaration: &'static AssociatedConstDescriptor,
         implementation_source: AssociatedConstImplementationSource,

@@ -38,6 +38,7 @@ impl TypeDefinitionId {
     /// Returns the process-local identity for `T`.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub fn of<T: 'static>() -> Self {
         Self(TypeId::of::<T>())
     }

@@ -93,7 +93,6 @@ impl<'call, M: InvocationMode> InvocationBinding<'call, M> {
     /// # Returns
     ///
     /// Returns the name, or `None` for a positional binding.
-    #[must_use]
     #[inline]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()

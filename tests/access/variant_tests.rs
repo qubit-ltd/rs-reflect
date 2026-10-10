@@ -90,18 +90,16 @@ fn get_done_value<'a>(target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, Fiel
 
 static U32_TYPE: OpaqueTypeDescriptor = descriptor::opaque_member::<u32>();
 static U32_TYPE_REF: TypeRef = TypeRef::Opaque(&U32_TYPE);
-static PROGRESS_FIELDS: [FieldDescriptor; 1] =
-    [
-        descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
-            .with_access(FieldAccessPolicy::ReadWrite, Some(get_progress_value), None, None)
-            .with_variant(0, "Progress"),
-    ];
-static DONE_FIELDS: [FieldDescriptor; 1] =
-    [
-        descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
-            .with_access(FieldAccessPolicy::ReadWrite, Some(get_done_value), None, None)
-            .with_variant(1, "Done"),
-    ];
+static PROGRESS_FIELDS: [FieldDescriptor; 1] = [
+    descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
+        .with_access(FieldAccessPolicy::ReadWrite, Some(get_progress_value), None, None)
+        .with_variant(0, "Progress"),
+];
+static DONE_FIELDS: [FieldDescriptor; 1] = [
+    descriptor::field(event_descriptor, 0, None, None, &U32_TYPE_REF, Visibility::Private)
+        .with_access(FieldAccessPolicy::ReadWrite, Some(get_done_value), None, None)
+        .with_variant(1, "Done"),
+];
 static EVENT_VARIANTS: [VariantDescriptor; 2] = [
     descriptor::variant(
         event_descriptor,

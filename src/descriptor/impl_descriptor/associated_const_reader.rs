@@ -47,6 +47,7 @@ impl AssociatedConstReader {
     /// Returns a reader that invokes `read` on each call.
     #[doc(hidden)]
     #[must_use]
+    #[inline]
     pub const fn new(read: fn() -> ReflectedOwned) -> Self {
         Self {
             read: AssociatedConstReadAdapter::Function(read),

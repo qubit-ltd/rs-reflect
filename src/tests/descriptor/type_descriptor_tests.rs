@@ -10,12 +10,15 @@
 //! cannot expose through the public API.
 
 use std::any::TypeId;
+use std::any::type_name;
 
 use crate::descriptor::FunctionPointerKind;
 use crate::descriptor::MapKind;
 use crate::descriptor::Mutability;
+use crate::descriptor::OptionalProjectionError;
 use crate::descriptor::PrimitiveKind;
 use crate::descriptor::ReferenceKind;
+use crate::descriptor::Reflect;
 use crate::descriptor::SequenceKind;
 use crate::descriptor::SetKind;
 use crate::descriptor::SmartPointerKind;
@@ -25,10 +28,11 @@ use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeKind;
 use crate::descriptor::TypeRef;
 use crate::expression::FunctionAbi;
+use crate::value::ReflectedRef;
 
 /// Creates an eager resolved type relation with process lifetime for internal
 /// descriptor fixtures.
-fn resolved_type_ref<T: crate::descriptor::Reflect>() -> &'static TypeRef {
+fn resolved_type_ref<T: Reflect>() -> &'static TypeRef {
     Box::leak(Box::new(TypeRef::Resolved(TypeDescriptor::of::<T>())))
 }
 
@@ -77,8 +81,8 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
         optional
             .as_optional()
             .expect("optional view")
-            .project_ref(crate::value::ReflectedRef::new(&Some(()))),
-        Err(crate::descriptor::OptionalProjectionError::Unavailable),
+            .project_ref(ReflectedRef::new(&Some(()))),
+        Err(OptionalProjectionError::Unavailable),
     ));
     assert_eq!(sequence.as_sequence().expect("sequence view").kind(), SequenceKind::Vec,);
     assert_eq!(set.as_set().expect("set view").kind(), SetKind::BTreeSet);
@@ -110,7 +114,7 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
 
     assert_eq!(primitive.query_name(), "number");
     assert_eq!(primitive.type_id(), TypeId::of::<u8>());
-    assert_eq!(primitive.type_name(), std::any::type_name::<u8>());
+    assert_eq!(primitive.type_name(), type_name::<u8>());
     assert_eq!(primitive.kind(), TypeKind::Primitive(PrimitiveKind::U8));
     assert!(primitive.as_text().is_none());
     assert!(primitive.fields().is_empty());

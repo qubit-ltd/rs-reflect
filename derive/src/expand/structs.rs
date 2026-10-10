@@ -383,6 +383,7 @@ pub(crate) fn capabilities(
 ///
 /// Returns the built-in name for a supported bare path, or `None` for custom
 /// and qualified provider paths.
+#[inline]
 fn builtin_capability_name(path: &crate::ir::PathIr) -> Option<&'static str> {
     if path.leading_colon || path.qualified_self.is_some() || path.segments.len() != 1 {
         return None;
@@ -465,6 +466,7 @@ fn registration(
 ///
 /// Returns the corresponding runtime visibility expression.
 #[must_use]
+#[inline]
 fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => {
@@ -498,6 +500,7 @@ fn visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> To
 ///
 /// Returns tokens naming the matching runtime struct category.
 #[must_use]
+#[inline]
 pub(crate) fn kind_tokens(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
     match declaration.field_shape {
         FieldShapeIr::Unit => {

@@ -45,23 +45,6 @@ pub struct DynamicRef<'a, M: Mode> {
 }
 
 impl<'a> DynamicRef<'a, Local> {
-    /// Returns the exact identity of the borrowed value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any()
-            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
-    }
-    /// Reuses an existing local erased borrow.
-    pub(crate) fn from_any(value: &'a dyn Any) -> Self {
-        Self {
-            storage: LocalRefStorage::Any(value),
-            marker: PhantomData,
-        }
-    }
     /// Wraps a sized `'static` value as a local shared dynamic borrow.
     ///
     /// # Type Parameters
@@ -75,6 +58,8 @@ impl<'a> DynamicRef<'a, Local> {
     /// # Returns
     ///
     /// Returns a local dynamic wrapper for `value`.
+    #[must_use]
+    #[inline]
     pub fn new<T: Sized + 'static>(value: &'a T) -> Self {
         Self {
             storage: LocalRefStorage::Any(value),
@@ -95,11 +80,23 @@ impl<'a> DynamicRef<'a, Local> {
     ///
     /// Returns a local dynamic wrapper using the dedicated string variant.
     #[must_use]
+    #[inline]
     pub fn new_str(value: &'a str) -> Self {
         Self {
             storage: LocalRefStorage::Str(value),
             marker: PhantomData,
         }
+    }
+
+    /// Returns the exact identity of the borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Returns whether the stored `Any` value has the exact type `T`.
@@ -227,6 +224,14 @@ impl<'a> DynamicRef<'a, Local> {
             LocalRefStorage::Str(value) => Ok(value),
         }
     }
+
+    /// Reuses an existing local erased borrow without changing its lifetime.
+    pub(crate) fn from_any(value: &'a dyn Any) -> Self {
+        Self {
+            storage: LocalRefStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
 }
 
 impl Clone for DynamicRef<'_, Local> {
@@ -239,24 +244,6 @@ impl Clone for DynamicRef<'_, Local> {
 }
 
 impl<'a> DynamicRef<'a, ThreadSafe> {
-    /// Returns the exact identity of the borrowed value.
-    ///
-    /// # Returns
-    ///
-    /// Returns the concrete value's process-local `TypeId`.
-    #[must_use]
-    pub fn value_type_id(&self) -> std::any::TypeId {
-        self.as_any()
-            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
-    }
-    /// Reuses an existing thread-safe erased borrow.
-    pub(crate) fn from_any(value: &'a (dyn Any + Send + Sync)) -> Self {
-        Self {
-            storage: ThreadSafeRefStorage::Any(value),
-            marker: PhantomData,
-        }
-    }
-
     /// Wraps a sized, `'static`, and `Sync` value as a thread-safe shared
     /// borrow.
     ///
@@ -271,6 +258,8 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// # Returns
     ///
     /// Returns a thread-safe dynamic wrapper for `value`.
+    #[must_use]
+    #[inline]
     pub fn new<T: Sized + 'static + Sync>(value: &'a T) -> Self {
         Self {
             storage: ThreadSafeRefStorage::Any(value),
@@ -292,11 +281,23 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     /// Returns a thread-safe dynamic wrapper using the dedicated string
     /// variant.
     #[must_use]
+    #[inline]
     pub fn new_str(value: &'a str) -> Self {
         Self {
             storage: ThreadSafeRefStorage::Str(value),
             marker: PhantomData,
         }
+    }
+
+    /// Returns the exact identity of the borrowed value.
+    ///
+    /// # Returns
+    ///
+    /// Returns the concrete value's process-local `TypeId`.
+    #[must_use]
+    pub fn value_type_id(&self) -> std::any::TypeId {
+        self.as_any()
+            .map_or_else(std::any::TypeId::of::<str>, std::any::Any::type_id)
     }
 
     /// Returns whether the stored `Any` value has the exact type `T`.
@@ -441,6 +442,15 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
         };
         DynamicRef {
             storage,
+            marker: PhantomData,
+        }
+    }
+
+    /// Reuses an existing thread-safe erased borrow without changing its
+    /// lifetime or `Send`/`Sync` boundary.
+    pub(crate) fn from_any(value: &'a (dyn Any + Send + Sync)) -> Self {
+        Self {
+            storage: ThreadSafeRefStorage::Any(value),
             marker: PhantomData,
         }
     }

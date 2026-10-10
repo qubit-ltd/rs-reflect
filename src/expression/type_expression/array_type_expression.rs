@@ -8,8 +8,6 @@
 
 //! Structural representations of Rust type expressions.
 
-//! ArrayTypeExpression structure and operations.
-
 use crate::expression::ConstExpression;
 use crate::expression::DiagnosticText;
 use crate::expression::TypeExpression;
@@ -63,6 +61,7 @@ impl ArrayTypeExpression {
     ///
     /// Returns the repeated element type.
     #[must_use]
+    #[inline]
     pub fn element(&self) -> &TypeExpression {
         &self.element
     }
@@ -72,6 +71,7 @@ impl ArrayTypeExpression {
     ///
     /// Returns the array length expression.
     #[must_use]
+    #[inline]
     pub fn length(&self) -> &ConstExpression {
         &self.length
     }
@@ -81,6 +81,7 @@ impl ArrayTypeExpression {
     ///
     /// Returns the source-oriented spelling, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

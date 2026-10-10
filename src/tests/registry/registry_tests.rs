@@ -11,11 +11,14 @@
 use std::any::TypeId;
 
 use crate::TypeDescriptor;
+use crate::capability::clone_key;
 use crate::capability::CapabilityDescriptor;
 use crate::capability::CapabilityKey;
 use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::TraitId;
 use crate::descriptor::TypeDefinitionId;
+use crate::descriptor::TypeDefinitionDescriptor;
+use crate::expression::GenericDefinitionDescriptor;
 use crate::expression::TypeExpression;
 use crate::identity::CapabilityId;
 use crate::identity::ExternalTraitId;
@@ -31,8 +34,8 @@ fn test_capability_source_tracks_registered_fragments_only() {
     let type_key = CapabilityKey::<u8>::new(type_id);
     let type_source = FragmentIdentity::new("example", "type", 1, 1, "capability", 1);
 
-    let generic = Box::leak(Box::new(crate::expression::GenericDefinitionDescriptor::new([], [])));
-    let definition = Box::leak(Box::new(crate::descriptor::TypeDefinitionDescriptor::opaque(
+    let generic = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
+    let definition = Box::leak(Box::new(TypeDefinitionDescriptor::opaque(
         TypeDefinitionId::of::<Vec<u8>>(),
         "alloc::vec::Vec",
         "Vec",
@@ -138,12 +141,12 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
             .is_none()
     );
     assert_eq!(
-        registry.type_capability_members(crate::capability::clone_key()).count(),
+        registry.type_capability_members(clone_key()).count(),
         0
     );
     assert_eq!(
         registry
-            .definition_capability_members(crate::capability::clone_key())
+            .definition_capability_members(clone_key())
             .count(),
         0
     );
@@ -159,11 +162,11 @@ fn test_empty_snapshot_exercises_public_lookup_views() {
     assert!(
         registry
             .impl_definition_trait(&ImplDefinitionDescriptor::new_unresolved_trait(
-                crate::identity::FragmentIdentity::new("test", "registry", 1, 1, "impl", 1),
+                FragmentIdentity::new("test", "registry", 1, 1, "impl", 1),
                 TypeExpression::Parameter("T".into()),
                 "Trait",
                 None,
-                Box::leak(Box::new(crate::expression::GenericDefinitionDescriptor::new([], []))),
+                Box::leak(Box::new(GenericDefinitionDescriptor::new([], []))),
             ))
             .is_none()
     );

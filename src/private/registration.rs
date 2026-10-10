@@ -46,6 +46,7 @@ pub use crate::registry::fragment::StaticFragmentIdentity;
 /// Returns a registry error when identities, targets, or registered facts
 /// conflict.
 #[doc(hidden)]
+#[inline]
 pub fn build_registry(fragments: &[&'static RegistrationFragment]) -> Result<ReflectRegistry, RegistryError> {
     crate::registry::build_registry(fragments)
 }
@@ -66,6 +67,7 @@ pub use super::benchmark_registry_facts::prepare_benchmark_registry_facts;
 /// Returns a frozen effective-method view for those implementations.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
+#[inline]
 pub fn build_benchmark_effective_type_view(
     implementations: &[&'static crate::descriptor::ImplDescriptor],
 ) -> crate::registry::EffectiveTypeView {
@@ -91,6 +93,7 @@ pub fn build_benchmark_effective_type_view(
 ///
 /// Returns a clone of the cached registry error when initialization failed.
 #[doc(hidden)]
+#[inline]
 pub fn initialize_registry(
     cache: &'static OnceLock<Result<ReflectRegistry, RegistryError>>,
     fragments: &'static [&'static RegistrationFragment],

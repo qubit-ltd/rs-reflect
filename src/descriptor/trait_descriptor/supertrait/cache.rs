@@ -102,6 +102,7 @@ pub fn external_supertrait<T: ?Sized + 'static>(
 ///
 /// Propagates a panic from `build`; the cache cell remains uninitialized.
 #[doc(hidden)]
+#[must_use]
 pub fn cached_trait_object_descriptor<T: ?Sized + 'static>(
     build: impl FnOnce() -> TraitDescriptor,
 ) -> &'static TraitDescriptor {

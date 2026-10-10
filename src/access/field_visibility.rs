@@ -44,7 +44,6 @@ impl<'a> FieldVisibility<'a> {
     ///
     /// The declared visibility for a struct field, or `None` for an enum
     /// variant field.
-    #[must_use]
     #[inline]
     pub const fn as_declared(self) -> Option<&'a Visibility> {
         match self {

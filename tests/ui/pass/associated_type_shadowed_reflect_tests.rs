@@ -10,7 +10,9 @@ use qubit_reflect::reflect;
 use qubit_reflect::reflect_impl;
 use qubit_reflect::Reflect as DeriveReflect;
 
-trait Reflect: 'static {}
+trait Reflect: 'static {
+    // empty
+}
 
 struct ShadowValue;
 

@@ -8,6 +8,7 @@
 
 //! Typed pinned invocation components.
 
+use std::error::Error;
 use std::fmt;
 
 use super::pinned_mut_invocation_recovery::PinnedMutInvocationRecovery;
@@ -27,7 +28,9 @@ use crate::invoke::InvocationMode;
 ///
 /// ```
 /// use qubit_reflect::identity::{FragmentIdentity, MemberId};
-/// use qubit_reflect::invoke::{ArgumentExpectation, PinnedMutInvocationFailure, PinnedMutInvocation};
+/// use qubit_reflect::invoke::ArgumentExpectation;
+/// use qubit_reflect::invoke::PinnedMutInvocation;
+/// use qubit_reflect::invoke::PinnedMutInvocationFailure;
 /// use qubit_reflect::value::Local;
 ///
 /// let identity = MemberId::new(
@@ -79,6 +82,8 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedMutInvocationFailure<'call, T, M
     /// # Returns
     ///
     /// Returns mutable access to the retained receiver and arguments.
+    #[must_use]
+    #[inline]
     pub fn recovery_mut(&mut self) -> &mut PinnedMutInvocationRecovery<'call, T, M> {
         &mut self.recovery
     }
@@ -120,9 +125,9 @@ impl<T: ?Sized, M: InvocationMode> fmt::Display for PinnedMutInvocationFailure<'
     }
 }
 
-impl<T: ?Sized, M: InvocationMode> std::error::Error for PinnedMutInvocationFailure<'_, T, M> {
+impl<T: ?Sized, M: InvocationMode> Error for PinnedMutInvocationFailure<'_, T, M> {
     /// Returns the structured invocation error as the underlying cause.
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(&self.error)
     }
 }

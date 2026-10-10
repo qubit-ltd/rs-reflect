@@ -12,6 +12,10 @@ use crate::descriptor::TypeDefinitionDescriptor;
 
 /// A borrowed, deterministic set of generic declaration matches.
 ///
+/// # Type Parameters
+///
+/// - `'registry`: The lifetime of the registry-owned candidate slice.
+///
 /// # Examples
 ///
 /// ```

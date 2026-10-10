@@ -6,9 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Structural representations of Rust type expressions.
-
-//! FunctionAbi structure and operations.
+//! Structural representation of a function pointer's calling convention.
 
 use crate::expression::ExpressionName;
 

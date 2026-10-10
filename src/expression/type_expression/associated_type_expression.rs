@@ -57,6 +57,7 @@ impl AssociatedTypeExpression {
     /// # Returns
     ///
     /// Returns the projection with empty diagnostic text.
+    #[must_use]
     pub fn new(
         self_type: TypeExpression,
         trait_path: Option<TypeExpression>,
@@ -78,6 +79,7 @@ impl AssociatedTypeExpression {
     ///
     /// Returns the type on which the associated type is projected.
     #[must_use]
+    #[inline]
     pub fn self_type(&self) -> &TypeExpression {
         &self.self_type
     }
@@ -89,6 +91,7 @@ impl AssociatedTypeExpression {
     /// Returns the trait qualification, or `None` for an unqualified
     /// projection.
     #[must_use]
+    #[inline]
     pub fn trait_path(&self) -> Option<&TypeExpression> {
         self.trait_path.as_deref()
     }
@@ -99,6 +102,7 @@ impl AssociatedTypeExpression {
     ///
     /// Returns the associated type identifier.
     #[must_use]
+    #[inline]
     pub fn item(&self) -> &str {
         self.item.as_str()
     }
@@ -120,6 +124,7 @@ impl AssociatedTypeExpression {
     ///
     /// Returns diagnostic text, or `None` when absent.
     #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }

@@ -7,8 +7,11 @@
 // =============================================================================
 
 //! Integration tests for concrete generic reflection instances.
+use core::primitive::usize as Width;
+
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
+use qubit_reflect::Reflect as ImportedRuntimeReflect;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
@@ -161,7 +164,6 @@ struct CustomContainerField<T> {
 }
 
 type Size = usize;
-use core::primitive::usize as Width;
 
 #[derive(Reflect)]
 struct AliasedConsts<const SIZE: Size, const WIDTH: Width>;
@@ -173,8 +175,6 @@ struct Conditional<const N: usize>;
 struct ConditionalField<const N: usize> {
     conditional: Conditional<N>,
 }
-
-use qubit_reflect::Reflect as ImportedRuntimeReflect;
 
 #[derive(Reflect)]
 #[reflect(opaque)]

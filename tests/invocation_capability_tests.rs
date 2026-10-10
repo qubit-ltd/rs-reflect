@@ -58,7 +58,8 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
             )
             .expect("the local catching entry point must be present")
             .expect("validation must succeed")
-            .is_ok()
+            .is_ok(),
+        "the local catching entry point must return an invocation output"
     );
 
     let thread_safe = InvocationAdapter::thread_safe_with_catching(return_eight, catch_eight);
@@ -71,7 +72,8 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
             )
             .expect("the thread-safe catching entry point must be present")
             .expect("validation must succeed")
-            .is_ok()
+            .is_ok(),
+        "the thread-safe catching entry point must return an invocation output"
     );
 }
 
@@ -91,6 +93,7 @@ fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catch
                 ReflectRegistry::initialize().expect("valid fixture registry"),
                 Invocation::associated([])
             )
-            .is_err()
+            .is_err(),
+        "unavailable catching invocation must return an error"
     );
 }

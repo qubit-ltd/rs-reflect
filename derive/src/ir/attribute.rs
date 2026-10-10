@@ -59,6 +59,7 @@ impl HelperName {
     /// # Returns
     ///
     /// Returns the canonical attribute key spelling.
+    #[inline]
     #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
@@ -142,6 +143,7 @@ impl HelperTarget {
     /// # Returns
     ///
     /// Returns the human-readable target label.
+    #[inline]
     #[must_use]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
@@ -160,6 +162,7 @@ impl HelperTarget {
     /// # Returns
     ///
     /// Returns the target's unique bit mask.
+    #[inline]
     #[must_use]
     const fn bit(self) -> u16 {
         1 << (self as u16)
@@ -183,6 +186,7 @@ impl TargetSet {
     /// # Returns
     ///
     /// Returns the compact target set.
+    #[inline]
     #[must_use]
     const fn new(bits: u16) -> Self {
         Self(bits)
@@ -197,6 +201,7 @@ impl TargetSet {
     /// # Returns
     ///
     /// Returns whether its bit is set.
+    #[inline]
     #[must_use]
     const fn contains(self, target: HelperTarget) -> bool {
         let Self(bits) = self;
@@ -403,6 +408,7 @@ impl HelperAttributeIr {
     /// # Returns
     ///
     /// Returns the rename string, or `None` for other helper values.
+    #[inline]
     #[must_use]
     pub(crate) fn rename(&self) -> Option<&str> {
         match &self.value {
@@ -416,6 +422,7 @@ impl HelperAttributeIr {
     /// # Returns
     ///
     /// Returns the specialization data, or `None` for other helper values.
+    #[inline]
     #[must_use]
     pub(crate) fn specialization(&self) -> Option<&SpecializationIr> {
         match &self.value {

@@ -6,6 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::fmt::Result;
+
 use crate::descriptor::TraitDescriptor;
 
 /// The typed view of a dyn-compatible trait object.
@@ -35,6 +39,7 @@ impl TraitObjectTypeDescriptor {
     /// # Returns
     ///
     /// Returns a trait-object view backed by that resolver.
+    #[inline]
     pub(crate) const fn new(trait_descriptor: fn() -> &'static TraitDescriptor) -> Self {
         Self { trait_descriptor }
     }
@@ -46,12 +51,13 @@ impl TraitObjectTypeDescriptor {
     /// Returns the process-lifetime applied trait descriptor, initializing it
     /// on first access.
     #[must_use]
+    #[inline]
     pub fn trait_descriptor(&self) -> &'static TraitDescriptor {
         (self.trait_descriptor)()
     }
 }
 
-impl std::fmt::Debug for TraitObjectTypeDescriptor {
+impl Debug for TraitObjectTypeDescriptor {
     /// Formats the linked trait identity without expanding its full graph.
     ///
     /// # Parameters
@@ -65,7 +71,7 @@ impl std::fmt::Debug for TraitObjectTypeDescriptor {
     /// # Errors
     ///
     /// Returns an error reported by `formatter`.
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         formatter
             .debug_struct("TraitObjectTypeDescriptor")
             .field("trait", &self.trait_descriptor().rust_path())

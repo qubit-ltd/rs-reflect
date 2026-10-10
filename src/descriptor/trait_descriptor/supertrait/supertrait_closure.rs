@@ -13,6 +13,10 @@ use crate::descriptor::TraitDescriptor;
 
 /// A deterministic, duplicate-free transitive supertrait view.
 ///
+/// # Type Parameters
+///
+/// - `'a`: The lifetime of the borrowed applied supertrait descriptors.
+///
 /// # Examples
 ///
 /// ```

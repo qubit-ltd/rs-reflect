@@ -80,6 +80,7 @@ impl Deref for TraitDescriptorRef {
     /// # Returns
     ///
     /// Returns a shared reference to the retained descriptor.
+    #[inline]
     fn deref(&self) -> &Self::Target {
         let Self(descriptor) = self;
         descriptor

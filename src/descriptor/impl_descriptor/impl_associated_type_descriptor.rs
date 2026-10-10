@@ -38,6 +38,7 @@ impl ImplAssociatedTypeDescriptor {
     /// Returns the declaration-level binding facts.
     #[doc(hidden)]
     #[must_use = "the associated type declaration facts are required by generated registration"]
+    #[inline]
     pub const fn new(rust_name: &'static str) -> Self {
         Self { rust_name }
     }

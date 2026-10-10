@@ -8,11 +8,13 @@
 
 //! Lossless aggregation of independent procedural-macro diagnostics.
 
+use syn::Error;
+
 /// Accumulates independent diagnostics while retaining every original span.
 #[derive(Default)]
 pub(crate) struct ErrorCollector {
     /// Combined diagnostics in insertion order, when any have been added.
-    error: Option<syn::Error>,
+    error: Option<Error>,
 }
 
 impl ErrorCollector {
@@ -21,7 +23,7 @@ impl ErrorCollector {
     /// # Parameters
     ///
     /// - `error`: Diagnostic to retain, including its source span.
-    pub(crate) fn push(&mut self, error: syn::Error) {
+    pub(crate) fn push(&mut self, error: Error) {
         if let Some(combined) = &mut self.error {
             combined.combine(error);
         } else {
@@ -34,7 +36,7 @@ impl ErrorCollector {
     /// # Returns
     ///
     /// Returns the combined diagnostic, or `None` when the collector is empty.
-    pub(crate) fn into_error(self) -> Option<syn::Error> {
+    pub(crate) fn into_error(self) -> Option<Error> {
         self.error
     }
 }

@@ -31,6 +31,7 @@ impl GenericEnvironment {
     ///
     /// Returns an environment with no visible generic parameters.
     #[must_use]
+    #[inline]
     pub(crate) fn new() -> Self {
         Self::default()
     }
@@ -86,6 +87,7 @@ impl GenericEnvironment {
     ///
     /// Returns `true` when the name is a visible type parameter.
     #[must_use]
+    #[inline]
     pub(crate) fn is_type_parameter(&self, name: &str) -> bool {
         self.type_parameters.contains(name)
     }
@@ -100,6 +102,7 @@ impl GenericEnvironment {
     ///
     /// Returns `true` when the name is a visible const parameter.
     #[must_use]
+    #[inline]
     pub(crate) fn is_const_parameter(&self, name: &str) -> bool {
         self.const_parameters.contains(name)
     }
@@ -107,6 +110,7 @@ impl GenericEnvironment {
     /// Adds one type parameter for focused generator tests.
     #[cfg(test)]
     #[must_use]
+    #[inline]
     pub(crate) fn with_type_parameter(mut self, name: impl Into<String>) -> Self {
         self.type_parameters.insert(name.into());
         self
@@ -115,6 +119,7 @@ impl GenericEnvironment {
     /// Adds one const parameter for focused generator tests.
     #[cfg(test)]
     #[must_use]
+    #[inline]
     pub(crate) fn with_const_parameter(mut self, name: impl Into<String>) -> Self {
         self.const_parameters.insert(name.into());
         self

@@ -69,6 +69,7 @@ impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     ///
     /// Returns the structured error and complete recovery payload.
     #[must_use = "the error and recovery input are required to handle the failure"]
+    #[inline]
     pub fn into_parts(self) -> (InvocationError, InvocationRecovery<'call, M>) {
         (self.error, self.recovery)
     }
@@ -78,6 +79,7 @@ impl<'call, M: InvocationMode> InvocationFailure<'call, M> {
     ///
     /// Returns the original receiver and arguments.
     #[must_use]
+    #[inline]
     pub fn into_recovery(self) -> InvocationRecovery<'call, M> {
         self.recovery
     }

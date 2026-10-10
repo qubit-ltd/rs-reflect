@@ -26,9 +26,14 @@ use crate::identity::Visibility;
 /// ```
 /// use std::any::TypeId;
 /// use std::sync::LazyLock;
-/// use qubit_reflect::descriptor::{MethodDeclarationOwner, MethodDescriptor, TraitCompleteness, TraitDefinitionDescriptor, TraitId};
+/// use qubit_reflect::descriptor::MethodDeclarationOwner;
+/// use qubit_reflect::descriptor::MethodDescriptor;
+/// use qubit_reflect::descriptor::TraitCompleteness;
+/// use qubit_reflect::descriptor::TraitDefinitionDescriptor;
+/// use qubit_reflect::descriptor::TraitId;
 /// use qubit_reflect::expression::GenericDefinitionDescriptor;
-/// use qubit_reflect::identity::{FragmentIdentity, MemberId};
+/// use qubit_reflect::identity::FragmentIdentity;
+/// use qubit_reflect::identity::MemberId;
 ///
 /// struct Marker;
 /// static GENERICS: LazyLock<GenericDefinitionDescriptor> =

@@ -8,7 +8,9 @@
 //! Lazily resolved relationships between immutable type descriptors.
 
 use std::fmt;
+use std::sync::Arc;
 use std::sync::OnceLock;
+use std::thread;
 
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeRef;
@@ -103,11 +105,11 @@ mod tests {
     #[test]
     fn test_concurrent_first_navigation_executes_resolver_once() {
         static RELATION: LazyTypeRef = LazyTypeRef::resolved::<CountedTarget>();
-        let barrier = std::sync::Arc::new(Barrier::new(32));
+        let barrier = Arc::new(Barrier::new(32));
         let handles: Vec<_> = (0..32)
             .map(|_| {
-                let barrier = std::sync::Arc::clone(&barrier);
-                std::thread::spawn(move || {
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
                     barrier.wait();
                     RELATION.get() as *const _ as usize
                 })

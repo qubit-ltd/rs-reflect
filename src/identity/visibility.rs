@@ -27,7 +27,7 @@ pub enum Visibility {
     Crate,
     /// Visible to the immediate parent module.
     Super,
-    /// Visible only in the retained source path.
+    /// Visible within the retained restricted path and its descendant modules.
     Restricted(Box<str>),
     /// Visible only in the declaring module.
     Private,

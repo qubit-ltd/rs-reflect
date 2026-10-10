@@ -25,25 +25,6 @@ use crate::error::IdError;
 pub struct CapabilityId(&'static str);
 
 impl CapabilityId {
-    /// Validates a potentially dynamic external capability name without
-    /// promoting it to a static ABI identity.
-    ///
-    /// # Parameters
-    ///
-    /// - `value`: Candidate dot-separated capability name.
-    ///
-    /// # Returns
-    ///
-    /// Returns `()` when `value` is a valid external capability ID.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IdError`] when the name is malformed or uses the reserved
-    /// `qubit.reflect` namespace.
-    pub fn validate(value: &str) -> Result<(), IdError> {
-        validate(value, IdAuthority::EXTERNAL)
-    }
-
     /// Creates an externally defined static capability ID.
     ///
     /// Returns [`IdError`] when `value` is malformed or uses the reserved
@@ -98,6 +79,25 @@ impl CapabilityId {
     pub fn as_str(&self) -> &str {
         let Self(value) = self;
         value
+    }
+
+    /// Validates a potentially dynamic external capability name without
+    /// promoting it to a static ABI identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Candidate dot-separated capability name.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` when `value` is a valid external capability ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IdError`] when the name is malformed or uses the reserved
+    /// `qubit.reflect` namespace.
+    pub fn validate(value: &str) -> Result<(), IdError> {
+        validate(value, IdAuthority::EXTERNAL)
     }
 }
 
@@ -167,7 +167,9 @@ impl IdAuthority {
 /// namespace.
 pub(crate) fn validate(value: &str, authority: IdAuthority) -> Result<(), IdError> {
     validate_segments(value)?;
-    if authority != IdAuthority::CORE && (value == "qubit.reflect" || value.starts_with("qubit.reflect.")) {
+    if authority != IdAuthority::CORE
+        && (value == "qubit.reflect" || value.starts_with("qubit.reflect."))
+    {
         return Err(IdError::ReservedNamespace { value: value.into() });
     }
     Ok(())

@@ -8,6 +8,7 @@
 
 //! Regression coverage for default trait method invocation parity.
 
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -113,7 +114,7 @@ trait DefaultInvocationMatrix {
     }
 
     #[allow(dead_code)]
-    fn default_trait_object_parameter(_: &dyn std::fmt::Debug) -> usize {
+    fn default_trait_object_parameter(_: &dyn Debug) -> usize {
         0
     }
 

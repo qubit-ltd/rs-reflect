@@ -13,8 +13,10 @@ use std::pin::Pin;
 use super::pinned_ref_invocation_failure::PinnedRefInvocationFailure;
 use super::pinned_ref_invocation_recovery::PinnedRefInvocationRecovery;
 use super::pinned_validated_ref_invocation::PinnedValidatedRefInvocation;
+use crate::descriptor::ParameterDescriptor;
 use crate::identity::MemberId;
 use crate::invoke::ArgumentExpectation;
+use crate::invoke::Invocation;
 use crate::invoke::InvocationArg;
 use crate::invoke::InvocationBinding;
 use crate::invoke::InvocationMode;
@@ -42,7 +44,7 @@ use crate::invoke::InvocationMode;
 /// ```
 pub struct PinnedRefInvocation<'call, T: ?Sized, M: InvocationMode> {
     pub(in crate::invoke::pinned) receiver: Pin<&'call T>,
-    pub(in crate::invoke::pinned) invocation: crate::invoke::Invocation<'call, M>,
+    pub(in crate::invoke::pinned) invocation: Invocation<'call, M>,
 }
 
 impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
@@ -67,7 +69,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated(arguments),
+            invocation: Invocation::associated(arguments),
         }
     }
 
@@ -95,7 +97,7 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     {
         Self {
             receiver,
-            invocation: crate::invoke::Invocation::associated_bindings(bindings),
+            invocation: Invocation::associated_bindings(bindings),
         }
     }
 
@@ -152,24 +154,6 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     /// # Errors
     ///
     /// Returns a pinned failure retaining the original receiver and bindings.
-    pub(crate) fn bind_arguments(
-        self,
-        method_identity: &MemberId,
-        parameters: &[crate::descriptor::ParameterDescriptor],
-    ) -> Result<Self, PinnedRefInvocationFailure<'call, T, M>> {
-        let Self { receiver, invocation } = self;
-        match invocation.bind_arguments(method_identity, parameters) {
-            Ok(invocation) => Ok(Self { receiver, invocation }),
-            Err(failure) => Err(PinnedRefInvocationFailure {
-                error: failure.error,
-                recovery: PinnedRefInvocationRecovery {
-                    receiver,
-                    invocation: failure.recovery.into_invocation(),
-                },
-            }),
-        }
-    }
-
     /// Validates argument count, passing modes, and exact erased types.
     ///
     /// On error no input is extracted; the returned failure retains both the
@@ -198,6 +182,38 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
                 let (_, arguments) = validated.into_parts();
                 Ok(PinnedValidatedRefInvocation { receiver, arguments })
             }
+            Err(failure) => Err(PinnedRefInvocationFailure {
+                error: failure.error,
+                recovery: PinnedRefInvocationRecovery {
+                    receiver,
+                    invocation: failure.recovery.into_invocation(),
+                },
+            }),
+        }
+    }
+
+    /// Resolves bindings against one concrete method declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `method_identity`: Identity attached to a binding failure.
+    /// - `parameters`: Method parameters in declaration order.
+    ///
+    /// # Returns
+    ///
+    /// Returns a typed invocation with arguments ordered for the declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns a pinned failure retaining the original receiver and bindings.
+    pub(crate) fn bind_arguments(
+        self,
+        method_identity: &MemberId,
+        parameters: &[ParameterDescriptor],
+    ) -> Result<Self, PinnedRefInvocationFailure<'call, T, M>> {
+        let Self { receiver, invocation } = self;
+        match invocation.bind_arguments(method_identity, parameters) {
+            Ok(invocation) => Ok(Self { receiver, invocation }),
             Err(failure) => Err(PinnedRefInvocationFailure {
                 error: failure.error,
                 recovery: PinnedRefInvocationRecovery {

@@ -190,6 +190,7 @@ impl AssociatedTypeDescriptor {
     /// # Returns
     ///
     /// Returns this declaration with its type expressions substituted.
+    #[must_use]
     pub(in crate::descriptor::trait_descriptor) fn substituted(
         self,
         substitutions: &TraitApplicationSubstitutions,

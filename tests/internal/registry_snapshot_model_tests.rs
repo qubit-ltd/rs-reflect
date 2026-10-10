@@ -112,11 +112,21 @@ pub fn check(unbounded: &[u8]) {
     let reversed = build(operations.iter().rev().copied());
     match (first, reversed) {
         (Ok(first), Ok(reversed)) => {
-            assert_eq!(observations(&first), observations(&reversed))
+            assert_eq!(
+                observations(&first),
+                observations(&reversed),
+                "registry observations must not depend on insertion order"
+            )
         }
         (Err(first), Err(reversed)) => {
-            assert!(!first.to_string().is_empty());
-            assert!(!reversed.to_string().is_empty());
+            assert!(
+                !first.to_string().is_empty(),
+                "the forward snapshot error must include a diagnostic"
+            );
+            assert!(
+                !reversed.to_string().is_empty(),
+                "the reversed snapshot error must include a diagnostic"
+            );
         }
         _ => panic!("validity must not depend on insertion order"),
     }
@@ -132,14 +142,23 @@ pub fn check(unbounded: &[u8]) {
     };
     let first = isolated(value);
     let second = isolated(value + 1);
-    assert!(first.types().is_empty());
-    assert!(second.types().is_empty());
+    assert!(
+        first.types().is_empty(),
+        "an isolated fixture must contain no registered types"
+    );
+    assert!(
+        second.types().is_empty(),
+        "the second isolated fixture must contain no registered types"
+    );
     let before = observations(&first);
     let mut duplicate = RegistrySnapshotBuilder::new();
     duplicate
         .add_type(descriptor(0), source(0))
         .add_type(descriptor(0), source(0));
-    assert!(duplicate.build().is_err());
+    assert!(
+        duplicate.build().is_err(),
+        "duplicate type facts must be rejected"
+    );
     let mut conflicting = RegistrySnapshotBuilder::new();
     for id in 0..2 {
         conflicting.add_type_capabilities(
@@ -148,18 +167,27 @@ pub fn check(unbounded: &[u8]) {
             source(id),
         );
     }
-    assert!(conflicting.build().is_err());
-    assert_eq!(observations(&first), before);
+    assert!(
+        conflicting.build().is_err(),
+        "conflicting adapter values must be rejected"
+    );
+    assert_eq!(
+        observations(&first),
+        before,
+        "building invalid snapshots must not mutate an existing registry"
+    );
     assert_eq!(
         first
             .capability(descriptor(0), key(0))
             .expect("first snapshot capability contract must match"),
-        Some(&value)
+        Some(&value),
+        "the first snapshot must retain its own adapter value"
     );
     assert_eq!(
         second
             .capability(descriptor(0), key(0))
             .expect("second snapshot capability contract must match"),
-        Some(&(value + 1))
+        Some(&(value + 1)),
+        "the second snapshot must retain its own adapter value"
     );
 }

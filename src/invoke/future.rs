@@ -133,6 +133,17 @@ pub struct ReflectedFuture<'call, M: InvocationMode + 'call> {
 
 impl<'call> ReflectedFuture<'call, Local> {
     /// Boxes a local future without polling it.
+    ///
+    /// # Parameters
+    ///
+    /// - `future`: The future producing an invocation result for this call
+    ///   lifetime. It may be non-`Send`.
+    ///
+    /// # Returns
+    ///
+    /// A boxed reflected future that preserves the future's call lifetime and
+    /// local thread boundary.
+    #[must_use]
     pub fn new<F>(future: F) -> Self
     where
         F: Future<Output = InvocationOutput<'call, Local>> + 'call,
@@ -145,6 +156,17 @@ impl<'call> ReflectedFuture<'call, Local> {
 
 impl<'call> ReflectedFuture<'call, ThreadSafe> {
     /// Boxes a `Send` future without polling it.
+    ///
+    /// # Parameters
+    ///
+    /// - `future`: The `Send` future producing an invocation result for this
+    ///   call lifetime.
+    ///
+    /// # Returns
+    ///
+    /// A boxed reflected future that preserves the future's call lifetime and
+    /// `Send` thread boundary.
+    #[must_use]
     pub fn new<F>(future: F) -> Self
     where
         F: Future<Output = InvocationOutput<'call, ThreadSafe>> + Send + 'call,

@@ -34,6 +34,7 @@ use crate::registry::TraitCandidates;
 use crate::registry::TypeCandidates;
 use crate::registry::TypeDefinitionCandidates;
 use crate::registry::capability_member::CapabilityMember;
+use crate::registry::fragment::CapabilityTarget;
 use crate::registry::indexes::RegistryIndexes;
 use crate::registry::registry_builder::build_inventory_registry;
 use crate::registry::registry_builder::initialize_cached;
@@ -473,7 +474,7 @@ impl ReflectRegistry {
         let Some(capability) = capabilities.descriptor(capability_id) else {
             return Ok(None);
         };
-        let target = crate::registry::fragment::CapabilityTarget::Type(descriptor.type_id());
+        let target = CapabilityTarget::Type(descriptor.type_id());
         let origin = self
             .indexes
             .capability_origins
@@ -504,7 +505,7 @@ impl ReflectRegistry {
         let capabilities = self.indexes.capabilities_by_target.get(&descriptor.type_id())?;
         let capability = capabilities.descriptor(capability_id)?;
         self.indexes.capability_fragments.get(&(
-            crate::registry::fragment::CapabilityTarget::Type(descriptor.type_id()),
+            CapabilityTarget::Type(descriptor.type_id()),
             *capability.id(),
         ))
     }
@@ -525,7 +526,7 @@ impl ReflectRegistry {
     #[must_use]
     pub fn definition_capability_origin(&self, id: TypeDefinitionId, capability_id: &str) -> Option<CapabilityOrigin> {
         let capability = self.definition_capability_by_id(id, capability_id)?;
-        let target = crate::registry::fragment::CapabilityTarget::TypeDefinition(id);
+        let target = CapabilityTarget::TypeDefinition(id);
         Some(
             self.indexes
                 .capability_origins
@@ -551,7 +552,7 @@ impl ReflectRegistry {
         let capabilities = self.indexes.capabilities_by_definition.get(&id)?;
         let capability = capabilities.descriptor(capability_id)?;
         self.indexes.capability_fragments.get(&(
-            crate::registry::fragment::CapabilityTarget::TypeDefinition(id),
+            CapabilityTarget::TypeDefinition(id),
             *capability.id(),
         ))
     }
@@ -717,7 +718,7 @@ impl ReflectRegistry {
     ) -> impl Iterator<Item = CapabilityMember<'registry, &'static TypeDescriptor, A>> + 'registry {
         self.types.iter().copied().filter_map(move |descriptor| {
             let type_id = descriptor.type_id();
-            let target = crate::registry::fragment::CapabilityTarget::Type(type_id);
+            let target = CapabilityTarget::Type(type_id);
             let capabilities = self.indexes.capabilities_by_target.get(&type_id)?;
             let capability = capabilities.descriptor(key.id().as_str())?;
             let source = self
@@ -764,7 +765,7 @@ impl ReflectRegistry {
     ) -> impl Iterator<Item = CapabilityMember<'registry, &'static TypeDefinitionDescriptor, A>> + 'registry {
         self.definitions.iter().copied().filter_map(move |definition| {
             let definition_id = definition.id();
-            let target = crate::registry::fragment::CapabilityTarget::TypeDefinition(definition_id);
+            let target = CapabilityTarget::TypeDefinition(definition_id);
             let capabilities = self.indexes.capabilities_by_definition.get(&definition_id)?;
             let capability = capabilities.descriptor(key.id().as_str())?;
             let source = self
@@ -807,7 +808,7 @@ impl ReflectRegistry {
                     .indexes
                     .capability_fragments
                     .get(&(
-                        crate::registry::fragment::CapabilityTarget::Type(*type_id),
+                        CapabilityTarget::Type(*type_id),
                         *capability.id(),
                     ))
                     .expect("every effective capability has a retained source fragment");
@@ -838,7 +839,7 @@ impl ReflectRegistry {
     pub fn capability_only_definition_targets(
         &self,
         capability_id: &str,
-    ) -> Vec<(crate::TypeDefinitionId, &FragmentIdentity)> {
+    ) -> Vec<(TypeDefinitionId, &FragmentIdentity)> {
         let mut targets = self
             .indexes
             .capabilities_by_definition
@@ -852,7 +853,7 @@ impl ReflectRegistry {
                     .indexes
                     .capability_fragments
                     .get(&(
-                        crate::registry::fragment::CapabilityTarget::TypeDefinition(*id),
+                        CapabilityTarget::TypeDefinition(*id),
                         *capability.id(),
                     ))
                     .expect("every effective definition capability has a retained source fragment");

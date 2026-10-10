@@ -55,6 +55,7 @@ impl ReferenceTypeExpression {
     ///
     /// Returns the reference expression with empty diagnostic text.
     #[must_use]
+    #[inline]
     pub fn new(lifetime: LifetimeExpression, mutable: bool, target: TypeExpression) -> Self {
         Self {
             lifetime,
@@ -69,6 +70,7 @@ impl ReferenceTypeExpression {
     ///
     /// Returns the named, static, elided, or placeholder lifetime.
     #[must_use]
+    #[inline]
     pub fn lifetime(&self) -> &LifetimeExpression {
         &self.lifetime
     }
@@ -78,6 +80,7 @@ impl ReferenceTypeExpression {
     ///
     /// Returns `true` for `&mut` and `false` for a shared reference.
     #[must_use]
+    #[inline]
     pub fn is_mutable(&self) -> bool {
         self.mutable
     }
@@ -87,6 +90,7 @@ impl ReferenceTypeExpression {
     ///
     /// Returns the target type expression.
     #[must_use]
+    #[inline]
     pub fn target(&self) -> &TypeExpression {
         &self.target
     }
@@ -95,7 +99,7 @@ impl ReferenceTypeExpression {
     /// # Returns
     ///
     /// Returns the source-oriented spelling, or `None` when absent.
-    #[must_use]
+    #[inline]
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -110,6 +114,7 @@ impl ReferenceTypeExpression {
     /// Returns the expression with diagnostic text attached; structural
     /// identity is unchanged.
     #[must_use]
+    #[inline]
     pub fn with_diagnostic(mut self, value: impl Into<Box<str>>) -> Self {
         self.diagnostic = DiagnosticText::from(value.into());
         self

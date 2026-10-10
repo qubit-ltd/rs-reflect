@@ -8,6 +8,8 @@
 
 //! Associated-constant shape analysis used by trait expansion.
 
+use std::collections::HashSet;
+
 use crate::ir::GenericBoundIr;
 use crate::ir::PathArgumentIr;
 use crate::ir::PathArgumentsIr;
@@ -25,7 +27,7 @@ use crate::ir::TypeKindIr;
 /// Returns whether every lifetime and type shape is statically resolvable.
 #[must_use]
 pub(super) fn has_proven_static_shape(ty: &TypeIr) -> bool {
-    has_proven_static_shape_in(ty, &std::collections::HashSet::new(), false)
+    has_proven_static_shape_in(ty, &HashSet::new(), false)
 }
 
 /// Recursively checks a type while tracking enclosing lifetime binders.
@@ -44,7 +46,7 @@ pub(super) fn has_proven_static_shape(ty: &TypeIr) -> bool {
 #[must_use]
 fn has_proven_static_shape_in(
     ty: &TypeIr,
-    bound_lifetimes: &std::collections::HashSet<String>,
+    bound_lifetimes: &HashSet<String>,
     callable_elision: bool,
 ) -> bool {
     match &ty.kind {

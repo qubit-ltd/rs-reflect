@@ -862,33 +862,80 @@ fn expand_concrete_impl(
                 .to_owned();
             let receiver = match &method.receiver {
                 Some(receiver) => match receiver.kind {
-                    ReceiverKindIr::Value => quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Owned)),
-                    ReceiverKindIr::SharedReference => quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Shared)),
-                    ReceiverKindIr::MutableReference => quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Mutable)),
-                    ReceiverKindIr::Typed => { let value = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span); quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Explicit(#value))) }
+                    ReceiverKindIr::Value => {
+                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Owned))
+                    }
+                    ReceiverKindIr::SharedReference => {
+                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Shared))
+                    }
+                    ReceiverKindIr::MutableReference => {
+                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Mutable))
+                    }
+                    ReceiverKindIr::Typed => {
+                        let value = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span);
+                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Explicit(#value)))
+                    }
                 },
                 None => quote!(None),
             };
             let parameters = method.parameters.iter().map(|parameter| {
                 let name = parameter.name.as_deref().map(|name| syn::LitStr::new(name, parameter.span));
-                let name = match name { Some(value) => quote!(Some(#value)), None => quote!(None) };
-                let pattern = match parameter.pattern.kind {
-                    ParameterPatternKindIr::Identifier => quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Identifier),
-                    ParameterPatternKindIr::Wildcard => quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Wildcard),
-                    ParameterPatternKindIr::Destructure => { let source = syn::LitStr::new(&parameter.pattern.source, parameter.span); quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Destructure(#source.into())) }
+                let name = match name {
+                    Some(value) => quote!(Some(#value)),
+                    None => quote!(None),
                 };
-                let passing = match &parameter.ty.kind { TypeKindIr::Reference { mutable: true, .. } => quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::MutableBorrow), TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::SharedBorrow), _ => quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::Owned) };
+                let pattern = match parameter.pattern.kind {
+                    ParameterPatternKindIr::Identifier => {
+                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Identifier)
+                    }
+                    ParameterPatternKindIr::Wildcard => {
+                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Wildcard)
+                    }
+                    ParameterPatternKindIr::Destructure => {
+                        let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
+                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Destructure(#source.into()))
+                    }
+                };
+                let passing = match &parameter.ty.kind {
+                    TypeKindIr::Reference { mutable: true, .. } => {
+                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::MutableBorrow)
+                    }
+                    TypeKindIr::Reference { .. } => {
+                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::SharedBorrow)
+                    }
+                    _ => quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::Owned),
+                };
                 let ty = super::traits::type_expression(
                     &parameter.ty,
                     &method_environment,
                     &facade,
                 );
                 let parameter_index = parameter.index;
-                quote!(#facade::__private::codegen_v3::descriptor::ParameterDescriptor::new(#parameter_index, #name, #pattern, #passing, #ty, None))
+                quote!(#facade::__private::codegen_v3::descriptor::ParameterDescriptor::new(
+                    #parameter_index,
+                    #name,
+                    #pattern,
+                    #passing,
+                    #ty,
+                    None,
+                ))
             });
             let return_value = match &method.return_type {
                 ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v3::descriptor::ReturnDescriptor::unit()),
-                ReturnTypeIr::Type(ty) => { let expression = super::traits::type_expression(ty, &method_environment, &facade); let kind = match &ty.kind { TypeKindIr::Never => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Never), TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Reference), TypeKindIr::ImplTrait { .. } => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Opaque), _ => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Concrete) }; quote!(#facade::__private::codegen_v3::descriptor::ReturnDescriptor::new(#kind, Some(#expression), None)) }
+                ReturnTypeIr::Type(ty) => {
+                    let expression = super::traits::type_expression(ty, &method_environment, &facade);
+                    let kind = match &ty.kind {
+                        TypeKindIr::Never => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Never),
+                        TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Reference),
+                        TypeKindIr::ImplTrait { .. } => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Opaque),
+                        _ => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Concrete),
+                    };
+                    quote!(#facade::__private::codegen_v3::descriptor::ReturnDescriptor::new(
+                        #kind,
+                        Some(#expression),
+                        None,
+                    ))
+                }
             };
             let generic_definition = super::traits::generic_definition(&method.generics, method.span, &facade);
             let qualifiers = &method.qualifiers;

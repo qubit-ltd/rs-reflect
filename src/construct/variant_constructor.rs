@@ -130,6 +130,7 @@ impl<M: Mode + 'static> VariantConstructor<M> {
     /// # Returns
     ///
     /// Returns policies corresponding to the variant fields by source index.
+    #[must_use]
     #[inline]
     pub const fn fields(&self) -> &'static [ConstructionField<M>] {
         self.fields

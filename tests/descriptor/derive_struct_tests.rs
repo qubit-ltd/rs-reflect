@@ -7,23 +7,25 @@
 // =============================================================================
 
 //! Integration tests for `Reflect` struct derives.
+use std::collections::BTreeMap;
 use std::process::Command;
 use std::process::Stdio;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-use qubit_reflect as reflect;
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::StructKind;
 use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::TypeRef;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::ReflectedMut;
 use qubit_reflect::value::ReflectedOwned;
 use qubit_reflect::value::ReflectedRef;
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
 struct DerivedNamed {
@@ -89,7 +91,7 @@ struct RecursiveVectorNode {
 struct RecursiveCompositeNode {
     array: [Box<RecursiveCompositeNode>; 1],
     tuple: (Box<RecursiveCompositeNode>,),
-    map: std::collections::BTreeMap<u8, RecursiveCompositeNode>,
+    map: BTreeMap<u8, RecursiveCompositeNode>,
 }
 
 /// Runs one exact integration test in a child process and fails after a
@@ -392,14 +394,14 @@ fn test_derive_reflect_preserves_non_named_struct_shapes() {
 /// Verifies type-level opacity does not impose reflection bounds on its fields.
 #[test]
 fn test_derive_reflect_type_level_opaque_supports_unreflectable_generic_members() {
-    let descriptor = TypeDescriptor::of::<DerivedOpaque<std::rc::Rc<()>>>();
+    let descriptor = TypeDescriptor::of::<DerivedOpaque<Rc<()>>>();
     let opaque = DerivedOpaque {
-        value: std::rc::Rc::new(()),
+        value: Rc::new(()),
     };
 
     assert_eq!(descriptor.kind(), TypeKind::Opaque);
     assert!(descriptor.fields().is_empty());
-    assert_eq!(std::rc::Rc::strong_count(&opaque.value), 1);
+    assert_eq!(Rc::strong_count(&opaque.value), 1);
 }
 
 /// Verifies generic specializations receive distinct interned descriptors.
@@ -433,11 +435,11 @@ fn test_derive_reflect_generic_struct_resolves_field_type_per_specialization() {
 /// `Reflect`.
 #[test]
 fn test_derive_reflect_opaque_generic_field_does_not_require_reflect_bound() {
-    let descriptor = TypeDescriptor::of::<DerivedOpaqueMember<std::rc::Rc<()>>>();
+    let descriptor = TypeDescriptor::of::<DerivedOpaqueMember<Rc<()>>>();
 
     assert!(matches!(
         descriptor.field_at(0).expect("opaque field").field_type(),
-        reflect::descriptor::TypeRef::Opaque(_)
+        TypeRef::Opaque(_)
     ));
 }
 

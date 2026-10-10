@@ -8,6 +8,7 @@
 
 //! Integration tests for the immutable distributed reflection registry.
 use std::any::TypeId;
+use std::any::type_name;
 use std::sync::LazyLock;
 use std::sync::OnceLock;
 
@@ -528,7 +529,7 @@ fn test_registry_runtime_discovers_and_indexes_types_in_stable_order() {
         .expect("the late descriptor must be enumerated");
     assert!(early_position < late_position);
 
-    let type_candidates = registry.find_by_type_name(std::any::type_name::<EarlyType>());
+    let type_candidates = registry.find_by_type_name(type_name::<EarlyType>());
     assert_eq!(type_candidates.len(), 1);
     let type_name_matches: Vec<_> = type_candidates.into_iter().map(TypeDescriptor::type_id).collect();
     assert_eq!(type_name_matches, [TypeId::of::<EarlyType>()]);

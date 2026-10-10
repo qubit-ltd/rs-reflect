@@ -96,90 +96,6 @@ impl ImplDescriptor {
         ImplDescriptorBuilder::new(definition, target_type)
     }
 
-    /// Returns whether two descriptors represent the same concrete impl
-    /// application.
-    ///
-    /// # Parameters
-    ///
-    /// - `other`: Descriptor to compare with this application.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` when both descriptors identify the same impl application.
-    #[must_use]
-    pub(crate) fn same_application(&self, other: &Self) -> bool {
-        self.kind() == other.kind()
-            && self.definition().fragment_identity() == other.definition().fragment_identity()
-            && self.arguments() == other.arguments()
-            && self.target_type().type_id() == other.target_type().type_id()
-    }
-
-    /// Orders implementations by kind, namespace, and source identity.
-    ///
-    /// # Parameters
-    ///
-    /// - `other`: Descriptor to compare with this implementation.
-    ///
-    /// # Returns
-    ///
-    /// Returns the deterministic ordering between the implementations.
-    #[must_use]
-    pub(crate) fn registry_cmp(&self, other: &Self) -> Ordering {
-        self.kind()
-            .registry_rank()
-            .cmp(&other.kind().registry_rank())
-            .then_with(|| self.namespace_cmp(other))
-            .then_with(|| {
-                self.definition()
-                    .fragment_identity()
-                    .cmp(other.definition().fragment_identity())
-            })
-    }
-
-    /// Orders implementation namespaces deterministically.
-    ///
-    /// # Parameters
-    ///
-    /// - `other`: Descriptor whose namespace is compared with this one.
-    ///
-    /// # Returns
-    ///
-    /// Returns the ordering between the implementation namespaces.
-    #[must_use]
-    fn namespace_cmp(&self, other: &Self) -> Ordering {
-        match (self.implemented_trait(), other.implemented_trait()) {
-            (None, None) => Ordering::Equal,
-            (None, Some(_)) => Ordering::Less,
-            (Some(_), None) => Ordering::Greater,
-            (Some(left), Some(right)) => match (left.definition().trait_id(), right.definition().trait_id()) {
-                (TraitId::Reflected(_), TraitId::Reflected(_)) => left.rust_path().cmp(right.rust_path()),
-                (TraitId::External(left), TraitId::External(right)) => left.cmp(right),
-                (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
-                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
-            },
-        }
-    }
-
-    /// Returns whether this implementation belongs to a lookup namespace.
-    ///
-    /// # Parameters
-    ///
-    /// - `qualifier`: Namespace restriction for the lookup.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` when this implementation matches the qualifier.
-    #[must_use]
-    pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
-        match qualifier {
-            MethodQualifier::Any => true,
-            MethodQualifier::Inherent => self.kind() == ImplKind::Inherent,
-            MethodQualifier::Trait(expected) => self
-                .implemented_trait()
-                .is_some_and(|actual| actual.same_application(expected)),
-        }
-    }
-
     /// Returns the generic or blanket impl definition.
     ///
     /// # Returns
@@ -339,6 +255,90 @@ impl ImplDescriptor {
             }
         }
         found.map_or(MethodLookup::Missing, MethodLookup::Unique)
+    }
+
+    /// Returns whether two descriptors represent the same concrete impl
+    /// application.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor to compare with this application.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when both descriptors identify the same impl application.
+    #[must_use]
+    pub(crate) fn same_application(&self, other: &Self) -> bool {
+        self.kind() == other.kind()
+            && self.definition().fragment_identity() == other.definition().fragment_identity()
+            && self.arguments() == other.arguments()
+            && self.target_type().type_id() == other.target_type().type_id()
+    }
+
+    /// Orders implementations by kind, namespace, and source identity.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor to compare with this implementation.
+    ///
+    /// # Returns
+    ///
+    /// Returns the deterministic ordering between the implementations.
+    #[must_use]
+    pub(crate) fn registry_cmp(&self, other: &Self) -> Ordering {
+        self.kind()
+            .registry_rank()
+            .cmp(&other.kind().registry_rank())
+            .then_with(|| self.namespace_cmp(other))
+            .then_with(|| {
+                self.definition()
+                    .fragment_identity()
+                    .cmp(other.definition().fragment_identity())
+            })
+    }
+
+    /// Returns whether this implementation belongs to a lookup namespace.
+    ///
+    /// # Parameters
+    ///
+    /// - `qualifier`: Namespace restriction for the lookup.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when this implementation matches the qualifier.
+    #[must_use]
+    pub(crate) fn matches_qualifier(&self, qualifier: MethodQualifier<'_>) -> bool {
+        match qualifier {
+            MethodQualifier::Any => true,
+            MethodQualifier::Inherent => self.kind() == ImplKind::Inherent,
+            MethodQualifier::Trait(expected) => self
+                .implemented_trait()
+                .is_some_and(|actual| actual.same_application(expected)),
+        }
+    }
+
+    /// Orders implementation namespaces deterministically.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: Descriptor whose namespace is compared with this one.
+    ///
+    /// # Returns
+    ///
+    /// Returns the ordering between the implementation namespaces.
+    #[must_use]
+    fn namespace_cmp(&self, other: &Self) -> Ordering {
+        match (self.implemented_trait(), other.implemented_trait()) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(left), Some(right)) => match (left.definition().trait_id(), right.definition().trait_id()) {
+                (TraitId::Reflected(_), TraitId::Reflected(_)) => left.rust_path().cmp(right.rust_path()),
+                (TraitId::External(left), TraitId::External(right)) => left.cmp(right),
+                (TraitId::Reflected(_), TraitId::External(_)) => Ordering::Less,
+                (TraitId::External(_), TraitId::Reflected(_)) => Ordering::Greater,
+            },
+        }
     }
 }
 

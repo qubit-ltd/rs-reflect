@@ -38,6 +38,7 @@ pub type ConstructionDefaultProvider<M> = fn() -> DynamicOwned<M>;
 /// let policy = ConstructionFieldPolicy::<Local>::Required;
 /// assert!(matches!(policy, ConstructionFieldPolicy::Required));
 /// ```
+#[must_use]
 pub enum ConstructionFieldPolicy<M: Mode> {
     /// The caller must supply this field during from-zero construction.
     Required,
@@ -281,6 +282,7 @@ impl<M: Mode> fmt::Debug for ConstructionField<M> {
 /// let policy = UpdateFieldPolicy::Allowed;
 /// assert_eq!(policy, UpdateFieldPolicy::Allowed);
 /// ```
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum UpdateFieldPolicy {
     /// The generated updater accepts an exact whole-field replacement.

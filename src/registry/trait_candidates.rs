@@ -95,6 +95,7 @@ impl<'registry> IntoIterator for TraitCandidates<'registry> {
     /// # Returns
     ///
     /// Returns an exact-size iterator over the candidates.
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.descriptors.iter().copied()
     }

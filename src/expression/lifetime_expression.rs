@@ -49,6 +49,7 @@ impl LifetimeExpression {
     /// # Errors
     ///
     /// Returns [`ExpressionError::EmptyName`] when `name` is empty.
+    #[inline]
     pub fn named(name: impl Into<Box<str>>) -> Result<Self, ExpressionError> {
         ExpressionName::new(name).map(Self::Named)
     }

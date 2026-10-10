@@ -16,6 +16,9 @@ use crate::access::FieldAccessError;
 use crate::access::FieldAccessOperation;
 use crate::access::FieldIdentity;
 use crate::access::FieldSetFailure;
+use crate::access::field_adapter::dynamic_mut_type_id;
+use crate::access::field_adapter::dynamic_owned_type_id;
+use crate::access::field_adapter::dynamic_ref_type_id;
 use crate::capability::CapabilityConflictKind;
 use crate::capability::TypeCapabilities;
 use crate::capability::clone_descriptor;
@@ -31,6 +34,7 @@ use crate::value::DynamicMut;
 use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
 use crate::value::Local;
+use crate::value::ReflectedOwned;
 
 fn rejected_field_value(value: u8) -> FieldSetFailure {
     let field = FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
@@ -41,11 +45,11 @@ fn rejected_field_value(value: u8) -> FieldSetFailure {
         },
         field,
         Some("value"),
-        crate::value::ReflectedOwned::new(value),
+        ReflectedOwned::new(value),
     )
 }
 
-fn owned_u8(value: crate::value::ReflectedOwned) -> u8 {
+fn owned_u8(value: ReflectedOwned) -> u8 {
     match value.downcast::<u8>() {
         Ok(value) => value,
         Err(_) => panic!("test recovery must preserve the original u8"),
@@ -115,14 +119,14 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
         field: direct,
         operation: FieldAccessOperation::Set,
     };
-    let failure: FieldSetFailure<crate::value::Local> = FieldSetFailure::after_execution(adapter_error.clone());
+    let failure: FieldSetFailure<Local> = FieldSetFailure::after_execution(adapter_error.clone());
     assert!(failure.recovery().is_none());
     match failure.into_recovery() {
         Ok(_) => panic!("an adapter failure must not synthesize recovery"),
         Err(error) => assert_eq!(error, adapter_error),
     }
     assert_eq!(
-        FieldSetFailure::<crate::value::Local>::after_execution(adapter_error.clone()).into_error(),
+        FieldSetFailure::<Local>::after_execution(adapter_error.clone()).into_error(),
         adapter_error
     );
 }
@@ -131,17 +135,17 @@ fn test_field_failure_recovery_preserves_identity_phase_and_owned_value() {
 fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
     let shared = 7_u8;
     assert_eq!(
-        crate::access::field_adapter::dynamic_ref_type_id(&DynamicRef::<Local>::new(&shared)),
+        dynamic_ref_type_id(&DynamicRef::<Local>::new(&shared)),
         TypeId::of::<u8>(),
     );
     let mut mutable = 8_u16;
     assert_eq!(
-        crate::access::field_adapter::dynamic_mut_type_id(&DynamicMut::<Local>::new(&mut mutable)),
+        dynamic_mut_type_id(&DynamicMut::<Local>::new(&mut mutable)),
         TypeId::of::<u16>(),
     );
     let owned = DynamicOwned::<Local>::new(9_u32);
     assert_eq!(
-        crate::access::field_adapter::dynamic_owned_type_id(&owned),
+        dynamic_owned_type_id(&owned),
         TypeId::of::<u32>(),
     );
 
