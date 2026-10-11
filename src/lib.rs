@@ -34,6 +34,37 @@
 //! assert_eq!(value[0], "Ada");
 //! ```
 //!
+//! To reflect an application record and update a named field, enable the
+//! default `derive` feature:
+//!
+//! ```rust
+//! # #![allow(proc_macro_derive_resolution_fallback)]
+//! # #[cfg(feature = "derive")]
+//! # fn main() {
+//! use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
+//!
+//! #[derive(Reflect)]
+//! #[reflect(crate = qubit_reflect)]
+//! struct Customer {
+//!     email: String,
+//! }
+//!
+//! let mut customer = Customer { email: String::from("old@example.com") };
+//! let email = TypeDescriptor::of::<Customer>()
+//!     .field("email")
+//!     .expect("derived field");
+//! email
+//!     .set(
+//!         ReflectedMut::new(&mut customer),
+//!         ReflectedOwned::new(String::from("new@example.com")),
+//!     )
+//!     .expect("exactly typed replacement");
+//! assert_eq!(customer.email, "new@example.com");
+//! # }
+//! # #[cfg(not(feature = "derive"))]
+//! # fn main() {}
+//! ```
+//!
 //! # Guides
 //!
 //! - [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
