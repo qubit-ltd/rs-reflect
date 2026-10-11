@@ -10,5 +10,6 @@
 
 mod declaration;
 
+#[cfg(test)]
 pub(crate) use declaration::validate_declaration;
 pub(crate) use declaration::validation_error;

@@ -429,10 +429,10 @@ fn validate_query_name_scope<'a>(
         if let Some((existing_rust_name, _)) = names.insert(query_name.clone(), (rust_name.clone(), diagnostic_span)) {
             errors.push(syn::Error::new(
                 diagnostic_span,
-                format!(concat!(
-                    "{member_kind} query name `{query_name}` for Rust member `{rust_name}` ",
-                    "conflicts with Rust member `{existing_rust_name}`"
-                )),
+                format!(
+                    "{} query name `{}` for Rust member `{}` conflicts with Rust member `{}`",
+                    member_kind, query_name, rust_name, existing_rust_name
+                ),
             ));
         }
     }
@@ -517,10 +517,9 @@ fn validate_external_traits(declaration: &TraitDeclarationIr, errors: &mut Error
         if !paths.contains(path) && !reflected_paths.contains(path) {
             errors.push(syn::Error::new(
                 declaration.span,
-                format!(concat!(
-                    "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or ",
-                    "#[reflect(external_trait({path}, id = \"...\"))]"
-                )),
+                format!(
+                    "direct supertrait `{path}` needs #[reflect(supertrait({path}))] or #[reflect(external_trait({path}, id = \"...\"))]"
+                ),
             ));
         }
     }
