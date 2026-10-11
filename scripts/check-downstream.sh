@@ -146,6 +146,9 @@ if [[ -n "$EVIDENCE_DIR" ]]; then
         --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
     log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
         --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" \
+        -p qubit-platform-core --lib --tests
+    log_and_run cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
+        --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" \
         -p qubit-platform-testkit
 else
     cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$MODEL_ROOT/Cargo.toml" --workspace --all-features --lib --tests
@@ -156,5 +159,8 @@ else
             --lib --no-default-features --features "$feature"
     done
     cargo +"$RS_CI_BUILD_TOOLCHAIN" check --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" --workspace
+    cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked \
+        --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" \
+        -p qubit-platform-core --lib --tests
     cargo +"$RS_CI_BUILD_TOOLCHAIN" test --locked --manifest-path "$DOWNSTREAM_ROOT/Cargo.toml" -p qubit-platform-testkit
 fi
