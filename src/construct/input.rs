@@ -241,7 +241,6 @@ impl<M: Mode> ConstructionField<M> {
     /// # Returns
     ///
     /// Returns the copyable policy and its provider, when present.
-    #[must_use]
     #[inline]
     pub const fn policy(&self) -> ConstructionFieldPolicy<M> {
         self.policy
@@ -383,7 +382,6 @@ impl UpdateField {
     /// # Returns
     ///
     /// Returns the copyable update policy.
-    #[must_use]
     #[inline]
     pub const fn policy(&self) -> UpdateFieldPolicy {
         self.policy

@@ -12,7 +12,7 @@
 use crate::error::RegistryError;
 use crate::registry::BenchmarkRegistryFacts as RegistryBenchmarkFacts;
 use crate::registry::ReflectRegistry;
-use crate::registry::aggregate_benchmark_registry_facts;
+use crate::registry::aggregate_benchmark_registry_facts as aggregate_registry_benchmark_facts;
 use crate::registry::prepare_benchmark_registry_facts as prepare_registry_benchmark_facts;
 
 /// Prepared synthetic facts for post-materialization registry aggregation
@@ -56,5 +56,5 @@ pub fn prepare_benchmark_registry_facts(fragment_count: usize) -> BenchmarkRegis
 #[doc(hidden)]
 pub fn aggregate_benchmark_registry_facts(facts: &BenchmarkRegistryFacts) -> Result<ReflectRegistry, RegistryError> {
     let BenchmarkRegistryFacts(facts) = facts;
-    aggregate_benchmark_registry_facts(facts)
+    aggregate_registry_benchmark_facts(facts)
 }

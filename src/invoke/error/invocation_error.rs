@@ -80,7 +80,6 @@ impl InvocationError {
     /// # Returns
     ///
     /// Returns the reason validation rejected the invocation.
-    #[must_use]
     #[inline]
     pub const fn kind(&self) -> &InvocationErrorKind {
         &self.kind

@@ -8,9 +8,7 @@
 //! Lazily resolved relationships between immutable type descriptors.
 
 use std::fmt;
-use std::sync::Arc;
 use std::sync::OnceLock;
-use std::thread;
 
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeRef;
@@ -73,10 +71,12 @@ fn resolve<T: Reflect + ?Sized>() -> TypeRef {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::sync::Barrier;
     use std::sync::OnceLock;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
+    use std::thread;
 
     use super::LazyTypeRef;
     use crate::descriptor::Reflect;
