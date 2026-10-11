@@ -471,9 +471,15 @@ fn test_derive_reflect_honors_field_names_visibility_and_access_policies() {
     assert_eq!(payload.query_name(), Some("payload"));
     assert_eq!(
         payload.visibility().as_declared(),
-        Some(&reflect::identity::Visibility::Crate)
+        Some(&qubit_reflect::identity::Visibility::Crate)
     );
-    assert_eq!(payload.access_policy(), reflect::access::FieldAccessPolicy::ReadOnly);
-    assert_eq!(skipped.access_policy(), reflect::access::FieldAccessPolicy::Skipped);
+    assert_eq!(
+        payload.access_policy(),
+        qubit_reflect::access::FieldAccessPolicy::ReadOnly
+    );
+    assert_eq!(
+        skipped.access_policy(),
+        qubit_reflect::access::FieldAccessPolicy::Skipped
+    );
     assert_eq!(values.skipped, "hidden");
 }

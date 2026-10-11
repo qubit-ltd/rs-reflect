@@ -24,11 +24,13 @@ fn conflicting_key() -> CapabilityKey<fn()> {
 }
 
 /// Provides the first conflicting capability declaration.
+#[allow(clippy::extra_unused_type_parameters)] // The derive provider contract supplies the reflected type parameter.
 fn first_provider<T: 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(conflicting_key(), first_adapter as fn())
 }
 
 /// Provides the second conflicting capability declaration.
+#[allow(clippy::extra_unused_type_parameters)] // The derive provider contract supplies the reflected type parameter.
 fn second_provider<T: 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(conflicting_key(), second_adapter as fn())
 }

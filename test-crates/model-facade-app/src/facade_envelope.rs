@@ -9,7 +9,9 @@
 //! Generic model facade fixture declaration.
 
 use model_facade_derive::model_reflect;
+#[cfg(test)]
 use model_facade_runtime::Reflect;
+#[cfg(test)]
 use model_facade_runtime::ReflectRegistry;
 
 /// A generic facade fixture that exercises generated expression metadata.
