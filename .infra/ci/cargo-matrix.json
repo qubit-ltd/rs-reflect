@@ -71,10 +71,7 @@
         "registry-types",
         "registry-impl-a",
         "registry-impl-b",
-        "registry-app",
-        "model-facade-runtime",
-        "model-facade-derive",
-        "model-facade-app"
+        "registry-app"
       ]
     }
   ]

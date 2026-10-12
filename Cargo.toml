@@ -31,9 +31,6 @@ members = [
     "test-crates/registry-impl-a",
     "test-crates/registry-impl-b",
     "test-crates/registry-app",
-    "test-crates/model-facade-runtime",
-    "test-crates/model-facade-derive",
-    "test-crates/model-facade-app",
     "test-crates/macro-runtime-only",
     "test-crates/conditional-feature",
 ]
