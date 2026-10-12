@@ -7,10 +7,10 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 
-`qubit-reflect-derive` provides the `Reflect`, `reflect`, and `reflect_impl` procedural macros used to generate reflection metadata and checked operation adapters. Most applications should depend on `qubit-reflect` with its default `derive` feature, which re-exports these macros together with the matching runtime API. This crate is useful when a facade or macro integration needs to depend on the procedural macros directly.
+`qubit-reflect-derive` provides the `Reflect`, `reflect`, and `reflect_impl` procedural macros used to generate reflection metadata and checked operation adapters. Applications normally depend directly on `qubit-reflect` with its default `derive` feature, which exposes these macros together with the matching runtime API. Direct use of this proc-macro crate is only needed when the runtime's default features are disabled.
 
 ## Installation
 
@@ -53,7 +53,6 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     name: String,
 }
@@ -68,10 +67,8 @@ fn main() {
 
 The derive supports structs and enums. The `reflect` attribute describes traits, and `reflect_impl` describes inherent or trait implementations. Unsupported operations remain unavailable with structured metadata instead of bypassing Rust's type and ownership checks. The macros do not provide reflection storage or runtime operations; those belong to `qubit-reflect`.
 
-In same-package runtime examples, automatic discovery may select `crate`, the
-example executable. Use `#[reflect(crate = qubit_reflect)]` for derives and
-`#[reflect_impl(crate = qubit_reflect)]` for implementations to choose the runtime
-facade explicitly. Native runtime examples declare `required-features = ["derive"]`
+The macros resolve the direct `qubit-reflect` dependency, including in
+same-package runtime examples. Native runtime examples declare `required-features = ["derive"]`
 and are shipped in the runtime package; from the checkout root run
 `cargo run --example field_patch`, `cargo run --example customer_patch`, or
 `cargo run --example support_action`.

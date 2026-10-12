@@ -1,6 +1,6 @@
 # Qubit Reflect 用户手册
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 <!-- reflect-contract: panic.async_poll=not-caught -->
 <!-- reflect-contract: panic.abort=catching-unavailable -->
@@ -9,12 +9,14 @@
 
 [中文 README](../README.zh_CN.md) · [English user guide](user_guide.md) · [API 文档](https://docs.rs/qubit-reflect)
 
-本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本。它面向需要在运行时按字段名读写 Rust 结构体的后台服务与框架开发者；维护统一依赖入口或外观库的开发者按需查阅[外观库与迁移](#外观库与迁移)。读到[核对 PATCH 结果](#核对-patch-结果)，就能完成客服控制台的字段级 PATCH；后续章节按需介绍构造、方法调用、注册表、能力与线程安全。
+本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本，面向希望通过宏为自有类型添加反射能力的 Rust 应用与框架开发者。先了解宏如何生成描述符和运行时操作入口，再运行字段示例；客服控制台是这一机制的应用案例。后续章节按需讲解构造、方法调用、注册表、能力和访问边界。已有集成可按需查阅[迁移说明](#迁移说明)。
 
 ## 目录
 
 - [它解决什么问题](#它解决什么问题)
+- [宏如何生成反射能力](#宏如何生成反射能力)
 - [从哪里开始](#从哪里开始)
+- [使用宏生成的字段反射](#使用宏生成的字段反射)
 - [接入客服控制台](#接入客服控制台)
   - [定义可编辑的记录类型](#定义可编辑的记录类型)
   - [涉及的核心类型](#涉及的核心类型)
@@ -35,27 +37,39 @@
   - [什么时候需要线程安全包装器](#什么时候需要线程安全包装器)
 - [错误、诊断与排障](#错误诊断与排障)
 - [边界与实践清单](#边界与实践清单)
-- [外观库与迁移](#外观库与迁移)
-  - [通过外观库导出派生宏](#通过外观库导出派生宏)
+- [迁移说明](#迁移说明)
   - [迁移 effective capability 查询](#迁移-effective-capability-查询)
 - [延伸阅读](#延伸阅读)
 
 ## 它解决什么问题
 
-以客服控制台为例。运营人员通过 `PATCH` 修改客户资料，请求只携带字段名（如 `email`、`credit_limit_cents`）和已由 API 层解码好的值；同一套界面还要能编辑订单以及以后新增的记录类型。如果为每种类型手写 `match field_name { ... }`，这些分支很快就会和结构体定义脱节。
+Rust 不提供通用的运行时机制来枚举应用结构体的字段、枚举分支、trait 或实现。框架若需要按名称发现成员或执行运行时选定的操作，通常得手写元数据和分发表，重复类型声明中已有的信息。这些副本容易随着类型修改而过时。
 
-`qubit-reflect` 让每种记录在声明处派生描述符，一个通用的 `apply_patch` 就能按名称查找字段、核对精确 Rust 类型与访问策略，再对应用仍持有的结构体读取或替换。主键等字段可以声明 `#[reflect(read_only)]`，在触碰结构体之前拒绝修改。
+`qubit-reflect` 从标注过的 Rust 声明生成结构描述和受支持操作的适配器。使用方通过不可变描述符和经过类型检查的动态值检查或操作类型。自定义类型须主动派生或实现 `Reflect`；trait 和方法的反射另需属性宏。注册表汇总已链接的类型与实现信息，不保存业务对象，也不在运行时加载插件。
 
-应用边界必须分清：HTTP 或表单文本的解析、业务校验、鉴权和持久化由 API 层与仓储负责。反射只检查 Rust 类型、借用方式和声明的访问策略，不替应用解释文本。自定义类型需要主动派生或实现 `Reflect`；注册表只保存类型与操作的元数据，不保存业务对象，也不会在运行时加载插件。
+## 宏如何生成反射能力
+
+| 声明处的写法 | 运行时得到什么 |
+| --- | --- |
+| 在结构体或枚举上写 `#[derive(Reflect)]` | `Reflect` 实现、结构描述符，以及受支持的字段访问或构造入口。 |
+| 在 trait 上写 `#[reflect(...)]` | 可供注册表查询的 trait 与方法元数据。 |
+| 在 `impl` 上写 `#[reflect_impl(...)]` | 实现与方法信息；受支持的签名还会得到调用适配器。 |
+| 在类型、字段、分支或方法上写 `#[reflect(...)]` | 为生成的反射约定指定 `rename`、`read_only`、`skip`、`no_invoke` 等策略。 |
+
+宏在编译期运行；`TypeDescriptor::of::<T>()` 返回具体反射类型的运行时视图。按名称找到字段后，`FieldDescriptor` 的适配器会核对对象和值的精确 Rust 类型。方法则通过选定的 `ReflectRegistry` 查找，调用时还会校验接收者和参数。操作被显式关闭或签名不受支持时，结构信息仍可能可见；向不可信调用方开放这些入口前，请阅读[使用边界](#边界与实践清单)。
+
+下面以客服控制台说明字段反射：API 层已把 `Customer.email` 的变更解码为 Rust `String`，反射层负责按名称找到字段并替换这个有类型的值。请求解析、鉴权、业务校验和持久化仍由应用完成。
 
 ## 从哪里开始
 
-1. 在[接入客服控制台](#接入客服控制台)安装依赖并运行最小字段 PATCH 示例。
-2. 在[核对 PATCH 结果](#核对-patch-结果)理解合法变更、拒绝输入与内存对象状态；到这里，基础接入完成。
+1. 先看[宏如何生成反射能力](#宏如何生成反射能力)，再运行[使用宏生成的字段反射](#使用宏生成的字段反射)中的示例，了解派生宏、描述符查询和受检字段访问如何衔接。
+2. 要开发按字段驱动的业务流程，再继续阅读通用修改逻辑和[核对 PATCH 结果](#核对-patch-结果)。
 3. 需要创建对象时读[用输入构造新对象](#用输入构造新对象)；需要操作按钮触发业务方法时读[按名称调用业务方法](#按名称调用业务方法)。
-4. 编写框架或外观库时，再查[发现类型与能力](#发现类型与能力)、[构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)和[外观库与迁移](#外观库与迁移)。
+4. 编写框架时，再查[发现类型与能力](#发现类型与能力)和[构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)；升级已有集成时参阅[迁移说明](#迁移说明)。
 
-## 接入客服控制台
+## 使用宏生成的字段反射
+
+下面的可运行代码只展示反射边界。`Customer` 仍是调用方持有的普通 Rust 值；派生宏为它生成描述符和受检字段入口。业务流程放在示例之后。
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
@@ -67,7 +81,6 @@ use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,
@@ -117,8 +130,7 @@ fn main() {
 qubit-reflect = "0.2"
 ```
 
-同包 example 中，宏自动发现的 `crate` 可能指向示例程序，因此用
-`#[reflect(crate = qubit_reflect)]` 与 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
+宏会直接解析 `qubit-reflect` 运行时，同包 example 无须指定 crate 路径。
 `qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。先确认锁定的依赖图可以解析：
 
 ```bash
@@ -134,6 +146,8 @@ cargo run --example support_action
 ```
 
 三个目标均声明 `required-features = ["derive"]`，仅运行时构建会跳过它们。运行时 crate 的分发包包含这些源码，启用 `derive` 后也可在解包目录运行相同命令。上面的版本依赖用于选择已发布版本；源码检出的运行结果不能证明当前检出已发布或可从 registry 安装。
+
+## 接入客服控制台
 
 记录类型、通用补丁逻辑和客户服务分属不同模块。`CustomerRepository` 代表应用连接实际存储的接口。接入分三步：定义记录类型、编写与类型无关的补丁逻辑、在仓储加载成功后应用变更并保存。
 
@@ -386,14 +400,13 @@ use qubit_reflect::invoke::InvocationDispatchReason;
 use qubit_reflect::reflect_impl;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     id: u64,
     suspended: bool,
     suspension_reason: Option<String>,
 }
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
@@ -613,7 +626,7 @@ fn main() -> Result<(), qubit_reflect::RegistryError> {
 
 反射本身不要求执行此审计，但模型投影有更严格的约束：若模型元数据能力指向的类型不是 snapshot 成员，`ModelRegistry::from_reflect_registry` 会返回 `UnregisteredModelTarget`。启用泛型模型元数据时，定义目标也遵循相同规则。应检查对应的 `capability_only_*_targets` 结果及其来源片段，再将预期的模型类型或定义加入 snapshot，或从该视图中移除相应元数据注册。能力可查询并不代表它已成为模型成员。
 
-其他入口包括 `add_type`、`add_definition`、`add_trait`、`add_impl_definition`、`add_impl`、`add_definition_capabilities`。模型层的 `ModelRegistry::from_reflect_registry` 只投影快照的类型成员；若只想纳入 `MyModel`，在拥有该类型和 `qubit-model-metadata` 依赖的外观库中按以下集成步骤构建快照：
+其他入口包括 `add_type`、`add_definition`、`add_trait`、`add_impl_definition`、`add_impl`、`add_definition_capabilities`。模型层的 `ModelRegistry::from_reflect_registry` 只投影快照的类型成员；若只想纳入 `MyModel`，在直接依赖 `qubit-reflect` 和 `qubit-model-metadata` 的 crate 中按以下集成步骤构建快照：
 
 ```text
 let mut builder = RegistrySnapshotBuilder::new();
@@ -668,7 +681,7 @@ qubit-reflect = { version = "0.2", features = ["ecosystem-types"] }
 qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 ```
 
-两个外部类型 feature 相互独立，均不在默认配置中。需要生成外部类型描述符的外观库或元数据 crate，须在自己的依赖上开启对应 feature；仅重导出宏不会启用这些实现。`qubit-types` 只为 `qubit_id::Id` 提供反射。如果应用还使用 ID 生成器，请直接依赖 `qubit-id` 并启用所需 feature，不要依赖本 crate 间接启用的 feature。
+两个外部类型 feature 相互独立，均不在默认配置中。生成这些外部类型描述符的 crate，须在自己直接声明的 `qubit-reflect` 依赖上开启对应 feature。`qubit-types` 只为 `qubit_id::Id` 提供反射。如果应用还使用 ID 生成器，请直接依赖 `qubit-id` 并启用所需 feature，不要依赖本 crate 间接启用的 feature。
 
 ### 什么时候使用不透明边界
 
@@ -721,7 +734,7 @@ fn main() {
 | 注册表初始化或快照构建失败 | 查看 `RegistryError` 的冲突来源；全局初始化错误在当前进程缓存，修复声明后启动新进程。 |
 | 外部类型没有 `Reflect` 实现 | 在使用该反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`。 |
 | 跨线程入口不可用 | 检查类型或方法的 `thread_safe` 请求、Rust 约束及 `SendReflected*` 包装器。 |
-| 外观库派生找不到辅助项 | 核对 `#[reflect(crate = ...)]` 路径、`__private::codegen_v3` 的精确导出及宏和运行时版本。 |
+| 派生宏找不到运行时 | 在当前 crate 直接声明 `qubit-reflect` 依赖，并启用默认的 `derive` feature。 |
 
 普通调用会传播方法体的 panic。`catch_unwind` 入口仅在显式请求且平台支持时可用；`panic=abort` 无法提供该入口。异步调用返回 Future，不替应用选择执行器。恢复输入不代表业务操作一定可以重试；应用还要判断用户代码或外围持久化步骤是否产生了副作用。
 
@@ -733,25 +746,9 @@ fn main() {
 - 元组和可移植函数指针分别支持 0 到 32 个元素或参数；超过范围没有 `Reflect` 实现。携带数据的枚举不提供整数判别值映射。
 - 描述符和按具体类型缓存的能力会在进程中长期保留；初始化与首次解析可能分配内存。性能敏感路径应按应用负载测量。
 
-## 外观库与迁移
+## 迁移说明
 
-本节面向维护统一依赖入口、过程宏或旧版集成的开发者。业务 crate 直接使用派生宏时，不需要配置生成协议。
-
-### 通过外观库导出派生宏
-
-如果业务声明使用 `#[reflect(crate = my_facade)]`，外观库须在约定路径精确导出匹配版本的生成协议。下面是放在外观库 `src/lib.rs` 的最小代码，使用 `cargo check` 检查；它没有程序入口：
-
-```rust,no_run
-pub use qubit_reflect::Reflect;
-pub use qubit_reflect::TypeDescriptor;
-
-#[doc(hidden)]
-pub mod __private {
-    pub use qubit_reflect::__private::codegen_v3;
-}
-```
-
-生成代码只需要 `codegen_v3`；外观库无须为宏展开重导出 `descriptor`、`construct`、`value`，也不应通配重导出整个 `qubit_reflect` 或 `__private`。`codegen_v3` 是宏展开代码与运行时之间的版本化协议，不是供业务手写描述符的 API。显式快照不会更换此协议；旧外观库的 `codegen_v2` 导出应升级。下游 `qubit-model-metadata` 的模型元数据 ABI `v7` 与此协议独立。
+每个派生反射的下游 crate 都必须直接依赖 `qubit-reflect`；生成代码会自动解析该依赖。
 
 ### 迁移 effective capability 查询
 

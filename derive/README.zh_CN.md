@@ -7,10 +7,10 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 
-`qubit-reflect-derive` 提供 `Reflect`、`reflect` 和 `reflect_impl` 过程宏，用于生成反射元数据及受检操作适配器。大多数应用应依赖默认启用 `derive` 功能的 `qubit-reflect`，这样可以同时使用这些宏和匹配版本的运行时 API。只有在封装 facade 或编写宏集成时，通常才需要直接依赖这个过程宏 crate。
+`qubit-reflect-derive` 提供 `Reflect`、`reflect` 和 `reflect_impl` 过程宏，用于生成反射元数据及受检操作适配器。普通应用应直接依赖默认启用 `derive` 功能的 `qubit-reflect`，同时取得这些宏和匹配的运行时 API。只有关闭运行时默认 feature 时，才需要单独依赖这个过程宏 crate。
 
 ## 安装
 
@@ -47,7 +47,6 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     name: String,
 }
@@ -62,7 +61,7 @@ fn main() {
 
 `Reflect` 支持结构体和枚举；`reflect` 属性用于描述 trait，`reflect_impl` 用于描述 inherent impl 或 trait impl。无法执行的操作会保留结构化元数据，不会绕过 Rust 的类型和所有权检查。过程宏本身不提供运行时存储或反射操作，这些功能由 `qubit-reflect` 提供。
 
-运行时包的同包 example 中，自动发现的 `crate` 可能指向示例可执行程序。派生声明使用 `#[reflect(crate = qubit_reflect)]`，实现块使用 `#[reflect_impl(crate = qubit_reflect)]`，即可明确选择运行时外观库。三个原生示例均要求 `derive` feature，源码也随运行时包分发；在检出根目录运行 `cargo run --example field_patch`、`cargo run --example customer_patch` 或 `cargo run --example support_action`。
+宏会解析当前 crate 直接声明的 `qubit-reflect` 依赖，同包 example 也无需额外指定路径。三个原生示例均要求 `derive` feature，源码也随运行时包分发；在检出根目录运行 `cargo run --example field_patch`、`cargo run --example customer_patch` 或 `cargo run --example support_action`。
 
 `#[reflect(capabilities(...))]` 中，裸写 `Clone`、`Default`、`Send`、`Sync` 会选择内建能力；限定路径始终选择自定义 provider。例如 `my_crate::Clone` 会调用 `my_crate::Clone::<Self>()`，不会因末段同名而变成内建 `Clone`。
 

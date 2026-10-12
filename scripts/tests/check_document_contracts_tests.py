@@ -11,9 +11,9 @@ if subject:
     SPEC.loader.exec_module(subject)
 
 GROUPS = {
-    "README": ("README.md", "README.zh_CN.md", ["facade.explicit", "examples.native"]),
-    "derive": ("derive/README.md", "derive/README.zh_CN.md", ["facade.explicit", "provider.qualified"]),
-    "guide": ("doc/user_guide.md", "doc/user_guide.zh_CN.md", ["facade.explicit", "provider.qualified", "panic.async_poll", "panic.abort", "dispatch.input_recovery", "examples.native"]),
+    "README": ("README.md", "README.zh_CN.md", ["runtime.direct", "examples.native"]),
+    "derive": ("derive/README.md", "derive/README.zh_CN.md", ["runtime.direct", "provider.qualified"]),
+    "guide": ("doc/user_guide.md", "doc/user_guide.zh_CN.md", ["runtime.direct", "provider.qualified", "panic.async_poll", "panic.abort", "dispatch.input_recovery", "examples.native"]),
     "design": (
         "doc/2026-09-03-qubit-reflect-design.md",
         "doc/2026-09-03-qubit-reflect-design.zh_CN.md",
@@ -36,7 +36,7 @@ GROUPS = {
         ["typeref.constructor", "lazy.retry", "field.lookup"],
     ),
 }
-FACTS = {"facade.explicit": "qubit_reflect", "provider.qualified": "custom-provider", "panic.async_poll": "not-caught", "panic.abort": "catching-unavailable", "dispatch.input_recovery": "original-input", "examples.native": "cargo-example", "coverage.configure": "70", "coverage.parse": "85", "coverage.validate": "80", "coverage.expand": "85", "registry.source": "src/registry/reflect_registry.rs", "typeref.constructor": "owned-resolved", "lazy.retry": "panic-retry", "field.lookup": "linear"}
+FACTS = {"runtime.direct": "qubit_reflect", "provider.qualified": "custom-provider", "panic.async_poll": "not-caught", "panic.abort": "catching-unavailable", "dispatch.input_recovery": "original-input", "examples.native": "cargo-example", "coverage.configure": "70", "coverage.parse": "85", "coverage.validate": "80", "coverage.expand": "85", "registry.source": "src/registry/reflect_registry.rs", "typeref.constructor": "owned-resolved", "lazy.retry": "panic-retry", "field.lookup": "linear"}
 class ContractTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(subject, "document contract checker has not been implemented")
@@ -112,7 +112,7 @@ class ContractTests(unittest.TestCase):
     def test_duplicate_missing_unknown_and_bilingual_value_drift(self):
         document = self.root / "README.zh_CN.md"
         original = document.read_text()
-        cases = [original + "<!-- reflect-contract: facade.explicit=qubit_reflect -->", original.splitlines()[0], original + "<!-- reflect-contract: extra.key=value -->", original.replace("qubit_reflect", "wrong")]
+        cases = [original + "<!-- reflect-contract: runtime.direct=qubit_reflect -->", original.splitlines()[0], original + "<!-- reflect-contract: extra.key=value -->", original.replace("qubit_reflect", "wrong")]
         for text in cases:
             with self.subTest(text=text):
                 document.write_text(text)

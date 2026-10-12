@@ -7,14 +7,16 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: examples.native=cargo-example -->
 
-`qubit-reflect` solves a common problem inside a back-office service: a support console sends `PATCH` requests that name the field to change, such as `email` or `credit_limit_cents`, and the same screen must work for customers, orders, and every record type added later. Hand-written `match field_name { ... }` blocks per type drift out of sync with the structs they describe. This crate lets each record type derive its own descriptor at the declaration site, so one generic handler can find a field by name, check the exact Rust type and the declared access policy, and then read or replace the value on a struct the application still owns. Reflection macros generate the code on stable Rust. The crate does not parse request text into Rust values, serialize objects, or enforce business rules and authorization.
+`qubit-reflect` brings opt-in, macro-based reflection to Rust. Add `#[derive(Reflect)]` to a struct or enum, `#[reflect]` to a trait, or `#[reflect_impl]` to an implementation. The macros generate structural metadata and checked runtime adapters, so application and framework code can discover types and members, access fields, construct values, and invoke supported methods without maintaining a separate handwritten description of each type. It works on stable Rust and keeps Rust's ownership and type checks at the dynamic boundary.
 
-## A customer service example
+## Why use reflection?
 
-A customer service loads `Customer { id, email, display_name, credit_limit_cents }` from its repository. The API layer has already decoded the request into typed changes, for example `("email", String)`. A generic `apply_patch` looks each field up by name on `TypeDescriptor::of::<Customer>()` and calls `set`. The `id` field is declared `#[reflect(read_only)]`, so the handler rejects attempts to change the primary key before touching the struct; a wrong value type is rejected the same way and the untouched value is handed back to the caller. Only after every change is applied does the service save the customer. Adding an `Order` type to the same console means deriving `Reflect` on it; the handler does not change.
+Rust's ordinary type information cannot enumerate an application's fields or call methods selected by name at runtime. Frameworks that need this behavior often keep a parallel table of field names, types, and access functions. That table can drift as declarations change. Here the declaration and its reflection contract live together: the macros generate descriptors and adapters at compile time, while `TypeDescriptor` and the registry expose them at runtime.
+
+For example, a generic record editor can look up `Customer.email` by name, inspect its type, and replace its value. The same editor can work with another reflected type without a new field-name `match`. The application still decides how to parse input, authorize edits, validate business rules, and persist records. The [user guide](doc/user_guide.md) follows this example through a complete load–patch–save workflow.
 
 ## Installation
 
@@ -23,9 +25,11 @@ A customer service loads `Customer { id, email, display_name, credit_limit_cents
 qubit-reflect = "0.2"
 ```
 
-Reflection macros are enabled by default. For runtime-only use or reflection of third-party types, see the [dependency profiles](doc/user_guide.md#choose-dependency-features) in the user guide.
+Reflection macros are enabled by default. Each crate that derives reflection declares its own `qubit-reflect` dependency. For runtime-only use or reflection of third-party types, see the [dependency profiles](doc/user_guide.md#choose-dependency-features) in the user guide.
 
 ## Quick start
+
+This example derives reflection for a type, finds a field through its generated descriptor, and reads and replaces an exactly typed value. `read_only` removes the write adapter for `id` while retaining its field metadata.
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
@@ -37,7 +41,6 @@ use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,
@@ -83,10 +86,9 @@ fn main() {
 The complete, runnable load–patch–save flow lives in
 [`examples/customer_patch.rs`](examples/customer_patch.rs). Method lookup and
 invocation are shown in [`examples/support_action.rs`](examples/support_action.rs).
-These are native examples of the runtime package. In same-package example targets,
-automatic crate discovery can resolve the runtime to `crate`, which refers to the
-example executable. The declarations explicitly select the runtime facade with
-`#[reflect(crate = qubit_reflect)]` and `#[reflect_impl(crate = qubit_reflect)]`.
+These are native examples of the runtime package. The macros resolve the
+`qubit-reflect` runtime directly, including in same-package example targets;
+no crate-path helper is required.
 Cargo resolves the optional `qubit-datatype` and `qubit-id` dependencies from
 crates.io, so a source checkout does not need adjacent repositories. Verify
 dependency resolution from the repository root:
@@ -118,9 +120,9 @@ shows the runnable path.
 
 The API layer decodes request text into each field's Rust type and checks that the caller may edit the record; `apply_patch` only verifies field names, access policy, and exact types. When a change is rejected, earlier changes may already sit in the in-memory struct, but nothing has been saved because `update_customer` returns before `save`. See the [user guide](doc/user_guide.md#errors-diagnostics-and-troubleshooting) for the full error model.
 
-### Register reflected actions at startup
+### Reflect methods and implementations
 
-The same console offers action buttons such as “Suspend customer”. Their configuration table stores a method name, and the backend invokes that method on the loaded record. Annotate the implementation with `#[reflect_impl]`, call `ReflectRegistry::initialize()` once during application startup, then resolve actions with `TypeDescriptor::methods_named_in` and `invoke_local`. The runnable flow is in [`examples/support_action.rs`](examples/support_action.rs). `methods_named_in` returns `Missing`, `Unique`, or `Ambiguous`; handle each case in application code. `invoke_local` returns an outer `Err(InvocationUnavailable)` when no entry is available, preserving the complete original input, and `Ok(Err(InvocationFailure))` when receiver or argument validation failed before the method body ran. Ordinary invocation propagates method-body panics; capture requires both `#[reflect(catch_unwind)]` and an available catching entry selected by the caller. A runnable version is in [`examples/support_action.rs`](examples/support_action.rs); registry initialization and method lookup are covered in the [user guide](doc/user_guide.md#invoke-methods).
+For method reflection, annotate an `impl` block with `#[reflect_impl]`. Initialize `ReflectRegistry` once, then use the selected registry to look up and invoke a supported method. [`examples/support_action.rs`](examples/support_action.rs) shows a method selected by name; [the guide](doc/user_guide.md#invoke-methods) explains lookup results, invocation errors, and input recovery. Use `#[reflect]` to describe a trait declaration and `#[reflect_impl]` for its implementation.
 
 ## What it provides
 

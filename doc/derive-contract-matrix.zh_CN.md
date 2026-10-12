@@ -16,7 +16,7 @@
 | 启用成员上的无效 helper | 现有 `tests/ui/fail/` helper 诊断 | default features | 在源码 helper 处编译失败。 |
 | 签名和调用策略 | `tests/ui/fail/` 中 invocation、unwind、线程安全 fixture | all-features CI | 不支持签名产生源码位置诊断；支持的策略可编译。 |
 | 泛型特化 | `tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs`；integration fixture | all-features CI；没有专用 Cargo feature | 无效特化编译失败；已注册具体特化保持方法与适配器映射一致。 |
-| Facade 与重命名/直接依赖 | `test-crates/model-facade-*`；`test-crates/macro-runtime-only` | facade；关闭 runtime 默认 feature 的直接 derive | 内部支持宏按公开协议解析。 |
+| 直接依赖与依赖重命名 | `test-crates/macro-runtime-only`；`tests/derive_examples/derive_examples_tests.rs` | 关闭 runtime 默认 feature 后直接使用 derive；直接重命名依赖 | 生成代码无须 crate 路径参数即可解析运行时。 |
 | Runtime-only feature 边界 | `test-crates/macro-runtime-only` | runtime 不启用默认 feature | 仍可直接使用 derive 宏，不必启用 runtime derive 导出。 |
 
 覆盖采集器在 `target/derive-coverage/` 保存各阶段源码文件、执行行数、百分比及配置下限、HTML、原始 llvm-cov JSON 和机器可读摘要。达到下限不代表所有宏展开路径都已覆盖，也不能替代 UI 契约 fixture。

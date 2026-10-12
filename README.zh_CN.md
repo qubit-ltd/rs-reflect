@@ -7,14 +7,16 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: examples.native=cargo-example -->
 
-`qubit-reflect` 帮助 Rust 后台服务用一套通用逻辑处理控制台发来的字段级 `PATCH`：请求只携带字段名（如 `email`、`credit_limit_cents`）和已由 API 层解码好的值，同一套界面还要能编辑客户、订单以及以后新增的记录类型。若每种类型各写一段 `match field_name { ... }`，分支很快就会和结构体定义脱节。本库让每种记录在声明处派生描述符，通用处理函数即可按名称查找字段、核对精确 Rust 类型与访问策略，再对应用仍持有的结构体读取或替换。反射代码由宏在稳定版 Rust 上生成。本库不负责把请求文本解析成 Rust 值，不提供序列化，也不替代业务校验与鉴权。
+`qubit-reflect` 为 Rust 提供按需启用、基于宏的反射能力。在结构体或枚举上派生 `Reflect`，用 `#[reflect]` 标注 trait，或用 `#[reflect_impl]` 标注实现块，宏就会生成结构元数据及经过类型检查的运行时操作入口。应用与框架可以据此发现类型和成员、访问字段、构造值，并调用受支持的方法，无须为每个类型另写一套容易过时的描述代码。该机制可在稳定版 Rust 上使用，动态操作仍遵守 Rust 的所有权和类型约束。
 
-## 客服控制台实战场景
+## 为什么需要反射
 
-客户服务从仓储加载 `Customer { id, email, display_name, credit_limit_cents }`。API 层已把请求解码为带类型的变更，例如 `("email", String)`。通用 `apply_patch` 在 `TypeDescriptor::of::<Customer>()` 上按名称定位字段并调用 `set`。`id` 标注了 `#[reflect(read_only)]`，改主键会在触碰结构体前被拒绝；类型不匹配时同样拒绝，未消费的值会退回调用方。全部变更应用成功后，服务才保存客户。以后要让同一控制台编辑 `Order`，只需为 `Order` 派生 `Reflect`，`apply_patch` 与 HTTP 处理代码无须改动。
+普通 Rust 类型信息无法在运行时枚举应用结构体的字段，也不能按名称调用方法。需要这些能力的框架常另写字段名、类型和访问函数表；类型定义一变，这张表就可能遗漏更新。`qubit-reflect` 把反射约定放回声明处：宏在编译期生成描述符和操作适配器，运行时通过 `TypeDescriptor` 和注册表查询。
+
+例如，通用记录编辑器可以按名称找到 `Customer.email`，检查类型并替换其值；另一种记录只要实现 `Reflect`，就能沿用同一套处理逻辑。输入解析、鉴权、业务校验和持久化仍由应用负责。[用户手册](doc/user_guide.zh_CN.md)以加载、修改、保存客户记录为例，展示完整接入过程。
 
 ## 安装
 
@@ -23,9 +25,11 @@
 qubit-reflect = "0.2"
 ```
 
-反射宏默认启用。仅使用运行时 API，或为第三方类型提供反射实现时，参阅用户手册的[依赖功能选择](doc/user_guide.zh_CN.md#选择依赖功能)。
+反射宏默认启用。每个派生反射的 crate 都要直接声明 `qubit-reflect` 依赖。仅使用运行时 API，或为第三方类型提供反射实现时，参阅用户手册的[依赖功能选择](doc/user_guide.zh_CN.md#选择依赖功能)。
 
 ## 快速开始
+
+下面先为类型派生反射，再通过生成的描述符定位字段，读取并替换精确类型的值。`read_only` 使 `id` 不可写，但仍保留其字段元数据。
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
@@ -37,7 +41,6 @@ use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,
@@ -80,7 +83,7 @@ fn main() {
 ```
 
 
-完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。同包 example 中，自动发现的 `crate` 会指向示例可执行程序，因此声明用 `#[reflect(crate = qubit_reflect)]` 和 `#[reflect_impl(crate = qubit_reflect)]` 显式指定运行时外观库。
+完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。宏会直接解析 `qubit-reflect` 运行时，同包 example 也无须额外指定 crate 路径。
 
 可选的 `qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。在仓库根目录确认依赖解析：
 
@@ -102,9 +105,9 @@ cargo run --example support_action
 
 把请求解码为字段的 Rust 类型、判断调用者是否有权编辑记录，属于 API 层职责；`apply_patch` 只核对字段名、访问策略与精确类型。某条变更被拒绝时，前面的变更可能已写入内存中的结构体，但尚未调用 `save`，调用方丢弃已加载对象即可。完整错误模型见[用户手册](doc/user_guide.zh_CN.md#错误诊断与排障)。
 
-### 启动时登记可反射的业务操作
+### 反射方法与实现块
 
-同一控制台还提供「冻结客户」等操作按钮：配置表存方法名，后端在已加载的记录上按名称调用。给 `impl` 块加上 `#[reflect_impl]`，在应用启动时调用 `ReflectRegistry::initialize()` 一次，后续通过 `TypeDescriptor::methods_named_in` 与 `invoke_local` 解析并执行操作。完整可运行代码见 [`examples/support_action.rs`](examples/support_action.rs)。`methods_named_in` 可能返回 `Missing`、`Unique` 或 `Ambiguous`，应用需分别处理。`invoke_local` 的外层 `Err(InvocationUnavailable)` 表示入口不可用，并保留完整原始输入；`Ok(Err(InvocationFailure))` 表示接收者或参数在方法体执行前未通过校验。普通调用会传播方法体内的 panic；捕获既要求方法标注 `#[reflect(catch_unwind)]`，也要求调用方选择可用的 catching 入口。可运行示例见 [`examples/support_action.rs`](examples/support_action.rs)；注册表初始化与方法查找见[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)。
+需要反射方法时，用 `#[reflect_impl]` 标注 `impl` 块，启动时初始化一次 `ReflectRegistry`，再使用选定的注册表按名称查找并调用受支持的方法。[`examples/support_action.rs`](examples/support_action.rs) 展示完整调用；[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)解释查找结果、调用错误和输入恢复。要描述 trait 声明，使用 `#[reflect]`；其实现仍由 `#[reflect_impl]` 标注。
 
 ## 能力与边界
 

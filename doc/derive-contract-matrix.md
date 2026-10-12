@@ -16,7 +16,7 @@ This matrix separates compiler-facing macro contracts from runtime coverage. `sc
 | Invalid helper on an active member | existing `tests/ui/fail/` helper diagnostics | default features | Compilation fails at the source helper. |
 | Signature and invocation policies | `tests/ui/fail/` invocation, unwind, and thread-safety fixtures | all-features CI | Unsupported signatures fail with source-oriented diagnostics; supported policies compile. |
 | Generic specialization | `tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs`; integration fixtures | all-features CI; no dedicated Cargo feature | Invalid specialization fails; registered concrete specialization preserves method/adapter mapping. |
-| Facade and renamed/direct dependencies | `test-crates/model-facade-*`; `test-crates/macro-runtime-only` | facade; direct derive with runtime defaults disabled | Internal support macro resolves through the documented protocol. |
+| Direct and renamed runtime dependencies | `test-crates/macro-runtime-only`; `tests/derive_examples/derive_examples_tests.rs` | direct derive with runtime defaults disabled; direct renamed dependency | Generated code resolves the runtime without a crate-path helper. |
 | Runtime-only feature boundary | `test-crates/macro-runtime-only` | no runtime default features | Direct derive macro remains usable without enabling runtime derive exports. |
 
 The coverage collector reports per-stage source files, executed line counts, percentages and configured floors, HTML, the raw llvm-cov JSON, and a machine-readable summary under `target/derive-coverage/`. Passing a floor does not prove every macro expansion path or replace the UI contract fixtures.

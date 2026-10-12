@@ -869,10 +869,9 @@ use qubit_reflect::{Invocation, Reflect, ReflectRegistry, ReflectedMut, Reflecte
                     TypeDescriptor, reflect_impl};
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User { username: String }
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl User {
     fn rename(&mut self, username: String) { self.username = username; }
 }
@@ -1182,11 +1181,9 @@ assert_eq!(model.field("username").unwrap().descriptor().index(), 1);
   `qubit-model-metadata::TypeMetadata`；从 descriptor 反查模型 metadata 的便利能力必须由模型层包装、扩展 trait
   或 registry 提供，避免形成循环依赖。
 - **REQ-INT-011**：`qubit-model-derive` 和 `qubit-model-metadata` 必须依赖 `qubit-reflect` 的公共契约实现结构反射；
-  模型角色 attribute macro 应在展开结果中委托给由模型 facade 重导出的 `Reflect` derive，不得复制一套字段、variant、
-  泛型 bound、opaque 或注册代码生成逻辑。模型 facade 必须隐藏地重导出版本匹配的
-  `__private::codegen_v3` 与所需 derive 路径，使终端用户无需为宏展开细节额外声明直接依赖；生成代码不得要求 facade
-  重导出 `descriptor`、`construct`、`value` 等完整 runtime 业务模块。同一声明重复叠加角色宏与显式 `Reflect`
-  derive 必须给出编译期诊断。
+  每个生成反射声明的 crate 都必须直接依赖 `qubit-reflect`。模型角色宏应复用匹配的 `Reflect` derive，
+  不得复制字段、variant、泛型 bound、opaque 或注册代码生成逻辑，也不得重导出无关的反射 API。
+  同一声明重复叠加角色宏与显式 `Reflect` derive 必须给出编译期诊断。
 - **REQ-INT-012**：涉及反射结构、动态操作或两层依赖方向时，本文是 `rs-reflect`、`rs-model-derive` 与
   `rs-model-metadata` 后续对齐的权威需求源；模型层文档若与本文冲突，必须修改模型层文档和实现，不得在
   `qubit-reflect` 中加入领域概念或兼容性分叉。
@@ -1301,8 +1298,8 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
   `impl Trait` 返回值和位置/名称绑定边界，并验证非 async opaque return 只描述且报告稳定的不可调用原因。
 - **REQ-ACCPT-036**：必须测试同一 external trait 通过不同源码别名但相同 `ExternalTraitId` 汇聚，并测试同一目标的
   重复 impl 身份或不可合并事实产生确定性错误。
-- **REQ-ACCPT-037**：必须测试 `qubit-reflect-derive` 的默认 re-export、直接依赖 derive crate 的高级用法，以及
-  Cargo 依赖重命名后的生成代码路径解析，以及通过显式运行时外观库接入的同包原生 example。默认配置和分发包必须实际运行三个示例；无默认 feature 构建必须跳过要求 derive 的目标。
+- **REQ-ACCPT-037**：必须测试运行时 crate 导出的过程宏、直接依赖 derive crate 的高级用法、
+  Cargo 依赖重命名后的生成代码路径解析，以及无须 crate 路径参数的同包原生 example。默认配置和分发包必须实际运行三个示例；无默认 feature 构建必须跳过要求 derive 的目标。
 - **REQ-ACCPT-038**：必须测试按 `TypeId`、重名 `type_name` 候选和全量枚举查询，并证明任意非 reflect attribute
   不会泄漏为底层 descriptor 或引入 `syn` 公共依赖。
 - **REQ-ACCPT-039**：必须测试 `str`、slice 和 `dyn Trait` 等 unsized descriptor、内建 `str` 借用包装与动态调用，
@@ -1323,9 +1320,9 @@ receiver 不匹配、参数数量错误、参数类型错误、名称歧义、�
   缺失语义，并覆盖外部 supertrait/bound 的 `external_trait(path, id = "...")` 映射、缺失映射和冲突诊断。
 - **REQ-ACCPT-046**：必须测试带 lifetime 参数的 derive 类型只在 `'static` concrete 实例上取得根 descriptor，且可
   从该实例导航到包含完整 lifetime 参数和字段符号类型的定义 descriptor；非 `'static` 根值进入动态边界必须编译失败。
-- **REQ-ACCPT-047**：必须提供跨 crate 集成测试，证明模型角色宏通过模型 facade 委托同一 `Reflect` derive、终端用户
-  不需直接添加 `qubit-reflect` 依赖、最小 facade 不重导出完整 runtime 业务模块也能覆盖 struct、enum、generic、trait
-  与 impl 生成路径、模型 descriptor 与反射根 descriptor 身份一致，并验证重复显式 derive 的诊断。
+- **REQ-ACCPT-047**：必须提供跨 crate 集成测试，证明反射声明在直接依赖 `qubit-reflect` 时可编译，
+  包括关闭运行时默认 feature 后直接使用 derive crate 的场景。生成代码无须 crate 路径参数即可解析；
+  重复显式 derive 的冲突必须给出诊断。
 - **REQ-ACCPT-048**：必须测试三种线程安全包装到本地包装的无损 `into_local` 降级，并用编译失败测试证明本地包装
   不能凭 descriptor capability 或运行时检查升级为线程安全包装；降级后的值必须可用于字段访问和动态构造。
 

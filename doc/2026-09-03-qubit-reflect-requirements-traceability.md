@@ -46,11 +46,11 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-007 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/value/mode.rs`, `src/value/dynamic_ref.rs`, `src/value/dynamic_mut.rs` | `tests/ui/fail/thread_safe_borrow_bound_tests.rs`, `tests/ui/fail/thread_safe_field_tests.rs` |
 | REQ-ACCPT-008 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/invoke/invocation.rs`, `src/construct/validated.rs`, `src/access/field_adapter.rs` | `tests/invoke/runtime_tests.rs`, `tests/construct/runtime_tests.rs`, `tests/access/field_tests.rs` |
 | REQ-ACCPT-009 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/private/lazy_type_ref.rs`, `src/registry/interner.rs` | `tests/descriptor/derive_struct_tests.rs` |
-| REQ-ACCPT-010 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `test-crates/model-facade-runtime/src/lib.rs`, `src/descriptor/field_descriptor.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-ACCPT-010 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/lib.rs`, `src/descriptor/field_descriptor.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-ACCPT-011 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/option.rs`, `src/builtin/sequence.rs`, `src/descriptor/type_descriptor.rs` | `tests/descriptor/builtin_tests.rs` |
 | REQ-ACCPT-012 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-ACCPT-013 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/invoke/recovery.rs`, `src/construct/recovery.rs` | `tests/invoke/runtime_tests.rs`, `tests/construct/runtime_tests.rs` |
-| REQ-ACCPT-014 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `test-crates/model-facade-runtime/src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-ACCPT-014 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-ACCPT-015 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/map.rs`, `src/builtin/set.rs` | `tests/descriptor/builtin_tests.rs` |
 | REQ-ACCPT-016 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/descriptor/type_ref.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/derive_struct_tests.rs` |
 | REQ-ACCPT-017 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/value/mode.rs`, `src/value/dynamic_owned.rs` | `tests/value/thread_mode_tests.rs`, `tests/ui/fail/thread_safe_field_tests.rs` |
@@ -73,7 +73,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-034 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/invoke/invocation.rs`, `src/invoke/recovery.rs` | `tests/invoke/runtime_tests.rs`, `tests/ui/fail/thread_safe_borrow_bound_tests.rs` |
 | REQ-ACCPT-035 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs`, `tests/invoke/runtime_tests.rs` |
 | REQ-ACCPT-036 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/registry_builder.rs`, `derive/src/expand/impls.rs` | `tests/registry/runtime_tests.rs`, `tests/generic_impl_trait_link_tests.rs` |
-| REQ-ACCPT-037 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/lib.rs`, `derive/src/expand/mod.rs` | `derive/tests/parser_tests.rs`, `test-crates/model-facade-app/src/lib.rs`, `examples/field_patch.rs`, `examples/customer_patch.rs`, `examples/support_action.rs`, `scripts/check_release_consumer.py`, `scripts/check_document_contracts.py` |
+| REQ-ACCPT-037 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/lib.rs`, `derive/src/expand/mod.rs` | `derive/tests/parser_tests.rs`, `test-crates/macro-runtime-only/src/main.rs`, `examples/field_patch.rs`, `examples/customer_patch.rs`, `examples/support_action.rs`, `scripts/check_release_consumer.py`, `scripts/check_document_contracts.py` |
 | REQ-ACCPT-038 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/registry/indexes.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-ACCPT-039 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/slice.rs`, `src/builtin/trait_object.rs`, `src/value/dynamic_ref.rs` | `tests/descriptor/builtin_tests.rs`, `tests/value/str_tests.rs` |
 | REQ-ACCPT-040 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/builtin/mod.rs`, `src/descriptor/typed_view.rs` | `tests/descriptor/builtin_tests.rs` |
@@ -83,7 +83,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-ACCPT-044 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/expand/structs.rs`, `src/descriptor/type_ref.rs` | `tests/ui/pass/opaque_generic_tests.rs`, `tests/descriptor/generic_tests.rs` |
 | REQ-ACCPT-045 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/invoke/adapter.rs`, `derive/src/expand/impls.rs` | `tests/invocation_macro_contract_tests.rs`, `tests/ui/pass/catch_unwind_thread_safe_tests.rs` |
 | REQ-ACCPT-046 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `derive/src/expand/generics.rs`, `derive/src/expand/structs.rs` | `tests/ui/pass/lifetime_generic_tests.rs`, `tests/descriptor/generic_tests.rs` |
-| REQ-ACCPT-047 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/private/codegen_v3/mod.rs`, `derive/src/expand/`, `test-crates/model-facade-derive/src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `derive/tests/codegen_protocol_tests.rs`, `test-crates/model-facade-app/src/lib.rs`, `tests/registry/model_facade_tests.rs` |
+| REQ-ACCPT-047 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/private/codegen_v3/mod.rs`, `derive/src/expand/`, `derive/src/lib.rs`, `src/lib.rs` | `derive/tests/codegen_protocol_tests.rs`, `test-crates/macro-runtime-only/src/main.rs`, `tests/derive_examples/derive_examples_tests.rs` |
 | REQ-ACCPT-048 | T14, T15, T17, T18, T19, T21, T22, T24, T25, T26 | `src/value/aliases.rs`, `src/value/mode.rs` | `tests/value/thread_mode_tests.rs` |
 | REQ-AGG-001 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
 | REQ-AGG-002 | T12, T17, T20, T21, T26 | `src/registry/registry_builder.rs`, `src/registry/fragment.rs` | `tests/registry/runtime_tests.rs`, `tests/registry/cross_crate_tests.rs` |
@@ -160,18 +160,18 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-GEN-010 | T03, T06, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-011 | T03, T06, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `derive/src/expand/generics.rs` | `tests/descriptor/generic_tests.rs` |
 | REQ-GEN-012 | T03, T06, T07, T12, T14, T20, T22 | `src/descriptor/concrete_generic_descriptor.rs`, `src/descriptor/type_definition_descriptor.rs`, `src/descriptor/type_descriptor.rs`, `derive/src/expand/generics.rs`, `src/registry/reflect_registry.rs` | `tests/descriptor/generic_tests.rs`, `tests/public_type_definition_registry_tests.rs`, `tests/public_capability_registry_tests.rs`, `tests/capability_key_allocation_tests.rs` |
-| REQ-INT-001 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-002 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-003 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-004 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-005 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-006 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-007 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-008 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-009 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-010 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-011 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
-| REQ-INT-012 | T23, T25, T26 | `src/lib.rs`, `test-crates/model-facade-runtime/src/lib.rs` | `tests/registry/model_facade_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-INT-001 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-002 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-003 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-004 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-005 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-006 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-007 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-008 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-009 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-010 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-011 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
+| REQ-INT-012 | T23, T25, T26 | `src/lib.rs`, `src/lib.rs` | `tests/derive_examples/derive_examples_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-INV-001 | T09, T17, T18, T22 | `derive/src/expand/impls.rs`, `src/invoke/receiver.rs`, `src/invoke/invocation.rs` | `tests/descriptor/reflect_impl_tests.rs`, `tests/invoke/runtime_tests.rs`  `tests/snapshot_invocation_tests.rs`, `tests/public_receiver_resolution_failure_tests.rs` |
 | REQ-INV-002 | T09, T18, T22 | `src/invoke/invocation.rs`, `src/invoke/error.rs` | `tests/invoke/runtime_tests.rs`, `tests/invoke/adapter_tests.rs`  `tests/snapshot_invocation_tests.rs`, `tests/public_receiver_resolution_failure_tests.rs` |
 | REQ-INV-003 | T09, T18, T22 | `src/invoke/receiver.rs`, `src/invoke/invocation.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs`, `tests/invoke/runtime_tests.rs` |
@@ -204,7 +204,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-MAC-014 | T13, T14, T15, T16, T17, T22 | `derive/src/expand/impls.rs`, `derive/src/expand/traits.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-015 | T13, T14, T15, T16, T17, T22 | `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-016 | T13, T14, T15, T16, T17, T22 | `derive/src/lib.rs` | `derive/tests/parser_tests.rs` |
-| REQ-MAC-017 | T13, T14, T15, T16, T17, T22 | `derive/src/lib.rs`, `derive/src/expand/mod.rs`, `src/private/codegen_v3/mod.rs` | `derive/tests/codegen_protocol_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-MAC-017 | T13, T14, T15, T16, T17, T22 | `derive/src/lib.rs`, `derive/src/expand/mod.rs`, `src/private/codegen_v3/mod.rs` | `derive/tests/codegen_protocol_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-MAC-018 | T13, T14, T15, T16, T17, T22 | `derive/src/parse/attributes.rs`, `derive/src/expand/impls.rs` | `tests/ui/fail/external_trait_id_tests.rs`, `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-019 | T13, T14, T15, T16, T17, T22 | `derive/src/parse/attributes.rs`, `derive/src/ir/attribute.rs` | `tests/descriptor/derive_struct_tests.rs`, `tests/descriptor/reflect_impl_tests.rs` |
 | REQ-MAC-020 | T13, T14, T15, T16, T17, T20, T22 | `derive/src/expand/impls.rs`, `src/descriptor/impl_descriptor.rs` | `tests/ui/pass/generic_impl_specialization_tests.rs`, `tests/descriptor/reflect_impl_tests.rs` |
@@ -228,7 +228,7 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-OUT-004 | T01, T05, T06, T07, T12, T23, T26 | `src/descriptor/type_descriptor.rs`, `src/identity/fragment_identity.rs` | `tests/descriptor/identity_tests.rs`, `tests/descriptor/type_descriptor_tests.rs` |
 | REQ-OUT-005 | T01, T05, T06, T07, T12, T23, T26 | `src/private/registration.rs`, `src/registry/reflect_registry.rs` | `tests/registry/runtime_tests.rs` |
 | REQ-OUT-006 | T01, T05, T06, T07, T12, T23, T26 | `src/descriptor/method_descriptor.rs`, `derive/src/expand/impls.rs` | `tests/descriptor/reflect_impl_tests.rs` |
-| REQ-OUT-007 | T01, T05, T06, T07, T12, T23, T26 | `src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/registry/model_facade_tests.rs` |
+| REQ-OUT-007 | T01, T05, T06, T07, T12, T23, T26 | `src/lib.rs`, `src/descriptor/type_descriptor.rs` | `tests/derive_examples/derive_examples_tests.rs` |
 | REQ-OUT-008 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/validated.rs`, `src/construct/struct_constructor.rs` | `tests/construct/runtime_tests.rs` |
 | REQ-OUT-009 | T01, T26 | `Cargo.toml`, `src/lib.rs` | `.infra/ci/cargo-matrix.json`, `.infra/tools/rs-infra-ci/cargo-feature-check.sh` |
 | REQ-OUT-010 | T01, T05, T06, T07, T12, T23, T26 | `src/construct/struct_construction_descriptor.rs`, `src/descriptor/type_categories.rs` | `tests/construct/adapter_tests.rs` |
@@ -263,12 +263,12 @@ diff -u /tmp/reflect-requirements /tmp/reflect-traceability
 | REQ-TYPE-001 | T05, T06, T14, T15 | `src/descriptor/type_descriptor.rs`, `src/registry/interner.rs` | `tests/descriptor/type_descriptor_tests.rs`, `tests/descriptor/builtin_tests.rs` |
 | REQ-TYPE-002 | T05, T14, T15 | `src/descriptor/type_descriptor.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/type_descriptor_tests.rs` |
 | REQ-TYPE-003 | T02, T05 | `src/descriptor/type_descriptor.rs`, `src/descriptor/type_ref.rs` | `tests/descriptor/type_descriptor_tests.rs` |
-| REQ-TYPE-004 | T02, T05 | `src/descriptor/type_descriptor.rs` | `tests/descriptor/type_descriptor_tests.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-TYPE-004 | T02, T05 | `src/descriptor/type_descriptor.rs` | `tests/descriptor/type_descriptor_tests.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-TYPE-005 | T05, T14, T15 | `src/descriptor/type_descriptor.rs`, `src/descriptor/variant_descriptor.rs`, `derive/src/expand/enums.rs` | `tests/descriptor/derive_struct_tests.rs`, `tests/descriptor/derive_enum_tests.rs` |
 | REQ-TYPE-006 | T05 | `src/descriptor/type_descriptor.rs`, `src/descriptor/typed_view.rs` | `tests/descriptor/type_descriptor_tests.rs` |
 | REQ-TYPE-007 | T06 | `src/builtin/mod.rs`, `src/builtin/scalar.rs`, `src/builtin/sequence.rs`, `src/builtin/map.rs`, `src/builtin/pointer.rs` | `tests/descriptor/builtin_tests.rs`, `tests/builtin_registry_freeze_tests.rs` |
 | REQ-TYPE-008 | T05, T11, T12, T13 | `src/descriptor/impl_descriptor.rs`, `src/registry/effective_type_view.rs`, `derive/src/validate/declaration.rs` | `tests/descriptor/type_descriptor_tests.rs`, `tests/ui/fail/duplicate_rename_tests.rs` |
-| REQ-TYPE-009 | T05, T23 | `src/descriptor/type_descriptor.rs`, `src/lib.rs` | `test-crates/model-facade-runtime/src/lib.rs`, `test-crates/model-facade-app/src/lib.rs` |
+| REQ-TYPE-009 | T05, T23 | `src/descriptor/type_descriptor.rs`, `src/lib.rs` | `src/lib.rs`, `test-crates/macro-runtime-only/src/main.rs` |
 | REQ-TYPE-010 | T06, T14, T15 | `src/builtin/mod.rs`, `derive/src/expand/generics.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/builtin_tests.rs`, `tests/descriptor/generic_tests.rs`, `tests/ui/pass/opaque_generic_tests.rs` |
 | REQ-TYPE-011 | T05, T14 | `src/descriptor/type_categories.rs`, `src/descriptor/typed_view.rs`, `derive/src/expand/structs.rs` | `tests/descriptor/derive_struct_tests.rs` |
 | REQ-TYPE-012 | T05, T12 | `src/descriptor/type_descriptor.rs`, `src/registry/reflect_registry.rs`, `src/registry/indexes.rs` | `tests/registry/runtime_tests.rs`, `tests/builtin_registry_freeze_tests.rs` |

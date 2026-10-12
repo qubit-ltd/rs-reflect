@@ -1,6 +1,6 @@
 # Qubit Reflect user guide
 
-<!-- reflect-contract: facade.explicit=qubit_reflect -->
+<!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 <!-- reflect-contract: panic.async_poll=not-caught -->
 <!-- reflect-contract: panic.abort=catching-unavailable -->
@@ -9,12 +9,14 @@
 
 [Chinese user guide](user_guide.zh_CN.md) · [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 
-This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust application and framework developers who need to read and update structs by field name at runtime. Maintainers of dependency facades should read [Facade integration and migration](#facade-integration-and-migration). Reading through [Check the PATCH result](#check-the-patch-result) is enough to integrate field-level PATCH handling in a support console. Later sections cover construction, method invocation, registries, capabilities, and thread-safe boundaries.
+This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust application and framework developers who want to add reflection to their own types with macros and use the generated descriptors at runtime. Start with the macro and runtime model below, then run the field example. The support-console integration shows one practical use of that mechanism. Later sections cover construction, method invocation, registries, capabilities, and access boundaries; existing integrations can jump to [Migration notes](#migration-notes).
 
 ## Contents
 
 - [The problem it solves](#the-problem-it-solves)
+- [How macro-based reflection works](#how-macro-based-reflection-works)
 - [Where to start](#where-to-start)
+- [Use generated field reflection](#use-generated-field-reflection)
 - [Integrate a support console](#integrate-a-support-console)
   - [Define the editable record type](#define-the-editable-record-type)
   - [Types used on this path](#types-used-on-this-path)
@@ -33,26 +35,39 @@ This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust ap
   - [Choose transparent, opaque, and thread-safe boundaries](#choose-transparent-opaque-and-thread-safe-boundaries)
 - [Errors, diagnostics, and troubleshooting](#errors-diagnostics-and-troubleshooting)
 - [Boundaries and a practice checklist](#boundaries-and-a-practice-checklist)
-- [Facade integration and migration](#facade-integration-and-migration)
+- [Migration notes](#migration-notes)
 - [Further reading](#further-reading)
 
 ## The problem it solves
 
-Take a back-office support console. An operator sends `PATCH` requests that name the field to change, such as `email` or `credit_limit_cents`, and the API layer has already decoded each value into the field's Rust type. The same screen must later edit orders and every record type added afterward. If the service maintains a separate `match field_name { ... }` for each type, those branches drift away from the struct definitions.
+Rust does not provide general runtime inspection of an application's struct fields, enum variants, traits, or implementations. If a framework needs to discover members by name or perform an operation selected at runtime, handwritten metadata and dispatch tables repeat facts already present in the Rust declaration. Those copies can drift.
 
-With `qubit-reflect`, each record type derives its descriptor at the declaration site. One generic `apply_patch` looks up fields by name, checks the exact Rust type and declared access policy, and reads or replaces values on structs the application still owns. Primary keys can be declared `#[reflect(read_only)]` so the handler rejects changes before touching the struct.
+`qubit-reflect` generates the description and supported operation adapters from annotated Rust declarations. Consumers use immutable descriptors and checked dynamic values to inspect or operate on a reflected type. Reflection is opt-in: custom types derive or implement `Reflect`; trait and method reflection require their own attribute macros. The registry collects linked type and implementation facts, but does not store application objects or load plugins at runtime.
 
-The application still parses request text, validates business rules, authorizes the caller, and persists changes. Reflection checks Rust types, borrowing modes, and declared policies only. Custom types must derive or implement `Reflect`. A registry holds type and operation metadata, not application objects, and does not load plugins at runtime.
+## How macro-based reflection works
+
+| At the declaration | What it provides at runtime |
+| --- | --- |
+| `#[derive(Reflect)]` on a struct or enum | A `Reflect` implementation, structural descriptors, and supported field or construction adapters. |
+| `#[reflect(...)]` on a trait | Trait and method metadata for registry lookup. |
+| `#[reflect_impl(...)]` on an `impl` | Implementation and method facts, with invocation adapters for supported signatures. |
+| `#[reflect(...)]` on a type, field, variant, or method | A policy such as `rename`, `read_only`, `skip`, or `no_invoke` for the generated contract. |
+
+The macros run at compile time; `TypeDescriptor::of::<T>()` gives the runtime view of a concrete reflected type. A field lookup returns a `FieldDescriptor`, whose adapters check the receiver and value's exact Rust types. Method lookup uses a selected `ReflectRegistry`; invocation additionally checks the receiver and arguments. Structural metadata may remain available when an operation is deliberately disabled or its signature is unsupported. See [boundaries](#boundaries-and-a-practice-checklist) before exposing generated access to untrusted callers.
+
+The next example uses a support console: an API layer has decoded a change for `Customer.email` into a Rust `String`. The reflection layer can find the field by name and apply a typed replacement; the application still parses requests, authorizes callers, validates business rules, and persists changes.
 
 ## Where to start
 
-1. [Integrate a support console](#integrate-a-support-console) covers the record type, generic patch logic, and the load–patch–save path.
-2. [Check the PATCH result](#check-the-patch-result) shows what a successful field change looks like and how rejected input is returned. The basic integration ends there.
+1. Read [How macro-based reflection works](#how-macro-based-reflection-works), then run [Use generated field reflection](#use-generated-field-reflection). This is enough to see derive, descriptor lookup, and checked field access together.
+2. Continue through the generic patch and [Check the PATCH result](#check-the-patch-result) when building a field-driven application workflow.
 3. Read on as needed: [Construct a new value from input](#construct-a-new-value-from-input), [Invoke methods](#invoke-methods), [Discover types and extension capabilities](#discover-types-and-extension-capabilities), or [Choose features and access boundaries](#choose-features-and-access-boundaries).
 
-Registry snapshots, facades, and migration notes come after the basic path.
+Registry snapshots and migration notes come after the basic path.
 
-## Integrate a support console
+## Use generated field reflection
+
+The following runnable example focuses on the reflection boundary. `Customer` remains an ordinary Rust value owned by the caller; the derive macro supplies its descriptor and checked field adapters. The business workflow appears after the example.
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
@@ -64,7 +79,6 @@ use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,
@@ -114,9 +128,8 @@ Add the dependency:
 qubit-reflect = "0.2"
 ```
 
-The same-package examples explicitly use `#[reflect(crate = qubit_reflect)]`
-and `#[reflect_impl(crate = qubit_reflect)]`: automatic crate discovery may
-otherwise select the example executable as `crate`. Optional `qubit-datatype`
+The macros resolve the runtime crate directly, including in same-package
+examples. Optional `qubit-datatype`
 and `qubit-id` dependencies resolve from crates.io, so a source checkout does
 not require adjacent repositories. Verify dependency resolution from the
 repository root:
@@ -139,6 +152,8 @@ skips them. Their source files are included in the packaged runtime crate, so th
 same commands work in an extracted package when `derive` is enabled. The version
 dependency above selects a published release; source-checkout execution does not
 prove that this checkout has been published or installed from a registry.
+
+## Integrate a support console
 
 The record type, generic patch logic, and customer service are separate modules. `CustomerRepository` stands for the interface that talks to real storage. Integration has three steps: define the editable record type, write type-agnostic patch logic, and load, apply every change, then save.
 
@@ -397,14 +412,13 @@ use qubit_reflect::invoke::InvocationDispatchReason;
 use qubit_reflect::reflect_impl;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     id: u64,
     suspended: bool,
     suspension_reason: Option<String>,
 }
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
@@ -855,10 +869,8 @@ dependency families or silently acquire their trait implementations.
 `qubit-types` only provides reflection for `qubit_id::Id`; if the application
 also uses ID generators, add a direct `qubit-id` dependency with the needed
 features instead of relying on features enabled transitively by this crate.
-If a facade or metadata crate generates descriptors for one of these external
-types, that crate must enable the matching feature on its own
-`qubit-reflect` dependency; re-exporting the macros does not enable type-family
-implementations by itself.
+Each crate generating descriptors for these external types must enable the
+matching feature on its own direct `qubit-reflect` dependency.
 
 ### Choose transparent, opaque, and thread-safe boundaries
 
@@ -928,7 +940,7 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 | Registry initialization or snapshot build fails | Inspect `RegistryError` and conflicting fragments; global initialization errors are cached for the process. |
 | Cross-thread entry points unavailable | Request `thread_safe` on the type or method and use `SendReflected*` only where Rust bounds hold. |
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary. |
-| A facade-based derive cannot resolve helpers | Preserve `#[reflect(crate = ...)]`, export exactly `__private::codegen_v3`, and align facade and runtime versions. |
+| A derive cannot resolve the runtime | Declare `qubit-reflect` as a direct dependency and enable its default `derive` feature. |
 
 Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve the owned replacement in `FieldSetFailure`; errors after the adapter takes ownership have no recovery payload. Construction failures return `ConstructionRecovery`. Pre-execution invocation failures retain receiver and arguments in `InvocationRecovery`. Ordinary invocation always propagates method panics. To capture them, the method must opt in with `#[reflect(catch_unwind)]` and the caller must select an available catching entry.
 
@@ -941,42 +953,10 @@ Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve
 - Descriptors and per-type capability caches live for the whole process; initialization may allocate. Measure the paths your application uses if overhead matters.
 - Tests should cover a successful field read and replace, unknown fields, read-only rejection, type mismatch recovery, method invocation failure, and registry initialization failure on conflicting declarations.
 
-## Facade integration and migration
+## Migration notes
 
-This section is for maintainers of dependency facades, procedural macros, or
-older integrations. Applications using derives directly do not need to
-configure the generated-code protocol.
-
-### Integrate through a downstream facade or macro
-
-A facade that directly hosts `qubit-reflect` derives exposes the versioned
-generated-code protocol under the path expected by the derive. Public
-application exports are an independent choice; this minimal example exports
-the two types used by its callers. This is library code without a program entry point, so it is compiled without execution:
-
-```rust,no_run
-pub use qubit_reflect::Reflect;
-pub use qubit_reflect::TypeDescriptor;
-
-#[doc(hidden)]
-pub mod __private {
-    pub use qubit_reflect::__private::codegen_v3;
-}
-```
-
-Declarations can then use `#[reflect(crate = my_facade)]`. Generated code needs
-only the `codegen_v3` export; the facade does not need to re-export runtime
-modules such as `descriptor`, `construct`, or `value`. Do not glob-re-export
-`qubit_reflect` or its `__private` module: that turns unrelated implementation
-details into the facade's API. A downstream procedural macro may give the same
-module through exact item re-exports. `codegen_v3` is a
-compiler-to-runtime protocol, not a supported handwritten construction API; a
-future incompatible protocol receives a new versioned module.
-
-Explicit snapshots do not change the generated-code protocol. Facades still
-expose `__private::codegen_v3`; downstream `qubit-model-metadata` uses its
-independent model metadata ABI `v7` in the current `qubit-model-metadata`
-checkout. This is separate from the reflection `codegen_v3` protocol.
+Each downstream crate that derives reflection must directly depend on
+`qubit-reflect`; generated code resolves that dependency automatically.
 
 ### Migrating effective capability queries
 
@@ -1030,9 +1010,8 @@ two snapshots without cross-contamination; global failure does not affect
 valid local calls. Outputs and futures do not borrow the registry, but remain
 constrained by input lifetimes.
 
-Old `codegen_v2` facades fail compilation: migrate the exact export to
-`codegen_v3`. Model metadata ABI `v7` and `definition_provider_v2` remain
-independent. Debug prints structural facts without running providers; providers
+Model metadata ABI `v7` and `definition_provider_v2` remain independent.
+Debug prints structural facts without running providers; providers
 themselves must not re-enter initialization.
 
 ## Further reading

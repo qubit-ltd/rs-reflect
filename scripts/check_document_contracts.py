@@ -10,7 +10,7 @@ from urllib.parse import unquote
 from urllib.parse import urlsplit
 
 FACTS = {
-    "facade.explicit": "qubit_reflect",
+    "runtime.direct": "qubit_reflect",
     "provider.qualified": "custom-provider",
     "panic.async_poll": "not-caught",
     "panic.abort": "catching-unavailable",
@@ -26,10 +26,10 @@ FACTS = {
     "field.lookup": "linear",
 }
 GROUPS = (
-    ("README.md", "README.zh_CN.md", ("facade.explicit", "examples.native")),
-    ("derive/README.md", "derive/README.zh_CN.md", ("facade.explicit", "provider.qualified")),
+    ("README.md", "README.zh_CN.md", ("runtime.direct", "examples.native")),
+    ("derive/README.md", "derive/README.zh_CN.md", ("runtime.direct", "provider.qualified")),
     ("doc/user_guide.md", "doc/user_guide.zh_CN.md", (
-        "facade.explicit", "provider.qualified", "panic.async_poll", "panic.abort",
+        "runtime.direct", "provider.qualified", "panic.async_poll", "panic.abort",
         "dispatch.input_recovery", "examples.native")),
     ("doc/2026-09-03-qubit-reflect-design.md", "doc/2026-09-03-qubit-reflect-design.zh_CN.md", (
         "panic.async_poll", "panic.abort", "dispatch.input_recovery", "coverage.configure",

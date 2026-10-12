@@ -100,7 +100,7 @@ grep -Eq '^\| REQ-ERR-00[1-3] .*tests/ui' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
 grep -Eq '^\| REQ-GEN-006 .*tests/descriptor/builtin_tests\.rs' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
-grep -Eq '^\| REQ-ACCPT-010 .*model_facade' \
+grep -Eq '^\| REQ-ACCPT-010 .*derive_examples' \
     doc/2026-09-03-qubit-reflect-requirements-traceability.md
 
 echo "Requirements and traceability documents are aligned."
