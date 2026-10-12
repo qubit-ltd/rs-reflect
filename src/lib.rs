@@ -68,10 +68,6 @@
 //!
 //! - [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
 //! - [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.zh_CN.md)
-//! - [Current complete design (0.2)](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-03-qubit-reflect-design.md)
-//! - [当前完整设计（0.2）](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-09-03-qubit-reflect-design.zh_CN.md)
-//! - [2026-10-07 design review notes](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-10-07-qubit-reflect-current-design.md)
-//! - [2026-10-07 设计复核记录](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-10-07-qubit-reflect-current-design.zh_CN.md)
 #![forbid(unsafe_code)]
 
 extern crate self as qubit_reflect;

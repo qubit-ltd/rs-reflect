@@ -6,6 +6,9 @@
 <!-- reflect-contract: panic.abort=catching-unavailable -->
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 <!-- reflect-contract: examples.native=cargo-example -->
+<!-- reflect-contract: typeref.constructor=owned-resolved -->
+<!-- reflect-contract: lazy.retry=panic-retry -->
+<!-- reflect-contract: field.lookup=linear -->
 
 [中文 README](../README.zh_CN.md) · [English user guide](user_guide.md) · [API 文档](https://docs.rs/qubit-reflect)
 
@@ -59,6 +62,8 @@ Rust 不提供通用的运行时机制来枚举应用结构体的字段、枚举
 宏在编译期运行；`TypeDescriptor::of::<T>()` 返回具体反射类型的运行时视图。按名称找到字段后，`FieldDescriptor` 的适配器会核对对象和值的精确 Rust 类型。方法则通过选定的 `ReflectRegistry` 查找，调用时还会校验接收者和参数。操作被显式关闭或签名不受支持时，结构信息仍可能可见；向不可信调用方开放这些入口前，请阅读[使用边界](#边界与实践清单)。
 
 下面以客服控制台说明字段反射：API 层已把 `Customer.email` 的变更解码为 Rust `String`，反射层负责按名称找到字段并替换这个有类型的值。请求解析、鉴权、业务校验和持久化仍由应用完成。
+
+`TypeRef::of::<T>()` 返回指向 `TypeDescriptor::of::<T>()` 的已解析值；这个 `TypeRef` 值本身不做全局驻留。首次初始化描述符可能分配内存；手写 `Reflect` 实现若报告了与 `T` 不一致的 Rust `TypeId`，则会 panic。生成代码使用的延迟类型引用会缓存成功解析的结果，供并发查询复用；若解析过程 panic，稍后的查询仍可重试。`TypeDescriptor::field` 当前按名称线性扫描字段；频繁查询时，应结合实际记录形状测量开销。
 
 ## 从哪里开始
 
@@ -756,7 +761,7 @@ fn main() {
 
 类型自身能力声明冲突会包装为 `CapabilityAccessError::IntrinsicConflict`。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可用 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 追踪原始原因。`capability_origin` 区分 `Intrinsic { type_id }` 与 `Registered { source }`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`type_capability_members` 与 `definition_capability_members` 只遍历冻结快照中的成员，不执行 provider；每项携带 lookup 状态、origin 和来源，fact-only 与适配器类型不匹配也会保留。孤儿目标应单独通过 `capability_only_type_targets` 和 `capability_only_definition_targets` 审计。内建能力有类型成员时以类型声明片段为来源，否则使用最早触发检查的片段；未注册具体实例的有效能力查询可能执行其自身工厂，但不会将该实例加入快照。
 
-`descriptor::InvocationAdapter` 与 `MethodInstanceDescriptor` 的十二个消费调用方法将外层 `Option` 改成了 `Result`：旧 `None` 分支改为处理外层 `Err` 并明确取回输入，旧 `Some(result)` 改为 `Ok(result)`。这是破坏性变更，内层校验、catching 契约及函数指针 ABI 不变；详见[稳定性说明](2026-09-07-qubit-reflect-api-stability.zh_CN.md)。
+`descriptor::InvocationAdapter` 与 `MethodInstanceDescriptor` 的十二个消费调用方法将外层 `Option` 改成了 `Result`：旧 `None` 分支改为处理外层 `Err` 并明确取回输入，旧 `Some(result)` 改为 `Ok(result)`。这是破坏性变更，内层校验、catching 契约及函数指针 ABI 不变。外层 `Err(InvocationUnavailable<I>)` 保留方法执行前的完整原始输入；通过 `reason()` 查看原因，再用 `into_invocation()` 或 `into_parts()` 取回输入。进入用户代码后，已消费的输入和副作用无法恢复。
 
 所有 `invoke_*` 入口必须显式传入选定注册表。方法可见但返回 `ReceiverAdapterUnavailable` 时，检查该快照是否提供类型和模式都匹配的 `ReceiverAdapter`，调用不会自动回退到全局注册表。同一能力键可在不同快照中选择不同适配器；全局初始化失败也不影响有效的本地快照。输出和 Future 不借用注册表，但仍受输入生命周期约束。
 
@@ -764,5 +769,5 @@ fn main() {
 
 ## 延伸阅读
 
-- [README](../README.zh_CN.md) · [当前完整设计（0.2）](2026-09-03-qubit-reflect-design.zh_CN.md) · [2026-10-07 设计复核记录](2026-10-07-qubit-reflect-current-design.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
+- [README](../README.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
 - [English user guide](user_guide.md) · [English README](../README.md)

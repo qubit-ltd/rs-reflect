@@ -6,6 +6,9 @@
 <!-- reflect-contract: panic.abort=catching-unavailable -->
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 <!-- reflect-contract: examples.native=cargo-example -->
+<!-- reflect-contract: typeref.constructor=owned-resolved -->
+<!-- reflect-contract: lazy.retry=panic-retry -->
+<!-- reflect-contract: field.lookup=linear -->
 
 [Chinese user guide](user_guide.zh_CN.md) · [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 
@@ -56,6 +59,8 @@ Rust does not provide general runtime inspection of an application's struct fiel
 The macros run at compile time; `TypeDescriptor::of::<T>()` gives the runtime view of a concrete reflected type. A field lookup returns a `FieldDescriptor`, whose adapters check the receiver and value's exact Rust types. Method lookup uses a selected `ReflectRegistry`; invocation additionally checks the receiver and arguments. Structural metadata may remain available when an operation is deliberately disabled or its signature is unsupported. See [boundaries](#boundaries-and-a-practice-checklist) before exposing generated access to untrusted callers.
 
 The next example uses a support console: an API layer has decoded a change for `Customer.email` into a Rust `String`. The reflection layer can find the field by name and apply a typed replacement; the application still parses requests, authorizes callers, validates business rules, and persists changes.
+
+`TypeRef::of::<T>()` produces an owned resolved reference to `TypeDescriptor::of::<T>()`; the reference value itself is not globally interned. Initializing the descriptor can allocate, and a manual `Reflect` implementation with a mismatched Rust `TypeId` panics. Generated lazy type references cache successful resolution for concurrent readers; a resolver panic leaves the slot empty so a later lookup can retry. `TypeDescriptor::field` scans fields by name, so measure repeated lookups with your actual record shapes before relying on lookup cost in a hot path.
 
 ## Where to start
 
@@ -999,8 +1004,10 @@ The twelve consuming methods on `descriptor::InvocationAdapter` and
 `MethodInstanceDescriptor` now use outer `Result` instead of `Option`: migrate
 `None` to outer `Err`, recover the input explicitly, and migrate `Some(result)`
 to `Ok(result)`. This is a breaking change; the inner validation and catching
-contracts and function-pointer ABI remain unchanged. See the
-[stability note](2026-09-07-qubit-reflect-api-stability.md).
+contracts and function-pointer ABI remain unchanged. Outer `Err(InvocationUnavailable<I>)`
+preserves the original input before method execution; use `reason()` to inspect
+the cause and `into_invocation()` or `into_parts()` to recover it. Once user code
+has started, consumed inputs and side effects cannot be restored.
 
 Every `invoke_*` entry now requires a registry. If lookup succeeds but
 invocation returns `ReceiverAdapterUnavailable`, check the selected snapshot
@@ -1016,5 +1023,5 @@ themselves must not re-enter initialization.
 
 ## Further reading
 
-- [README](../README.md) · [Current complete design (0.2)](2026-09-03-qubit-reflect-design.md) · [2026-10-07 design review notes](2026-10-07-qubit-reflect-current-design.md) · [API reference](https://docs.rs/qubit-reflect)
+- [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 - [Chinese user guide](user_guide.zh_CN.md) · [中文 README](../README.zh_CN.md)
