@@ -68,7 +68,8 @@
 //!
 //! - [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
 //! - [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.zh_CN.md)
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate self as qubit_reflect;
 
