@@ -18,7 +18,7 @@
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect, opaque)]
+/// #[reflect(opaque)]
 /// struct Hidden;
 /// let opaque = TypeDescriptor::of::<Hidden>().as_opaque().expect("opaque root");
 /// assert_eq!(std::mem::size_of_val(opaque), 0);

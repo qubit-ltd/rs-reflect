@@ -15,7 +15,6 @@ use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,

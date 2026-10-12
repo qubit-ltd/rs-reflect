@@ -48,14 +48,19 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
         }
         Err(error) => return Err(error),
     };
+    dispatch_with_context(declaration, &context)
+}
+
+/// Expands a declaration after resolving its runtime path.
+fn dispatch_with_context(declaration: DeclarationIr, context: &ExpansionContext) -> Result<TokenStream> {
     match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
-            TypeDeclarationKindIr::Struct => super::structs::expand(declaration, &context),
-            TypeDeclarationKindIr::Enum => super::enums::expand(declaration, &context),
+            TypeDeclarationKindIr::Struct => super::structs::expand(declaration, context),
+            TypeDeclarationKindIr::Enum => super::enums::expand(declaration, context),
             TypeDeclarationKindIr::Union => Err(syn::Error::new(declaration.span, "cannot expand Reflect for union")),
         },
-        DeclarationIr::Trait(declaration) => Ok(super::traits::expand(declaration, &context)),
-        DeclarationIr::Impl(declaration) => Ok(super::impls::expand_impl(declaration, &context)),
+        DeclarationIr::Trait(declaration) => Ok(super::traits::expand(declaration, context)),
+        DeclarationIr::Impl(declaration) => Ok(super::impls::expand_impl(declaration, context)),
     }
 }
 
@@ -64,7 +69,8 @@ mod tests {
     use proc_macro2::TokenStream;
     use quote::quote;
 
-    use super::dispatch;
+    use super::dispatch_with_context;
+    use crate::expand::ExpansionContext;
     use crate::ir::DeclarationIr;
     use crate::ir::MacroKind;
     use crate::ir::TypeDeclarationIr;
@@ -81,7 +87,7 @@ mod tests {
     ///
     /// Returns the validated type declaration used by dispatch tests.
     fn parse_type(item: TokenStream) -> TypeDeclarationIr {
-        let input = quote!(#[reflect(crate = qubit_reflect)] #item);
+        let input = quote!(#item);
         let parsed = parse_and_validate_declaration(MacroKind::Derive, TokenStream::new(), input)
             .expect("the test declaration should parse and validate");
         let DeclarationIr::Type(declaration) = parsed.declaration else {
@@ -98,7 +104,9 @@ mod tests {
     /// - `expected`: Expected diagnostic prefix.
     /// - `detail`: Expected diagnostic detail.
     fn assert_diagnostic(declaration: TypeDeclarationIr, expected: &str, detail: &str) {
-        let error = dispatch(DeclarationIr::Type(declaration)).expect_err("malformed IR must be diagnosed");
+        let context = ExpansionContext::for_tests();
+        let error = dispatch_with_context(DeclarationIr::Type(declaration), &context)
+            .expect_err("malformed IR must be diagnosed");
         assert!(
             error.to_string().contains(expected),
             "diagnostic should include the expected prefix: {error}",
@@ -174,7 +182,9 @@ mod tests {
         ));
         declaration.kind = TypeDeclarationKindIr::Union;
 
-        let error = dispatch(DeclarationIr::Type(declaration)).expect_err("union must be rejected");
+        let context = ExpansionContext::for_tests();
+        let error = dispatch_with_context(DeclarationIr::Type(declaration), &context)
+            .expect_err("union must be rejected");
         assert!(
             error.to_string().contains("cannot expand Reflect for union"),
             "union declarations should report the unsupported type",

@@ -20,7 +20,6 @@ use syn::Attribute;
 use syn::Data;
 use syn::DeriveInput;
 use syn::Error;
-use syn::Expr;
 use syn::Field;
 use syn::Fields;
 use syn::FieldsNamed;
@@ -30,16 +29,10 @@ use syn::Item;
 use syn::ItemImpl;
 use syn::ItemStruct;
 use syn::ItemTrait;
-use syn::Meta;
-use syn::Path;
 use syn::Result;
-use syn::Token;
 use syn::TraitItem;
-use syn::parse::Parser;
 use syn::parse_quote;
 use syn::parse2;
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 
 use crate::configure::carrier::carrier_name;
 use crate::configure::conditional_attributes;
@@ -157,7 +150,7 @@ pub(super) fn make_carrier(kind: MacroKind, arguments: TokenStream, item: TokenS
         let field: Field = parse_quote!(#(#projected)* #marker #name: ());
         fields.push(field);
     }
-    let support = support_path(&arguments)?;
+    let support = support_path()?;
     let name = carrier_name(&source_tokens, &arguments);
     let header_attribute: Attribute = parse_quote!(#[reflect_configure_header(#header)]);
     let argument_attribute: Attribute = parse_quote!(#[reflect_configure_args(#arguments)]);
@@ -364,16 +357,14 @@ fn impl_item_attributes_mut(item: &mut ImplItem) -> Option<&mut Vec<Attribute>> 
 ///
 /// # Parameters
 ///
-/// - `arguments`: Outer reflection macro arguments that may name a facade.
-///
 /// # Returns
 ///
-/// Returns a direct derive path or the versioned runtime facade re-export.
+/// Returns a direct derive path or the versioned runtime support path.
 ///
 /// # Errors
 ///
 /// Returns a diagnostic if neither supported dependency path is available.
-fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
+fn support_path() -> Result<TokenStream> {
     if let Ok(found) = crate_name("qubit-reflect-derive") {
         let path = match found {
             FoundCrate::Itself => quote!(crate),
@@ -384,12 +375,9 @@ fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
         };
         return Ok(quote!(#path::ConfiguredReflection));
     }
-    if let Some(path) = explicit_runtime_path(arguments)? {
-        return Ok(quote!(#path::__private::codegen_v3::macro_support::ConfiguredReflection));
-    }
     match crate_name("qubit-reflect") {
         Ok(FoundCrate::Itself) => Ok(quote!(
-            crate::__private::codegen_v3::macro_support::ConfiguredReflection
+            ::qubit_reflect::__private::codegen_v3::macro_support::ConfiguredReflection
         )),
         Ok(FoundCrate::Name(name)) => {
             let identifier = Ident::new(&name, Span::call_site());
@@ -397,36 +385,7 @@ fn support_path(arguments: &TokenStream) -> Result<TokenStream> {
         }
         Err(_) => Err(Error::new(
             Span::call_site(),
-            "cannot resolve the internal reflection derive; add `qubit-reflect-derive` or enable the facade's `derive` feature",
+            "cannot resolve the internal reflection derive; add `qubit-reflect` as a direct dependency with its `derive` feature",
         )),
     }
-}
-
-/// Reads an explicit runtime path from outer macro arguments.
-///
-/// # Parameters
-///
-/// - `arguments`: Reflection helper syntax.
-///
-/// # Returns
-///
-/// Returns the `crate = path` value when present, or `None` when absent.
-///
-/// # Errors
-///
-/// Returns a syntax diagnostic for malformed arguments.
-pub(super) fn explicit_runtime_path(arguments: &TokenStream) -> Result<Option<Path>> {
-    let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
-    let values = parser.parse2(arguments.clone())?;
-    for value in values {
-        if let Meta::NameValue(name_value) = value
-            && name_value.path.is_ident("crate")
-        {
-            let Expr::Path(path) = name_value.value else {
-                return Err(Error::new(name_value.value.span(), "`crate` must be a path"));
-            };
-            return Ok(Some(path.path));
-        }
-    }
-    Ok(None)
 }

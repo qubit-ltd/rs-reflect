@@ -19,7 +19,6 @@ use crate::descriptor::StructKind;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct Record { value: u8 }
 /// let record = TypeDescriptor::of::<Record>().as_struct().expect("struct type");
 /// assert_eq!(record.kind(), qubit_reflect::descriptor::StructKind::Named);

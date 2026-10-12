@@ -32,7 +32,6 @@ use super::type_ref::type_name_of;
 /// use qubit_reflect::descriptor::TypeRef;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct Record {
 ///     #[reflect(opaque)]
 ///     value: u8,

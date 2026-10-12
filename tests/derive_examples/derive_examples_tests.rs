@@ -14,7 +14,7 @@ use qubit_reflect_derive::reflect;
 use qubit_reflect_derive::reflect_impl;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect, rename = "account")]
+#[reflect(rename = "account")]
 struct Account {
     #[reflect(read_only)]
     id: u32,
@@ -32,15 +32,14 @@ fn test_derive_reflect_example() {
 }
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct NamedService;
 
-#[reflect(crate = qubit_reflect)]
+#[reflect]
 trait Named {
     fn name(&self) -> &'static str;
 }
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl Named for NamedService {
     fn name(&self) -> &'static str {
         "service"
@@ -60,10 +59,9 @@ fn test_reflect_trait_example() {
 }
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct InherentService;
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl InherentService {
     #[reflect(no_invoke)]
     fn ping(&self) {}

@@ -47,8 +47,6 @@ pub(crate) enum HelperName {
     Supertrait,
     /// Assert dyn compatibility and inherited bindings.
     DynCompatible,
-    /// Select the runtime crate facade.
-    RuntimeCrate,
     /// Select a v2 type definition provider.
     DefinitionProviderV2,
 }
@@ -78,7 +76,6 @@ impl HelperName {
             Self::ExternalTrait => "external_trait",
             Self::Supertrait => "supertrait",
             Self::DynCompatible => "dyn_compatible",
-            Self::RuntimeCrate => "crate",
             Self::DefinitionProviderV2 => "definition_provider_v2",
         }
     }
@@ -308,11 +305,6 @@ const HELPER_RULES: &[HelperRule] = &[
         source_name: "dyn_compatible",
         targets: TargetSet::new(TRAIT),
     },
-    HelperRule {
-        name: HelperName::RuntimeCrate,
-        source_name: "crate",
-        targets: TargetSet::new(TYPE | TRAIT | IMPL),
-    },
 ];
 
 /// One parsed helper occurrence, retained separately until duplicate
@@ -350,8 +342,6 @@ pub(crate) enum HelperValueIr {
     ExternalTrait(ExternalTraitIr),
     /// Explicit inherited associated type bindings for dyn compatibility.
     DynCompatible(Vec<PathIr>),
-    /// Runtime crate facade path.
-    RuntimeCrate(PathIr),
     /// Explicit v2 definition-provider identifier.
     DefinitionProviderV2(syn::Ident),
 }

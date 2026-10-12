@@ -322,11 +322,10 @@ fn test_missing_receiver_and_owned_unit_keep_distinct_validation_facts() {
 
 #[cfg(feature = "derive")]
 #[derive(qubit_reflect::Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct BorrowedSignature;
 
 #[cfg(feature = "derive")]
-#[qubit_reflect::reflect_impl(crate = qubit_reflect)]
+#[qubit_reflect::reflect_impl]
 impl BorrowedSignature {
     pub fn values(input: &[u8]) -> &[u8] {
         input

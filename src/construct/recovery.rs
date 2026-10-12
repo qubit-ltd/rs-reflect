@@ -103,7 +103,6 @@ impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }

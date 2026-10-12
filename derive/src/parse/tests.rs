@@ -612,42 +612,19 @@ fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
 }
 
 #[test]
-fn test_trait_and_impl_accept_explicit_runtime_facade() {
-    let reflected_trait = parse_valid(
-        MacroKind::Trait,
-        quote!(crate = framework::reflect),
-        quote!(
-            trait Service {}
-        ),
+fn test_explicit_runtime_crate_helper_is_rejected() {
+    let derive_error = parse_invalid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote!(#[reflect(crate = qubit_reflect)] struct Record {}),
     );
-    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
-        panic!("expected a trait declaration");
-    };
-    assert_eq!(
-        reflected_trait
-            .attributes
-            .iter()
-            .filter(|attribute| attribute.name == HelperName::RuntimeCrate)
-            .count(),
-        1,
-    );
+    assert!(derive_error.contains("unknown"), "unexpected derive error: {derive_error}");
 
-    let reflected_impl = parse_valid(
-        MacroKind::Impl,
-        quote!(crate = framework::reflect),
-        quote!(impl Service {}),
-    );
-    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
-        panic!("expected an impl declaration");
-    };
-    assert_eq!(
-        reflected_impl
-            .attributes
-            .iter()
-            .filter(|attribute| attribute.name == HelperName::RuntimeCrate)
-            .count(),
-        1,
-    );
+    let trait_error = parse_invalid(MacroKind::Trait, quote!(crate = qubit_reflect), quote!(trait Service {}));
+    assert!(trait_error.contains("unknown"), "unexpected trait error: {trait_error}");
+
+    let impl_error = parse_invalid(MacroKind::Impl, quote!(crate = qubit_reflect), quote!(impl Service {}));
+    assert!(impl_error.contains("unknown"), "unexpected impl error: {impl_error}");
 }
 
 /// The versioned provider hook accepts only one caller-owned identifier on a

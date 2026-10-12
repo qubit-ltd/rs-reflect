@@ -44,7 +44,6 @@
 //! use qubit_reflect::{Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
 //!
 //! #[derive(Reflect)]
-//! #[reflect(crate = qubit_reflect)]
 //! struct Customer {
 //!     email: String,
 //! }
@@ -74,6 +73,8 @@
 //! - [2026-10-07 design review notes](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-10-07-qubit-reflect-current-design.md)
 //! - [2026-10-07 设计复核记录](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/2026-10-07-qubit-reflect-current-design.zh_CN.md)
 #![forbid(unsafe_code)]
+
+extern crate self as qubit_reflect;
 
 /// APIs for reflected field and variant access.
 pub mod access;

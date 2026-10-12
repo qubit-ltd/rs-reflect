@@ -114,7 +114,6 @@ impl<M: Mode> fmt::Debug for ConstructionFieldPolicy<M> {
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }
@@ -306,7 +305,6 @@ pub enum UpdateFieldPolicy {
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }

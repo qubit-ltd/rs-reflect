@@ -36,7 +36,6 @@ use crate::value::Mode;
 ///     mod example {
 ///         use qubit_reflect::Reflect;
 ///         #[derive(Reflect)]
-///         #[reflect(crate = qubit_reflect)]
 ///         pub struct Record {
 ///             #[reflect(read_only)]
 ///             pub value: u32,
@@ -245,7 +244,6 @@ impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
 ///     mod example {
 ///         use qubit_reflect::Reflect;
 ///         #[derive(Reflect)]
-///         #[reflect(crate = qubit_reflect)]
 ///         pub struct Record {
 ///             #[reflect(read_only)]
 ///             pub value: u32,

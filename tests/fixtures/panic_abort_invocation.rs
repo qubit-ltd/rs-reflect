@@ -22,10 +22,9 @@ use qubit_reflect::reflect_impl as reflect_impl_macro;
 use qubit_reflect::registry;
 
 #[derive(ReflectDerive)]
-#[reflect(crate = qubit_reflect)]
 struct Worker;
 
-#[reflect_impl_macro(crate = qubit_reflect)]
+#[reflect_impl_macro]
 impl Worker {
     #[reflect(catch_unwind)]
     fn marked() {}

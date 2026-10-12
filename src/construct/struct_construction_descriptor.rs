@@ -29,7 +29,6 @@ use crate::value::ThreadSafe;
 /// mod example {
 ///     use qubit_reflect::Reflect;
 ///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
 ///     pub struct User {
 ///         name: String,
 ///     }

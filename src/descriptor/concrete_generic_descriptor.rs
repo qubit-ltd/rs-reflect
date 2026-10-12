@@ -35,7 +35,6 @@ type ConstArgumentValueFactory = fn() -> ReflectedOwned;
 /// mod example {
 ///     use qubit_reflect::Reflect;
 ///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
 ///     pub struct Envelope<T>(T);
 /// }
 ///

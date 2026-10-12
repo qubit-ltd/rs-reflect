@@ -297,7 +297,6 @@ macro_rules! register_definition_capabilities {
 /// use qubit_reflect::register_reflected_type;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct Example;
 ///
 /// register_reflected_type!(Example);

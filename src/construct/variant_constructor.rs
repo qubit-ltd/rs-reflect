@@ -53,7 +53,6 @@ pub type VariantConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dy
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// enum Event {
 ///     Text(String),
 /// }

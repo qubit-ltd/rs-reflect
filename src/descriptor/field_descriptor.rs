@@ -63,7 +63,6 @@ use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct User {
     name: String,
 }

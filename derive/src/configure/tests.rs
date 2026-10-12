@@ -6,14 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Unit tests for reflection carrier construction and facade argument parsing.
+//! Unit tests for reflection carrier construction.
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Path;
-use syn::parse2;
-
-use super::pipeline::explicit_runtime_path;
 use super::pipeline::make_carrier;
 use crate::ir::MacroKind;
 
@@ -109,20 +105,5 @@ fn test_carrier_rejects_derive_macro_kind() {
     assert!(
         error.to_string().contains("only supports trait and impl macros"),
         "derive macro kind must report unsupported carrier usage",
-    );
-}
-
-#[test]
-fn test_explicit_runtime_path_requires_a_path_expression() {
-    let path = explicit_runtime_path(&quote!(crate = ::reflection_facade))
-        .expect("valid facade arguments should parse")
-        .expect("the explicit crate argument should be retained");
-    let expected: Path = parse2(quote!(::reflection_facade)).expect("the expected path should parse");
-    assert_eq!(path, expected, "the explicit runtime path must be preserved");
-
-    let error = explicit_runtime_path(&quote!(crate = 42)).expect_err("a scalar is not a valid runtime facade path");
-    assert!(
-        error.to_string().contains("`crate` must be a path"),
-        "non-path crate arguments must report the path requirement",
     );
 }

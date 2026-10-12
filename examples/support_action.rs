@@ -20,14 +20,13 @@ use qubit_reflect::invoke::InvocationDispatchReason;
 use qubit_reflect::reflect_impl;
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     id: u64,
     suspended: bool,
     suspension_reason: Option<String>,
 }
 
-#[reflect_impl(crate = qubit_reflect)]
+#[reflect_impl]
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.

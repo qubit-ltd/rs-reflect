@@ -52,7 +52,6 @@ pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dyn
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }

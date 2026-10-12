@@ -18,40 +18,34 @@ use syn::Error;
 use syn::Result as SynResult;
 
 use crate::ir::HelperAttributeIr;
-use crate::ir::HelperValueIr;
 
 /// Immutable context shared by one declaration expansion.
 #[derive(Debug)]
 pub(crate) struct ExpansionContext {
-    /// Caller-visible path to the runtime facade.
+    /// Caller-visible path to the runtime crate.
     facade: TokenStream,
 }
 
 impl ExpansionContext {
-    /// Resolves an explicit runtime facade or the Cargo dependency name.
+    #[cfg(test)]
+    pub(crate) fn for_tests() -> Self {
+        Self { facade: quote!(::qubit_reflect) }
+    }
+
+    /// Resolves the runtime crate from the current Cargo package.
     ///
     /// # Parameters
     ///
-    /// - `attributes`: Validated helper attributes attached to the declaration.
+    /// - `_attributes`: Validated helper attributes attached to the declaration.
     ///
     /// # Returns
     ///
-    /// Returns the expansion context, or a diagnostic when the runtime crate
-    /// cannot be resolved.
+    /// Returns the expansion context, or a diagnostic when the runtime crate cannot be resolved.
     ///
     /// # Errors
     ///
-    /// Returns a syntax diagnostic when the runtime facade cannot be resolved.
-    pub(crate) fn from_attributes(attributes: &[HelperAttributeIr]) -> SynResult<Self> {
-        if let Some(facade) = attributes.iter().find_map(|attribute| {
-            if let HelperValueIr::RuntimeCrate(path) = &attribute.value {
-                Some(path.tokens.clone())
-            } else {
-                None
-            }
-        }) {
-            return Ok(Self { facade });
-        }
+    /// Returns a syntax diagnostic when the runtime crate cannot be resolved.
+    pub(crate) fn from_attributes(_attributes: &[HelperAttributeIr]) -> SynResult<Self> {
         Self::from_found_crate(crate_name("qubit-reflect").ok())
     }
 
@@ -98,7 +92,7 @@ impl ExpansionContext {
     /// Returns a diagnostic when no runtime dependency was found.
     fn from_found_crate(found: Option<FoundCrate>) -> SynResult<Self> {
         let facade = match found {
-            Some(FoundCrate::Itself) => quote!(crate),
+            Some(FoundCrate::Itself) => quote!(::qubit_reflect),
             Some(FoundCrate::Name(name)) => {
                 let identifier = Ident::new(&name, Span::call_site());
                 quote!(::#identifier)
@@ -106,7 +100,7 @@ impl ExpansionContext {
             None => {
                 return Err(Error::new(
                     Span::call_site(),
-                    "cannot resolve `qubit-reflect`; use `#[reflect(crate = path)]`",
+                    "cannot resolve `qubit-reflect`; add it as a direct dependency",
                 ));
             }
         };
@@ -133,38 +127,12 @@ pub(crate) fn fingerprint(source: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use proc_macro_crate::FoundCrate;
-    use proc_macro2::Span;
-    use quote::quote;
-
     use super::ExpansionContext;
-    use crate::ir::HelperAttributeIr;
-    use crate::ir::HelperName;
-    use crate::ir::HelperTarget;
-    use crate::ir::HelperValueIr;
-    use crate::ir::PathIr;
 
     #[test]
-    fn test_explicit_facade_has_priority() {
-        let attributes = [HelperAttributeIr {
-            name: HelperName::RuntimeCrate,
-            value: HelperValueIr::RuntimeCrate(PathIr {
-                source: "framework::reflect".to_owned(),
-                segments: Vec::new(),
-                leading_colon: false,
-                qualified_self: None,
-                tokens: quote!(framework::reflect),
-                span: Span::call_site(),
-            }),
-            target: HelperTarget::Type,
-            span: Span::call_site(),
-            value_span: Span::call_site(),
-        }];
-        let context = ExpansionContext::from_attributes(&attributes).expect("explicit facade must resolve");
-        assert_eq!(
-            context.facade().to_string(),
-            "framework :: reflect",
-            "explicit facade path should be preserved",
-        );
+    fn test_package_example_uses_library_path() {
+        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Itself)).expect("package runtime must resolve");
+        assert_eq!(context.facade().to_string(), ":: qubit_reflect");
     }
 
     #[test]
@@ -174,16 +142,16 @@ mod tests {
         assert_eq!(
             context.facade().to_string(),
             ":: reflect_runtime",
-            "renamed dependencies should use an absolute facade path",
+            "renamed dependencies should use an absolute runtime path",
         );
     }
 
     #[test]
-    fn test_missing_facade_reports_actionable_error() {
+    fn test_missing_runtime_reports_actionable_error() {
         let error = ExpansionContext::from_found_crate(None).expect_err("missing runtime must fail");
         assert!(
-            error.to_string().contains("#[reflect(crate = path)]"),
-            "missing runtime diagnostics should explain how to configure the facade",
+            error.to_string().contains("add it as a direct dependency"),
+            "missing runtime diagnostics should explain how to add the dependency",
         );
     }
 }

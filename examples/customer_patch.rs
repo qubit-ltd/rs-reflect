@@ -17,7 +17,6 @@ use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 
 #[derive(Clone, Reflect)]
-#[reflect(crate = qubit_reflect)]
 struct Customer {
     #[reflect(read_only)]
     id: u64,

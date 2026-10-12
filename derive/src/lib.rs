@@ -29,7 +29,7 @@ use proc_macro::TokenStream;
 ///
 /// | Scope | Supported options |
 /// | --- | --- |
-/// | Type | `rename = "name"`, `opaque`, `capabilities(...)`, `thread_safe`, `crate = path`, `definition_provider_v2 = identifier` |
+/// | Type | `rename = "name"`, `opaque`, `capabilities(...)`, `thread_safe`, `definition_provider_v2 = identifier` |
 /// | Field | `rename = "name"` (named fields only), `opaque`, `skip`, `read_only`, `no_construct`, `default`, `default = path` |
 /// | Enum variant | `rename = "name"`, `skip`, `no_construct` |
 ///
@@ -48,9 +48,7 @@ use proc_macro::TokenStream;
 /// this meaning even if their final segment is a built-in name:
 /// `capabilities(my_crate::Clone)` calls `my_crate::Clone::<Self>()`.
 ///
-/// `crate = path` selects the runtime facade used by generated code, for
-/// example `crate = my_runtime`. Omit it to resolve the installed runtime
-/// crate. The facade must expose the versioned code-generation support.
+/// Generated code resolves the directly declared `qubit-reflect` dependency.
 /// `definition_provider_v2 = identifier` is a facade integration hook for a
 /// generic type: it emits a caller-named definition provider, not a path.
 ///
@@ -82,7 +80,7 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 ///
 /// # Attribute scopes
 ///
-/// Trait arguments support `rename = "name"`, `crate = path`,
+/// Trait arguments support `rename = "name"`,
 /// `supertrait(Path, ...)`, `external_trait(Path, id = "stable.id")`, and
 /// `dyn_compatible` or `dyn_compatible(Parent::AssociatedType, ...)`.
 /// `supertrait(...)` selects reflected supertrait relationships;
@@ -107,18 +105,15 @@ pub fn derive_reflect(input: TokenStream) -> TokenStream {
 /// collection, adapter generation, and specialization analysis. An inactive
 /// member is absent from the reflected definition.
 ///
-/// `crate = path` selects a runtime facade; omission resolves the installed
-/// runtime crate. A macro-forwarding facade must re-export the versioned
-/// internal derive support or enable the runtime facade's `derive` feature.
 /// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
-/// for facade integration and supertrait proofs.
+/// for trait reflection and supertrait proofs.
 ///
 /// # Examples
 ///
 /// The [runtime integration example](https://github.com/qubit-ltd/rs-reflect/blob/main/tests/derive_examples/derive_examples_tests.rs)
 /// reflects a trait and its implementation, then checks their registration.
 /// See the [user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
-/// for facade integration and supertrait examples.
+/// for trait and supertrait examples.
 ///
 /// # Parameters
 ///
@@ -137,16 +132,14 @@ pub fn reflect(attribute: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// # Attribute scopes
 ///
-/// Impl arguments support `crate = path`, repeated `specialize(T = Concrete,
+/// Impl arguments support repeated `specialize(T = Concrete,
 /// N = 4, ...)`, `external_trait_id = "stable.id"` (trait impls only), and
-/// `definition_provider_v2 = identifier` to resolve a facade-provided reflected
+/// `definition_provider_v2 = identifier` to resolve a caller-provided reflected
 /// trait definition provider by its function name.
 /// `specialize(...)` registers selected concrete instances of a generic impl;
 /// unspecialized generic declarations retain metadata. `external_trait_id`
-/// identifies an external trait namespace. `crate = path` selects the runtime
-/// facade; omission resolves the installed runtime crate. The facade must
-/// expose versioned code-generation and internal derive support, or enable
-/// its runtime `derive` feature when forwarding attribute macros.
+/// identifies an external trait namespace. Generated code resolves the directly
+/// declared `qubit-reflect` dependency.
 ///
 /// Direct methods accept `#[reflect(...)]` with `rename = "name"`, `skip`,
 /// `no_invoke`, `catch_unwind`, `thread_safe`, and repeated `specialize(...)`.

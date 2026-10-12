@@ -50,7 +50,6 @@ pub type StructUpdateAdapter<M> = fn(ValidatedUpdateInput<M>) -> DynamicOwned<M>
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// struct User {
 ///     name: String,
 /// }

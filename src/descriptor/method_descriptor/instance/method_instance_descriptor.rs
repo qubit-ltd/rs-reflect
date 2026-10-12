@@ -42,9 +42,8 @@ use crate::invoke::InvocationUnavailable;
 /// mod example {
 ///     use qubit_reflect::{Reflect, reflect_impl};
 ///     #[derive(Reflect)]
-///     #[reflect(crate = qubit_reflect)]
 ///     pub struct Service;
-///     #[reflect_impl(crate = qubit_reflect)]
+///     #[reflect_impl]
 ///     impl Service {
 ///         fn ping(&self) {}
 ///     }

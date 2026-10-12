@@ -19,7 +19,6 @@ use crate::descriptor::EnumRepr;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// enum State { Ready }
 /// let state = TypeDescriptor::of::<State>().as_enum().expect("enum type");
 /// assert!(state.representations().is_empty());

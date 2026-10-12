@@ -166,7 +166,6 @@ fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -
             parse_string_value(&meta, "external_trait_id").map(crate::ir::HelperValueIr::ExternalTraitId)
         }
         HelperName::ExternalTrait => parse_external_trait(&meta).map(crate::ir::HelperValueIr::ExternalTrait),
-        HelperName::RuntimeCrate => parse_runtime_crate(&meta).map(crate::ir::HelperValueIr::RuntimeCrate),
     };
     match value {
         Ok(value) => {
@@ -209,32 +208,6 @@ fn parse_optional_path_list(meta: &Meta, name: &str) -> SynResult<Vec<PathIr>> {
         return Ok(Vec::new());
     }
     parse_path_list(meta, name)
-}
-
-/// Parses the explicit facade path used by a downstream macro re-export.
-///
-/// # Parameters
-///
-/// - `meta`: Parsed `crate` helper metadata.
-///
-/// # Returns
-///
-/// Returns the converted Rust facade path.
-///
-/// # Errors
-///
-/// Returns a syntax diagnostic when the helper is not a Rust path expression.
-fn parse_runtime_crate(meta: &Meta) -> SynResult<PathIr> {
-    let Meta::NameValue(name_value) = meta else {
-        return Err(Error::new(meta.span(), "`crate` requires a Rust facade path"));
-    };
-    let Expr::Path(path) = &name_value.value else {
-        return Err(Error::new(
-            name_value.value.span(),
-            "`crate` requires a Rust facade path",
-        ));
-    };
-    Ok(convert_path(&path.path))
 }
 
 /// Requires a bare flag helper without arguments or a value.

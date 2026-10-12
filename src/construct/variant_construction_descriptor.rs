@@ -26,7 +26,6 @@ use crate::value::ThreadSafe;
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// #[derive(Reflect)]
-/// #[reflect(crate = qubit_reflect)]
 /// enum State {
 ///     Ready,
 /// }

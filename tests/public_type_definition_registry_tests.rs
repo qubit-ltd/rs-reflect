@@ -43,13 +43,12 @@ use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 
 #[derive(Clone, Reflect)]
-#[reflect(crate = qubit_reflect, capabilities(Clone))]
+#[reflect(capabilities(Clone))]
 struct GenericRecord<T: Clone> {
     value: T,
 }
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect)]
 enum GenericEnum<T> {
     Unit,
     Tuple(T),
@@ -365,13 +364,13 @@ struct StructMarker;
 struct EnumMarker;
 
 #[derive(Clone, Default, Reflect)]
-#[reflect(crate = qubit_reflect, capabilities(Clone, Default, concrete_provider))]
+#[reflect(capabilities(Clone, Default, concrete_provider))]
 struct CapabilityRecord<T: Clone + Default> {
     value: T,
 }
 
 #[derive(Clone, Reflect)]
-#[reflect(crate = qubit_reflect, capabilities(Clone, concrete_provider))]
+#[reflect(capabilities(Clone, concrete_provider))]
 enum CapabilityEnum<T: Clone> {
     Value(T),
 }
@@ -439,7 +438,7 @@ fn test_generic_capabilities_preserve_each_monomorph() {
 }
 
 #[derive(Reflect)]
-#[reflect(crate = qubit_reflect, definition_provider_v2 = domain_definition)]
+#[reflect(definition_provider_v2 = domain_definition)]
 struct DomainDefinition<T> {
     value: T,
 }
