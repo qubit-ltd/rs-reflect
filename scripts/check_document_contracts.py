@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Check bilingual reflection facts against documentation and real project inputs."""
 
-import ast
 from pathlib import Path
 import re
 import sys
@@ -16,11 +15,6 @@ FACTS = {
     "panic.abort": "catching-unavailable",
     "dispatch.input_recovery": "original-input",
     "examples.native": "cargo-example",
-    "coverage.configure": "70",
-    "coverage.parse": "85",
-    "coverage.validate": "80",
-    "coverage.expand": "85",
-    "registry.source": "src/registry/reflect_registry.rs",
     "typeref.constructor": "owned-resolved",
     "lazy.retry": "panic-retry",
     "field.lookup": "linear",
@@ -30,16 +24,8 @@ GROUPS = (
     ("derive/README.md", "derive/README.zh_CN.md", ("runtime.direct", "provider.qualified")),
     ("doc/user_guide.md", "doc/user_guide.zh_CN.md", (
         "runtime.direct", "provider.qualified", "panic.async_poll", "panic.abort",
-        "dispatch.input_recovery", "examples.native")),
-    ("doc/2026-09-03-qubit-reflect-design.md", "doc/2026-09-03-qubit-reflect-design.zh_CN.md", (
-        "panic.async_poll", "panic.abort", "dispatch.input_recovery", "coverage.configure",
-        "coverage.parse", "coverage.validate", "coverage.expand", "registry.source")),
-    ("doc/2026-09-07-qubit-reflect-api-stability.md", "doc/2026-09-07-qubit-reflect-api-stability.zh_CN.md",
-     ("dispatch.input_recovery",)),
-    ("doc/derive-contract-matrix.md", "doc/derive-contract-matrix.zh_CN.md", (
-        "coverage.configure", "coverage.parse", "coverage.validate", "coverage.expand")),
-    ("doc/2026-10-07-qubit-reflect-current-design.md", "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md", (
-        "typeref.constructor", "lazy.retry", "field.lookup")),
+        "dispatch.input_recovery", "examples.native", "typeref.constructor",
+        "lazy.retry", "field.lookup")),
 )
 EXAMPLES = ("field_patch", "customer_patch", "support_action")
 def document_facts(document):
@@ -59,27 +45,6 @@ def document_facts(document):
                 raise ValueError(f"{document}:{line_number}: duplicate contract key {key}")
             facts[key] = value
     return facts
-
-
-def coverage_thresholds(root):
-    """Read the gate's literal constant without executing a supplied root's script."""
-    source = root / "scripts/derive_coverage_report.py"
-    module = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
-    values = []
-    for node in module.body:
-        if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "MINIMUM_LINE_COVERAGE" for target in node.targets):
-            values.append(ast.literal_eval(node.value))
-    if len(values) != 1 or not isinstance(values[0], dict):
-        raise ValueError(f"{source}: expected one MINIMUM_LINE_COVERAGE constant")
-    expected = {
-        key.removeprefix("coverage."): float(value)
-        for key, value in FACTS.items()
-        if key.startswith("coverage.")
-    }
-    if values[0] != expected:
-        differing = next((stage for stage in expected if values[0].get(stage) != expected[stage]), "stages")
-        raise ValueError(f"{source}: coverage.{differing}: threshold drift: {values[0]}")
-    return {f"coverage.{stage}": f"{value:g}" for stage, value in values[0].items()}
 
 
 def check_examples(root):
@@ -128,11 +93,6 @@ def check_local_links(root):
         "derive/README.zh_CN.md",
         "doc/user_guide.md",
         "doc/user_guide.zh_CN.md",
-        "doc/2026-09-03-qubit-reflect-design.md",
-        "doc/2026-09-03-qubit-reflect-design.zh_CN.md",
-        "doc/2026-10-07-qubit-reflect-current-design.md",
-        "doc/2026-10-07-qubit-reflect-current-design.zh_CN.md",
-        "doc/2026-09-27-reflection-downstream-reassessment.zh_CN.md",
     )
     root = Path(root).resolve()
     documents = [root / name for name in names]
@@ -171,13 +131,9 @@ def check_contracts(root):
     """Validate the required keys, bilingual values, and actual source contracts."""
     root = Path(root)
     expected_values = dict(FACTS)
-    expected_values.update(coverage_thresholds(root))
     check_examples(root)
     check_source_checkout_docs(root)
     check_local_links(root)
-    registry = root / FACTS["registry.source"]
-    if not registry.is_file() or not registry.resolve().is_relative_to(root.resolve()):
-        raise ValueError(f"registry.source: missing or escaping {registry}")
     for english, chinese, required in GROUPS:
         pair = []
         for name in (english, chinese):

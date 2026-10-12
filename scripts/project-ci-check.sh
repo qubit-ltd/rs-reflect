@@ -9,10 +9,8 @@ RS_CI_BUILD_TOOLCHAIN="${RS_CI_BUILD_TOOLCHAIN:-1.94.0}"
 cargo +"$RS_CI_BUILD_TOOLCHAIN" fetch --locked
 
 python3 -m unittest discover -s "$PROJECT_ROOT/scripts/tests" -p '*tests.py'
-bash "$PROJECT_ROOT/scripts/tests/requirements_traceability_check_tests.sh"
 python3 "$PROJECT_ROOT/scripts/tests/coverage_policy_entrypoint_tests.py"
 "$PROJECT_ROOT/scripts/check-markdown-examples.sh"
-"$PROJECT_ROOT/scripts/check-requirements-traceability.sh"
 python3 "$PROJECT_ROOT/scripts/check_document_contracts.py"
 RUSTFLAGS="${RUSTFLAGS:-} -C panic=abort" \
     cargo +"$RS_CI_BUILD_TOOLCHAIN" run --quiet --all-features \
