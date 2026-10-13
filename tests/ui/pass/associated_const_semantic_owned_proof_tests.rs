@@ -8,27 +8,26 @@
 
 use core::fmt::Debug;
 
-use qubit_reflect::reflect;
 
 type Bytes = [u8];
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait AliasedUnsizedConstContract {
     const BYTES: Bytes;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait MaybeUnsizedConstContract<T: ?Sized> {
     const VALUE: T;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait LifetimeProjectionConstContract<'a> {
     type Value;
     const VALUE: Self::Value;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait BorrowedConstContract<'a> {
     const FUNCTION: fn(&'a u8);
     const POINTER: *const &'a u8;
@@ -39,7 +38,7 @@ trait BorrowedConstContract<'a> {
     const STATIC_DYN: Option<Box<dyn Debug>> = None;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait HrtbConstContract {
     const BOUND_FUNCTION: for<'a> fn(&'a u8);
     const ELIDED_FUNCTION: fn(&u8);

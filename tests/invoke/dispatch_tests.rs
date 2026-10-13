@@ -15,8 +15,7 @@ use std::sync::atomic::Ordering;
 
 use qubit_reflect::Invocation;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::ReflectedRef;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::descriptor::ImplDescriptor;
 use qubit_reflect::descriptor::InvocationAdapter;
 use qubit_reflect::descriptor::InvocationUnavailableReason;
@@ -38,12 +37,11 @@ use qubit_reflect::invoke::PinnedMutInvocationFailure;
 use qubit_reflect::invoke::PinnedRefAdapter;
 use qubit_reflect::invoke::PinnedRefInvocation;
 use qubit_reflect::invoke::PinnedRefInvocationFailure;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
 struct DropProbe(Arc<AtomicUsize>);
 struct BusinessProbe(Arc<AtomicUsize>);
@@ -69,7 +67,9 @@ fn opaque_entry() {}
 fn test_dispatch_missing_entry_preserves_owned_input() {
     let drops = Arc::new(AtomicUsize::new(0));
     let registry = RegistrySnapshotBuilder::new().build().expect("empty snapshot");
-    let input = Invocation::associated([InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops))))]);
+    let input = Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(
+        &drops,
+    ))))]);
     let adapter = InvocationAdapter::new(opaque_entry);
     let unavailable = match adapter.invoke_local(&registry, input) {
         Err(error) => error,
@@ -83,10 +83,10 @@ fn test_dispatch_missing_entry_preserves_owned_input() {
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DispatchFixture;
 
-#[reflect_impl]
+#[ReflectImpl]
 impl DispatchFixture {
     /// Supplies a genuine generated declaration for fixture construction.
     fn declaration() {}
@@ -186,26 +186,10 @@ fn test_dispatch_ordinary_modes_missing_slots_and_no_adapter_preserve_inputs() {
         if high {
             let target = instance(Some(&OPAQUE));
             ordinary_case!(target, invoke_local, Local, Local, &missing);
-            ordinary_case!(target, invoke_thread_safe, ThreadSafe, ThreadSafe, &missing);
             ordinary_case!(target, invoke_catching_local, Local, CatchingLocal, &missing);
-            ordinary_case!(
-                target,
-                invoke_catching_thread_safe,
-                ThreadSafe,
-                CatchingThreadSafe,
-                &missing
-            );
         } else {
             ordinary_case!(OPAQUE, invoke_local, Local, Local, &missing);
-            ordinary_case!(OPAQUE, invoke_thread_safe, ThreadSafe, ThreadSafe, &missing);
             ordinary_case!(OPAQUE, invoke_catching_local, Local, CatchingLocal, &missing);
-            ordinary_case!(
-                OPAQUE,
-                invoke_catching_thread_safe,
-                ThreadSafe,
-                CatchingThreadSafe,
-                &missing
-            );
         }
     }
     let target = instance(None);
@@ -213,15 +197,7 @@ fn test_dispatch_ordinary_modes_missing_slots_and_no_adapter_preserve_inputs() {
         reasons: target.unavailable_reasons().into(),
     };
     ordinary_case!(target, invoke_local, Local, Local, &reason);
-    ordinary_case!(target, invoke_thread_safe, ThreadSafe, ThreadSafe, &reason);
     ordinary_case!(target, invoke_catching_local, Local, CatchingLocal, &reason);
-    ordinary_case!(
-        target,
-        invoke_catching_thread_safe,
-        ThreadSafe,
-        CatchingThreadSafe,
-        &reason
-    );
 }
 
 /// An immovable receiver whose safe pinned projection remains usable after
@@ -265,11 +241,11 @@ macro_rules! pinned_cases {
             [
                 InvocationBinding::named(
                     "untouched",
-                    InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops)))),
+                    InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(&drops)))),
                 ),
-                InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(BusinessProbe(Arc::clone(
-                    &business_calls,
-                ))))),
+                InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(BusinessProbe(
+                    Arc::clone(&business_calls),
+                )))),
             ],
         );
         let input = unavailable(
@@ -290,11 +266,11 @@ macro_rules! pinned_cases {
             [
                 InvocationBinding::named(
                     "untouched",
-                    InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops)))),
+                    InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(&drops)))),
                 ),
-                InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(BusinessProbe(Arc::clone(
-                    &business_calls,
-                ))))),
+                InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(BusinessProbe(
+                    Arc::clone(&business_calls),
+                )))),
             ],
         );
         let input = unavailable(
@@ -352,8 +328,8 @@ fn test_dispatch_pinned_modes_missing_slots_type_mismatch_and_no_adapter() {
         let input = PinnedRefInvocation::new(
             receiver.as_ref(),
             [
-                InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops)))),
-                InvocationArg::Owned(ReflectedOwned::new(BusinessProbe(Arc::clone(&business_calls)))),
+                InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(&drops)))),
+                InvocationArg::Owned(DynamicOwned::<Local>::new(BusinessProbe(Arc::clone(&business_calls)))),
             ],
         );
         let result = if high {
@@ -375,8 +351,8 @@ fn test_dispatch_pinned_modes_missing_slots_type_mismatch_and_no_adapter() {
         let input = PinnedMutInvocation::new(
             receiver.as_mut(),
             [
-                InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops)))),
-                InvocationArg::Owned(ReflectedOwned::new(BusinessProbe(Arc::clone(&business_calls)))),
+                InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(&drops)))),
+                InvocationArg::Owned(DynamicOwned::<Local>::new(BusinessProbe(Arc::clone(&business_calls)))),
             ],
         );
         let result = if high {
@@ -412,27 +388,10 @@ fn local_entry<'call>(
     record_business(input.arguments());
     panic!("unavailable catching dispatch must not execute ordinary business entry")
 }
-/// Rejects accidental execution of the ordinary thread-safe business entry.
-fn thread_safe_entry<'call>(
-    _: &ReflectRegistry,
-    input: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    for argument in input.arguments() {
-        if let InvocationArg::Owned(value) = argument
-            && let Some(probe) = value.downcast_ref::<BusinessProbe>()
-        {
-            probe.0.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-    panic!("unavailable catching dispatch must not execute ordinary business entry")
-}
-
 #[test]
-fn test_dispatch_catching_priority_in_both_modes_and_layers() {
+fn test_dispatch_catching_priority_in_local_mode_and_layers() {
     static LOCAL: InvocationAdapter = InvocationAdapter::local(local_entry);
-    static SEND: InvocationAdapter = InvocationAdapter::thread_safe(thread_safe_entry);
     static ABORT_LOCAL: InvocationAdapter = InvocationAdapter::local_with_unavailable_catching(local_entry);
-    static ABORT_SEND: InvocationAdapter = InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_entry);
     for (adapter, reason) in [
         (&LOCAL, InvocationDispatchReason::CatchingNotRequested),
         (&ABORT_LOCAL, InvocationDispatchReason::PanicAbort),
@@ -444,53 +403,6 @@ fn test_dispatch_catching_priority_in_both_modes_and_layers() {
             Local,
             CatchingLocal,
             &reason
-        );
-        ordinary_case!(
-            adapter,
-            invoke_catching_thread_safe,
-            ThreadSafe,
-            CatchingThreadSafe,
-            &InvocationDispatchReason::MissingEntry
-        );
-        ordinary_case!(
-            instance(Some(adapter)),
-            invoke_catching_thread_safe,
-            ThreadSafe,
-            CatchingThreadSafe,
-            &InvocationDispatchReason::MissingEntry
-        );
-    }
-    for (adapter, reason) in [
-        (&SEND, InvocationDispatchReason::CatchingNotRequested),
-        (&ABORT_SEND, InvocationDispatchReason::PanicAbort),
-    ] {
-        ordinary_case!(
-            adapter,
-            invoke_catching_thread_safe,
-            ThreadSafe,
-            CatchingThreadSafe,
-            &reason
-        );
-        ordinary_case!(
-            instance(Some(adapter)),
-            invoke_catching_thread_safe,
-            ThreadSafe,
-            CatchingThreadSafe,
-            &reason
-        );
-        ordinary_case!(
-            adapter,
-            invoke_catching_local,
-            Local,
-            CatchingLocal,
-            &InvocationDispatchReason::MissingEntry
-        );
-        ordinary_case!(
-            instance(Some(adapter)),
-            invoke_catching_local,
-            Local,
-            CatchingLocal,
-            &InvocationDispatchReason::MissingEntry
         );
     }
 }
@@ -504,7 +416,9 @@ fn test_dispatch_recovered_input_outlives_registry_snapshot() {
         unavailable(
             adapter.invoke_local(
                 &registry,
-                Invocation::associated([InvocationArg::Owned(ReflectedOwned::new(DropProbe(Arc::clone(&drops))))]),
+                Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(DropProbe(Arc::clone(
+                    &drops,
+                ))))]),
             ),
             InvocationDispatchMode::Local,
             &InvocationDispatchReason::MissingEntry,
@@ -520,7 +434,7 @@ fn test_dispatch_recovered_input_outlives_registry_snapshot() {
         unavailable(
             adapter.invoke_local(
                 &registry,
-                Invocation::associated([InvocationArg::Ref(ReflectedRef::new(&argument))]),
+                Invocation::associated([InvocationArg::Ref(DynamicRef::<Local>::new(&argument))]),
             ),
             InvocationDispatchMode::Local,
             &InvocationDispatchReason::MissingEntry,

@@ -6,22 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct DefaultStrSample;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait DefaultStr {
     fn echo_default(value: &str) -> &str {
         value
     }
 }
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl DefaultStr for DefaultStrSample {}
 
 fn main() {}

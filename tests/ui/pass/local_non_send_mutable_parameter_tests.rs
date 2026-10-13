@@ -6,17 +6,16 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
+use std::rc::Rc;
 
-#[derive(Reflect)]
+
+#[qubit_reflect::Reflect]
 struct Worker;
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl Worker {
-    #[reflect(thread_safe)]
-    fn increment(value: u32) -> u32 {
-        value + 1
+    fn run(value: &mut Rc<u8>) {
+        *value = Rc::new(1);
     }
 }
 

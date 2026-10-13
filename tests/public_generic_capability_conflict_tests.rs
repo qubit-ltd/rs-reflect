@@ -13,7 +13,6 @@ use std::any::TypeId;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectRegistry;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
@@ -28,6 +27,8 @@ use qubit_reflect::invoke::InvocationArg;
 use qubit_reflect::invoke::InvocationErrorKind;
 use qubit_reflect::invoke::ReceiverExpectation;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
 /// The shared capability contract intentionally registered twice.
 fn key() -> CapabilityKey<fn()> {
@@ -64,7 +65,7 @@ fn first<T: 'static>() -> CapabilityDescriptor {
 fn second<T: 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(key(), adapter as fn())
 }
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(capabilities(first, second))]
 struct Conflict<T> {
     value: T,
@@ -104,7 +105,7 @@ fn different_contract<T: 'static>() -> CapabilityDescriptor {
     CapabilityDescriptor::with_adapter(key, 17_usize)
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(capabilities(first, different_contract))]
 struct Mismatch<T> {
     value: T,
@@ -143,7 +144,7 @@ static FAIL_COUNTS: std::sync::Mutex<std::collections::BTreeMap<std::any::TypeId
 static COUNTS: std::sync::Mutex<std::collections::BTreeMap<std::any::TypeId, usize>> =
     std::sync::Mutex::new(std::collections::BTreeMap::new());
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(capabilities(counted, fact))]
 struct Counted<T> {
     value: T,
@@ -246,7 +247,7 @@ fn test_receiver_capability_conflict_preserves_validated_inputs() {
     assert_eq!(absent.type_name(), None);
     assert_eq!(unit.type_id(), Some(std::any::TypeId::of::<()>()));
     assert_eq!(unit.type_name(), Some(std::any::type_name::<()>()));
-    let invocation = Invocation::associated([InvocationArg::Owned(ReflectedOwned::new(7_u8))]);
+    let invocation = Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(7_u8))]);
     let validated = invocation
         .validate(
             &identity,

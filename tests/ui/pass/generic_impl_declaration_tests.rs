@@ -6,16 +6,23 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use qubit_reflect::Reflect;
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::marker::PhantomData;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct Page<T>(PhantomData<T>);
 
-#[reflect_impl(specialize(T = u8))]
+#[qubit_reflect::ReflectImpl]
 impl<T> Page<T> {
     fn reflected_count() -> usize {
         1

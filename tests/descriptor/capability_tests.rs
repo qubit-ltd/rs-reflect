@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 use qubit_reflect as reflect;
-use qubit_reflect::Reflect as DeriveReflect;
+use qubit_reflect::Reflect;
 use qubit_reflect::capability::CapabilityAccessError;
 use qubit_reflect::capability::CapabilityConflictKind;
 use qubit_reflect::capability::CapabilityDescriptor;
@@ -24,13 +24,11 @@ use qubit_reflect::capability::default_descriptor;
 use qubit_reflect::capability::default_key;
 use qubit_reflect::capability::send_key;
 use qubit_reflect::capability::sync_key;
-use qubit_reflect::descriptor::Reflect;
 use qubit_reflect::descriptor::TypeDescriptor;
 use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::register_reflected_type;
 use qubit_reflect::register_type_capabilities;
 use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedOwned;
 
 #[derive(Debug, Eq, PartialEq)]
 struct TextAdapter(&'static str);
@@ -41,21 +39,23 @@ struct NumberAdapter;
 #[derive(Debug, Eq, PartialEq)]
 struct ExtensionAdapter(&'static str);
 
-#[derive(Clone, Default, Debug, Eq, PartialEq, DeriveReflect)]
+#[derive(Clone, Default, Debug, Eq, PartialEq)]
+#[Reflect]
 struct LocalOnly {
     values: Rc<Vec<u32>>,
 }
 
-#[derive(Clone, Default, DeriveReflect)]
+#[derive(Clone, Default)]
+#[Reflect]
 struct SendSync;
 
-#[derive(DeriveReflect)]
+#[Reflect]
 struct ExtensionRegistration;
 
 struct ReflectedRoot;
 
-#[derive(Clone, Default, DeriveReflect)]
-#[reflect(capabilities(Clone, Default))]
+#[derive(Clone, Default)]
+#[Reflect]
 struct DerivedCapabilities;
 
 mod custom {
@@ -63,7 +63,8 @@ mod custom {
     use qubit_reflect::capability::CapabilityKey;
     use qubit_reflect::identity::CapabilityId;
 
-    #[allow(non_snake_case)]
+    // This fixture is discovered through reflected metadata by the test.
+    #[allow(dead_code, non_snake_case)]
     pub fn Clone<T: 'static>() -> CapabilityDescriptor {
         let _ = std::any::TypeId::of::<T>();
         let id = CapabilityId::new("example.capability.qualified_clone").expect("test capability ID");
@@ -71,11 +72,10 @@ mod custom {
     }
 }
 
-#[derive(DeriveReflect)]
-#[reflect(capabilities(custom::Clone))]
+#[Reflect]
 struct QualifiedClone;
 
-#[derive(DeriveReflect)]
+#[Reflect]
 struct DerivedExtensionRegistration;
 
 /// Builds the test root's capability set once for its static descriptor.
@@ -108,6 +108,8 @@ register_type_capabilities!(LocalOnly: Clone, Default);
 register_type_capabilities!(SendSync: Clone, Default, Send, Sync);
 register_type_capabilities!(ExtensionRegistration: [extension_key() => ExtensionAdapter("registered")]);
 register_type_capabilities!(DerivedExtensionRegistration: [extension_key() => ExtensionAdapter("derived")]);
+register_type_capabilities!(DerivedCapabilities: Clone, Default);
+register_type_capabilities!(QualifiedClone: [qualified_key() => NumberAdapter]);
 
 /// Creates a valid third-party capability ID for a test.
 fn external_id(value: &'static str) -> CapabilityId {
@@ -117,6 +119,10 @@ fn external_id(value: &'static str) -> CapabilityId {
 /// Returns the typed third-party extension key used by static registrations.
 fn extension_key() -> CapabilityKey<ExtensionAdapter> {
     CapabilityKey::new(external_id("example.capability.extension"))
+}
+
+fn qualified_key() -> CapabilityKey<NumberAdapter> {
+    CapabilityKey::new(external_id("example.capability.qualified_clone"))
 }
 
 /// Confirms descriptors retain unknown contracts and iterate by stable ID
@@ -255,12 +261,13 @@ fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
         .get(clone_key())
         .unwrap()
         .expect("the clone adapter must be present");
+    let source = String::from("clone me");
     let cloned = clone_adapter
-        .clone_owned(&ReflectedOwned::new(String::from("clone me")))
+        .clone_value(&source)
         .expect("the dynamic value has the registered type");
     assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("clone me"));
 
-    let mismatch = match clone_adapter.clone_owned(&ReflectedOwned::new(17_u32)) {
+    let mismatch = match clone_adapter.clone_value(&17_u32) {
         Ok(_) => panic!("an adapter must reject a different concrete type"),
         Err(error) => error,
     };
@@ -392,7 +399,7 @@ fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
             .capability(text, clone_key())
             .expect("valid capability declarations")
             .expect("String must have an actual clone adapter")
-            .clone_owned(&ReflectedOwned::new(String::from("text")))
+            .clone_value(&String::from("text"))
             .expect("the registered String adapter must accept String")
             .downcast_ref::<String>()
             .map(String::as_str),
@@ -420,7 +427,7 @@ fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
         .get(clone_key())
         .unwrap()
         .expect("the clone registration carries its operation adapter")
-        .clone_owned(&ReflectedOwned::new(source.clone()))
+        .clone_value(&source)
         .expect("the registered local concrete type must clone dynamically");
     assert_eq!(cloned.downcast_ref::<LocalOnly>(), Some(&source));
 }

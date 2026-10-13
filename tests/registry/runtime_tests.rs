@@ -79,6 +79,14 @@ const fn static_identity(
 const EARLY_IDENTITY: StaticFragmentIdentity = static_identity("a_early", 10, "type", 10);
 const LATE_IDENTITY: StaticFragmentIdentity = static_identity("z_late", 20, "type", 20);
 
+#[test]
+fn empty_static_fragment_set_builds_an_empty_registry_snapshot() {
+    let registry = build_registry(&[]).expect("an empty fragment set is valid");
+
+    assert!(registry.types().is_empty());
+    assert!(registry.implementations(TypeId::of::<EarlyType>()).is_empty());
+}
+
 /// Returns the runtime identity of the early reflected type.
 fn early_runtime_identity() -> RuntimeIdentity {
     RuntimeIdentity::Type(TypeId::of::<EarlyType>())

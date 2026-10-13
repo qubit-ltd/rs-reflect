@@ -6,13 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::reflect;
 
 trait External {
     fn generic<T>(&self, value: T);
 }
 
-#[reflect(
+#[qubit_reflect::Reflect(
     external_trait(External, id = "example.External"),
     dyn_compatible
 )]

@@ -6,83 +6,154 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for construction input and recovery inspection APIs.
+use std::cell::Cell;
+use std::rc::Rc;
 
-use qubit_reflect::ConstructionError;
 use qubit_reflect::NamedConstructionInput;
-use qubit_reflect::ReflectedOwned;
+use qubit_reflect::Reflect;
+use qubit_reflect::StructUpdateInput;
 use qubit_reflect::TupleConstructionInput;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::construct::RecoveredConstructionValue;
-use qubit_reflect::construct::StructUpdateInput;
+use qubit_reflect::construct::ConstructionError;
+use qubit_reflect::construct::RecoveredAnyValue;
 
-/// Verifies named input retains caller order and exposes recovery through all
-/// public inspection and consuming APIs.
-#[test]
-fn test_named_construction_recovery_preserves_names_values_and_error() {
-    let input = NamedConstructionInput::new([
-        ("first", ReflectedOwned::new(7_u8)),
-        ("second", ReflectedOwned::new(String::from("value"))),
-    ]);
-    assert_eq!(input.fields().len(), 2);
-    assert_eq!(input.fields()[0].0.as_ref(), "first");
-    assert!(format!("{input:?}").contains("first"));
-
-    let Err(recovery) = TypeDescriptor::of::<u8>().construct_struct(input) else {
-        panic!("primitive targets cannot construct named structs");
-    };
-    assert_eq!(recovery.error(), &ConstructionError::TargetUnavailable);
-    assert_eq!(recovery.values().len(), 2);
-    assert!(format!("{recovery:?}").contains("TargetUnavailable"));
-    assert_eq!(
-        recovery.to_string(),
-        "dynamic construction is unavailable for this target"
-    );
-
-    let (error, values) = recovery.into_parts();
-    assert_eq!(error, ConstructionError::TargetUnavailable);
-    let RecoveredConstructionValue::Named { name, value } = &values[0] else {
-        panic!("first recovery entry should be named");
-    };
-    assert_eq!(name.as_ref(), "first");
-    assert_eq!(value.downcast_ref::<u8>(), Some(&7));
+#[Reflect]
+#[derive(Debug)]
+pub struct User {
+    pub id: u64,
+    pub name: String,
 }
 
-/// Verifies tuple and unit target-unavailable paths preserve positional values
-/// and empty recovery respectively.
-#[test]
-fn test_tuple_and_unit_construction_recovery_preserve_shape() {
-    let input = TupleConstructionInput::new([ReflectedOwned::new(11_u8), ReflectedOwned::new(12_u8)]);
-    assert_eq!(input.values().len(), 2);
-    assert!(format!("{input:?}").contains("value_count"));
+#[Reflect]
+#[derive(Debug)]
+pub struct Pair(pub u64, pub String);
 
-    let Err(recovery) = TypeDescriptor::of::<u8>().construct_tuple(input) else {
-        panic!("primitive targets cannot construct tuple structs");
-    };
-    let values = recovery.into_values();
-    let RecoveredConstructionValue::Positional { index, value } = &values[1] else {
-        panic!("second recovery entry should be positional");
-    };
-    assert_eq!(*index, 1);
-    assert_eq!(value.downcast_ref::<u8>(), Some(&12));
-    assert!(format!("{:?}", values[0]).contains("Positional"));
+struct DropProbe(Rc<Cell<usize>>);
 
-    let Err(unit_recovery) = TypeDescriptor::of::<u8>().construct_unit() else {
-        panic!("primitive targets cannot construct unit structs");
-    };
-    assert!(unit_recovery.values().is_empty());
+impl Drop for DropProbe {
+    fn drop(&mut self) {
+        self.0.set(self.0.get() + 1);
+    }
 }
 
-/// Verifies update input exposes an untouched base and ordered overrides
-/// before validation.
 #[test]
-fn test_struct_update_input_exposes_base_and_overrides() {
-    let input = StructUpdateInput::new(
-        ReflectedOwned::new(3_u8),
-        NamedConstructionInput::new([("value", ReflectedOwned::new(4_u8))]),
-    );
+fn validation_failure_recovers_original_named_values_in_caller_order() {
+    let recovery = TypeDescriptor::of::<User>()
+        .construct_struct::<User>(
+            NamedConstructionInput::new()
+                .field("name", String::from("Ada"))
+                .field_any("id", Box::new(17_i32)),
+        )
+        .expect_err("field type mismatch must fail validation");
 
-    assert_eq!(input.base().downcast_ref::<u8>(), Some(&3));
-    assert_eq!(input.overrides().fields()[0].0.as_ref(), "value");
-    assert!(format!("{input:?}").contains("override_count"));
+    assert!(matches!(recovery.error(), ConstructionError::ValueTypeMismatch { .. }));
+    let (_, values) = recovery.into_any_parts();
+    let [
+        RecoveredAnyValue::Named {
+            name: first_name,
+            value: first_value,
+        },
+        RecoveredAnyValue::Named {
+            name: second_name,
+            value: second_value,
+        },
+    ] = values.as_ref()
+    else {
+        panic!("each supplied value must be retained");
+    };
+    assert_eq!(first_name.as_ref(), "name");
+    assert_eq!(first_value.downcast_ref::<String>().map(String::as_str), Some("Ada"));
+    assert_eq!(second_name.as_ref(), "id");
+    assert_eq!(second_value.downcast_ref::<i32>(), Some(&17));
+}
+
+#[test]
+fn missing_and_duplicate_inputs_report_structured_errors_and_recover_values() {
+    let missing = TypeDescriptor::of::<User>()
+        .construct_struct::<User>(NamedConstructionInput::new().field("id", 1_u64))
+        .expect_err("required name is missing");
+    assert!(matches!(missing.error(), ConstructionError::MissingField { .. }));
+    assert_eq!(missing.into_any_parts().1.len(), 1);
+
+    let duplicate = TypeDescriptor::of::<User>()
+        .construct_struct::<User>(
+            NamedConstructionInput::new()
+                .field("id", 1_u64)
+                .field("id", 2_u64)
+                .field("name", String::from("Ada")),
+        )
+        .expect_err("duplicate names are rejected");
+    assert!(matches!(duplicate.error(), ConstructionError::DuplicateField { .. }));
+    assert_eq!(duplicate.into_any_parts().1.len(), 3);
+}
+
+#[test]
+fn failed_validation_keeps_owned_input_until_recovery_is_dropped() {
+    let drops = Rc::new(Cell::new(0));
+    let recovery = TypeDescriptor::of::<User>()
+        .construct_struct::<User>(
+            NamedConstructionInput::new()
+                .field("id", DropProbe(Rc::clone(&drops)))
+                .field("name", String::from("Ada")),
+        )
+        .expect_err("the exact field type is checked before construction");
+
+    assert!(matches!(recovery.error(), ConstructionError::ValueTypeMismatch { .. }));
+    assert_eq!(drops.get(), 0, "validation must not drop the original input");
+    let (_, values) = recovery.into_any_parts();
+    let [RecoveredAnyValue::Named { value, .. }, RecoveredAnyValue::Named { .. }] = values.as_ref() else {
+        panic!("recovery must preserve both original bindings");
+    };
+    assert!(value.downcast_ref::<DropProbe>().is_some());
+    assert_eq!(drops.get(), 0, "inspecting recovery must retain ownership");
+    drop(values);
+    assert_eq!(drops.get(), 1, "the recovered value must be dropped exactly once");
+}
+
+#[test]
+fn positional_construction_recovery_preserves_indices_and_values() {
+    let recovery = TypeDescriptor::of::<Pair>()
+        .construct_tuple::<Pair>(TupleConstructionInput::new().value(7_i32).value(String::from("seven")))
+        .expect_err("the first tuple field has the wrong exact type");
+
+    assert!(matches!(recovery.error(), ConstructionError::ValueTypeMismatch { .. }));
+    assert!(format!("{recovery:?}").contains("ConstructionRecovery"));
+    assert!(recovery.to_string().contains("construction value type mismatch"));
+    let (_, values) = recovery.into_any_parts();
+    let [
+        RecoveredAnyValue::Positional {
+            index: first_index,
+            value: first_value,
+        },
+        RecoveredAnyValue::Positional {
+            index: second_index,
+            value: second_value,
+        },
+    ] = values.as_ref()
+    else {
+        panic!("all positional values must be recovered in caller order");
+    };
+    assert_eq!(*first_index, 0);
+    assert_eq!(first_value.downcast_ref::<i32>(), Some(&7));
+    assert_eq!(*second_index, 1);
+    assert_eq!(second_value.downcast_ref::<String>().map(String::as_str), Some("seven"));
+}
+
+#[test]
+fn failed_update_recovery_keeps_base_before_named_overrides() {
+    let recovery = TypeDescriptor::of::<User>()
+        .update_struct::<User>(StructUpdateInput::from_any(
+            Box::new(String::from("wrong base")),
+            NamedConstructionInput::new().field("name", String::from("replacement")),
+        ))
+        .expect_err("the base must have the exact reflected root type");
+
+    assert!(matches!(recovery.error(), ConstructionError::BaseTypeMismatch { .. }));
+    let (_, values) = recovery.into_any_parts();
+    let [RecoveredAnyValue::Base(base), RecoveredAnyValue::Named { name, value }] = values.as_ref() else {
+        panic!("the base must precede every override in recovery order");
+    };
+    assert_eq!(base.downcast_ref::<String>().map(String::as_str), Some("wrong base"));
+    assert_eq!(name.as_ref(), "name");
+    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("replacement"));
 }

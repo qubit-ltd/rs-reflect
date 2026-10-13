@@ -22,7 +22,6 @@ use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
 use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
 use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
@@ -42,13 +41,14 @@ use qubit_reflect::identity::VisibilityKind;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
 
-#[derive(Clone, Reflect)]
+#[derive(Clone)]
+#[Reflect]
 #[reflect(capabilities(Clone))]
 struct GenericRecord<T: Clone> {
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 enum GenericEnum<T> {
     Unit,
     Tuple(T),
@@ -363,13 +363,15 @@ struct OpaqueMarker;
 struct StructMarker;
 struct EnumMarker;
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default)]
+#[Reflect]
 #[reflect(capabilities(Clone, Default, concrete_provider))]
 struct CapabilityRecord<T: Clone + Default> {
     value: T,
 }
 
-#[derive(Clone, Reflect)]
+#[derive(Clone)]
+#[Reflect]
 #[reflect(capabilities(Clone, concrete_provider))]
 enum CapabilityEnum<T: Clone> {
     Value(T),
@@ -388,12 +390,11 @@ fn concrete_key() -> CapabilityKey<fn() -> std::any::TypeId> {
 /// Executes adapters instead of merely checking that capability IDs exist.
 fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &ReflectRegistry) {
     let descriptor = TypeDescriptor::of::<T>();
-    let owned = ReflectedOwned::new(value);
     let cloned = registry
         .capability(descriptor, clone_key())
         .expect("valid capability declarations")
         .expect("clone adapter")
-        .clone_owned(&owned)
+        .clone_value(&value as &dyn std::any::Any)
         .expect("clone must accept its exact monomorph");
     assert!(cloned.downcast_ref::<T>().is_some());
     assert_eq!(
@@ -437,7 +438,7 @@ fn test_generic_capabilities_preserve_each_monomorph() {
     });
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(definition_provider_v2 = domain_definition)]
 struct DomainDefinition<T> {
     value: T,

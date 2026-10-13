@@ -11,6 +11,7 @@ use std::any::TypeId;
 
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::FieldDescriptor;
 use qubit_reflect::descriptor::MethodLookup;
@@ -105,21 +106,22 @@ impl Reflect for RecursiveNode {
     }
 }
 
-#[derive(reflect::Reflect)]
+#[Reflect]
 struct AggregatedNavigationTarget;
 
+#[Reflect]
 trait AmbiguousNavigationMethod {
     fn repeated(&self) -> u8;
 }
 
-#[reflect::reflect_impl(external_trait_id = "fixture.type_descriptor.ambiguous")]
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_AmbiguousNavigationMethod)]
 impl AmbiguousNavigationMethod for AggregatedNavigationTarget {
     fn repeated(&self) -> u8 {
         1
     }
 }
 
-#[reflect::reflect_impl]
+#[ReflectImpl]
 impl AggregatedNavigationTarget {
     fn inherent_only(&self) -> u8 {
         2

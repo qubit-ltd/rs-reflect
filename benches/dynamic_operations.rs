@@ -16,26 +16,23 @@ use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::construct::NamedConstructionInput;
 use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ReflectedRef;
 
-#[derive(Reflect)]
+#[Reflect]
 struct BenchmarkRecord {
-    id: u64,
+    pub id: u64,
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl BenchmarkRecord {
     fn increment(&mut self) -> u64 {
         self.id += 1;
@@ -55,13 +52,12 @@ fn dynamic_operations(criterion: &mut Criterion) {
     let mut field_probe = BenchmarkRecord { id: 1 };
     assert_eq!(
         field
-            .get(ReflectedRef::new(&field_probe))
-            .expect("dynamic field get setup must succeed")
-            .downcast_ref::<u64>(),
-        Some(&1),
+            .get::<BenchmarkRecord, u64>(&field_probe)
+            .expect("dynamic field get setup must succeed"),
+        &1,
     );
     field
-        .set(ReflectedMut::new(&mut field_probe), ReflectedOwned::new(2_u64))
+        .set(&mut field_probe, 2_u64)
         .expect("dynamic field set setup must succeed");
     assert_eq!(field_probe.id, 2);
 
@@ -82,7 +78,7 @@ fn dynamic_operations(criterion: &mut Criterion) {
         3,
     );
     descriptor
-        .construct_struct(NamedConstructionInput::new([("id", ReflectedOwned::new(3_u64))]))
+        .construct_struct::<BenchmarkRecord>(NamedConstructionInput::new().field("id", 3_u64))
         .expect("dynamic construction setup must succeed");
 
     criterion.bench_function("field/direct_get", |bench| {
@@ -98,12 +94,12 @@ fn dynamic_operations(criterion: &mut Criterion) {
     });
     criterion.bench_function("field/reflected_get", |bench| {
         let reflected = BenchmarkRecord { id: 0 };
-        bench.iter(|| black_box(field.get(ReflectedRef::new(&reflected))));
+        bench.iter(|| black_box(field.get::<BenchmarkRecord, u64>(&reflected)));
     });
     criterion.bench_function("field/reflected_set", |bench| {
         bench.iter_batched(
             || BenchmarkRecord { id: 0 },
-            |mut value| black_box(field.set(ReflectedMut::new(&mut value), ReflectedOwned::new(black_box(1_u64)))),
+            |mut value| black_box(field.set(&mut value, black_box(1_u64))),
             BatchSize::SmallInput,
         );
     });
@@ -132,10 +128,10 @@ fn dynamic_operations(criterion: &mut Criterion) {
     });
     criterion.bench_function("construction/reflected", |bench| {
         bench.iter(|| {
-            black_box(descriptor.construct_struct(NamedConstructionInput::new([(
-                "id",
-                ReflectedOwned::new(black_box(1_u64)),
-            )])))
+            black_box(
+                descriptor
+                    .construct_struct::<BenchmarkRecord>(NamedConstructionInput::new().field("id", black_box(1_u64))),
+            )
         });
     });
 }

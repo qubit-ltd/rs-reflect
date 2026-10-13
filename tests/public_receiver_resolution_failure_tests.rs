@@ -17,8 +17,8 @@ use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
 use qubit_reflect::__private::testing::build_registry;
 use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::ReflectRegistry;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::descriptor::ImplDescriptor;
 use qubit_reflect::descriptor::MethodLookup;
@@ -31,15 +31,15 @@ use qubit_reflect::invoke::InvocationErrorKind;
 use qubit_reflect::invoke::InvocationReceiver;
 use qubit_reflect::invoke::ReceiverAdapter;
 use qubit_reflect::invoke::receiver_adapter_key;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::register_type_capabilities;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Receiver;
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Receiver {
     /// This body must not execute when registry resolution fails.
     fn run(self: Pin<Rc<Self>>, first: u8, second: u16) -> u32 {
@@ -96,10 +96,10 @@ fn test_generated_receiver_resolution_failure_preserves_named_inputs() {
     };
     let receiver = Pin::new(Rc::new(Receiver));
     let invocation = Invocation::from_bindings(
-        Some(InvocationReceiver::Owned(ReflectedOwned::new(receiver.clone()))),
+        Some(InvocationReceiver::Owned(DynamicOwned::<Local>::new(receiver.clone()))),
         [
-            InvocationBinding::named("second", InvocationArg::Owned(ReflectedOwned::new(22_u16))),
-            InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
+            InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(22_u16))),
+            InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(11_u8))),
         ],
     );
     let Ok(Err(failure)) = method.invoke_local(&registry, invocation) else {
@@ -149,10 +149,10 @@ fn test_explicit_receiver_invocation_succeeds_after_global_initialization_failur
         panic!("generated method in local snapshot")
     };
     let invocation = Invocation::owned(
-        ReflectedOwned::new(Pin::new(Rc::new(Receiver))),
+        DynamicOwned::<Local>::new(Pin::new(Rc::new(Receiver))),
         [
-            InvocationArg::Owned(ReflectedOwned::new(11_u8)),
-            InvocationArg::Owned(ReflectedOwned::new(22_u16)),
+            InvocationArg::Owned(DynamicOwned::<Local>::new(11_u8)),
+            InvocationArg::Owned(DynamicOwned::<Local>::new(22_u16)),
         ],
     );
     let output = method

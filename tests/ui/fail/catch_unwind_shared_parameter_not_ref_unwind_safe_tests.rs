@@ -8,19 +8,17 @@
 
 use std::cell::Cell;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct Fragile {
     state: Cell<u8>,
 }
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 struct Worker;
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl Worker {
     #[reflect(catch_unwind)]
     fn run(value: &Fragile) -> u8 {

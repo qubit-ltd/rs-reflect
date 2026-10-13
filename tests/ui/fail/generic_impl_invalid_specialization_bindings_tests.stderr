@@ -1,11 +1,11 @@
-error: missing specialization argument `N`
-  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:18:16
+error: `specialize` was removed; bind generic methods at the call site with `bind_method!`
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:16:30
    |
-18 | #[reflect_impl(specialize(T = u8))]
-   |                ^^^^^^^^^^
+16 | #[qubit_reflect::ReflectImpl(specialize(T = u8))]
+   |                              ^^^^^^^^^^
 
-error: duplicate specialization argument `T`
-  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:25:35
+error: `specialize` was removed; bind generic methods at the call site with `bind_method!`
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:23:30
    |
-25 | #[reflect_impl(specialize(T = u8, T = u16, N = 4))]
-   |                                   ^
+23 | #[qubit_reflect::ReflectImpl(specialize(T = u8, T = u16, N = 4))]
+   |                              ^^^^^^^^^^

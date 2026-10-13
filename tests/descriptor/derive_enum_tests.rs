@@ -20,12 +20,9 @@ use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::descriptor::VariantDescriptor;
 use qubit_reflect::descriptor::VariantKind;
 use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ReflectedRef;
 
 /// Counts destruction of a replacement submitted to an inactive variant.
-struct VariantDropProbe(Rc<Cell<usize>>);
+pub struct VariantDropProbe(Rc<Cell<usize>>);
 
 impl Drop for VariantDropProbe {
     /// Records when the caller-owned replacement is finally destroyed.
@@ -34,61 +31,61 @@ impl Drop for VariantDropProbe {
     }
 }
 
-#[derive(Reflect)]
-enum RecoverableEvent {
+#[Reflect]
+pub enum RecoverableEvent {
     Probe(#[reflect(opaque)] VariantDropProbe),
     Inactive,
 }
 
-#[derive(Reflect)]
-enum DerivedEvent {
+#[Reflect]
+pub enum DerivedEvent {
     Ready,
     Number(u8),
     Named { value: String },
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(u8)]
 enum ReprEvent {
     First = 3,
     Second,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(C)]
 enum CReprEvent {
     First,
     Second,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(u8, C)]
 enum CombinedReprEvent {
     Unit = 5,
     Payload(u16),
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(Rust)]
 enum RustReprEvent {
     Unit,
     Payload(u8),
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(transparent)]
 enum TransparentReprEvent {
     Payload(u32),
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[repr(align(16))]
 enum AlignedReprEvent {
     Unit,
     Payload(u8),
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[allow(clippy::duplicated_attributes)]
 #[repr(u16)]
 #[repr(C)]
@@ -100,40 +97,39 @@ enum MultiAttributeReprEvent {
     Payload(u8),
 }
 
-#[derive(Reflect)]
+#[Reflect]
 enum GenericEvent<T> {
     Value(T),
     Empty,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[allow(dead_code)]
 enum VariantPolicyEvent {
     Visible,
     #[reflect(skip)]
     Hidden,
-    #[reflect(no_construct)]
     ConstructionDisabled,
     Last(u8),
 }
 
-/// Verifies skipped variants are absent while `no_construct` keeps structure.
+/// Verifies a skipped variant is entirely absent while later source positions
+/// remain stable.
 #[test]
-fn test_derive_reflect_variant_skip_and_no_construct_are_distinct() {
+fn test_derive_reflect_variant_skip_is_complete_and_preserves_source_index() {
     let descriptor = TypeDescriptor::of::<VariantPolicyEvent>();
     let indices: Vec<_> = descriptor.variants().iter().map(VariantDescriptor::index).collect();
 
     assert_eq!(indices, [0, 2, 3]);
     assert!(descriptor.variant("Hidden").is_none());
     assert!(descriptor.variant_at(1).is_none());
-    let disabled = descriptor
+    let retained = descriptor
         .variant_at(2)
-        .expect("no_construct must retain the source variant");
-    assert_eq!(disabled.rust_name(), "ConstructionDisabled");
-    assert!(disabled.construction().is_none());
+        .expect("the non-skipped source variant remains described");
+    assert_eq!(retained.rust_name(), "ConstructionDisabled");
     assert!(
-        disabled
-            .is_active(ReflectedRef::new(&VariantPolicyEvent::ConstructionDisabled))
+        retained
+            .is_active(&VariantPolicyEvent::ConstructionDisabled)
             .expect("the retained variant must preserve access semantics")
     );
     assert!(
@@ -208,21 +204,20 @@ fn test_derive_reflect_enum_field_access_checks_active_variant() {
         .expect("tuple variant");
     let value = DerivedEvent::Number(7);
 
-    assert!(number.is_active(ReflectedRef::new(&value)).expect("enum target"));
+    assert!(number.is_active(&value).expect("enum target"));
     assert_eq!(
         number
             .field_at(0)
             .expect("tuple field")
-            .get(ReflectedRef::new(&value))
-            .expect("active payload")
-            .downcast_ref::<u8>(),
-        Some(&7)
+            .get::<DerivedEvent, u8>(&value)
+            .expect("active payload"),
+        &7
     );
     assert!(
         number
             .field_at(0)
             .expect("tuple field")
-            .get(ReflectedRef::new(&DerivedEvent::Ready))
+            .get::<DerivedEvent, u8>(&DerivedEvent::Ready)
             .is_err()
     );
 }
@@ -240,10 +235,7 @@ fn test_derive_reflect_enum_field_set_recovers_inactive_variant_replacement() {
     let drops = Rc::new(Cell::new(0));
 
     let failure = field
-        .set(
-            ReflectedMut::new(&mut target),
-            ReflectedOwned::new(VariantDropProbe(Rc::clone(&drops))),
-        )
+        .set(&mut target, VariantDropProbe(Rc::clone(&drops)))
         .expect_err("an inactive variant must reject field replacement");
 
     assert!(matches!(failure.error(), FieldAccessError::InactiveVariant { .. }));
@@ -252,10 +244,7 @@ fn test_derive_reflect_enum_field_set_recovers_inactive_variant_replacement() {
     let replacement = failure
         .into_recovery()
         .unwrap_or_else(|_| panic!("inactive-variant failure must contain recovery"))
-        .into_value_at(0)
-        .unwrap_or_else(|_| panic!("replacement must be recoverable by field index"))
-        .downcast::<VariantDropProbe>()
-        .unwrap_or_else(|_| panic!("recovery must preserve the replacement type"));
+        .into_value();
     assert_eq!(drops.get(), 0, "taking recovery must preserve ownership");
     drop(replacement);
     assert_eq!(drops.get(), 1, "the caller controls final destruction");

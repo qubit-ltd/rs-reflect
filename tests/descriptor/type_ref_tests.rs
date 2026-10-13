@@ -9,6 +9,7 @@
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::TypeRef;
+use qubit_reflect::expression::TypeExpression;
 
 struct Bad;
 
@@ -32,6 +33,16 @@ fn test_of_returns_root_descriptor_for_unsized_type() {
     let root = reference.as_resolved().expect("resolved root");
 
     assert!(std::ptr::eq(root, TypeDescriptor::of::<str>()));
+}
+
+#[test]
+fn test_symbolic_type_ref_exposes_expression_without_concrete_identity() {
+    let expression = TypeExpression::parameter("T").expect("parameter name is valid");
+    let reference = TypeRef::Symbolic(expression.clone());
+
+    assert_eq!(reference.as_symbolic(), Some(&expression));
+    assert_eq!(reference.concrete_type_id(), None);
+    assert!(reference.as_opaque().is_none());
 }
 
 #[test]

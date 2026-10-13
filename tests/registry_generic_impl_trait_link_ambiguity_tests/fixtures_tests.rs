@@ -13,18 +13,18 @@
 use std::marker::PhantomData;
 
 use FirstMatchingTrait as AmbiguousAlias;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[reflect]
+#[Reflect]
 trait FirstMatchingTrait {
     /// Returns the shared fixture value.
     fn shared_value(&self) -> usize;
 }
 
-#[reflect]
+#[Reflect]
 trait SecondMatchingTrait {
     /// Returns the shared fixture value.
     fn shared_value(&self) -> usize;
@@ -32,7 +32,7 @@ trait SecondMatchingTrait {
 
 struct AmbiguousTarget<T>(PhantomData<T>);
 
-#[reflect_impl]
+#[ReflectImpl]
 impl<T> AmbiguousAlias for AmbiguousTarget<T> {
     /// Returns the shared fixture value.
     fn shared_value(&self) -> usize {

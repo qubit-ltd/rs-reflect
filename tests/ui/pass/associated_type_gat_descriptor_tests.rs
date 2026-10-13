@@ -10,11 +10,10 @@ use qubit_reflect::expression::GenericParameterDescriptor;
 use qubit_reflect::expression::LifetimeExpression;
 use qubit_reflect::expression::PredicateDescriptor;
 use qubit_reflect::expression::TypeExpression;
-use qubit_reflect::reflect;
 
 struct Target;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait GatContract {
     type Output<'a, T>
     where

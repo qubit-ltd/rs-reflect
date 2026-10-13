@@ -9,20 +9,19 @@
 //! Compile fixture for direct derive macros with a runtime-only dependency.
 
 use qubit_reflect_derive::Reflect;
-use qubit_reflect_derive::reflect;
-use qubit_reflect_derive::reflect_impl;
+use qubit_reflect_derive::ReflectImpl;
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct RuntimeOnlyTarget;
 
-#[reflect]
+#[Reflect]
 trait RuntimeOnlyTrait {
     #[cfg(any())]
     fn disabled(&self) -> MissingTraitType;
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl RuntimeOnlyTarget {
     #[cfg(any())]
     fn disabled(&self) -> MissingImplType {

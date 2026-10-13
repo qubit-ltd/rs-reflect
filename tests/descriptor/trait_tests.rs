@@ -16,14 +16,12 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use qubit_reflect as reflect;
-use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::AssociatedConstBindingDescriptor;
 use qubit_reflect::descriptor::AssociatedConstDescriptor;
 use qubit_reflect::descriptor::AssociatedConstImplementationSource;
 use qubit_reflect::descriptor::AssociatedConstReader;
 use qubit_reflect::descriptor::AssociatedTypeBindingDescriptor;
 use qubit_reflect::descriptor::AssociatedTypeDescriptor;
-use qubit_reflect::descriptor::CatchingAvailability;
 use qubit_reflect::descriptor::ImplAssociatedConstDescriptor;
 use qubit_reflect::descriptor::ImplAssociatedTypeDescriptor;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
@@ -68,9 +66,6 @@ use qubit_reflect::identity::ExternalTraitId;
 use qubit_reflect::identity::FragmentIdentity;
 use qubit_reflect::identity::MemberId;
 use qubit_reflect::identity::Visibility;
-use qubit_reflect::value::Local;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ThreadSafe;
 
 struct RootMarker;
 struct MiddleMarker;
@@ -184,25 +179,10 @@ fn member_id(kind: &str, index: usize) -> MemberId {
 
 fn invocation_adapter_token() {}
 
-fn local_invocation_entry<'call>(
-    _registry: &ReflectRegistry,
-    _: reflect::invoke::Invocation<'call, Local>,
-) -> Result<reflect::invoke::InvocationOutput<'call, Local>, reflect::invoke::InvocationFailure<'call, Local>> {
-    Ok(reflect::invoke::InvocationOutput::Unit)
-}
-
-fn thread_safe_invocation_entry<'call>(
-    _registry: &ReflectRegistry,
-    _: reflect::invoke::Invocation<'call, ThreadSafe>,
-) -> Result<reflect::invoke::InvocationOutput<'call, ThreadSafe>, reflect::invoke::InvocationFailure<'call, ThreadSafe>>
-{
-    Ok(reflect::invoke::InvocationOutput::Unit)
-}
-
 static INVOCATION_ADAPTER: InvocationAdapter = InvocationAdapter::new(invocation_adapter_token);
 
-fn read_limit() -> ReflectedOwned {
-    ReflectedOwned::new(32_u32)
+fn read_limit() -> Box<dyn std::any::Any> {
+    Box::new(32_u32)
 }
 
 static ASSOCIATED_CONST_READER: AssociatedConstReader = AssociatedConstReader::new(read_limit);
@@ -468,33 +448,6 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     assert_eq!(applied.all_supertraits().len(), 0);
     assert!(format!("{applied:?}").contains("TraitDescriptor"));
 
-    let local_adapter = InvocationAdapter::local(local_invocation_entry);
-    assert!(
-        local_adapter
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<Local>::associated([])
-            )
-            .is_ok()
-    );
-    assert_eq!(
-        local_adapter.catching_availability(),
-        CatchingAvailability::NotRequested
-    );
-    let thread_safe_adapter = InvocationAdapter::thread_safe_with_unavailable_catching(thread_safe_invocation_entry);
-    assert!(
-        thread_safe_adapter
-            .invoke_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<ThreadSafe>::associated([])
-            )
-            .is_ok()
-    );
-    assert_eq!(
-        thread_safe_adapter.catching_availability(),
-        CatchingAvailability::UnavailablePanicAbort,
-    );
-
     let payload = TraitImplPayload::new(&ROOT_DEFINITION, applied);
     assert!(std::ptr::eq(payload.definition(), &*ROOT_DEFINITION));
     assert!(std::ptr::eq(payload.applied(), applied));
@@ -586,45 +539,6 @@ fn test_trait_descriptor_inspection_apis_preserve_local_facts() {
     for error in method_errors {
         assert!(!error.to_string().is_empty());
     }
-
-    let adapter = InvocationAdapter::new(invocation_adapter_token);
-    (adapter.entry_point())();
-    assert_eq!(
-        adapter.catching_availability(),
-        reflect::descriptor::CatchingAvailability::NotRequested,
-    );
-    assert!(
-        adapter
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<Local>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        adapter
-            .invoke_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<ThreadSafe>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        adapter
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<Local>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        adapter
-            .invoke_catching_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<ThreadSafe>::associated([])
-            )
-            .is_err()
-    );
 }
 
 #[test]
@@ -999,11 +913,9 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
         AssociatedConstImplementationSource::Defaulted
     );
     let value = generic_impl.associated_consts()[0]
-        .read()
-        .expect("the associated const reader must be available");
-    let Ok(value) = value.downcast::<u32>() else {
-        panic!("the reader must preserve the declared type");
-    };
+        .read::<u32>()
+        .expect("the associated const reader must be available")
+        .expect("the reader must preserve the declared type");
     assert_eq!(value, 32);
     assert_eq!(generic_impl.definition().generic_definition().parameters().len(), 1);
     assert_eq!(generic_impl.arguments(), arguments);
@@ -1017,40 +929,7 @@ fn test_trait_descriptor_applied_impl_preserves_items_sources_and_qualified_look
     assert!(format!("{ASSOCIATED_CONST_READER:?}").contains("AssociatedConstReader"));
     assert!(generic_impl.associated_consts()[0].is_readable());
     assert_eq!(generic_impl.associated_consts()[0].read_unavailable_reason(), None);
-    assert!(instance.adapter().is_some());
     assert!(instance.arguments().is_empty());
-    assert!(
-        instance
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<Local>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        instance
-            .invoke_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<ThreadSafe>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        instance
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<Local>::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        instance
-            .invoke_catching_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                reflect::invoke::Invocation::<ThreadSafe>::associated([])
-            )
-            .is_err()
-    );
     assert_eq!(
         instance
             .implementation_method()

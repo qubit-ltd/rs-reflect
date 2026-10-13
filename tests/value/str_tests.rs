@@ -7,14 +7,15 @@
 // =============================================================================
 
 //! Integration tests for `str` dynamic values.
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedRef;
+use qubit_reflect::value::DynamicMut;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
 /// Confirms shared `str` values use their dedicated non-`Any` variant.
 #[test]
 fn test_shared_str_uses_its_dedicated_accessors() {
     let text = "hello";
-    let value = ReflectedRef::new_str(text);
+    let value = DynamicRef::<Local>::new_str(text);
 
     assert_eq!(value.as_str(), Some("hello"));
     assert!(value.as_any().is_none());
@@ -24,7 +25,7 @@ fn test_shared_str_uses_its_dedicated_accessors() {
 #[test]
 fn test_mutable_str_uses_its_dedicated_accessors() {
     let mut text = String::from("hello");
-    let mut value = ReflectedMut::new_str_mut(text.as_mut_str());
+    let mut value = DynamicMut::<Local>::new_str_mut(text.as_mut_str());
 
     value
         .as_str_mut()
@@ -38,7 +39,7 @@ fn test_mutable_str_uses_its_dedicated_accessors() {
 /// unchanged because they do not participate in `Any` downcasts.
 #[test]
 fn test_local_str_consuming_downcast_returns_original_wrapper() {
-    let value = ReflectedRef::new_str("hello");
+    let value = DynamicRef::<Local>::new_str("hello");
     let value = match value.downcast::<String>() {
         Ok(_) => {
             panic!("a dedicated str variant must not downcast through Any")
@@ -48,7 +49,7 @@ fn test_local_str_consuming_downcast_returns_original_wrapper() {
     assert_eq!(value.as_str(), Some("hello"));
 
     let mut text = String::from("hello");
-    let value = ReflectedMut::new_str_mut(text.as_mut_str());
+    let value = DynamicMut::<Local>::new_str_mut(text.as_mut_str());
     let mut value = match value.downcast::<String>() {
         Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
         Err(value) => value,
@@ -65,14 +66,14 @@ fn test_local_str_consuming_downcast_returns_original_wrapper() {
 #[test]
 fn test_local_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let text = String::from("hello");
-    let extracted = match ReflectedRef::new_str(text.as_str()).into_str() {
+    let extracted = match DynamicRef::<Local>::new_str(text.as_str()).into_str() {
         Ok(extracted) => extracted,
         Err(_) => panic!("a dedicated str wrapper must extract successfully"),
     };
     assert_eq!(extracted, "hello");
 
     let number = 42_u32;
-    let value = match ReflectedRef::new(&number).into_str() {
+    let value = match DynamicRef::<Local>::new(&number).into_str() {
         Ok(_) => panic!("an Any-compatible wrapper must not extract as str"),
         Err(value) => value,
     };
@@ -84,7 +85,7 @@ fn test_local_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
 #[test]
 fn test_local_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let mut text = String::from("hello");
-    match ReflectedMut::new_str_mut(text.as_mut_str()).into_str_mut() {
+    match DynamicMut::<Local>::new_str_mut(text.as_mut_str()).into_str_mut() {
         Ok(extracted) => extracted.make_ascii_uppercase(),
         Err(_) => {
             panic!("a dedicated mutable str wrapper must extract successfully")
@@ -93,7 +94,7 @@ fn test_local_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
     assert_eq!(text, "HELLO");
 
     let mut number = 42_u32;
-    let mut value = match ReflectedMut::new(&mut number).into_str_mut() {
+    let mut value = match DynamicMut::<Local>::new(&mut number).into_str_mut() {
         Ok(_) => {
             panic!("an Any-compatible wrapper must not extract as mutable str")
         }

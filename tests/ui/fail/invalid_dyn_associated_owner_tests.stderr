@@ -1,5 +1,5 @@
 error: `dyn_compatible` associated-type prefixes must name a direct supertrait
-  --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:16:31
+  --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:15:46
    |
-16 | #[reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
-   |                               ^^^^^^^^^^^^^^
+15 | #[qubit_reflect::Reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
+   |                                              ^^^^^^^^^^^^^^

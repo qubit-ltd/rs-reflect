@@ -8,7 +8,8 @@
 
 //! Executable fixture for the abort-on-panic catching descriptor contract.
 
-use qubit_reflect::Reflect as ReflectDerive;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 #[cfg(panic = "abort")]
 use qubit_reflect::descriptor;
 #[cfg(panic = "abort")]
@@ -17,16 +18,14 @@ use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationDispatchMode;
 #[cfg(panic = "abort")]
 use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::reflect_impl as reflect_impl_macro;
 #[cfg(panic = "abort")]
 use qubit_reflect::registry;
 
-#[derive(ReflectDerive)]
+#[Reflect]
 struct Worker;
 
-#[reflect_impl_macro]
+#[ReflectImpl]
 impl Worker {
-    #[reflect(catch_unwind)]
     fn marked() {}
 }
 

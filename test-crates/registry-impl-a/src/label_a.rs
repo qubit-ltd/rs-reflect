@@ -8,7 +8,7 @@
 
 //! First independent implementation fragment.
 
-use qubit_reflect::reflect_impl;
+use qubit_reflect::ReflectImpl;
 use registry_types::RegistryUser;
 
 /// First external trait used to verify cross-crate impl aggregation.
@@ -17,7 +17,7 @@ pub trait LabelA {
     fn label_a(&self) -> u8;
 }
 
-#[reflect_impl(external_trait_id = "fixture.registry.label_a")]
+#[ReflectImpl(external_trait_id = "fixture.registry.label_a")]
 impl LabelA for RegistryUser {
     fn label_a(&self) -> u8 {
         self.id + 10

@@ -22,14 +22,14 @@ use qubit_reflect::TypeDescriptor;
 
 macro_rules! define_lookup_record {
     ($name:ident; $($field:ident),+ $(,)?) => {
-        #[derive(qubit_reflect::Reflect)]
+        #[qubit_reflect::Reflect]
         struct $name {
             $($field: u8,)+
         }
     };
 }
 
-#[derive(qubit_reflect::Reflect)]
+#[qubit_reflect::Reflect]
 struct FieldLookupRecord {
     f00: u8,
     f01: u8,

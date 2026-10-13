@@ -15,7 +15,7 @@ use std::rc::Rc;
 use qubit_reflect::Invocation;
 use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedOwned;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
@@ -27,17 +27,17 @@ use qubit_reflect::invoke::InvocationErrorKind;
 use qubit_reflect::invoke::InvocationReceiver;
 use qubit_reflect::invoke::ReceiverAdapter;
 use qubit_reflect::invoke::receiver_adapter_key;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Counter {
     value: u32,
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Counter {
     /// Returns a value selected by the snapshot's receiver adapter.
     fn read(self: Pin<Rc<Self>>) -> u32 {
@@ -106,7 +106,7 @@ fn snapshot(adapter: Option<ReceiverAdapter<Pin<Rc<Counter>>, Local>>) -> Reflec
 
 /// Supplies an owned pinned receiver without global capability registration.
 fn invocation() -> Invocation<'static, Local> {
-    Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Counter { value: 1 }))), [])
+    Invocation::owned(DynamicOwned::<Local>::new(Pin::new(Rc::new(Counter { value: 1 }))), [])
 }
 
 /// Executes the generated method using the same snapshot used for lookup.
@@ -255,12 +255,12 @@ fn test_absent_fact_only_and_mismatched_capabilities_preserve_all_inputs() {
             panic!("generated method")
         };
         let invocation = Invocation::from_bindings(
-            Some(InvocationReceiver::Owned(ReflectedOwned::new(Pin::new(Rc::new(
-                Counter { value: 1 },
-            ))))),
+            Some(InvocationReceiver::Owned(DynamicOwned::<Local>::new(Pin::new(
+                Rc::new(Counter { value: 1 }),
+            )))),
             [
-                InvocationBinding::named("second", InvocationArg::Owned(ReflectedOwned::new(22_u16))),
-                InvocationBinding::positional(InvocationArg::Owned(ReflectedOwned::new(11_u8))),
+                InvocationBinding::named("second", InvocationArg::Owned(DynamicOwned::<Local>::new(22_u16))),
+                InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(11_u8))),
             ],
         );
         let result = method

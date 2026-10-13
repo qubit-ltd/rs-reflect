@@ -1,5 +1,11 @@
-error: duplicate `rename` reflection helper
-  --> tests/ui/fail/duplicate_rename_tests.rs:12:29
+error: `rename` was removed; reflected names now use the Rust item name
+  --> tests/ui/fail/duplicate_rename_tests.rs:11:11
    |
-12 | #[reflect(rename = "first", rename = "second")]
+11 | #[reflect(rename = "first", rename = "second")]
+   |           ^^^^^^
+
+error: `rename` was removed; reflected names now use the Rust item name
+  --> tests/ui/fail/duplicate_rename_tests.rs:11:29
+   |
+11 | #[reflect(rename = "first", rename = "second")]
    |                             ^^^^^^

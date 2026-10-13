@@ -6,38 +6,37 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::reflect;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait Service {
     const LIMIT: usize;
 
     fn transform<T>(&self, value: T) -> T;
 }
 
-#[reflect(external_trait(Sized, id = "core.marker.Sized"))]
+#[qubit_reflect::Reflect(external_trait(Sized, id = "core.marker.Sized"))]
 trait SizedService: Sized {
     fn value(&self) -> usize;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait StaticService {
     fn create() -> usize;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait ReturnsSelf {
     fn duplicate(&self) -> Self;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait OpaqueMethodService {
     fn opaque(&self) -> impl std::fmt::Debug;
 
     fn takes_opaque(&self, value: impl std::fmt::Debug);
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait AsyncService {
     async fn run(&self);
 }

@@ -6,7 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Macro-level contracts for panic, async borrowing, and invocation modes.
+//! Macro-level contracts for ordinary invocation, borrowed async inputs, and
+//! panic propagation through the v3 method API.
+
+#![cfg(feature = "derive")]
 
 use std::cell::Cell;
 use std::future::Future;
@@ -14,30 +17,20 @@ use std::panic::AssertUnwindSafe;
 use std::panic::catch_unwind;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use std::task::Context;
 use std::task::Poll;
 use std::task::Waker;
 
-use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
-use qubit_reflect::descriptor::CatchingAvailability;
-use qubit_reflect::descriptor::MethodInstanceDescriptor;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::descriptor::MethodQualifier;
 use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationArg;
 use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Worker {
     prefix: String,
 }
@@ -46,46 +39,36 @@ thread_local! {
     static LOCAL_POLLS: Cell<usize> = const { Cell::new(0) };
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Worker {
-    async fn borrowed_local(&self, suffix: &String) -> String {
+    pub async fn borrowed_local(&self, suffix: &String) -> String {
         LOCAL_POLLS.with(|polls| polls.set(polls.get() + 1));
         format!("{}{}", self.prefix, suffix)
     }
 
-    async fn non_send_local(value: u8) -> u8 {
+    pub async fn non_send_local(value: u8) -> u8 {
         let state = Rc::new(Cell::new(value));
         std::future::ready(()).await;
         state.get() + 1
     }
 
-    #[reflect(thread_safe)]
-    async fn send_future(polls: Arc<AtomicUsize>) -> usize {
-        polls.fetch_add(1, Ordering::SeqCst);
-        17
-    }
-
-    fn ordinary_panic() {
+    pub fn ordinary_panic() {
         panic!("ordinary panic payload")
     }
 
     #[reflect(catch_unwind)]
-    fn catching_panic() {
+    pub fn catching_panic() {
         panic!("caught panic payload")
     }
 
-    #[reflect(thread_safe, catch_unwind)]
-    fn thread_safe_catching_panic() {
-        panic!("thread-safe caught payload")
+    fn private_value() -> u8 {
+        23
     }
 }
 
-fn method(name: &str) -> &'static MethodInstanceDescriptor {
+fn method(name: &str) -> &'static qubit_reflect::descriptor::MethodInstanceDescriptor {
     let registry = ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
-    let MethodLookup::Unique(method) =
-        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, name)
-    else {
+    let MethodLookup::Unique(method) = Worker::type_descriptor().methods_named_in(registry, name) else {
         panic!("method `{name}` must be uniquely discoverable")
     };
     method
@@ -102,16 +85,10 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
         prefix: String::from("hello "),
     };
     let suffix = String::from("world");
+    let registry = ReflectRegistry::initialize().expect("valid fixture registry");
     let output = method("borrowed_local")
-        .invoke_local(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::borrowed(
-                DynamicRef::<Local>::new(&worker),
-                [InvocationArg::Ref(DynamicRef::<Local>::new(&suffix))],
-            ),
-        )
-        .expect("the default local adapter must exist")
-        .expect("borrow validation must succeed");
+        .invoke(registry, Invocation::receiver_ref(&worker).arg_ref(&suffix))
+        .expect("public method and matching typed inputs must invoke");
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
@@ -128,13 +105,10 @@ fn test_local_async_future_is_lazy_and_borrows_receiver_and_parameter() {
 
 #[test]
 fn test_local_async_adapter_accepts_a_non_send_future() {
+    let registry = ReflectRegistry::initialize().expect("valid fixture registry");
     let output = method("non_send_local")
-        .invoke_local(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(6_u8))]),
-        )
-        .expect("the default local adapter must exist")
-        .expect("owned validation must succeed");
+        .invoke(registry, Invocation::associated_function().arg(6_u8))
+        .expect("the local invocation adapter must accept its ordinary value input");
     let InvocationOutput::Future(mut future) = output else {
         panic!("async invocation must return a reflected future")
     };
@@ -148,155 +122,51 @@ fn test_local_async_adapter_accepts_a_non_send_future() {
 }
 
 #[test]
-fn test_thread_safe_async_adapter_returns_a_send_future_without_local_capability() {
-    let polls = Arc::new(AtomicUsize::new(0));
-    let output = method("send_future")
-        .invoke_thread_safe(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([InvocationArg::Owned(DynamicOwned::<ThreadSafe>::new(Arc::clone(
-                &polls,
-            )))]),
-        )
-        .expect("the explicit thread-safe adapter must exist")
-        .expect("owned validation must succeed");
-    assert!(
-        method("send_future")
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([InvocationArg::Owned(DynamicOwned::<Local>::new(Arc::clone(&polls,)))]),
-            )
-            .is_err(),
-        "thread-safe capability must not be inferred as local"
-    );
-    let InvocationOutput::Future(future) = output else {
-        panic!("async invocation must return a reflected future")
-    };
-    let output = std::thread::spawn(move || {
-        let mut future = future;
-        poll_once(&mut future)
-    })
-    .join()
-    .expect("the reflected future must be Send");
-    let Poll::Ready(InvocationOutput::Owned(value)) = output else {
-        panic!("the future must complete on its first explicit poll")
-    };
-    let Ok(value) = DynamicOwned::<ThreadSafe>::downcast::<usize>(value) else {
-        panic!("the output must retain usize")
-    };
-    assert_eq!(value, 17);
-    assert_eq!(polls.load(Ordering::SeqCst), 1);
+fn test_user_panic_propagates_unchanged_from_dynamic_invocation() {
+    let registry = ReflectRegistry::initialize().expect("valid fixture registry");
+    let payload = catch_unwind(AssertUnwindSafe(|| {
+        let _ = method("ordinary_panic")
+            .invoke(registry, Invocation::associated_function())
+            .expect("public method must have an invocation adapter");
+    }))
+    .expect_err("ordinary invocation must propagate the original panic");
+    assert_eq!(payload.downcast_ref::<&str>(), Some(&"ordinary panic payload"));
 }
 
 #[test]
-fn test_unmarked_and_marked_panics_keep_distinct_capabilities_and_payloads() {
-    let ordinary = method("ordinary_panic");
-    assert_eq!(
-        ordinary.adapter().unwrap().catching_availability(),
-        CatchingAvailability::NotRequested
-    );
-    assert!(
-        ordinary
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        ordinary
-            .invoke_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .is_err(),
-        "thread-safe capability must require its explicit attribute"
-    );
-    let payload = match catch_unwind(AssertUnwindSafe(|| {
-        ordinary
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([]),
-            )
-            .expect("the normal adapter must exist")
-            .expect("validation must succeed")
-    })) {
-        Ok(_) => {
-            panic!("ordinary invocation must propagate the original panic")
-        }
-        Err(payload) => payload,
-    };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"ordinary panic payload"));
-
-    let catching = method("catching_panic");
-    assert_eq!(
-        catching.adapter().unwrap().catching_availability(),
-        CatchingAvailability::Available
-    );
-    let payload = match catch_unwind(AssertUnwindSafe(|| {
-        catching
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([]),
-            )
-            .expect("the normal adapter must remain present")
-            .expect("validation must succeed")
-    })) {
-        Ok(_) => {
-            panic!("normal invocation must still propagate the original panic")
-        }
-        Err(payload) => payload,
-    };
-    assert_eq!(payload.downcast_ref::<&str>(), Some(&"caught panic payload"));
-    let panic = match catching
-        .invoke_catching_local(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([]),
-        )
-        .expect("the explicit catching adapter must exist")
-        .expect("validation must succeed")
-    {
-        Ok(_) => panic!("the user panic must be captured"),
-        Err(panic) => panic,
+fn test_local_catching_adapter_retains_the_panic_payload() {
+    let registry = ReflectRegistry::initialize().expect("valid fixture registry");
+    let result = method("catching_panic")
+        .invoke_catching_local(registry, Invocation::associated_function())
+        .expect("the explicit local catching adapter must be available")
+        .expect("an associated invocation has no input validation failures");
+    let Err(panic) = result else {
+        panic!("the user method panics")
     };
     assert_eq!(panic.payload().downcast_ref::<&str>(), Some(&"caught panic payload"));
 }
 
 #[test]
-fn test_thread_safe_and_catching_attributes_compose_explicitly() {
-    let catching = method("thread_safe_catching_panic");
-    assert!(
-        catching
-            .invoke_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .is_err()
-    );
-    assert!(
-        catching
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .is_err()
-    );
-    assert_eq!(
-        catching.adapter().unwrap().catching_availability(),
-        CatchingAvailability::Available
-    );
-    let panic = match catching
-        .invoke_catching_thread_safe(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([]),
-        )
-        .expect("the explicit thread-safe catching adapter must exist")
-        .expect("validation must succeed")
-    {
-        Ok(_) => panic!("the user panic must be captured"),
-        Err(panic) => panic,
+fn test_private_method_requires_unsafe_visibility_bypass() {
+    let registry = ReflectRegistry::initialize().expect("valid fixture registry");
+    let method = method("private_value");
+    let result = method.invoke(registry, Invocation::associated_function());
+    let Err(failure) = result else {
+        panic!("safe dynamic invocation must reject a private method")
     };
+    assert!(matches!(
+        failure.error().kind(),
+        qubit_reflect::invoke::InvocationErrorKind::VisibilityDenied
+    ));
+
+    let output = unsafe { method.invoke_unsafe(registry, Invocation::associated_function()) }
+        .expect("unsafe invocation may bypass the method visibility check");
+    let InvocationOutput::Owned(value) = output else {
+        panic!("the method returns an owned u8")
+    };
+    assert_eq!(value.value_type_id(), std::any::TypeId::of::<u8>());
     assert_eq!(
-        panic.payload().downcast_ref::<&str>(),
-        Some(&"thread-safe caught payload")
+        DynamicOwned::<Local>::downcast::<u8>(value).unwrap_or_else(|_| panic!("the method returns u8")),
+        23
     );
 }

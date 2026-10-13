@@ -9,7 +9,7 @@
 use std::marker::PhantomData;
 
 use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
+
 
 trait Element {
     type Tail: Reflect;
@@ -21,11 +21,11 @@ impl Element for Bytes {
     type Tail = u8;
 }
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct Buffer<T, const N: usize>(PhantomData<[T; N]>);
 
-#[reflect_impl(specialize(T = Bytes, N = 4))]
+#[qubit_reflect::ReflectImpl]
 impl<T: Element, const N: usize> Buffer<T, N> {
     fn tail_path(value: <T as Element>::Tail) -> <T as Element>::Tail {
         value

@@ -1,17 +1,17 @@
 error[E0277]: the type `&mut Worker` may not be safely transferred across an unwind boundary
-  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe_tests.rs:16:6
+  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe_tests.rs:14:6
    |
-16 |   impl Worker {
+14 |   impl Worker {
    |  ______^
-17 | |     #[reflect(catch_unwind)]
-18 | |     fn run(&mut self) {
+15 | |     #[reflect(catch_unwind)]
+16 | |     fn run(&mut self) {
    | |____________^ `&mut Worker` may not be safely transferred across an unwind boundary
    |
    = help: the trait `UnwindSafe` is not implemented for `&mut Worker`
    = note: `UnwindSafe` is implemented for `&Worker`, but not for `&mut Worker`
 note: required by a bound in `__qubit_reflect_assert_unwind_safe`
-  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe_tests.rs:15:1
+  --> tests/ui/fail/catch_unwind_mutable_receiver_not_unwind_safe_tests.rs:13:1
    |
-15 | #[reflect_impl]
-   | ^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_unwind_safe`
+13 | #[qubit_reflect::ReflectImpl]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `__qubit_reflect_assert_unwind_safe`
    = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)

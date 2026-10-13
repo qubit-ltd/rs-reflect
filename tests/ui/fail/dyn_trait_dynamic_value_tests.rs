@@ -6,16 +6,16 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::ReflectedRef;
-use qubit_reflect::reflect;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait Service {
     fn value(&self) -> usize;
 }
 
 fn wrap(value: &dyn Service) {
-    let _ = ReflectedRef::new(value);
+    let _ = DynamicRef::<Local>::new(value);
 }
 
 fn main() {}

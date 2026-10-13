@@ -9,6 +9,8 @@
 //! Public accessor and query contracts exercised through the external crate
 //! API.
 
+#![cfg(feature = "derive")]
+
 use std::any::TypeId;
 
 use qubit_reflect::access::FieldAccessError;
@@ -62,7 +64,6 @@ use qubit_reflect::invoke::ReceiverExpectation;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ReflectedOwned;
 
 fn fragment(fingerprint: u64) -> FragmentIdentity {
     FragmentIdentity::new("crate", "crate::module", 10, 4, "field", fingerprint)
@@ -237,7 +238,7 @@ fn test_small_generic_and_invocation_accessors_preserve_input_facts() {
     assert!(matches!(binding.argument(), InvocationArg::Owned(_)));
 
     let reader = AssociatedConstReader::from_getter(|| 7_u8);
-    assert_eq!(reader.read().downcast_ref::<u8>(), Some(&7));
+    assert_eq!(reader.read::<u8>().expect("exact associated constant type"), 7);
 
     let panic = InvocationPanic::new(
         MemberId::new("Type", "method", 0, fragment(19)),
@@ -316,16 +317,16 @@ fn test_missing_receiver_and_owned_unit_keep_distinct_validation_facts() {
     assert_eq!(failure.error().method_identity(), &identity);
     let recovered = failure.into_recovery().into_invocation();
     assert!(recovered.validate(&identity, absent, &[]).is_ok());
-    let invocation = Invocation::<Local>::new(Some(InvocationReceiver::Owned(ReflectedOwned::new(()))), []);
+    let invocation = Invocation::<Local>::new(Some(InvocationReceiver::Owned(DynamicOwned::<Local>::new(()))), []);
     assert!(invocation.validate(&identity, unit, &[]).is_ok());
 }
 
 #[cfg(feature = "derive")]
-#[derive(qubit_reflect::Reflect)]
+#[qubit_reflect::Reflect]
 struct BorrowedSignature;
 
 #[cfg(feature = "derive")]
-#[qubit_reflect::reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl BorrowedSignature {
     pub fn values(input: &[u8]) -> &[u8] {
         input

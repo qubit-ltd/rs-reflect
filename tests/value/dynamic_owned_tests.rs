@@ -7,13 +7,14 @@
 // =============================================================================
 
 //! Integration tests for owned dynamic values.
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::SendReflectedOwned;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
+use qubit_reflect::value::ThreadSafe;
 
 /// Confirms an owned downcast failure returns a usable original wrapper.
 #[test]
 fn test_downcast_owned_failure_returns_the_original_wrapper() {
-    let value = ReflectedOwned::new(String::from("owned value"));
+    let value = DynamicOwned::<Local>::new(String::from("owned value"));
     let value = value.downcast::<u32>().expect_err("a String must not downcast to u32");
 
     assert!(value.is::<String>());
@@ -27,7 +28,7 @@ fn test_downcast_owned_failure_returns_the_original_wrapper() {
 /// Confirms local owned values expose safe `Any` interoperability.
 #[test]
 fn test_owned_any_interoperation_preserves_type_identity() {
-    let mut value = ReflectedOwned::new(41_u32);
+    let mut value = DynamicOwned::<Local>::new(41_u32);
 
     assert_eq!(value.downcast_ref::<u32>(), Some(&41));
     assert_eq!(
@@ -55,7 +56,7 @@ fn test_owned_any_interoperation_preserves_type_identity() {
 /// Confirms a thread-safe owned value can be irreversibly downgraded.
 #[test]
 fn test_thread_safe_owned_can_be_downgraded_to_local() {
-    let value = SendReflectedOwned::new(String::from("thread-safe"));
+    let value = DynamicOwned::<ThreadSafe>::new(String::from("thread-safe"));
     assert_send_and_sync(&value);
     let value = value.into_local();
 
@@ -70,7 +71,7 @@ fn test_thread_safe_owned_can_be_downgraded_to_local() {
 /// paths before downgrade.
 #[test]
 fn test_thread_safe_owned_typed_and_any_access_preserve_value() {
-    let mut value = SendReflectedOwned::new(51_u32);
+    let mut value = DynamicOwned::<ThreadSafe>::new(51_u32);
     assert!(value.is::<u32>());
     assert!(!value.is::<String>());
     assert_eq!(value.downcast_ref::<u32>(), Some(&51));

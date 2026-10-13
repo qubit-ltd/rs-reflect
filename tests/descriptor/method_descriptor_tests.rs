@@ -8,11 +8,9 @@
 
 //! Characterization tests for method descriptor structure and invocation.
 
-use std::any::TypeId;
 use std::any::type_name;
 use std::sync::LazyLock;
 
-use qubit_reflect::ReflectRegistry;
 use qubit_reflect::descriptor::CatchingAvailability;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
 use qubit_reflect::descriptor::ImplKind;
@@ -37,17 +35,6 @@ use qubit_reflect::expression::TypeExpression;
 use qubit_reflect::identity::FragmentIdentity;
 use qubit_reflect::identity::MemberId;
 use qubit_reflect::identity::Visibility;
-use qubit_reflect::invoke::ArgumentExpectation;
-use qubit_reflect::invoke::CatchingInvocationResult;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::invoke::InvocationBinding;
-use qubit_reflect::invoke::InvocationFailure;
-use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::invoke::ReceiverExpectation;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
 static EMPTY_GENERIC_DEFINITION: LazyLock<GenericDefinitionDescriptor> =
     LazyLock::new(|| GenericDefinitionDescriptor::new(Vec::new(), Vec::new()));
@@ -87,56 +74,6 @@ fn parameter(index: usize, name: &'static str) -> ParameterDescriptor {
         TypeExpression::Never,
         None,
     )
-}
-
-/// Returns one successful local invocation result.
-fn return_local<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, Local>,
-) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(7_u8)))
-}
-
-/// Returns one successful thread-safe invocation result.
-fn return_thread_safe<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
-}
-
-/// Wraps the local fixture output in the catching contract.
-fn catch_local<'call>(
-    registry: &ReflectRegistry,
-    invocation: Invocation<'call, Local>,
-) -> CatchingInvocationResult<'call, Local> {
-    return_local(registry, invocation).map(Ok)
-}
-
-/// Wraps the thread-safe fixture output in the catching contract.
-fn catch_thread_safe<'call>(
-    registry: &ReflectRegistry,
-    invocation: Invocation<'call, ThreadSafe>,
-) -> CatchingInvocationResult<'call, ThreadSafe> {
-    return_thread_safe(registry, invocation).map(Ok)
-}
-
-/// Validates the declaration-ordered inputs and deliberately rejects the
-/// caller's final value type.
-fn validate_local_types<'call>(
-    _registry: &ReflectRegistry,
-    invocation: Invocation<'call, Local>,
-) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-    invocation.validate(
-        &method_identity(7),
-        ReceiverExpectation::none(),
-        &[
-            ArgumentExpectation::owned::<u8>(),
-            ArgumentExpectation::owned::<u16>(),
-            ArgumentExpectation::owned::<u32>(),
-        ],
-    )?;
-    unreachable!("the mismatched fixture input must fail validation")
 }
 
 /// Returns the fully qualified compiler name for a public descriptor type.
@@ -220,44 +157,6 @@ fn test_method_descriptor_builder_preserves_parameter_and_debug_field_order() {
 }
 
 #[test]
-fn test_invocation_adapter_mode_availability_remains_distinct() {
-    let registry = ReflectRegistry::initialize().expect("the fixture registry must initialize");
-    let local = InvocationAdapter::local_with_catching(return_local, catch_local);
-    assert!(local.invoke_local(registry, Invocation::associated([])).is_ok());
-    assert!(local.invoke_thread_safe(registry, Invocation::associated([])).is_err());
-    assert!(
-        local
-            .invoke_catching_local(registry, Invocation::associated([]))
-            .is_ok()
-    );
-    assert!(
-        local
-            .invoke_catching_thread_safe(registry, Invocation::associated([]))
-            .is_err()
-    );
-    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
-
-    let thread_safe = InvocationAdapter::thread_safe_with_catching(return_thread_safe, catch_thread_safe);
-    assert!(thread_safe.invoke_local(registry, Invocation::associated([])).is_err());
-    assert!(
-        thread_safe
-            .invoke_thread_safe(registry, Invocation::associated([]))
-            .is_ok()
-    );
-    assert!(
-        thread_safe
-            .invoke_catching_local(registry, Invocation::associated([]))
-            .is_err()
-    );
-    assert!(
-        thread_safe
-            .invoke_catching_thread_safe(registry, Invocation::associated([]))
-            .is_ok()
-    );
-    assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
-}
-
-#[test]
 fn test_method_instance_build_error_messages_remain_stable() {
     let cases = [
         (
@@ -292,64 +191,4 @@ fn test_method_instance_build_error_messages_remain_stable() {
     for (error, expected) in cases {
         assert_eq!(error.to_string(), expected);
     }
-}
-
-#[test]
-fn test_method_instance_validation_failure_recovers_caller_order() {
-    static ADAPTER: InvocationAdapter = InvocationAdapter::local(validate_local_types);
-    let declaration = Box::leak(Box::new(
-        MethodDescriptor::builder(
-            method_identity(7),
-            "encode",
-            "encode",
-            MethodDeclarationOwner::Impl(impl_definition()),
-        )
-        .parameters(vec![
-            parameter(0, "first"),
-            parameter(1, "second"),
-            parameter(2, "third"),
-        ])
-        .build(),
-    ));
-    let instance = MethodInstanceDescriptor::new(
-        declaration,
-        None,
-        MethodImplementationSource::Declared,
-        Some(&ADAPTER),
-        Box::new([]),
-    )
-    .expect("the fixture method instance must be valid");
-    let invocation = Invocation::associated_bindings([
-        InvocationBinding::named("third", InvocationArg::Owned(DynamicOwned::<Local>::new(12_u32))),
-        InvocationBinding::positional(InvocationArg::Owned(DynamicOwned::<Local>::new(10_u8))),
-        InvocationBinding::named(
-            "second",
-            InvocationArg::Owned(DynamicOwned::<Local>::new(String::from("wrong"))),
-        ),
-    ]);
-
-    let result = instance
-        .invoke_local(
-            ReflectRegistry::initialize().expect("the fixture registry must initialize"),
-            invocation,
-        )
-        .expect("the local adapter must be available");
-    let Err(failure) = result else {
-        panic!("the mismatched second parameter must fail validation")
-    };
-    assert_eq!(
-        (0..3)
-            .map(|index| failure.recovery().argument_name(index))
-            .collect::<Vec<_>>(),
-        [Some("third"), None, Some("second")]
-    );
-    assert_eq!(
-        failure
-            .recovery()
-            .arguments()
-            .iter()
-            .map(InvocationArg::type_id)
-            .collect::<Vec<TypeId>>(),
-        [TypeId::of::<u32>(), TypeId::of::<u8>(), TypeId::of::<String>()]
-    );
 }

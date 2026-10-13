@@ -54,7 +54,7 @@ mod invocation_runtime {
     }
 
     /// A reflected target used to exercise descriptor-aware argument binding.
-    #[derive(reflect::Reflect)]
+    #[reflect::Reflect]
     #[reflect(opaque)]
     struct NamedInvocationTarget;
 
@@ -64,7 +64,7 @@ mod invocation_runtime {
     /// Serializes tests that observe the shared invocation-entry counter.
     static NAMED_INVOCATION_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    #[reflect::reflect_impl]
+    #[reflect::ReflectImpl]
     impl NamedInvocationTarget {
         /// Encodes three differently sized inputs so binding order is visible.
         fn encode(first: u8, second: u16, third: u32) -> u64 {
@@ -179,6 +179,34 @@ mod invocation_runtime {
             .downcast_mut::<Counter>()
             .unwrap_or_else(|| unreachable!("validation guarantees receiver type"));
         let value = DynamicOwned::<Local>::downcast::<i32>(value)
+            .unwrap_or_else(|_| unreachable!("validation guarantees argument type"));
+        counter.value += value;
+        Ok(InvocationOutput::Unit)
+    }
+
+    /// Validates and executes a thread-safe mutable receiver adapter.
+    fn invoke_add_thread_safe<'call>(
+        invocation: Invocation<'call, ThreadSafe>,
+    ) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
+        let validated = invocation.validate(
+            &method_identity(0),
+            ReceiverExpectation::borrowed_mut::<Counter>(),
+            &[ArgumentExpectation::owned::<i32>()],
+        )?;
+        let (receiver, arguments) = validated.into_parts();
+        let Some(InvocationReceiver::Mut(mut receiver)) = receiver else {
+            unreachable!("validation guarantees a mutable receiver")
+        };
+        let [InvocationArg::Owned(value)] = <Vec<InvocationArg<'call, ThreadSafe>> as TryInto<
+            [InvocationArg<'call, ThreadSafe>; 1],
+        >>::try_into(arguments.into_vec())
+        .unwrap_or_else(|_| unreachable!("validation guarantees one argument")) else {
+            unreachable!("validation guarantees an owned argument")
+        };
+        let counter = receiver
+            .downcast_mut::<Counter>()
+            .unwrap_or_else(|| unreachable!("validation guarantees receiver type"));
+        let value = DynamicOwned::<ThreadSafe>::downcast::<i32>(value)
             .unwrap_or_else(|_| unreachable!("validation guarantees argument type"));
         counter.value += value;
         Ok(InvocationOutput::Unit)
@@ -329,6 +357,23 @@ mod invocation_runtime {
         );
 
         let output = invoke_add(invocation).expect("a valid invocation should execute");
+
+        assert!(matches!(output, InvocationOutput::Unit));
+        drop(output);
+        assert_eq!(counter.value, 12);
+    }
+
+    /// Verifies a thread-safe mutable receiver and owned argument execute after
+    /// validation.
+    #[test]
+    fn test_thread_safe_borrowed_mut_invocation_updates_receiver() {
+        let mut counter = Counter { value: 5 };
+        let invocation = Invocation::<ThreadSafe>::borrowed_mut(
+            DynamicMut::<ThreadSafe>::new(&mut counter),
+            [InvocationArg::Owned(DynamicOwned::<ThreadSafe>::new(7_i32))],
+        );
+
+        let output = invoke_add_thread_safe(invocation).expect("a valid thread-safe invocation should execute");
 
         assert!(matches!(output, InvocationOutput::Unit));
         drop(output);
@@ -1108,39 +1153,10 @@ mod invocation_runtime {
         assert_eq!(polls.get(), 1);
     }
 
-    /// Verifies thread-safe invocation values and futures retain their Send
-    /// boundary.
+    /// Verifies dynamic inputs report exact identities for owned, shared,
+    /// mutable, and dedicated string values.
     #[test]
-    fn test_thread_safe_runtime_types_cross_send_boundary() {
-        fn assert_send<T: Send>() {}
-
-        assert_send::<Invocation<'static, ThreadSafe>>();
-        assert_send::<InvocationArg<'static, ThreadSafe>>();
-        assert_send::<InvocationOutput<'static, ThreadSafe>>();
-        assert_send::<ReflectedFuture<'static, ThreadSafe>>();
-
-        let future = ReflectedFuture::<ThreadSafe>::new(async {
-            InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(17_u32))
-        });
-        let output = std::thread::spawn(move || {
-            let mut future = future;
-            poll_once(&mut future)
-        })
-        .join()
-        .expect("thread-safe reflected future should cross a thread boundary");
-        let Poll::Ready(InvocationOutput::Owned(value)) = output else {
-            panic!("thread-safe future should complete")
-        };
-        assert_eq!(
-            DynamicOwned::<ThreadSafe>::downcast::<u32>(value).unwrap_or_else(|_| panic!("output should be u32")),
-            17
-        );
-    }
-
-    /// Verifies each invocation mode reports exact identities for owned,
-    /// shared, mutable, and dedicated string dynamic values.
-    #[test]
-    fn test_invocation_modes_report_dynamic_value_type_identities() {
+    fn test_invocation_inputs_report_dynamic_value_type_identities() {
         let local_owned = DynamicOwned::<Local>::new(1_u8);
         let local_number = 2_u16;
         let local_ref = DynamicRef::<Local>::new(&local_number);
@@ -1154,28 +1170,6 @@ mod invocation_runtime {
         assert_eq!(<Local as InvocationMode>::mut_type_id(&local_mut), TypeId::of::<u32>());
         assert_eq!(
             <Local as InvocationMode>::ref_type_id(&DynamicRef::<Local>::new_str("text")),
-            TypeId::of::<str>(),
-        );
-
-        let thread_owned = DynamicOwned::<ThreadSafe>::new(4_u8);
-        let thread_number = 5_u16;
-        let thread_ref = DynamicRef::<ThreadSafe>::new(&thread_number);
-        let mut thread_mut_number = 6_u32;
-        let thread_mut = DynamicMut::<ThreadSafe>::new(&mut thread_mut_number);
-        assert_eq!(
-            <ThreadSafe as InvocationMode>::owned_type_id(&thread_owned),
-            TypeId::of::<u8>(),
-        );
-        assert_eq!(
-            <ThreadSafe as InvocationMode>::ref_type_id(&thread_ref),
-            TypeId::of::<u16>(),
-        );
-        assert_eq!(
-            <ThreadSafe as InvocationMode>::mut_type_id(&thread_mut),
-            TypeId::of::<u32>(),
-        );
-        assert_eq!(
-            <ThreadSafe as InvocationMode>::ref_type_id(&DynamicRef::<ThreadSafe>::new_str("text")),
             TypeId::of::<str>(),
         );
     }

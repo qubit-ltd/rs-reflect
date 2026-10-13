@@ -6,10 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
-use qubit_reflect::Reflect as DeriveReflect;
-
 trait Reflect: 'static {
     // empty
 }
@@ -18,15 +14,15 @@ struct ShadowValue;
 
 impl Reflect for ShadowValue {}
 
-#[derive(DeriveReflect)]
+#[qubit_reflect::Reflect]
 struct Target;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait ShadowBoundContract {
     type Item: crate::Reflect + 'static;
 }
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl ShadowBoundContract for Target {
     type Item = ShadowValue;
 }

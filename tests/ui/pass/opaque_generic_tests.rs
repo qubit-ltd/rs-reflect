@@ -8,9 +8,8 @@
 
 use std::rc::Rc;
 
-use qubit_reflect::Reflect;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct Opaque<T> {
     value: T,

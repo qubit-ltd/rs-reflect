@@ -9,6 +9,8 @@ publish = false
 [dependencies]
 qubit-reflect = { path = "../..", features = ["derive"] }
 
+[workspace]
+
 [[bin]]
 name = "field_patch"
 path = "../../examples/field_patch.rs"

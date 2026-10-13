@@ -7,11 +7,10 @@
 // =============================================================================
 
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::reflect;
 
 use self::dependency as renamed_dependency;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait Service {
     fn value(&self) -> usize;
 
@@ -22,19 +21,19 @@ trait Service {
         Self: Sized;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait GenericService<T, const N: usize> {
     fn repeat(&self, value: T) -> [T; N];
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait AssociatedService {
     type Output;
 
     fn output(&self) -> Self::Output;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait ReceiverService {
     fn consume(self);
 
@@ -43,31 +42,30 @@ trait ReceiverService {
     fn pinned(self: std::pin::Pin<Box<Self>>);
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait ParentService {
     fn parent(&self) -> usize;
 }
 
-#[reflect(supertrait(ParentService), dyn_compatible)]
+#[qubit_reflect::Reflect(supertrait(ParentService), dyn_compatible)]
 trait ChildService: ParentService {
     fn child(&self) -> usize;
 }
 
-#[reflect(external_trait(std::fmt::Debug, id = "core.fmt.Debug"))]
+#[qubit_reflect::Reflect(external_trait(std::fmt::Debug, id = "core.fmt.Debug"))]
 trait DebugService: std::fmt::Debug {
     fn debug_value(&self) -> usize;
 }
 
 mod dependency {
-    use qubit_reflect::reflect;
 
-    #[reflect]
+    #[qubit_reflect::Reflect]
     pub trait DependencyParent {
         fn dependency_parent(&self) -> usize;
     }
 }
 
-#[reflect(
+#[qubit_reflect::Reflect(
     supertrait(renamed_dependency::DependencyParent),
     dyn_compatible
 )]
@@ -75,7 +73,7 @@ trait RenamedDependencyChild: renamed_dependency::DependencyParent {
     fn renamed_dependency_child(&self) -> usize;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait SizedAssociatedService {
     type Hidden
     where
@@ -92,29 +90,29 @@ trait ExternalParent<T> {
     fn external<U>(&self, value: U) -> T;
 }
 
-#[reflect(external_trait(ExternalParent<u8>, id = "example.ExternalParent"))]
+#[qubit_reflect::Reflect(external_trait(ExternalParent<u8>, id = "example.ExternalParent"))]
 trait ExternalChild: ExternalParent<u8> {
     fn external_child(&self) -> usize;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait Debug {
     fn generic<T>(&self, value: T) -> T;
 }
 
-#[reflect(supertrait(Debug))]
+#[qubit_reflect::Reflect(supertrait(Debug))]
 trait LocalDebugChild: Debug {
     fn local_debug_child(&self) -> usize;
 }
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait InheritedAssociatedParent {
     type Item;
 
     fn inherited_item(&self) -> Self::Item;
 }
 
-#[reflect(
+#[qubit_reflect::Reflect(
     supertrait(InheritedAssociatedParent),
     dyn_compatible(InheritedAssociatedParent::Item)
 )]

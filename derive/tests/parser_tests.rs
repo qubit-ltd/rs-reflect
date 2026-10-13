@@ -17,66 +17,54 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use qubit_reflect_derive::Reflect;
-use qubit_reflect_derive::reflect;
-use qubit_reflect_derive::reflect_impl;
+use qubit_reflect_derive::ReflectImpl;
 
-#[derive(Clone, Default, Reflect)]
-#[reflect(rename = "Record", capabilities(Clone, Default))]
+#[Reflect]
+#[reflect(capabilities(Clone, Default))]
 struct Record<T: Clone + Default> {
-    #[reflect(rename = "identifier", read_only, no_construct, default)]
     id: u64,
     #[reflect(opaque)]
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 enum Event {
-    #[reflect(rename = "ready", no_construct)]
     Ready,
     #[reflect(skip)]
-    Hidden(#[reflect(default = default_code)] u32),
+    Hidden,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct Opaque;
 
-#[reflect(external_trait(Send, id = "core.marker.Send"))]
+#[Reflect(external_trait(Send, id = "core.marker.Send"))]
 trait Service: Send {
-    #[reflect(
-        rename = "execute",
-        catch_unwind,
-        thread_safe,
-        specialize(T = String)
-    )]
+    #[reflect(catch_unwind)]
     fn run<T>(&self, value: T);
 
     #[reflect(no_invoke)]
     fn disabled(&self);
 }
 
-#[reflect_impl(specialize(T = String))]
+#[ReflectImpl]
 impl<T: Clone + Default> Record<T> {
-    #[reflect(rename = "current", skip)]
+    #[reflect(skip)]
     fn value(&self) -> &T {
         &self.value
     }
 }
 
+#[Reflect]
 trait ExternalFormat {
     fn format(&self) -> String;
 }
 
-#[reflect_impl(external_trait_id = "example.ExternalFormat")]
+#[ReflectImpl]
 impl<T: Clone + Default> ExternalFormat for Record<T> {
     fn format(&self) -> String {
         String::new()
     }
-}
-
-/// Supplies the field default used by the parser fixture.
-fn default_code() -> u32 {
-    0
 }
 
 #[test]
@@ -87,7 +75,7 @@ fn test_macro_parsers_accept_supported_declarations() {
 }
 
 #[test]
-fn test_macro_diagnostic_points_to_the_conflicting_rename_literal() {
+fn test_macro_diagnostic_rejects_a_removed_rename_option() {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("the system clock should follow the Unix epoch")
@@ -117,7 +105,7 @@ qubit-reflect-derive = {{ path = "{dependency_path}" }}
             "qubit_reflect_derive",
             r#"::Reflect;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Duplicate {
 #[reflect(rename = "same")]
 first: u8,
@@ -138,13 +126,9 @@ second: u8,
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     fs::remove_dir_all(&fixture).expect("the temporary fixture should be removed");
 
-    assert!(!output.status.success(), "the duplicate rename should fail");
+    assert!(!output.status.success(), "the removed rename option should fail");
     assert!(
-        stderr.contains("field query name `same` for Rust member `second`"),
+        stderr.contains("`rename` was removed"),
         "unexpected compiler diagnostic:\n{stderr}"
-    );
-    assert!(
-        stderr.contains("src/lib.rs:7:20"),
-        "the diagnostic should point at the second rename literal:\n{stderr}"
     );
 }

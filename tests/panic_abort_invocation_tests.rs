@@ -8,23 +8,24 @@
 
 //! Abort-on-panic configuration contract for explicit catching descriptors.
 
+#![cfg(feature = "derive")]
 #![cfg(panic = "abort")]
 
 use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::descriptor::CatchingAvailability;
 use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::descriptor::MethodQualifier;
 use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationDispatchMode;
 use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Worker;
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Worker {
     #[reflect(catch_unwind)]
     fn marked() {}

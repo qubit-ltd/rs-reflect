@@ -10,13 +10,11 @@ use std::cell::Cell;
 use std::future::ready;
 use std::rc::Rc;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 struct Worker;
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl Worker {
     async fn run(value: u8) -> u8 {
         let local = Rc::new(Cell::new(value));

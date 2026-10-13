@@ -38,7 +38,7 @@ fn second_provider<T: 'static>() -> CapabilityDescriptor {
 fn first_adapter() {}
 fn second_adapter() {}
 
-#[cfg_attr(feature = "derive", derive(Reflect))]
+#[cfg_attr(feature = "derive", Reflect)]
 #[cfg_attr(feature = "derive", reflect(capabilities(first_provider, second_provider)))]
 struct IntrinsicConflict;
 

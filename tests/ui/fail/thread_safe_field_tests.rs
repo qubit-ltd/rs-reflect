@@ -6,9 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 struct Invalid {
     #[reflect(thread_safe)]
     value: u32,

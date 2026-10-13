@@ -14,7 +14,6 @@ use qubit_reflect::invoke::InvocationFailure;
 use qubit_reflect::invoke::InvocationOutput;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
 /// Returns one owned output through the local invocation boundary.
 fn return_seven<'call>(
@@ -41,31 +40,4 @@ fn test_invocation_adapter_local_descriptor_invokes_its_typed_entry_point() {
         panic!("output type must be u8");
     };
     assert_eq!(value, 7);
-}
-
-/// Returns one owned thread-safe output through the generated boundary.
-fn return_eight<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
-}
-
-#[test]
-fn test_invocation_adapter_thread_safe_descriptor_invokes_its_typed_entry_point() {
-    let adapter = InvocationAdapter::thread_safe(return_eight);
-    let output = adapter
-        .invoke_thread_safe(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([]),
-        )
-        .expect("the thread-safe entry point must be present")
-        .expect("the thread-safe adapter must be callable");
-    let InvocationOutput::Owned(value) = output else {
-        panic!("adapter must retain its owned output");
-    };
-    let Ok(value) = DynamicOwned::<ThreadSafe>::downcast::<u8>(value) else {
-        panic!("output type must be u8");
-    };
-    assert_eq!(value, 8);
 }

@@ -15,8 +15,8 @@ use std::rc::Rc;
 
 use qubit_reflect::Invocation;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::ReflectRegistry;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityDescriptor;
 use qubit_reflect::capability::CapabilityKey;
@@ -25,9 +25,9 @@ use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::invoke::InvocationErrorKind;
 use qubit_reflect::invoke::InvocationReceiver;
 use qubit_reflect::invoke::receiver_adapter_key;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::register_type_capabilities;
 use qubit_reflect::registry::RegistrySnapshotBuilder;
+use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
 /// Declares the first conflicting intrinsic fact.
@@ -43,24 +43,24 @@ fn second<T: 'static>() -> CapabilityDescriptor {
     first::<T>()
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(capabilities(first, second))]
 struct Conflict<T> {
     value: T,
 }
 
-#[reflect_impl(specialize(T = u8))]
-impl<T> Conflict<T> {
+#[ReflectImpl]
+impl Conflict<u8> {
     /// Cannot execute while the receiver's intrinsic capabilities conflict.
     fn read(self: Pin<Rc<Self>>) -> u8 {
         99
     }
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct Global;
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Global {
     /// Requires the receiver adapter registered only in the global registry.
     fn read(self: Pin<Rc<Self>>) -> u8 {
@@ -102,7 +102,10 @@ fn test_intrinsic_conflict_survives_generated_snapshot_invocation() {
     let MethodLookup::Unique(method) = target.methods_named_in(&registry, "read") else {
         panic!("the reflected Conflict<u8> method must resolve uniquely")
     };
-    let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))), []);
+    let input = Invocation::owned(
+        DynamicOwned::<Local>::new(Pin::new(Rc::new(Conflict { value: 1_u8 }))),
+        [],
+    );
     let result = method
         .invoke_local(&registry, input)
         .expect("static adapter must exist");
@@ -141,7 +144,7 @@ fn test_missing_local_capability_does_not_use_a_valid_global_adapter() {
     let MethodLookup::Unique(method) = target.methods_named_in(&registry, "read") else {
         panic!("the reflected Global method must resolve uniquely")
     };
-    let input = Invocation::owned(ReflectedOwned::new(Pin::new(Rc::new(Global))), []);
+    let input = Invocation::owned(DynamicOwned::<Local>::new(Pin::new(Rc::new(Global))), []);
     let result = method
         .invoke_local(&registry, input)
         .expect("static adapter must exist");

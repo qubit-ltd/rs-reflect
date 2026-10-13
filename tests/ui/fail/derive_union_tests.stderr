@@ -1,5 +1,7 @@
-error: Reflect cannot be derived for unions
-  --> tests/ui/fail/derive_union_tests.rs:12:7
+error: `#[Reflect]` supports structs, enums, and traits
+  --> tests/ui/fail/derive_union_tests.rs:11:1
    |
-12 | union Unsupported {
-   |       ^^^^^^^^^^^
+11 | / union Unsupported {
+12 | |     number: u32,
+13 | | }
+   | |_^

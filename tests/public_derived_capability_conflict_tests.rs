@@ -8,12 +8,15 @@
 
 //! Derived and explicit capability conflict integration tests.
 
+#![cfg(feature = "derive")]
+
 use qubit_reflect::Reflect;
 use qubit_reflect::error::RegistryErrorKind;
 use qubit_reflect::register_type_capabilities;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[derive(Clone, Reflect)]
+#[derive(Clone)]
+#[Reflect]
 #[reflect(capabilities(Clone))]
 struct DuplicateDerivedCapability;
 

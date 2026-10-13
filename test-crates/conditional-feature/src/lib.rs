@@ -7,14 +7,14 @@
 // =============================================================================
 //! Fixture proving that reflected members follow a Cargo feature.
 
-use qubit_reflect::reflect;
+use qubit_reflect::Reflect;
 
 /// A signature type available only when the fixture feature is enabled.
 #[cfg(feature = "conditional-extra")]
 pub struct FeatureOnlyType;
 
 /// A trait whose members and helper validation follow the selected feature.
-#[reflect]
+#[Reflect]
 pub trait FeatureConditional {
     /// Exists on 64-bit targets.
     #[cfg(target_pointer_width = "64")]
@@ -26,6 +26,5 @@ pub trait FeatureConditional {
 
     /// Returns the feature-gated signature type.
     #[cfg(feature = "conditional-extra")]
-    #[reflect(rename = "enabled_feature_method")]
     fn feature_method(&self) -> FeatureOnlyType;
 }

@@ -23,71 +23,67 @@ use qubit_reflect::descriptor::StructKind;
 use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::descriptor::TypeRef;
 use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
-use qubit_reflect::value::ReflectedRef;
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedNamed {
     value: u8,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedTuple(u8, String);
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedNewtype(u16);
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedUnit;
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct DerivedOpaque<T> {
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedGeneric<T> {
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DerivedOpaqueMember<T> {
     #[reflect(opaque)]
     value: T,
 }
 
-#[derive(Reflect)]
-#[reflect(rename = "renamed-record")]
+#[Reflect]
 struct RenamedFields {
-    #[reflect(rename = "payload", read_only)]
-    pub(crate) value: u8,
+    value: u8,
     #[reflect(skip)]
     skipped: String,
+    retained_after_skip: bool,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DirectRecursiveNode {
     next: Option<Box<DirectRecursiveNode>>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct IndirectRecursiveLeft {
     right: Option<Box<IndirectRecursiveRight>>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct IndirectRecursiveRight {
     left: Option<Box<IndirectRecursiveLeft>>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct RecursiveVectorNode {
     children: Vec<RecursiveVectorNode>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct RecursiveCompositeNode {
     array: [Box<RecursiveCompositeNode>; 1],
     tuple: (Box<RecursiveCompositeNode>,),
@@ -355,25 +351,16 @@ fn test_derive_reflect_builds_named_struct_descriptor() {
     assert_eq!(field.rust_name(), Some("value"));
 }
 
-/// Verifies a derived private field uses the safe generated access adapters.
+/// Verifies a derived field descriptor retains Rust identity and visibility.
 #[test]
-fn test_derive_reflect_accesses_private_named_field() {
+fn test_derive_reflect_describes_private_named_field() {
     let field = TypeDescriptor::of::<DerivedNamed>()
         .field("value")
         .expect("derived field must be discoverable");
-    let mut value = DerivedNamed { value: 7 };
 
-    assert_eq!(
-        field
-            .get(ReflectedRef::new(&value))
-            .expect("private field read must succeed")
-            .downcast_ref::<u8>(),
-        Some(&7)
-    );
-    field
-        .set(ReflectedMut::new(&mut value), ReflectedOwned::new(9_u8))
-        .expect("private field replacement must succeed");
-    assert_eq!(value.value, 9);
+    assert_eq!(field.index(), 0);
+    assert_eq!(field.rust_name(), Some("value"));
+    assert_eq!(field.query_name(), Some("value"));
 }
 
 /// Verifies tuple, newtype, and unit shapes retain their distinct descriptor
@@ -455,31 +442,26 @@ fn test_derive_reflect_registers_concrete_struct() {
     ));
 }
 
-/// Verifies field policies retain source visibility and explicit query names.
+/// Verifies skipped fields are absent while later fields retain source indexes.
 #[test]
-fn test_derive_reflect_honors_field_names_visibility_and_access_policies() {
+fn test_derive_reflect_skip_excludes_field_without_renumbering_source_positions() {
     let descriptor = TypeDescriptor::of::<RenamedFields>();
-    let payload = descriptor.field("payload").expect("renamed field");
-    let skipped = descriptor.field_at(1).expect("skipped field");
+    let value = descriptor.field("value").expect("first reflected field");
+    let retained = descriptor
+        .field("retained_after_skip")
+        .expect("field after skipped source member");
     let values = RenamedFields {
         value: 1,
         skipped: "hidden".into(),
+        retained_after_skip: true,
     };
 
-    assert_eq!(descriptor.query_name(), "renamed-record");
-    assert_eq!(payload.rust_name(), Some("value"));
-    assert_eq!(payload.query_name(), Some("payload"));
-    assert_eq!(
-        payload.visibility().as_declared(),
-        Some(&qubit_reflect::identity::Visibility::Crate)
-    );
-    assert_eq!(
-        payload.access_policy(),
-        qubit_reflect::access::FieldAccessPolicy::ReadOnly
-    );
-    assert_eq!(
-        skipped.access_policy(),
-        qubit_reflect::access::FieldAccessPolicy::Skipped
-    );
+    assert_eq!(value.index(), 0);
+    assert_eq!(retained.index(), 2);
+    assert_eq!(value.query_name(), Some("value"));
+    assert_eq!(retained.query_name(), Some("retained_after_skip"));
+    assert_eq!(descriptor.fields().len(), 2);
+    assert!(descriptor.field("skipped").is_none());
+    assert!(descriptor.field_at(1).is_none());
     assert_eq!(values.skipped, "hidden");
 }

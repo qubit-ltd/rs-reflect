@@ -8,6 +8,8 @@
 
 //! Descriptor diagnostics must never initialize intrinsic capabilities.
 
+#![cfg(feature = "derive")]
+
 use qubit_reflect::TypeDescriptor;
 
 #[test]
@@ -51,7 +53,7 @@ mod derived {
         capability()
     }
 
-    #[derive(Reflect)]
+    #[Reflect]
     #[reflect(capabilities(counted))]
     struct Counted<T> {
         value: T,
@@ -81,7 +83,7 @@ mod derived {
         capability()
     }
 
-    #[derive(Reflect)]
+    #[Reflect]
     #[reflect(capabilities(logging))]
     struct Logging<T> {
         value: T,
@@ -138,7 +140,7 @@ mod derived {
         panic!("explicit capability provider panic");
     }
 
-    #[derive(Reflect)]
+    #[Reflect]
     #[reflect(capabilities(panicking))]
     struct Panicking<T> {
         value: T,
@@ -164,7 +166,7 @@ mod derived {
         duplicate::<T>()
     }
 
-    #[derive(Reflect)]
+    #[Reflect]
     #[reflect(capabilities(duplicate, second_duplicate))]
     struct Conflict<T> {
         value: T,

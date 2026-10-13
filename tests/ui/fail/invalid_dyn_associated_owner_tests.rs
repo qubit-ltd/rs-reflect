@@ -6,14 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::reflect;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait Parent {
     type Item;
 }
 
-#[reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
+#[qubit_reflect::Reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
 trait InvalidOwner: Parent {}
 
 fn main() {}

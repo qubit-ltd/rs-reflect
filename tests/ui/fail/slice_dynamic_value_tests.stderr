@@ -1,8 +1,8 @@
 error[E0277]: the size for values of type `[u8]` cannot be known at compilation time
-  --> tests/ui/fail/slice_dynamic_value_tests.rs:12:31
+  --> tests/ui/fail/slice_dynamic_value_tests.rs:13:38
    |
-12 |     let _ = ReflectedRef::new(value);
-   |             ----------------- ^^^^^ doesn't have a size known at compile-time
+13 |     let _ = DynamicRef::<Local>::new(value);
+   |             ------------------------ ^^^^^ doesn't have a size known at compile-time
    |             |
    |             required by a bound introduced by this call
    |

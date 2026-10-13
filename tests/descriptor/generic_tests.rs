@@ -14,34 +14,34 @@ use qubit_reflect::Reflect;
 use qubit_reflect::Reflect as ImportedRuntimeReflect;
 use qubit_reflect::TypeDescriptor;
 
-#[derive(Reflect)]
+#[Reflect]
 struct User {
     id: u64,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct Order {
     number: u64,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct Page<T> {
     item: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct VectorPage<T> {
     items: std::vec::Vec<T>,
 }
 
 type VectorAlias<T> = std::vec::Vec<T>;
 
-#[derive(Reflect)]
+#[Reflect]
 struct AliasedVectorPage<T> {
     items: VectorAlias<T>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct ExplicitAliasedVectorPage<T: ImportedRuntimeReflect> {
     items: VectorAlias<T>,
 }
@@ -49,24 +49,24 @@ struct ExplicitAliasedVectorPage<T: ImportedRuntimeReflect> {
 mod custom_container_name {
     use super::reflect::Reflect;
 
-    #[derive(Reflect)]
+    #[Reflect]
     #[reflect(opaque)]
     pub(super) struct Vec<T> {
         pub(super) value: T,
     }
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct CustomNamedVectorPage<T> {
     items: custom_container_name::Vec<T>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct GenericRecord<T, const N: usize> {
     values: [T; N],
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct OpaqueGenericRecord<T, const N: usize> {
     values: [T; N],
@@ -74,13 +74,13 @@ struct OpaqueGenericRecord<T, const N: usize> {
 
 struct Unreflected;
 
-#[derive(Reflect)]
+#[Reflect]
 struct DirectReflectBound<T: reflect::Reflect> {
     #[reflect(opaque)]
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct WhereReflectBound<T>
 where
     T: reflect::Reflect,
@@ -89,19 +89,19 @@ where
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct Borrowed<'a> {
     value: &'a str,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct Mixed<'a, T, const N: core::primitive::usize> {
     borrowed: &'a str,
     value: T,
     bytes: [u8; N],
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct ScalarConsts<
     const B: bool,
     const C: char,
@@ -119,7 +119,7 @@ struct ScalarConsts<
     const USIZE: usize,
 >;
 
-#[derive(Reflect)]
+#[Reflect]
 struct ExpressionConst<const N: usize>;
 
 mod unrelated_contract {
@@ -128,7 +128,7 @@ mod unrelated_contract {
 
 impl unrelated_contract::Reflect for Unreflected {}
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct UnrelatedReflectBound<T: unrelated_contract::Reflect> {
     value: T,
@@ -144,7 +144,7 @@ impl Family for UserFamily {
     type Item = User;
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct AssociatedItem<T: Family>
 where
     T::Item: reflect::Reflect,
@@ -152,37 +152,37 @@ where
     item: T::Item,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct CustomContainer<T> {
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct CustomContainerField<T> {
     container: CustomContainer<T>,
 }
 
 type Size = usize;
 
-#[derive(Reflect)]
+#[Reflect]
 struct AliasedConsts<const SIZE: Size, const WIDTH: Width>;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Conditional<const N: usize>;
 
-#[derive(Reflect)]
+#[Reflect]
 struct ConditionalField<const N: usize> {
     conditional: Conditional<N>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct ImportedDirectReflectBound<T: ImportedRuntimeReflect> {
     value: T,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 #[reflect(opaque)]
 struct ImportedWhereReflectBound<T>
 where
@@ -197,11 +197,11 @@ mod shadowed_runtime_path {
     }
 
     use self::qubit_reflect::Reflect as ShadowedReflect;
-    use super::reflect::Reflect as ExternalReflect;
+    use super::reflect::Reflect;
 
     impl ShadowedReflect for super::Unreflected {}
 
-    #[derive(ExternalReflect)]
+    #[Reflect]
     #[reflect(opaque)]
     pub(super) struct ShadowedBound<T: ShadowedReflect> {
         pub(super) value: T,

@@ -1,5 +1,5 @@
 error: `invalid..identifier` is not a dot-separated stable identifier
-  --> tests/ui/fail/external_trait_id_tests.rs:14:36
+  --> tests/ui/fail/external_trait_id_tests.rs:13:50
    |
-14 | #[reflect_impl(external_trait_id = "invalid..identifier")]
-   |                                    ^^^^^^^^^^^^^^^^^^^^^
+13 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid..identifier")]
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^

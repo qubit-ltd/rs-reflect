@@ -8,74 +8,69 @@
 
 //! Executable coverage for the three runtime examples in derive macro docs.
 
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect_derive::Reflect;
-use qubit_reflect_derive::reflect;
-use qubit_reflect_derive::reflect_impl;
 
-#[derive(Reflect)]
-#[reflect(rename = "account")]
+#[Reflect]
 struct Account {
-    #[reflect(read_only)]
-    id: u32,
+    pub id: u32,
+    #[reflect(skip)]
+    internal: String,
 }
 
-/// Checks the documented derive rename and read-only field behavior.
+/// Checks that an example type exposes its public field and omits skipped data.
 #[test]
-fn test_derive_reflect_example() {
+fn test_reflect_type_example() {
     let descriptor = TypeDescriptor::of::<Account>();
-    assert_eq!(descriptor.query_name(), "account");
-    assert!(
-        descriptor.field("id").is_some(),
-        "the renamed account descriptor should expose its id field"
-    );
+    let account = Account {
+        id: 7,
+        internal: String::from("private application state"),
+    };
+
+    assert!(descriptor.field("id").is_some());
+    assert!(descriptor.field("internal").is_none());
+    assert_eq!(account.internal, "private application state");
 }
 
-#[derive(Reflect)]
-struct NamedService;
-
-#[reflect]
+#[Reflect]
 trait Named {
     fn name(&self) -> &'static str;
 }
 
-#[reflect_impl]
+#[Reflect]
+struct NamedService;
+
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_Named)]
 impl Named for NamedService {
     fn name(&self) -> &'static str {
         "service"
     }
 }
 
-/// Checks the documented trait and implementation registration.
+/// Checks that the documented trait implementation is reflected.
 #[test]
 fn test_reflect_trait_example() {
     let implementations = TypeDescriptor::of::<NamedService>()
         .impls_global()
         .expect("valid trait registrations");
-    assert!(
-        implementations.iter().any(|item| item.implemented_trait().is_some()),
-        "the service descriptor should register its implemented trait"
-    );
+    assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct InherentService;
 
-#[reflect_impl]
+#[ReflectImpl]
 impl InherentService {
-    #[reflect(no_invoke)]
-    fn ping(&self) {}
+    pub fn ping(&self) {}
 }
 
-/// Checks the documented inherent method registration and no-invoke policy.
+/// Checks that an inherent implementation is described without policy flags.
 #[test]
 fn test_reflect_impl_example() {
     InherentService.ping();
     let implementations = TypeDescriptor::of::<InherentService>()
         .impls_global()
         .expect("valid inherent method registrations");
-    assert!(
-        implementations.iter().any(|item| item.method("ping").is_some()),
-        "the service descriptor should register its ping method"
-    );
+    assert!(implementations.iter().any(|item| item.method("ping").is_some()));
 }

@@ -6,15 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(opaque)]
 struct ConditionalTarget;
 
-#[reflect]
+#[qubit_reflect::Reflect]
 trait ConditionalTrait {
     #[cfg(any())]
     fn disabled(&self) -> MissingTraitType;
@@ -27,7 +24,7 @@ trait ConditionalTrait {
     fn enabled(&self) -> u32;
 }
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl ConditionalTarget {
     #[cfg(any())]
     fn disabled(&self) -> MissingImplType {

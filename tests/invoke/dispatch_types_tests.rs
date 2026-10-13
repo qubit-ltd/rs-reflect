@@ -6,33 +6,26 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public type exports, exhaustive variants and positive thread boundaries.
+//! Remaining dispatch diagnostics and local invocation paths.
 
-use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationDispatchMode;
 use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::invoke::InvocationDispatchResult;
-use qubit_reflect::invoke::InvocationUnavailable;
-use qubit_reflect::value::ThreadSafe;
 
 #[test]
-fn test_dispatch_modes_are_exhaustive() {
+fn test_local_dispatch_modes_have_stable_names() {
     let modes = [
         InvocationDispatchMode::Local,
-        InvocationDispatchMode::ThreadSafe,
         InvocationDispatchMode::CatchingLocal,
-        InvocationDispatchMode::CatchingThreadSafe,
         InvocationDispatchMode::PinnedRefLocal,
         InvocationDispatchMode::PinnedMutLocal,
     ];
     for mode in modes {
         let label = match mode {
             InvocationDispatchMode::Local => "Local",
-            InvocationDispatchMode::ThreadSafe => "ThreadSafe",
             InvocationDispatchMode::CatchingLocal => "CatchingLocal",
-            InvocationDispatchMode::CatchingThreadSafe => "CatchingThreadSafe",
             InvocationDispatchMode::PinnedRefLocal => "PinnedRefLocal",
             InvocationDispatchMode::PinnedMutLocal => "PinnedMutLocal",
+            _ => panic!("thread-safe dispatch modes are not part of the v3 contract"),
         };
         assert_eq!(format!("{mode:?}"), label);
     }
@@ -56,11 +49,4 @@ fn test_dispatch_reasons_are_exhaustive() {
             | InvocationDispatchReason::PinnedReceiverTypeMismatch => {}
         }
     }
-}
-
-#[test]
-fn test_thread_safe_unavailable_preserves_send() {
-    fn assert_send<T: Send>() {}
-    assert_send::<InvocationUnavailable<Invocation<'static, ThreadSafe>>>();
-    assert_send::<InvocationDispatchResult<Invocation<'static, ThreadSafe>, ()>>();
 }

@@ -8,10 +8,10 @@
 
 //! Parent trait shared by the cross-crate registry fixtures.
 
-use qubit_reflect::reflect;
+use qubit_reflect::Reflect;
 
 /// A dependency-owned dyn-compatible trait with an inherited binding.
-#[reflect]
+#[Reflect(dyn_compatible)]
 pub trait RegistryDynParent {
     /// The value exposed by the parent trait.
     type Item;

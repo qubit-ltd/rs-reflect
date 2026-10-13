@@ -12,7 +12,7 @@ fn label() -> String {
     String::from("default")
 }
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 struct Record {
     #[reflect(default = label)]
     label: String,

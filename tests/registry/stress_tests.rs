@@ -30,20 +30,18 @@ use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::error::RegistryErrorKind;
 use qubit_reflect::identity::CapabilityId;
 use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedOwned;
 
-#[derive(Reflect)]
+#[Reflect]
 struct StressRecord<T> {
     values: Vec<T>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct RecursiveStressNode {
     children: Vec<Option<Box<RecursiveStressNode>>>,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct RecoveryRecord {
     value: u64,
 }
@@ -303,18 +301,16 @@ fn test_stress_field_failure_recovery_drops_each_input_exactly_once() {
     let mut target = RecoveryRecord { value: 7 };
 
     for attempt in 0..ATTEMPTS {
-        let replacement = ReflectedOwned::new(DropProbe(Arc::clone(&drops)));
+        let replacement = DropProbe(Arc::clone(&drops));
         let failure = field
-            .set(ReflectedMut::new(&mut target), replacement)
+            .set(&mut target, replacement)
             .expect_err("wrong replacement type must fail before execution");
         assert_eq!(drops.load(Ordering::SeqCst), attempt);
         let recovered = failure
             .into_recovery()
             .unwrap_or_else(|_| panic!("pre-execution failure must retain recovery"))
             .into_value_at(0)
-            .unwrap_or_else(|_| panic!("replacement must remain at its source index"))
-            .downcast::<DropProbe>()
-            .unwrap_or_else(|_| panic!("recovery must preserve the concrete replacement"));
+            .unwrap_or_else(|_| panic!("replacement must remain at its source index"));
         assert_eq!(drops.load(Ordering::SeqCst), attempt);
         drop(recovered);
     }

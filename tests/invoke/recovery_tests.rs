@@ -19,7 +19,6 @@ use qubit_reflect::invoke::InvocationBinding;
 use qubit_reflect::invoke::ReceiverExpectation;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
 /// Creates the method identity used by recovery validation fixtures.
 fn method_identity() -> MemberId {
@@ -63,7 +62,7 @@ fn test_invocation_recovery_inspection_preserves_bindings() {
 /// Verifies successful validation exposes and consumes receiver and argument
 /// state in both erased-value modes.
 #[test]
-fn test_validated_invocation_inspection_supports_both_modes() {
+fn test_validated_invocation_inspection_supports_typed_inputs() {
     let mutable_expectation = ArgumentExpectation::borrowed_mut::<u32>();
     assert_eq!(mutable_expectation.type_name(), std::any::type_name::<u32>());
 
@@ -74,16 +73,6 @@ fn test_validated_invocation_inspection_supports_both_modes() {
     assert!(local.arguments().is_empty());
     assert!(format!("{local:?}").contains("ValidatedInvocation"));
     let (receiver, arguments) = local.into_parts();
-    assert!(receiver.is_none());
-    assert!(arguments.is_empty());
-
-    let thread_safe = Invocation::<ThreadSafe>::associated([])
-        .validate(&method_identity(), ReceiverExpectation::none(), &[])
-        .expect("an empty associated thread-safe invocation must validate");
-    assert!(thread_safe.receiver().is_none());
-    assert!(thread_safe.arguments().is_empty());
-    assert!(format!("{thread_safe:?}").contains("ValidatedInvocation"));
-    let (receiver, arguments) = thread_safe.into_parts();
     assert!(receiver.is_none());
     assert!(arguments.is_empty());
 }

@@ -11,7 +11,6 @@
 
 use qubit_reflect::NamedConstructionInput;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::StructUpdateInput;
 use qubit_reflect::TupleConstructionInput;
 use qubit_reflect::TypeDescriptor;
@@ -20,19 +19,14 @@ use qubit_reflect::construct::ConstructionShape;
 use qubit_reflect::descriptor::StructKind;
 use qubit_reflect::descriptor::TypeDefinitionData;
 use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::ThreadSafe;
 
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct EmptyUnit;
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct EmptyNamed {
     // empty
 }
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct EmptyTuple();
 
 #[test]
@@ -40,45 +34,27 @@ fn test_empty_named_constructs_as_named() {
     let descriptor = TypeDescriptor::of::<EmptyNamed>();
     assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
     let output = descriptor
-        .construct_struct(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()))
+        .construct_struct::<EmptyNamed>(NamedConstructionInput::new())
         .expect("empty named struct construction should succeed");
-    assert!(output.downcast::<EmptyNamed>().is_ok());
+    let _ = output;
 }
 
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct GenericEmpty<const N: usize> {}
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct GenericTuple<const N: usize>();
-#[derive(Reflect)]
-#[reflect(thread_safe)]
+#[Reflect]
 struct GenericUnit<const N: usize>;
 
-/// Checks construction and rejection in both modes without erasing type
+/// Checks construction and rejection across shapes without erasing type
 /// identity.
 fn assert_empty_shape<T: Reflect>(kind: StructKind) {
     let descriptor = TypeDescriptor::of::<T>();
     assert_eq!(descriptor.kind(), TypeKind::Struct(kind));
     let local = [
-        descriptor.construct_unit(),
-        descriptor.construct_struct(NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>())),
-        descriptor.construct_tuple(TupleConstructionInput::new(std::iter::empty::<ReflectedOwned>())),
-    ];
-    let constructor = descriptor
-        .struct_construction()
-        .expect("empty struct descriptor should expose construction")
-        .thread_safe_constructor()
-        .expect("empty struct should have a thread-safe constructor");
-    let threaded = [
-        constructor.construct_unit(),
-        constructor.construct_named(NamedConstructionInput::new(std::iter::empty::<(
-            &str,
-            DynamicOwned<ThreadSafe>,
-        )>())),
-        constructor.construct_tuple(TupleConstructionInput::new(
-            std::iter::empty::<DynamicOwned<ThreadSafe>>(),
-        )),
+        descriptor.construct_unit::<T>(),
+        descriptor.construct_struct::<T>(NamedConstructionInput::new()),
+        descriptor.construct_tuple::<T>(TupleConstructionInput::new()),
     ];
     let shapes = [
         ConstructionShape::Unit,
@@ -94,16 +70,12 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
     for (actual, result) in shapes.into_iter().zip(local) {
         if actual == expected {
             let updated = descriptor
-                .struct_construction()
-                .expect("empty struct descriptor should expose construction")
-                .local_updater()
-                .expect("empty struct should have a local updater")
-                .update(StructUpdateInput::new(
+                .update_struct::<T>(StructUpdateInput::new(
                     result.expect("matching local construction shape should succeed"),
-                    NamedConstructionInput::new(std::iter::empty::<(&str, ReflectedOwned)>()),
+                    NamedConstructionInput::new(),
                 ))
                 .expect("updating an empty struct with no fields should succeed");
-            assert!(updated.downcast::<T>().is_ok());
+            let _ = updated;
         } else {
             let Err(failure) = result else {
                 panic!("wrong shape must fail")
@@ -114,28 +86,10 @@ fn assert_empty_shape<T: Reflect>(kind: StructKind) {
             );
         }
     }
-    for (actual, result) in shapes.into_iter().zip(threaded) {
-        if actual == expected {
-            assert!(
-                result
-                    .expect("matching thread-safe construction shape should succeed")
-                    .downcast::<T>()
-                    .is_ok()
-            );
-        } else {
-            let Err(failure) = result else {
-                panic!("wrong thread-safe shape must fail")
-            };
-            assert!(
-                matches!(failure.error(), ConstructionError::WrongShape { expected: e, actual: a }
-                if *e == expected && *a == actual)
-            );
-        }
-    }
 }
 
 #[test]
-fn test_all_empty_shapes_construct_in_both_modes_and_reject_wrong_shapes() {
+fn test_all_empty_shapes_construct_and_reject_wrong_shapes() {
     assert_empty_shape::<EmptyUnit>(StructKind::Unit);
     assert_empty_shape::<EmptyNamed>(StructKind::Named);
     assert_empty_shape::<EmptyTuple>(StructKind::Tuple);

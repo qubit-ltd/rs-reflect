@@ -8,6 +8,8 @@
 
 //! Tests that manual, built-in, and derived descriptors match their Rust types.
 
+#![cfg(feature = "derive")]
+
 use std::any::TypeId;
 
 use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
@@ -30,7 +32,7 @@ impl Reflect for Right {
 }
 
 #[cfg(feature = "derive")]
-#[derive(Reflect)]
+#[Reflect]
 struct Derived;
 
 #[test]

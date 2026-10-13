@@ -6,22 +6,20 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::descriptor::InvocationAdapter;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::invoke::InvocationUnavailable;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationFailure;
+use qubit_reflect::ReflectRegistry;
+use qubit_reflect::descriptor::MethodInstanceDescriptor;
 use qubit_reflect::value::Local;
-use qubit_reflect::ReflectedRef;
 
-fn opaque_entry() {}
-
-fn escape_input(registry: &ReflectRegistry) -> InvocationUnavailable<Invocation<'static, Local>> {
+fn escape_failure(
+    method: &MethodInstanceDescriptor,
+    registry: &ReflectRegistry,
+) -> InvocationFailure<'static, Local> {
     let argument = String::from("borrowed");
-    let input = Invocation::associated([InvocationArg::Ref(ReflectedRef::new(&argument))]);
-    match InvocationAdapter::new(opaque_entry).invoke_local(registry, input) {
-        Err(unavailable) => unavailable,
-        Ok(_) => panic!("opaque entry"),
+    match method.invoke(registry, Invocation::associated_function().arg_ref(&argument)) {
+        Err(failure) => failure,
+        Ok(_) => panic!("the fixture method fails before execution"),
     }
 }
 

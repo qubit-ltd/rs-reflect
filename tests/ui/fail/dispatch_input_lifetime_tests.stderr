@@ -1,8 +1,7 @@
 error[E0515]: cannot return value referencing local variable `argument`
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:23:29
+  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:21:25
    |
-21 |     let input = Invocation::associated([InvocationArg::Ref(ReflectedRef::new(&argument))]);
-   |                                                                              --------- `argument` is borrowed here
-22 |     match InvocationAdapter::new(opaque_entry).invoke_local(registry, input) {
-23 |         Err(unavailable) => unavailable,
-   |                             ^^^^^^^^^^^ returns a value referencing data owned by the current function
+20 |     match method.invoke(registry, Invocation::associated_function().arg_ref(&argument)) {
+   |                                                                             --------- `argument` is borrowed here
+21 |         Err(failure) => failure,
+   |                         ^^^^^^^ returns a value referencing data owned by the current function

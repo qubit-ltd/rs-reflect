@@ -8,15 +8,12 @@
 
 use std::rc::Rc;
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
 
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 struct Worker;
 
-#[reflect_impl]
+#[qubit_reflect::ReflectImpl]
 impl Worker {
-    #[reflect(thread_safe)]
     async fn run() -> u8 {
         let local = Rc::new(1_u8);
         std::future::pending::<()>().await;

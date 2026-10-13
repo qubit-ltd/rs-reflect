@@ -13,19 +13,19 @@
 use std::marker::PhantomData;
 
 use EmptyTrait as EmptyAlias;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[reflect]
+#[Reflect]
 trait EmptyTrait {
     // empty
 }
 
 struct EmptyTarget<T>(PhantomData<T>);
 
-#[reflect_impl]
+#[ReflectImpl]
 impl<T> EmptyAlias for EmptyTarget<T> {}
 
 /// Verifies an alias without declaration facts cannot become marker identity.

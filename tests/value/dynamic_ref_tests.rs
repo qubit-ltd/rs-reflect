@@ -7,14 +7,15 @@
 // =============================================================================
 
 //! Integration tests for borrowed dynamic values.
-use qubit_reflect::value::ReflectedMut;
-use qubit_reflect::value::ReflectedRef;
+use qubit_reflect::value::DynamicMut;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
 /// Confirms a failed shared downcast leaves the original borrow usable.
 #[test]
 fn test_ref_downcast_failure_keeps_the_borrow_usable() {
     let number = 42_u32;
-    let value = ReflectedRef::new(&number);
+    let value = DynamicRef::<Local>::new(&number);
 
     assert_eq!(value.downcast_ref::<String>(), None);
     assert_eq!(value.downcast_ref::<u32>(), Some(&42));
@@ -27,7 +28,7 @@ fn test_ref_downcast_failure_keeps_the_borrow_usable() {
 fn test_mut_downcast_failure_keeps_the_borrow_usable() {
     let mut number = 42_u32;
     {
-        let mut value = ReflectedMut::new(&mut number);
+        let mut value = DynamicMut::<Local>::new(&mut number);
 
         assert!(value.is::<u32>());
         assert_eq!(value.as_str(), None);
@@ -45,11 +46,11 @@ fn test_mut_downcast_failure_keeps_the_borrow_usable() {
 #[test]
 fn test_borrowed_any_interoperation_preserves_type_identity() {
     let mut number = 42_u32;
-    let value = ReflectedRef::new(&number);
+    let value = DynamicRef::<Local>::new(&number);
     assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&42));
 
     {
-        let mut value = ReflectedMut::new(&mut number);
+        let mut value = DynamicMut::<Local>::new(&mut number);
         *value
             .as_any_mut()
             .and_then(|value| value.downcast_mut::<u32>())
@@ -64,7 +65,7 @@ fn test_borrowed_any_interoperation_preserves_type_identity() {
 #[test]
 fn test_ref_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
     let number = 42_u32;
-    let value = ReflectedRef::new(&number);
+    let value = DynamicRef::<Local>::new(&number);
     let value = match value.downcast::<String>() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,
@@ -81,7 +82,7 @@ fn test_ref_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
 #[test]
 fn test_mut_consuming_downcast_preserves_borrow_and_recovers_mismatch() {
     let mut number = 42_u32;
-    let value = ReflectedMut::new(&mut number);
+    let value = DynamicMut::<Local>::new(&mut number);
     let value = match value.downcast::<String>() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,

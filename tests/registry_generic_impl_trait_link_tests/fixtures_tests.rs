@@ -12,8 +12,8 @@
 
 use std::marker::PhantomData;
 
-use qubit_reflect::reflect;
-use qubit_reflect::reflect_impl;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::registry::ReflectRegistry;
 
 use self::path_traits::__qubit_reflect_trait_definition_CrateQualifiedTrait;
@@ -22,34 +22,34 @@ use self::path_traits::__qubit_reflect_trait_definition_RelativeQualifiedTrait;
 use self::path_traits::ImportedAliasTrait as ReflectedAlias;
 
 pub(crate) mod path_traits {
-    use qubit_reflect::reflect;
+    use qubit_reflect::Reflect;
 
-    #[reflect]
+    #[Reflect]
     pub(crate) trait CrateQualifiedTrait {
         /// Returns the crate-qualified fixture value.
         fn crate_qualified_value(&self) -> usize;
     }
 
-    #[reflect]
+    #[Reflect]
     pub(crate) trait RelativeQualifiedTrait {
         /// Returns the relative-qualified fixture value.
         fn relative_qualified_value(&self) -> usize;
     }
 
-    #[reflect]
+    #[Reflect]
     pub(crate) trait SuperQualifiedTrait {
         /// Returns the super-qualified fixture value.
         fn super_qualified_value(&self) -> usize;
     }
 
-    #[reflect]
+    #[Reflect]
     pub(crate) trait ImportedAliasTrait {
         /// Returns the imported-alias fixture value.
         fn imported_alias_value(&self) -> usize;
     }
 }
 
-#[reflect]
+#[Reflect]
 trait SelfQualifiedTrait {
     /// Returns the self-qualified fixture value.
     fn self_qualified_value(&self) -> usize;
@@ -60,7 +60,7 @@ struct RelativeQualifiedTarget<T>(PhantomData<T>);
 struct SelfQualifiedTarget<T>(PhantomData<T>);
 struct ImportedAliasTarget<T>(PhantomData<T>);
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_CrateQualifiedTrait)]
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_CrateQualifiedTrait)]
 impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait for CrateQualifiedTarget<T> {
     /// Returns the crate-qualified fixture value.
     fn crate_qualified_value(&self) -> usize {
@@ -68,7 +68,7 @@ impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifi
     }
 }
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_RelativeQualifiedTrait)]
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_RelativeQualifiedTrait)]
 impl<T> path_traits::RelativeQualifiedTrait for RelativeQualifiedTarget<T> {
     /// Returns the relative-qualified fixture value.
     fn relative_qualified_value(&self) -> usize {
@@ -76,7 +76,7 @@ impl<T> path_traits::RelativeQualifiedTrait for RelativeQualifiedTarget<T> {
     }
 }
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_SelfQualifiedTrait)]
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_SelfQualifiedTrait)]
 impl<T> self::SelfQualifiedTrait for SelfQualifiedTarget<T> {
     /// Returns the self-qualified fixture value.
     fn self_qualified_value(&self) -> usize {
@@ -84,7 +84,7 @@ impl<T> self::SelfQualifiedTrait for SelfQualifiedTarget<T> {
     }
 }
 
-#[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_ImportedAliasTrait)]
+#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_ImportedAliasTrait)]
 impl<T> ReflectedAlias for ImportedAliasTarget<T> {
     /// Returns the imported-alias fixture value.
     fn imported_alias_value(&self) -> usize {
@@ -95,13 +95,13 @@ impl<T> ReflectedAlias for ImportedAliasTarget<T> {
 mod nested_impl {
     use std::marker::PhantomData;
 
-    use qubit_reflect::reflect_impl;
+    use qubit_reflect::ReflectImpl;
 
     use super::path_traits::__qubit_reflect_trait_definition_SuperQualifiedTrait;
 
     pub(super) struct SuperQualifiedTarget<T>(PhantomData<T>);
 
-    #[reflect_impl(definition_provider_v2 = __qubit_reflect_trait_definition_SuperQualifiedTrait)]
+    #[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_SuperQualifiedTrait)]
     impl<T> super::path_traits::SuperQualifiedTrait for SuperQualifiedTarget<T> {
         /// Returns the super-qualified fixture value.
         fn super_qualified_value(&self) -> usize {

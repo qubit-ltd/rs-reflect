@@ -6,14 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use std::rc::Rc;
-
-use qubit_reflect::Reflect;
-
-#[derive(Reflect)]
+#[qubit_reflect::Reflect]
 #[reflect(thread_safe)]
 struct LocalOnly {
-    value: Rc<u8>,
 }
 
 fn main() {}

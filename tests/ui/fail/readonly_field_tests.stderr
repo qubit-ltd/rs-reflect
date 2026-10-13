@@ -1,0 +1,5 @@
+error: `readonly` was removed; field mutation follows the v3 access API
+  --> tests/ui/fail/readonly_field_tests.rs:11:15
+   |
+11 |     #[reflect(readonly)]
+   |               ^^^^^^^^

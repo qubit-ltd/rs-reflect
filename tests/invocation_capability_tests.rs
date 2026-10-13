@@ -16,7 +16,6 @@ use qubit_reflect::invoke::InvocationFailure;
 use qubit_reflect::invoke::InvocationOutput;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
-use qubit_reflect::value::ThreadSafe;
 
 fn return_seven<'call>(
     _registry: &ReflectRegistry,
@@ -25,25 +24,11 @@ fn return_seven<'call>(
     Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(7_u8)))
 }
 
-fn return_eight<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, ThreadSafe>,
-) -> Result<InvocationOutput<'call, ThreadSafe>, InvocationFailure<'call, ThreadSafe>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<ThreadSafe>::new(8_u8)))
-}
-
 fn catch_seven<'call>(
     _registry: &ReflectRegistry,
     invocation: Invocation<'call, Local>,
 ) -> CatchingInvocationResult<'call, Local> {
     return_seven(_registry, invocation).map(Ok)
-}
-
-fn catch_eight<'call>(
-    _registry: &ReflectRegistry,
-    invocation: Invocation<'call, ThreadSafe>,
-) -> CatchingInvocationResult<'call, ThreadSafe> {
-    return_eight(_registry, invocation).map(Ok)
 }
 
 #[test]
@@ -60,20 +45,6 @@ fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
             .expect("validation must succeed")
             .is_ok(),
         "the local catching entry point must return an invocation output"
-    );
-
-    let thread_safe = InvocationAdapter::thread_safe_with_catching(return_eight, catch_eight);
-    assert_eq!(thread_safe.catching_availability(), CatchingAvailability::Available);
-    assert!(
-        thread_safe
-            .invoke_catching_thread_safe(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .expect("the thread-safe catching entry point must be present")
-            .expect("validation must succeed")
-            .is_ok(),
-        "the thread-safe catching entry point must return an invocation output"
     );
 }
 

@@ -6,17 +6,19 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
-use qubit_reflect::reflect_impl;
+use std::cell::Cell;
 
-#[derive(Reflect)]
-struct Worker;
 
-#[reflect_impl]
+#[qubit_reflect::Reflect]
+#[reflect(opaque)]
+struct Worker {
+    state: Cell<u8>,
+}
+
+#[qubit_reflect::ReflectImpl]
 impl Worker {
-    #[reflect(thread_safe, catch_unwind)]
-    fn run(value: u32) -> u32 {
-        value + 1
+    fn run(&self) -> u8 {
+        self.state.get()
     }
 }
 

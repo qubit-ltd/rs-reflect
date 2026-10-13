@@ -13,35 +13,33 @@ use std::sync::atomic::Ordering;
 
 use libfuzzer_sys::fuzz_target;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::ReflectedRef;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::construct::NamedConstructionInput;
 use qubit_reflect::descriptor::MethodLookup;
 use qubit_reflect::invoke::Invocation;
 use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::reflect_impl;
 use qubit_reflect::registry::ReflectRegistry;
 use qubit_reflect::value::DynamicMut;
+use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
 const MAX_INPUT_BYTES: usize = 4_096;
 static DROPS: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Reflect)]
+#[Reflect]
 struct DynamicRecord {
-    value: u64,
+    pub value: u64,
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl DynamicRecord {
     fn add(&mut self, delta: u64) {
         self.value = self.value.wrapping_add(delta);
     }
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct DropProbe;
 
 impl Drop for DropProbe {
@@ -52,9 +50,9 @@ impl Drop for DropProbe {
 
 /// Resets the probe and verifies one recovered owned value is dropped exactly
 /// once by `operation`.
-fn assert_one_recovered_drop(operation: impl FnOnce(ReflectedOwned)) {
+fn assert_one_recovered_drop(operation: impl FnOnce(DropProbe)) {
     DROPS.store(0, Ordering::SeqCst);
-    operation(ReflectedOwned::new(DropProbe));
+    operation(DropProbe);
     assert_eq!(DROPS.load(Ordering::SeqCst), 1);
 }
 
@@ -76,18 +74,14 @@ fuzz_target!(|unbounded: &[u8]| {
     for command in data {
         match command % 5 {
             0 => {
-                let value = field.get(ReflectedRef::new(&record)).expect("exact shared target");
-                assert_eq!(value.downcast_ref::<u64>(), Some(&record.value));
+                let value = field.get::<DynamicRecord, u64>(&record).expect("exact shared target");
+                assert_eq!(*value, record.value);
             }
             1 => {
-                field
-                    .set(ReflectedMut::new(&mut record), ReflectedOwned::new(u64::from(*command)))
-                    .expect("exact replacement");
+                field.set(&mut record, u64::from(*command)).expect("exact replacement");
             }
             2 => assert_one_recovered_drop(|replacement| {
-                let failure = field
-                    .set(ReflectedMut::new(&mut record), replacement)
-                    .expect_err("wrong replacement type");
+                let failure = field.set(&mut record, replacement).expect_err("wrong replacement type");
                 assert_eq!(DROPS.load(Ordering::SeqCst), 0);
                 drop(
                     failure
@@ -102,7 +96,7 @@ fuzz_target!(|unbounded: &[u8]| {
                         registry,
                         Invocation::borrowed_mut(
                             DynamicMut::<Local>::new(&mut record),
-                            [InvocationArg::Owned(argument)],
+                            [InvocationArg::Owned(DynamicOwned::<Local>::new(argument))],
                         ),
                     )
                     .expect("generated adapter");
@@ -113,7 +107,8 @@ fuzz_target!(|unbounded: &[u8]| {
                 drop(failure.into_recovery());
             }),
             _ => assert_one_recovered_drop(|value| {
-                let result = descriptor.construct_struct(NamedConstructionInput::new([("value", value)]));
+                let result =
+                    descriptor.construct_struct::<DynamicRecord>(NamedConstructionInput::new().field("value", value));
                 let Err(recovery) = result else {
                     panic!("wrong construction field type");
                 };

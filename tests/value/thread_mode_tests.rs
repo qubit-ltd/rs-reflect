@@ -7,9 +7,10 @@
 // =============================================================================
 
 //! Integration tests for thread-safe dynamic value mode.
-use qubit_reflect::value::SendReflectedMut;
-use qubit_reflect::value::SendReflectedOwned;
-use qubit_reflect::value::SendReflectedRef;
+use qubit_reflect::value::DynamicMut;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::ThreadSafe;
 
 /// Verifies that a wrapper retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
@@ -18,9 +19,9 @@ fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
 #[test]
 fn test_thread_safe_ref_can_be_downgraded_without_losing_the_borrow() {
     let number = 42_u32;
-    assert_send_and_sync(&SendReflectedRef::new(&number));
+    assert_send_and_sync(&DynamicRef::<ThreadSafe>::new(&number));
 
-    let value = SendReflectedRef::new(&number).into_local();
+    let value = DynamicRef::<ThreadSafe>::new(&number).into_local();
     assert_eq!(value.downcast_ref::<u32>(), Some(&42));
 }
 
@@ -29,7 +30,7 @@ fn test_thread_safe_ref_can_be_downgraded_without_losing_the_borrow() {
 #[test]
 fn test_thread_safe_ref_any_and_downcast_are_available_before_downgrade() {
     let number = 42_u32;
-    let value = SendReflectedRef::new(&number);
+    let value = DynamicRef::<ThreadSafe>::new(&number);
 
     assert!(value.as_any().is_some());
     assert!(value.is::<u32>());
@@ -45,10 +46,10 @@ fn test_thread_safe_ref_any_and_downcast_are_available_before_downgrade() {
 #[test]
 fn test_thread_safe_mut_can_be_downgraded_without_losing_the_borrow() {
     let mut number = 42_u32;
-    assert_send_and_sync(&SendReflectedMut::new(&mut number));
+    assert_send_and_sync(&DynamicMut::<ThreadSafe>::new(&mut number));
 
     {
-        let mut value = SendReflectedMut::new(&mut number).into_local();
+        let mut value = DynamicMut::<ThreadSafe>::new(&mut number).into_local();
         *value
             .downcast_mut::<u32>()
             .expect("the mutable borrow survives the mode downgrade") = 43;
@@ -62,7 +63,7 @@ fn test_thread_safe_mut_can_be_downgraded_without_losing_the_borrow() {
 #[test]
 fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
     let mut number = 42_u32;
-    let mut value = SendReflectedMut::new(&mut number);
+    let mut value = DynamicMut::<ThreadSafe>::new(&mut number);
 
     assert!(value.as_any().is_some());
     assert!(value.is::<u32>());
@@ -82,7 +83,7 @@ fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
 /// without first downgrading to local mode.
 #[test]
 fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
-    let mut value = SendReflectedOwned::new(41_u32);
+    let mut value = DynamicOwned::<ThreadSafe>::new(41_u32);
 
     assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
     *value
@@ -103,10 +104,10 @@ fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
 
 #[test]
 fn test_thread_safe_owned_borrow_bridges_preserve_thread_safe_mode() {
-    let mut value = SendReflectedOwned::new(61_u32);
-    let shared: SendReflectedRef<'_> = value.as_reflected_ref();
+    let mut value = DynamicOwned::<ThreadSafe>::new(61_u32);
+    let shared: DynamicRef<'_, ThreadSafe> = value.as_reflected_ref();
     assert_eq!(shared.downcast_ref::<u32>(), Some(&61));
-    let mut mutable: SendReflectedMut<'_> = value.as_reflected_mut();
+    let mut mutable: DynamicMut<'_, ThreadSafe> = value.as_reflected_mut();
     *mutable
         .downcast_mut::<u32>()
         .expect("the owned thread-safe value must expose a mutable bridge") = 67;
@@ -117,15 +118,15 @@ fn test_thread_safe_owned_borrow_bridges_preserve_thread_safe_mode() {
 /// downgrade.
 #[test]
 fn test_thread_safe_str_variants_can_be_downgraded() {
-    let value = SendReflectedRef::new_str("hello");
+    let value = DynamicRef::<ThreadSafe>::new_str("hello");
     assert_send_and_sync(&value);
     assert!(value.as_any().is_none());
     assert_eq!(value.into_local().as_str(), Some("hello"));
 
     let mut text = String::from("hello");
-    assert_send_and_sync(&SendReflectedMut::new_str_mut(text.as_mut_str()));
+    assert_send_and_sync(&DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str()));
     {
-        let value = SendReflectedMut::new_str_mut(text.as_mut_str());
+        let value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
         assert!(value.as_any().is_none());
         let mut value = value.into_local();
         value
@@ -137,7 +138,7 @@ fn test_thread_safe_str_variants_can_be_downgraded() {
     assert_eq!(text, "HELLO");
 
     let mut text = String::from("hello");
-    let mut value = SendReflectedMut::new_str_mut(text.as_mut_str());
+    let mut value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
     assert!(value.as_any_mut().is_none());
 }
 
@@ -146,7 +147,7 @@ fn test_thread_safe_str_variants_can_be_downgraded() {
 #[test]
 fn test_thread_safe_ref_consuming_downcast_recovers_mismatch() {
     let number = 42_u32;
-    let value = SendReflectedRef::new(&number);
+    let value = DynamicRef::<ThreadSafe>::new(&number);
     let value = match value.downcast::<String>() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,
@@ -163,7 +164,7 @@ fn test_thread_safe_ref_consuming_downcast_recovers_mismatch() {
 #[test]
 fn test_thread_safe_mut_consuming_downcast_recovers_mismatch() {
     let mut number = 42_u32;
-    let value = SendReflectedMut::new(&mut number);
+    let value = DynamicMut::<ThreadSafe>::new(&mut number);
     let value = match value.downcast::<String>() {
         Ok(_) => panic!("a mismatched consuming downcast must fail"),
         Err(value) => value,
@@ -179,7 +180,7 @@ fn test_thread_safe_mut_consuming_downcast_recovers_mismatch() {
 /// variants intact when they cannot participate in `Any` downcasts.
 #[test]
 fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
-    let value = SendReflectedRef::new_str("hello");
+    let value = DynamicRef::<ThreadSafe>::new_str("hello");
     let value = match value.downcast::<String>() {
         Ok(_) => {
             panic!("a dedicated str variant must not downcast through Any")
@@ -189,7 +190,7 @@ fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
     assert_eq!(value.as_str(), Some("hello"));
 
     let mut text = String::from("hello");
-    let value = SendReflectedMut::new_str_mut(text.as_mut_str());
+    let value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
     let mut value = match value.downcast::<String>() {
         Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
         Err(value) => value,
@@ -206,14 +207,14 @@ fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
 #[test]
 fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let text = String::from("hello");
-    let extracted = match SendReflectedRef::new_str(text.as_str()).into_str() {
+    let extracted = match DynamicRef::<ThreadSafe>::new_str(text.as_str()).into_str() {
         Ok(extracted) => extracted,
         Err(_) => panic!("a dedicated thread-safe str wrapper must extract successfully"),
     };
     assert_eq!(extracted, "hello");
 
     let number = 42_u32;
-    let value = match SendReflectedRef::new(&number).into_str() {
+    let value = match DynamicRef::<ThreadSafe>::new(&number).into_str() {
         Ok(_) => panic!("a thread-safe Any wrapper must not extract as str"),
         Err(value) => value,
     };
@@ -225,14 +226,14 @@ fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper
 #[test]
 fn test_thread_safe_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
     let mut text = String::from("hello");
-    match SendReflectedMut::new_str_mut(text.as_mut_str()).into_str_mut() {
+    match DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str()).into_str_mut() {
         Ok(extracted) => extracted.make_ascii_uppercase(),
         Err(_) => panic!("a dedicated thread-safe mutable str wrapper must extract successfully"),
     }
     assert_eq!(text, "HELLO");
 
     let mut number = 42_u32;
-    let mut value = match SendReflectedMut::new(&mut number).into_str_mut() {
+    let mut value = match DynamicMut::<ThreadSafe>::new(&mut number).into_str_mut() {
         Ok(_) => {
             panic!("a thread-safe Any wrapper must not extract as mutable str")
         }
