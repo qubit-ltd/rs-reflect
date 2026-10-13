@@ -8,10 +8,12 @@
 
 //! Complete ownership recovery for pre-execution construction failures.
 
+use std::any::Any;
 use std::fmt;
 
 use crate::construct::ConstructionError;
 use crate::value::DynamicOwned;
+use crate::value::Local;
 use crate::value::Mode;
 
 /// One caller-owned value retained after construction validation fails.
@@ -23,18 +25,16 @@ use crate::value::Mode;
 /// # Examples
 ///
 /// ```
-/// use qubit_reflect::construct::RecoveredConstructionValue;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
+/// use qubit_reflect::construct::RecoveredAnyValue;
 ///
-/// let value = RecoveredConstructionValue::Named {
+/// let value = RecoveredAnyValue::Named {
 ///     name: "title".into(),
-///     value: DynamicOwned::<Local>::new(String::from("draft")),
+///     value: Box::new(String::from("draft")),
 /// };
-/// assert!(matches!(value, RecoveredConstructionValue::Named { .. }));
+/// assert!(matches!(value, RecoveredAnyValue::Named { .. }));
 /// ```
 #[must_use]
-pub enum RecoveredConstructionValue<M: Mode> {
+pub(crate) enum RecoveredConstructionValue<M: Mode> {
     /// The owned base of a failed update, always first in update recovery.
     Base(DynamicOwned<M>),
     /// A named value retaining its original query spelling and caller order.
@@ -51,6 +51,52 @@ pub enum RecoveredConstructionValue<M: Mode> {
         /// Untouched caller-owned dynamic value.
         value: DynamicOwned<M>,
     },
+}
+
+/// A recovered ordinary Rust value with the caller's original input identity.
+#[must_use]
+pub enum RecoveredAnyValue {
+    /// The owned base value of a failed update.
+    Base(Box<dyn Any>),
+    /// A named input value, retaining its source name and order.
+    Named {
+        /// The field name supplied by the caller.
+        name: Box<str>,
+        /// The original rejected field value.
+        value: Box<dyn Any>,
+    },
+    /// A positional input value, retaining its source index and order.
+    Positional {
+        /// The original zero-based position.
+        index: usize,
+        /// The original rejected positional value.
+        value: Box<dyn Any>,
+    },
+}
+
+impl RecoveredConstructionValue<Local> {
+    /// Consumes this entry and returns its original value as `Box<dyn Any>`.
+    pub fn into_any(self) -> RecoveredAnyValue {
+        match self {
+            Self::Base(value) => RecoveredAnyValue::Base(
+                value
+                    .into_any()
+                    .unwrap_or_else(|_| unreachable!("local dynamic values contain Any")),
+            ),
+            Self::Named { name, value } => RecoveredAnyValue::Named {
+                name,
+                value: value
+                    .into_any()
+                    .unwrap_or_else(|_| unreachable!("local dynamic values contain Any")),
+            },
+            Self::Positional { index, value } => RecoveredAnyValue::Positional {
+                index,
+                value: value
+                    .into_any()
+                    .unwrap_or_else(|_| unreachable!("local dynamic values contain Any")),
+            },
+        }
+    }
 }
 
 impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
@@ -97,22 +143,16 @@ impl<M: Mode> fmt::Debug for RecoveredConstructionValue<M> {
 /// #[cfg(feature = "derive")]
 /// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct User { pub name: String }
 /// }
 ///
-/// let constructor = TypeDescriptor::of::<User>()
-///     .struct_construction()
-///     .expect("derived construction")
-///     .local_constructor();
-/// let input = NamedConstructionInput::<Local>::new(std::iter::empty::<(&str, DynamicOwned<Local>)>());
-/// let recovery = match constructor.construct_named(input) {
+/// let recovery = match TypeDescriptor::of::<example::User>().construct_struct::<example::User>(NamedConstructionInput::new()) {
 ///     Err(recovery) => recovery,
 ///     Ok(_) => panic!("expected missing-field recovery"),
 /// };
@@ -161,32 +201,24 @@ impl<M: Mode> ConstructionRecovery<M> {
         &self.error
     }
 
-    /// Returns every recovered value in original caller order.
-    ///
-    /// Update recovery places the base first, followed by overrides in caller
-    /// order.
-    #[inline]
-    pub fn values(&self) -> &[RecoveredConstructionValue<M>] {
-        &self.values
-    }
-
     /// Consumes recovery and returns the structured error and ordered values.
     ///
     /// # Returns
     ///
     /// Returns the error and all retained values in recovery order.
-    pub fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
+    pub(crate) fn into_parts(self) -> (ConstructionError, Box<[RecoveredConstructionValue<M>]>) {
         (*self.error, self.values.into_boxed_slice())
     }
+}
 
-    /// Consumes recovery and returns all owned values in recovery order.
-    ///
-    /// # Returns
-    ///
-    /// Returns every retained caller value in documented recovery order.
-    #[must_use]
-    pub fn into_values(self) -> Box<[RecoveredConstructionValue<M>]> {
-        self.values.into_boxed_slice()
+impl ConstructionRecovery<Local> {
+    /// Consumes recovery into its error and plain erased Rust values.
+    pub fn into_any_parts(self) -> (ConstructionError, Box<[RecoveredAnyValue]>) {
+        let (error, values) = self.into_parts();
+        (
+            error,
+            values.into_vec().into_iter().map(|value| value.into_any()).collect(),
+        )
     }
 }
 

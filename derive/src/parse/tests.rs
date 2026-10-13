@@ -46,11 +46,11 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
         MacroKind::Derive,
         TokenStream::new(),
         quote! {
-            #[reflect(rename = "Packet", capabilities(Clone, Default))]
+            #[reflect(capabilities(Clone, Default))]
             struct Packet<T> {
-                #[reflect(rename = "payload", opaque, read_only, no_construct, default)]
+                #[reflect(opaque)]
                 value: T,
-                #[reflect(skip, default = make_count)]
+                #[reflect(skip)]
                 count: usize,
             }
         },
@@ -58,20 +58,18 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
     let DeclarationIr::Type(structure) = &structure.declaration else {
         panic!("expected a type declaration");
     };
-    assert_eq!(structure.helper_count(HelperName::Rename), 1);
+    assert_eq!(structure.helper_count(HelperName::Rename), 0);
     assert_eq!(structure.helper_count(HelperName::Capabilities), 1);
-    assert_eq!(structure.fields.len(), 2);
+    assert_eq!(structure.fields.len(), 1);
     assert_eq!(structure.fields[0].ty.source, "T");
     assert!(matches!(structure.fields[0].ty.kind, TypeKindIr::Path(_)));
-    assert_eq!(structure.fields[0].attributes.len(), 5);
-    assert_eq!(structure.fields[1].attributes.len(), 2);
+    assert_eq!(structure.fields[0].attributes.len(), 1);
 
     let enumeration = parse_valid(
         MacroKind::Derive,
         TokenStream::new(),
         quote! {
             enum Event {
-                #[reflect(rename = "ready", no_construct)]
                 Ready,
                 #[reflect(skip)]
                 Data(#[reflect(opaque)] Vec<u8>),
@@ -81,8 +79,8 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
     let DeclarationIr::Type(enumeration) = &enumeration.declaration else {
         panic!("expected a type declaration");
     };
-    assert_eq!(enumeration.variants.len(), 2);
-    assert_eq!(enumeration.variants[1].fields[0].ty.source, "Vec < u8 >");
+    assert_eq!(enumeration.variants.len(), 1);
+    assert_eq!(enumeration.variants[0].name, "Ready");
 }
 
 #[test]
@@ -96,10 +94,7 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
                 const LIMIT: usize = 8;
 
                 #[reflect(
-                    rename = "execute",
                     catch_unwind,
-                    thread_safe,
-                    specialize(T = String, N = 4)
                 )]
                 fn run<T, const N: usize>(&self, value: T) -> Self::Output;
 
@@ -119,13 +114,10 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
 
     let reflected_impl = parse_valid(
         MacroKind::Impl,
-        quote!(
-            external_trait_id = "example.service.Service",
-            specialize(T = String, N = 4)
-        ),
+        quote!(external_trait_id = "example.service.Service",),
         quote! {
             impl<T, const N: usize> Service for Packet<T> {
-                #[reflect(rename = "execute", skip)]
+                #[reflect(skip)]
                 fn run(&self) {}
             }
         },
@@ -133,10 +125,30 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
         panic!("expected an impl declaration");
     };
-    assert_eq!(reflected_impl.methods.len(), 1);
+    assert_eq!(reflected_impl.methods.len(), 0);
     assert_eq!(reflected_impl.target_type.source, "Packet < T >");
     assert!(reflected_impl.trait_path.is_some());
     assert!(!reflected_impl.retained_tokens.to_string().contains("reflect"));
+}
+
+#[test]
+fn test_parse_trait_skip_omits_method_metadata() {
+    let parsed = parse_valid(
+        MacroKind::Trait,
+        TokenStream::new(),
+        quote! {
+            trait VisibilityContract {
+                #[reflect(skip)]
+                fn hidden(&self);
+                fn visible(&self);
+            }
+        },
+    );
+    let DeclarationIr::Trait(reflected_trait) = &parsed.declaration else {
+        panic!("expected a trait declaration");
+    };
+    assert_eq!(reflected_trait.methods.len(), 1);
+    assert_eq!(reflected_trait.methods[0].name, "visible");
 }
 
 #[test]
@@ -153,7 +165,7 @@ fn test_validate_rejects_wrong_targets_with_combined_diagnostics() {
         },
     );
     assert!(diagnostics.contains("`skip` is not valid on a type"));
-    assert!(diagnostics.contains("`thread_safe` is not valid on a field"));
+    assert!(diagnostics.contains("`thread_safe` was removed"));
 }
 
 #[test]
@@ -163,12 +175,11 @@ fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
         TokenStream::new(),
         quote! {
             impl Value {
-                #[reflect(rename = "one", rename = "two", skip, no_invoke, catch_unwind)]
+                #[reflect(skip, no_invoke, catch_unwind)]
                 fn value(&self) {}
             }
         },
     );
-    assert!(diagnostics.contains("duplicate `rename`"));
     assert!(diagnostics.contains("`skip` cannot be combined with `no_invoke`"));
     assert!(diagnostics.contains("`skip` cannot be combined with `catch_unwind`"));
 
@@ -177,13 +188,12 @@ fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
         TokenStream::new(),
         quote! {
             impl Value {
-                #[reflect(no_invoke, catch_unwind, thread_safe)]
+                #[reflect(no_invoke, catch_unwind)]
                 fn disabled(&self) {}
             }
         },
     );
     assert!(no_invoke.contains("`no_invoke` cannot be combined with `catch_unwind`"));
-    assert!(no_invoke.contains("`no_invoke` cannot be combined with `thread_safe`"));
 }
 
 #[test]
@@ -249,7 +259,7 @@ fn test_parse_rejects_bare_helpers_and_aggregates_validation_errors() {
 }
 
 #[test]
-fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
+fn test_validate_rejects_union_and_removed_rename_helpers() {
     let union_diagnostic = parse_invalid(
         MacroKind::Derive,
         TokenStream::new(),
@@ -271,8 +281,7 @@ fn test_validate_rejects_union_and_empty_or_conflicting_query_names() {
             }
         },
     );
-    assert!(names.contains("rename cannot be empty"));
-    assert!(names.contains("field query name `same` for Rust member `third` conflicts with Rust member `second`"));
+    assert!(names.contains("`rename` was removed"));
 }
 
 #[test]
@@ -333,40 +342,46 @@ fn test_external_mappings_reject_non_supertrait_bounds() {
 }
 
 #[test]
-fn test_validate_specialization_parameter_completeness() {
-    let diagnostics = parse_invalid(
+fn test_removed_options_are_explicitly_rejected_and_supported_helpers_remain() {
+    for (tokens, expected) in [
+        (quote!(rename = "old"), "`rename` was removed"),
+        (quote!(readonly), "`readonly` was removed"),
+        (quote!(read_only), "`readonly` was removed"),
+        (quote!(no_construct), "`no_construct` was removed"),
+        (quote!(default), "`default` was removed"),
+        (quote!(thread_safe), "`thread_safe` was removed"),
+        (quote!(specialize(T = String)), "`specialize` was removed"),
+    ] {
+        let diagnostic = parse_invalid(
+            MacroKind::Derive,
+            TokenStream::new(),
+            quote! { struct OldApi { #[reflect(#tokens)] value: String } },
+        );
+        assert!(diagnostic.contains(expected), "{tokens}: {diagnostic}");
+    }
+
+    let impl_diagnostic = parse_invalid(
         MacroKind::Impl,
-        quote!(specialize(T = String, T = Vec<u8>, Extra = u32)),
+        quote!(specialize(T = String)),
         quote!(
-            impl<T, const N: usize> Container<T, N> {}
+            impl<T> Container<T> {}
         ),
     );
-    assert!(diagnostics.contains("duplicate specialization argument `T`"));
-    assert!(diagnostics.contains("unknown specialization parameter `Extra`"));
-    assert!(diagnostics.contains("missing specialization argument `N`"));
+    assert!(impl_diagnostic.contains("`specialize` was removed"));
 
-    let valid = parse_valid(
-        MacroKind::Impl,
-        quote!(specialize(T = Result<String, std::io::Error>, N = 16)),
-        quote!(
-            impl<T, const N: usize> Container<T, N> {}
-        ),
-    );
-    let DeclarationIr::Impl(valid) = &valid.declaration else {
-        panic!("expected an impl declaration");
-    };
-    assert_eq!(valid.specializations.len(), 1);
-    assert_eq!(valid.specializations[0].bindings.len(), 2);
-
-    let wrong_kinds = parse_invalid(
-        MacroKind::Impl,
-        quote!(specialize(T = 1, N = Vec<u8>)),
+    let supported = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
         quote! {
-            impl<T, const N: usize> Container<T, N> {}
+            #[reflect(capabilities(Clone), definition_provider_v2 = provider)]
+            struct NewApi<T> { #[reflect(skip)] value: T }
         },
     );
-    assert!(wrong_kinds.contains("specialization value for `T` does not match its Type parameter kind"));
-    assert!(wrong_kinds.contains("specialization value for `N` does not match its Const parameter kind"));
+    let DeclarationIr::Type(supported) = &supported.declaration else {
+        panic!("expected a type declaration");
+    };
+    assert_eq!(supported.helper_count(HelperName::Capabilities), 1);
+    assert_eq!(supported.helper_count(HelperName::DefinitionProviderV2), 1);
 }
 
 #[test]
@@ -381,17 +396,17 @@ fn test_helper_target_matrix_matches_the_shared_contract() {
         HelperTarget::AssociatedItem,
     ];
     let expectations = [
-        (HelperName::Rename, &[0, 1, 2, 3, 5][..]),
+        (HelperName::Rename, &[][..]),
         (HelperName::Opaque, &[0, 1][..]),
         (HelperName::Capabilities, &[0][..]),
         (HelperName::Skip, &[1, 2, 3][..]),
-        (HelperName::ReadOnly, &[1][..]),
-        (HelperName::NoConstruct, &[1, 2][..]),
-        (HelperName::Default, &[1][..]),
+        (HelperName::ReadOnly, &[][..]),
+        (HelperName::NoConstruct, &[][..]),
+        (HelperName::Default, &[][..]),
         (HelperName::NoInvoke, &[3][..]),
         (HelperName::CatchUnwind, &[3][..]),
-        (HelperName::ThreadSafe, &[0, 3][..]),
-        (HelperName::Specialize, &[3, 4][..]),
+        (HelperName::ThreadSafe, &[][..]),
+        (HelperName::Specialize, &[][..]),
         (HelperName::ExternalTraitId, &[4][..]),
         (HelperName::ExternalTrait, &[5][..]),
     ];
@@ -409,7 +424,7 @@ fn test_helper_target_matrix_matches_the_shared_contract() {
 }
 
 #[test]
-fn test_validate_accepts_repeatable_external_mappings_and_specializations() {
+fn test_validate_accepts_repeatable_external_mappings() {
     let reflected_trait = parse_valid(
         MacroKind::Trait,
         quote!(
@@ -424,18 +439,6 @@ fn test_validate_accepts_repeatable_external_mappings_and_specializations() {
         panic!("expected a trait declaration");
     };
     assert_eq!(reflected_trait.external_traits.len(), 2);
-
-    let reflected_impl = parse_valid(
-        MacroKind::Impl,
-        quote!(specialize(T = String), specialize(T = Vec<u8>)),
-        quote! {
-            impl<T> Container<T> {}
-        },
-    );
-    let DeclarationIr::Impl(reflected_impl) = &reflected_impl.declaration else {
-        panic!("expected an impl declaration");
-    };
-    assert_eq!(reflected_impl.specializations.len(), 2);
 }
 
 #[test]
@@ -616,11 +619,23 @@ fn test_explicit_runtime_crate_helper_is_rejected() {
     let derive_error = parse_invalid(
         MacroKind::Derive,
         TokenStream::new(),
-        quote!(#[reflect(crate = qubit_reflect)] struct Record {}),
+        quote!(
+            #[reflect(crate = qubit_reflect)]
+            struct Record {}
+        ),
     );
-    assert!(derive_error.contains("unknown"), "unexpected derive error: {derive_error}");
+    assert!(
+        derive_error.contains("unknown"),
+        "unexpected derive error: {derive_error}"
+    );
 
-    let trait_error = parse_invalid(MacroKind::Trait, quote!(crate = qubit_reflect), quote!(trait Service {}));
+    let trait_error = parse_invalid(
+        MacroKind::Trait,
+        quote!(crate = qubit_reflect),
+        quote!(
+            trait Service {}
+        ),
+    );
     assert!(trait_error.contains("unknown"), "unexpected trait error: {trait_error}");
 
     let impl_error = parse_invalid(MacroKind::Impl, quote!(crate = qubit_reflect), quote!(impl Service {}));
@@ -700,4 +715,58 @@ fn test_empty_struct_ir_retains_source_field_shape() {
         assert_eq!(declaration.field_shape, expected);
         assert!(declaration.fields.is_empty());
     }
+}
+
+#[test]
+fn test_skip_removes_members_from_all_reflection_ir_collections() {
+    let structure = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            struct Sample {
+                visible: u8,
+                #[reflect(skip)]
+                hidden: String,
+            }
+        },
+    );
+    let DeclarationIr::Type(structure) = structure.declaration else {
+        panic!("expected a type declaration");
+    };
+    assert_eq!(structure.fields.len(), 1);
+    assert_eq!(structure.fields[0].name.as_ref().unwrap(), "visible");
+
+    let enumeration = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! {
+            enum SampleEnum {
+                Visible,
+                #[reflect(skip)]
+                Hidden(String),
+            }
+        },
+    );
+    let DeclarationIr::Type(enumeration) = enumeration.declaration else {
+        panic!("expected a type declaration");
+    };
+    assert_eq!(enumeration.variants.len(), 1);
+    assert_eq!(enumeration.variants[0].name, "Visible");
+
+    let implementation = parse_valid(
+        MacroKind::Impl,
+        TokenStream::new(),
+        quote! {
+            impl Sample {
+                fn visible(&self) {}
+                #[reflect(skip)]
+                fn hidden(&self) {}
+            }
+        },
+    );
+    let DeclarationIr::Impl(implementation) = implementation.declaration else {
+        panic!("expected an impl declaration");
+    };
+    assert_eq!(implementation.methods.len(), 1);
+    assert_eq!(implementation.methods[0].name, "visible");
 }

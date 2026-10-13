@@ -6,109 +6,71 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! AssociatedConstReader metadata and behavior.
+//! Associated-constant readers returning ordinary owned Rust values.
 
-mod associated_const_read_adapter;
-
+use std::any::Any;
+use std::any::TypeId;
 use std::fmt;
 
-use self::associated_const_read_adapter::AssociatedConstReadAdapter;
-use crate::value::ReflectedOwned;
+use crate::error::TypeMismatch;
 
 /// A safe reader for one concrete associated constant value.
-///
-/// A reader invokes its generated adapter each time, producing a fresh owned
-/// value without exposing a reference to static storage.
-///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::descriptor::AssociatedConstReader;
-/// use qubit_reflect::ReflectedOwned;
-///
-/// fn read_value() -> ReflectedOwned { ReflectedOwned::new(7_u8) }
-/// let reader = AssociatedConstReader::new(read_value);
-/// assert_eq!(reader.read().downcast_ref::<u8>(), Some(&7));
-/// ```
 pub struct AssociatedConstReader {
-    /// Safe function or closure adapter that reads a fresh owned value.
-    read: AssociatedConstReadAdapter,
+    /// Function or process-lifetime closure producing a fresh erased value.
+    read: AssociatedConstAnyGetter,
+}
+
+enum AssociatedConstAnyGetter {
+    Function(fn() -> Box<dyn Any>),
+    Closure(&'static (dyn Fn() -> Box<dyn Any> + Send + Sync)),
 }
 
 impl AssociatedConstReader {
-    /// Creates a reader from generated safe adapter code.
-    ///
-    /// # Parameters
-    ///
-    /// - `read`: Generated function returning an owned reflected value.
-    ///
-    /// # Returns
-    ///
-    /// Returns a reader that invokes `read` on each call.
+    /// Creates a reader from a generated function returning a boxed value.
     #[doc(hidden)]
     #[must_use]
-    #[inline]
-    pub const fn new(read: fn() -> ReflectedOwned) -> Self {
+    pub const fn new(read: fn() -> Box<dyn Any>) -> Self {
         Self {
-            read: AssociatedConstReadAdapter::Function(read),
+            read: AssociatedConstAnyGetter::Function(read),
         }
     }
 
-    /// Creates a reader from a compiler-proven sized `'static` value getter.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `T`: Concrete associated constant value type.
-    ///
-    /// # Parameters
-    ///
-    /// - `getter`: Function that returns the associated constant value.
-    ///
-    /// # Returns
-    ///
-    /// Returns a reader that owns each value produced by `getter`.
-    /// The generated closure is retained for the process lifetime.
+    /// Creates a reader from a concrete associated-value getter.
     #[doc(hidden)]
     #[must_use]
-    pub fn from_getter<T: 'static>(getter: fn() -> T) -> Self {
-        let read = Box::leak(Box::new(move || ReflectedOwned::new(getter())));
+    pub fn from_getter<T: Any>(getter: fn() -> T) -> Self {
+        let read = Box::leak(Box::new(move || Box::new(getter()) as Box<dyn Any>));
         Self {
-            read: AssociatedConstReadAdapter::Closure(read),
+            read: AssociatedConstAnyGetter::Closure(read),
         }
     }
 
-    /// Reads a fresh owned reflected value.
-    ///
-    /// This invokes the generated reader adapter on every call.
-    ///
-    /// # Returns
-    ///
-    /// Returns a newly owned reflected value.
+    /// Reads a fresh associated value as `Box<dyn Any>`.
     #[must_use]
-    pub fn read(&self) -> ReflectedOwned {
+    pub fn read_any(&self) -> Box<dyn Any> {
         match self.read {
-            AssociatedConstReadAdapter::Function(read) => read(),
-            AssociatedConstReadAdapter::Closure(read) => read(),
+            AssociatedConstAnyGetter::Function(read) => read(),
+            AssociatedConstAnyGetter::Closure(read) => read(),
         }
+    }
+
+    /// Reads a fresh value and checks that it has exact type `T`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeMismatch`] if the associated value's concrete type is
+    /// different from `T`.
+    pub fn read<T: Any>(&self) -> Result<T, TypeMismatch> {
+        let value = self.read_any();
+        let actual = value.as_ref().type_id();
+        value
+            .downcast::<T>()
+            .map(|value| *value)
+            .map_err(|_| TypeMismatch::new(TypeId::of::<T>(), actual))
     }
 }
 
 impl fmt::Debug for AssociatedConstReader {
-    /// Formats adapter availability without exposing a process address.
-    ///
-    /// # Parameters
-    ///
-    /// - `formatter`: Formatter receiving the stable, address-free
-    ///   representation.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` after writing the representation, or the formatter
-    /// error.
-    ///
-    /// # Errors
-    ///
-    /// Returns the error reported by `formatter`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("AssociatedConstReader(..)")
     }

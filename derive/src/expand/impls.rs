@@ -21,19 +21,11 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 use specialization_codegen::specialization_arguments;
-use specialization_codegen::specialization_associated_type_resolver_arms;
-use specialization_codegen::specialization_replacements;
 use specialization_codegen::specialized_method;
-use specialization_codegen::substitute_impl_associated_item_types;
-use specialization_codegen::substitute_impl_lifetimes;
-use specialization_codegen::substitute_impl_method_types;
-use specialization_codegen::substitute_trait_path_tokens;
-use specialization_codegen::substitute_type_tokens;
 use specialization_codegen::typed_extension_receiver_type;
 
 use crate::expand::ExpansionContext;
 use crate::expand::generic_environment::GenericEnvironment;
-use crate::ir::GenericKindIr;
 use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
@@ -62,7 +54,9 @@ use crate::ir::VisibilityIr;
 #[must_use]
 pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
     if !declaration.generics.params.is_empty() {
-        return expand_generic_impl_specializations(declaration, context);
+        let retained = declaration.retained_tokens.clone();
+        let definition = expand_generic_impl_definition(&declaration, context.facade(), context);
+        return quote!(#retained #definition);
     }
     expand_concrete_impl(
         declaration,
@@ -73,69 +67,6 @@ pub(crate) fn expand_impl(declaration: ImplDeclarationIr, context: &ExpansionCon
         context.facade(),
         context,
     )
-}
-
-/// Retains a generic impl and emits one concrete registration fragment for
-/// every explicit specialization.
-///
-/// Blanket and constrained impls have no finite runtime `TypeId` set, so an
-/// impl without `specialize(...)` deliberately remains descriptor-only.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated generic impl and its explicit specializations.
-/// - `context`: Expansion context containing the runtime facade.
-///
-/// # Returns
-///
-/// Returns the retained impl, generic definition and selected concrete
-/// fragments.
-#[must_use]
-fn expand_generic_impl_specializations(declaration: ImplDeclarationIr, context: &ExpansionContext) -> TokenStream {
-    let retained = declaration.retained_tokens.clone();
-    let facade = context.facade().clone();
-    let definition = expand_generic_impl_definition(&declaration, &facade, context);
-    if declaration.specializations.is_empty() {
-        return quote!(#retained #definition);
-    }
-    let shared_definition = generic_impl_definition_module(&declaration);
-    let fragments = declaration.specializations.iter().map(|specialization| {
-        let specialization_arguments = specialization_arguments(specialization, &declaration.generics, &facade);
-        let arguments = quote!(#specialization_arguments.into_vec());
-        let replacements = specialization_replacements(specialization);
-        let associated_type_resolver_arms =
-            specialization_associated_type_resolver_arms(&declaration, &replacements, &facade);
-        let lifetime_names: Vec<_> = declaration
-            .generics
-            .params
-            .iter()
-            .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
-            .map(|parameter| parameter.name.as_str())
-            .collect();
-        let mut concrete = declaration.clone();
-        concrete.retained_tokens = TokenStream::new();
-        concrete.specializations.clear();
-        substitute_impl_lifetimes(&mut concrete, &lifetime_names);
-        substitute_type_tokens(&mut concrete.target_type, &replacements);
-        if let Some(trait_path) = &mut concrete.trait_path {
-            substitute_trait_path_tokens(trait_path, &replacements);
-        }
-        substitute_impl_method_types(&mut concrete, &replacements);
-        substitute_impl_associated_item_types(&mut concrete, &replacements);
-        let applicability_witness =
-            impl_specialization_applicability_witness(&declaration, &concrete.target_type.tokens);
-        let definition = quote!(super::#shared_definition::definition());
-        expand_concrete_impl(
-            concrete,
-            arguments,
-            Some(definition),
-            Some(applicability_witness),
-            associated_type_resolver_arms,
-            &facade,
-            context,
-        )
-    });
-    quote!(#retained #definition #(#fragments)*)
 }
 
 /// Emits one declaration-level registration for a generic inherent impl.
@@ -194,6 +125,17 @@ fn expand_generic_impl_definition(
             _ => None,
         });
     let reflected_provider_import = reflected_provider.map(|provider| quote!(use super::#provider;));
+    let initialize_methods = if let Some(provider) = reflected_provider {
+        quote! {
+            let mut methods = ::std::vec![#(#methods),*];
+            methods.retain(|method| {
+                #provider().methods().iter().any(|declaration| declaration.rust_name() == method.rust_name())
+            });
+            methods.into_boxed_slice()
+        }
+    } else {
+        quote!(::std::vec![#(#methods),*].into_boxed_slice())
+    };
     let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
         let path = trait_path
             .segments
@@ -210,30 +152,23 @@ fn expand_generic_impl_definition(
                 )))
             }
             None => {
-                reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider().trait_id().clone())))
+                if let Some(provider) = reflected_provider {
+                    quote!(Some(#provider().trait_id().clone()))
+                } else {
+                    quote!(None)
+                }
             }
         };
-        let trait_definition = reflected_provider.map_or_else(|| quote!(None), |provider| quote!(Some(#provider())));
-        if external_id.is_none() && reflected_provider.is_some() {
-            quote! {
-                #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new(
-                    fragment_identity(),
-                    #target,
-                    #facade::__private::codegen_v3::descriptor::ImplKind::Trait,
-                    #trait_definition,
-                    ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
-                ).expect("generated generic reflected impl definition is consistent")
-            }
-        } else {
-            quote! {
-                #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new_unresolved_trait(
-                    fragment_identity(),
-                    #target,
-                    #path,
-                    #trait_id,
-                    ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
-                )
-            }
+        let trait_application = super::expression_codegen::path_type_expression(trait_path, &environment, facade);
+        quote! {
+            #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new_unresolved_trait_with_expression(
+                fragment_identity(),
+                #target,
+                #path,
+                #trait_id,
+                #trait_application,
+                ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
+            )
         }
     } else {
         quote! {
@@ -314,9 +249,7 @@ fn expand_generic_impl_definition(
                 static DEFINITION: ::std::sync::OnceLock<#facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor> =
                     ::std::sync::OnceLock::new();
                 let definition = DEFINITION.get_or_init(|| #definition_constructor);
-                definition.initialize_methods(|definition| {
-                    ::std::vec![#(#methods),*].into_boxed_slice()
-                });
+                definition.initialize_methods(|_definition| { #initialize_methods });
                 definition.initialize_associated_items(|_| (
                     ::std::vec![#(#associated_types),*].into_boxed_slice(),
                     ::std::vec![#(#associated_consts),*].into_boxed_slice(),
@@ -371,39 +304,6 @@ fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
         location.line,
         location.column,
     )
-}
-
-/// Emits a private trait witness whose concrete use proves that the selected
-/// specialization satisfies the original impl header and where predicates.
-///
-/// # Parameters
-///
-/// - `declaration`: Original generic impl declaration and predicates.
-/// - `concrete_target`: Selected concrete target type tokens.
-///
-/// # Returns
-///
-/// Returns a private witness trait implementation and compile-time assertion.
-#[must_use]
-fn impl_specialization_applicability_witness(
-    declaration: &ImplDeclarationIr,
-    concrete_target: &TokenStream,
-) -> TokenStream {
-    let impl_declaration = &declaration.generics.impl_declaration;
-    let where_clause = &declaration.generics.where_clause;
-    let symbolic_target = &declaration.target_type.tokens;
-    quote! {
-        trait __QubitReflectImplSpecializationApplies {}
-
-        impl #impl_declaration __QubitReflectImplSpecializationApplies for #symbolic_target
-        #where_clause
-        {}
-
-        const _: fn() = || {
-            fn assert_applies<T: __QubitReflectImplSpecializationApplies>() {}
-            assert_applies::<#concrete_target>();
-        };
-    }
 }
 
 /// Builds declaration-level method descriptors without concrete adapters or
@@ -616,7 +516,7 @@ fn expand_concrete_impl(
         )
     });
     let retained = declaration.retained_tokens;
-    let target = declaration.target_type.tokens;
+    let target = declaration.target_type.tokens.clone();
     let impl_generic_definition = super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
     let trait_path = declaration.trait_path.as_ref().map(|path| path.tokens.clone());
     let trait_call_path = trait_path.clone();
@@ -633,7 +533,7 @@ fn expand_concrete_impl(
     let line = location.line as u32;
     let column = location.column as u32;
     let module = format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
-    let target_source = declaration.target_type.source;
+    let target_source = declaration.target_type.source.clone();
     let invocation_adapter_definitions: Vec<_> = declaration
         .methods
         .iter()
@@ -1070,11 +970,6 @@ fn expand_concrete_impl(
     } else {
         quote!(None)
     };
-    let trait_definition = if has_trait {
-        quote!(trait_definition)
-    } else {
-        quote!(None)
-    };
     let external_registration = match external_id {
         Some(id) => {
             let (rust_name, rust_path, _) = external_trait_metadata
@@ -1147,24 +1042,48 @@ fn expand_concrete_impl(
         None => quote!(),
     };
     let definition_setup = shared_definition.unwrap_or_else(|| {
-        quote! {
-            ::std::boxed::Box::leak(::std::boxed::Box::new(
-                #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new(
-                    fragment_identity(),
-                    #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v3::expression::concrete(
-                            vec![#target_source.into()].into_boxed_slice(),
-                            ::std::vec::Vec::new().into_boxed_slice(),
-                            #facade::__private::codegen_v3::expression::DiagnosticText::from(#target_source),
-                        ),
+        if let Some(trait_path) = declaration.trait_path.as_ref() {
+            let target_expression = super::traits::type_expression(
+                &declaration.target_type,
+                &environment,
+                &facade,
+            );
+            let trait_application = super::expression_codegen::path_type_expression(
+                trait_path,
+                &environment,
+                &facade,
+            );
+            let trait_name = trait_path.source.as_str();
+            quote! {
+                ::std::boxed::Box::leak(::std::boxed::Box::new(
+                    #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new_unresolved_trait_with_expression(
+                        fragment_identity(),
+                        #target_expression,
+                        #trait_name,
+                        trait_definition.map(|definition| definition.trait_id().clone()),
+                        #trait_application,
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(#impl_generic_definition)),
                     ),
-                    #kind,
-                    #trait_definition,
-                    ::std::boxed::Box::leak(::std::boxed::Box::new(
-                        #impl_generic_definition,
-                    )),
-                ).expect("generated impl definition is consistent"),
-            ))
+                ))
+            }
+        } else {
+            quote! {
+                ::std::boxed::Box::leak(::std::boxed::Box::new(
+                    #facade::__private::codegen_v3::descriptor::ImplDefinitionDescriptor::new(
+                        fragment_identity(),
+                        #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                            #facade::__private::codegen_v3::expression::concrete(
+                                vec![#target_source.into()].into_boxed_slice(),
+                                ::std::vec::Vec::new().into_boxed_slice(),
+                                #facade::__private::codegen_v3::expression::DiagnosticText::from(#target_source),
+                            ),
+                        ),
+                        #kind,
+                        None,
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(#impl_generic_definition)),
+                    ).expect("generated impl definition is consistent"),
+                ))
+            }
         }
     });
     let generic_specialization_adapter_definitions = generic_specialization_adapter_definitions.collect();

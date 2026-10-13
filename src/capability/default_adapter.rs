@@ -6,10 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Safe dynamic default constructors for concrete Rust types.
+//! Safe type-erased default constructors for concrete Rust types.
 
-use crate::value::DynamicOwned;
-use crate::value::Local;
+use std::any::Any;
 
 /// A safe dynamic default constructor for one exact concrete Rust type.
 ///
@@ -17,15 +16,13 @@ use crate::value::Local;
 ///
 /// ```
 /// use qubit_reflect::capability::DefaultAdapter;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 ///
-/// let value: DynamicOwned<Local> = DefaultAdapter::new::<String>().create();
+/// let value = DefaultAdapter::new::<String>().create();
 /// assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some(""));
 /// ```
 #[derive(Clone, Copy)]
 pub struct DefaultAdapter {
-    create: fn() -> DynamicOwned<Local>,
+    create: fn() -> Box<dyn Any>,
 }
 
 impl DefaultAdapter {
@@ -47,18 +44,18 @@ impl DefaultAdapter {
         }
     }
 
-    /// Creates a local dynamic value containing `T::default()`.
+    /// Creates an owned `T::default()` value behind `Any`.
     ///
     /// # Returns
     ///
-    /// Returns a local dynamic value containing the default value.
+    /// Returns an erased value containing the default value.
     ///
     /// # Panics
     ///
     /// Panics if the captured `Default` implementation panics.
     #[must_use]
     #[inline]
-    pub fn create(&self) -> DynamicOwned<Local> {
+    pub fn create(&self) -> Box<dyn Any> {
         (self.create)()
     }
 }
@@ -71,11 +68,11 @@ impl DefaultAdapter {
 ///
 /// # Returns
 ///
-/// Returns a local dynamic value containing `T::default()`.
+/// Returns an erased value containing `T::default()`.
 ///
 /// # Panics
 ///
 /// Panics if `T::default()` panics.
-fn create_default<T: Default + 'static>() -> DynamicOwned<Local> {
-    DynamicOwned::<Local>::new(T::default())
+fn create_default<T: Default + 'static>() -> Box<dyn Any> {
+    Box::new(T::default())
 }

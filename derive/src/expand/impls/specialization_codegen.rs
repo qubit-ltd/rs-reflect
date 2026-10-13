@@ -42,6 +42,7 @@ use crate::ir::TypeKindIr;
 ///
 /// Returns generated resolver match arms in declaration order.
 #[must_use]
+#[allow(dead_code)]
 pub(super) fn specialization_associated_type_resolver_arms(
     declaration: &ImplDeclarationIr,
     replacements: &[(Ident, TokenStream)],
@@ -135,6 +136,7 @@ pub(super) fn substitute_type_syntax(tokens: &TokenStream, replacements: &[(Iden
 ///
 /// - `declaration`: Concrete impl declaration whose method types are rewritten.
 /// - `replacements`: Generic identifiers and concrete type or const tokens.
+#[allow(dead_code)]
 pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, replacements: &[(Ident, TokenStream)]) {
     for method in &mut declaration.methods {
         let replacements = replacements
@@ -167,6 +169,7 @@ pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, 
 /// - `declaration`: Concrete impl declaration whose associated item types are
 ///   rewritten.
 /// - `replacements`: Generic identifiers and concrete type or const tokens.
+#[allow(dead_code)]
 pub(super) fn substitute_impl_associated_item_types(
     declaration: &mut ImplDeclarationIr,
     replacements: &[(Ident, TokenStream)],
@@ -206,6 +209,7 @@ fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream
 /// - `declaration`: Concrete impl declaration whose generic lifetimes become
 ///   `'static`.
 /// - `lifetime_names`: Impl lifetime names selected for substitution.
+#[allow(dead_code)]
 pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names: &[&str]) {
     substitute_type_lifetimes(&mut declaration.target_type, lifetime_names);
     if let Some(trait_path) = &mut declaration.trait_path {
@@ -390,6 +394,7 @@ pub(super) fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, To
 /// # Panics
 ///
 /// Panics if validated specialization tokens no longer parse as a Rust path.
+#[allow(dead_code)]
 pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
     let mut parsed: syn::Path =
         syn::parse2(path.tokens.clone()).expect("validated specialization must retain valid trait path syntax");

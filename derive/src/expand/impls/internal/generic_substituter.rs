@@ -63,6 +63,7 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
 ///
 /// Returns the rewritten path.
 #[must_use]
+#[allow(dead_code)]
 pub(in crate::expand::impls) fn substitute_path_syntax(path: &Path, replacements: &[(Ident, TokenStream)]) -> Path {
     let mut path = path.clone();
     GenericSubstituter { replacements }.visit_path_mut(&mut path);

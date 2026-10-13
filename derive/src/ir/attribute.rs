@@ -233,7 +233,7 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::Rename,
         source_name: "rename",
-        targets: TargetSet::new(TYPE | FIELD | VARIANT | METHOD | TRAIT),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Opaque,
@@ -253,17 +253,17 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::ReadOnly,
         source_name: "read_only",
-        targets: TargetSet::new(FIELD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::NoConstruct,
         source_name: "no_construct",
-        targets: TargetSet::new(FIELD | VARIANT),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Default,
         source_name: "default",
-        targets: TargetSet::new(FIELD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::NoInvoke,
@@ -278,12 +278,12 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::ThreadSafe,
         source_name: "thread_safe",
-        targets: TargetSet::new(TYPE | METHOD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Specialize,
         source_name: "specialize",
-        targets: TargetSet::new(METHOD | IMPL),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::ExternalTraitId,

@@ -17,10 +17,4 @@ pub use crate::value::DynamicRef;
 #[doc(hidden)]
 pub use crate::value::Local;
 #[doc(hidden)]
-pub use crate::value::ReflectedMut;
-#[doc(hidden)]
-pub use crate::value::ReflectedOwned;
-#[doc(hidden)]
-pub use crate::value::ReflectedRef;
-#[doc(hidden)]
 pub use crate::value::ThreadSafe;

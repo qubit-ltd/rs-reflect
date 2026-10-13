@@ -62,6 +62,7 @@ trybuild = "^1.0"
 [[test]]
 name = "integration_tests"
 path = "tests/mod.rs"
+required-features = ["derive"]
 
 [[test]]
 name = "ui_tests"

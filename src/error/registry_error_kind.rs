@@ -30,6 +30,12 @@ pub enum RegistryErrorKind {
     /// A generic trait impl definition could not resolve one unique trait
     /// declaration.
     ImplTraitResolution,
+    /// An explicit method binding matched no registered implementation.
+    MethodBindingNotFound,
+    /// An explicit method binding matched multiple declarations.
+    MethodBindingAmbiguous,
+    /// A method selector was registered more than once.
+    MethodBindingConflict,
     /// The target platform cannot support distributed registration.
     UnsupportedPlatform,
 }

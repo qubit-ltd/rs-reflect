@@ -49,6 +49,15 @@ pub struct DynamicOwned<M: Mode> {
 }
 
 impl DynamicOwned<Local> {
+    /// Takes ownership of an existing erased ordinary value without boxing it
+    /// again.
+    pub(crate) fn from_box(value: Box<dyn Any>) -> Self {
+        Self {
+            storage: LocalOwnedStorage::Any(value),
+            marker: PhantomData,
+        }
+    }
+
     /// Wraps `value` as a local owned dynamic value.
     ///
     /// The value must be `'static` so it can participate in `Any` downcasts.

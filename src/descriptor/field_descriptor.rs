@@ -8,6 +8,7 @@
 
 //! Immutable structural facts about reflected fields.
 
+use std::any::Any;
 use std::any::TypeId;
 use std::fmt;
 
@@ -27,12 +28,6 @@ use crate::access::ThreadSafeFieldGetAdapter;
 use crate::access::ThreadSafeFieldGetMutAdapter;
 use crate::access::ThreadSafeFieldSetAdapter;
 use crate::access::ThreadSafeFieldSetPreflightAdapter;
-use crate::access::field_adapter::dynamic_mut_type_id;
-use crate::access::field_adapter::dynamic_owned_type_id;
-use crate::access::field_adapter::dynamic_ref_type_id;
-use crate::access::field_adapter::thread_safe_mut_type_id;
-use crate::access::field_adapter::thread_safe_owned_type_id;
-use crate::access::field_adapter::thread_safe_ref_type_id;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeRef;
 use crate::error::TypeMismatch;
@@ -40,10 +35,7 @@ use crate::identity::Visibility;
 use crate::value::DynamicMut;
 use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
-use crate::value::ReflectedMut;
-use crate::value::ReflectedOwned;
-use crate::value::ReflectedRef;
-use crate::value::ThreadSafe;
+use crate::value::Local;
 
 /// A function that resolves a field or variant's declaring root descriptor.
 ///
@@ -62,12 +54,13 @@ pub type TypeDescriptorResolver = fn() -> &'static TypeDescriptor;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 
-#[derive(Reflect)]
-struct User {
-    name: String,
+mod example {
+    use qubit_reflect::Reflect;
+    #[Reflect]
+    pub struct User { pub name: String }
 }
 
-let field = TypeDescriptor::of::<User>()
+let field = TypeDescriptor::of::<example::User>()
     .field("name")
     .expect("the derived field exists");
 assert_eq!(field.rust_name(), Some("name"));
@@ -442,260 +435,350 @@ impl FieldDescriptor {
         self.variant_rust_name
     }
 
-    /// Reads this field from an exact declaring-type target.
-    ///
-    /// Returns a target mismatch, policy, or unavailable-adapter error before
-    /// invoking generated code. An enum-field adapter may additionally report
-    /// [`FieldAccessError::InactiveVariant`]. The returned borrow cannot
-    /// outlive `target`.
+    /// Reads the field as `V` from an exact, publicly accessible target.
     ///
     /// # Parameters
     ///
-    /// - `target`: The shared dynamic borrow of the exact declaring type.
+    /// - `target`: Shared reference to the declaring value.
     ///
     /// # Returns
     ///
-    /// Returns a shared dynamic borrow of the field.
+    /// A shared borrow of the field, tied to `target`.
     ///
     /// # Errors
     ///
-    /// Returns [`FieldAccessError`] if the target has the wrong type, access
-    /// is disabled, no adapter is available, or the containing enum variant is
-    /// inactive.
-    pub fn get<'a>(&self, target: ReflectedRef<'a>) -> Result<ReflectedRef<'a>, FieldAccessError> {
-        self.validate_shared_target(&target)?;
-        self.validate_policy(FieldAccessOperation::Get)?;
-        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
-        adapter(target)
+    /// Returns an error if the target or field type differs, the field is not
+    /// public, the adapter is unavailable, or its enum variant is inactive.
+    pub fn get<'a, T: 'static, V: 'static>(&self, target: &'a T) -> Result<&'a V, FieldAccessError> {
+        self.get_impl(target, false)
     }
 
-    /// Mutably borrows this field from an exact declaring-type target.
-    ///
-    /// Returns a target mismatch, read-only/skipped policy, or unavailable-
-    /// adapter error before invoking generated code. The returned exclusive
-    /// borrow cannot outlive `target`.
+    /// Reads the field while bypassing only its source visibility check.
     ///
     /// # Parameters
     ///
-    /// - `target`: The exclusive dynamic borrow of the exact declaring type.
+    /// - `target`: Shared reference to the declaring value.
     ///
     /// # Returns
     ///
-    /// Returns an exclusive dynamic borrow of the field.
+    /// A shared borrow of the field, tied to `target`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure access is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn get_unsafe<'a, T: 'static, V: 'static>(&self, target: &'a T) -> Result<&'a V, FieldAccessError> {
+        self.get_impl(target, true)
+    }
+
+    fn get_impl<'a, T: 'static, V: 'static>(
+        &self,
+        target: &'a T,
+        bypass_visibility: bool,
+    ) -> Result<&'a V, FieldAccessError> {
+        let target = DynamicRef::<Local>::new(target);
+        self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id())?;
+        self.validate_policy(FieldAccessOperation::Get)?;
+        self.validate_visibility(FieldAccessOperation::Get, bypass_visibility)?;
+        if self.concrete_field_identity().is_none() {
+            return Err(self.unavailable(FieldAccessOperation::Get));
+        }
+        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        adapter(target)?
+            .downcast::<V>()
+            .map_err(|_| self.field_type_mismatch::<V>())
+    }
+
+    /// Reads a field through the local dynamic borrow boundary.
+    pub fn get_dynamic<'a>(&self, target: DynamicRef<'a, Local>) -> Result<DynamicRef<'a, Local>, FieldAccessError> {
+        self.get_dynamic_impl(target, false)
+    }
+
+    /// Reads a field through the local dynamic borrow boundary while bypassing
+    /// only source visibility.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure access is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn get_dynamic_unsafe<'a>(
+        &self,
+        target: DynamicRef<'a, Local>,
+    ) -> Result<DynamicRef<'a, Local>, FieldAccessError> {
+        self.get_dynamic_impl(target, true)
+    }
+
+    fn get_dynamic_impl<'a>(
+        &self,
+        target: DynamicRef<'a, Local>,
+        bypass_visibility: bool,
+    ) -> Result<DynamicRef<'a, Local>, FieldAccessError> {
+        self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id())?;
+        self.validate_policy(FieldAccessOperation::Get)?;
+        self.validate_visibility(FieldAccessOperation::Get, bypass_visibility)?;
+        let (expected, expected_name) = self
+            .concrete_field_identity()
+            .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        let adapter = self.get.ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?;
+        let value = adapter(target)?;
+        let actual = value.value_type_id();
+        if actual == expected {
+            Ok(value)
+        } else {
+            Err(self.field_type_mismatch_for(expected, actual, expected_name))
+        }
+    }
+
+    /// Mutably borrows the field as `V` from an exact, publicly accessible
+    /// target.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Exclusive reference to the declaring value.
+    ///
+    /// # Returns
+    ///
+    /// An exclusive borrow of the field, tied to `target`.
     ///
     /// # Errors
     ///
-    /// Returns [`FieldAccessError`] if the target has the wrong type, the
-    /// policy forbids mutation, no mutable adapter is available, or the
-    /// containing enum variant is inactive.
-    pub fn get_mut<'a>(&self, target: ReflectedMut<'a>) -> Result<ReflectedMut<'a>, FieldAccessError> {
-        self.validate_mutable_target(&target)?;
+    /// Returns an error if the target or field type differs, the field is not
+    /// public, mutation is unavailable, or its enum variant is inactive.
+    pub fn get_mut<'a, T: 'static, V: 'static>(&self, target: &'a mut T) -> Result<&'a mut V, FieldAccessError> {
+        self.get_mut_impl(target, false)
+    }
+
+    /// Mutably borrows the field while bypassing only source visibility.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Exclusive reference to the declaring value.
+    ///
+    /// # Returns
+    ///
+    /// An exclusive borrow of the field, tied to `target`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure access is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn get_mut_unsafe<'a, T: 'static, V: 'static>(
+        &self,
+        target: &'a mut T,
+    ) -> Result<&'a mut V, FieldAccessError> {
+        self.get_mut_impl(target, true)
+    }
+
+    fn get_mut_impl<'a, T: 'static, V: 'static>(
+        &self,
+        target: &'a mut T,
+        bypass_visibility: bool,
+    ) -> Result<&'a mut V, FieldAccessError> {
+        let target = DynamicMut::<Local>::new(target);
+        self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id())?;
         self.validate_policy(FieldAccessOperation::GetMut)?;
+        self.validate_visibility(FieldAccessOperation::GetMut, bypass_visibility)?;
+        if self.concrete_field_identity().is_none() {
+            return Err(self.unavailable(FieldAccessOperation::GetMut));
+        }
         let adapter = self
             .get_mut
             .ok_or_else(|| self.unavailable(FieldAccessOperation::GetMut))?;
-        adapter(target)
+        adapter(target)?
+            .downcast::<V>()
+            .map_err(|_| self.field_type_mismatch::<V>())
     }
 
-    /// Replaces this field using an exact declaring-type target and exact
-    /// declared field value.
+    /// Mutably borrows a field through the local dynamic borrow boundary.
+    pub fn get_mut_dynamic<'a>(
+        &self,
+        target: DynamicMut<'a, Local>,
+    ) -> Result<DynamicMut<'a, Local>, FieldAccessError> {
+        self.get_mut_dynamic_impl(target, false)
+    }
+
+    /// Mutably borrows a field through the local dynamic borrow boundary while
+    /// bypassing only source visibility.
     ///
-    /// All target, policy, value, and adapter-availability checks complete
-    /// before generated code is invoked. These failures do not modify the
-    /// target and return the untouched replacement through
-    /// [`FieldSetFailure::recovery`]. A symbolic definition-level field has no
-    /// exact runtime identity and therefore reports
-    /// [`FieldAccessError::Unavailable`].
+    /// # Safety
+    ///
+    /// The caller must ensure access is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn get_mut_dynamic_unsafe<'a>(
+        &self,
+        target: DynamicMut<'a, Local>,
+    ) -> Result<DynamicMut<'a, Local>, FieldAccessError> {
+        self.get_mut_dynamic_impl(target, true)
+    }
+
+    fn get_mut_dynamic_impl<'a>(
+        &self,
+        target: DynamicMut<'a, Local>,
+        bypass_visibility: bool,
+    ) -> Result<DynamicMut<'a, Local>, FieldAccessError> {
+        self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id())?;
+        self.validate_policy(FieldAccessOperation::GetMut)?;
+        self.validate_visibility(FieldAccessOperation::GetMut, bypass_visibility)?;
+        let (expected, expected_name) = self
+            .concrete_field_identity()
+            .ok_or_else(|| self.unavailable(FieldAccessOperation::GetMut))?;
+        let adapter = self
+            .get_mut
+            .ok_or_else(|| self.unavailable(FieldAccessOperation::GetMut))?;
+        let value = adapter(target)?;
+        let actual = value.value_type_id();
+        if actual == expected {
+            Ok(value)
+        } else {
+            Err(self.field_type_mismatch_for(expected, actual, expected_name))
+        }
+    }
+
+    /// Replaces a public field with an ordinary value.
+    ///
+    /// On validation failure, the exact input value is retained in the
+    /// returned failure.
     ///
     /// # Parameters
     ///
-    /// - `target`: The exclusive dynamic borrow of the exact declaring type.
-    /// - `value`: The owned replacement with the field's expected type.
+    /// - `target`: Exclusive reference to the declaring value.
+    /// - `value`: Exact replacement value for the field.
     ///
     /// # Returns
     ///
-    /// Returns `()` after the adapter replaces the field.
+    /// `Ok(())` after replacement, or an error retaining `value` when
+    /// validation fails before adapter execution.
+    pub fn set<T: 'static, V: 'static>(&self, target: &mut T, value: V) -> Result<(), FieldSetFailure<V>> {
+        self.set_impl(target, value, false)
+    }
+
+    /// Replaces a field while bypassing only source visibility.
     ///
-    /// # Errors
+    /// # Parameters
     ///
-    /// Returns a [`FieldSetFailure`] containing the error and, when validation
-    /// failed before adapter execution, the original replacement value.
-    pub fn set(&self, target: ReflectedMut<'_>, value: ReflectedOwned) -> Result<(), FieldSetFailure> {
-        if let Err(error) = self.validate_mutable_target(&target) {
+    /// - `target`: Exclusive reference to the declaring value.
+    /// - `value`: Exact replacement value for the field.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` after replacement, or an error retaining `value` when
+    /// validation fails before adapter execution.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure mutation is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn set_unsafe<T: 'static, V: 'static>(
+        &self,
+        target: &mut T,
+        value: V,
+    ) -> Result<(), FieldSetFailure<V>> {
+        self.set_impl(target, value, true)
+    }
+
+    fn set_impl<T: 'static, V: 'static>(
+        &self,
+        target: &mut T,
+        value: V,
+        bypass_visibility: bool,
+    ) -> Result<(), FieldSetFailure<V>> {
+        let target = DynamicMut::<Local>::new(target);
+        if let Err(error) = self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id()) {
             return Err(self.set_failure(error, value));
         }
         if let Err(error) = self.validate_policy(FieldAccessOperation::Set) {
             return Err(self.set_failure(error, value));
         }
-        let (expected, _) = match self.concrete_field_identity() {
-            Some(identity) => identity,
-            None => {
-                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
-            }
+        if let Err(error) = self.validate_visibility(FieldAccessOperation::Set, bypass_visibility) {
+            return Err(self.set_failure(error, value));
+        }
+        let Some((expected, expected_name)) = self.concrete_field_identity() else {
+            return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
         };
-        let actual = dynamic_owned_type_id(&value);
+        let actual = field_value_type_id(&value, expected);
         if actual != expected {
             let error = FieldAccessError::ValueTypeMismatch {
                 field: self.identity(),
-                mismatch: Box::new(
-                    TypeMismatch::new(expected, actual)
-                        .with_expected_name(self.concrete_field_identity().expect("checked above").1),
-                ),
+                mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(expected_name)),
             };
             return Err(self.set_failure(error, value));
         }
-        let adapter = match self.set {
-            Some(adapter) => adapter,
-            None => {
-                return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
-            }
+        let Some(adapter) = self.set else {
+            return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
         };
         if let Some(preflight) = self.set_preflight
             && let Err(error) = preflight(&target)
         {
             return Err(self.set_failure(error, value));
         }
-        adapter(target, value).map_err(FieldSetFailure::after_execution)
+        adapter(target, erase_field_value(value, expected)).map_err(FieldSetFailure::after_execution)
     }
 
-    /// Reads this field while preserving a thread-safe erased boundary.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: A thread-safe shared borrow of the exact declaring type.
-    ///
-    /// # Returns
-    ///
-    /// Returns a thread-safe shared borrow of the field.
-    ///
-    /// # Errors
-    ///
-    /// Returns an access error for a target mismatch, disallowed policy,
-    /// unavailable adapter, or inactive enum variant.
-    pub fn get_thread_safe<'a>(
+    /// Replaces a field through the local dynamic value boundary.
+    pub fn set_dynamic(
         &self,
-        target: DynamicRef<'a, ThreadSafe>,
-    ) -> Result<DynamicRef<'a, ThreadSafe>, FieldAccessError> {
-        self.validate_target_identity(self.declaring_type().type_id(), thread_safe_ref_type_id(&target))?;
-        self.validate_policy(FieldAccessOperation::Get)?;
-        self.thread_safe_get
-            .ok_or_else(|| self.unavailable(FieldAccessOperation::Get))?(target)
+        target: DynamicMut<'_, Local>,
+        value: DynamicOwned<Local>,
+    ) -> Result<(), FieldSetFailure<DynamicOwned<Local>>> {
+        self.set_dynamic_impl(target, value, false)
     }
 
-    /// Mutably reads this field while preserving a thread-safe erased boundary.
+    /// Replaces a field through the local dynamic value boundary while
+    /// bypassing only source visibility.
     ///
-    /// # Parameters
+    /// # Safety
     ///
-    /// - `target`: A thread-safe exclusive borrow of the exact declaring type.
-    ///
-    /// # Returns
-    ///
-    /// Returns a thread-safe exclusive borrow of the field.
-    ///
-    /// # Errors
-    ///
-    /// Returns an access error for a target mismatch, disallowed policy,
-    /// unavailable adapter, or inactive enum variant.
-    pub fn get_mut_thread_safe<'a>(
+    /// The caller must ensure mutation is permitted by the program's privacy
+    /// and encapsulation invariants.
+    #[allow(unsafe_code)]
+    pub unsafe fn set_dynamic_unsafe(
         &self,
-        target: DynamicMut<'a, ThreadSafe>,
-    ) -> Result<DynamicMut<'a, ThreadSafe>, FieldAccessError> {
-        self.validate_target_identity(self.declaring_type().type_id(), thread_safe_mut_type_id(&target))?;
-        self.validate_policy(FieldAccessOperation::GetMut)?;
-        self.thread_safe_get_mut
-            .ok_or_else(|| self.unavailable(FieldAccessOperation::GetMut))?(target)
+        target: DynamicMut<'_, Local>,
+        value: DynamicOwned<Local>,
+    ) -> Result<(), FieldSetFailure<DynamicOwned<Local>>> {
+        self.set_dynamic_impl(target, value, true)
     }
 
-    /// Replaces this field through thread-safe dynamic values.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: A thread-safe exclusive borrow of the exact declaring type.
-    /// - `value`: The owned thread-safe replacement value.
-    ///
-    /// # Returns
-    ///
-    /// Returns `()` after replacement succeeds.
-    ///
-    /// # Errors
-    ///
-    /// Returns the structured error and retains the replacement when validation
-    /// fails before adapter execution.
-    pub fn set_thread_safe(
+    fn set_dynamic_impl(
         &self,
-        target: DynamicMut<'_, ThreadSafe>,
-        value: DynamicOwned<ThreadSafe>,
-    ) -> Result<(), FieldSetFailure<ThreadSafe>> {
-        let field = self.identity();
-        let failure = |error, value| FieldSetFailure::before_execution(error, field.clone(), self.query_name, value);
-        if let Err(error) =
-            self.validate_target_identity(self.declaring_type().type_id(), thread_safe_mut_type_id(&target))
-        {
-            return Err(failure(error, value));
+        target: DynamicMut<'_, Local>,
+        value: DynamicOwned<Local>,
+        bypass_visibility: bool,
+    ) -> Result<(), FieldSetFailure<DynamicOwned<Local>>> {
+        if let Err(error) = self.validate_target_identity(self.declaring_type().type_id(), target.value_type_id()) {
+            return Err(self.set_failure(error, value));
         }
         if let Err(error) = self.validate_policy(FieldAccessOperation::Set) {
-            return Err(failure(error, value));
+            return Err(self.set_failure(error, value));
+        }
+        if let Err(error) = self.validate_visibility(FieldAccessOperation::Set, bypass_visibility) {
+            return Err(self.set_failure(error, value));
         }
         let Some((expected, expected_name)) = self.concrete_field_identity() else {
-            return Err(failure(self.unavailable(FieldAccessOperation::Set), value));
+            return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
         };
-        let actual = thread_safe_owned_type_id(&value);
+        let actual = dynamic_field_value_type_id(&value, expected);
         if actual != expected {
-            return Err(failure(
-                FieldAccessError::ValueTypeMismatch {
-                    field: field.clone(),
-                    mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(expected_name)),
-                },
-                value,
-            ));
+            let error = FieldAccessError::ValueTypeMismatch {
+                field: self.identity(),
+                mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(expected_name)),
+            };
+            return Err(self.set_failure(error, value));
         }
-        let Some(adapter) = self.thread_safe_set else {
-            return Err(failure(self.unavailable(FieldAccessOperation::Set), value));
+        let Some(adapter) = self.set else {
+            return Err(self.set_failure(self.unavailable(FieldAccessOperation::Set), value));
         };
-        if let Some(preflight) = self.thread_safe_set_preflight
+        if let Some(preflight) = self.set_preflight
             && let Err(error) = preflight(&target)
         {
-            return Err(failure(error, value));
+            return Err(self.set_failure(error, value));
         }
-        adapter(target, value).map_err(FieldSetFailure::after_execution)
-    }
-
-    /// Validates a shared target without consuming or changing it.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: The shared borrow whose exact root type is checked.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` when the target matches this field's declaring type.
-    ///
-    /// # Errors
-    ///
-    /// Returns a target-type mismatch associated with this field.
-    fn validate_shared_target(&self, target: &ReflectedRef<'_>) -> Result<(), FieldAccessError> {
-        let expected = self.declaring_type().type_id();
-        let actual = dynamic_ref_type_id(target);
-        self.validate_target_identity(expected, actual)
-    }
-
-    /// Validates a mutable target without consuming or changing it.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: The mutable borrow whose exact root type is checked.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` when the target matches this field's declaring type.
-    ///
-    /// # Errors
-    ///
-    /// Returns a target-type mismatch associated with this field.
-    fn validate_mutable_target(&self, target: &ReflectedMut<'_>) -> Result<(), FieldAccessError> {
-        let expected = self.declaring_type().type_id();
-        let actual = dynamic_mut_type_id(target);
-        self.validate_target_identity(expected, actual)
+        adapter(target, normalize_dynamic_field_value(value, expected)).map_err(FieldSetFailure::after_execution)
     }
 
     /// Compares exact target identities and attaches this field's identity to
@@ -723,6 +806,41 @@ impl FieldDescriptor {
                     TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()),
                 ),
             })
+        }
+    }
+
+    fn validate_visibility(
+        &self,
+        operation: FieldAccessOperation,
+        bypass_visibility: bool,
+    ) -> Result<(), FieldAccessError> {
+        if bypass_visibility || self.visibility == Visibility::Public {
+            Ok(())
+        } else {
+            Err(FieldAccessError::NotPublic {
+                field: self.identity(),
+                operation,
+            })
+        }
+    }
+
+    fn field_type_mismatch<V: 'static>(&self) -> FieldAccessError {
+        let (expected, expected_name) = self
+            .concrete_field_identity()
+            .expect("typed access requires a concrete field type");
+        let actual = TypeId::of::<V>();
+        self.field_type_mismatch_for(expected, actual, expected_name)
+    }
+
+    fn field_type_mismatch_for(
+        &self,
+        expected: TypeId,
+        actual: TypeId,
+        expected_name: &'static str,
+    ) -> FieldAccessError {
+        FieldAccessError::FieldTypeMismatch {
+            field: self.identity(),
+            mismatch: Box::new(TypeMismatch::new(expected, actual).with_expected_name(expected_name)),
         }
     }
 
@@ -764,8 +882,11 @@ impl FieldDescriptor {
     /// symbolic field type.
     fn concrete_field_identity(&self) -> Option<(TypeId, &'static str)> {
         match self.field_type() {
-            TypeRef::Resolved(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
-            TypeRef::Opaque(descriptor) => Some((descriptor.type_id(), descriptor.type_name())),
+            TypeRef::Resolved(descriptor) => Some((TypeDescriptor::type_id(descriptor), descriptor.type_name())),
+            TypeRef::Opaque(descriptor) => Some((
+                crate::descriptor::OpaqueTypeDescriptor::type_id(descriptor),
+                descriptor.type_name(),
+            )),
             TypeRef::Symbolic(_) => None,
         }
     }
@@ -828,8 +949,61 @@ impl FieldDescriptor {
     /// # Returns
     ///
     /// Returns a failure that owns the error and replacement recovery.
-    fn set_failure(&self, error: FieldAccessError, value: ReflectedOwned) -> FieldSetFailure {
+    fn set_failure<V>(&self, error: FieldAccessError, value: V) -> FieldSetFailure<V> {
         FieldSetFailure::before_execution(error, self.identity(), self.query_name, value)
+    }
+}
+
+fn field_value_type_id<V: 'static>(value: &V, expected: TypeId) -> TypeId {
+    let is_dynamic_box = TypeId::of::<V>() == TypeId::of::<Box<dyn Any>>();
+    let expected_is_box = expected == TypeId::of::<Box<dyn Any>>();
+    if is_dynamic_box && !expected_is_box {
+        let value = value as &dyn Any;
+        value
+            .downcast_ref::<Box<dyn Any>>()
+            .expect("the input type ID identifies Box<dyn Any>")
+            .as_ref()
+            .type_id()
+    } else {
+        TypeId::of::<V>()
+    }
+}
+
+fn dynamic_field_value_type_id(value: &DynamicOwned<Local>, expected: TypeId) -> TypeId {
+    let actual = value.value_type_id();
+    if actual == TypeId::of::<Box<dyn Any>>() && expected != TypeId::of::<Box<dyn Any>>() {
+        value
+            .downcast_ref::<Box<dyn Any>>()
+            .expect("the dynamic owned value has the boxed Any type")
+            .as_ref()
+            .type_id()
+    } else {
+        actual
+    }
+}
+
+fn normalize_dynamic_field_value(value: DynamicOwned<Local>, expected: TypeId) -> DynamicOwned<Local> {
+    if value.value_type_id() == TypeId::of::<Box<dyn Any>>() && expected != TypeId::of::<Box<dyn Any>>() {
+        let boxed = value
+            .downcast::<Box<dyn Any>>()
+            .unwrap_or_else(|_| unreachable!("the dynamic boxed Any type was checked"));
+        DynamicOwned::<Local>::from_box(boxed)
+    } else {
+        value
+    }
+}
+
+fn erase_field_value<V: 'static>(value: V, expected: TypeId) -> DynamicOwned<Local> {
+    let is_dynamic_box = TypeId::of::<V>() == TypeId::of::<Box<dyn Any>>();
+    let expected_is_box = expected == TypeId::of::<Box<dyn Any>>();
+    let erased: Box<dyn Any> = Box::new(value);
+    if is_dynamic_box && !expected_is_box {
+        let boxed = erased
+            .downcast::<Box<dyn Any>>()
+            .expect("the input type ID identifies Box<dyn Any>");
+        DynamicOwned::<Local>::from_box(*boxed)
+    } else {
+        DynamicOwned::<Local>::from_box(erased)
     }
 }
 

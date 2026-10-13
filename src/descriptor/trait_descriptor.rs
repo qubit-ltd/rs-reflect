@@ -49,14 +49,14 @@ pub(super) use self::trait_descriptor_builder::generic_argument_is_concrete;
 /// use qubit_reflect::TypeDescriptor;
 /// #[cfg(feature = "derive")]
 /// mod example {
-///     use qubit_reflect::{reflect, reflect_impl, Reflect};
-///     #[derive(Reflect)]
+///     use qubit_reflect::{Reflect, ReflectImpl};
+///     #[Reflect]
 ///     pub struct Service;
-///     #[reflect]
+///     #[Reflect]
 ///     pub trait Named {
 ///         fn name(&self) -> &'static str;
 ///     }
-///     #[reflect_impl]
+///     #[ReflectImpl]
 ///     impl Named for Service {
 ///         fn name(&self) -> &'static str { "service" }
 ///     }

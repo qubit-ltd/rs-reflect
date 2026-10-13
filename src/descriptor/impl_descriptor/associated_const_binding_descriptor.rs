@@ -8,11 +8,13 @@
 
 //! AssociatedConstBindingDescriptor metadata and behavior.
 
+use std::any::Any;
+
 use crate::descriptor::AssociatedConstDescriptor;
 use crate::descriptor::AssociatedConstImplementationSource;
 use crate::descriptor::AssociatedConstReadUnavailableReason;
 use crate::descriptor::AssociatedConstReader;
-use crate::value::ReflectedOwned;
+use crate::error::TypeMismatch;
 
 /// One associated constant binding contributed by a concrete impl.
 ///
@@ -111,7 +113,7 @@ impl AssociatedConstBindingDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns `true` when [`Self::read`] can return a value.
+    /// Returns `true` when the associated value has a reader.
     #[must_use]
     #[inline]
     pub const fn is_readable(&self) -> bool {
@@ -120,7 +122,7 @@ impl AssociatedConstBindingDescriptor {
 
     /// Returns the structured reason why no safe reader is available.
     ///
-    /// `None` means [`Self::read`] can produce a fresh owned value.
+    /// `None` means the associated value has a fresh-value reader.
     ///
     /// # Returns
     ///
@@ -132,16 +134,20 @@ impl AssociatedConstBindingDescriptor {
         self.read_unavailable_reason
     }
 
-    /// Reads the associated constant through its safe adapter.
-    ///
-    /// `None` means the declared type cannot cross the owned dynamic boundary.
+    /// Reads the associated constant and checks its exact type.
     ///
     /// # Returns
     ///
-    /// Returns a fresh owned reflected value, or `None` when no safe reader
-    /// exists.
+    /// Returns `None` when no reader exists, or a type mismatch error when
+    /// the value's concrete type differs from `T`.
     #[must_use]
-    pub fn read(&self) -> Option<ReflectedOwned> {
-        self.reader.map(AssociatedConstReader::read)
+    pub fn read<T: Any>(&self) -> Option<Result<T, TypeMismatch>> {
+        self.reader.map(AssociatedConstReader::read::<T>)
+    }
+
+    /// Reads the associated value as an erased ordinary Rust value.
+    #[must_use]
+    pub fn read_any(&self) -> Option<Box<dyn Any>> {
+        self.reader.map(AssociatedConstReader::read_any)
     }
 }

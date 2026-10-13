@@ -100,3 +100,25 @@ pub fn initialize_registry(
 ) -> Result<&'static ReflectRegistry, RegistryError> {
     crate::registry::initialize_registry(cache, fragments)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ReflectRegistry;
+    use super::RegistrationFragment;
+    use super::build_registry;
+    use super::initialize_registry;
+
+    #[test]
+    fn build_registry_accepts_an_empty_static_fragment_set() {
+        let fragments: &'static [&'static RegistrationFragment] = &[];
+        let registry = build_registry(fragments).expect("an empty fragment set is valid");
+
+        assert!(registry.types().is_empty());
+        assert!(registry.impl_definitions().is_empty());
+
+        static CACHE: std::sync::OnceLock<Result<ReflectRegistry, crate::error::RegistryError>> =
+            std::sync::OnceLock::new();
+        let cached = initialize_registry(&CACHE, fragments).expect("empty initialization is valid");
+        assert!(cached.types().is_empty());
+    }
+}

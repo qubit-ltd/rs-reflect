@@ -10,6 +10,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
+
 use super::pipeline::make_carrier;
 use crate::ir::MacroKind;
 

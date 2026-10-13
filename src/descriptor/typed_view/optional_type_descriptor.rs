@@ -6,6 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::any::Any;
 use std::any::TypeId;
 
 use super::OptionalProjectionError;
@@ -14,10 +15,16 @@ use crate::__private::TypeRefSource;
 use crate::descriptor::Reflect;
 use crate::descriptor::TypeRef;
 use crate::error::TypeMismatch;
-use crate::value::ReflectedRef;
+use crate::value::DynamicMut;
+use crate::value::DynamicRef;
+use crate::value::Local;
 
 /// Projects a borrowed optional value into its contained element, when present.
-pub(crate) type OptionalRefProjector = for<'a> fn(ReflectedRef<'a>) -> Result<Option<ReflectedRef<'a>>, TypeMismatch>;
+pub(crate) type OptionalRefProjector =
+    for<'a> fn(DynamicRef<'a, Local>) -> Result<Option<DynamicRef<'a, Local>>, TypeMismatch>;
+/// Projects a mutable optional borrow while preserving its exclusive lifetime.
+pub(crate) type OptionalMutProjector =
+    for<'a> fn(DynamicMut<'a, Local>) -> Result<Option<DynamicMut<'a, Local>>, TypeMismatch>;
 
 /// The typed view of an optional descriptor.
 ///
@@ -35,6 +42,8 @@ pub struct OptionalTypeDescriptor {
     /// Optional function that inspects a borrowed value of the represented
     /// type.
     projector: Option<OptionalRefProjector>,
+    /// Optional function that mutably projects a borrowed optional value.
+    mut_projector: Option<OptionalMutProjector>,
 }
 
 impl OptionalTypeDescriptor {
@@ -51,6 +60,7 @@ impl OptionalTypeDescriptor {
         Self {
             element: TypeRefSource::Eager(element),
             projector: None,
+            mut_projector: None,
         }
     }
 
@@ -65,10 +75,11 @@ impl OptionalTypeDescriptor {
     ///
     /// Returns an optional view that resolves its element type on first access
     /// and can project borrowed values.
-    pub(crate) const fn new_lazy(element: &'static LazyTypeRef, projector: OptionalRefProjector) -> Self {
+    pub(crate) const fn new_lazy<T: Reflect>(element: &'static LazyTypeRef, projector: OptionalRefProjector) -> Self {
         Self {
             element: TypeRefSource::Lazy(element),
             projector: Some(projector),
+            mut_projector: Some(project_option_mut::<T>),
         }
     }
 
@@ -99,11 +110,41 @@ impl OptionalTypeDescriptor {
     /// Returns [`OptionalProjectionError::Unavailable`] when no projector was
     /// registered, or [`OptionalProjectionError::TypeMismatch`] for a value
     /// whose concrete type differs from the optional type represented here.
-    pub fn project_ref<'a>(
+    pub fn project_ref<'a, T: Any>(&self, value: &'a Option<T>) -> Result<Option<&'a T>, OptionalProjectionError> {
+        let projected = self.projector.ok_or(OptionalProjectionError::Unavailable)?(DynamicRef::<Local>::new(value))
+            .map_err(OptionalProjectionError::TypeMismatch)?;
+        projected
+            .map(|element| {
+                let actual = element.value_type_id();
+                element
+                    .downcast::<T>()
+                    .map_err(|_| OptionalProjectionError::TypeMismatch(TypeMismatch::new(TypeId::of::<T>(), actual)))
+            })
+            .transpose()
+    }
+
+    /// Projects a checked dynamic shared borrow to its optional element.
+    ///
+    /// This operation checks only the exact optional type and whether it is
+    /// `Some`; it does not bypass member visibility or other access policies.
+    pub fn project_dynamic_ref<'a>(
         &self,
-        value: ReflectedRef<'a>,
-    ) -> Result<Option<ReflectedRef<'a>>, OptionalProjectionError> {
-        self.projector.ok_or(OptionalProjectionError::Unavailable)?(value).map_err(Into::into)
+        value: DynamicRef<'a, Local>,
+    ) -> Result<Option<DynamicRef<'a, Local>>, OptionalProjectionError> {
+        self.projector.ok_or(OptionalProjectionError::Unavailable)?(value)
+            .map_err(OptionalProjectionError::TypeMismatch)
+    }
+
+    /// Projects a checked dynamic exclusive borrow to its optional element.
+    ///
+    /// This operation checks only the exact optional type and whether it is
+    /// `Some`; it does not bypass member visibility or other access policies.
+    pub fn project_dynamic_mut<'a>(
+        &self,
+        value: DynamicMut<'a, Local>,
+    ) -> Result<Option<DynamicMut<'a, Local>>, OptionalProjectionError> {
+        self.mut_projector.ok_or(OptionalProjectionError::Unavailable)?(value)
+            .map_err(OptionalProjectionError::TypeMismatch)
     }
 
     /// Returns the optional element type.
@@ -138,11 +179,22 @@ impl OptionalTypeDescriptor {
 /// Returns a `TypeMismatch` with the expected `Option<T>` and actual value
 /// type IDs when the supplied borrow has another concrete type.
 pub(crate) fn project_option_ref<'a, T: Reflect>(
-    value: ReflectedRef<'a>,
-) -> Result<Option<ReflectedRef<'a>>, TypeMismatch> {
+    value: DynamicRef<'a, Local>,
+) -> Result<Option<DynamicRef<'a, Local>>, TypeMismatch> {
     let actual = value.value_type_id();
     let option = value
         .downcast::<Option<T>>()
         .map_err(|_| TypeMismatch::new(TypeId::of::<Option<T>>(), actual))?;
-    Ok(option.as_ref().map(ReflectedRef::new))
+    Ok(option.as_ref().map(DynamicRef::<Local>::new))
+}
+
+/// Projects a built-in `Option<T>` value through an exclusive borrow.
+pub(crate) fn project_option_mut<'a, T: Reflect>(
+    value: DynamicMut<'a, Local>,
+) -> Result<Option<DynamicMut<'a, Local>>, TypeMismatch> {
+    let actual = value.value_type_id();
+    let option = value
+        .downcast::<Option<T>>()
+        .map_err(|_| TypeMismatch::new(TypeId::of::<Option<T>>(), actual))?;
+    Ok(option.as_mut().map(DynamicMut::<Local>::new))
 }

@@ -14,15 +14,14 @@ use crate::descriptor::TypeDescriptor;
 use crate::descriptor::VariantDescriptor;
 use crate::descriptor::VariantKind;
 use crate::error::TypeMismatch;
-use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
 use crate::value::Local;
-use crate::value::ReflectedRef;
 
 fn declaring_type() -> &'static TypeDescriptor {
     TypeDescriptor::of::<u8>()
 }
 
-fn active_test(value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
+fn active_test(value: DynamicRef<'_, Local>) -> Result<bool, TypeMismatch> {
     Ok(value.downcast_ref::<u8>().is_some())
 }
 
@@ -43,9 +42,9 @@ fn test_variant_descriptor_exposes_source_facts_and_unavailable_construction() {
     assert!(variant.field_at(0).is_none());
     assert!(variant.construction().is_none());
 
-    let named = NamedConstructionInput::<Local>::new(std::iter::empty::<(&'static str, DynamicOwned<Local>)>());
-    let tuple = TupleConstructionInput::<Local>::new(std::iter::empty::<DynamicOwned<Local>>());
-    assert!(variant.construct_struct(named).is_err());
-    assert!(variant.construct_tuple(tuple).is_err());
-    assert!(variant.construct_unit().is_err());
+    let named = NamedConstructionInput::<Local>::new();
+    let tuple = TupleConstructionInput::<Local>::new();
+    assert!(variant.construct_struct::<u8>(named).is_err());
+    assert!(variant.construct_tuple::<u8>(tuple).is_err());
+    assert!(variant.construct_unit::<u8>().is_err());
 }

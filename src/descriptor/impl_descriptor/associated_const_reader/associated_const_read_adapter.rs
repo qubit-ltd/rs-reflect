@@ -8,7 +8,8 @@
 
 //! Private storage forms for generated associated constant readers.
 
-use crate::value::ReflectedOwned;
+use crate::value::DynamicOwned;
+use crate::value::Local;
 
 /// Adapter retained by one associated constant reader to produce owned values.
 ///
@@ -16,7 +17,7 @@ use crate::value::ReflectedOwned;
 /// for the process lifetime and produce a fresh value on each invocation.
 pub(super) enum AssociatedConstReadAdapter {
     /// Non-capturing generated function returning a fresh owned value.
-    Function(fn() -> ReflectedOwned),
+    Function(fn() -> DynamicOwned<Local>),
     /// Process-lifetime closure adapting a concrete value getter.
-    Closure(&'static (dyn Fn() -> ReflectedOwned + Send + Sync)),
+    Closure(&'static (dyn Fn() -> DynamicOwned<Local> + Send + Sync)),
 }

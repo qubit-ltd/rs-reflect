@@ -6,14 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Safe dynamic clone operations for concrete Rust types.
+//! Safe type-erased clone operations for concrete Rust types.
 
 use std::any::Any;
 use std::any::TypeId;
 
 use crate::error::TypeMismatch;
-use crate::value::DynamicOwned;
-use crate::value::Local;
+
+type CloneOperation = fn(&dyn Any) -> Result<Box<dyn Any>, TypeMismatch>;
 
 /// A safe dynamic clone operation for one exact concrete Rust type.
 ///
@@ -21,18 +21,16 @@ use crate::value::Local;
 ///
 /// ```
 /// use qubit_reflect::capability::CloneAdapter;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 ///
 /// let adapter = CloneAdapter::new::<String>();
-/// let value = DynamicOwned::<Local>::new(String::from("value"));
-/// let cloned = adapter.clone_owned(&value).expect("matching type");
+/// let value = String::from("value");
+/// let cloned = adapter.clone_value(&value).expect("matching type");
 /// assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("value"));
 /// ```
 #[derive(Clone, Copy)]
 pub struct CloneAdapter {
     /// Stores the monomorphized clone operation for the registered type.
-    clone_owned: fn(&DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch>,
+    clone_value: CloneOperation,
 }
 
 impl CloneAdapter {
@@ -49,22 +47,22 @@ impl CloneAdapter {
     #[inline]
     pub fn new<T: Clone + 'static>() -> Self {
         Self {
-            clone_owned: clone_owned::<T>,
+            clone_value: clone_value::<T>,
         }
     }
 
-    /// Clones a local dynamic value when it contains the registered exact type.
+    /// Clones an ordinary value when it has the registered exact type.
     ///
     /// Returns [`TypeMismatch`] without changing `value` when its concrete type
     /// differs from the type captured by this adapter.
     ///
     /// # Parameters
     ///
-    /// - `value`: The dynamic value to clone.
+    /// - `value`: The erased value to clone.
     ///
     /// # Returns
     ///
-    /// Returns an owned clone of the exact registered type.
+    /// Returns a boxed clone of the exact registered type.
     ///
     /// # Errors
     ///
@@ -73,15 +71,14 @@ impl CloneAdapter {
     ///
     /// # Panics
     ///
-    /// Panics if the captured `Clone` implementation panics or if local dynamic
-    /// storage violates its `Any` compatibility invariant.
+    /// Panics if the captured `Clone` implementation panics.
     #[inline]
-    pub fn clone_owned(&self, value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
-        (self.clone_owned)(value)
+    pub fn clone_value(&self, value: &dyn Any) -> Result<Box<dyn Any>, TypeMismatch> {
+        (self.clone_value)(value)
     }
 }
 
-/// Clones one exact dynamic concrete type after checking its runtime identity.
+/// Clones one exact concrete type after checking its runtime identity.
 ///
 /// # Type Parameters
 ///
@@ -89,11 +86,11 @@ impl CloneAdapter {
 ///
 /// # Parameters
 ///
-/// - `value`: The dynamic value to clone.
+/// - `value`: The erased value to clone.
 ///
 /// # Returns
 ///
-/// Returns an owned clone of the value.
+/// Returns a boxed clone of the value.
 ///
 /// # Errors
 ///
@@ -101,15 +98,10 @@ impl CloneAdapter {
 ///
 /// # Panics
 ///
-/// Panics only if a local dynamic value violates its invariant that storage is
-/// compatible with `Any`.
-fn clone_owned<T: Clone + 'static>(value: &DynamicOwned<Local>) -> Result<DynamicOwned<Local>, TypeMismatch> {
+/// Panics only if the captured `Clone` implementation panics.
+fn clone_value<T: Clone + 'static>(value: &dyn Any) -> Result<Box<dyn Any>, TypeMismatch> {
     let Some(value) = value.downcast_ref::<T>() else {
-        let actual = value
-            .as_any()
-            .map(Any::type_id)
-            .expect("DynamicOwned<Local> always contains Any-compatible storage");
-        return Err(TypeMismatch::new(TypeId::of::<T>(), actual));
+        return Err(TypeMismatch::new(TypeId::of::<T>(), value.type_id()));
     };
-    Ok(DynamicOwned::<Local>::new(value.clone()))
+    Ok(Box::new(value.clone()))
 }

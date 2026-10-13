@@ -33,6 +33,8 @@ pub mod invoke;
 pub mod macro_support;
 /// Distributed registration protocol required by generated code.
 pub mod registration;
+/// Registry types required by call-site method binding generation.
+pub mod registry;
 /// Dynamic-value types required by generated code.
 pub mod value;
 

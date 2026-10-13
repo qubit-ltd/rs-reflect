@@ -31,13 +31,13 @@ use super::type_ref::type_name_of;
 /// use qubit_reflect::TypeDescriptor;
 /// use qubit_reflect::descriptor::TypeRef;
 ///
-/// #[derive(Reflect)]
-/// struct Record {
-///     #[reflect(opaque)]
-///     value: u8,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct Record { #[reflect(opaque)] pub value: u8 }
 /// }
 ///
-/// let field = TypeDescriptor::of::<Record>()
+/// let field = TypeDescriptor::of::<example::Record>()
 ///     .field("value")
 ///     .expect("the derived field exists");
 /// let TypeRef::Opaque(opaque) = field.field_type() else {

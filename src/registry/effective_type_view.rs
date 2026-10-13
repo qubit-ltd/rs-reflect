@@ -8,11 +8,15 @@
 
 //! Deterministic effective-method views over one registered reflected root.
 
+use crate::descriptor::ImplDefinitionDescriptor;
 use crate::descriptor::ImplDescriptor;
+use crate::descriptor::ImplKind;
 use crate::descriptor::MethodImplementationSource;
 use crate::descriptor::MethodInstanceDescriptor;
 use crate::descriptor::MethodLookup;
 use crate::descriptor::MethodQualifier;
+use crate::descriptor::TraitDefinitionDescriptor;
+use crate::registry::ResolvedMethodBinding;
 
 /// A frozen effective view of the implementations and methods targeting one
 /// concrete reflected type.
@@ -33,9 +37,15 @@ pub struct EffectiveTypeView {
     /// All contributing impl fragments in deterministic registry order.
     implementations: Box<[&'static ImplDescriptor]>,
     /// Implementations that own the effective method instances below.
-    method_implementations: Box<[&'static ImplDescriptor]>,
+    method_implementations: Box<[EffectiveMethodOwner]>,
     /// Frozen effective methods in deterministic lookup order.
-    methods: Box<[&'static MethodInstanceDescriptor]>,
+    methods: Box<[MethodInstanceDescriptor]>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum EffectiveMethodOwner {
+    Concrete(&'static ImplDescriptor),
+    Definition(&'static ImplDefinitionDescriptor),
 }
 
 impl EffectiveTypeView {
@@ -51,7 +61,7 @@ impl EffectiveTypeView {
     /// Merges already deterministically ordered implementation fragments.
     pub(crate) fn new(implementations: &[&'static ImplDescriptor]) -> Self {
         let mut method_implementations = Vec::new();
-        let mut methods: Vec<&'static MethodInstanceDescriptor> = Vec::new();
+        let mut methods: Vec<MethodInstanceDescriptor> = Vec::new();
         for implementation in implementations {
             for candidate in implementation.method_instances() {
                 let duplicate = methods.iter().enumerate().position(|(index, current)| {
@@ -59,13 +69,13 @@ impl EffectiveTypeView {
                 });
                 match duplicate {
                     Some(index) if candidate.implementation_source() == MethodImplementationSource::Overridden => {
-                        method_implementations[index] = *implementation;
-                        methods[index] = candidate;
+                        method_implementations[index] = EffectiveMethodOwner::Concrete(implementation);
+                        methods[index] = candidate.clone();
                     }
                     Some(_) => {}
                     None => {
-                        method_implementations.push(*implementation);
-                        methods.push(candidate);
+                        method_implementations.push(EffectiveMethodOwner::Concrete(implementation));
+                        methods.push(candidate.clone());
                     }
                 }
             }
@@ -75,6 +85,86 @@ impl EffectiveTypeView {
             method_implementations: method_implementations.into_boxed_slice(),
             methods: methods.into_boxed_slice(),
         }
+    }
+
+    /// Builds a view that also includes compile-time-bound generic methods.
+    pub(crate) fn with_method_bindings(
+        mut self,
+        target: std::any::TypeId,
+        bindings: &[ResolvedMethodBinding],
+        traits: &[(crate::descriptor::TraitId, &'static TraitDefinitionDescriptor)],
+    ) -> Self {
+        let mut method_implementations = self.method_implementations.into_vec();
+        let mut methods = self.methods.into_vec();
+        for binding in bindings.iter().filter(|binding| binding.target().type_id() == target) {
+            let implementation = binding.implementation();
+            let trait_definition = implementation.implemented_trait_id().and_then(|id| {
+                traits
+                    .iter()
+                    .find(|(candidate, _)| candidate == id)
+                    .map(|(_, value)| *value)
+            });
+            let declaration = if let Some(trait_definition) = trait_definition {
+                trait_definition
+                    .methods()
+                    .iter()
+                    .find(|method| method.identity() == binding.declaration_identity())
+            } else {
+                implementation
+                    .methods()
+                    .iter()
+                    .find(|method| method.identity() == binding.declaration_identity())
+            };
+            let Some(declaration) = declaration else { continue };
+            let effective_method = implementation
+                .methods()
+                .iter()
+                .find(|method| method.identity() == binding.effective_method_identity());
+            let (implementation_method, source) = if declaration.declaring_trait().is_some() {
+                match effective_method {
+                    Some(method) if method.identity() != declaration.identity() => {
+                        (Some(method), MethodImplementationSource::Overridden)
+                    }
+                    _ => (None, MethodImplementationSource::Defaulted),
+                }
+            } else {
+                (None, MethodImplementationSource::Declared)
+            };
+            let Ok(instance) = MethodInstanceDescriptor::with_arguments(
+                declaration,
+                implementation_method,
+                source,
+                Some(binding.adapter()),
+                binding.method_arguments().to_vec().into_boxed_slice(),
+                Box::new([]),
+            ) else {
+                continue;
+            };
+            let owner = EffectiveMethodOwner::Definition(implementation);
+            let duplicate = methods.iter().enumerate().position(|(index, current)| {
+                current.declaration().rust_name() == instance.declaration().rust_name()
+                    && current.declaration().query_name() == instance.declaration().query_name()
+                    && current.arguments() == instance.arguments()
+                    && match method_implementations[index] {
+                        EffectiveMethodOwner::Definition(existing) => {
+                            existing.fragment_identity() == implementation.fragment_identity()
+                        }
+                        EffectiveMethodOwner::Concrete(existing) => {
+                            existing.definition().fragment_identity() == implementation.fragment_identity()
+                        }
+                    }
+            });
+            if let Some(index) = duplicate {
+                method_implementations[index] = owner;
+                methods[index] = instance;
+            } else {
+                method_implementations.push(owner);
+                methods.push(instance);
+            }
+        }
+        self.method_implementations = method_implementations.into_boxed_slice();
+        self.methods = methods.into_boxed_slice();
+        self
     }
 
     /// Returns all contributing impl fragments in registry-stable order.
@@ -96,7 +186,7 @@ impl EffectiveTypeView {
     ///
     /// Returns the unique effective method instances in deterministic order.
     #[must_use]
-    pub const fn methods(&self) -> &[&'static MethodInstanceDescriptor] {
+    pub const fn methods(&self) -> &[MethodInstanceDescriptor] {
         &self.methods
     }
 
@@ -115,13 +205,23 @@ impl EffectiveTypeView {
     pub fn lookup_method<'a>(&'a self, qualifier: MethodQualifier<'_>, name: &str) -> MethodLookup<'a> {
         let mut found = None;
         for (implementation, instance) in self.method_implementations.iter().zip(&self.methods) {
-            if !implementation.matches_qualifier(qualifier) || instance.declaration().query_name() != name {
+            let matches = match (implementation, qualifier) {
+                (_, MethodQualifier::Any) => true,
+                (EffectiveMethodOwner::Concrete(owner), qualifier) => owner.matches_qualifier(qualifier),
+                (EffectiveMethodOwner::Definition(owner), MethodQualifier::Inherent) => {
+                    owner.kind() == ImplKind::Inherent
+                }
+                (EffectiveMethodOwner::Definition(owner), MethodQualifier::Trait(expected)) => {
+                    owner.implemented_trait_id() == Some(expected.definition().trait_id())
+                }
+            };
+            if !matches || instance.declaration().query_name() != name {
                 continue;
             }
             if found.is_some() {
                 return MethodLookup::Ambiguous;
             }
-            found = Some(*instance);
+            found = Some(instance);
         }
         found.map_or(MethodLookup::Missing, MethodLookup::Unique)
     }
@@ -136,19 +236,22 @@ pub(crate) fn build_benchmark_effective_type_view(implementations: &[&'static Im
 /// Returns whether two instances occupy the same complete effective
 /// application slot.
 fn same_method_application(
-    current_implementation: &ImplDescriptor,
+    current_implementation: EffectiveMethodOwner,
     current: &MethodInstanceDescriptor,
     candidate_implementation: &ImplDescriptor,
     candidate: &MethodInstanceDescriptor,
 ) -> bool {
     if current.declaration().identity() != candidate.declaration().identity()
         || current.arguments() != candidate.arguments()
-        || !current_implementation.same_application(candidate_implementation)
+        || !matches!(current_implementation, EffectiveMethodOwner::Concrete(owner) if owner.same_application(candidate_implementation))
     {
         return false;
     }
     match (
-        current_implementation.implemented_trait(),
+        match current_implementation {
+            EffectiveMethodOwner::Concrete(value) => value.implemented_trait(),
+            EffectiveMethodOwner::Definition(_) => None,
+        },
         candidate_implementation.implemented_trait(),
     ) {
         (None, None) => true,

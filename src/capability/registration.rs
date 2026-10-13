@@ -296,10 +296,13 @@ macro_rules! register_definition_capabilities {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::register_reflected_type;
 ///
-/// #[derive(Reflect)]
-/// struct Example;
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct Example;
+/// }
 ///
-/// register_reflected_type!(Example);
+/// register_reflected_type!(example::Example);
 /// }
 /// #[cfg(not(feature = "derive"))]
 /// fn main() {}

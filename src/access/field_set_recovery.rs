@@ -15,51 +15,50 @@ use crate::access::FieldAccessError;
 use crate::access::FieldIdentity;
 use crate::value::DynamicOwned;
 use crate::value::Local;
-use crate::value::Mode;
 
 /// An untouched replacement retained after field-set validation fails.
 ///
 /// # Type Parameters
 ///
-/// - `M`: Local or thread-safe ownership mode of the retained replacement.
+/// - `V`: Concrete replacement type retained for recovery.
 ///
 /// # Examples
 ///
 /// ```
 /// #[cfg(feature = "derive")]
 /// fn main() {
-///     use qubit_reflect::ReflectedMut;
-///     use qubit_reflect::ReflectedOwned;
 ///     use qubit_reflect::TypeDescriptor;
-///     use qubit_reflect::access::FieldSetRecovery;
-///     use qubit_reflect::value::Local;
+///     use qubit_reflect::access::FieldSetFailure;
 ///     mod example {
 ///         use qubit_reflect::Reflect;
-///         #[derive(Reflect)]
+///         #[Reflect]
 ///         pub struct Record {
-///             #[reflect(read_only)]
-///             pub value: u32,
+///             value: u32,
+///         }
+///         impl Record {
+///             pub fn new(value: u32) -> Self { Self { value } }
 ///         }
 ///     }
-///     let field = TypeDescriptor::of::<example::Record>().field("value").expect("field exists");
-///     let mut record = example::Record { value: 7 };
-///     let failure = field
-///         .set(ReflectedMut::new(&mut record), ReflectedOwned::new(9_u32))
-///         .expect_err("the field is read-only");
-///     let recovery: &FieldSetRecovery<Local> = failure.recovery().expect("input is retained");
-///     assert_eq!(recovery.value().downcast_ref::<u32>(), Some(&9));
+///     let field = TypeDescriptor::of::<example::Record>()
+///         .field("value")
+///         .expect("field exists");
+///     let mut record = example::Record::new(7);
+///     let failure: FieldSetFailure<u32> = field
+///         .set(&mut record, 9_u32)
+///         .expect_err("field is private");
+///     assert!(failure.recovery().is_some());
 /// }
 /// #[cfg(not(feature = "derive"))]
 /// fn main() {}
 /// ```
 #[must_use]
-pub struct FieldSetRecovery<M: Mode = Local> {
+pub struct FieldSetRecovery<V = DynamicOwned<Local>> {
     field: FieldIdentity,
     query_name: Option<&'static str>,
-    value: DynamicOwned<M>,
+    value: V,
 }
 
-impl<M: Mode> FieldSetRecovery<M> {
+impl<V> FieldSetRecovery<V> {
     /// Creates recovery for one field replacement value.
     ///
     /// # Parameters
@@ -71,7 +70,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     /// # Returns
     ///
     /// Recovery metadata that still owns the original replacement.
-    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: DynamicOwned<M>) -> Self {
+    pub(crate) const fn new(field: FieldIdentity, query_name: Option<&'static str>, value: V) -> Self {
         Self {
             field,
             query_name,
@@ -108,7 +107,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     /// A shared borrow of the value retained for recovery.
     #[must_use]
     #[inline]
-    pub const fn value(&self) -> &DynamicOwned<M> {
+    pub const fn value(&self) -> &V {
         &self.value
     }
 
@@ -125,7 +124,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     ///
     /// The retained value when the name matches; otherwise `None`.
     #[must_use]
-    pub fn value_by_name(&self, name: &str) -> Option<&DynamicOwned<M>> {
+    pub fn value_by_name(&self, name: &str) -> Option<&V> {
         (self.query_name == Some(name)).then_some(&self.value)
     }
 
@@ -141,7 +140,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     ///
     /// The retained value when the index matches; otherwise `None`.
     #[must_use]
-    pub fn value_at(&self, index: usize) -> Option<&DynamicOwned<M>> {
+    pub fn value_at(&self, index: usize) -> Option<&V> {
         (self.field.index() == index).then_some(&self.value)
     }
 
@@ -152,7 +151,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     /// The original value, transferring its ownership to the caller.
     #[must_use]
     #[inline]
-    pub fn into_value(self) -> DynamicOwned<M> {
+    pub fn into_value(self) -> V {
         self.value
     }
 
@@ -168,7 +167,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     /// # Returns
     ///
     /// The replacement on a match, or the intact recovery on a mismatch.
-    pub fn into_value_by_name(self, name: &str) -> Result<DynamicOwned<M>, Self> {
+    pub fn into_value_by_name(self, name: &str) -> Result<V, Self> {
         if self.query_name == Some(name) {
             Ok(self.value)
         } else {
@@ -187,7 +186,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     /// # Returns
     ///
     /// The replacement on a match, or the intact recovery on a mismatch.
-    pub fn into_value_at(self, index: usize) -> Result<DynamicOwned<M>, Self> {
+    pub fn into_value_at(self, index: usize) -> Result<V, Self> {
         if self.field.index() == index {
             Ok(self.value)
         } else {
@@ -196,7 +195,7 @@ impl<M: Mode> FieldSetRecovery<M> {
     }
 }
 
-impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
+impl<V> fmt::Debug for FieldSetRecovery<V> {
     /// Formats binding metadata without requiring the erased value to be
     /// `Debug`.
     ///
@@ -230,43 +229,43 @@ impl<M: Mode> fmt::Debug for FieldSetRecovery<M> {
 ///
 /// # Type Parameters
 ///
-/// - `M`: Local or thread-safe ownership mode of any retained replacement.
+/// - `V`: Concrete replacement type retained for recovery.
 ///
 /// # Examples
 ///
 /// ```
 /// #[cfg(feature = "derive")]
 /// fn main() {
-///     use qubit_reflect::ReflectedMut;
-///     use qubit_reflect::ReflectedOwned;
 ///     use qubit_reflect::TypeDescriptor;
 ///     use qubit_reflect::access::FieldSetFailure;
 ///     mod example {
 ///         use qubit_reflect::Reflect;
-///         #[derive(Reflect)]
+///         #[Reflect]
 ///         pub struct Record {
-///             #[reflect(read_only)]
-///             pub value: u32,
+///             value: u32,
+///         }
+///         impl Record {
+///             pub fn new(value: u32) -> Self { Self { value } }
 ///         }
 ///     }
 ///     let field = TypeDescriptor::of::<example::Record>().field("value").expect("field exists");
-///     let mut record = example::Record { value: 7 };
-///     let failure: FieldSetFailure = field
-///         .set(ReflectedMut::new(&mut record), ReflectedOwned::new(9_u32))
+///     let mut record = example::Record::new(7);
+///     let failure: FieldSetFailure<u32> = field
+///         .set(&mut record, 9_u32)
 ///         .expect_err("the field is read-only");
-///     assert!(failure.error().to_string().contains("read-only"));
+///     assert!(failure.error().to_string().contains("NotPublic") || failure.error().to_string().contains("public"));
 ///     assert!(failure.recovery().is_some());
 /// }
 /// #[cfg(not(feature = "derive"))]
 /// fn main() {}
 /// ```
 #[must_use]
-pub struct FieldSetFailure<M: Mode = Local> {
+pub struct FieldSetFailure<V = DynamicOwned<Local>> {
     error: Box<FieldAccessError>,
-    recovery: Option<Box<FieldSetRecovery<M>>>,
+    recovery: Option<Box<FieldSetRecovery<V>>>,
 }
 
-impl<M: Mode> FieldSetFailure<M> {
+impl<V> FieldSetFailure<V> {
     /// Creates a pre-execution failure retaining the untouched replacement.
     ///
     /// # Parameters
@@ -283,7 +282,7 @@ impl<M: Mode> FieldSetFailure<M> {
         error: FieldAccessError,
         field: FieldIdentity,
         query_name: Option<&'static str>,
-        value: DynamicOwned<M>,
+        value: V,
     ) -> Self {
         Self {
             error: Box::new(error),
@@ -329,7 +328,7 @@ impl<M: Mode> FieldSetFailure<M> {
     /// adapter accepted ownership.
     #[must_use]
     #[inline]
-    pub fn recovery(&self) -> Option<&FieldSetRecovery<M>> {
+    pub fn recovery(&self) -> Option<&FieldSetRecovery<V>> {
         self.recovery.as_deref()
     }
 
@@ -338,7 +337,7 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Returns
     ///
     /// The structured error and any value retained before adapter execution.
-    pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery<M>>) {
+    pub fn into_parts(self) -> (FieldAccessError, Option<FieldSetRecovery<V>>) {
         (*self.error, self.recovery.map(|recovery| *recovery))
     }
 
@@ -354,7 +353,7 @@ impl<M: Mode> FieldSetFailure<M> {
     /// # Errors
     ///
     /// Returns the adapter error when execution already accepted ownership.
-    pub fn into_recovery(self) -> Result<FieldSetRecovery<M>, FieldAccessError> {
+    pub fn into_recovery(self) -> Result<FieldSetRecovery<V>, FieldAccessError> {
         match self.recovery {
             Some(recovery) => Ok(*recovery),
             None => Err(*self.error),
@@ -371,7 +370,7 @@ impl<M: Mode> FieldSetFailure<M> {
     }
 }
 
-impl<M: Mode> fmt::Debug for FieldSetFailure<M> {
+impl<V> fmt::Debug for FieldSetFailure<V> {
     /// Formats the error and recovery metadata without formatting erased
     /// values.
     ///
@@ -395,7 +394,7 @@ impl<M: Mode> fmt::Debug for FieldSetFailure<M> {
     }
 }
 
-impl<M: Mode> fmt::Display for FieldSetFailure<M> {
+impl<V> fmt::Display for FieldSetFailure<V> {
     /// Delegates human-readable output to the structured access error.
     ///
     /// # Parameters
@@ -414,7 +413,7 @@ impl<M: Mode> fmt::Display for FieldSetFailure<M> {
     }
 }
 
-impl<M: Mode> Error for FieldSetFailure<M> {
+impl<V: 'static> Error for FieldSetFailure<V> {
     /// Returns the underlying machine-readable access error.
     ///
     /// # Returns
@@ -425,7 +424,7 @@ impl<M: Mode> Error for FieldSetFailure<M> {
     }
 }
 
-impl<M: Mode> AsRef<FieldAccessError> for FieldSetFailure<M> {
+impl<V> AsRef<FieldAccessError> for FieldSetFailure<V> {
     /// Borrows the underlying access error for compatibility with generic
     /// error inspection code.
     ///

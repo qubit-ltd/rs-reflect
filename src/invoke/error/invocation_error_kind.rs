@@ -23,6 +23,18 @@ use crate::invoke::InvocationInputMode;
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum InvocationErrorKind {
+    /// The method is not publicly callable through the safe reflection API.
+    #[error("method is not publicly accessible")]
+    VisibilityDenied,
+    /// No concrete adapter was registered for this method declaration.
+    #[error("method invocation is unavailable: {reasons:?}")]
+    MethodUnavailable {
+        /// Stable reasons that prevent this declaration from being invoked.
+        reasons: Box<[crate::descriptor::InvocationUnavailableReason]>,
+    },
+    /// An adapter exists, but has no entry for the requested invocation mode.
+    #[error("method invocation entry is unavailable: {0:?}")]
+    EntryUnavailable(crate::invoke::InvocationDispatchReason),
     /// Intrinsic explicit receiver capabilities contain conflicting facts.
     #[error("receiver capability resolution failed: {0}")]
     CapabilityResolution(#[source] crate::capability::CapabilityConflict),

@@ -8,12 +8,14 @@
 
 //! Caller-owned construction input and per-field policy declarations.
 
+use std::any::Any;
 use std::fmt;
 
 use crate::construct::ConstructionRecovery;
-use crate::construct::RecoveredConstructionValue;
+use crate::construct::recovery::RecoveredConstructionValue;
 use crate::descriptor::FieldDescriptor;
 use crate::value::DynamicOwned;
+use crate::value::Local;
 use crate::value::Mode;
 
 /// A mode-specific explicit provider for one omitted field value.
@@ -113,12 +115,13 @@ impl<M: Mode> fmt::Debug for ConstructionFieldPolicy<M> {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct User { pub name: String }
 /// }
 ///
-/// let descriptor = TypeDescriptor::of::<User>().field("name").expect("field exists");
+/// let descriptor = TypeDescriptor::of::<example::User>().field("name").expect("field exists");
 /// let policy = ConstructionField::<Local>::required(descriptor);
 /// assert_eq!(policy.descriptor().query_name(), Some("name"));
 /// }
@@ -304,12 +307,13 @@ pub enum UpdateFieldPolicy {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct User { pub name: String }
 /// }
 ///
-/// let field = TypeDescriptor::of::<User>().field("name").expect("field exists");
+/// let field = TypeDescriptor::of::<example::User>().field("name").expect("field exists");
 /// let update = UpdateField::allowed(field);
 /// assert_eq!(update.descriptor().query_name(), Some("name"));
 /// }
@@ -420,45 +424,15 @@ impl fmt::Debug for UpdateField {
 ///
 /// ```
 /// use qubit_reflect::construct::NamedConstructionInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
-///
-/// let input = NamedConstructionInput::<Local>::new([
-///     ("name", DynamicOwned::<Local>::new(String::from("Ada"))),
-/// ]);
-/// assert_eq!(input.fields()[0].0.as_ref(), "name");
+/// let input = NamedConstructionInput::new().field("name", String::from("Ada"));
+/// let _ = input;
 /// ```
-pub struct NamedConstructionInput<M: Mode> {
+pub struct NamedConstructionInput<M: Mode = Local> {
     /// Caller-supplied names and values, preserved in insertion order.
     fields: Vec<(Box<str>, DynamicOwned<M>)>,
 }
 
 impl<M: Mode> NamedConstructionInput<M> {
-    /// Collects named owned values in caller order without validating them.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `I`: The input iterator type.
-    /// - `N`: The field-name type converted into `Box<str>`.
-    ///
-    /// # Parameters
-    ///
-    /// - `fields`: The caller-ordered query names and owned values.
-    ///
-    /// # Returns
-    ///
-    /// Returns input ready for later shape, name, and type validation.
-    #[must_use]
-    pub fn new<I, N>(fields: I) -> Self
-    where
-        I: IntoIterator<Item = (N, DynamicOwned<M>)>,
-        N: Into<Box<str>>,
-    {
-        Self {
-            fields: fields.into_iter().map(|(name, value)| (name.into(), value)).collect(),
-        }
-    }
-
     /// Returns named values in their original caller order.
     ///
     /// # Returns
@@ -466,7 +440,7 @@ impl<M: Mode> NamedConstructionInput<M> {
     /// Returns each original query name and its untouched dynamic value.
     #[must_use]
     #[inline]
-    pub fn fields(&self) -> &[(Box<str>, DynamicOwned<M>)] {
+    pub(crate) fn fields(&self) -> &[(Box<str>, DynamicOwned<M>)] {
         &self.fields
     }
 
@@ -495,6 +469,35 @@ impl<M: Mode> NamedConstructionInput<M> {
             .map(|(name, value)| RecoveredConstructionValue::Named { name, value })
             .collect();
         ConstructionRecovery::new(error, values)
+    }
+}
+
+impl NamedConstructionInput<Local> {
+    /// Starts an empty named construction input.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { fields: Vec::new() }
+    }
+
+    /// Adds an owned field value while preserving caller order.
+    #[must_use]
+    pub fn field<T: Any>(mut self, name: impl Into<Box<str>>, value: T) -> Self {
+        self.fields.push((name.into(), DynamicOwned::<Local>::new(value)));
+        self
+    }
+
+    /// Adds a value supplied in an existing `Box<dyn Any>` without changing its
+    /// exact type.
+    #[must_use]
+    pub fn field_any(mut self, name: impl Into<Box<str>>, value: Box<dyn Any>) -> Self {
+        self.fields.push((name.into(), DynamicOwned::<Local>::from_box(value)));
+        self
+    }
+}
+
+impl Default for NamedConstructionInput<Local> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -530,44 +533,15 @@ impl<M: Mode> fmt::Debug for NamedConstructionInput<M> {
 ///
 /// ```
 /// use qubit_reflect::construct::TupleConstructionInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
-///
-/// let input = TupleConstructionInput::<Local>::new([
-///     DynamicOwned::<Local>::new(7_u32),
-///     DynamicOwned::<Local>::new(String::from("seven")),
-/// ]);
-/// assert_eq!(input.values().len(), 2);
+/// let input = TupleConstructionInput::new().value(7_u32).value(String::from("seven"));
+/// let _collected = input;
 /// ```
-pub struct TupleConstructionInput<M: Mode> {
+pub struct TupleConstructionInput<M: Mode = Local> {
     /// Caller-supplied values, preserved in positional order.
     values: Vec<DynamicOwned<M>>,
 }
 
 impl<M: Mode> TupleConstructionInput<M> {
-    /// Collects positional owned values without validating or extracting them.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `I`: The iterator yielding positional values.
-    ///
-    /// # Parameters
-    ///
-    /// - `values`: The source-ordered dynamic values.
-    ///
-    /// # Returns
-    ///
-    /// Returns input ready for later shape and type validation.
-    #[must_use]
-    pub fn new<I>(values: I) -> Self
-    where
-        I: IntoIterator<Item = DynamicOwned<M>>,
-    {
-        Self {
-            values: values.into_iter().collect(),
-        }
-    }
-
     /// Returns values in their original positional order.
     ///
     /// # Returns
@@ -575,7 +549,7 @@ impl<M: Mode> TupleConstructionInput<M> {
     /// Returns the untouched dynamic values in source order.
     #[must_use]
     #[inline]
-    pub fn values(&self) -> &[DynamicOwned<M>] {
+    pub(crate) fn values(&self) -> &[DynamicOwned<M>] {
         &self.values
     }
 
@@ -605,6 +579,35 @@ impl<M: Mode> TupleConstructionInput<M> {
             .map(|(index, value)| RecoveredConstructionValue::Positional { index, value })
             .collect();
         ConstructionRecovery::new(error, values)
+    }
+}
+
+impl TupleConstructionInput<Local> {
+    /// Starts an empty positional construction input.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { values: Vec::new() }
+    }
+
+    /// Appends an owned positional value.
+    #[must_use]
+    pub fn value<T: Any>(mut self, value: T) -> Self {
+        self.values.push(DynamicOwned::<Local>::new(value));
+        self
+    }
+
+    /// Appends a value supplied in an existing `Box<dyn Any>` without changing
+    /// its exact type.
+    #[must_use]
+    pub fn value_any(mut self, value: Box<dyn Any>) -> Self {
+        self.values.push(DynamicOwned::<Local>::from_box(value));
+        self
+    }
+}
+
+impl Default for TupleConstructionInput<Local> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -641,17 +644,12 @@ impl<M: Mode> fmt::Debug for TupleConstructionInput<M> {
 /// ```
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::construct::StructUpdateInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
-///
-/// let base = DynamicOwned::<Local>::new((1_u32, String::from("before")));
-/// let overrides = NamedConstructionInput::new([
-///     ("name", DynamicOwned::<Local>::new(String::from("after"))),
-/// ]);
+/// let base = (1_u32, String::from("before"));
+/// let overrides = NamedConstructionInput::new().field("name", String::from("after"));
 /// let input = StructUpdateInput::new(base, overrides);
-/// assert_eq!(input.overrides().fields().len(), 1);
+/// let _ = input;
 /// ```
-pub struct StructUpdateInput<M: Mode> {
+pub struct StructUpdateInput<M: Mode = Local> {
     /// Exact owned root value whose fields may be replaced.
     base: DynamicOwned<M>,
     /// Caller-supplied whole-field replacements in their original order.
@@ -659,23 +657,6 @@ pub struct StructUpdateInput<M: Mode> {
 }
 
 impl<M: Mode> StructUpdateInput<M> {
-    /// Collects an owned base and overrides without mutating or extracting
-    /// them.
-    ///
-    /// # Parameters
-    ///
-    /// - `base`: The exact owned struct value to update.
-    /// - `overrides`: Named whole-field replacements in caller order.
-    ///
-    /// # Returns
-    ///
-    /// Returns an unvalidated update request that retains both inputs.
-    #[must_use]
-    #[inline]
-    pub const fn new(base: DynamicOwned<M>, overrides: NamedConstructionInput<M>) -> Self {
-        Self { base, overrides }
-    }
-
     /// Returns the untouched owned base value.
     ///
     /// # Returns
@@ -683,7 +664,7 @@ impl<M: Mode> StructUpdateInput<M> {
     /// Returns a borrow of the owned update base.
     #[must_use]
     #[inline]
-    pub const fn base(&self) -> &DynamicOwned<M> {
+    pub(crate) const fn base(&self) -> &DynamicOwned<M> {
         &self.base
     }
 
@@ -694,7 +675,7 @@ impl<M: Mode> StructUpdateInput<M> {
     /// Returns the named overrides without validating or consuming them.
     #[must_use]
     #[inline]
-    pub const fn overrides(&self) -> &NamedConstructionInput<M> {
+    pub(crate) const fn overrides(&self) -> &NamedConstructionInput<M> {
         &self.overrides
     }
 
@@ -726,6 +707,26 @@ impl<M: Mode> StructUpdateInput<M> {
                 .map(|(name, value)| RecoveredConstructionValue::Named { name, value }),
         );
         ConstructionRecovery::new(error, values)
+    }
+}
+
+impl StructUpdateInput<Local> {
+    /// Starts an update with an owned base value and named overrides.
+    #[must_use]
+    pub fn new<T: Any>(base: T, overrides: NamedConstructionInput<Local>) -> Self {
+        Self {
+            base: DynamicOwned::<Local>::new(base),
+            overrides,
+        }
+    }
+
+    /// Starts an update with an existing erased base value and named overrides.
+    #[must_use]
+    pub fn from_any(base: Box<dyn Any>, overrides: NamedConstructionInput<Local>) -> Self {
+        Self {
+            base: DynamicOwned::<Local>::from_box(base),
+            overrides,
+        }
     }
 }
 

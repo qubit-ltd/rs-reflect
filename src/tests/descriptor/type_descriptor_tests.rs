@@ -28,7 +28,6 @@ use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeKind;
 use crate::descriptor::TypeRef;
 use crate::expression::FunctionAbi;
-use crate::value::ReflectedRef;
 
 /// Creates an eager resolved type relation with process lifetime for internal
 /// descriptor fixtures.
@@ -78,10 +77,7 @@ fn test_type_descriptor_eager_constructors_preserve_typed_views() {
     ));
     assert!(!optional.as_optional().expect("optional view").has_ref_projection());
     assert!(matches!(
-        optional
-            .as_optional()
-            .expect("optional view")
-            .project_ref(ReflectedRef::new(&Some(()))),
+        optional.as_optional().expect("optional view").project_ref(&Some(())),
         Err(OptionalProjectionError::Unavailable),
     ));
     assert_eq!(sequence.as_sequence().expect("sequence view").kind(), SequenceKind::Vec,);

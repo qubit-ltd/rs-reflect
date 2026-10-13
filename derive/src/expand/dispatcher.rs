@@ -183,8 +183,8 @@ mod tests {
         declaration.kind = TypeDeclarationKindIr::Union;
 
         let context = ExpansionContext::for_tests();
-        let error = dispatch_with_context(DeclarationIr::Type(declaration), &context)
-            .expect_err("union must be rejected");
+        let error =
+            dispatch_with_context(DeclarationIr::Type(declaration), &context).expect_err("union must be rejected");
         assert!(
             error.to_string().contains("cannot expand Reflect for union"),
             "union declarations should report the unsupported type",

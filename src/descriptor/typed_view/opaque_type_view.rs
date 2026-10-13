@@ -17,10 +17,8 @@
 /// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
-/// #[derive(Reflect)]
-/// #[reflect(opaque)]
-/// struct Hidden;
-/// let opaque = TypeDescriptor::of::<Hidden>().as_opaque().expect("opaque root");
+/// mod example { use qubit_reflect::Reflect; #[Reflect] #[reflect(opaque)] pub struct Hidden; }
+/// let opaque = TypeDescriptor::of::<example::Hidden>().as_opaque().expect("opaque root");
 /// assert_eq!(std::mem::size_of_val(opaque), 0);
 /// }
 /// #[cfg(not(feature = "derive"))]

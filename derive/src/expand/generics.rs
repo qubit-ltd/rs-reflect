@@ -128,7 +128,7 @@ pub(crate) fn concrete_descriptor(declaration: &TypeDeclarationIr, facade: &Toke
                 type_arguments.push(quote!(None));
                 const_argument_values.push(quote!(Some(
                     (|| #facade::__private::codegen_v3::descriptor::const_argument_owned::<#const_type_tokens>(#name))
-                        as fn() -> #facade::__private::codegen_v3::value::ReflectedOwned
+                        as fn() -> #facade::__private::codegen_v3::value::DynamicOwned<#facade::__private::codegen_v3::value::Local>
                 )));
             }
         }
@@ -488,6 +488,167 @@ pub(crate) fn reflected_field_types(declaration: &TypeDeclarationIr) -> Vec<&Typ
             })
     });
     fields
+}
+
+/// Returns source `cfg` attributes for one struct or enum-variant field.
+///
+/// The parser keeps source indices in the semantic IR while `cfg` attributes
+/// are compiler evaluated after procedural macro expansion. Reapplying these
+/// attributes to generated items keeps their presence in step with the Rust
+/// field.
+#[must_use]
+pub(crate) fn field_cfg_attributes(
+    declaration: &TypeDeclarationIr,
+    variant_index: Option<usize>,
+    field_index: usize,
+) -> Vec<syn::Attribute> {
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid type declaration");
+    let fields = match (&input.data, variant_index) {
+        (syn::Data::Struct(data), None) => &data.fields,
+        (syn::Data::Enum(data), Some(index)) => {
+            let Some(variant) = data.variants.iter().nth(index) else {
+                return Vec::new();
+            };
+            &variant.fields
+        }
+        _ => return Vec::new(),
+    };
+    fields
+        .iter()
+        .nth(field_index)
+        .map(|field| {
+            field
+                .attrs
+                .iter()
+                .filter(|attribute| attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr"))
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Returns source `cfg` attributes for one enum variant.
+#[must_use]
+pub(crate) fn variant_cfg_attributes(declaration: &TypeDeclarationIr, variant_index: usize) -> Vec<syn::Attribute> {
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid type declaration");
+    let syn::Data::Enum(data) = input.data else {
+        return Vec::new();
+    };
+    data.variants
+        .iter()
+        .nth(variant_index)
+        .map(|variant| {
+            variant
+                .attrs
+                .iter()
+                .filter(|attribute| attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr"))
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Reports whether a source field was omitted from reflection by `skip`.
+#[must_use]
+pub(crate) fn has_skipped_field(declaration: &TypeDeclarationIr, variant_index: Option<usize>) -> bool {
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid type declaration");
+    let fields = match (&input.data, variant_index) {
+        (syn::Data::Struct(data), None) => &data.fields,
+        (syn::Data::Enum(data), Some(index)) => {
+            let Some(variant) = data.variants.iter().nth(index) else {
+                return false;
+            };
+            &variant.fields
+        }
+        _ => return false,
+    };
+    fields.iter().any(|field| {
+        field.attrs.iter().any(|attribute| {
+            attribute.path().is_ident("reflect")
+                && attribute
+                    .parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+                    .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
+        })
+    })
+}
+
+/// Returns the source field count before reflection-only fields are removed.
+#[must_use]
+pub(crate) fn source_field_count(declaration: &TypeDeclarationIr, variant_index: Option<usize>) -> usize {
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid type declaration");
+    match (&input.data, variant_index) {
+        (syn::Data::Struct(data), None) => data.fields.iter().count(),
+        (syn::Data::Enum(data), Some(index)) => data
+            .variants
+            .iter()
+            .nth(index)
+            .map_or(0, |variant| variant.fields.iter().count()),
+        _ => 0,
+    }
+}
+
+/// Reports whether a source field has an explicit `#[reflect(skip)]` helper.
+#[must_use]
+pub(crate) fn source_field_is_skipped(
+    declaration: &TypeDeclarationIr,
+    variant_index: Option<usize>,
+    field_index: usize,
+) -> bool {
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid type declaration");
+    let fields = match (&input.data, variant_index) {
+        (syn::Data::Struct(data), None) => &data.fields,
+        (syn::Data::Enum(data), Some(index)) => {
+            let Some(variant) = data.variants.iter().nth(index) else {
+                return false;
+            };
+            &variant.fields
+        }
+        _ => return false,
+    };
+    fields.iter().nth(field_index).is_some_and(|field| {
+        field.attrs.iter().any(|attribute| {
+            attribute.path().is_ident("reflect")
+                && attribute
+                    .parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+                    .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
+        })
+    })
+}
+
+/// Reports whether a field is the standard `Box<dyn Any>` erased-value type.
+///
+/// Such a field retains its exact Rust type identity without requiring an
+/// impossible `Reflect` implementation for `dyn Any`.
+#[must_use]
+pub(crate) fn is_boxed_dyn_any(field_type: &TypeIr) -> bool {
+    let Ok(syn::Type::Path(path)) = syn::parse2::<syn::Type>(field_type.tokens.clone()) else {
+        return false;
+    };
+    let Some(segment) = path.path.segments.last() else {
+        return false;
+    };
+    if segment.ident != "Box" {
+        return false;
+    }
+    let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return false;
+    };
+    arguments.args.iter().any(|argument| {
+        let syn::GenericArgument::Type(syn::Type::TraitObject(object)) = argument else {
+            return false;
+        };
+        object.bounds.iter().any(|bound| match bound {
+            syn::TypeParamBound::Trait(bound) => {
+                bound.path.segments.last().is_some_and(|segment| segment.ident == "Any")
+            }
+            _ => false,
+        })
+    })
 }
 
 /// Returns one field's complete type when its descriptor is source-visible.

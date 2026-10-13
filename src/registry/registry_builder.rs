@@ -10,6 +10,7 @@
 
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::capability::CapabilityConflict;
@@ -26,10 +27,18 @@ use crate::descriptor::TypeDefinitionDescriptor;
 use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
+use crate::expression::ConcreteTypeExpression;
+use crate::expression::ConstExpression;
+use crate::expression::GenericArgument;
+use crate::expression::GenericParameterDescriptor;
+use crate::expression::TypeExpression;
 use crate::identity::CapabilityId;
 use crate::identity::ExternalTraitId;
 use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
+use crate::registry::MethodBinding;
+use crate::registry::MethodBindingIdentity;
+use crate::registry::ResolvedMethodBinding;
 use crate::registry::fragment::CapabilityRegistration;
 use crate::registry::fragment::CapabilityTarget;
 use crate::registry::fragment::FragmentPayload;
@@ -71,6 +80,8 @@ struct RegistryBuilder {
     capability_origins: HashMap<(CapabilityTarget, CapabilityId), CapabilityOrigin>,
     /// Candidate intrinsic capabilities awaiting conflict validation.
     intrinsic_candidates: HashMap<TypeId, (&'static TypeDescriptor, FragmentIdentity)>,
+    /// Explicit call-site method adapters awaiting exact declaration linking.
+    method_bindings: Vec<(MethodBinding, FragmentIdentity)>,
 }
 
 impl RegistryBuilder {
@@ -102,6 +113,9 @@ impl RegistryBuilder {
                 self.impl_definitions.push(descriptor);
             }
             FragmentPayload::Impl(descriptor) => self.push_impl(descriptor, &built.identity)?,
+            FragmentPayload::MethodBinding(binding) => {
+                self.method_bindings.push((*binding, built.identity));
+            }
             FragmentPayload::Capability(registration) => {
                 self.push_capability_registration(&registration, &built.identity)?;
             }
@@ -410,6 +424,16 @@ impl RegistryBuilder {
         }
 
         let target_type_id = descriptor.target_type().type_id();
+        if !self
+            .impl_definitions
+            .iter()
+            .any(|definition| definition.fragment_identity() == definition_identity)
+        {
+            descriptor
+                .definition()
+                .initialize_methods(|_| descriptor.methods().to_vec().into_boxed_slice());
+            self.impl_definitions.push(descriptor.definition());
+        }
         if let Some(implemented_trait) = descriptor.implemented_trait() {
             let key = (target_type_id, implemented_trait.trait_id().clone());
             if let Some(first) = self.trait_impls.get(&key) {
@@ -459,13 +483,128 @@ impl RegistryBuilder {
         Ok(())
     }
 
+    /// Resolves every call-site binding to exactly one concrete impl method.
+    ///
+    /// # Returns
+    ///
+    /// Returns bindings in registration-fragment order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured error for duplicate selectors, missing methods,
+    /// or selectors that match more than one reflected declaration.
+    fn resolve_method_bindings(&self) -> Result<Vec<ResolvedMethodBinding>, RegistryError> {
+        let mut seen: HashMap<MethodBindingIdentity, (&FragmentIdentity, &str)> = HashMap::new();
+        let mut resolved = Vec::with_capacity(self.method_bindings.len());
+        for (binding, source) in &self.method_bindings {
+            let identity = binding.identity();
+            if let Some((previous, _)) = seen.get(&identity) {
+                return Err(RegistryError::method_binding_conflict(
+                    (*previous).clone(),
+                    source.clone(),
+                    binding.rust_name(),
+                ));
+            }
+            seen.insert(identity, (source, binding.rust_name()));
+
+            let mut candidates = Vec::new();
+            let target = binding.target_descriptor();
+            let Some(actual_target) = binding
+                .target_application()
+                .cloned()
+                .or_else(|| concrete_type_expression(target))
+            else {
+                return Err(RegistryError::method_binding_not_found(
+                    source.clone(),
+                    binding.rust_name(),
+                ));
+            };
+            for definition in &self.impl_definitions {
+                let Some(mut substitutions) = unify_impl_target(definition, &actual_target) else {
+                    continue;
+                };
+                let trait_declaration = match binding.trait_selector() {
+                    None if definition.kind() == ImplKind::Inherent => None,
+                    Some(selector)
+                        if definition.kind() == ImplKind::Trait
+                            && definition.implemented_trait_id() == Some(selector.definition())
+                            && definition.implemented_trait_expression().is_some_and(|expression| {
+                                unify_type_expression(expression, selector.application(), &mut substitutions)
+                            }) =>
+                    {
+                        self.traits_by_id.get(selector.definition()).copied()
+                    }
+                    _ => continue,
+                };
+
+                let (declaration, effective_method) = if let Some(trait_declaration) = trait_declaration {
+                    let Some(declaration) = trait_declaration
+                        .methods()
+                        .iter()
+                        .find(|method| method.rust_name() == binding.rust_name())
+                    else {
+                        continue;
+                    };
+                    let effective_method = definition
+                        .methods()
+                        .iter()
+                        .find(|method| method.rust_name() == binding.rust_name())
+                        .unwrap_or(declaration);
+                    (declaration, effective_method)
+                } else {
+                    let Some(method) = definition
+                        .methods()
+                        .iter()
+                        .find(|method| method.rust_name() == binding.rust_name())
+                    else {
+                        continue;
+                    };
+                    (method, method)
+                };
+                if !method_generic_arity_matches(declaration, binding.method_arguments()) {
+                    continue;
+                }
+                let Some(impl_arguments) = concrete_impl_arguments(definition, &substitutions) else {
+                    continue;
+                };
+                candidates.push((definition, declaration, effective_method, impl_arguments));
+            }
+
+            match candidates.as_slice() {
+                [] => {
+                    return Err(RegistryError::method_binding_not_found(
+                        source.clone(),
+                        binding.rust_name(),
+                    ));
+                }
+                [(implementation, declaration, effective_method, impl_arguments)] => {
+                    resolved.push(ResolvedMethodBinding::new(
+                        binding.clone(),
+                        implementation,
+                        declaration,
+                        effective_method,
+                        impl_arguments.clone(),
+                    ))
+                }
+                _ => {
+                    return Err(RegistryError::method_binding_ambiguous(
+                        source.clone(),
+                        binding.rust_name(),
+                        candidates.len(),
+                    ));
+                }
+            }
+        }
+        Ok(resolved)
+    }
+
     /// Freezes deterministic slices and hash indexes after successful
     /// validation.
     ///
     /// # Returns
     ///
     /// Returns the immutable registry snapshot.
-    fn finish(mut self) -> ReflectRegistry {
+    fn finish(mut self, method_bindings: Vec<ResolvedMethodBinding>) -> ReflectRegistry {
         for implementations in self.impls_by_target.values_mut() {
             implementations.sort_by(|left, right| left.registry_cmp(right));
         }
@@ -506,9 +645,19 @@ impl RegistryBuilder {
             .into_iter()
             .map(|(type_id, implementations)| (type_id, implementations.into_boxed_slice()))
             .collect::<HashMap<_, _>>();
-        let effective_views_by_target = impls_by_target
-            .iter()
-            .map(|(type_id, implementations)| (*type_id, EffectiveTypeView::new(implementations)))
+        let mut effective_targets: HashSet<_> = impls_by_target.keys().copied().collect();
+        effective_targets.extend(method_bindings.iter().map(|binding| binding.target().type_id()));
+        let effective_views_by_target = effective_targets
+            .into_iter()
+            .map(|type_id| {
+                let implementations = impls_by_target.get(&type_id).map_or(&[][..], Box::as_ref);
+                let view = EffectiveTypeView::new(implementations).with_method_bindings(
+                    type_id,
+                    &method_bindings,
+                    &trait_definitions,
+                );
+                (type_id, view)
+            })
             .collect();
         let mut type_capability_descriptors: HashMap<TypeId, Vec<CapabilityDescriptor>> = HashMap::new();
         let mut definition_capability_descriptors: HashMap<TypeDefinitionId, Vec<CapabilityDescriptor>> =
@@ -567,11 +716,170 @@ impl RegistryBuilder {
             types: self.types.into_boxed_slice(),
             definitions: self.definitions.into_boxed_slice(),
             impl_definitions: self.impl_definitions.into_boxed_slice(),
+            method_bindings: method_bindings.into_boxed_slice(),
             indexes,
             empty_effective_view: EffectiveTypeView::empty(),
             empty_capabilities: TypeCapabilities::default(),
         }
     }
+}
+
+/// Checks the supplied concrete method generic arguments against the
+/// declaration's non-lifetime generic parameter count.
+fn method_generic_arity_matches(
+    method: &crate::descriptor::MethodDescriptor,
+    arguments: &[crate::expression::GenericArgument],
+) -> bool {
+    let expected = method
+        .generic_definition()
+        .parameters()
+        .iter()
+        .filter(|parameter| !matches!(parameter, GenericParameterDescriptor::Lifetime { .. }))
+        .collect::<Vec<_>>();
+    expected.len() == arguments.len()
+        && expected.iter().zip(arguments).all(|(parameter, argument)| {
+            matches!(
+                (parameter, argument),
+                (GenericParameterDescriptor::Type { .. }, GenericArgument::Type(_))
+                    | (GenericParameterDescriptor::Const { .. }, GenericArgument::Const(_))
+            )
+        })
+}
+
+/// Builds the concrete target expression retained by a reflected root.
+fn concrete_type_expression(target: &TypeDescriptor) -> Option<TypeExpression> {
+    let (path, arguments): (&str, Box<[GenericArgument]>) = if let Some(definition) = target.type_definition() {
+        let arguments: Box<[GenericArgument]> = target
+            .concrete_generic()
+            .map_or_else(Box::default, |generic| generic.arguments().to_vec().into_boxed_slice());
+        (definition.rust_path(), arguments)
+    } else {
+        let type_name = target.type_name();
+        let path = type_name.split('<').next().unwrap_or(type_name);
+        (path, Box::default())
+    };
+    let path = path.trim_start_matches("::").split("::").collect::<Vec<_>>();
+    let concrete = ConcreteTypeExpression::new(path, arguments).ok()?;
+    Some(TypeExpression::Concrete(concrete))
+}
+
+/// Unifies one impl target expression with a concrete reflected target.
+fn unify_impl_target(
+    definition: &ImplDefinitionDescriptor,
+    actual: &TypeExpression,
+) -> Option<HashMap<Box<str>, GenericArgument>> {
+    let mut substitutions = HashMap::new();
+    unify_type_expression(definition.target_type(), actual, &mut substitutions).then_some(substitutions)
+}
+
+/// Unifies structural type expressions while recording impl type and const
+/// parameters from the target and trait application.
+fn unify_type_expression(
+    pattern: &TypeExpression,
+    actual: &TypeExpression,
+    substitutions: &mut HashMap<Box<str>, GenericArgument>,
+) -> bool {
+    match (pattern, actual) {
+        (TypeExpression::Parameter(name), actual) => {
+            bind_substitution(name.as_str(), GenericArgument::Type(actual.clone()), substitutions)
+        }
+        (TypeExpression::Concrete(pattern), TypeExpression::Concrete(actual)) => {
+            path_matches(pattern.path(), actual.path())
+                && unify_generic_arguments(pattern.arguments(), actual.arguments(), substitutions)
+        }
+        _ => pattern == actual,
+    }
+}
+
+fn unify_generic_arguments(
+    pattern: &[GenericArgument],
+    actual: &[GenericArgument],
+    substitutions: &mut HashMap<Box<str>, GenericArgument>,
+) -> bool {
+    let pattern = pattern
+        .iter()
+        .filter(|argument| !matches!(argument, GenericArgument::Lifetime(_)))
+        .collect::<Vec<_>>();
+    let actual = actual
+        .iter()
+        .filter(|argument| !matches!(argument, GenericArgument::Lifetime(_)))
+        .collect::<Vec<_>>();
+    pattern.len() == actual.len()
+        && pattern
+            .iter()
+            .zip(actual)
+            .all(|(pattern, actual)| unify_generic_argument(pattern, actual, substitutions))
+}
+
+fn unify_generic_argument(
+    pattern: &GenericArgument,
+    actual: &GenericArgument,
+    substitutions: &mut HashMap<Box<str>, GenericArgument>,
+) -> bool {
+    match (pattern, actual) {
+        (GenericArgument::Type(pattern), GenericArgument::Type(actual)) => {
+            unify_type_expression(pattern, actual, substitutions)
+        }
+        (GenericArgument::Const(pattern), GenericArgument::Const(actual)) => {
+            if let ConstExpression::Parameter(name) = pattern.value() {
+                bind_substitution(name.as_str(), GenericArgument::Const(actual.clone()), substitutions)
+            } else {
+                pattern == actual
+            }
+        }
+        _ => pattern == actual,
+    }
+}
+
+fn bind_substitution(
+    name: &str,
+    value: GenericArgument,
+    substitutions: &mut HashMap<Box<str>, GenericArgument>,
+) -> bool {
+    match substitutions.get(name) {
+        Some(existing) => existing == &value,
+        None => {
+            substitutions.insert(name.into(), value);
+            true
+        }
+    }
+}
+
+/// Accepts an exact path or one source spelling with a leading crate alias.
+fn path_matches(pattern: &[Box<str>], actual: &[Box<str>]) -> bool {
+    let pattern = without_crate_prefix(pattern);
+    let actual = without_crate_prefix(actual);
+    if pattern == actual {
+        return true;
+    }
+    (pattern.len() == actual.len() + 1 && pattern[1..] == *actual)
+        || (actual.len() == pattern.len() + 1 && actual[1..] == *pattern)
+}
+
+fn without_crate_prefix(path: &[Box<str>]) -> &[Box<str>] {
+    if path.first().is_some_and(|part| part.as_ref() == "crate") {
+        &path[1..]
+    } else {
+        path
+    }
+}
+
+fn concrete_impl_arguments(
+    definition: &ImplDefinitionDescriptor,
+    substitutions: &HashMap<Box<str>, GenericArgument>,
+) -> Option<Box<[GenericArgument]>> {
+    definition
+        .generic_definition()
+        .parameters()
+        .iter()
+        .filter_map(|parameter| match parameter {
+            GenericParameterDescriptor::Lifetime { .. } => None,
+            GenericParameterDescriptor::Type { name, .. } | GenericParameterDescriptor::Const { name, .. } => {
+                Some(substitutions.get(name.as_str()).cloned())
+            }
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(Vec::into_boxed_slice)
 }
 
 /// Groups generic declarations by one static name in fragment order.
@@ -746,7 +1054,8 @@ pub(crate) fn validate_and_freeze_materialized(
     }
     builder.resolve_intrinsic_capabilities()?;
     builder.resolve_impl_definition_traits()?;
-    Ok(builder.finish())
+    let method_bindings = builder.resolve_method_bindings()?;
+    Ok(builder.finish(method_bindings))
 }
 
 /// Detects exact duplicates and content changes before any payload is built.

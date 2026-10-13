@@ -8,6 +8,8 @@
 
 //! Invocation collection and all-input validation.
 
+use std::pin::Pin;
+
 use super::binding_recovery::BindingRecovery;
 use super::binding_validation::mode_matches;
 use super::binding_validation::receiver_mode_matches;
@@ -28,6 +30,7 @@ use crate::invoke::ReceiverExpectation;
 use crate::value::DynamicMut;
 use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
+use crate::value::Local;
 
 /// An explicit receiver and caller-ordered arguments sharing one call lifetime.
 ///
@@ -658,6 +661,89 @@ impl<'call, M: InvocationMode> Invocation<'call, M> {
             error: InvocationError::new(method_identity.clone(), kind),
             recovery: InvocationRecovery::new(receiver, arguments, argument_names),
         }
+    }
+}
+
+impl<'call> Invocation<'call, Local> {
+    /// Creates an invocation for an associated function.
+    #[must_use]
+    pub fn associated_function() -> Self {
+        Self::associated([])
+    }
+
+    /// Creates an invocation with an owned receiver.
+    #[must_use]
+    pub fn receiver_owned<T: 'static>(receiver: T) -> Self {
+        Self::new(
+            Some(InvocationReceiver::Owned(DynamicOwned::<Local>::new(receiver))),
+            [],
+        )
+    }
+
+    /// Creates an invocation with a shared receiver.
+    #[must_use]
+    pub fn receiver_ref<T: 'static>(receiver: &'call T) -> Self {
+        Self::new(Some(InvocationReceiver::Ref(DynamicRef::<Local>::new(receiver))), [])
+    }
+
+    /// Creates an invocation with an exclusive receiver borrow.
+    #[must_use]
+    pub fn receiver_mut<T: 'static>(receiver: &'call mut T) -> Self {
+        Self::new(Some(InvocationReceiver::Mut(DynamicMut::<Local>::new(receiver))), [])
+    }
+
+    /// Creates a pinned shared receiver invocation without erasing its pin.
+    #[must_use]
+    pub fn receiver_pin_ref<T: ?Sized>(receiver: Pin<&'call T>) -> crate::invoke::PinnedRefInvocation<'call, T, Local> {
+        crate::invoke::PinnedRefInvocation::new(receiver, [])
+    }
+
+    /// Creates a pinned mutable receiver invocation without erasing its pin.
+    #[must_use]
+    pub fn receiver_pin_mut<T: ?Sized>(
+        receiver: Pin<&'call mut T>,
+    ) -> crate::invoke::PinnedMutInvocation<'call, T, Local> {
+        crate::invoke::PinnedMutInvocation::new(receiver, [])
+    }
+
+    /// Appends an owned argument in caller order.
+    #[must_use]
+    pub fn arg<T: 'static>(mut self, argument: T) -> Self {
+        self.push_argument(InvocationArg::Owned(DynamicOwned::<Local>::new(argument)), None);
+        self
+    }
+
+    /// Appends a shared borrowed argument in caller order.
+    #[must_use]
+    pub fn arg_ref<T: 'static>(mut self, argument: &'call T) -> Self {
+        self.push_argument(InvocationArg::Ref(DynamicRef::<Local>::new(argument)), None);
+        self
+    }
+
+    /// Appends an exclusively borrowed argument in caller order.
+    #[must_use]
+    pub fn arg_mut<T: 'static>(mut self, argument: &'call mut T) -> Self {
+        self.push_argument(InvocationArg::Mut(DynamicMut::<Local>::new(argument)), None);
+        self
+    }
+
+    /// Appends an owned argument bound to a parameter name.
+    #[must_use]
+    pub fn named_arg<N: Into<Box<str>>, T: 'static>(mut self, name: N, argument: T) -> Self {
+        self.push_argument(
+            InvocationArg::Owned(DynamicOwned::<Local>::new(argument)),
+            Some(name.into()),
+        );
+        self
+    }
+
+    pub(in crate::invoke) fn push_argument(&mut self, argument: InvocationArg<'call, Local>, name: Option<Box<str>>) {
+        let mut arguments = std::mem::take(&mut self.arguments).into_vec();
+        let mut names = std::mem::take(&mut self.argument_names).into_vec();
+        arguments.push(argument);
+        names.push(name);
+        self.arguments = arguments.into_boxed_slice();
+        self.argument_names = names.into_boxed_slice();
     }
 }
 

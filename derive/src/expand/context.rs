@@ -29,18 +29,22 @@ pub(crate) struct ExpansionContext {
 impl ExpansionContext {
     #[cfg(test)]
     pub(crate) fn for_tests() -> Self {
-        Self { facade: quote!(::qubit_reflect) }
+        Self {
+            facade: quote!(::qubit_reflect),
+        }
     }
 
     /// Resolves the runtime crate from the current Cargo package.
     ///
     /// # Parameters
     ///
-    /// - `_attributes`: Validated helper attributes attached to the declaration.
+    /// - `_attributes`: Validated helper attributes attached to the
+    ///   declaration.
     ///
     /// # Returns
     ///
-    /// Returns the expansion context, or a diagnostic when the runtime crate cannot be resolved.
+    /// Returns the expansion context, or a diagnostic when the runtime crate
+    /// cannot be resolved.
     ///
     /// # Errors
     ///
@@ -127,11 +131,13 @@ pub(crate) fn fingerprint(source: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use proc_macro_crate::FoundCrate;
+
     use super::ExpansionContext;
 
     #[test]
     fn test_package_example_uses_library_path() {
-        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Itself)).expect("package runtime must resolve");
+        let context =
+            ExpansionContext::from_found_crate(Some(FoundCrate::Itself)).expect("package runtime must resolve");
         assert_eq!(context.facade().to_string(), ":: qubit_reflect");
     }
 

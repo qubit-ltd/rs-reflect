@@ -36,10 +36,10 @@ use crate::expression::GenericArgument;
 /// use qubit_reflect::TypeDescriptor;
 /// #[cfg(feature = "derive")]
 /// mod example {
-///     use qubit_reflect::{Reflect, reflect_impl};
-///     #[derive(Reflect)]
+///     use qubit_reflect::{Reflect, ReflectImpl};
+///     #[Reflect]
 ///     pub struct Service;
-///     #[reflect_impl]
+///     #[ReflectImpl]
 ///     impl Service {
 ///         fn ping(&self) {}
 ///     }

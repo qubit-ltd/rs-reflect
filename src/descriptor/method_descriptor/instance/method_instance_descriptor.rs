@@ -13,7 +13,9 @@ use super::method_instance_build_error::MethodInstanceBuildError;
 use crate::descriptor::method_descriptor::InvocationAdapter;
 use crate::descriptor::method_descriptor::InvocationUnavailableReason;
 use crate::descriptor::method_descriptor::MethodDescriptor;
+use crate::descriptor::method_descriptor::MethodVisibility;
 use crate::expression::GenericArgument;
+use crate::identity::Visibility;
 use crate::invoke::InvocationDispatchMode;
 use crate::invoke::InvocationDispatchReason;
 use crate::invoke::InvocationUnavailable;
@@ -40,10 +42,10 @@ use crate::invoke::InvocationUnavailable;
 /// use qubit_reflect::registry::ReflectRegistry;
 /// #[cfg(feature = "derive")]
 /// mod example {
-///     use qubit_reflect::{Reflect, reflect_impl};
-///     #[derive(Reflect)]
+///     use qubit_reflect::{Reflect, ReflectImpl};
+///     #[Reflect]
 ///     pub struct Service;
-///     #[reflect_impl]
+///     #[ReflectImpl]
 ///     impl Service {
 ///         fn ping(&self) {}
 ///     }
@@ -78,7 +80,23 @@ pub struct MethodInstanceDescriptor {
     unavailable_reasons: Box<[InvocationUnavailableReason]>,
 }
 
+fn method_is_public(method: &MethodDescriptor) -> bool {
+    match method.visibility() {
+        MethodVisibility::Declared(Visibility::Public) => true,
+        MethodVisibility::Declared(_) => false,
+        MethodVisibility::InheritedFromTrait => method
+            .declaring_trait()
+            .is_some_and(|declaration| declaration.visibility() == &Visibility::Public),
+    }
+}
+
 impl MethodInstanceDescriptor {
+    fn is_publicly_callable(&self, method: &MethodDescriptor) -> bool {
+        match self.declaration.declaring_trait() {
+            Some(trait_declaration) => trait_declaration.visibility() == &Visibility::Public,
+            None => method_is_public(method),
+        }
+    }
     /// Creates a concrete method instance.
     ///
     /// `adapter` is present only when `unavailable_reasons` is empty and the
@@ -280,6 +298,204 @@ impl MethodInstanceDescriptor {
     #[inline]
     pub const fn unavailable_reasons(&self) -> &[InvocationUnavailableReason] {
         &self.unavailable_reasons
+    }
+
+    /// Invokes this method when its declaration is publicly accessible.
+    ///
+    /// All dispatch and validation failures are returned in one
+    /// [`crate::invoke::InvocationFailure`], which retains the receiver and
+    /// every argument that has not entered user code.
+    pub fn invoke<'call>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::InvocationFailure<'call, crate::value::Local>,
+    > {
+        self.invoke_with_visibility(registry, invocation, false)
+    }
+
+    /// Invokes this method without enforcing source visibility.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold every invariant normally enforced by Rust
+    /// visibility for this method, including access to private state and
+    /// respecting the containing type's invariants. Receiver, parameter,
+    /// borrowing, and pin checks are still performed by the adapter.
+    #[allow(unsafe_code)]
+    pub unsafe fn invoke_unsafe<'call>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::InvocationFailure<'call, crate::value::Local>,
+    > {
+        self.invoke_with_visibility(registry, invocation, true)
+    }
+
+    /// Invokes a method with a pinned shared receiver.
+    pub fn invoke_pinned_ref<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        self.invoke_pinned_ref_with_visibility(registry, invocation, false)
+    }
+
+    /// Invokes a pinned shared receiver without enforcing source visibility.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold every invariant normally enforced by Rust
+    /// visibility for this method. The typed pin and argument checks remain.
+    #[allow(unsafe_code)]
+    pub unsafe fn invoke_pinned_ref_unsafe<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        self.invoke_pinned_ref_with_visibility(registry, invocation, true)
+    }
+
+    fn invoke_pinned_ref_with_visibility<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedRefInvocation<'call, T, crate::value::Local>,
+        bypass_visibility: bool,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedRefInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        let method = self.effective_method();
+        if !bypass_visibility && !self.is_publicly_callable(method) {
+            return Err(invocation.reject(method.identity(), crate::invoke::InvocationErrorKind::VisibilityDenied));
+        }
+        if self.adapter.is_none() {
+            return Err(invocation.reject(
+                method.identity(),
+                crate::invoke::InvocationErrorKind::MethodUnavailable {
+                    reasons: self.unavailable_reasons.clone(),
+                },
+            ));
+        }
+        match self.invoke_pinned_ref_local(registry, invocation) {
+            Ok(Ok(output)) => Ok(output),
+            Ok(Err(failure)) => Err(failure),
+            Err(unavailable) => {
+                let (_, reason, invocation) = unavailable.into_parts();
+                Err(invocation.reject(
+                    method.identity(),
+                    crate::invoke::InvocationErrorKind::EntryUnavailable(reason),
+                ))
+            }
+        }
+    }
+
+    /// Invokes a method with a pinned mutable receiver.
+    pub fn invoke_pinned_mut<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        self.invoke_pinned_mut_with_visibility(registry, invocation, false)
+    }
+
+    /// Invokes a pinned mutable receiver without enforcing source visibility.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold every invariant normally enforced by Rust
+    /// visibility for this method. The typed pin and argument checks remain.
+    #[allow(unsafe_code)]
+    pub unsafe fn invoke_pinned_mut_unsafe<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        self.invoke_pinned_mut_with_visibility(registry, invocation, true)
+    }
+
+    fn invoke_pinned_mut_with_visibility<'call, T: 'static>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::PinnedMutInvocation<'call, T, crate::value::Local>,
+        bypass_visibility: bool,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::PinnedMutInvocationFailure<'call, T, crate::value::Local>,
+    > {
+        let method = self.effective_method();
+        if !bypass_visibility && !self.is_publicly_callable(method) {
+            return Err(invocation.reject(method.identity(), crate::invoke::InvocationErrorKind::VisibilityDenied));
+        }
+        if self.adapter.is_none() {
+            return Err(invocation.reject(
+                method.identity(),
+                crate::invoke::InvocationErrorKind::MethodUnavailable {
+                    reasons: self.unavailable_reasons.clone(),
+                },
+            ));
+        }
+        match self.invoke_pinned_mut_local(registry, invocation) {
+            Ok(Ok(output)) => Ok(output),
+            Ok(Err(failure)) => Err(failure),
+            Err(unavailable) => {
+                let (_, reason, invocation) = unavailable.into_parts();
+                Err(invocation.reject(
+                    method.identity(),
+                    crate::invoke::InvocationErrorKind::EntryUnavailable(reason),
+                ))
+            }
+        }
+    }
+
+    fn invoke_with_visibility<'call>(
+        &self,
+        registry: &crate::registry::ReflectRegistry,
+        invocation: crate::invoke::Invocation<'call, crate::value::Local>,
+        bypass_visibility: bool,
+    ) -> Result<
+        crate::invoke::InvocationOutput<'call, crate::value::Local>,
+        crate::invoke::InvocationFailure<'call, crate::value::Local>,
+    > {
+        let method = self.effective_method();
+        if !bypass_visibility && !self.is_publicly_callable(method) {
+            return Err(invocation.reject(method.identity(), crate::invoke::InvocationErrorKind::VisibilityDenied));
+        }
+        let Some(adapter) = self.adapter else {
+            return Err(invocation.reject(
+                method.identity(),
+                crate::invoke::InvocationErrorKind::MethodUnavailable {
+                    reasons: self.unavailable_reasons.clone(),
+                },
+            ));
+        };
+        let Some(entry_point) = adapter.local else {
+            return Err(invocation.reject(
+                method.identity(),
+                crate::invoke::InvocationErrorKind::EntryUnavailable(
+                    crate::invoke::InvocationDispatchReason::MissingEntry,
+                ),
+            ));
+        };
+        invocation
+            .bind_arguments(method.identity(), method.parameters())
+            .and_then(|invocation| entry_point(registry, invocation))
     }
 
     /// Binds and invokes this concrete method through its local adapter.

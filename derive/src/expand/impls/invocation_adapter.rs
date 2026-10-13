@@ -198,10 +198,10 @@ fn definition_for_call(
                 quote!(<#target>::#method_name #generic_call (receiver, #(#call_arguments),*))
             };
             let output = match method.return_type {
-                ReturnTypeIr::Unit => quote! {
+                ReturnTypeIr::Unit => quote! {{
                     #call;
                     #facade::__private::codegen_v3::invoke::InvocationOutput::Unit
-                },
+                }},
                 ReturnTypeIr::Type(TypeIr {
                     kind: TypeKindIr::Never,
                     ..

@@ -8,6 +8,7 @@
 
 //! Crate-internal descriptor construction tests.
 
+mod field_descriptor_tests;
 mod trait_descriptor_tests;
 mod type_descriptor_tests;
 mod variant_descriptor_tests;

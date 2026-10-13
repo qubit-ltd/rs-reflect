@@ -39,7 +39,7 @@ pub use input::TupleConstructionInput;
 pub use input::UpdateField;
 pub use input::UpdateFieldPolicy;
 pub use recovery::ConstructionRecovery;
-pub use recovery::RecoveredConstructionValue;
+pub use recovery::RecoveredAnyValue;
 pub use struct_construction_descriptor::StructConstructionDescriptor;
 pub use struct_constructor::StructConstructionAdapter;
 pub use struct_constructor::StructConstructor;

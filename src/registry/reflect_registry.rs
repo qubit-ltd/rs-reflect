@@ -30,6 +30,7 @@ use crate::expression::TypeExpression;
 use crate::identity::FragmentIdentity;
 use crate::registry::EffectiveTypeView;
 use crate::registry::ImplDefinitionCandidates;
+use crate::registry::ResolvedMethodBinding;
 use crate::registry::TraitCandidates;
 use crate::registry::TypeCandidates;
 use crate::registry::TypeDefinitionCandidates;
@@ -66,6 +67,8 @@ pub struct ReflectRegistry {
     pub(super) definitions: Box<[&'static TypeDefinitionDescriptor]>,
     /// Registered impl declarations in stable source-fragment order.
     pub(super) impl_definitions: Box<[&'static ImplDefinitionDescriptor]>,
+    /// Call-site adapters resolved to exact concrete method declarations.
+    pub(super) method_bindings: Box<[ResolvedMethodBinding]>,
     /// Immutable indexes built from the validated fragments.
     pub(super) indexes: RegistryIndexes,
     /// Stable empty effective-method view used for unregistered targets.
@@ -884,6 +887,36 @@ impl ReflectRegistry {
     #[inline]
     pub fn impl_definitions(&self) -> &[&'static ImplDefinitionDescriptor] {
         &self.impl_definitions
+    }
+
+    /// Returns call-site adapters resolved to concrete method declarations.
+    ///
+    /// These bindings contain only compile-time monomorphized adapters. An
+    /// unbound generic declaration remains queryable through its descriptor but
+    /// is not made callable by runtime specialization.
+    #[must_use]
+    #[inline]
+    pub fn method_bindings(&self) -> &[ResolvedMethodBinding] {
+        &self.method_bindings
+    }
+
+    /// Finds one compile-time method specialization by its exact reflected
+    /// target, impl declaration, method identity, and method generic arguments.
+    #[must_use]
+    pub fn method_binding(
+        &self,
+        target: TypeId,
+        impl_identity: &crate::identity::FragmentIdentity,
+        method_identity: &crate::identity::MemberId,
+        method_arguments: &[crate::expression::GenericArgument],
+    ) -> Option<&ResolvedMethodBinding> {
+        self.method_bindings.iter().find(|binding| {
+            binding.target().type_id() == target
+                && binding.impl_identity() == impl_identity
+                && (binding.declaration_identity() == method_identity
+                    || binding.effective_method_identity() == method_identity)
+                && binding.method_arguments() == method_arguments
+        })
     }
 
     /// Finds impl declarations whose symbolic target exactly equals `target`.

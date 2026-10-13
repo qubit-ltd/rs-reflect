@@ -16,6 +16,7 @@ use crate::descriptor::TypeDefinitionDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::error::RegistryError;
 use crate::identity::FragmentIdentity;
+use crate::registry::MethodBinding;
 use crate::registry::fragment::CapabilityRegistration;
 use crate::registry::fragment::FragmentPayload;
 use crate::registry::internal::MaterializedFragment;
@@ -65,6 +66,26 @@ impl RegistrySnapshotBuilder {
     #[must_use]
     pub const fn new() -> Self {
         Self { fragments: Vec::new() }
+    }
+
+    /// Adds every linker-discovered static reflection fragment to this
+    /// snapshot before call-site bindings are added.
+    ///
+    /// This is the normal starting point for a snapshot that combines
+    /// `#[Reflect]` and `#[ReflectImpl]` declarations with explicit
+    /// `bind_method!` values. It does not add method bindings produced as
+    /// ordinary values; pass those to [`Self::add_method_binding`]. Do not
+    /// call this more than once on the same builder, or manually add a
+    /// fragment that is already linked into the inventory.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so call-site method bindings can be appended.
+    pub fn include_linked_fragments(&mut self) -> &mut Self {
+        for fragment in inventory::iter::<crate::registry::fragment::RegistrationFragment> {
+            self.push(fragment.build(), fragment.identity());
+        }
+        self
     }
 
     /// Adds one concrete reflected type as a snapshot member.
@@ -172,6 +193,24 @@ impl RegistrySnapshotBuilder {
     /// Returns this builder so additional fragments can be added.
     pub fn add_impl(&mut self, descriptor: &'static ImplDescriptor, source: FragmentIdentity) -> &mut Self {
         self.push(FragmentPayload::Impl(descriptor), source)
+    }
+
+    /// Adds one explicitly monomorphized method adapter to this snapshot.
+    ///
+    /// The binding contains a concrete call-site adapter and a selector. The
+    /// registry matches that selector only after all impl fragments have been
+    /// collected; it does not generate code or specialize methods by `TypeId`.
+    ///
+    /// # Parameters
+    ///
+    /// - `binding`: Call-site adapter and exact reflected method selector.
+    /// - `source`: Identity assigned to this binding fragment.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder so additional fragments can be added.
+    pub fn add_method_binding(&mut self, binding: MethodBinding, source: FragmentIdentity) -> &mut Self {
+        self.push(FragmentPayload::MethodBinding(Box::new(binding)), source)
     }
 
     /// Adds capabilities for a concrete type without adding the type as a

@@ -46,6 +46,22 @@ pub enum FieldAccessError {
         /// The exact expected and actual value identities.
         mismatch: Box<TypeMismatch>,
     },
+    /// A requested typed field view does not match the declared field type.
+    #[error("field type mismatch while accessing {field}")]
+    FieldTypeMismatch {
+        /// The field whose operation was requested.
+        field: FieldIdentity,
+        /// The exact expected and requested value identities.
+        mismatch: Box<TypeMismatch>,
+    },
+    /// A safe operation targeted a field that is not publicly accessible.
+    #[error("field {field} is not public and does not support {operation}")]
+    NotPublic {
+        /// The field whose operation was requested.
+        field: FieldIdentity,
+        /// The rejected operation.
+        operation: FieldAccessOperation,
+    },
     /// A skipped field does not expose any dynamic access adapter.
     #[error("field {field} is skipped and does not support {operation}")]
     Skipped {
@@ -107,6 +123,8 @@ impl FieldAccessError {
         match self {
             Self::TargetTypeMismatch { field, .. }
             | Self::ValueTypeMismatch { field, .. }
+            | Self::FieldTypeMismatch { field, .. }
+            | Self::NotPublic { field, .. }
             | Self::Skipped { field, .. }
             | Self::ReadOnly { field, .. }
             | Self::Unavailable { field, .. }

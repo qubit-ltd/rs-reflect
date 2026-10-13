@@ -111,16 +111,14 @@ impl fmt::Display for ConstructionUnavailableReason {
 /// # #![allow(proc_macro_derive_resolution_fallback)]
 /// use qubit_reflect::construct::ConstructionError;
 /// use qubit_reflect::construct::NamedConstructionInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
 /// mod example {
 ///     use qubit_reflect::Reflect;
-///     #[derive(Reflect)]
+///     #[Reflect]
 ///     pub struct User {
-///         name: String,
+///         pub name: String,
 ///     }
 /// }
 ///
@@ -128,7 +126,7 @@ impl fmt::Display for ConstructionUnavailableReason {
 ///     .struct_construction()
 ///     .expect("derived construction")
 ///     .local_constructor();
-/// let input = NamedConstructionInput::<Local>::new(std::iter::empty::<(&str, DynamicOwned<Local>)>());
+/// let input = NamedConstructionInput::new();
 /// let recovery = match constructor.construct_named(input) {
 ///     Err(recovery) => recovery,
 ///     Ok(_) => panic!("expected missing-field error"),
@@ -311,6 +309,20 @@ pub enum ConstructionError {
     /// The reflected target did not generate the requested construction path.
     #[error("dynamic construction is unavailable for this target")]
     TargetUnavailable,
+    /// The requested typed result differs from the descriptor's exact root.
+    #[error("construction target type mismatch: expected {expected:?}, got {actual:?}")]
+    TargetTypeMismatch {
+        /// Descriptor root type requested for construction.
+        expected: TypeId,
+        /// Concrete type requested by the caller.
+        actual: TypeId,
+    },
+    /// A safe constructor would write a field that is not publicly accessible.
+    #[error("construction would write a non-public field {field}")]
+    VisibilityDenied {
+        /// Exact declared field hidden from safe construction.
+        field: Box<ConstructionFieldId>,
+    },
     /// The selected input form does not match the struct or variant shape.
     #[error("construction shape mismatch: expected {expected}, got {actual}")]
     WrongShape {

@@ -66,49 +66,49 @@ pub trait Mode: sealed::Sealed {
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedRef;
+/// use qubit_reflect::value::{DynamicRef, Local};
 ///
 /// fn assert_send<T: Send>(_: T) {}
 /// let value = 1_u32;
-/// assert_send(ReflectedRef::new(&value));
+/// assert_send(DynamicRef::<Local>::new(&value));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedRef;
+/// use qubit_reflect::value::{DynamicRef, Local};
 ///
 /// fn assert_sync<T: Sync>(_: T) {}
 /// let value = 1_u32;
-/// assert_sync(ReflectedRef::new(&value));
+/// assert_sync(DynamicRef::<Local>::new(&value));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, Local};
 ///
 /// fn assert_send<T: Send>(_: T) {}
 /// let mut value = 1_u32;
-/// assert_send(ReflectedMut::new(&mut value));
+/// assert_send(DynamicMut::<Local>::new(&mut value));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, Local};
 ///
 /// fn assert_sync<T: Sync>(_: T) {}
 /// let mut value = 1_u32;
-/// assert_sync(ReflectedMut::new(&mut value));
+/// assert_sync(DynamicMut::<Local>::new(&mut value));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedOwned;
+/// use qubit_reflect::value::{DynamicOwned, Local};
 ///
 /// fn assert_send<T: Send>(_: T) {}
-/// assert_send(ReflectedOwned::new(1_u32));
+/// assert_send(DynamicOwned::<Local>::new(1_u32));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedOwned;
+/// use qubit_reflect::value::{DynamicOwned, Local};
 ///
 /// fn assert_sync<T: Sync>(_: T) {}
-/// assert_sync(ReflectedOwned::new(1_u32));
+/// assert_sync(DynamicOwned::<Local>::new(1_u32));
 /// ```
 pub enum Local {}
 
@@ -127,73 +127,73 @@ pub enum Local {}
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedOwned;
+/// use qubit_reflect::value::{DynamicOwned, ThreadSafe};
 /// use std::rc::Rc;
 ///
-/// let _ = SendReflectedOwned::new(Rc::new(1_u32));
+/// let _ = SendDynamicOwned::<Local>::new(Rc::new(1_u32));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedOwned;
+/// use qubit_reflect::value::{DynamicOwned, ThreadSafe};
 /// use std::cell::Cell;
 ///
-/// let _ = SendReflectedOwned::new(Cell::new(1_u32));
+/// let _ = SendDynamicOwned::<Local>::new(Cell::new(1_u32));
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedRef;
+/// use qubit_reflect::value::{DynamicRef, ThreadSafe};
 /// use std::cell::Cell;
 ///
 /// let value = Cell::new(1_u32);
-/// let _ = SendReflectedRef::new(&value);
+/// let _ = SendDynamicRef::<Local>::new(&value);
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, ThreadSafe};
 /// use std::rc::Rc;
 ///
 /// let mut value = Rc::new(1_u32);
-/// let _ = SendReflectedMut::new(&mut value);
+/// let _ = SendDynamicMut::<Local>::new(&mut value);
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, ThreadSafe};
 /// use std::cell::Cell;
 ///
 /// let mut value = Cell::new(1_u32);
-/// let _ = SendReflectedMut::new(&mut value);
+/// let _ = SendDynamicMut::<Local>::new(&mut value);
 /// ```
 ///
 /// Dynamic borrows cannot be promoted to `'static`.
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedRef;
+/// use qubit_reflect::value::{DynamicRef, Local};
 ///
-/// fn promote<'a>(value: ReflectedRef<'a>) -> ReflectedRef<'static> {
+/// fn promote<'a>(value: DynamicRef<'a, Local>) -> DynamicRef<'static, Local> {
 ///     value
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::ReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, Local};
 ///
-/// fn promote<'a>(value: ReflectedMut<'a>) -> ReflectedMut<'static> {
+/// fn promote<'a>(value: DynamicMut<'a, Local>) -> DynamicMut<'static, Local> {
 ///     value
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedRef;
+/// use qubit_reflect::value::{DynamicRef, ThreadSafe};
 ///
-/// fn promote<'a>(value: SendReflectedRef<'a>) -> SendReflectedRef<'static> {
+/// fn promote<'a>(value: DynamicRef<'a, ThreadSafe>) -> DynamicRef<'static, ThreadSafe> {
 ///     value
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// use qubit_reflect::value::SendReflectedMut;
+/// use qubit_reflect::value::{DynamicMut, ThreadSafe};
 ///
-/// fn promote<'a>(value: SendReflectedMut<'a>) -> SendReflectedMut<'static> {
+/// fn promote<'a>(value: DynamicMut<'a, ThreadSafe>) -> DynamicMut<'static, ThreadSafe> {
 ///     value
 /// }
 /// ```

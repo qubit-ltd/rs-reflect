@@ -15,12 +15,12 @@ use crate::error::TypeMismatch;
 /// # Examples
 ///
 /// ```
-/// use qubit_reflect::{OptionalProjectionError, ReflectedRef, TypeDescriptor};
+/// use qubit_reflect::{OptionalProjectionError, TypeDescriptor};
 ///
 /// let optional = TypeDescriptor::of::<Option<u32>>()
 ///     .as_optional()
 ///     .expect("optional descriptor");
-/// let Err(error) = optional.project_ref(ReflectedRef::new_str("text")) else {
+/// let Err(error) = optional.project_ref(&Some(String::from("text"))) else {
 ///     panic!("a string is not Option<u32>");
 /// };
 /// assert!(matches!(error, OptionalProjectionError::TypeMismatch(_)));

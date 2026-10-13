@@ -12,13 +12,14 @@ use crate::__private::LazyTypeRef;
 use crate::descriptor::TypeDescriptor;
 use crate::expression::GenericArgument;
 use crate::expression::GenericDefinitionDescriptor;
-use crate::value::ReflectedOwned;
+use crate::value::DynamicOwned;
+use crate::value::Local;
 
 /// Creates one fresh local owned value for a concrete const argument.
 ///
 /// The factory is called only when the corresponding runtime const value is
 /// explicitly requested.
-type ConstArgumentValueFactory = fn() -> ReflectedOwned;
+type ConstArgumentValueFactory = fn() -> DynamicOwned<Local>;
 
 /// A concrete instance's link to its declaration-level generic definition and
 /// arguments.
@@ -34,7 +35,7 @@ type ConstArgumentValueFactory = fn() -> ReflectedOwned;
 ///
 /// mod example {
 ///     use qubit_reflect::Reflect;
-///     #[derive(Reflect)]
+///     #[Reflect]
 ///     pub struct Envelope<T>(T);
 /// }
 ///
@@ -286,7 +287,7 @@ impl ConcreteGenericDescriptor {
     ///
     /// Returns a fresh exact-type owned value, or `None` when unavailable.
     #[must_use]
-    pub fn const_argument_value(&self, index: usize) -> Option<ReflectedOwned> {
+    pub fn const_argument_value(&self, index: usize) -> Option<DynamicOwned<Local>> {
         if !matches!(self.arguments.get(index), Some(GenericArgument::Const(_))) {
             return None;
         }
@@ -313,7 +314,7 @@ impl ConcreteGenericDescriptor {
     /// Returns a fresh owned wrapper, or `None` when no safe factory exists.
     #[must_use]
     #[inline]
-    pub fn const_argument_value_for_definition(&self, definition_index: usize) -> Option<ReflectedOwned> {
+    pub fn const_argument_value_for_definition(&self, definition_index: usize) -> Option<DynamicOwned<Local>> {
         self.argument_index(definition_index)
             .and_then(|argument_index| self.const_argument_value(argument_index))
     }

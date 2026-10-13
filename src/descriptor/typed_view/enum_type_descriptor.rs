@@ -18,9 +18,8 @@ use crate::descriptor::EnumRepr;
 /// fn main() {
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
-/// #[derive(Reflect)]
-/// enum State { Ready }
-/// let state = TypeDescriptor::of::<State>().as_enum().expect("enum type");
+/// mod example { use qubit_reflect::Reflect; #[Reflect] pub enum State { Ready } }
+/// let state = TypeDescriptor::of::<example::State>().as_enum().expect("enum type");
 /// assert!(state.representations().is_empty());
 /// }
 /// #[cfg(not(feature = "derive"))]

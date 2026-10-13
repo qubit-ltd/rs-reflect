@@ -8,10 +8,11 @@
 
 //! Immutable structural facts about reflected enum variants.
 
+use std::any::Any;
+use std::any::TypeId;
 use std::fmt;
 
 use crate::access::VariantActiveAdapter;
-use crate::access::field_adapter::dynamic_ref_type_id;
 use crate::construct::ConstructionError;
 use crate::construct::ConstructionRecovery;
 use crate::construct::NamedConstructionInput;
@@ -21,9 +22,8 @@ use crate::descriptor::FieldDescriptor;
 use crate::descriptor::TypeDescriptor;
 use crate::descriptor::TypeDescriptorResolver;
 use crate::error::TypeMismatch;
+use crate::value::DynamicRef;
 use crate::value::Local;
-use crate::value::ReflectedOwned;
-use crate::value::ReflectedRef;
 
 mod discriminant_origin;
 mod numeric_discriminant;
@@ -44,12 +44,13 @@ pub use variant_kind::VariantKind;
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 
-#[derive(Reflect)]
-enum State {
-    Ready,
+mod example {
+    use qubit_reflect::Reflect;
+    #[Reflect]
+    pub enum State { Ready }
 }
 
-let variant = TypeDescriptor::of::<State>()
+let variant = TypeDescriptor::of::<example::State>()
     .variant("Ready")
     .expect("the derived variant exists");
 assert_eq!(variant.rust_name(), "Ready");
@@ -154,7 +155,7 @@ impl VariantDescriptor {
         self.construction.as_ref()
     }
 
-    /// Constructs a named variant through its generated local adapter.
+    /// Constructs a named variant from ordinary owned values.
     ///
     /// # Parameters
     ///
@@ -162,23 +163,56 @@ impl VariantDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns the constructed enum value with local dynamic ownership.
+    /// Returns the constructed enum value as `T`.
     ///
     /// # Errors
     ///
-    /// Returns the construction error and recoverable input values if
-    /// validation fails or this variant has no constructor.
-    pub fn construct_struct(
+    /// Returns recovery with the original inputs if validation fails, the
+    /// requested root type is wrong, or the variant has no constructor.
+    pub fn construct_struct<T: Any>(
         &self,
         input: NamedConstructionInput<Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
-        match self.construction() {
-            Some(construction) => construction.local_constructor().construct_named(input),
-            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        let expected = self.declaring_type().type_id();
+        let actual = TypeId::of::<T>();
+        if actual != expected {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch { expected, actual }));
         }
+        let result = match self.construction() {
+            Some(construction) => construction.local_constructor().construct_named(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its enum root descriptor")))
     }
 
-    /// Constructs a tuple variant through its generated local adapter.
+    /// Dynamically constructs this named variant and returns its exact Rust
+    /// value.
+    pub fn construct_struct_any(
+        &self,
+        input: NamedConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let result = match self.construction() {
+            Some(construction) => construction.local_constructor().construct_named(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a tuple variant from ordinary owned values.
     ///
     /// # Parameters
     ///
@@ -186,35 +220,96 @@ impl VariantDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns the constructed enum value with local dynamic ownership.
+    /// Returns the constructed enum value as `T`.
     ///
     /// # Errors
     ///
-    /// Returns the construction error and recoverable input values if
-    /// validation fails or this variant has no constructor.
-    pub fn construct_tuple(
+    /// Returns recovery with the original inputs if validation fails, the
+    /// requested root type is wrong, or the variant has no constructor.
+    pub fn construct_tuple<T: Any>(
         &self,
         input: TupleConstructionInput<Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
-        match self.construction() {
-            Some(construction) => construction.local_constructor().construct_tuple(input),
-            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        let expected = self.declaring_type().type_id();
+        let actual = TypeId::of::<T>();
+        if actual != expected {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch { expected, actual }));
         }
+        let result = match self.construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its enum root descriptor")))
     }
 
-    /// Constructs a unit variant through its generated local adapter.
+    /// Dynamically constructs this tuple variant and returns its exact Rust
+    /// value.
+    pub fn construct_tuple_any(
+        &self,
+        input: TupleConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let result = match self.construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a unit variant as its exact Rust enum type.
     ///
     /// # Returns
     ///
-    /// Returns the constructed enum value with local dynamic ownership.
+    /// Returns the constructed enum value as `T`.
     ///
     /// # Errors
     ///
     /// Returns the construction error if validation fails or this variant has
     /// no constructor.
-    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<Local>> {
+    pub fn construct_unit<T: Any>(&self) -> Result<T, ConstructionRecovery<Local>> {
+        let expected = self.declaring_type().type_id();
+        let actual = TypeId::of::<T>();
+        if actual != expected {
+            return Err(ConstructionRecovery::new(
+                ConstructionError::TargetTypeMismatch { expected, actual },
+                Vec::new(),
+            ));
+        }
         match self.construction() {
-            Some(construction) => construction.local_constructor().construct_unit(),
+            Some(construction) => construction.local_constructor().construct_unit().map(|value| {
+                value
+                    .downcast::<T>()
+                    .unwrap_or_else(|_| unreachable!("the generated constructor must match its enum root descriptor"))
+            }),
+            None => Err(ConstructionRecovery::new(
+                ConstructionError::TargetUnavailable,
+                Vec::new(),
+            )),
+        }
+    }
+
+    /// Dynamically constructs this unit variant and returns its exact Rust
+    /// value.
+    pub fn construct_unit_any(&self) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        match self.construction() {
+            Some(construction) => construction.local_constructor().construct_unit().map(|value| {
+                value
+                    .into_any()
+                    .unwrap_or_else(|_| unreachable!("owned construction results are Any values"))
+            }),
             None => Err(ConstructionRecovery::new(
                 ConstructionError::TargetUnavailable,
                 Vec::new(),
@@ -332,25 +427,26 @@ impl VariantDescriptor {
     ///
     /// # Parameters
     ///
-    /// - `index`: Zero-based position in this variant's field slice.
+    /// - `index`: Zero-based source index of the variant field.
     ///
     /// # Returns
     ///
-    /// Returns the field at that position, or `None` when out of range.
+    /// Returns the field with that source index, or `None` when absent
+    /// (including skipped fields).
     #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
-        self.fields.get(index)
+        self.fields.iter().find(|field| field.index() == index)
     }
 
     /// Returns whether this variant is active for an exact declaring enum
-    /// value.
+    /// value supplied by ordinary reference.
     ///
     /// A target of another type returns [`TypeMismatch`] without invoking the
     /// generated adapter.
     ///
     /// # Parameters
     ///
-    /// - `value`: Dynamic reference expected to contain the declaring enum.
+    /// - `value`: Enum value expected to have the declaring root type.
     ///
     /// # Returns
     ///
@@ -360,13 +456,13 @@ impl VariantDescriptor {
     ///
     /// Returns [`TypeMismatch`] if `value` does not contain the declaring enum
     /// type.
-    pub fn is_active(&self, value: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
+    pub fn is_active<T: Any>(&self, value: &T) -> Result<bool, TypeMismatch> {
         let expected = self.declaring_type().type_id();
-        let actual = dynamic_ref_type_id(&value);
+        let actual = TypeId::of::<T>();
         if actual != expected {
             return Err(TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()));
         }
-        (self.active_test)(value)
+        (self.active_test)(DynamicRef::<Local>::new(value))
     }
 }
 

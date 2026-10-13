@@ -8,6 +8,7 @@
 
 //! Token expansion for validated reflection declarations.
 
+pub(crate) mod bind_method;
 mod construction;
 mod context;
 mod dispatcher;

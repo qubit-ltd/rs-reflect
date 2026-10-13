@@ -55,6 +55,10 @@ struct RegistryErrorData {
     capability_target: Option<CapabilityTarget>,
     /// Whether the conflict was caused by an intrinsic capability declaration.
     intrinsic_conflict: bool,
+    /// Rust method name associated with a method-binding diagnostic.
+    method_binding_name: Option<Box<str>>,
+    /// Number of declarations found by a method-binding selector.
+    method_binding_matches: Option<usize>,
 }
 
 impl RegistryError {
@@ -134,6 +138,8 @@ impl RegistryError {
             capability_details: Some(conflict),
             capability_target: None,
             intrinsic_conflict: true,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
     }
 
@@ -164,6 +170,8 @@ impl RegistryError {
             capability_details: Some(conflict),
             capability_target: Some(target),
             intrinsic_conflict: false,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
     }
 
@@ -191,6 +199,8 @@ impl RegistryError {
             capability_details: Some(conflict),
             capability_target: Some(target),
             intrinsic_conflict: true,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
     }
 
@@ -212,7 +222,64 @@ impl RegistryError {
             capability_details: None,
             capability_target: None,
             intrinsic_conflict: false,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
+    }
+
+    /// Creates an error when a method binding selector matched no declaration.
+    pub fn method_binding_not_found(fragment: FragmentIdentity, method: &str) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::MethodBindingNotFound,
+            left: Some(fragment),
+            right: None,
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
+            method_binding_name: Some(method.into()),
+            method_binding_matches: Some(0),
+        }))
+    }
+
+    /// Creates an error when a method binding selector matched multiple
+    /// declarations.
+    pub fn method_binding_ambiguous(fragment: FragmentIdentity, method: &str, matches: usize) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::MethodBindingAmbiguous,
+            left: Some(fragment),
+            right: None,
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
+            method_binding_name: Some(method.into()),
+            method_binding_matches: Some(matches),
+        }))
+    }
+
+    /// Creates an error when one exact method specialization is bound twice.
+    pub fn method_binding_conflict(left: FragmentIdentity, right: FragmentIdentity, method: &str) -> Self {
+        Self(Arc::new(RegistryErrorData {
+            kind: RegistryErrorKind::MethodBindingConflict,
+            left: Some(left),
+            right: Some(right),
+            capability_details: None,
+            capability_target: None,
+            intrinsic_conflict: false,
+            method_binding_name: Some(method.into()),
+            method_binding_matches: Some(2),
+        }))
+    }
+
+    /// Returns the Rust method name retained by a method-binding diagnostic.
+    #[must_use]
+    pub fn method_binding_name(&self) -> Option<&str> {
+        self.0.method_binding_name.as_deref()
+    }
+
+    /// Returns the number of declarations matched by a binding selector.
+    #[must_use]
+    pub fn method_binding_matches(&self) -> Option<usize> {
+        self.0.method_binding_matches
     }
 
     /// Creates an error when the current platform lacks
@@ -229,6 +296,8 @@ impl RegistryError {
             capability_details: None,
             capability_target: None,
             intrinsic_conflict: false,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
     }
 
@@ -352,6 +421,8 @@ impl RegistryError {
             capability_details: None,
             capability_target: None,
             intrinsic_conflict: false,
+            method_binding_name: None,
+            method_binding_matches: None,
         }))
     }
 }
@@ -375,6 +446,12 @@ impl Display for RegistryError {
         write!(formatter, "reflection registry error: {:?}", data.kind)?;
         if let Some(conflict) = &data.capability_details {
             write!(formatter, " for capability `{}` ({:?})", conflict.id(), conflict.kind(),)?;
+        }
+        if let Some(method) = &data.method_binding_name {
+            write!(formatter, " for method binding `{method}`")?;
+        }
+        if let Some(matches) = data.method_binding_matches {
+            write!(formatter, " ({matches} matches)")?;
         }
         if let Some(target) = data.capability_target {
             write!(formatter, " on {target:?}")?;

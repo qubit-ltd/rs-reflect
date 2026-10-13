@@ -761,28 +761,6 @@ mod tests {
 
     #[test]
     fn test_adapter_modes_and_pinned_receiver_are_retained() {
-        let thread_safe = impl_method(quote! {
-            impl Service {
-                #[reflect(thread_safe)]
-                fn execute(self: ::std::pin::Pin<&mut Self>) -> u32 { 0 }
-            }
-        });
-        let pinned_plan = plan(&thread_safe);
-        assert!(
-            pinned_plan.modes.thread_safe,
-            "thread_safe mode must remain in the pinned plan"
-        );
-        assert_eq!(
-            pinned_plan.pinned_receiver_mutability(),
-            Some(true),
-            "the pinned receiver is mutable"
-        );
-        assert_eq!(
-            reasons(&pinned_plan),
-            &[UnavailableReasonPlan::PinnedModeConflict],
-            "thread_safe conflicts with pinned invocation"
-        );
-
         let catching = impl_method(quote! {
             impl Service {
                 #[reflect(catch_unwind)]

@@ -8,6 +8,7 @@
 
 //! Atomic owned-struct update validation and adapter dispatch.
 
+use std::any::Any;
 use std::any::TypeId;
 use std::fmt;
 
@@ -16,12 +17,10 @@ use crate::construct::StructUpdateInput;
 use crate::construct::UpdateField;
 use crate::construct::ValidatedUpdateInput;
 use crate::construct::struct_constructor::local_type_id;
-use crate::construct::struct_constructor::thread_safe_type_id;
 use crate::descriptor::TypeDescriptor;
 use crate::value::DynamicOwned;
 use crate::value::Local;
 use crate::value::Mode;
-use crate::value::ThreadSafe;
 
 /// A mode-specific safe adapter generated inside the declaring struct module.
 ///
@@ -44,24 +43,23 @@ pub type StructUpdateAdapter<M> = fn(ValidatedUpdateInput<M>) -> DynamicOwned<M>
 /// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
 /// use qubit_reflect::construct::StructUpdateInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct User { pub name: String }
 /// }
 ///
-/// let descriptor = TypeDescriptor::of::<User>();
+/// let descriptor = TypeDescriptor::of::<example::User>();
 /// let updater = descriptor.struct_construction().expect("generated updater").local_updater().expect("update enabled");
 /// let input = StructUpdateInput::new(
-///     DynamicOwned::<Local>::new(User { name: String::from("Ada") }),
-///     NamedConstructionInput::new([("name", DynamicOwned::<Local>::new(String::from("Grace")))]),
+///     example::User { name: String::from("Ada") },
+///     NamedConstructionInput::new().field("name", String::from("Grace")),
 /// );
-/// let updated = updater.update(input).expect("valid replacement");
-/// assert_eq!(updated.downcast_ref::<User>().map(|user| user.name.as_str()), Some("Grace"));
+/// let updated = updater.update::<example::User>(input).expect("valid replacement");
+/// assert_eq!(updated.name, "Grace");
 /// }
 /// #[cfg(not(feature = "derive"))]
 /// fn main() {}
@@ -158,10 +156,16 @@ impl<M: Mode + 'static> StructUpdater<M> {
         &self,
         input: StructUpdateInput<M>,
         value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+        allow_private: bool,
     ) -> Result<DynamicOwned<M>, ConstructionRecovery<M>> {
         self.assert_descriptor_contract();
-        let validated =
-            crate::construct::validated::validate_update(input, self.descriptor.type_id(), self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_update_with_visibility(
+            input,
+            self.descriptor.type_id(),
+            self.fields,
+            value_type_id,
+            allow_private,
+        )?;
         let output = (self.adapter)(validated);
         assert_eq!(
             value_type_id(&output),
@@ -216,36 +220,72 @@ impl StructUpdater<Local> {
     ///
     /// Panics if generated metadata or adapter output violates its contract.
     #[inline]
-    pub fn update(&self, input: StructUpdateInput<Local>) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
-        self.update_with(input, local_type_id)
+    pub fn update<T: Any>(&self, input: StructUpdateInput<Local>) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.descriptor.type_id() {
+            return Err(
+                input.into_recovery(crate::construct::ConstructionError::TargetTypeMismatch {
+                    expected: self.descriptor.type_id(),
+                    actual: TypeId::of::<T>(),
+                }),
+            );
+        }
+        let value = self.update_with(input, local_type_id, false)?;
+        Ok(value
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated updater must match its root descriptor")))
     }
-}
 
-impl StructUpdater<ThreadSafe> {
-    /// Atomically validates and updates a thread-safe owned struct value.
+    /// Updates a value dynamically and returns its exact owned Rust value.
+    pub fn update_any(&self, input: StructUpdateInput<Local>) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        self.update_with(input, local_type_id, false).map(|value| {
+            value
+                .into_any()
+                .unwrap_or_else(|_| unreachable!("owned update results are Any values"))
+        })
+    }
+
+    /// Updates a local struct while allowing writes to private fields.
     ///
-    /// # Parameters
+    /// # Safety
     ///
-    /// - `input`: The base value and named whole-field replacements.
-    ///
-    /// # Returns
-    ///
-    /// Returns the updated thread-safe value on success.
-    ///
-    /// # Errors
-    ///
-    /// Returns recovery with the untouched base and overrides when validation
-    /// fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if generated metadata or adapter output violates its contract.
-    #[inline]
-    pub fn update(
+    /// The caller must ensure replacement values preserve every invariant
+    /// normally enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn update_unsafe<T: Any>(
         &self,
-        input: StructUpdateInput<ThreadSafe>,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
-        self.update_with(input, thread_safe_type_id)
+        input: StructUpdateInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.descriptor.type_id() {
+            return Err(
+                input.into_recovery(crate::construct::ConstructionError::TargetTypeMismatch {
+                    expected: self.descriptor.type_id(),
+                    actual: TypeId::of::<T>(),
+                }),
+            );
+        }
+        let value = self.update_with(input, local_type_id, true)?;
+        Ok(value
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated updater must match its root descriptor")))
+    }
+
+    /// Updates a local struct dynamically while allowing writes to private
+    /// fields.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure replacement values preserve every invariant
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn update_any_unsafe(
+        &self,
+        input: StructUpdateInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        self.update_with(input, local_type_id, true).map(|value| {
+            value
+                .into_any()
+                .unwrap_or_else(|_| unreachable!("owned update results are Any values"))
+        })
     }
 }
 

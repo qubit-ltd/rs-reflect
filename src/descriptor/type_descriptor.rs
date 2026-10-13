@@ -8,6 +8,7 @@
 
 //! The unique root descriptor and [`Reflect`] query trait.
 
+use std::any::Any;
 use std::any::TypeId;
 use std::fmt;
 
@@ -18,6 +19,7 @@ use crate::construct::ConstructionError;
 use crate::construct::ConstructionRecovery;
 use crate::construct::NamedConstructionInput;
 use crate::construct::StructConstructionDescriptor;
+use crate::construct::StructUpdateInput;
 use crate::construct::TupleConstructionInput;
 use crate::descriptor::ArrayTypeDescriptor;
 use crate::descriptor::ConcreteGenericDescriptor;
@@ -65,7 +67,7 @@ use crate::descriptor::type_ref::type_name_of;
 use crate::error::RegistryError;
 use crate::expression::FunctionAbi;
 use crate::registry::ReflectRegistry;
-use crate::value::ReflectedOwned;
+use crate::value::Local;
 
 /// Kind-specific data retained by a root descriptor.
 enum TypeDescriptorData {
@@ -221,7 +223,9 @@ impl TypeDescriptor {
         self.type_definition().map(TypeDefinitionDescriptor::id)
     }
 
-    /// Constructs a named struct through its generated local adapter.
+    /// Constructs a named struct from ordinary owned values.
+    ///
+    /// `T` must be the exact Rust type represented by this descriptor.
     ///
     /// # Parameters
     ///
@@ -229,24 +233,108 @@ impl TypeDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns the constructed value with local dynamic ownership.
+    /// Returns the constructed value as `T`.
     ///
     /// # Errors
     ///
-    /// Returns the construction error and all recoverable caller values if
-    /// validation fails or this descriptor has no constructor.
-    pub fn construct_struct(
+    /// Returns recovery with the original caller values if the requested type
+    /// is wrong, an input is invalid, a non-public field would be written, or
+    /// construction is unavailable.
+    pub fn construct_struct<T: Any>(
         &self,
-        input: NamedConstructionInput<crate::value::Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
-        match self.struct_construction() {
-            Some(construction) => construction.local_constructor().construct_named(input),
-            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        input: NamedConstructionInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch {
+                expected: self.type_id(),
+                actual: TypeId::of::<T>(),
+            }));
         }
+        let result = match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_named(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor")))
     }
 
-    /// Constructs a tuple or newtype struct through its generated local
-    /// adapter.
+    /// Dynamically constructs a named struct and returns its exact owned Rust
+    /// value.
+    pub fn construct_struct_any(
+        &self,
+        input: NamedConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let result = match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_named(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a named struct while bypassing field visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy all invariants
+    /// normally enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_struct_unsafe<T: Any>(
+        &self,
+        input: NamedConstructionInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch {
+                expected: self.type_id(),
+                actual: TypeId::of::<T>(),
+            }));
+        }
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_named_unsafe(input)? };
+        Ok(output
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor")))
+    }
+
+    /// Dynamically constructs a named struct while bypassing visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy all invariants
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_struct_any_unsafe(
+        &self,
+        input: NamedConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_named_unsafe(input)? };
+        Ok(output
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a tuple or newtype struct from ordinary owned values.
     ///
     /// # Parameters
     ///
@@ -254,39 +342,284 @@ impl TypeDescriptor {
     ///
     /// # Returns
     ///
-    /// Returns the constructed value with local dynamic ownership.
+    /// Returns the constructed value as `T`.
     ///
     /// # Errors
     ///
-    /// Returns the construction error and all recoverable caller values if
-    /// validation fails or this descriptor has no constructor.
-    pub fn construct_tuple(
+    /// Returns recovery with the original caller values if the requested type
+    /// is wrong, an input is invalid, a non-public field would be written, or
+    /// construction is unavailable.
+    pub fn construct_tuple<T: Any>(
         &self,
-        input: TupleConstructionInput<crate::value::Local>,
-    ) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
-        match self.struct_construction() {
-            Some(construction) => construction.local_constructor().construct_tuple(input),
-            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        input: TupleConstructionInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch {
+                expected: self.type_id(),
+                actual: TypeId::of::<T>(),
+            }));
         }
+        let result = match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor")))
     }
 
-    /// Constructs a unit struct through its generated local adapter.
+    /// Dynamically constructs a tuple struct and returns its exact owned Rust
+    /// value.
+    pub fn construct_tuple_any(
+        &self,
+        input: TupleConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let result = match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_tuple(input)?,
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        Ok(result
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a tuple struct while bypassing field visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy all invariants
+    /// normally enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_tuple_unsafe<T: Any>(
+        &self,
+        input: TupleConstructionInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(input.into_recovery(ConstructionError::TargetTypeMismatch {
+                expected: self.type_id(),
+                actual: TypeId::of::<T>(),
+            }));
+        }
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_tuple_unsafe(input)? };
+        Ok(output
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor")))
+    }
+
+    /// Dynamically constructs a tuple struct while bypassing visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy all invariants
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_tuple_any_unsafe(
+        &self,
+        input: TupleConstructionInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_tuple_unsafe(input)? };
+        Ok(output
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Constructs a unit struct as its exact Rust type.
     ///
     /// # Returns
     ///
-    /// Returns the constructed value with local dynamic ownership.
+    /// Returns the constructed value as `T`.
     ///
     /// # Errors
     ///
-    /// Returns the construction error if validation fails or this descriptor
-    /// has no constructor.
-    pub fn construct_unit(&self) -> Result<ReflectedOwned, ConstructionRecovery<crate::value::Local>> {
+    /// Returns recovery if the requested type differs or construction is
+    /// unavailable.
+    pub fn construct_unit<T: Any>(&self) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(ConstructionRecovery::new(
+                ConstructionError::TargetTypeMismatch {
+                    expected: self.type_id(),
+                    actual: TypeId::of::<T>(),
+                },
+                Vec::new(),
+            ));
+        }
         match self.struct_construction() {
-            Some(construction) => construction.local_constructor().construct_unit(),
+            Some(construction) => construction.local_constructor().construct_unit().map(|value| {
+                value
+                    .downcast::<T>()
+                    .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor"))
+            }),
             None => Err(ConstructionRecovery::new(
                 ConstructionError::TargetUnavailable,
                 Vec::new(),
             )),
+        }
+    }
+
+    /// Dynamically constructs a unit struct and returns its exact owned Rust
+    /// value.
+    pub fn construct_unit_any(&self) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        match self.struct_construction() {
+            Some(construction) => construction.local_constructor().construct_unit().map(|value| {
+                value
+                    .into_any()
+                    .unwrap_or_else(|_| unreachable!("owned construction results are Any values"))
+            }),
+            None => Err(ConstructionRecovery::new(
+                ConstructionError::TargetUnavailable,
+                Vec::new(),
+            )),
+        }
+    }
+
+    /// Constructs a unit struct while bypassing field visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure generated values preserve all invariants
+    /// normally enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_unit_unsafe<T: Any>(&self) -> Result<T, ConstructionRecovery<Local>> {
+        if TypeId::of::<T>() != self.type_id() {
+            return Err(ConstructionRecovery::new(
+                ConstructionError::TargetTypeMismatch {
+                    expected: self.type_id(),
+                    actual: TypeId::of::<T>(),
+                },
+                Vec::new(),
+            ));
+        }
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_unit_unsafe()? };
+        Ok(output
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("the generated constructor must match its root descriptor")))
+    }
+
+    /// Dynamically constructs a unit struct while bypassing field visibility
+    /// checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure generated values preserve all invariants
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_unit_any_unsafe(&self) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        let constructor = match self.struct_construction() {
+            Some(construction) => construction.local_constructor(),
+            None => {
+                return Err(ConstructionRecovery::new(
+                    ConstructionError::TargetUnavailable,
+                    Vec::new(),
+                ));
+            }
+        };
+        // SAFETY: this method exposes the constructor's documented visibility bypass.
+        let output = unsafe { constructor.construct_unit_unsafe()? };
+        Ok(output
+            .into_any()
+            .unwrap_or_else(|_| unreachable!("owned construction results are Any values")))
+    }
+
+    /// Updates a struct with ordinary owned field values.
+    ///
+    /// `T` must be the exact Rust type represented by this descriptor.
+    pub fn update_struct<T: Any>(&self, input: StructUpdateInput<Local>) -> Result<T, ConstructionRecovery<Local>> {
+        match self
+            .struct_construction()
+            .and_then(StructConstructionDescriptor::local_updater)
+        {
+            Some(updater) => updater.update(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Updates a struct dynamically and returns its exact owned Rust value.
+    pub fn update_struct_any(
+        &self,
+        input: StructUpdateInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        match self
+            .struct_construction()
+            .and_then(StructConstructionDescriptor::local_updater)
+        {
+            Some(updater) => updater.update_any(input),
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Updates a struct while bypassing field visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure replacement values preserve invariants normally
+    /// enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn update_struct_unsafe<T: Any>(
+        &self,
+        input: StructUpdateInput<Local>,
+    ) -> Result<T, ConstructionRecovery<Local>> {
+        match self
+            .struct_construction()
+            .and_then(StructConstructionDescriptor::local_updater)
+        {
+            Some(updater) => {
+                // SAFETY: this method exposes the updater's documented visibility bypass.
+                unsafe { updater.update_unsafe(input) }
+            }
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
+        }
+    }
+
+    /// Dynamically updates a struct while bypassing field visibility checks.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure replacement values preserve invariants normally
+    /// enforced by the target type's private fields.
+    #[allow(unsafe_code)]
+    pub unsafe fn update_struct_any_unsafe(
+        &self,
+        input: StructUpdateInput<Local>,
+    ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
+        match self
+            .struct_construction()
+            .and_then(StructConstructionDescriptor::local_updater)
+        {
+            Some(updater) => {
+                // SAFETY: this method exposes the updater's documented visibility bypass.
+                unsafe { updater.update_any_unsafe(input) }
+            }
+            None => Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         }
     }
 
@@ -578,7 +911,7 @@ impl TypeDescriptor {
     ) -> Self {
         Self::new::<Option<T>>(
             query_name,
-            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy(element, projector)),
+            TypeDescriptorData::Optional(OptionalTypeDescriptor::new_lazy::<T>(element, projector)),
             &[],
             &[],
         )
@@ -1700,14 +2033,15 @@ impl TypeDescriptor {
     ///
     /// # Parameters
     ///
-    /// - `index`: Zero-based position in the direct field slice.
+    /// - `index`: Zero-based source index of the direct field.
     ///
     /// # Returns
     ///
-    /// Returns the field at that index, or `None` when out of range.
+    /// Returns the field with that source index, or `None` when absent
+    /// (including skipped fields).
     #[must_use]
     pub fn field_at(&self, index: usize) -> Option<&FieldDescriptor> {
-        self.fields.get(index)
+        self.fields.iter().find(|field| field.index() == index)
     }
 
     /// Returns enum variants in source declaration order.
@@ -1831,7 +2165,7 @@ impl TypeDescriptor {
     /// Returns the cached registry initialization error if registration could
     /// not be aggregated.
     #[must_use = "inspect the effective methods or handle the registry error"]
-    pub fn methods_global(&self) -> Result<&'static [&'static MethodInstanceDescriptor], RegistryError> {
+    pub fn methods_global(&self) -> Result<&'static [MethodInstanceDescriptor], RegistryError> {
         let registry = ReflectRegistry::initialize()?;
         Ok(self.methods_in(registry))
     }
@@ -1848,10 +2182,7 @@ impl TypeDescriptor {
     /// Returns effective method instances borrowed from the supplied snapshot.
     #[must_use]
     #[inline]
-    pub fn methods_in<'registry>(
-        &self,
-        registry: &'registry ReflectRegistry,
-    ) -> &'registry [&'static MethodInstanceDescriptor] {
+    pub fn methods_in<'registry>(&self, registry: &'registry ReflectRegistry) -> &'registry [MethodInstanceDescriptor] {
         registry.effective_view(self.type_id()).methods()
     }
 

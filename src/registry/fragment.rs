@@ -19,6 +19,8 @@ use crate::descriptor::TypeDefinitionDescriptor;
 use crate::descriptor::TypeDefinitionId;
 use crate::descriptor::TypeDescriptor;
 use crate::identity::FragmentIdentity;
+use crate::registry::MethodBinding;
+use crate::registry::MethodBindingIdentity;
 
 /// Const-constructible stable source and content facts for one fragment.
 ///
@@ -126,6 +128,8 @@ pub enum FragmentKind {
     ImplDefinition,
     /// A concrete inherent or trait implementation descriptor.
     Impl,
+    /// A call-site method specialization and its generated adapter.
+    MethodBinding,
     /// One capability fact for an exact concrete type.
     Capability,
 }
@@ -154,6 +158,8 @@ pub enum RuntimeIdentity {
     ImplDefinition(FragmentIdentity),
     /// A concrete implementation target.
     Impl(TypeId),
+    /// The exact selector represented by one method binding.
+    MethodBinding(MethodBindingIdentity),
     /// Capability facts attached to an exact concrete type.
     Capabilities(CapabilityTarget),
 }
@@ -337,6 +343,8 @@ pub enum FragmentPayload {
     ImplDefinition(&'static ImplDefinitionDescriptor),
     /// One concrete implementation descriptor.
     Impl(&'static ImplDescriptor),
+    /// One call-site method specialization and its generated adapter.
+    MethodBinding(Box<MethodBinding>),
     /// One capability fact for an exact concrete type.
     Capability(CapabilityRegistration),
 }
@@ -356,6 +364,7 @@ impl FragmentPayload {
             Self::Trait(_) => FragmentKind::Trait,
             Self::ImplDefinition(_) => FragmentKind::ImplDefinition,
             Self::Impl(_) => FragmentKind::Impl,
+            Self::MethodBinding(_) => FragmentKind::MethodBinding,
             Self::Capability(_) => FragmentKind::Capability,
         }
     }
@@ -373,6 +382,7 @@ impl FragmentPayload {
             Self::Trait(descriptor) => RuntimeIdentity::Trait(descriptor.trait_id().clone()),
             Self::ImplDefinition(descriptor) => RuntimeIdentity::ImplDefinition(descriptor.fragment_identity().clone()),
             Self::Impl(descriptor) => RuntimeIdentity::Impl(descriptor.target_type().type_id()),
+            Self::MethodBinding(binding) => RuntimeIdentity::MethodBinding(binding.identity()),
             Self::Capability(registration) => RuntimeIdentity::Capabilities(registration.target()),
         }
     }

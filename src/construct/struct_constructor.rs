@@ -24,7 +24,6 @@ use crate::descriptor::TypeDescriptor;
 use crate::value::DynamicOwned;
 use crate::value::Local;
 use crate::value::Mode;
-use crate::value::ThreadSafe;
 
 /// A mode-specific safe adapter generated inside the declaring struct module.
 ///
@@ -46,23 +45,22 @@ pub type StructConstructionAdapter<M> = fn(ValidatedConstructionInput<M>) -> Dyn
 /// #[cfg(feature = "derive")]
 /// fn main() {
 /// use qubit_reflect::construct::NamedConstructionInput;
-/// use qubit_reflect::value::DynamicOwned;
-/// use qubit_reflect::value::Local;
 /// use qubit_reflect::Reflect;
 /// use qubit_reflect::TypeDescriptor;
 ///
-/// #[derive(Reflect)]
-/// struct User {
-///     name: String,
+/// mod example {
+///     use qubit_reflect::Reflect;
+///     #[Reflect]
+///     pub struct User { pub name: String }
 /// }
 ///
-/// let constructor = TypeDescriptor::of::<User>()
+/// let constructor = TypeDescriptor::of::<example::User>()
 ///     .struct_construction()
 ///     .expect("derived constructor")
 ///     .local_constructor();
-/// let input = NamedConstructionInput::new([("name", DynamicOwned::<Local>::new(String::from("Ada")))]);
+/// let input = NamedConstructionInput::new().field("name", String::from("Ada"));
 /// let user = constructor.construct_named(input).expect("valid field input");
-/// assert!(user.downcast_ref::<User>().is_some());
+/// assert!(user.downcast_ref::<example::User>().is_some());
 /// }
 /// #[cfg(not(feature = "derive"))]
 /// fn main() {}
@@ -180,6 +178,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
         &self,
         input: NamedConstructionInput<M>,
         value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+        allow_private: bool,
     ) -> Result<DynamicOwned<M>, ConstructionRecovery<M>> {
         self.assert_descriptor_contract();
         if self.shape() != ConstructionShape::Named {
@@ -188,7 +187,12 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Named,
             }));
         }
-        let validated = crate::construct::validated::validate_named(input, self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_named_with_visibility(
+            input,
+            self.fields,
+            value_type_id,
+            allow_private,
+        )?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -220,6 +224,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
         &self,
         input: TupleConstructionInput<M>,
         value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+        allow_private: bool,
     ) -> Result<DynamicOwned<M>, ConstructionRecovery<M>> {
         self.assert_descriptor_contract();
         if self.shape() != ConstructionShape::Tuple {
@@ -228,7 +233,12 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 actual: ConstructionShape::Tuple,
             }));
         }
-        let validated = crate::construct::validated::validate_tuple(input, self.fields, value_type_id)?;
+        let validated = crate::construct::validated::validate_tuple_with_visibility(
+            input,
+            self.fields,
+            value_type_id,
+            allow_private,
+        )?;
         Ok(self.execute(validated, value_type_id))
     }
 
@@ -258,6 +268,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
     fn construct_unit_with(
         &self,
         value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+        allow_private: bool,
     ) -> Result<DynamicOwned<M>, ConstructionRecovery<M>> {
         self.assert_descriptor_contract();
         if self.shape() != ConstructionShape::Unit {
@@ -269,7 +280,7 @@ impl<M: Mode + 'static> StructConstructor<M> {
                 Vec::new(),
             ));
         }
-        let validated = crate::construct::validated::validate_unit(self.fields)
+        let validated = crate::construct::validated::validate_unit_with_visibility(self.fields, allow_private)
             .map_err(|error| ConstructionRecovery::new(error, Vec::new()))?;
         Ok(self.execute(validated, value_type_id))
     }
@@ -355,7 +366,22 @@ impl StructConstructor<Local> {
         &self,
         input: NamedConstructionInput<Local>,
     ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
-        self.construct_named_with(input, local_type_id)
+        self.construct_named_with(input, local_type_id, false)
+    }
+
+    /// Constructs a local struct while allowing generated code to initialize
+    /// private fields.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy every invariant
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_named_unsafe(
+        &self,
+        input: NamedConstructionInput<Local>,
+    ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
+        self.construct_named_with(input, local_type_id, true)
     }
 
     /// Validates and constructs a local tuple or newtype struct.
@@ -380,7 +406,22 @@ impl StructConstructor<Local> {
         &self,
         input: TupleConstructionInput<Local>,
     ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
-        self.construct_tuple_with(input, local_type_id)
+        self.construct_tuple_with(input, local_type_id, false)
+    }
+
+    /// Constructs a local tuple struct while allowing initialization of private
+    /// fields.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the supplied values satisfy every invariant
+    /// normally enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_tuple_unsafe(
+        &self,
+        input: TupleConstructionInput<Local>,
+    ) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
+        self.construct_tuple_with(input, local_type_id, true)
     }
 
     /// Validates and constructs a local unit struct.
@@ -399,78 +440,19 @@ impl StructConstructor<Local> {
     /// Panics if generated metadata or adapter output violates its contract.
     #[inline]
     pub fn construct_unit(&self) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
-        self.construct_unit_with(local_type_id)
-    }
-}
-
-impl StructConstructor<ThreadSafe> {
-    /// Validates and constructs a thread-safe named struct.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Named values to validate against the struct fields.
-    ///
-    /// # Returns
-    ///
-    /// Returns the constructed thread-safe value on success.
-    ///
-    /// # Errors
-    ///
-    /// Returns recovery with all caller-owned values when validation fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if generated metadata or adapter output violates its contract.
-    #[inline]
-    pub fn construct_named(
-        &self,
-        input: NamedConstructionInput<ThreadSafe>,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
-        self.construct_named_with(input, thread_safe_type_id)
+        self.construct_unit_with(local_type_id, false)
     }
 
-    /// Validates and constructs a thread-safe tuple or newtype struct.
+    /// Constructs a local unit struct while allowing initialization of private
+    /// fields.
     ///
-    /// # Parameters
+    /// # Safety
     ///
-    /// - `input`: Positional values to validate against the struct fields.
-    ///
-    /// # Returns
-    ///
-    /// Returns the constructed thread-safe value on success.
-    ///
-    /// # Errors
-    ///
-    /// Returns recovery with all caller-owned values when validation fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if generated metadata or adapter output violates its contract.
-    #[inline]
-    pub fn construct_tuple(
-        &self,
-        input: TupleConstructionInput<ThreadSafe>,
-    ) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
-        self.construct_tuple_with(input, thread_safe_type_id)
-    }
-
-    /// Validates and constructs a thread-safe unit struct.
-    ///
-    /// # Returns
-    ///
-    /// Returns the constructed thread-safe value on success.
-    ///
-    /// # Errors
-    ///
-    /// Returns an empty-input recovery when the target is not constructible as
-    /// a unit struct.
-    ///
-    /// # Panics
-    ///
-    /// Panics if generated metadata or adapter output violates its contract.
-    #[inline]
-    pub fn construct_unit(&self) -> Result<DynamicOwned<ThreadSafe>, ConstructionRecovery<ThreadSafe>> {
-        self.construct_unit_with(thread_safe_type_id)
+    /// The caller must ensure generated values satisfy all invariants normally
+    /// enforced by private fields of the target type.
+    #[allow(unsafe_code)]
+    pub unsafe fn construct_unit_unsafe(&self) -> Result<DynamicOwned<Local>, ConstructionRecovery<Local>> {
+        self.construct_unit_with(local_type_id, true)
     }
 }
 
@@ -519,27 +501,4 @@ pub(crate) fn local_type_id(value: &DynamicOwned<Local>) -> TypeId {
         .as_any()
         .map(Any::type_id)
         .unwrap_or_else(|| unreachable!("owned local values are Any-compatible"))
-}
-
-/// Returns the exact thread-safe erased value type identity.
-///
-/// # Parameters
-///
-/// - `value`: The thread-safe dynamic value whose concrete type is inspected.
-///
-/// # Returns
-///
-/// Returns its process-local concrete `TypeId`.
-///
-/// # Panics
-///
-/// Panics only if thread-safe dynamic storage violates its `Any` compatibility
-/// invariant.
-#[must_use]
-#[inline]
-pub(crate) fn thread_safe_type_id(value: &DynamicOwned<ThreadSafe>) -> TypeId {
-    value
-        .as_any()
-        .map(Any::type_id)
-        .unwrap_or_else(|| unreachable!("owned thread-safe values are Any-compatible"))
 }

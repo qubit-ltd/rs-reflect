@@ -19,7 +19,13 @@ use crate::invoke::ArgumentExpectation;
 use crate::invoke::Invocation;
 use crate::invoke::InvocationArg;
 use crate::invoke::InvocationBinding;
+use crate::invoke::InvocationError;
+use crate::invoke::InvocationErrorKind;
 use crate::invoke::InvocationMode;
+use crate::value::DynamicMut;
+use crate::value::DynamicOwned;
+use crate::value::DynamicRef;
+use crate::value::Local;
 
 /// Invocation input for a `Pin<&T>` receiver.
 ///
@@ -110,6 +116,20 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
     #[inline]
     pub const fn receiver(&self) -> Pin<&'call T> {
         self.receiver
+    }
+
+    pub(crate) fn reject(
+        self,
+        identity: &MemberId,
+        kind: InvocationErrorKind,
+    ) -> PinnedRefInvocationFailure<'call, T, M> {
+        PinnedRefInvocationFailure {
+            error: InvocationError::new(identity.clone(), kind),
+            recovery: PinnedRefInvocationRecovery {
+                receiver: self.receiver,
+                invocation: self.invocation,
+            },
+        }
     }
 
     /// Returns arguments in their current caller or declaration order.
@@ -222,5 +242,41 @@ impl<'call, T: ?Sized, M: InvocationMode> PinnedRefInvocation<'call, T, M> {
                 },
             }),
         }
+    }
+}
+
+impl<'call, T: ?Sized> PinnedRefInvocation<'call, T, Local> {
+    /// Appends an owned argument while retaining the pinned receiver.
+    #[must_use]
+    pub fn arg<V: 'static>(mut self, value: V) -> Self {
+        self.invocation
+            .push_argument(InvocationArg::Owned(DynamicOwned::<Local>::new(value)), None);
+        self
+    }
+
+    /// Appends an owned argument bound to a parameter name.
+    #[must_use]
+    pub fn named_arg<N: Into<Box<str>>, V: 'static>(mut self, name: N, value: V) -> Self {
+        self.invocation.push_argument(
+            InvocationArg::Owned(DynamicOwned::<Local>::new(value)),
+            Some(name.into()),
+        );
+        self
+    }
+
+    /// Appends a shared borrowed argument while retaining the pinned receiver.
+    #[must_use]
+    pub fn arg_ref(mut self, value: &'call (impl Sized + 'static)) -> Self {
+        self.invocation
+            .push_argument(InvocationArg::Ref(DynamicRef::<Local>::new(value)), None);
+        self
+    }
+
+    /// Appends a mutable borrowed argument while retaining the pinned receiver.
+    #[must_use]
+    pub fn arg_mut(mut self, value: &'call mut (impl Sized + 'static)) -> Self {
+        self.invocation
+            .push_argument(InvocationArg::Mut(DynamicMut::<Local>::new(value)), None);
+        self
     }
 }

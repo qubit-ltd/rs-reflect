@@ -34,7 +34,6 @@ use crate::value::DynamicMut;
 use crate::value::DynamicOwned;
 use crate::value::DynamicRef;
 use crate::value::Local;
-use crate::value::ReflectedOwned;
 
 fn rejected_field_value(value: u8) -> FieldSetFailure {
     let field = FieldIdentity::new(TypeId::of::<u16>(), "u16", 3, Some("value"));
@@ -45,11 +44,11 @@ fn rejected_field_value(value: u8) -> FieldSetFailure {
         },
         field,
         Some("value"),
-        ReflectedOwned::new(value),
+        DynamicOwned::<Local>::new(value),
     )
 }
 
-fn owned_u8(value: ReflectedOwned) -> u8 {
+fn owned_u8(value: DynamicOwned<Local>) -> u8 {
     match value.downcast::<u8>() {
         Ok(value) => value,
         Err(_) => panic!("test recovery must preserve the original u8"),
@@ -159,12 +158,12 @@ fn test_dynamic_type_probes_and_capability_adapters_enforce_exact_contracts() {
         .get(clone_key())
         .unwrap()
         .expect("clone adapter is registered");
-    let source = DynamicOwned::<Local>::new(String::from("value"));
+    let source = String::from("value");
     let cloned = clone_adapter
-        .clone_owned(&source)
+        .clone_value(&source)
         .expect("exact source type can be cloned");
     assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("value"));
-    assert!(clone_adapter.clone_owned(&DynamicOwned::<Local>::new(1_u8)).is_err());
+    assert!(clone_adapter.clone_value(&1_u8).is_err());
     let defaulted = capabilities
         .get(default_key())
         .unwrap()

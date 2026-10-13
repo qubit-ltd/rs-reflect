@@ -37,7 +37,8 @@ use crate::descriptor::VariantKind;
 use crate::expression::ConstExpression;
 use crate::expression::FunctionAbi;
 use crate::identity::Visibility;
-use crate::value::ReflectedOwned;
+use crate::value::DynamicOwned;
+use crate::value::Local;
 
 /// A zero-sized method-resolution probe for determining whether the generic
 /// environment semantically proves `T: Reflect`.
@@ -323,8 +324,8 @@ pub fn const_argument_diagnostic<T: ConstArgumentValue>(value: T) -> Box<str> {
 ///
 /// Returns the value wrapped as a local reflected owned value.
 #[doc(hidden)]
-pub fn const_argument_owned<T: 'static>(value: T) -> ReflectedOwned {
-    ReflectedOwned::new(value)
+pub fn const_argument_owned<T: 'static>(value: T) -> DynamicOwned<Local> {
+    DynamicOwned::<Local>::new(value)
 }
 
 /// Interns a runtime-created descriptor for one concrete type specialization.

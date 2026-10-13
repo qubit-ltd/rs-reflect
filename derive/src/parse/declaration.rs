@@ -48,6 +48,7 @@ use crate::ir::GenericKindIr;
 use crate::ir::GenericParamIr;
 use crate::ir::GenericsIr;
 use crate::ir::HelperAttributeIr;
+use crate::ir::HelperName;
 use crate::ir::HelperTarget;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MacroKind;
@@ -230,14 +231,17 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                 .variants
                 .iter()
                 .enumerate()
-                .map(|(index, variant)| {
+                .filter_map(|(index, variant)| {
                     let attributes = parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
+                    if is_skipped(&attributes, &mut errors) {
+                        return None;
+                    }
                     let kind = match variant.fields {
                         Fields::Unit => VariantKindIr::Unit,
                         Fields::Unnamed(_) => VariantKindIr::Tuple,
                         Fields::Named(_) => VariantKindIr::Struct,
                     };
-                    VariantIr {
+                    Some(VariantIr {
                         name: variant.ident.clone(),
                         index,
                         kind,
@@ -248,7 +252,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                             .as_ref()
                             .map(|(_, expression)| expression.to_token_stream()),
                         span: variant.ident.span(),
-                    }
+                    })
                 })
                 .collect(),
             retained_tokens,
@@ -389,6 +393,46 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
     })
 }
 
+/// Reports conflicting helpers and returns whether the member must be omitted.
+fn is_skipped(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) -> bool {
+    let skips: Vec<_> = attributes
+        .iter()
+        .filter(|attribute| attribute.name == HelperName::Skip)
+        .collect();
+    let Some(skip) = skips.first() else {
+        return false;
+    };
+    if skips.len() > 1 {
+        errors.push(Error::new(skip.span, "duplicate `skip` helper"));
+    }
+    for (index, attribute) in attributes.iter().enumerate() {
+        if attributes[..index]
+            .iter()
+            .any(|previous| previous.name == attribute.name)
+        {
+            errors.push(Error::new(
+                attribute.span,
+                format!("duplicate `{}` helper", attribute.name.as_str()),
+            ));
+        }
+    }
+    let conflicts: &[HelperName] = match skip.target {
+        HelperTarget::Field => &[HelperName::ReadOnly, HelperName::NoConstruct],
+        HelperTarget::Variant => &[HelperName::NoConstruct],
+        HelperTarget::Method => &[HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe],
+        _ => &[],
+    };
+    for conflict in conflicts {
+        if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == *conflict) {
+            errors.push(Error::new(
+                attribute.span,
+                format!("`skip` cannot be combined with `{}`", conflict.as_str()),
+            ));
+        }
+    }
+    true
+}
+
 /// Converts a field collection in source order.
 ///
 /// # Parameters
@@ -404,13 +448,19 @@ fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> 
     fields
         .iter()
         .enumerate()
-        .map(|(index, field)| FieldIr {
-            name: field.ident.clone(),
-            index,
-            visibility: convert_visibility(&field.vis),
-            ty: convert_type(&field.ty),
-            attributes: parse_attributes(&field.attrs, HelperTarget::Field, errors),
-            span: field.span(),
+        .filter_map(|(index, field)| {
+            let attributes = parse_attributes(&field.attrs, HelperTarget::Field, errors);
+            if is_skipped(&attributes, errors) {
+                return None;
+            }
+            Some(FieldIr {
+                name: field.ident.clone(),
+                index,
+                visibility: convert_visibility(&field.vis),
+                ty: convert_type(&field.ty),
+                attributes,
+                span: field.span(),
+            })
         })
         .collect()
 }
@@ -553,13 +603,18 @@ fn convert_trait_items(
     let mut associated_consts = Vec::new();
     for trait_item in &item.items {
         match trait_item {
-            TraitItem::Fn(function) => methods.push(convert_method(
-                &function.sig,
-                &Visibility::Inherited,
-                &function.attrs,
-                function.default.is_some(),
-                errors,
-            )),
+            TraitItem::Fn(function) => {
+                let method = convert_method(
+                    &function.sig,
+                    &Visibility::Inherited,
+                    &function.attrs,
+                    function.default.is_some(),
+                    errors,
+                );
+                if !is_skipped(&method.attributes, errors) {
+                    methods.push(method);
+                }
+            }
             TraitItem::Type(ty) => associated_types.push(AssociatedTypeIr {
                 name: ty.ident.clone(),
                 generics: convert_generics(&ty.generics),
@@ -606,13 +661,12 @@ fn convert_impl_items(
     let mut associated_consts = Vec::new();
     for impl_item in &item.items {
         match impl_item {
-            ImplItem::Fn(function) => methods.push(convert_method(
-                &function.sig,
-                &function.vis,
-                &function.attrs,
-                true,
-                errors,
-            )),
+            ImplItem::Fn(function) => {
+                let method = convert_method(&function.sig, &function.vis, &function.attrs, true, errors);
+                if !is_skipped(&method.attributes, errors) {
+                    methods.push(method);
+                }
+            }
             ImplItem::Type(ty) => associated_types.push(AssociatedTypeIr {
                 name: ty.ident.clone(),
                 generics: convert_generics(&ty.generics),

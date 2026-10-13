@@ -615,6 +615,30 @@ pub(crate) fn path_arguments(
                     )
                 }
                 PathArgumentIr::Type(value) => {
+                    if let TypeKindIr::Path(path) = &value.kind
+                        && path.qualified_self.is_none()
+                        && path.segments.len() == 1
+                        && matches!(path.segments[0].arguments, PathArgumentsIr::None)
+                        && environment.is_const_parameter(&path.segments[0].name)
+                    {
+                        let name = LitStr::new(&path.segments[0].name, value.span);
+                        let expression = quote!(#facade::__private::codegen_v3::expression::const_parameter(#name));
+                        return Some(
+                            quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
+                                #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
+                                    #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
+                                        #facade::__private::codegen_v3::expression::concrete(
+                                            vec!["_".into()].into_boxed_slice(),
+                                            vec![].into_boxed_slice(),
+                                            #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                                        )
+                                    ),
+                                    #expression,
+                                    #name,
+                                ),
+                            )),
+                        );
+                    }
                     let value = type_expression(value, environment, facade);
                     Some(
                         quote!(#facade::__private::codegen_v3::expression::GenericArgument::Type(
@@ -1027,6 +1051,25 @@ mod tests {
         );
         assert!(rendered.contains("u8"), "generated expression should contain u8");
         assert!(rendered.contains("u16"), "generated expression should contain u16");
+    }
+
+    /// Verifies const parameters passed as type-shaped path arguments retain
+    /// their const kind in generic impl metadata.
+    #[test]
+    fn test_type_expression_classifies_const_generic_path_arguments() {
+        let environment = GenericEnvironment::new()
+            .with_type_parameter("item")
+            .with_const_parameter("capacity");
+        let rendered = render_type("Service<item, capacity>", &environment);
+
+        assert!(
+            rendered.contains("GenericArgument :: Const"),
+            "const generic argument should be emitted as a const"
+        );
+        assert!(
+            rendered.contains("const_parameter (\"capacity\")"),
+            "const parameter should retain its symbolic identity"
+        );
     }
 
     /// Verifies qualified projections and associated constraints stay

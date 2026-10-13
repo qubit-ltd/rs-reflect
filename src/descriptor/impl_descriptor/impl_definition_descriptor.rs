@@ -82,6 +82,8 @@ pub struct ImplDefinitionDescriptor {
     implemented_trait_id: Option<TraitId>,
     /// Diagnostic path retained even when the trait declaration is unresolved.
     implemented_trait_path: Option<Box<str>>,
+    /// Structural trait application retained for generic impl matching.
+    implemented_trait_expression: Option<TypeExpression>,
     /// Generic parameters and predicates declared by this impl.
     generic_definition: &'static GenericDefinitionDescriptor,
     /// Lazily initialized methods in source order.
@@ -132,6 +134,7 @@ impl ImplDefinitionDescriptor {
             implemented_trait,
             implemented_trait_id: implemented_trait.map(|descriptor| descriptor.trait_id().clone()),
             implemented_trait_path: implemented_trait.map(|descriptor| descriptor.rust_path().into()),
+            implemented_trait_expression: None,
             generic_definition,
             methods: OnceLock::new(),
             associated_items: OnceLock::new(),
@@ -169,10 +172,33 @@ impl ImplDefinitionDescriptor {
             implemented_trait: None,
             implemented_trait_id,
             implemented_trait_path: Some(implemented_trait_path.into()),
+            implemented_trait_expression: None,
             generic_definition,
             methods: OnceLock::new(),
             associated_items: OnceLock::new(),
         }
+    }
+
+    /// Creates an unresolved trait impl definition with its structural trait
+    /// application preserved for concrete call-site binding.
+    #[doc(hidden)]
+    pub fn new_unresolved_trait_with_expression(
+        fragment_identity: FragmentIdentity,
+        target_type: TypeExpression,
+        implemented_trait_path: impl Into<Box<str>>,
+        implemented_trait_id: Option<TraitId>,
+        implemented_trait_expression: TypeExpression,
+        generic_definition: &'static GenericDefinitionDescriptor,
+    ) -> Self {
+        let mut result = Self::new_unresolved_trait(
+            fragment_identity,
+            target_type,
+            implemented_trait_path,
+            implemented_trait_id,
+            generic_definition,
+        );
+        result.implemented_trait_expression = Some(implemented_trait_expression);
+        result
     }
 
     /// Returns the source/content identity of this impl fragment.
@@ -244,6 +270,14 @@ impl ImplDefinitionDescriptor {
     #[inline]
     pub fn implemented_trait_id(&self) -> Option<&TraitId> {
         self.implemented_trait_id.as_ref()
+    }
+
+    /// Returns the structural trait application when the source impl retained
+    /// one, including its generic and associated-type arguments.
+    #[must_use]
+    #[inline]
+    pub const fn implemented_trait_expression(&self) -> Option<&TypeExpression> {
+        self.implemented_trait_expression.as_ref()
     }
 
     /// Returns the trait link resolved in `registry`, or `None` when this

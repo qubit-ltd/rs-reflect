@@ -14,6 +14,7 @@ pub(crate) mod fragment;
 mod impl_definition_candidates;
 mod indexes;
 mod internal;
+mod method_binding;
 mod reflect_registry;
 mod registry_builder;
 mod registry_snapshot_builder;
@@ -33,6 +34,10 @@ pub(crate) use internal::benchmark_registry_facts::BenchmarkRegistryFacts;
 pub(crate) use internal::benchmark_registry_facts::aggregate_benchmark_registry_facts;
 #[cfg(feature = "bench-internals")]
 pub(crate) use internal::benchmark_registry_facts::prepare_benchmark_registry_facts;
+pub use method_binding::MethodBinding;
+pub use method_binding::MethodBindingIdentity;
+pub use method_binding::ResolvedMethodBinding;
+pub use method_binding::TraitMethodSelector;
 pub use reflect_registry::ReflectRegistry;
 pub(crate) use registry_builder::build_registry;
 pub(crate) use registry_builder::initialize_registry;

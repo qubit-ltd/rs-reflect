@@ -261,36 +261,26 @@ impl<M: Mode> fmt::Debug for ValidatedUpdateInput<M> {
     }
 }
 
-/// Validates named from-zero input without extracting any caller-owned value.
-///
-/// # Type Parameters
-///
-/// - `M`: The dynamic ownership mode of the input and validated values.
-///
-/// # Parameters
-///
-/// - `input`: Named caller-owned values to validate.
-/// - `fields`: The target fields and their generated construction policies.
-/// - `value_type_id`: The exact runtime type identity function for `M`.
-///
-/// # Returns
-///
-/// Returns descriptor-ordered validated values on success.
-///
-/// # Errors
-///
-/// Returns recovery containing the input values when validation fails.
-///
-/// # Panics
-///
-/// Panics if a generated value provider panics or metadata violates the
-/// descriptor-order contract.
-pub(crate) fn validate_named<M: Mode>(
+pub(crate) fn validate_named_with_visibility<M: Mode>(
     input: NamedConstructionInput<M>,
     fields: &'static [ConstructionField<M>],
     value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+    allow_private: bool,
 ) -> Result<ValidatedConstructionInput<M>, ConstructionRecovery<M>> {
     assert_field_contract(fields);
+    if !allow_private
+        && let Some(field) = fields.iter().find(|field| {
+            field
+                .descriptor()
+                .visibility()
+                .as_declared()
+                .is_some_and(|visibility| visibility.kind() != crate::identity::VisibilityKind::Public)
+        })
+    {
+        return Err(input.into_recovery(ConstructionError::VisibilityDenied {
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
+        }));
+    }
     if let Some(error) = unavailable_constructor_field(fields) {
         return Err(input.into_recovery(error));
     }
@@ -351,37 +341,26 @@ pub(crate) fn validate_named<M: Mode>(
     })
 }
 
-/// Validates tuple input, permitting only trailing explicitly defaulted fields.
-///
-/// # Type Parameters
-///
-/// - `M`: The dynamic ownership mode of the input and validated values.
-///
-/// # Parameters
-///
-/// - `input`: Positional caller-owned values to validate.
-/// - `fields`: The target fields and their generated construction policies.
-/// - `value_type_id`: The exact runtime type identity function for `M`.
-///
-/// # Returns
-///
-/// Returns descriptor-ordered validated values on success.
-///
-/// # Errors
-///
-/// Returns recovery containing the input values when shape or validation
-/// fails.
-///
-/// # Panics
-///
-/// Panics if a generated value provider panics or metadata violates the
-/// descriptor-order contract.
-pub(crate) fn validate_tuple<M: Mode>(
+pub(crate) fn validate_tuple_with_visibility<M: Mode>(
     input: TupleConstructionInput<M>,
     fields: &'static [ConstructionField<M>],
     value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+    allow_private: bool,
 ) -> Result<ValidatedConstructionInput<M>, ConstructionRecovery<M>> {
     assert_field_contract(fields);
+    if !allow_private
+        && let Some(field) = fields.iter().find(|field| {
+            field
+                .descriptor()
+                .visibility()
+                .as_declared()
+                .is_some_and(|visibility| visibility.kind() != crate::identity::VisibilityKind::Public)
+        })
+    {
+        return Err(input.into_recovery(ConstructionError::VisibilityDenied {
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
+        }));
+    }
     if let Some(error) = unavailable_constructor_field(fields) {
         return Err(input.into_recovery(error));
     }
@@ -479,10 +458,31 @@ pub(crate) fn validate_tuple<M: Mode>(
 /// # Panics
 ///
 /// Panics if generated field indices violate the descriptor-order contract.
+#[cfg(test)]
 pub(crate) fn validate_unit<M: Mode>(
     fields: &'static [ConstructionField<M>],
 ) -> Result<ValidatedConstructionInput<M>, ConstructionError> {
+    validate_unit_with_visibility(fields, false)
+}
+
+pub(crate) fn validate_unit_with_visibility<M: Mode>(
+    fields: &'static [ConstructionField<M>],
+    allow_private: bool,
+) -> Result<ValidatedConstructionInput<M>, ConstructionError> {
     assert_field_contract(fields);
+    if !allow_private
+        && let Some(field) = fields.iter().find(|field| {
+            field
+                .descriptor()
+                .visibility()
+                .as_declared()
+                .is_some_and(|visibility| visibility.kind() != crate::identity::VisibilityKind::Public)
+        })
+    {
+        return Err(ConstructionError::VisibilityDenied {
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
+        });
+    }
     if let Some(error) = unavailable_constructor_field(fields) {
         return Err(error);
     }
@@ -518,13 +518,37 @@ pub(crate) fn validate_unit<M: Mode>(
 /// # Panics
 ///
 /// Panics if generated field indices violate the descriptor-order contract.
+#[cfg(test)]
 pub(crate) fn validate_update<M: Mode>(
     input: StructUpdateInput<M>,
     expected_root: TypeId,
     fields: &'static [UpdateField],
     value_type_id: fn(&DynamicOwned<M>) -> TypeId,
 ) -> Result<ValidatedUpdateInput<M>, ConstructionRecovery<M>> {
+    validate_update_with_visibility(input, expected_root, fields, value_type_id, false)
+}
+
+pub(crate) fn validate_update_with_visibility<M: Mode>(
+    input: StructUpdateInput<M>,
+    expected_root: TypeId,
+    fields: &'static [UpdateField],
+    value_type_id: fn(&DynamicOwned<M>) -> TypeId,
+    allow_private: bool,
+) -> Result<ValidatedUpdateInput<M>, ConstructionRecovery<M>> {
     assert_update_field_contract(fields);
+    if !allow_private
+        && let Some(field) = fields.iter().find(|field| {
+            field
+                .descriptor()
+                .visibility()
+                .as_declared()
+                .is_some_and(|visibility| visibility.kind() != crate::identity::VisibilityKind::Public)
+        })
+    {
+        return Err(input.into_recovery(ConstructionError::VisibilityDenied {
+            field: Box::new(ConstructionFieldId::from_descriptor(field.descriptor())),
+        }));
+    }
     let actual_root = value_type_id(input.base());
     if actual_root != expected_root {
         return Err(input.into_recovery(ConstructionError::BaseTypeMismatch {

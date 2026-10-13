@@ -135,6 +135,10 @@ fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -
         errors.push(Error::new(span, format!("unknown reflection helper `{path_text}`")));
         return None;
     };
+    if let Some(message) = removed_helper_diagnostic(&source_name) {
+        errors.push(Error::new(span, message));
+        return None;
+    }
     let Some(name) = HelperName::from_str(&source_name) else {
         errors.push(Error::new(span, format!("unknown reflection helper `{source_name}`")));
         return None;
@@ -187,6 +191,24 @@ fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -
             None
         }
     }
+}
+
+/// Returns an actionable diagnostic for helper options removed by the v3 API.
+///
+/// These names remain recognized here so that old source gets a focused error
+/// instead of silently changing behavior or producing a generic unknown-key
+/// diagnostic.
+fn removed_helper_diagnostic(name: &str) -> Option<String> {
+    let message = match name {
+        "rename" => "`rename` was removed; reflected names now use the Rust item name",
+        "readonly" | "read_only" => "`readonly` was removed; field mutation follows the v3 access API",
+        "no_construct" => "`no_construct` was removed; construction support is determined by the v3 descriptor API",
+        "default" => "`default` was removed; provide values through the v3 construction input API",
+        "thread_safe" => "`thread_safe` was removed; use the local or thread-safe value API explicitly",
+        "specialize" => "`specialize` was removed; bind generic methods at the call site with `bind_method!`",
+        _ => return None,
+    };
+    Some(message.to_owned())
 }
 
 /// Parses a flag or a parenthesized list of inherited associated item paths.

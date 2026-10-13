@@ -33,7 +33,8 @@ use crate::expression::LifetimeExpression;
 use crate::expression::TraitBoundModifier;
 use crate::expression::TypeExpression;
 use crate::identity::Visibility;
-use crate::value::ReflectedRef;
+use crate::value::DynamicRef;
+use crate::value::Local;
 
 struct InternedFixture;
 
@@ -57,7 +58,7 @@ fn debug_trait_descriptor() -> &'static TraitDescriptor {
 }
 
 /// Reports every value as belonging to the fixture variant.
-fn active_variant(_target: ReflectedRef<'_>) -> Result<bool, TypeMismatch> {
+fn active_variant(_target: DynamicRef<'_, Local>) -> Result<bool, TypeMismatch> {
     Ok(true)
 }
 
@@ -103,7 +104,7 @@ fn test_const_argument_factories_cover_supported_primitives() {
     assert_eq!(descriptor::const_argument_owned(9_u8).downcast_ref::<u8>(), Some(&9));
 
     let reader = descriptor::associated_const_reader(constant_value);
-    assert_eq!(reader.read().downcast_ref::<u8>(), Some(&41));
+    assert_eq!(reader.read::<u8>().expect("the const reader preserves its type"), 41);
     assert_eq!(format!("{reader:?}"), "AssociatedConstReader(..)");
 }
 

@@ -269,3 +269,8 @@ reason = "The sealed mode trait and its two marker implementations jointly defin
 rule = "public-type-layout"
 path = "src/value/storage.rs"
 reason = "Owned, shared, and mutable storage for local and thread-safe modes form one six-cell representation matrix."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/registry/method_binding.rs"
+reason = "Binding selectors, duplicate-detection identity, and resolved bindings form one registration protocol consumed together by the registry builder."

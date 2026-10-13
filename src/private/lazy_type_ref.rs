@@ -131,4 +131,14 @@ mod tests {
         assert!(std::panic::catch_unwind(|| RELATION.get()).is_err());
         assert!(std::panic::catch_unwind(|| RELATION.get()).is_err());
     }
+
+    #[test]
+    fn test_debug_does_not_resolve_and_reports_cached_state() {
+        static RELATION: LazyTypeRef = LazyTypeRef::resolved::<u8>();
+
+        assert_eq!(format!("{RELATION:?}"), "LazyTypeRef(\"<unresolved>\")");
+        let resolved = RELATION.get();
+        assert!(resolved.as_resolved().is_some());
+        assert_ne!(format!("{RELATION:?}"), "LazyTypeRef(\"<unresolved>\")");
+    }
 }
