@@ -7,19 +7,18 @@
 // =============================================================================
 
 // reflect-example-start
-use qubit_reflect::FieldAccessError;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
+use qubit_reflect::access::FieldAccessError;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    #[reflect(read_only)]
-    id: u64,
-    email: String,
-    credit_limit_cents: u64,
+    pub id: u64,
+    pub email: String,
+    pub credit_limit_cents: u64,
+    secret: String,
+    #[reflect(skip)]
+    internal_note: String,
 }
 
 /// Runs the example and panics if a business assertion or reflection operation
@@ -30,28 +29,35 @@ fn main() {
         id: 1001,
         email: String::from("ada@example.com"),
         credit_limit_cents: 50_000,
+        secret: String::from("private"),
+        internal_note: String::from("not reflected"),
     };
 
     let email = descriptor.field("email").expect("derived field");
     email
-        .set(
-            ReflectedMut::new(&mut customer),
-            ReflectedOwned::new(String::from("ada@corp.example")),
-        )
+        .set(&mut customer, String::from("ada@corp.example"))
         .expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current = email.get(ReflectedRef::new(&customer)).expect("shared read");
-    assert_eq!(
-        current.downcast_ref::<String>().map(String::as_str),
-        Some("ada@corp.example")
-    );
+    let current: &String = email.get(&customer).expect("shared read");
+    assert_eq!(current, "ada@corp.example");
 
-    let id = descriptor.field("id").expect("derived field");
-    let failure = id
-        .set(ReflectedMut::new(&mut customer), ReflectedOwned::new(2002_u64))
-        .expect_err("read-only field rejects replacement");
-    assert!(matches!(failure.error(), FieldAccessError::ReadOnly { .. }));
-    assert_eq!(customer.id, 1001);
+    let secret = descriptor.field("secret").expect("private field is described");
+    assert!(matches!(
+        secret.get::<_, String>(&customer),
+        Err(FieldAccessError::NotPublic { .. })
+    ));
+    // SAFETY: this example owns Customer and intentionally demonstrates the
+    // visibility bypass.
+    assert_eq!(
+        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
+        "private"
+    );
+    // SAFETY: this example owns Customer and maintains the String field's type
+    // invariant.
+    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    assert_eq!(customer.secret, "updated");
+    assert!(descriptor.field("internal_note").is_none());
+    assert_eq!(customer.internal_note, "not reflected");
 }
 // reflect-example-end

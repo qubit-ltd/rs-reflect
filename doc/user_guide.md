@@ -3,7 +3,6 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 <!-- reflect-contract: panic.async_poll=not-caught -->
-<!-- reflect-contract: panic.abort=catching-unavailable -->
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 <!-- reflect-contract: examples.native=cargo-example -->
 <!-- reflect-contract: typeref.constructor=owned-resolved -->
@@ -21,21 +20,16 @@ This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust ap
 - [Where to start](#where-to-start)
 - [Use generated field reflection](#use-generated-field-reflection)
 - [Integrate a support console](#integrate-a-support-console)
-  - [Define the editable record type](#define-the-editable-record-type)
-  - [Types used on this path](#types-used-on-this-path)
 - [Check the PATCH result](#check-the-patch-result)
   - [What success looks like](#what-success-looks-like)
 - [Construct a new value from input](#construct-a-new-value-from-input)
-  - [Constructing empty structs](#constructing-empty-structs)
 - [Invoke methods](#invoke-methods)
-  - [Recover unavailable input](#recover-an-input-when-the-selected-entry-is-unavailable)
-  - [Explicit generic specialization](#explicit-generic-specialization)
 - [Discover types and extension capabilities](#discover-types-and-extension-capabilities)
   - [Capabilities and registry discovery](#capabilities-and-registry-discovery)
   - [Build an isolated registry snapshot](#build-an-isolated-registry-snapshot)
 - [Choose features and access boundaries](#choose-features-and-access-boundaries)
   - [Choose dependency features](#choose-dependency-features)
-  - [Choose transparent, opaque, and thread-safe boundaries](#choose-transparent-opaque-and-thread-safe-boundaries)
+  - [Choose transparent or opaque boundaries](#choose-transparent-or-opaque-boundaries)
 - [Errors, diagnostics, and troubleshooting](#errors-diagnostics-and-troubleshooting)
 - [Boundaries and a practice checklist](#boundaries-and-a-practice-checklist)
 - [Migration notes](#migration-notes)
@@ -45,22 +39,25 @@ This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust ap
 
 Rust does not provide general runtime inspection of an application's struct fields, enum variants, traits, or implementations. If a framework needs to discover members by name or perform an operation selected at runtime, handwritten metadata and dispatch tables repeat facts already present in the Rust declaration. Those copies can drift.
 
-`qubit-reflect` generates the description and supported operation adapters from annotated Rust declarations. Consumers use immutable descriptors and checked dynamic values to inspect or operate on a reflected type. Reflection is opt-in: custom types derive or implement `Reflect`; trait and method reflection require their own attribute macros. The registry collects linked type and implementation facts, but does not store application objects or load plugins at runtime.
+`qubit-reflect` generates the description and supported operation adapters from annotated Rust declarations. Consumers use immutable descriptors and checked dynamic values to inspect or operate on a reflected type. Reflection is opt-in: annotate custom types and traits with `#[Reflect]`, and implementations with `#[ReflectImpl]`; manual implementations of the runtime `Reflect` trait are also supported. The registry collects linked type and implementation facts, but does not store application objects or load plugins at runtime.
 
 ## How macro-based reflection works
 
-| At the declaration | What it provides at runtime |
+| Declaration | Runtime facts |
 | --- | --- |
-| `#[derive(Reflect)]` on a struct or enum | A `Reflect` implementation, structural descriptors, and supported field or construction adapters. |
-| `#[reflect(...)]` on a trait | Trait and method metadata for registry lookup. |
-| `#[reflect_impl(...)]` on an `impl` | Implementation and method facts, with invocation adapters for supported signatures. |
-| `#[reflect(...)]` on a type, field, variant, or method | A policy such as `rename`, `read_only`, `skip`, or `no_invoke` for the generated contract. |
+| `#[Reflect]` on a struct, enum, or trait | Structural type, field, variant, and trait metadata plus supported adapters. |
+| `#[ReflectImpl]` on an inherent or trait `impl` | Implementation and method metadata plus supported invocation adapters. |
+| `#[reflect(skip)]` on a field, variant, or method | Completely omits that member from the reflection contract. |
 
-The macros run at compile time; `TypeDescriptor::of::<T>()` gives the runtime view of a concrete reflected type. A field lookup returns a `FieldDescriptor`, whose adapters check the receiver and value's exact Rust types. Method lookup uses a selected `ReflectRegistry`; invocation additionally checks the receiver and arguments. Structural metadata may remain available when an operation is deliberately disabled or its signature is unsupported. See [boundaries](#boundaries-and-a-practice-checklist) before exposing generated access to untrusted callers.
+The macros run at compile time. `TypeDescriptor::of::<T>()` gives the descriptor for a concrete type. Field operations accept ordinary references and values; invocation uses an `Invocation` builder and a selected `ReflectRegistry`. The runtime checks exact Rust types and preserves inputs rejected before an operation begins.
 
-The next example uses a support console: an API layer has decoded a change for `Customer.email` into a Rust `String`. The reflection layer can find the field by name and apply a typed replacement; the application still parses requests, authorizes callers, validates business rules, and persists changes.
+`skip` does not remove the Rust member and is not a secrecy mechanism. Non-public members can be described, but safe operations return a visibility error. The documented `_unsafe` operations bypass visibility only; callers must still satisfy the member's type and other invariants. Structs and enum variants with skipped fields remain describable but do not receive dynamic construction adapters, because the macro cannot invent a valid value for a hidden field without imposing extra bounds.
 
-`TypeRef::of::<T>()` produces an owned resolved reference to `TypeDescriptor::of::<T>()`; the reference value itself is not globally interned. Initializing the descriptor can allocate, and a manual `Reflect` implementation with a mismatched Rust `TypeId` panics. Generated lazy type references cache successful resolution for concurrent readers; a resolver panic leaves the slot empty so a later lookup can retry. `TypeDescriptor::field` scans fields by name, so measure repeated lookups with your actual record shapes before relying on lookup cost in a hot path.
+Generic method declarations remain definitions. To call one dynamically, bind a concrete instance at a compile-time call site with `bind_method!`, supplying its explicit function signature. Runtime `TypeId` values cannot generate new monomorphized code; an unbound generic method has no callable adapter. See the [method invocation section](#invoke-methods).
+
+`Box<dyn Any>` inputs to dynamic construction and update APIs are checked using the box's enclosed concrete type. A field declared as `Box<dyn Any>` still has that exact field type. Applications provide their own locks and synchronization; there are no separate thread-safe dynamic wrapper modes.
+
+A manual `Reflect` implementation must report the same Rust `TypeId` as its type. `TypeRef::of::<T>()` resolves to `TypeDescriptor::of::<T>()`; it is not a globally interned reference. Descriptor initialization can allocate. `TypeDescriptor::field` scans fields by name, so measure repeated lookups if they sit on a hot path.
 
 ## Where to start
 
@@ -72,23 +69,22 @@ Registry snapshots and migration notes come after the basic path.
 
 ## Use generated field reflection
 
-The following runnable example focuses on the reflection boundary. `Customer` remains an ordinary Rust value owned by the caller; the derive macro supplies its descriptor and checked field adapters. The business workflow appears after the example.
+The following runnable example focuses on the reflection boundary. `Customer` remains an ordinary Rust value owned by the caller; `#[Reflect]` supplies its descriptor and checked field adapters. The business workflow appears after the example.
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
-use qubit_reflect::FieldAccessError;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
+use qubit_reflect::access::FieldAccessError;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    #[reflect(read_only)]
-    id: u64,
-    email: String,
-    credit_limit_cents: u64,
+    pub id: u64,
+    pub email: String,
+    pub credit_limit_cents: u64,
+    secret: String,
+    #[reflect(skip)]
+    internal_note: String,
 }
 
 /// Runs the example and panics if a business assertion or reflection operation
@@ -99,29 +95,26 @@ fn main() {
         id: 1001,
         email: String::from("ada@example.com"),
         credit_limit_cents: 50_000,
+        secret: String::from("private"),
+        internal_note: String::from("not reflected"),
     };
 
     let email = descriptor.field("email").expect("derived field");
-    email
-        .set(
-            ReflectedMut::new(&mut customer),
-            ReflectedOwned::new(String::from("ada@corp.example")),
-        )
-        .expect("exactly typed replacement");
+    email.set(&mut customer, String::from("ada@corp.example")).expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current = email.get(ReflectedRef::new(&customer)).expect("shared read");
-    assert_eq!(
-        current.downcast_ref::<String>().map(String::as_str),
-        Some("ada@corp.example")
-    );
+    let current: &String = email.get(&customer).expect("shared read");
+    assert_eq!(current, "ada@corp.example");
 
-    let id = descriptor.field("id").expect("derived field");
-    let failure = id
-        .set(ReflectedMut::new(&mut customer), ReflectedOwned::new(2002_u64))
-        .expect_err("read-only field rejects replacement");
-    assert!(matches!(failure.error(), FieldAccessError::ReadOnly { .. }));
-    assert_eq!(customer.id, 1001);
+    let secret = descriptor.field("secret").expect("private field is described");
+    assert!(matches!(secret.get::<_, String>(&customer), Err(FieldAccessError::NotPublic { .. })));
+    // SAFETY: this example owns Customer and intentionally demonstrates the visibility bypass.
+    assert_eq!(unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"), "private");
+    // SAFETY: this example owns Customer and maintains the String field's type invariant.
+    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    assert_eq!(customer.secret, "updated");
+    assert!(descriptor.field("internal_note").is_none());
+    assert_eq!(customer.internal_note, "not reflected");
 }
 ```
 
@@ -160,120 +153,21 @@ prove that this checkout has been published or installed from a registry.
 
 ## Integrate a support console
 
-The record type, generic patch logic, and customer service are separate modules. `CustomerRepository` stands for the interface that talks to real storage. Integration has three steps: define the editable record type, write type-agnostic patch logic, and load, apply every change, then save.
+The runnable [`customer_patch` example](../examples/customer_patch.rs) shows a load–patch–save flow. An API layer parses request text into Rust values and authorizes the caller; the patch layer resolves field names and calls `field.set(&mut target, value)`. If the operation fails during validation, `FieldSetFailure<V>` retains the original value for inspection or retry. Earlier successful changes may exist in the in-memory object, so persist only after the full patch succeeds.
 
-### Define the editable record type
-
-The listing below condenses `src/customers/model.rs`, `src/patch.rs`, and `src/customer_service.rs` into one library file for documentation. This is library code without a program entry point, so it is compiled without execution:
-
-```rust,no_run
-// src/customers/model.rs
-pub mod customers {
-    use qubit_reflect::Reflect;
-
-    #[derive(Reflect)]
-    pub struct Customer {
-        #[reflect(read_only)]
-        pub id: u64,
-        pub email: String,
-        pub display_name: String,
-        pub credit_limit_cents: u64,
-    }
-}
-
-// src/patch.rs
-pub mod patch {
-    use qubit_reflect::{FieldAccessError, Reflect, ReflectedMut, ReflectedOwned, TypeDescriptor};
-
-    pub struct FieldChange {
-        pub field: String,
-        pub value: ReflectedOwned,
-    }
-
-    pub enum PatchError {
-        UnknownField { field: String, value: ReflectedOwned },
-        ReadOnly { field: String, value: ReflectedOwned },
-        TypeMismatch { field: String, value: ReflectedOwned },
-        Failed { field: String, error: FieldAccessError },
-    }
-
-    pub fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
-        let descriptor = TypeDescriptor::of::<T>();
-        for change in changes {
-            let field_name = change.field;
-            let Some(field) = descriptor.field(&field_name) else {
-                return Err(PatchError::UnknownField { field: field_name, value: change.value });
-            };
-            if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
-                let (error, recovery) = failure.into_parts();
-                return Err(match (error, recovery) {
-                    (FieldAccessError::ReadOnly { .. }, Some(recovery)) => {
-                        PatchError::ReadOnly { field: field_name, value: recovery.into_value() }
-                    }
-                    (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => {
-                        PatchError::TypeMismatch { field: field_name, value: recovery.into_value() }
-                    }
-                    (error, _) => PatchError::Failed { field: field_name, error },
-                });
-            }
-        }
-        Ok(())
-    }
-}
-
-// src/customer_service.rs
-pub mod customer_service {
-    use crate::customers::Customer;
-    use crate::patch::{FieldChange, PatchError, apply_patch};
-
-    pub trait CustomerRepository {
-        fn load(&self, id: u64) -> Result<Customer, Box<dyn std::error::Error>>;
-        fn save(&self, customer: &Customer) -> Result<(), Box<dyn std::error::Error>>;
-    }
-
-    pub enum UpdateError {
-        Patch(PatchError),
-        Repository(Box<dyn std::error::Error>),
-    }
-
-    pub fn update_customer(
-        repository: &dyn CustomerRepository,
-        id: u64,
-        changes: Vec<FieldChange>,
-    ) -> Result<(), UpdateError> {
-        let mut customer = repository.load(id).map_err(UpdateError::Repository)?;
-        apply_patch(&mut customer, changes).map_err(UpdateError::Patch)?;
-        repository.save(&customer).map_err(UpdateError::Repository)
-    }
-}
-```
-
-`#[derive(Reflect)]` generates structural metadata and access adapters at the declaration site. `apply_patch` works for every type that derives `Reflect`. The API layer authorizes the caller, decodes request text into `ReflectedOwned::new(the_field_rust_type)`, and calls `update_customer`. When it returns before `save`, nothing has been persisted. Reflection does not parse strings, coerce numbers, or infer `Into`.
-
-### Types used on this path
-
-| Type | Role in the support PATCH path |
-| --- | --- |
-| `Reflect` | Supplies reflection descriptors from a declaration; derive supports structs and enums. |
-| `TypeDescriptor` | Immutable structural metadata and field lookup for a concrete type. |
-| `FieldDescriptor` | Checked read, mutable borrow, or replacement for one field. |
-| `ReflectedRef` / `ReflectedMut` | Pass a shared or exclusive borrow of the target into adapters. |
-| `ReflectedOwned` | Pass ownership of a replacement or construction input. |
-| `FieldSetFailure` | Reports a failed replacement and, on pre-execution rejection, returns the unused owned value. |
-
-Repeated calls to `TypeDescriptor::of::<T>()` for the same concrete type return the same immutable root. Direct field access for a known type needs no registry initialization.
+A private field remains describable, but its safe getter or setter returns a visibility error. Use an `_unsafe` operation only when the caller can uphold the documented `# Safety` contract. A skipped field does not appear in queries at all; it is not an access-control mechanism.
 
 ## Check the PATCH result
 
-The minimal example updates the email, reads it back as `"ada@corp.example"`, and confirms the read-only `id` cannot be replaced. The program prints no application output; passing assertions and a normal exit are the success signal for that exercise.
+The minimal example updates the email, reads it back as `"ada@corp.example"`, and confirms the skipped `internal_note` is absent from the descriptor. The program prints no application output; passing assertions and a normal exit are the success signal for that exercise.
 
 ### What success looks like
 
-Before generated code runs, `set` checks the target type, access policy, and the replacement's exact `TypeId`. Read-only fields and type mismatches fail during those pre-execution checks; `FieldSetFailure::into_parts()` can return the unused owned value. Recovery retains field identity but not a borrow of the target; you can borrow `customer` again after the failed call ends.
+Before generated code runs, `set` checks the target type, visibility, and the replacement's exact `TypeId`. Non-public fields and type mismatches fail during those pre-execution checks; `FieldSetFailure::into_parts()` can return the unused value. Recovery retains field identity but not a borrow of the target; you can borrow `customer` again after the failed call ends.
 
 | Stage | What the application sees | What to do |
 | --- | --- | --- |
-| `field("email")` missing | `None`; the console may use a query name that differs from the source name after `rename`. | Check configuration and `rust_name()`; do not call field operations. |
+| `field("email")` missing | `None`; the member may be skipped or the name may not match the Rust declaration. | Check the declaration and whether `#[reflect(skip)]` is present; skipped members are not queryable. |
 | Pre-execution `set` rejection | `FieldSetFailure` recovery is `Some`; the replacement was not consumed. | Read the structured error, prompt for corrected input, recover the value if needed. |
 | Error after the adapter took ownership | Recovery is `None`. | Inspect the error and business state; do not assume the original value is retryable. |
 
@@ -281,149 +175,55 @@ Before generated code runs, `set` checks the target type, access policy, and the
 
 ## Construct a new value from input
 
-When the console creates a record, it may have decoded field values but no `Customer` instance yet. For a named struct, supply every constructible field by query name:
+Construction builders take ordinary owned values. A typed construction returns the concrete Rust value; dynamic construction returns `Box<dyn Any>`. Validation checks shape, member names or indices, duplicates, visibility, missing values, and exact types before it consumes the inputs.
 
 ```rust
-use qubit_reflect::{NamedConstructionInput, Reflect, ReflectedOwned, TypeDescriptor};
+use qubit_reflect::{NamedConstructionInput, Reflect, TypeDescriptor};
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    id: u64,
-    email: String,
-    display_name: String,
-    credit_limit_cents: u64,
+    pub id: u64,
+    pub email: String,
 }
 
 fn main() {
-    let customer = TypeDescriptor::of::<Customer>()
-        .construct_struct(NamedConstructionInput::new([
-            ("id", ReflectedOwned::new(1001_u64)),
-            ("email", ReflectedOwned::new(String::from("ada@example.com"))),
-            ("display_name", ReflectedOwned::new(String::from("Ada Lovelace"))),
-            ("credit_limit_cents", ReflectedOwned::new(50_000_u64)),
-        ]))
-        .expect("complete, exactly typed input")
-        .downcast::<Customer>()
-        .unwrap_or_else(|_| unreachable!("the descriptor constructs Customer"));
+    let customer: Customer = TypeDescriptor::of::<Customer>()
+        .construct_struct(
+            NamedConstructionInput::new()
+                .field("id", 1001_u64)
+                .field("email", String::from("ada@example.com")),
+        )
+        .expect("all public fields have values");
     assert_eq!(customer.email, "ada@example.com");
 }
 ```
 
-Use `construct_tuple` or `construct_unit` for the corresponding struct shape;
-an enum `VariantDescriptor` provides the same three construction methods.
-Construction validates shape, names or indices, duplicates, missing inputs,
-policy, and exact types before it consumes owned values. On failure,
-`ConstructionRecovery` returns the supplied inputs in caller order. A struct
-updater follows the same all-or-nothing validation rule, including for types
-that implement `Drop`.
-
-### Constructing empty structs
-
-| Declaration | Descriptor shape | Construction entry |
-| --- | --- | --- |
-| `struct A;` | `StructKind::Unit` | `construct_unit()` |
-| `struct B {}` | `StructKind::Named` | `construct_struct(NamedConstructionInput::new([]))` |
-| `struct C();` | `StructKind::Tuple` | `construct_tuple(TupleConstructionInput::new([]))` |
-
-The distinction also applies to empty const-generic structs. A wrong shape returns a construction
-error, never a value of a different type or an internal assertion failure.
+`ConstructionRecovery` retains inputs in caller order when validation fails. Struct updates accept a base value and ordinary replacement values. Dynamic `Box<dyn Any>` inputs are checked by their enclosed type; use the explicitly named `field_any`/`value_any` builder methods when supplying such dynamic boxes. If any field is marked `#[reflect(skip)]`, reflection still describes the type but dynamic construction is unavailable for that struct or enum variant: the omitted Rust field cannot safely be initialized by generated code.
 
 ## Invoke methods
 
-When the console must trigger a business operation, use `#[reflect_impl]` to
-generate method metadata, then use the same registry for lookup and invocation.
-`TypeDescriptor` queries ending in `_global` initialize and read the process-global
-registry; queries ending in `_in` read the explicitly supplied registry snapshot.
-When invoking a query result, use the same registry for lookup and invocation:
-for a global query, initialize the registry and pass that registry to invocation;
-for an isolated snapshot, pass that snapshot to both.
-The independent counter example below adds `2` to `1`, producing `3`. Passing
-the string `"2"` fails, returns that string, and leaves the counter at `3`.
-Converting UI input to `u64` remains the application's responsibility.
-
-### Invoke a service and recover invalid input
-
-Use the same registry for lookup and execution. `Err(InvocationUnavailable)` denotes an unavailable entry and preserves the input; `Ok(Err(InvocationFailure))` denotes a failed invocation; decode successful output by its exact type.
-
-```rust
-use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectedMut, ReflectedOwned,
-                    ReflectRegistry, TypeDescriptor, reflect_impl};
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::invoke::{InvocationArg, InvocationErrorKind};
-
-#[derive(Reflect)]
-struct Counter { value: u64 }
-
-#[reflect_impl]
-impl Counter {
-    fn add(&mut self, amount: u64) -> u64 {
-        self.value += amount;
-        self.value
-    }
-}
-
-fn main() {
-    let registry = ReflectRegistry::initialize().expect("valid declarations");
-    let MethodLookup::Unique(method) = TypeDescriptor::of::<Counter>()
-        .methods_named_in(&registry, "add") else { panic!("unique method") };
-    let mut counter = Counter { value: 1 };
-    {
-        let invocation = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
-            [InvocationArg::Owned(ReflectedOwned::new(2_u64))]);
-        let output = method.invoke_local(&registry, invocation)
-            .expect("statically supported signature")
-            .expect("valid receiver and arguments");
-        let InvocationOutput::Owned(value) = output else { panic!("owned output") };
-        assert_eq!(value.downcast::<u64>().unwrap_or_else(|_| panic!("u64")), 3);
-    }
-
-    {
-        let invalid = Invocation::borrowed_mut(ReflectedMut::new(&mut counter),
-            [InvocationArg::Owned(ReflectedOwned::new(String::from("2")))]);
-        let failure = method.invoke_local(&registry, invalid)
-            .expect("static entry still exists").err().expect("exact types required");
-        assert!(matches!(failure.error().kind(), InvocationErrorKind::ArgumentTypeMismatch { .. }));
-        let (receiver, arguments) = failure.into_recovery().into_parts();
-        drop(receiver);
-        let InvocationArg::Owned(value) = arguments.into_vec().pop().unwrap() else {
-            panic!("original owned input")
-        };
-        assert_eq!(value.downcast::<String>().unwrap_or_else(|_| panic!("String")), "2");
-    }
-    assert_eq!(counter.value, 3);
-}
-```
-
-### Recover an input when the selected entry is unavailable
-
-The support action does not request panic capture. This independent program first
-tries `invoke_catching_local`, receives `CatchingNotRequested`, takes back the
-complete `Invocation`, and explicitly retries through the ordinary local entry.
-The customer is suspended and the original reason is stored. This fallback is an
-application policy: ordinary invocation can propagate a method panic.
+Annotate method implementations with `#[ReflectImpl]`. A registry provides the method view, and `Invocation` accepts an ordinary receiver borrow and ordinary owned or borrowed arguments. The result is a single `Result`; validation failures preserve the receiver and unconsumed inputs in `InvocationFailure` recovery.
 
 <!-- reflect-source: examples/support_action.rs -->
 ```rust
 use qubit_reflect::Invocation;
 use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::ReflectRegistry;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::reflect_impl;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    id: u64,
-    suspended: bool,
-    suspension_reason: Option<String>,
+    pub id: u64,
+    pub suspended: bool,
+    pub suspension_reason: Option<String>,
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
@@ -442,7 +242,7 @@ impl Customer {
 fn main() {
     let registry = ReflectRegistry::initialize().expect("valid reflection declarations");
 
-    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(registry, "suspend") else {
+    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(&registry, "suspend") else {
         panic!("exactly one method named suspend")
     };
 
@@ -452,125 +252,25 @@ fn main() {
         suspension_reason: None,
     };
     {
-        let invocation = Invocation::borrowed_mut(
-            ReflectedMut::new(&mut customer),
-            [InvocationArg::Owned(ReflectedOwned::new(String::from(
-                "chargeback dispute",
-            )))],
-        );
-        let Err(unavailable) = suspend.invoke_catching_local(registry, invocation) else {
-            panic!("panic capture was not requested for this method")
-        };
-        assert!(matches!(
-            unavailable.reason(),
-            InvocationDispatchReason::CatchingNotRequested
-        ));
-        let invocation = unavailable.into_invocation();
+        let invocation = Invocation::receiver_mut(&mut customer).arg(String::from("chargeback dispute"));
         let output = suspend
-            .invoke_local(registry, invocation)
-            .expect("local invocation entry is available")
+            .invoke(registry, invocation)
             .expect("valid receiver and arguments");
         let InvocationOutput::Owned(changed) = output else {
             panic!("owned output")
         };
-        assert!(changed.downcast::<bool>().unwrap_or_else(|_| panic!("bool")));
+        assert!(DynamicOwned::<Local>::downcast::<bool>(changed).unwrap_or_else(|_| panic!("bool")));
     }
     assert!(customer.suspended);
     assert_eq!(customer.suspension_reason.as_deref(), Some("chargeback dispute"));
 }
 ```
 
-`InvocationDispatchResult<I, R>` is `Result<R, InvocationUnavailable<I>>`.
-An outer `Err` occurs before input binding, validation, or user code;
-`into_parts()` returns the triple `(mode, reason, invocation)`, while `into_invocation()`
-returns just the input. `NoAdapter` retains all static descriptor reasons;
-`MissingEntry` means this mode has no entry; catching also distinguishes
-`CatchingNotRequested` and `PanicAbort`. Ordinary calls return `Ok(Ok(output))`
-on success or `Ok(Err(InvocationFailure))` for validation errors. The counter
-example above uses the existing `InvocationRecovery` to retrieve the wrong
-string; that recovery contract is unchanged.
+Use the same registry for method lookup and invocation. Safe calls reject non-public methods. An `unsafe` invocation entry bypasses visibility only and still checks receiver type, argument types, borrowing, Pin, and enum state where applicable; read its `# Safety` section before calling it. Owned, borrowed, pinned, and future outputs retain the lifetimes imposed by their Rust signatures.
 
-Catching adds a separate method-panic layer:
-`Ok(Ok(Ok(output)))` succeeds, `Ok(Err(InvocationFailure))` reports validation,
-`Ok(Ok(Err(InvocationPanic)))` reports a caught method-body panic, and outer `Err`
-reports an unavailable catching entry. A caught panic does not restore inputs
-already consumed by the method or undo side effects.
+Generic methods need an explicit compile-time instance binding before name-based dynamic invocation. `bind_method!(method_path as fn(signature))` records the concrete target and generic arguments together with a generated adapter. The function signature is checked by Rust at the binding call site. Generic definitions remain queryable without a binding, but do not have a callable adapter. No runtime `TypeId` lookup generates code.
 
-Pinned borrowed calls use `PinnedRefInvocation<T, Local>` or
-`PinnedMutInvocation<T, Local>`. The supplied `T` must exactly match the receiver
-required by the pinned adapter; mismatch returns outer
-`PinnedReceiverTypeMismatch` before binding. Recovery preserves the original
-`Pin` and arguments, including caller order and named bindings, without unpinning
-or manufacturing a new pin proof. Ordinary validation uses the existing pinned
-recovery types. Outputs and futures borrow inputs as their signatures require,
-never the registry; recovering a mutable receiver still retains its exclusive
-borrow until the recovered input is consumed or dropped.
-
-Async invocation creates and returns a future; the application chooses its
-executor and polls it. Panics while polling that future are **not caught** by the
-invocation catching boundary. Async methods cannot request `catch_unwind`.
-With `panic=abort`, catching is unavailable (`PanicAbort` when an ordinary entry
-exists and catching was requested); aborting a method cannot be recovered by
-`catch_unwind`.
-
-### Declare traits and callable implementations
-
-- `#[reflect]` reflects a trait declaration, including supertraits, default
-  methods, associated types, and associated constants.
-- `#[reflect_impl]` reflects an inherent or trait implementation and generates
-  invocation adapters for methods whose receiver, parameters, ABI, and output
-  can safely cross the dynamic boundary.
-- `#[reflect(rename = "...")]` changes the lookup name only; `rust_name()`
-  preserves the original source identity. `skip`, `read_only`, `no_construct`,
-  `no_invoke`, and `opaque` preserve the applicable structural fact while
-  disabling or limiting the associated dynamic operation.
-
-Conditional compilation is applied before reflection validation. Put ordinary
-`#[cfg(...)]` and `#[cfg_attr(...)]` attributes on the declaration or member;
-inactive members are absent from both generated reflection metadata and the
-compiled Rust item. A platform-specific method may refer to a type that exists
-only on that platform, provided the same condition guards the method.
-`#[reflect(no_invoke)]` has a different purpose: the method remains in the
-descriptor, but reflection does not generate a dynamic call adapter.
-
-Look up a `MethodInstanceDescriptor` through the registry or an effective type
-view, then call `invoke_local(registry, invocation)` with the same explicit registry. Positional arguments are
-the canonical form. The runtime validates receiver, argument count, passing
-mode, and exact types in that order; a failure before user code returns the
-complete `InvocationRecovery`.
-
-Generic and blanket implementations register definition metadata. To make a
-finite concrete generic case callable or effective, declare
-`#[reflect(specialize(...))]`. `#[reflect(thread_safe)]` requests a
-thread-safe adapter and is accepted only when the generated Rust bounds prove
-the receiver, inputs, owned output, and future boundary. A thread-safe value
-can be downgraded to local mode, never upgraded by a runtime flag.
-
-### Explicit generic specialization
-
-Register a finite concrete impl for `Service<u8>`, then look up and invoke it through that concrete type.
-
-```rust
-use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectRegistry, TypeDescriptor, reflect_impl};
-use qubit_reflect::descriptor::MethodLookup;
-
-#[derive(Reflect)]
-struct Service<T> { value: T }
-
-#[reflect_impl(specialize(T = u8))]
-impl<T> Service<T> {
-    fn answer() -> u8 { 42 }
-}
-
-fn main() {
-    let registry = ReflectRegistry::initialize().unwrap();
-    let MethodLookup::Unique(method) = TypeDescriptor::of::<Service<u8>>()
-        .methods_named_in(&registry, "answer") else { panic!("explicit specialization") };
-    let output = method.invoke_local(&registry, Invocation::associated([])).unwrap().unwrap();
-    let InvocationOutput::Owned(value) = output else { panic!("owned output") };
-    assert_eq!(value.downcast::<u8>().unwrap_or_else(|_| panic!("u8")), 42);
-}
-```
+Method lookup can return no match, one method, or an ambiguous set. Handle each case explicitly. An invocation failure means the adapter exists but rejected the provided input; an unbound generic method instead reports an unavailable entry. Ordinary method panics follow the method's Rust panic behavior. Async calls return a future for the caller's executor to poll.
 
 ## Discover types and extension capabilities
 
@@ -593,22 +293,20 @@ descriptor also carries an adapter for inspecting a borrowed `Option<T>`.
 Built-in `Option<T>` descriptors provide that adapter:
 
 ```rust
-use qubit_reflect::{OptionalProjectionError, ReflectedRef, TypeDescriptor};
+use qubit_reflect::{OptionalProjectionError, TypeDescriptor};
 
 fn main() -> Result<(), OptionalProjectionError> {
 let value = Some(12_u32);
 let optional = TypeDescriptor::of::<Option<u32>>()
     .as_optional()
     .expect("Option descriptor");
-let inner = optional
-    .project_ref(ReflectedRef::new(&value))?
-    .expect("Some value");
-assert_eq!(inner.downcast_ref::<u32>(), Some(&12));
+let inner = optional.project_ref(&value)?;
+assert_eq!(inner, Some(&12));
 
 let absent: Option<u32> = None;
-assert!(optional.project_ref(ReflectedRef::new(&absent))?.is_none());
+assert!(optional.project_ref(&absent)?.is_none());
 assert!(matches!(
-    optional.project_ref(ReflectedRef::new(&Some(12_u8))),
+    optional.project_ref(&Some(12_u8)),
     Err(OptionalProjectionError::TypeMismatch(_)),
 ));
 Ok(())
@@ -620,8 +318,8 @@ without holding the concrete `Option<T>` adapter. Their `project_ref` call
 returns `OptionalProjectionError::Unavailable`; callers should check
 `has_ref_projection()` when adapter availability determines whether an
 operation can be bound. Projection uses the local shared borrow boundary; a
-`SendReflectedRef` can be explicitly converted with `into_local()` before
-projection. This API does not provide mutable or thread-safe projection.
+Projection accepts an ordinary shared reference. The caller is responsible for
+any synchronization needed to access the value from multiple threads.
 
 ### Capabilities and registry discovery
 
@@ -637,7 +335,7 @@ use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::registry::ReflectRegistry;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Service;
 
 fn main() {
@@ -846,7 +544,7 @@ empty and does not automatically include every registration linked into the proc
 
 | Feature | Provides |
 | --- | --- |
-| `derive` (default) | The `Reflect`, `reflect`, and `reflect_impl` macros. |
+| `derive` (default) | The `Reflect`, `ReflectImpl`, and `bind_method!` macros. |
 | `ecosystem-types` | Reflection implementations for `BigDecimal`, `DateTime<Utc>`, `NaiveDate`, `NaiveTime`, and `Uuid`. |
 | `qubit-types` | Reflection implementations for `qubit_id::Id` and `qubit_datatype::DataType`; the `qubit-id` default generator feature is disabled. |
 
@@ -877,59 +575,11 @@ features instead of relying on features enabled transitively by this crate.
 Each crate generating descriptors for these external types must enable the
 matching feature on its own direct `qubit-reflect` dependency.
 
-### Choose transparent, opaque, and thread-safe boundaries
+### Choose transparent or opaque boundaries
 
-Use the narrowest boundary that matches what downstream code must do:
+A transparent reflected type exposes its member structure and supported operations. Use the existing opaque type presentation when a value should be treated as a whole; it does not make a private member safe to access and does not replace application authorization. `#[reflect(skip)]` is stronger: the member is absent from the reflected descriptor and all queries.
 
-| Boundary | What it exposes | Important constraint |
-| --- | --- | --- |
-| Ordinary reflected field | A resolved `TypeRef` and navigation into the field type | The concrete field type must implement `Reflect`. |
-| `#[reflect(opaque)]` field | Whole-value read, replacement, argument passing, and outer construction | Operations still require exact `TypeId`; internal structure and independent root construction stay unavailable. |
-| `#[reflect(opaque)]` type | One opaque root descriptor and explicitly registered capabilities | It exposes no fields, variants, or per-member construction. |
-| Local dynamic wrapper | Checked operations on ordinary local values and borrows | It is not upgraded to `Send` or `Sync` by registry metadata. |
-| `SendReflected*` wrapper | A thread-safe erased boundary created under compile-time bounds | It can be consumed with `into_local`; a local wrapper cannot be upgraded at runtime. |
-
-Keep model semantics downstream. A model or schema layer may associate a
-`FieldDescriptor` with validation, persistence, codec, relation, or redaction
-metadata through downstream-owned custom capabilities and providers.
-`qubit-reflect` neither defines nor interprets those domain semantics. This preserves the dependency direction from model
-crates to `qubit-reflect`.
-
-The type-level `#[reflect(thread_safe)]` below generates thread-safe field
-access support. Thread-safe method adapters must be requested on the relevant
-methods; wrapping a value in `SendReflected*` alone is not sufficient:
-
-```rust
-use qubit_reflect::Reflect;
-use qubit_reflect::SendReflectedMut;
-use qubit_reflect::SendReflectedOwned;
-use qubit_reflect::SendReflectedRef;
-use qubit_reflect::TypeDescriptor;
-
-#[derive(Reflect)]
-#[reflect(thread_safe)]
-struct SharedCounter {
-    value: u64,
-}
-
-fn main() {
-    let field = TypeDescriptor::of::<SharedCounter>()
-        .field("value")
-        .expect("derived field");
-    let mut counter = SharedCounter { value: 1 };
-    let current = field
-        .get_thread_safe(SendReflectedRef::new(&counter))
-        .expect("thread-safe read adapter");
-    assert_eq!(current.downcast_ref::<u64>(), Some(&1));
-    field
-        .set_thread_safe(
-            SendReflectedMut::new(&mut counter),
-            SendReflectedOwned::new(2_u64),
-        )
-        .expect("thread-safe set adapter");
-    assert_eq!(counter.value, 2);
-}
-```
+The runtime does not define a separate cross-thread reflection mode. Keep synchronization in the application, for example by holding a mutex guard while calling `get`, `set`, or `invoke`. Rust's static `Send` and `Sync` checks continue to govern moving or sharing the underlying values.
 
 ## Errors, diagnostics, and troubleshooting
 
@@ -938,25 +588,25 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 | Symptom | What to check |
 | --- | --- |
 | Cargo cannot resolve `qubit-datatype` or `qubit-id` | Check registry access and the resolved dependency graph with `cargo metadata --locked --format-version 1`; adjacent repository checkouts are not required. |
-| `field("...")` returns `None` | Use the query name; `rename` changes it while `rust_name()` retains the source spelling. |
-| A field operation fails | Verify the wrapper (`ReflectedRef` versus `ReflectedMut`), the field policy, and the replacement's exact type; then inspect `FieldSetFailure` recovery. |
+| `field("...")` returns `None` | Check the Rust member name and whether the member is marked `#[reflect(skip)]`. Skipped members are absent from reflection. |
+| A field operation fails | Check public visibility and the exact target and value types; inspect `FieldSetFailure` to recover the original replacement. |
 | Construction fails | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |
-| A method is visible but not callable | Distinguish outer `Err(InvocationUnavailable)` (no entry; recover with `into_invocation()`) from `Ok(Err(InvocationFailure))` (pre-execution failure); generic methods need an explicit specialization. |
+| A method is visible but not callable | Check whether the method has a supported adapter and, for a generic method, a compile-time `bind_method!` instance binding. Inspect invocation recovery for rejected inputs. |
 | Registry initialization or snapshot build fails | Inspect `RegistryError` and conflicting fragments; global initialization errors are cached for the process. |
-| Cross-thread entry points unavailable | Request `thread_safe` on the type or method and use `SendReflected*` only where Rust bounds hold. |
+| Cross-thread use is unavailable | Apply synchronization in the caller and satisfy Rust's `Send`/`Sync` constraints for values moved between threads. |
 | An external type has no `Reflect` implementation | Enable `ecosystem-types` or `qubit-types` on the crate that owns the reflection boundary. |
 | A derive cannot resolve the runtime | Declare `qubit-reflect` as a direct dependency and enable its default `derive` feature. |
 
-Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve the owned replacement in `FieldSetFailure`; errors after the adapter takes ownership have no recovery payload. Construction failures return `ConstructionRecovery`. Pre-execution invocation failures retain receiver and arguments in `InvocationRecovery`. Ordinary invocation always propagates method panics. To capture them, the method must opt in with `#[reflect(catch_unwind)]` and the caller must select an available catching entry.
+Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve the owned replacement in `FieldSetFailure`; errors after the adapter takes ownership have no recovery payload. Construction failures return `ConstructionRecovery`. Pre-execution invocation failures retain receiver and arguments in `InvocationRecovery`. Ordinary invocation always propagates method panics. Do not assume method panics are caught by reflection; follow the method's Rust panic behavior.
 
 ## Boundaries and a practice checklist
 
 - Keep reflection attributes on the declaration that owns the contract. Generated code can reach private fields; reflection policies do not replace application authorization.
 - `TypeId`, descriptor addresses, query names, and trait markers are process-local identity, not serialization or cross-process model IDs.
-- Reflection does not parse request text, coerce numbers, infer `Into`, or upgrade local dynamic values to thread-safe mode at runtime.
-- Unsafe functions, unsupported ABIs, variadics, unspecialized generics, and opaque `impl Trait` returns may be described but are not dynamically callable. Tuple and function-pointer descriptors support arities 0 through 32.
+- Reflection does not parse request text, coerce numbers, or infer `Into`. Callers own synchronization and thread-safety policy.
+- Unsafe functions, unsupported ABIs, variadics, unbound generic methods, and opaque `impl Trait` returns may be described but are not dynamically callable. Tuple and function-pointer descriptors support arities 0 through 32.
 - Descriptors and per-type capability caches live for the whole process; initialization may allocate. Measure the paths your application uses if overhead matters.
-- Tests should cover a successful field read and replace, unknown fields, read-only rejection, type mismatch recovery, method invocation failure, and registry initialization failure on conflicting declarations.
+- Tests should cover a successful field read and replace, unknown fields, type mismatch recovery, method invocation failure, and registry initialization failure on conflicting declarations.
 
 ## Migration notes
 

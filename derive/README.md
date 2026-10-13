@@ -10,7 +10,7 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 
-`qubit-reflect-derive` provides the `Reflect`, `reflect`, and `reflect_impl` procedural macros used to generate reflection metadata and checked operation adapters. Applications normally depend directly on `qubit-reflect` with its default `derive` feature, which exposes these macros together with the matching runtime API. Direct use of this proc-macro crate is only needed when the runtime's default features are disabled.
+`qubit-reflect-derive` provides the `Reflect`, `ReflectImpl`, and `bind_method!` procedural macros used to generate reflection metadata and checked operation adapters. Applications normally depend directly on `qubit-reflect` with its default `derive` feature, which exposes these macros together with the matching runtime API. Direct use of this proc-macro crate is only needed when the runtime's default features are disabled.
 
 ## Installation
 
@@ -52,7 +52,7 @@ An editor can read a field selected at runtime while the application keeps owner
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
-#[derive(Reflect)]
+#[Reflect]
 struct User {
     name: String,
 }
@@ -65,7 +65,7 @@ fn main() {
 }
 ```
 
-The derive supports structs and enums. The `reflect` attribute describes traits, and `reflect_impl` describes inherent or trait implementations. Unsupported operations remain unavailable with structured metadata instead of bypassing Rust's type and ownership checks. The macros do not provide reflection storage or runtime operations; those belong to `qubit-reflect`.
+`#[Reflect]` describes structs, enums, and traits; `#[ReflectImpl]` describes inherent and trait implementations. `#[reflect(skip)]` completely removes a member from reflected metadata. Generic method definitions are not dynamically callable until a concrete method instance is bound at a compile-time call site with `bind_method!`; runtime type IDs cannot generate new monomorphized code. Unsupported operations remain unavailable with structured metadata instead of bypassing Rust's type and ownership checks. The macros do not provide reflection storage or runtime operations; those belong to `qubit-reflect`.
 
 The macros resolve the direct `qubit-reflect` dependency, including in
 same-package runtime examples. Native runtime examples declare `required-features = ["derive"]`

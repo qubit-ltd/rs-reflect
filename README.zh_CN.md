@@ -10,7 +10,7 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: examples.native=cargo-example -->
 
-`qubit-reflect` 为 Rust 提供按需启用、基于宏的反射能力。在结构体或枚举上派生 `Reflect`，用 `#[reflect]` 标注 trait，或用 `#[reflect_impl]` 标注实现块，宏就会生成结构元数据及经过类型检查的运行时操作入口。应用与框架可以据此发现类型和成员、访问字段、构造值，并调用受支持的方法，无须为每个类型另写一套容易过时的描述代码。该机制可在稳定版 Rust 上使用，动态操作仍遵守 Rust 的所有权和类型约束。
+`qubit-reflect` 为 Rust 提供按需启用、基于宏的反射能力。在结构体、枚举或 trait 上使用 `#[Reflect]`，在 inherent 或 trait 实现块上使用 `#[ReflectImpl]`，宏就会生成结构元数据及经过类型检查的运行时操作入口。应用与框架可以据此发现类型和成员、访问字段、构造值，并调用受支持的方法，无须为每个类型另写一套容易过时的描述代码。该机制可在稳定版 Rust 上使用，动态操作仍遵守 Rust 的所有权和类型约束。
 
 ## 为什么需要反射
 
@@ -29,23 +29,22 @@ qubit-reflect = "0.2"
 
 ## 快速开始
 
-下面先为类型派生反射，再通过生成的描述符定位字段，读取并替换精确类型的值。`read_only` 使 `id` 不可写，但仍保留其字段元数据。
+下面通过生成的描述符定位字段，读取并替换精确类型的值。普通字段操作接受 Rust 引用和值。安全入口拒绝私有 `secret` 字段；示例明确给出 safety 理由后使用文档规定的 `_unsafe` 入口。`internal_note` 保留在 Rust 结构体中，但被 skip 后不会进入反射元数据。
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
-use qubit_reflect::FieldAccessError;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
-use qubit_reflect::ReflectedRef;
 use qubit_reflect::TypeDescriptor;
+use qubit_reflect::access::FieldAccessError;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    #[reflect(read_only)]
-    id: u64,
-    email: String,
-    credit_limit_cents: u64,
+    pub id: u64,
+    pub email: String,
+    pub credit_limit_cents: u64,
+    secret: String,
+    #[reflect(skip)]
+    internal_note: String,
 }
 
 /// Runs the example and panics if a business assertion or reflection operation
@@ -56,29 +55,26 @@ fn main() {
         id: 1001,
         email: String::from("ada@example.com"),
         credit_limit_cents: 50_000,
+        secret: String::from("private"),
+        internal_note: String::from("not reflected"),
     };
 
     let email = descriptor.field("email").expect("derived field");
-    email
-        .set(
-            ReflectedMut::new(&mut customer),
-            ReflectedOwned::new(String::from("ada@corp.example")),
-        )
-        .expect("exactly typed replacement");
+    email.set(&mut customer, String::from("ada@corp.example")).expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current = email.get(ReflectedRef::new(&customer)).expect("shared read");
-    assert_eq!(
-        current.downcast_ref::<String>().map(String::as_str),
-        Some("ada@corp.example")
-    );
+    let current: &String = email.get(&customer).expect("shared read");
+    assert_eq!(current, "ada@corp.example");
 
-    let id = descriptor.field("id").expect("derived field");
-    let failure = id
-        .set(ReflectedMut::new(&mut customer), ReflectedOwned::new(2002_u64))
-        .expect_err("read-only field rejects replacement");
-    assert!(matches!(failure.error(), FieldAccessError::ReadOnly { .. }));
-    assert_eq!(customer.id, 1001);
+    let secret = descriptor.field("secret").expect("private field is described");
+    assert!(matches!(secret.get::<_, String>(&customer), Err(FieldAccessError::NotPublic { .. })));
+    // SAFETY: this example owns Customer and intentionally demonstrates the visibility bypass.
+    assert_eq!(unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"), "private");
+    // SAFETY: this example owns Customer and maintains the String field's type invariant.
+    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    assert_eq!(customer.secret, "updated");
+    assert!(descriptor.field("internal_note").is_none());
+    assert_eq!(customer.internal_note, "not reflected");
 }
 ```
 
@@ -107,22 +103,22 @@ cargo run --example support_action
 
 ### 反射方法与实现块
 
-需要反射方法时，用 `#[reflect_impl]` 标注 `impl` 块，启动时初始化一次 `ReflectRegistry`，再使用选定的注册表按名称查找并调用受支持的方法。[`examples/support_action.rs`](examples/support_action.rs) 展示完整调用；[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)解释查找结果、调用错误和输入恢复。要描述 trait 声明，使用 `#[reflect]`；其实现仍由 `#[reflect_impl]` 标注。
+需要反射方法时，用 `#[ReflectImpl]` 标注 `impl` 块，启动时初始化一次 `ReflectRegistry`，再使用选定的注册表按名称查找并调用受支持的方法。[`examples/support_action.rs`](examples/support_action.rs) 展示完整调用；[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)解释查找结果、调用错误和输入恢复。要描述 trait 声明，使用 `#[Reflect]`；其实现仍由 `#[ReflectImpl]` 标注。
 
 ## 能力与边界
 
-- `#[derive(Reflect)]`、`#[reflect]`、`#[reflect_impl]` 在声明处为结构体、枚举、trait 和 impl 生成不可变描述符，可在稳定版 Rust 上使用。
-- `TypeDescriptor` 与 `FieldDescriptor` 通过 `ReflectedRef`、`ReflectedMut`、`ReflectedOwned` 提供受检的字段读取、可变借用和替换；`construct_struct`、`construct_tuple`、`construct_unit` 用命名或位置输入构造新值。
-- 字段属性 `rename`、`read_only`、`skip`、`no_construct`、`opaque` 和方法属性 `no_invoke` 只限制对应的动态操作，结构信息仍然可见；普通 `#[cfg]` 则会让成员整体消失。
+- `#[Reflect]` 与 `#[ReflectImpl]` 在声明处为结构体、枚举、trait 和 impl 生成不可变描述符，可在稳定版 Rust 上使用。
+- `TypeDescriptor` 与 `FieldDescriptor` 通过普通 `&T`、`&mut T` 和拥有所有权的值提供受检字段读取、可变借用和替换；构造 builder 同样接收普通值。
+- `#[reflect(skip)]` 会将字段、分支或方法完全排除在反射元数据之外。它不会删除 Rust 成员，也不能用来保密。其他成员属性不改变可见性；安全入口拒绝非公开成员，满足安全前提时可使用文档说明的 `_unsafe` 入口绕过可见性。
 - 生成代码执行前的校验失败会返回结构化错误，并把调用方尚未被消费的输入一并退回：`FieldSetFailure`、`ConstructionRecovery`、`InvocationRecovery`。
 - `ReflectRegistry::initialize()` 把已链接的声明汇总成一份确定性的不可变注册表；`RegistrySnapshotBuilder` 让库和测试用显式事实构建隔离快照。两者都能解析方法以及 `Clone`、`Default` 等类型化能力，并区分能力处于 `Missing`、`FactOnly`、`AdapterTypeMismatch` 还是 `Found` 状态。
-- 泛型声明以定义的形式被描述；`#[reflect(specialize(...))]` 可为有限的具体实例生成调用入口。
-- 动态值默认是 `Local` 模式；`SendReflected*` 包装器和 `#[reflect(thread_safe)]` 只在生成代码能证明所需 `Send + Sync` 约束时提供线程安全边界。
+- 泛型声明保留为定义。若要动态调用泛型方法，须在编译期已知的调用点使用 `bind_method!` 绑定具体实例；运行时 `TypeId` 不能生成新的单态化代码。未绑定的泛型方法没有可调用适配器。
+- 需要在线程间共享反射对象时，由调用方自行加锁。跨线程传值仍受 Rust 的 `Send` 和 `Sync` 规则约束。
 - 内置基础类型、文本、元组、数组、`Option`、序列、集合、映射、智能指针和函数指针的描述符；可选的 `ecosystem-types` 与 `qubit-types` feature 分别补充 `BigDecimal`、`chrono`、`Uuid` 以及 Qubit `Id`/`DataType` 的实现。
 
 `Option<T>` 描述符既能返回元素类型，也能对内置 `Option<T>` 值执行经过类型检查的借用投影。`Some` 返回内部借用，`None` 返回空值，不相关的值返回类型不匹配错误。由结构事实构造的描述符保留相同的类型形状，但因没有运行时适配器而报告投影不可用。详见[可选值](doc/user_guide.zh_CN.md#可选值)。
 
-反射能力有明确边界：不转换数值、不解析字符串、不推导 `Into`，也不会把本地动态值升级为线程安全模式。任意 Rust 类型不会自动可反射，必须派生或实现 `Reflect`。`TypeId`、描述符地址和 trait 标记只是进程内身份，不能用作序列化或跨进程的模型标识。生成的访问代码可以触及私有字段，因此反射策略不能替代应用鉴权。`unsafe` 函数、不支持的 ABI、可变参数、未特化的泛型和不透明的 `impl Trait` 返回值可以被描述，但不能动态调用。元组和函数指针描述符支持 0 到 32 个元素或参数。描述符和按类型缓存的能力会在整个进程生命周期内保留，初始化可能分配内存；关心开销时请按应用实际路径测量。详情见[用户手册](doc/user_guide.zh_CN.md#边界与实践清单)。
+反射能力有明确边界：不转换数值、不解析字符串，也不推导 `Into`。字段替换失败时，`FieldSetFailure<V>` 保留未消费的原始输入；构造与调用在执行前失败时也会保留输入。动态输入中的 `Box<dyn Any>` 按盒内实际类型检查；若字段本身的类型就是 `Box<dyn Any>`，则仍按该字段的精确类型处理。任意 Rust 类型不会自动可反射，必须实现 `Reflect`。`TypeId`、描述符地址和 trait 标记只是进程内身份，不能用作序列化或跨进程的模型标识。反射不能替代应用鉴权。`unsafe` 函数、不支持的 ABI、可变参数、未绑定的泛型和不透明的 `impl Trait` 返回值可以被描述，但不能动态调用。元组和函数指针描述符支持 0 到 32 个元素或参数。描述符和按类型缓存的能力会在整个进程生命周期内保留，初始化可能分配内存；关心开销时请按应用实际路径测量。详情见[用户手册](doc/user_guide.zh_CN.md#边界与实践清单)。
 
 ## 延伸阅读
 

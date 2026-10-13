@@ -10,23 +10,21 @@
 use qubit_reflect::Invocation;
 use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
 use qubit_reflect::ReflectRegistry;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::reflect_impl;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
-#[derive(Reflect)]
+#[Reflect]
 struct Customer {
-    id: u64,
-    suspended: bool,
-    suspension_reason: Option<String>,
+    pub id: u64,
+    pub suspended: bool,
+    pub suspension_reason: Option<String>,
 }
 
-#[reflect_impl]
+#[ReflectImpl]
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
@@ -55,28 +53,14 @@ fn main() {
         suspension_reason: None,
     };
     {
-        let invocation = Invocation::borrowed_mut(
-            ReflectedMut::new(&mut customer),
-            [InvocationArg::Owned(ReflectedOwned::new(String::from(
-                "chargeback dispute",
-            )))],
-        );
-        let Err(unavailable) = suspend.invoke_catching_local(registry, invocation) else {
-            panic!("panic capture was not requested for this method")
-        };
-        assert!(matches!(
-            unavailable.reason(),
-            InvocationDispatchReason::CatchingNotRequested
-        ));
-        let invocation = unavailable.into_invocation();
+        let invocation = Invocation::receiver_mut(&mut customer).arg(String::from("chargeback dispute"));
         let output = suspend
-            .invoke_local(registry, invocation)
-            .expect("local invocation entry is available")
+            .invoke(registry, invocation)
             .expect("valid receiver and arguments");
         let InvocationOutput::Owned(changed) = output else {
             panic!("owned output")
         };
-        assert!(changed.downcast::<bool>().unwrap_or_else(|_| panic!("bool")));
+        assert!(DynamicOwned::<Local>::downcast::<bool>(changed).unwrap_or_else(|_| panic!("bool")));
     }
     assert!(customer.suspended);
     assert_eq!(customer.suspension_reason.as_deref(), Some("chargeback dispute"));

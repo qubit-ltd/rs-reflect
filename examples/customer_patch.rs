@@ -7,45 +7,37 @@
 // =============================================================================
 
 // reflect-example-start
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
 use qubit_reflect::FieldAccessError;
 use qubit_reflect::Reflect;
-use qubit_reflect::ReflectedMut;
-use qubit_reflect::ReflectedOwned;
 use qubit_reflect::TypeDescriptor;
 
-#[derive(Clone, Reflect)]
+#[derive(Clone)]
+#[Reflect]
 struct Customer {
-    #[reflect(read_only)]
-    id: u64,
-    email: String,
-    display_name: String,
-    credit_limit_cents: u64,
+    pub id: u64,
+    pub email: String,
+    pub display_name: String,
+    pub credit_limit_cents: u64,
 }
 
 struct FieldChange {
     field: String,
-    value: ReflectedOwned,
+    value: Box<dyn Any>,
 }
 
 enum PatchError {
     UnknownField {
         field: String,
-        value: ReflectedOwned,
-    },
-    ReadOnly {
-        field: String,
-        value: ReflectedOwned,
-    },
-    TypeMismatch {
-        field: String,
-        value: ReflectedOwned,
+        value: Box<dyn Any>,
     },
     Failed {
         field: String,
-        error: Box<FieldAccessError>,
+        error: FieldAccessError,
+        value: Box<dyn Any>,
     },
 }
 
@@ -53,8 +45,9 @@ enum PatchError {
 /// invalid field or value.
 ///
 /// Earlier successful changes remain applied. Rejected values are returned for
-/// unknown, read-only, or mismatched fields; other access failures retain their
-/// diagnostic error.
+/// unknown or mismatched fields; access failures retain their diagnostic error
+/// and original replacement value.
+#[allow(clippy::result_large_err)] // The example preserves rejected values inline for callers.
 fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<(), PatchError> {
     let descriptor = TypeDescriptor::of::<T>();
     for change in changes {
@@ -64,22 +57,16 @@ fn apply_patch<T: Reflect>(target: &mut T, changes: Vec<FieldChange>) -> Result<
                 value: change.value,
             });
         };
-        if let Err(failure) = field.set(ReflectedMut::new(target), change.value) {
+        if let Err(failure) = field.set(target, change.value) {
             let field_name = change.field;
             let (error, recovery) = failure.into_parts();
-            return Err(match (error, recovery) {
-                (FieldAccessError::ReadOnly { .. }, Some(recovery)) => PatchError::ReadOnly {
-                    field: field_name,
-                    value: recovery.into_value(),
-                },
-                (FieldAccessError::ValueTypeMismatch { .. }, Some(recovery)) => PatchError::TypeMismatch {
-                    field: field_name,
-                    value: recovery.into_value(),
-                },
-                (error, _) => PatchError::Failed {
-                    field: field_name,
-                    error: Box::new(error),
-                },
+            let Some(recovery) = recovery else {
+                unreachable!("preflight set failures retain the input")
+            };
+            return Err(PatchError::Failed {
+                field: field_name,
+                error,
+                value: recovery.into_value(),
             });
         }
     }
@@ -126,17 +113,16 @@ fn main() {
         &mut customer,
         vec![FieldChange {
             field: String::from("email"),
-            value: ReflectedOwned::new(String::from("ada@corp.example")),
+            value: Box::new(String::from("ada@corp.example")),
         }],
     ) {
         Ok(()) => {}
-        Err(PatchError::UnknownField { field, value })
-        | Err(PatchError::ReadOnly { field, value })
-        | Err(PatchError::TypeMismatch { field, value }) => {
+        Err(PatchError::UnknownField { field, value }) => {
             drop(value);
             panic!("unsupported change to field {field}")
         }
-        Err(PatchError::Failed { field, error }) => {
+        Err(PatchError::Failed { field, error, value }) => {
+            drop(value);
             panic!("change to field {field} failed: {error:?}")
         }
     }
@@ -149,10 +135,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
     use std::collections::HashMap;
     use std::sync::Mutex;
-
-    use qubit_reflect::ReflectedOwned;
 
     use super::Customer;
     use super::CustomerRepository;
@@ -161,7 +146,7 @@ mod tests {
     use super::apply_patch;
 
     #[test]
-    fn test_earlier_change_remains_in_memory_when_later_change_is_read_only() {
+    fn test_earlier_change_remains_in_memory_when_later_change_has_wrong_type() {
         let repository = CustomerRepository(Mutex::new(HashMap::from([(
             1001,
             Customer {
@@ -177,18 +162,19 @@ mod tests {
             vec![
                 FieldChange {
                     field: String::from("email"),
-                    value: ReflectedOwned::new(String::from("ada@corp.example")),
+                    value: Box::new(String::from("ada@corp.example")) as Box<dyn Any>,
                 },
                 FieldChange {
-                    field: String::from("id"),
-                    value: ReflectedOwned::new(2002_u64),
+                    field: String::from("email"),
+                    value: Box::new(2002_u64) as Box<dyn Any>,
                 },
             ],
         );
-        let Err(PatchError::ReadOnly { field, value }) = result else {
-            panic!("read-only id must reject the second change");
+        let Err(PatchError::Failed { field, error, value }) = result else {
+            panic!("a mismatched type must reject the second change");
         };
-        assert_eq!(field, "id");
+        assert_eq!(field, "email");
+        assert!(matches!(error, FieldAccessError::ValueTypeMismatch { .. }));
         assert_eq!(value.downcast_ref::<u64>(), Some(&2002));
         assert_eq!(customer.email, "ada@corp.example");
         assert_eq!(customer.id, 1001);
