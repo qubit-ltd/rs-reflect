@@ -26,6 +26,7 @@ struct Worker;
 
 #[ReflectImpl]
 impl Worker {
+    #[reflect(catch_unwind)]
     fn marked() {}
 }
 

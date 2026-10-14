@@ -17,6 +17,7 @@ use crate::error::TypeMismatch;
 use crate::value::DynamicRef;
 use crate::value::Local;
 
+#[cfg(feature = "derive")]
 #[crate::Reflect]
 enum VariantProbe {
     Ready,
@@ -56,6 +57,7 @@ fn test_variant_descriptor_exposes_source_facts_and_unavailable_construction() {
 }
 
 #[test]
+#[cfg(feature = "derive")]
 fn test_variant_descriptor_checks_dynamic_active_value_type() {
     let descriptor = TypeDescriptor::of::<VariantProbe>();
     let ready = descriptor.variant("Ready").expect("Ready variant");

@@ -48,13 +48,17 @@ class ParserTests(unittest.TestCase):
     def test_real_inventory_examples_are_isolated(self):
         root = SCRIPT.parents[1]
         source = '''```rust
-use qubit_reflect::{Reflect, ReflectRegistry};
-#[derive(Reflect)]
-#[reflect(rename = "IsolatedExample")]
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::registry::ReflectRegistry;
+
+#[Reflect]
 struct Example;
+
 fn main() {
-    let registry = ReflectRegistry::initialize().unwrap();
-    assert!(registry.get(Example::type_descriptor().type_id()).is_some());
+    let registry = ReflectRegistry::initialize().expect("valid registrations");
+    let descriptor = TypeDescriptor::of::<Example>();
+    assert!(registry.get(descriptor.type_id()).is_some());
 }
 ```
 '''
