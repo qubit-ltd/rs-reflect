@@ -207,13 +207,12 @@ let output = unsafe { private_method.invoke_unsafe(registry, invocation)? };
 - 泛型 ModelImpl 的 getter/setter call-site binding 尚未实现；metadata derive 对泛型 type/const ModelImpl 明确报错并有 compile-fail UI 覆盖。通用方法调用点 adapter 已支持泛型 impl/method/const binding。此限制已在下游文档记录。
 - 未执行 `git add`、`git commit`、`git push`。构建产物与临时文件在最终检查后按来源清理；计划文档保留。
 
-## 当前同级检出状态（2026-10-13，本轮集成待验）
+## 当前同级检出状态（2026-10-14 复核）
 
-上面的验收记录描述历史实施分支 `codex/rs-reflect-api-v3-rebuild`、`codex/rs-model-metadata-api-v3-rebuild` 与 `codex/rs-platform-api-v3-rebuild` 当时的结果，不代表当前同级检出已经集成。设计阶段记录的当前基线中，`rs-model-metadata` 为 `5fbffd8fcc22899a4c336f850344f049409a2d09`，运行 `cargo check -p qubit-model-metadata --lib --offline` 曾以 16 个编译错误失败；错误反映其仍使用旧反射入口。该历史基线结果也不替代本轮迁移后的新鲜验证。
+上面的验收记录描述 2026-10-13 历史实施分支当时的结果，不代表当前检出。下列提交 ID 是本轮验证开始时各仓库的 `HEAD`；`rs-reflect` 验证使用该提交上的未提交工作树修改，两个下游检出保持干净。2026-10-13 的历史基线和失败记录继续保留，不作为本轮命令结果。
 
-本轮 `rs-reflect` Rustdoc 修正位于实施工作树 `codex/rs-reflect-v3-docs`，起始提交为 `0cdd68c9ef3bf469e0d2a6d99a88c5b30d717b82`。本附录由 T4 添加；以下当前集成结果须待 T5 在最终目标检出上验证后填写，不应据此提前认定下游集成或 CI 已完成：
-
-- `rs-reflect` 当前最终提交与文档/doctest/CI 命令及退出码：待 T5 回填。
-- `rs-model-metadata` 当前最终提交与 check/test 命令及退出码：待 T5 回填。
-- `rs-platform` 当前最终提交与 workspace check/聚焦测试命令及退出码：待 T5 回填。
-- 尚未运行或未通过的检查、环境限制及剩余兼容范围：待 T5 回填。
+- `rs-reflect`（HEAD `091ab20777f56b28f29f3d640796bc43c9b09b7f`，日期 2026-10-14）：`python3 -m unittest discover -s scripts/tests -p '*tests.py'` 退出码 0（121 项）；`scripts/project-ci-check.sh` 最终退出码 0（包含覆盖率入口、18 个 Markdown 示例和 `panic=abort` invocation fixture）；`cargo test --workspace --all-features --locked` 退出码 0（包含 UI 与 Rustdoc）；`cargo test --package qubit-reflect --no-default-features --lib --locked` 退出码 0（43 项）；`.infra/bin/align-ci.sh` 最终退出码 0；`.infra/bin/ci-check.sh` 最终退出码 0，覆盖 functions 95.02%（1699/1788）、lines 92.86%（10798/11628）、regions 91.80%（12553/13675），并完成 style、build、test、Rustdoc、feature matrix、fuzz build、package 与 audit。首次运行发现 style 例外缺失、runtime-only 测试未按 derive feature 门控、panic-abort fixture 漏标 `#[reflect(catch_unwind)]`；相应修正后，上述最终命令通过。
+- T1 单项回归命令 `python3 -m unittest discover -s scripts/tests -p 'check_markdown_examples_tests.py' -k test_real_inventory_examples_are_isolated` 修复前退出码 1（旧示例使用 derive 宏的 attribute 语法）；修复后退出码 0（1 项通过，两个真实示例均执行成功）。
+- `rs-model-metadata`（HEAD `a2c2ba495dce956a55923bf1458c4a19675c31c9`，工作树干净）：`cargo check -p qubit-model-metadata --lib --locked` 退出码 0，仅验证该库的编译。
+- `rs-platform`（HEAD `216659b298f91a85ae0e7f9200abc28f395e6f6c`，工作树干净）：`cargo check -p qubit-platform-core --lib --locked` 退出码 0，仅验证该库的编译。
+- 剩余范围：本轮没有运行两个下游仓库的完整测试套件；下游结论仅限上述库级 `cargo check`。除此之外，本轮列出的最终检查均退出码 0；没有据此推断未执行的下游范围。
