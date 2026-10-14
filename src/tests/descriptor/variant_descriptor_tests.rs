@@ -17,6 +17,12 @@ use crate::error::TypeMismatch;
 use crate::value::DynamicRef;
 use crate::value::Local;
 
+#[crate::Reflect]
+enum VariantProbe {
+    Ready,
+    Waiting,
+}
+
 fn declaring_type() -> &'static TypeDescriptor {
     TypeDescriptor::of::<u8>()
 }
@@ -47,4 +53,37 @@ fn test_variant_descriptor_exposes_source_facts_and_unavailable_construction() {
     assert!(variant.construct_struct::<u8>(named).is_err());
     assert!(variant.construct_tuple::<u8>(tuple).is_err());
     assert!(variant.construct_unit::<u8>().is_err());
+}
+
+#[test]
+fn test_variant_descriptor_checks_dynamic_active_value_type() {
+    let descriptor = TypeDescriptor::of::<VariantProbe>();
+    let ready = descriptor.variant("Ready").expect("Ready variant");
+    let waiting = descriptor.variant("Waiting").expect("Waiting variant");
+
+    assert!(
+        ready
+            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Ready))
+            .unwrap()
+    );
+    assert!(
+        !ready
+            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Waiting))
+            .unwrap()
+    );
+    assert!(
+        waiting
+            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Waiting))
+            .unwrap()
+    );
+    assert!(
+        !waiting
+            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Ready))
+            .unwrap()
+    );
+    let error = ready
+        .is_active_dynamic(DynamicRef::<Local>::new(&7_u8))
+        .expect_err("a different dynamic root type must be rejected");
+    assert_eq!(error.expected(), std::any::TypeId::of::<VariantProbe>());
+    assert_eq!(error.actual(), std::any::TypeId::of::<u8>());
 }

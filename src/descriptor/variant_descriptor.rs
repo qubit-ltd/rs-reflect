@@ -464,6 +464,33 @@ impl VariantDescriptor {
         }
         (self.active_test)(DynamicRef::<Local>::new(value))
     }
+
+    /// Returns whether this variant is active for a dynamically borrowed enum.
+    ///
+    /// The dynamic borrow must have the exact declaring enum type. A mismatch
+    /// is returned before the generated adapter is called.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Dynamically borrowed value expected to have the declaring
+    ///   enum type.
+    ///
+    /// # Returns
+    ///
+    /// Returns whether this variant is active for `value`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeMismatch`] when `value` does not contain the declaring
+    /// enum type.
+    pub fn is_active_dynamic(&self, value: DynamicRef<'_, Local>) -> Result<bool, TypeMismatch> {
+        let expected = self.declaring_type().type_id();
+        let actual = value.value_type_id();
+        if actual != expected {
+            return Err(TypeMismatch::new(expected, actual).with_expected_name(self.declaring_type().type_name()));
+        }
+        (self.active_test)(value)
+    }
 }
 
 impl fmt::Debug for VariantDescriptor {

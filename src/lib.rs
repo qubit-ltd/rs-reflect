@@ -66,7 +66,10 @@
 #![deny(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+#[cfg(not(test))]
 pub use crate as qubit_reflect;
+#[cfg(test)]
+extern crate self as qubit_reflect;
 
 /// APIs for reflected field and variant access.
 pub mod access;
