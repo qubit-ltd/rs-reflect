@@ -3,6 +3,7 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 <!-- reflect-contract: panic.async_poll=not-caught -->
+<!-- reflect-contract: panic.abort=catching-unavailable -->
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 <!-- reflect-contract: examples.native=cargo-example -->
 <!-- reflect-contract: typeref.constructor=owned-resolved -->
@@ -102,17 +103,27 @@ fn main() {
     };
 
     let email = descriptor.field("email").expect("derived field");
-    email.set(&mut customer, String::from("ada@corp.example")).expect("exactly typed replacement");
+    email
+        .set(&mut customer, String::from("ada@corp.example"))
+        .expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
     let current: &String = email.get(&customer).expect("shared read");
     assert_eq!(current, "ada@corp.example");
 
     let secret = descriptor.field("secret").expect("private field is described");
-    assert!(matches!(secret.get::<_, String>(&customer), Err(FieldAccessError::NotPublic { .. })));
-    // SAFETY: this example owns Customer and intentionally demonstrates the visibility bypass.
-    assert_eq!(unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"), "private");
-    // SAFETY: this example owns Customer and maintains the String field's type invariant.
+    assert!(matches!(
+        secret.get::<_, String>(&customer),
+        Err(FieldAccessError::NotPublic { .. })
+    ));
+    // SAFETY: this example owns Customer and intentionally demonstrates the
+    // visibility bypass.
+    assert_eq!(
+        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
+        "private"
+    );
+    // SAFETY: this example owns Customer and maintains the String field's type
+    // invariant.
     unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
@@ -221,7 +232,7 @@ struct Customer {
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
-    fn suspend(&mut self, reason: String) -> bool {
+    pub fn suspend(&mut self, reason: String) -> bool {
         if self.suspended {
             return false;
         }
@@ -236,7 +247,7 @@ impl Customer {
 fn main() {
     let registry = ReflectRegistry::initialize().expect("valid reflection declarations");
 
-    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(&registry, "suspend") else {
+    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(registry, "suspend") else {
         panic!("exactly one method named suspend")
     };
 
@@ -263,6 +274,38 @@ fn main() {
 方法查找和调用要使用同一个注册表。安全调用会拒绝非公开方法。`unsafe` 调用入口仅绕过可见性，仍会检查接收者类型、参数类型、借用、Pin，以及适用的枚举分支；调用前应阅读其 `# Safety` 文档。自有值、借用值、Pin 和 Future 输出仍受 Rust 函数签名生命周期约束。
 
 若要动态调用泛型方法，须先为编译期已知的具体实例创建绑定。`bind_method!(方法路径 as fn(签名))` 在绑定点由 Rust 检查方法签名，并记录具体目标类型和泛型实参。未绑定的泛型定义仍可查询，但没有可调用适配器；不能根据运行时 `TypeId` 生成代码。
+
+绑定结果是普通值。调用 `build()` 前，先将它交给 snapshot builder，让注册表能把绑定与已链接的方法声明匹配起来：
+
+```rust,no_run
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::bind_method;
+use qubit_reflect::identity::FragmentIdentity;
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+
+#[Reflect]
+struct GenericService<T>(T);
+
+#[ReflectImpl]
+impl<T> GenericService<T> {
+    fn read(&self) -> &T {
+        &self.0
+    }
+}
+
+fn main() {
+    let binding = bind_method!(GenericService::<u8>::read as fn(&GenericService<u8>) -> &u8);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.include_linked_fragments();
+    builder.add_method_binding(
+        binding,
+        FragmentIdentity::new("example", module_path!(), line!(), 1, "binding", 1),
+    );
+    let registry = builder.build().expect("binding matches the linked method");
+    let _registry = registry;
+}
+```
 
 方法查找可能返回无匹配、唯一或多个候选，应分别处理。普通方法 panic 按 Rust 的 panic 行为传播。异步调用返回 Future，由调用方选择执行器并轮询。
 

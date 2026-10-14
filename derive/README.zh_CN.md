@@ -10,7 +10,7 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 
-`qubit-reflect-derive` 提供 `Reflect`、`reflect` 和 `reflect_impl` 过程宏，用于生成反射元数据及受检操作适配器。普通应用应直接依赖默认启用 `derive` 功能的 `qubit-reflect`，同时取得这些宏和匹配的运行时 API。只有关闭运行时默认 feature 时，才需要单独依赖这个过程宏 crate。
+`qubit-reflect-derive` 提供 `#[Reflect]`、`#[ReflectImpl]` 和 `bind_method!`，用于生成反射元数据及受检操作适配器。普通应用应直接依赖默认启用 `derive` 功能的 `qubit-reflect`，同时取得这些宏和匹配的运行时 API。只有关闭运行时默认 feature 时，才需要单独依赖这个过程宏 crate。
 
 ## 安装
 
@@ -46,7 +46,7 @@ qubit-reflect-derive = "0.2"
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
-#[derive(Reflect)]
+#[Reflect]
 struct User {
     name: String,
 }
@@ -59,7 +59,7 @@ fn main() {
 }
 ```
 
-`Reflect` 支持结构体和枚举；`reflect` 属性用于描述 trait，`reflect_impl` 用于描述 inherent impl 或 trait impl。无法执行的操作会保留结构化元数据，不会绕过 Rust 的类型和所有权检查。过程宏本身不提供运行时存储或反射操作，这些功能由 `qubit-reflect` 提供。
+`#[Reflect]` 可描述结构体、枚举和 trait；`#[ReflectImpl]` 可描述 inherent impl 或 trait impl。`#[reflect(skip)]` 会将成员完全排除在反射元数据之外。泛型方法定义不会自动成为可动态调用的方法；必须在编译期调用位置通过 `bind_method!` 绑定具体的方法实例，因为运行时类型 ID 无法生成新的单态化代码。无法执行的操作仍会保留为结构化元数据，不会绕过 Rust 的类型和所有权检查。过程宏本身不提供反射存储或运行时操作，这些功能由 `qubit-reflect` 提供。
 
 宏会解析当前 crate 直接声明的 `qubit-reflect` 依赖，同包 example 也无需额外指定路径。三个原生示例均要求 `derive` feature，源码也随运行时包分发；在检出根目录运行 `cargo run --example field_patch`、`cargo run --example customer_patch` 或 `cargo run --example support_action`。
 

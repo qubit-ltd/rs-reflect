@@ -3,6 +3,7 @@
 <!-- reflect-contract: runtime.direct=qubit_reflect -->
 <!-- reflect-contract: provider.qualified=custom-provider -->
 <!-- reflect-contract: panic.async_poll=not-caught -->
+<!-- reflect-contract: panic.abort=catching-unavailable -->
 <!-- reflect-contract: dispatch.input_recovery=original-input -->
 <!-- reflect-contract: examples.native=cargo-example -->
 <!-- reflect-contract: typeref.constructor=owned-resolved -->
@@ -100,17 +101,27 @@ fn main() {
     };
 
     let email = descriptor.field("email").expect("derived field");
-    email.set(&mut customer, String::from("ada@corp.example")).expect("exactly typed replacement");
+    email
+        .set(&mut customer, String::from("ada@corp.example"))
+        .expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
     let current: &String = email.get(&customer).expect("shared read");
     assert_eq!(current, "ada@corp.example");
 
     let secret = descriptor.field("secret").expect("private field is described");
-    assert!(matches!(secret.get::<_, String>(&customer), Err(FieldAccessError::NotPublic { .. })));
-    // SAFETY: this example owns Customer and intentionally demonstrates the visibility bypass.
-    assert_eq!(unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"), "private");
-    // SAFETY: this example owns Customer and maintains the String field's type invariant.
+    assert!(matches!(
+        secret.get::<_, String>(&customer),
+        Err(FieldAccessError::NotPublic { .. })
+    ));
+    // SAFETY: this example owns Customer and intentionally demonstrates the
+    // visibility bypass.
+    assert_eq!(
+        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
+        "private"
+    );
+    // SAFETY: this example owns Customer and maintains the String field's type
+    // invariant.
     unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
@@ -227,7 +238,7 @@ struct Customer {
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
-    fn suspend(&mut self, reason: String) -> bool {
+    pub fn suspend(&mut self, reason: String) -> bool {
         if self.suspended {
             return false;
         }
@@ -242,7 +253,7 @@ impl Customer {
 fn main() {
     let registry = ReflectRegistry::initialize().expect("valid reflection declarations");
 
-    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(&registry, "suspend") else {
+    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(registry, "suspend") else {
         panic!("exactly one method named suspend")
     };
 
@@ -269,6 +280,38 @@ fn main() {
 Use the same registry for method lookup and invocation. Safe calls reject non-public methods. An `unsafe` invocation entry bypasses visibility only and still checks receiver type, argument types, borrowing, Pin, and enum state where applicable; read its `# Safety` section before calling it. Owned, borrowed, pinned, and future outputs retain the lifetimes imposed by their Rust signatures.
 
 Generic methods need an explicit compile-time instance binding before name-based dynamic invocation. `bind_method!(method_path as fn(signature))` records the concrete target and generic arguments together with a generated adapter. The function signature is checked by Rust at the binding call site. Generic definitions remain queryable without a binding, but do not have a callable adapter. No runtime `TypeId` lookup generates code.
+
+The binding is an ordinary value; add it to the snapshot builder before `build()` so the registry can match it with the linked method declaration:
+
+```rust,no_run
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::bind_method;
+use qubit_reflect::identity::FragmentIdentity;
+use qubit_reflect::registry::RegistrySnapshotBuilder;
+
+#[Reflect]
+struct GenericService<T>(T);
+
+#[ReflectImpl]
+impl<T> GenericService<T> {
+    fn read(&self) -> &T {
+        &self.0
+    }
+}
+
+fn main() {
+    let binding = bind_method!(GenericService::<u8>::read as fn(&GenericService<u8>) -> &u8);
+    let mut builder = RegistrySnapshotBuilder::new();
+    builder.include_linked_fragments();
+    builder.add_method_binding(
+        binding,
+        FragmentIdentity::new("example", module_path!(), line!(), 1, "binding", 1),
+    );
+    let registry = builder.build().expect("binding matches the linked method");
+    let _registry = registry;
+}
+```
 
 Method lookup can return no match, one method, or an ambiguous set. Handle each case explicitly. An invocation failure means the adapter exists but rejected the provided input; an unbound generic method instead reports an unavailable entry. Ordinary method panics follow the method's Rust panic behavior. Async calls return a future for the caller's executor to poll.
 

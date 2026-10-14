@@ -60,17 +60,27 @@ fn main() {
     };
 
     let email = descriptor.field("email").expect("derived field");
-    email.set(&mut customer, String::from("ada@corp.example")).expect("exactly typed replacement");
+    email
+        .set(&mut customer, String::from("ada@corp.example"))
+        .expect("exactly typed replacement");
     assert_eq!(customer.email, "ada@corp.example");
 
     let current: &String = email.get(&customer).expect("shared read");
     assert_eq!(current, "ada@corp.example");
 
     let secret = descriptor.field("secret").expect("private field is described");
-    assert!(matches!(secret.get::<_, String>(&customer), Err(FieldAccessError::NotPublic { .. })));
-    // SAFETY: this example owns Customer and intentionally demonstrates the visibility bypass.
-    assert_eq!(unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"), "private");
-    // SAFETY: this example owns Customer and maintains the String field's type invariant.
+    assert!(matches!(
+        secret.get::<_, String>(&customer),
+        Err(FieldAccessError::NotPublic { .. })
+    ));
+    // SAFETY: this example owns Customer and intentionally demonstrates the
+    // visibility bypass.
+    assert_eq!(
+        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
+        "private"
+    );
+    // SAFETY: this example owns Customer and maintains the String field's type
+    // invariant.
     unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
