@@ -274,3 +274,8 @@ reason = "Owned, shared, and mutable storage for local and thread-safe modes for
 rule = "public-type-layout"
 path = "src/registry/method_binding.rs"
 reason = "Binding selectors, duplicate-detection identity, and resolved bindings form one registration protocol consumed together by the registry builder."
+
+[[exceptions]]
+rule = "aggregation-files"
+path = "src/lib.rs"
+reason = "Test builds require `extern crate self as qubit_reflect` so procedural macro expansions can resolve the crate's absolute path."
