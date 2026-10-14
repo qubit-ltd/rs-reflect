@@ -28,7 +28,7 @@ struct Customer {
 impl Customer {
     /// Suspends this customer with `reason`, returning false if already
     /// suspended.
-    fn suspend(&mut self, reason: String) -> bool {
+    pub fn suspend(&mut self, reason: String) -> bool {
         if self.suspended {
             return false;
         }
