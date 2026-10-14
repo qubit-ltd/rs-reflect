@@ -32,9 +32,9 @@ use crate::registry::ReflectRegistry;
 ///
 /// # Examples
 ///
-/// Most applications get this declaration metadata from `#[reflect_impl]`.
-/// The example builds the source declaration explicitly so it does not need
-/// to initialize the global inventory registry.
+/// Most applications get this declaration metadata from an impl block marked
+/// with `#[ReflectImpl]`. The example builds the source declaration explicitly
+/// so it does not need to initialize the global inventory registry.
 ///
 /// ```
 /// mod example {
