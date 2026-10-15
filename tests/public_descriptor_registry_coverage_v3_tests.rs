@@ -84,6 +84,16 @@ enum SkippedVariantConstruction {
 }
 
 #[Reflect]
+#[allow(dead_code)]
+struct SkippedTupleConstruction(u32, #[reflect(skip)] NotReflected);
+
+#[Reflect]
+#[allow(dead_code)]
+enum SkippedTupleVariantConstruction {
+    MissingPayload(u32, #[reflect(skip)] NotReflected),
+}
+
+#[Reflect]
 struct BindingTarget;
 
 #[Reflect(dyn_compatible)]
@@ -524,4 +534,116 @@ fn unavailable_type_and_variant_constructors_report_target_unavailable() {
         .construct_struct_any(NamedConstructionInput::new().field("value", 9_u32))
         .expect_err("skipped payload disables variant construction");
     assert!(matches!(construction.error(), ConstructionError::TargetUnavailable));
+}
+
+fn assert_target_unavailable<T>(
+    result: Result<T, qubit_reflect::construct::ConstructionRecovery<Local>>,
+) -> Box<[qubit_reflect::construct::RecoveredAnyValue]> {
+    let recovery = match result {
+        Ok(_) => panic!("missing constructor must report TargetUnavailable"),
+        Err(recovery) => recovery,
+    };
+    let (error, recovered) = recovery.into_any_parts();
+    assert!(matches!(error, ConstructionError::TargetUnavailable));
+    recovered
+}
+
+fn assert_named_recovery(values: &[qubit_reflect::construct::RecoveredAnyValue], first_name: &str) {
+    use qubit_reflect::construct::RecoveredAnyValue::Named;
+
+    assert_eq!(values.len(), 2);
+    assert!(matches!(
+        &values[0],
+        Named { name, value }
+            if name.as_ref() == first_name
+                && value.downcast_ref::<u32>() == Some(&2)
+    ));
+    assert!(matches!(
+        &values[1],
+        Named { name, value }
+            if name.as_ref() == "extra"
+                && value.downcast_ref::<String>().map(String::as_str) == Some("keep")
+    ));
+}
+
+fn assert_positional_recovery(values: &[qubit_reflect::construct::RecoveredAnyValue]) {
+    use qubit_reflect::construct::RecoveredAnyValue::Positional;
+
+    assert_eq!(values.len(), 2);
+    assert!(matches!(
+        &values[0],
+        Positional { index: 0, value } if value.downcast_ref::<u32>() == Some(&2)
+    ));
+    assert!(matches!(
+        &values[1],
+        Positional { index: 1, value }
+            if value.downcast_ref::<String>().map(String::as_str) == Some("keep")
+    ));
+}
+
+#[test]
+fn unavailable_type_and_variant_constructors_recover_all_eight_safe_inputs() {
+    let named_type = TypeDescriptor::of::<SkippedConstruction>();
+    let tuple_type = TypeDescriptor::of::<SkippedTupleConstruction>();
+    let named_variant = TypeDescriptor::of::<SkippedVariantConstruction>()
+        .variant("MissingPayload")
+        .expect("named skipped variant remains reflectable");
+    let tuple_variant = TypeDescriptor::of::<SkippedTupleVariantConstruction>()
+        .variant("MissingPayload")
+        .expect("tuple skipped variant remains reflectable");
+    assert!(named_type.struct_construction().is_none());
+    assert!(tuple_type.struct_construction().is_none());
+    assert!(named_variant.construction().is_none());
+    assert!(tuple_variant.construction().is_none());
+
+    let values = [
+        assert_target_unavailable(
+            named_type.construct_struct::<SkippedConstruction>(
+                NamedConstructionInput::new()
+                    .field("visible", 2_u32)
+                    .field("extra", String::from("keep")),
+            ),
+        ),
+        assert_target_unavailable(
+            named_type.construct_struct_any(
+                NamedConstructionInput::new()
+                    .field("visible", 2_u32)
+                    .field("extra", String::from("keep")),
+            ),
+        ),
+        assert_target_unavailable(tuple_type.construct_tuple::<SkippedTupleConstruction>(
+            TupleConstructionInput::new().value(2_u32).value(String::from("keep")),
+        )),
+        assert_target_unavailable(
+            tuple_type.construct_tuple_any(TupleConstructionInput::new().value(2_u32).value(String::from("keep"))),
+        ),
+        assert_target_unavailable(
+            named_variant.construct_struct::<SkippedVariantConstruction>(
+                NamedConstructionInput::new()
+                    .field("value", 2_u32)
+                    .field("extra", String::from("keep")),
+            ),
+        ),
+        assert_target_unavailable(
+            named_variant.construct_struct_any(
+                NamedConstructionInput::new()
+                    .field("value", 2_u32)
+                    .field("extra", String::from("keep")),
+            ),
+        ),
+        assert_target_unavailable(tuple_variant.construct_tuple::<SkippedTupleVariantConstruction>(
+            TupleConstructionInput::new().value(2_u32).value(String::from("keep")),
+        )),
+        assert_target_unavailable(
+            tuple_variant.construct_tuple_any(TupleConstructionInput::new().value(2_u32).value(String::from("keep"))),
+        ),
+    ];
+    assert_named_recovery(&values[0], "visible");
+    assert_named_recovery(&values[1], "visible");
+    assert_positional_recovery(&values[2]);
+    assert_positional_recovery(&values[3]);
+    assert_named_recovery(&values[4], "value");
+    assert_named_recovery(&values[5], "value");
+    assert_positional_recovery(&values[6]);
+    assert_positional_recovery(&values[7]);
 }
