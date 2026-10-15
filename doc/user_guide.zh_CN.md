@@ -521,6 +521,7 @@ qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 - `unsafe` 方法、不支持的 ABI、可变参数、不透明的 `impl Trait` 输出、未绑定具体实例的泛型方法以及不能安全擦除的动态大小类型，可以保留结构信息，但不保证有动态调用入口。
 - 元组和可移植函数指针分别支持 0 到 32 个元素或参数；超过范围没有 `Reflect` 实现。携带数据的枚举不提供整数判别值映射。
 - 描述符和按具体类型缓存的能力会在进程中长期保留；初始化与首次解析可能分配内存。性能敏感路径应按应用负载测量。
+- 测试应覆盖字段读取与替换、未知字段、用 `FieldSetFailure` 恢复执行前的类型不匹配、用 `InvocationRecovery` 恢复方法进入用户代码前的失败，以及 `RegistryError` 报告的注册冲突。
 
 ## 迁移说明
 
@@ -540,5 +541,6 @@ qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 
 ## 延伸阅读
 
+- [架构说明](architecture.zh_CN.md) · [English architecture](architecture.md)
 - [README](../README.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
 - [English user guide](user_guide.md) · [English README](../README.md)

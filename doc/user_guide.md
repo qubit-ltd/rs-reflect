@@ -649,7 +649,7 @@ Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve
 - Reflection does not parse request text, coerce numbers, or infer `Into`. Callers own synchronization and thread-safety policy.
 - Unsafe functions, unsupported ABIs, variadics, unbound generic methods, and opaque `impl Trait` returns may be described but are not dynamically callable. Tuple and function-pointer descriptors support arities 0 through 32.
 - Descriptors and per-type capability caches live for the whole process; initialization may allocate. Measure the paths your application uses if overhead matters.
-- Tests should cover a successful field read and replace, unknown fields, type mismatch recovery, method invocation failure, and registry initialization failure on conflicting declarations.
+- Tests should cover field reads and replacements, unknown fields, pre-execution type mismatch recovery with `FieldSetFailure`, method failures before user code with `InvocationRecovery`, and registration conflicts reported by `RegistryError`.
 
 ## Migration notes
 
@@ -716,5 +716,6 @@ themselves must not re-enter initialization.
 
 ## Further reading
 
+- [Architecture](architecture.md) · [中文架构](architecture.zh_CN.md)
 - [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 - [Chinese user guide](user_guide.zh_CN.md) · [中文 README](../README.zh_CN.md)

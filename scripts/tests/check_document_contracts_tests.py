@@ -31,6 +31,21 @@ class ContractTests(unittest.TestCase):
                     f"<!-- reflect-contract: {key}={values[key]} -->\n" for key in keys
                 )
                 path.write_text(markers + "Run `cargo metadata --locked --format-version 1`.\n")
+        with (self.root / "doc/user_guide.md").open("a", encoding="utf-8") as guide:
+            guide.write(
+                "## Boundaries and a practice checklist\n"
+                "- Tests should cover field reads and replacements, unknown fields, "
+                "type mismatch recovery with `FieldSetFailure`, pre-execution method "
+                "failures with `InvocationRecovery`, and registration conflicts with `RegistryError`.\n"
+                "## Migration notes\n"
+            )
+        with (self.root / "doc/user_guide.zh_CN.md").open("a", encoding="utf-8") as guide:
+            guide.write(
+                "## 边界与实践清单\n"
+                "- 测试应覆盖字段读取与替换、未知字段、使用 `FieldSetFailure` 恢复类型不匹配、"
+                "使用 `InvocationRecovery` 处理方法执行前失败，以及 `RegistryError` 注册冲突。\n"
+                "## 迁移说明\n"
+            )
         (self.root / "Cargo.toml").write_text('[package]\nname="fixture"\nversion="0.1.0"\ninclude=["/examples/**"]\n' + "".join(f'[[example]]\nname="{name}"\npath="examples/{name}.rs"\nrequired-features=["derive"]\n' for name in ["field_patch", "customer_patch", "support_action"]))
         (self.root / "examples").mkdir()
         for name in ["field_patch", "customer_patch", "support_action"]:
@@ -38,6 +53,27 @@ class ContractTests(unittest.TestCase):
 
     def test_valid_bilingual_facts_and_real_inputs(self):
         subject.check_contracts(self.root)
+
+    def test_guide_test_checklists_require_bilingual_items_and_all_apis(self):
+        subject.check_guide_test_checklists(self.root)
+        cases = (
+            ("doc/user_guide.zh_CN.md", "测试应覆盖", "checklist is missing a test item"),
+            ("doc/user_guide.md", "Tests should cover", "checklist is missing a test item"),
+            ("doc/user_guide.md", "`FieldSetFailure`", "FieldSetFailure"),
+            ("doc/user_guide.md", "`InvocationRecovery`", "InvocationRecovery"),
+            ("doc/user_guide.md", "`RegistryError`", "RegistryError"),
+            ("doc/user_guide.zh_CN.md", "`FieldSetFailure`", "FieldSetFailure"),
+            ("doc/user_guide.zh_CN.md", "`InvocationRecovery`", "InvocationRecovery"),
+            ("doc/user_guide.zh_CN.md", "`RegistryError`", "RegistryError"),
+        )
+        for name, token, diagnostic in cases:
+            with self.subTest(name=name, token=token):
+                document = self.root / name
+                original = document.read_text(encoding="utf-8")
+                document.write_text(original.replace(token, "removed", 1), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, diagnostic):
+                    subject.check_guide_test_checklists(self.root)
+                document.write_text(original, encoding="utf-8")
 
     def test_local_links_accept_existing_relative_and_external_targets(self):
         report = self.root / "doc/user_guide.zh_CN.md"

@@ -28,6 +28,36 @@ GROUPS = (
         "lazy.retry", "field.lookup")),
 )
 EXAMPLES = ("field_patch", "customer_patch", "support_action")
+GUIDE_CHECKLISTS = (
+    ("doc/user_guide.md", "Boundaries and a practice checklist", "Tests"),
+    ("doc/user_guide.zh_CN.md", "边界与实践清单", "测试"),
+)
+CHECKLIST_APIS = ("FieldSetFailure", "InvocationRecovery", "RegistryError")
+
+
+def check_guide_test_checklists(root):
+    """Require the bilingual boundary checklist to preserve test guidance."""
+    root = Path(root)
+    for name, heading, test_marker in GUIDE_CHECKLISTS:
+        document = root / name
+        lines = document.read_text(encoding="utf-8").splitlines()
+        headings = [index for index, line in enumerate(lines) if line == f"## {heading}"]
+        if len(headings) != 1:
+            raise ValueError(f"{document}: expected exactly one '## {heading}' section")
+        start = headings[0] + 1
+        end = next(
+            (index for index in range(start, len(lines)) if lines[index].startswith("## ")),
+            len(lines),
+        )
+        items = [line[2:] for line in lines[start:end] if line.startswith("- ")]
+        test_items = [item for item in items if test_marker in item]
+        if not test_items:
+            raise ValueError(f"{document}: checklist is missing a test item containing {test_marker!r}")
+        missing = [api for api in CHECKLIST_APIS if not any(api in item for item in test_items)]
+        if missing:
+            raise ValueError(f"{document}: test checklist item is missing API names {missing}")
+
+
 def document_facts(document):
     """Read unique structured facts with line-located diagnostics."""
     facts = {}
@@ -133,6 +163,7 @@ def check_contracts(root):
     expected_values = dict(FACTS)
     check_examples(root)
     check_source_checkout_docs(root)
+    check_guide_test_checklists(root)
     check_local_links(root)
     for english, chinese, required in GROUPS:
         pair = []
