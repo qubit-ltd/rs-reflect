@@ -152,6 +152,7 @@ Reflection is deliberately bounded. It does not coerce numeric values, parse str
 
 ## Learn more
 
+- [Architecture](doc/architecture.md) · [中文架构](doc/architecture.zh_CN.md)
 - [User guide](doc/user_guide.md)
 - [API reference](https://docs.rs/qubit-reflect)
 - [中文 README](README.zh_CN.md) · [中文用户手册](doc/user_guide.zh_CN.md)

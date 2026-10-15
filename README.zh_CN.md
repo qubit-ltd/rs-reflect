@@ -132,6 +132,7 @@ cargo run --example support_action
 
 ## 延伸阅读
 
+- [架构说明](doc/architecture.zh_CN.md) · [English architecture](doc/architecture.md)
 - [用户手册](doc/user_guide.zh_CN.md)
 - [API 文档](https://docs.rs/qubit-reflect)
 - [English README](README.md) · [English user guide](doc/user_guide.md)
