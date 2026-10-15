@@ -51,25 +51,6 @@ pub(in crate::expand::impls) fn substitute_type_syntax(
     ty.into_token_stream()
 }
 
-/// Substitutes generic symbols in a validated path.
-///
-/// # Parameters
-///
-/// - `path`: Validated path syntax to rewrite.
-/// - `replacements`: Generic identifiers and their concrete type or const
-///   tokens.
-///
-/// # Returns
-///
-/// Returns the rewritten path.
-#[must_use]
-#[allow(dead_code)]
-pub(in crate::expand::impls) fn substitute_path_syntax(path: &Path, replacements: &[(Ident, TokenStream)]) -> Path {
-    let mut path = path.clone();
-    GenericSubstituter { replacements }.visit_path_mut(&mut path);
-    path
-}
-
 /// Visitor that applies substitutions only in Rust type and const-expression
 /// nodes.
 struct GenericSubstituter<'a> {
@@ -202,11 +183,9 @@ mod tests {
     use proc_macro2::Span;
     use proc_macro2::TokenStream;
     use quote::quote;
-    use syn::Path;
     use syn::Type;
     use syn::parse2;
 
-    use super::substitute_path_syntax;
     use super::substitute_type_syntax;
 
     /// Creates type and const substitutions used by the visitor tests.
@@ -219,17 +198,6 @@ mod tests {
             (Ident::new("T", Span::call_site()), quote!(Vec<u8>)),
             (Ident::new("N", Span::call_site()), quote!(4)),
         ]
-    }
-
-    #[test]
-    fn test_substitute_path_syntax_rewrites_trait_type_and_const_arguments() {
-        let input: Path = parse2(quote!(Trait<T, N>)).expect("the trait path must be valid path syntax");
-        let expected: Path =
-            parse2(quote!(Trait<Vec<u8>, 4>)).expect("the expected trait path must be valid path syntax");
-
-        let actual = substitute_path_syntax(&input, &replacements());
-
-        assert_eq!(actual, expected, "type and const path arguments should be substituted");
     }
 
     #[test]

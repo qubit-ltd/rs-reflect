@@ -8,85 +8,17 @@
 
 //! Generic implementation specialization token generation.
 
-use proc_macro2::Group;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use proc_macro2::TokenTree;
 use quote::quote;
 
 use crate::ir::GenericKindIr;
-use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
-use crate::ir::PathArgumentIr;
-use crate::ir::PathArgumentsIr;
 use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::SpecializationIr;
 use crate::ir::SpecializationValueIr;
 use crate::ir::TypeIr;
-use crate::ir::TypeKindIr;
-
-/// Builds resolver proofs inside the original generic impl environment.
-///
-/// The helper is then monomorphized with the explicit specialization. This
-/// lets rustc resolve aliases and renamed dependencies while ensuring an
-/// unconstrained concrete binding is never inspected opportunistically.
-///
-/// # Parameters
-///
-/// - `declaration`: Generic impl declaration and associated-type bindings.
-/// - `replacements`: Concrete generic substitutions for one specialization.
-/// - `facade`: Runtime facade path used in generated references.
-///
-/// # Returns
-///
-/// Returns generated resolver match arms in declaration order.
-#[must_use]
-#[allow(dead_code)]
-pub(super) fn specialization_associated_type_resolver_arms(
-    declaration: &ImplDeclarationIr,
-    replacements: &[(Ident, TokenStream)],
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v3);
-    let impl_declaration = &declaration.generics.impl_declaration;
-    let where_clause = &declaration.generics.where_clause;
-    let specialization_arguments: Vec<_> = declaration
-        .generics
-        .params
-        .iter()
-        .filter(|parameter| parameter.kind != GenericKindIr::Lifetime)
-        .filter_map(|parameter| {
-            replacements
-                .iter()
-                .find(|(name, _)| name == &Ident::new(&parameter.name, parameter.span))
-                .map(|(_, value)| value)
-        })
-        .collect();
-    declaration
-        .associated_types
-        .iter()
-        .filter(|associated| associated.generics.params.is_empty())
-        .filter_map(|associated| {
-            let value = associated.value.as_ref()?;
-            let value = &value.tokens;
-            let name = syn::LitStr::new(&associated.name.to_string(), associated.span);
-            Some(quote! {
-                #name => {
-                    fn resolve #impl_declaration ()
-                        -> Option<#facade::__private::codegen_v3::descriptor::TypeDescriptorResolver>
-                        #where_clause
-                    {
-                        use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                        let probe = #facade::__private::codegen_v3::descriptor::ReflectArgumentProbe::<#value>::new();
-                        (&probe).resolve_reflect_type_descriptor()
-                    }
-                    resolve::<#(#specialization_arguments),*>()
-                }
-            })
-        })
-        .collect()
-}
 
 /// Builds replacement tokens for one validated type or const specialization.
 ///
@@ -129,61 +61,6 @@ pub(super) fn substitute_type_syntax(tokens: &TokenStream, replacements: &[(Iden
     super::internal::generic_substituter::substitute_type_syntax(tokens, replacements)
 }
 
-/// Replaces impl generic references in method signature types while retaining
-/// their structural IR for descriptor rendering.
-///
-/// # Parameters
-///
-/// - `declaration`: Concrete impl declaration whose method types are rewritten.
-/// - `replacements`: Generic identifiers and concrete type or const tokens.
-#[allow(dead_code)]
-pub(super) fn substitute_impl_method_types(declaration: &mut ImplDeclarationIr, replacements: &[(Ident, TokenStream)]) {
-    for method in &mut declaration.methods {
-        let replacements = replacements
-            .iter()
-            .filter(|(name, _)| {
-                !method
-                    .generics
-                    .params
-                    .iter()
-                    .any(|parameter| name == parameter.name.as_str())
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        if let Some(receiver) = &mut method.receiver {
-            substitute_type_tokens(&mut receiver.ty, &replacements);
-        }
-        for parameter in &mut method.parameters {
-            substitute_type_tokens(&mut parameter.ty, &replacements);
-        }
-        if let ReturnTypeIr::Type(ty) = &mut method.return_type {
-            substitute_type_tokens(ty, &replacements);
-        }
-    }
-}
-
-/// Replaces impl generic references in associated-item binding types.
-///
-/// # Parameters
-///
-/// - `declaration`: Concrete impl declaration whose associated item types are
-///   rewritten.
-/// - `replacements`: Generic identifiers and concrete type or const tokens.
-#[allow(dead_code)]
-pub(super) fn substitute_impl_associated_item_types(
-    declaration: &mut ImplDeclarationIr,
-    replacements: &[(Ident, TokenStream)],
-) {
-    for associated in &mut declaration.associated_types {
-        if let Some(value) = &mut associated.value {
-            reparse_substituted_type(value, replacements);
-        }
-    }
-    for associated in &mut declaration.associated_consts {
-        reparse_substituted_type(&mut associated.ty, replacements);
-    }
-}
-
 /// Rebuilds structural type IR after specialization changes a root path.
 ///
 /// # Parameters
@@ -202,178 +79,6 @@ fn reparse_substituted_type(ty: &mut TypeIr, replacements: &[(Ident, TokenStream
     *ty = crate::parse::convert_type(&parsed);
 }
 
-/// Applies the runtime-root lifetime policy to one specialized impl.
-///
-/// # Parameters
-///
-/// - `declaration`: Concrete impl declaration whose generic lifetimes become
-///   `'static`.
-/// - `lifetime_names`: Impl lifetime names selected for substitution.
-#[allow(dead_code)]
-pub(super) fn substitute_impl_lifetimes(declaration: &mut ImplDeclarationIr, lifetime_names: &[&str]) {
-    substitute_type_lifetimes(&mut declaration.target_type, lifetime_names);
-    if let Some(trait_path) = &mut declaration.trait_path {
-        substitute_path_lifetimes(trait_path, lifetime_names);
-    }
-    for method in &mut declaration.methods {
-        if let Some(receiver) = &mut method.receiver {
-            substitute_type_lifetimes(&mut receiver.ty, lifetime_names);
-            receiver.declaration = substitute_lifetime_tokens(&receiver.declaration, lifetime_names);
-        }
-        for parameter in &mut method.parameters {
-            substitute_type_lifetimes(&mut parameter.ty, lifetime_names);
-        }
-        if let ReturnTypeIr::Type(ty) = &mut method.return_type {
-            substitute_type_lifetimes(ty, lifetime_names);
-        }
-    }
-    for associated in &mut declaration.associated_types {
-        if let Some(value) = &mut associated.value {
-            substitute_type_lifetimes(value, lifetime_names);
-        }
-    }
-    for associated in &mut declaration.associated_consts {
-        substitute_type_lifetimes(&mut associated.ty, lifetime_names);
-    }
-}
-
-/// Substitutes impl lifetimes with `'static` in one type IR.
-///
-/// # Parameters
-///
-/// - `ty`: Structured type whose impl lifetimes are rewritten.
-/// - `lifetime_names`: Lifetime names selected for substitution.
-fn substitute_type_lifetimes(ty: &mut TypeIr, lifetime_names: &[&str]) {
-    ty.tokens = substitute_lifetime_tokens(&ty.tokens, lifetime_names);
-    ty.source = ty.tokens.to_string();
-    match &mut ty.kind {
-        TypeKindIr::Path(path) => substitute_path_lifetimes(path, lifetime_names),
-        TypeKindIr::Reference { lifetime, element, .. } => {
-            if lifetime
-                .as_deref()
-                .is_some_and(|lifetime| lifetime_names.contains(&lifetime.trim_start_matches('\'')))
-            {
-                *lifetime = Some("'static".to_owned());
-            }
-            substitute_type_lifetimes(element, lifetime_names);
-        }
-        TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
-            substitute_type_lifetimes(element, lifetime_names);
-        }
-        TypeKindIr::Tuple(elements) => {
-            for element in elements {
-                substitute_type_lifetimes(element, lifetime_names);
-            }
-        }
-        TypeKindIr::Array { element, length } => {
-            substitute_type_lifetimes(element, lifetime_names);
-            *length = substitute_lifetime_tokens(length, lifetime_names);
-        }
-        TypeKindIr::BareFunction { inputs, output, .. } => {
-            for input in inputs {
-                substitute_type_lifetimes(input, lifetime_names);
-            }
-            if let Some(output) = output {
-                substitute_type_lifetimes(output, lifetime_names);
-            }
-        }
-        TypeKindIr::TraitObject { .. }
-        | TypeKindIr::ImplTrait { .. }
-        | TypeKindIr::Never
-        | TypeKindIr::Infer
-        | TypeKindIr::Macro
-        | TypeKindIr::Other => {}
-    }
-}
-
-/// Substitutes impl lifetimes in one path and its structured arguments.
-///
-/// # Parameters
-///
-/// - `path`: Structured path whose impl lifetimes are rewritten.
-/// - `lifetime_names`: Lifetime names selected for substitution.
-fn substitute_path_lifetimes(path: &mut crate::ir::PathIr, lifetime_names: &[&str]) {
-    path.tokens = substitute_lifetime_tokens(&path.tokens, lifetime_names);
-    path.source = path.tokens.to_string();
-    if let Some(qualified_self) = &mut path.qualified_self {
-        substitute_type_lifetimes(&mut qualified_self.ty, lifetime_names);
-    }
-    for segment in &mut path.segments {
-        match &mut segment.arguments {
-            PathArgumentsIr::None => {}
-            PathArgumentsIr::AngleBracketed(arguments) => {
-                for argument in arguments {
-                    match argument {
-                        PathArgumentIr::Lifetime(lifetime)
-                            if lifetime_names.contains(&lifetime.trim_start_matches('\'')) =>
-                        {
-                            *lifetime = "'static".to_owned();
-                        }
-                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
-                            substitute_type_lifetimes(ty, lifetime_names);
-                        }
-                        PathArgumentIr::Const(tokens)
-                        | PathArgumentIr::AssociatedConst { value: tokens, .. }
-                        | PathArgumentIr::Other(tokens) => {
-                            *tokens = substitute_lifetime_tokens(tokens, lifetime_names);
-                        }
-                        PathArgumentIr::Lifetime(_) | PathArgumentIr::Constraint { .. } => {}
-                    }
-                }
-            }
-            PathArgumentsIr::Parenthesized { inputs, output } => {
-                for input in inputs {
-                    substitute_type_lifetimes(input, lifetime_names);
-                }
-                if let Some(output) = output {
-                    substitute_type_lifetimes(output, lifetime_names);
-                }
-            }
-        }
-    }
-}
-
-/// Rewrites lifetime token pairs while preserving group delimiters and spans.
-///
-/// # Parameters
-///
-/// - `tokens`: Token stream that may contain selected lifetime names.
-/// - `lifetime_names`: Lifetime names to replace with `'static`.
-///
-/// # Returns
-///
-/// Returns a token stream with matching lifetime tokens rewritten.
-#[must_use]
-fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> TokenStream {
-    let trees: Vec<_> = tokens.clone().into_iter().collect();
-    let mut output = TokenStream::new();
-    let mut index = 0;
-    while index < trees.len() {
-        if let TokenTree::Punct(punctuation) = &trees[index]
-            && punctuation.as_char() == '\''
-            && let Some(TokenTree::Ident(identifier)) = trees.get(index + 1)
-            && lifetime_names.contains(&identifier.to_string().as_str())
-        {
-            output.extend(quote!('static));
-            index += 2;
-            continue;
-        }
-        match &trees[index] {
-            TokenTree::Group(group) => {
-                let mut replacement = Group::new(
-                    group.delimiter(),
-                    substitute_lifetime_tokens(&group.stream(), lifetime_names),
-                );
-                replacement.set_span(group.span());
-                output.extend([TokenTree::Group(replacement)]);
-            }
-            tree => output.extend([tree.clone()]),
-        }
-        index += 1;
-    }
-    output
-}
-
 /// Recursively substitutes one type and every nested type retained by its IR.
 ///
 /// # Parameters
@@ -382,24 +87,6 @@ fn substitute_lifetime_tokens(tokens: &TokenStream, lifetime_names: &[&str]) -> 
 /// - `replacements`: Generic identifiers and concrete type or const tokens.
 pub(super) fn substitute_type_tokens(ty: &mut TypeIr, replacements: &[(Ident, TokenStream)]) {
     reparse_substituted_type(ty, replacements);
-}
-
-/// Rebuilds a trait path after substituting bound impl generic parameters.
-///
-/// # Parameters
-///
-/// - `path`: Structured trait path to rewrite.
-/// - `replacements`: Generic identifiers and concrete type or const tokens.
-///
-/// # Panics
-///
-/// Panics if validated specialization tokens no longer parse as a Rust path.
-#[allow(dead_code)]
-pub(super) fn substitute_trait_path_tokens(path: &mut crate::ir::PathIr, replacements: &[(Ident, TokenStream)]) {
-    let mut parsed: syn::Path =
-        syn::parse2(path.tokens.clone()).expect("validated specialization must retain valid trait path syntax");
-    parsed = super::internal::generic_substituter::substitute_path_syntax(&parsed, replacements);
-    *path = crate::parse::convert_path(&parsed);
 }
 
 /// Returns a non-core explicit receiver type that requires a registered
