@@ -120,7 +120,7 @@ cargo run --example support_action
 - `#[Reflect]` 与 `#[ReflectImpl]` 在声明处为结构体、枚举、trait 和 impl 生成不可变描述符，可在稳定版 Rust 上使用。
 - `TypeDescriptor` 与 `FieldDescriptor` 通过普通 `&T`、`&mut T` 和拥有所有权的值提供受检字段读取、可变借用和替换；构造 builder 同样接收普通值。
 - `#[reflect(skip)]` 会将字段、分支或方法完全排除在反射元数据之外。它不会删除 Rust 成员，也不能用来保密。其他成员属性不改变可见性；安全入口拒绝非公开成员，满足安全前提时可使用文档说明的 `_unsafe` 入口绕过可见性。
-- 生成代码执行前的校验失败会返回结构化错误，并把调用方尚未被消费的输入一并退回：`FieldSetFailure`、`ConstructionRecovery`、`InvocationRecovery`。
+- 生成代码执行前失败会返回结构化错误，并退回调用方尚未被消费的输入：`FieldSetFailure`、`ConstructionRecovery`、`InvocationRecovery`。named 与 tuple 构造没有可用适配器时也会通过 `ConstructionRecovery` 退回输入，错误为 `TargetUnavailable`。
 - `ReflectRegistry::initialize()` 把已链接的声明汇总成一份确定性的不可变注册表；`RegistrySnapshotBuilder` 让库和测试用显式事实构建隔离快照。两者都能解析方法以及 `Clone`、`Default` 等类型化能力，并区分能力处于 `Missing`、`FactOnly`、`AdapterTypeMismatch` 还是 `Found` 状态。
 - 泛型声明保留为定义。若要动态调用泛型方法，须在编译期已知的调用点使用 `bind_method!` 绑定具体实例；运行时 `TypeId` 不能生成新的单态化代码。未绑定的泛型方法没有可调用适配器。
 - 需要在线程间共享反射对象时，由调用方自行加锁。跨线程传值仍受 Rust 的 `Send` 和 `Sync` 规则约束。

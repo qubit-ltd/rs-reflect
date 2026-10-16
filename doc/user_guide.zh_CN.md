@@ -203,7 +203,7 @@ fn main() {
 }
 ```
 
-校验失败时，`ConstructionRecovery` 按调用方顺序保留输入。结构体更新也接受基础值和普通替换值。动态 `Box<dyn Any>` 输入根据盒内类型检查；使用 `field_any`/`value_any` builder 方法显式传入动态盒。若字段带有 `#[reflect(skip)]`，反射仍保留类型描述，但该结构体或枚举分支没有动态构造适配器：生成代码不能安全初始化被省略的 Rust 字段。
+结构体或枚举分支没有构造适配器时，named 与 tuple 构造会返回 `TargetUnavailable`，并按调用方顺序保留全部输入；调用 `into_any_parts()` 可取回这些值。带有 `#[reflect(skip)]` 的字段就是适配器不可用的一种情况：反射仍保留类型描述，但生成代码无法安全初始化被省略的 Rust 字段。构造适配器开始执行后，不承诺恢复已被消费的值或撤销任意副作用。结构体更新也接受基础值和普通替换值。动态 `Box<dyn Any>` 输入根据盒内类型检查；使用 `field_any`/`value_any` builder 方法显式传入动态盒。
 
 ## 按名称调用业务方法
 
@@ -505,7 +505,8 @@ qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 | Cargo 无法解析 `qubit-datatype` 或 `qubit-id` | 检查 registry 网络访问，并运行 `cargo metadata --locked --format-version 1` 查看锁定的依赖图；不需要检出相邻仓库。 |
 | `field("...")` 返回 `None` | 检查 Rust 字段名以及该字段是否标记为 `#[reflect(skip)]`；skip 成员完全不进入反射。 |
 | 字段读取或替换失败 | 检查目标类型、公开可见性及值的精确类型；从 `FieldSetFailure` 取回原始替换值。 |
-| 构造失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |
+| 构造返回 `TargetUnavailable` | 检查该类型或分支是否有构造适配器；named 与 tuple 输入仍保存在 `ConstructionRecovery` 中，可用 `into_any_parts()` 取回。 |
+| 构造校验失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |
 | 方法可见但无法调用 | 检查是否有受支持的适配器；泛型方法还须有编译期 `bind_method!` 具体实例绑定。查看调用失败中的恢复输入。 |
 | 注册表初始化或快照构建失败 | 查看 `RegistryError` 的冲突来源；全局初始化错误在当前进程缓存，修复声明后启动新进程。 |
 | 外部类型没有 `Reflect` 实现 | 在使用该反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`。 |

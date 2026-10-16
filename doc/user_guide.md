@@ -209,7 +209,7 @@ fn main() {
 }
 ```
 
-`ConstructionRecovery` retains inputs in caller order when validation fails. Struct updates accept a base value and ordinary replacement values. Dynamic `Box<dyn Any>` inputs are checked by their enclosed type; use the explicitly named `field_any`/`value_any` builder methods when supplying such dynamic boxes. If any field is marked `#[reflect(skip)]`, reflection still describes the type but dynamic construction is unavailable for that struct or enum variant: the omitted Rust field cannot safely be initialized by generated code.
+`ConstructionRecovery` retains inputs in caller order when validation fails. If a struct or enum variant has no construction adapter, named and tuple construction returns `TargetUnavailable` and retains all supplied inputs; use `into_any_parts()` to take them back. A `#[reflect(skip)]` field is one reason an adapter may be unavailable: reflection still describes the type, but generated code cannot safely initialize the omitted Rust field. Once a construction adapter runs, this recovery guarantee does not cover values it has consumed or arbitrary side effects. Struct updates accept a base value and ordinary replacement values. Dynamic `Box<dyn Any>` inputs are checked by their enclosed type; use the explicitly named `field_any`/`value_any` builder methods when supplying such dynamic boxes.
 
 ## Invoke methods
 
@@ -633,7 +633,8 @@ The API avoids implicit conversion: it does not coerce numeric values, parse str
 | Cargo cannot resolve `qubit-datatype` or `qubit-id` | Check registry access and the resolved dependency graph with `cargo metadata --locked --format-version 1`; adjacent repository checkouts are not required. |
 | `field("...")` returns `None` | Check the Rust member name and whether the member is marked `#[reflect(skip)]`. Skipped members are absent from reflection. |
 | A field operation fails | Check public visibility and the exact target and value types; inspect `FieldSetFailure` to recover the original replacement. |
-| Construction fails | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |
+| Construction returns `TargetUnavailable` | Check whether the type or variant has a construction adapter; named and tuple inputs remain in `ConstructionRecovery` and can be taken with `into_any_parts()`. |
+| Construction fails validation | Check shape, duplicate or missing fields, names or indices, and each value's type; recover inputs from `ConstructionRecovery`. |
 | A method is visible but not callable | Check whether the method has a supported adapter and, for a generic method, a compile-time `bind_method!` instance binding. Inspect invocation recovery for rejected inputs. |
 | Registry initialization or snapshot build fails | Inspect `RegistryError` and conflicting fragments; global initialization errors are cached for the process. |
 | Cross-thread use is unavailable | Apply synchronization in the caller and satisfy Rust's `Send`/`Sync` constraints for values moved between threads. |
