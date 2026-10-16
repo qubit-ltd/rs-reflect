@@ -167,8 +167,11 @@ impl VariantDescriptor {
     ///
     /// # Errors
     ///
-    /// Returns recovery with the original inputs if validation fails, the
-    /// requested root type is wrong, or the variant has no constructor.
+    /// Returns recovery if the requested root type is wrong or input
+    /// validation fails. If the variant has no constructor, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because no constructor has consumed them. Failures after a constructor
+    /// runs do not guarantee recovery of arbitrary side effects.
     pub fn construct_struct<T: Any>(
         &self,
         input: NamedConstructionInput<Local>,
@@ -180,12 +183,7 @@ impl VariantDescriptor {
         }
         let result = match self.construction() {
             Some(construction) => construction.local_constructor().construct_named(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .downcast::<T>()
@@ -194,18 +192,21 @@ impl VariantDescriptor {
 
     /// Dynamically constructs this named variant and returns its exact Rust
     /// value.
+    ///
+    /// # Errors
+    ///
+    /// Returns recovery if input validation fails. If the variant has no
+    /// constructor, returns `ConstructionError::TargetUnavailable` with all
+    /// inputs in recovery because no constructor has consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of
+    /// arbitrary side effects.
     pub fn construct_struct_any(
         &self,
         input: NamedConstructionInput<Local>,
     ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
         let result = match self.construction() {
             Some(construction) => construction.local_constructor().construct_named(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .into_any()
@@ -224,8 +225,11 @@ impl VariantDescriptor {
     ///
     /// # Errors
     ///
-    /// Returns recovery with the original inputs if validation fails, the
-    /// requested root type is wrong, or the variant has no constructor.
+    /// Returns recovery if the requested root type is wrong or input
+    /// validation fails. If the variant has no constructor, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because no constructor has consumed them. Failures after a constructor
+    /// runs do not guarantee recovery of arbitrary side effects.
     pub fn construct_tuple<T: Any>(
         &self,
         input: TupleConstructionInput<Local>,
@@ -237,12 +241,7 @@ impl VariantDescriptor {
         }
         let result = match self.construction() {
             Some(construction) => construction.local_constructor().construct_tuple(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .downcast::<T>()
@@ -251,18 +250,21 @@ impl VariantDescriptor {
 
     /// Dynamically constructs this tuple variant and returns its exact Rust
     /// value.
+    ///
+    /// # Errors
+    ///
+    /// Returns recovery if input validation fails. If the variant has no
+    /// constructor, returns `ConstructionError::TargetUnavailable` with all
+    /// inputs in recovery because no constructor has consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of
+    /// arbitrary side effects.
     pub fn construct_tuple_any(
         &self,
         input: TupleConstructionInput<Local>,
     ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
         let result = match self.construction() {
             Some(construction) => construction.local_constructor().construct_tuple(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .into_any()

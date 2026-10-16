@@ -237,9 +237,13 @@ impl TypeDescriptor {
     ///
     /// # Errors
     ///
-    /// Returns recovery with the original caller values if the requested type
-    /// is wrong, an input is invalid, a non-public field would be written, or
-    /// construction is unavailable.
+    /// Returns recovery if the requested type is wrong or input validation
+    /// fails. A non-public field cannot be written by this safe method.
+    /// If no constructor is available, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because the constructor has not consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of arbitrary
+    /// side effects.
     pub fn construct_struct<T: Any>(
         &self,
         input: NamedConstructionInput<Local>,
@@ -252,12 +256,7 @@ impl TypeDescriptor {
         }
         let result = match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_named(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .downcast::<T>()
@@ -266,18 +265,23 @@ impl TypeDescriptor {
 
     /// Dynamically constructs a named struct and returns its exact owned Rust
     /// value.
+    ///
+    /// # Errors
+    ///
+    /// Returns recovery if input validation fails. A non-public field cannot
+    /// be written by this safe method.
+    /// If no constructor is available, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because the constructor has not consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of arbitrary
+    /// side effects.
     pub fn construct_struct_any(
         &self,
         input: NamedConstructionInput<Local>,
     ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
         let result = match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_named(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .into_any()
@@ -346,9 +350,13 @@ impl TypeDescriptor {
     ///
     /// # Errors
     ///
-    /// Returns recovery with the original caller values if the requested type
-    /// is wrong, an input is invalid, a non-public field would be written, or
-    /// construction is unavailable.
+    /// Returns recovery if the requested type is wrong or input validation
+    /// fails. A non-public field cannot be written by this safe method.
+    /// If no constructor is available, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because the constructor has not consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of arbitrary
+    /// side effects.
     pub fn construct_tuple<T: Any>(
         &self,
         input: TupleConstructionInput<Local>,
@@ -361,12 +369,7 @@ impl TypeDescriptor {
         }
         let result = match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_tuple(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .downcast::<T>()
@@ -375,18 +378,23 @@ impl TypeDescriptor {
 
     /// Dynamically constructs a tuple struct and returns its exact owned Rust
     /// value.
+    ///
+    /// # Errors
+    ///
+    /// Returns recovery if input validation fails. A non-public field cannot
+    /// be written by this safe method.
+    /// If no constructor is available, returns
+    /// `ConstructionError::TargetUnavailable` with all inputs in recovery
+    /// because the constructor has not consumed them.
+    /// Failures after a constructor runs do not guarantee recovery of arbitrary
+    /// side effects.
     pub fn construct_tuple_any(
         &self,
         input: TupleConstructionInput<Local>,
     ) -> Result<Box<dyn Any>, ConstructionRecovery<Local>> {
         let result = match self.struct_construction() {
             Some(construction) => construction.local_constructor().construct_tuple(input)?,
-            None => {
-                return Err(ConstructionRecovery::new(
-                    ConstructionError::TargetUnavailable,
-                    Vec::new(),
-                ));
-            }
+            None => return Err(input.into_recovery(ConstructionError::TargetUnavailable)),
         };
         Ok(result
             .into_any()
