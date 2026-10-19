@@ -1,8 +1,10 @@
 //! Method declarations, effective implementations, and callable specializations.
 
 use crate::runtime::context::ReflectionContext;
+use crate::runtime::descriptor::generic::{
+    GenericDefinitionDescriptor, GenericParameterMetadata, GenericParameterMetadataKind,
+};
 use crate::runtime::descriptor::TypeDescriptor;
-use crate::runtime::descriptor::generic::GenericDefinitionDescriptor;
 use crate::runtime::error::{ContextError, LookupError, LookupQuery, LookupSubject};
 use crate::runtime::expression::{ExpressionData, TypeExpression};
 use crate::runtime::identity::{
@@ -19,6 +21,48 @@ use std::any::TypeId;
 
 pub(crate) use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
 pub(crate) use crate::runtime::descriptor::metadata::TypeMetadata;
+
+#[cfg(test)]
+mod specialization_integer_tests {
+    use super::*;
+
+    static U8_EXPRESSION: ExpressionData = ExpressionData::Named {
+        path: "u8",
+        definition: None,
+        arguments: &[],
+    };
+    static U8_PARAMETER: GenericParameterMetadata =
+        GenericParameterMetadata::const_parameter("N", 0, &U8_EXPRESSION, None);
+    static PARAMETERS: [GenericParameterMetadata; 1] = [U8_PARAMETER];
+    static MAX_ARGUMENT: [MethodSpecializationArgument; 1] =
+        [MethodSpecializationArgument::const_integer_literal(
+            false, 255,
+        )];
+    static OVERFLOW_ARGUMENT: [MethodSpecializationArgument; 1] =
+        [MethodSpecializationArgument::const_integer_literal(
+            false, 256,
+        )];
+
+    #[test]
+    fn normalizes_untyped_integer_literal_using_declared_const_type() {
+        let resolved = MethodSpecializationSpec::new(&MAX_ARGUMENT, NO_ADAPTERS)
+            .resolve(&PARAMETERS)
+            .expect("255 fits in u8");
+        assert_eq!(
+            resolved.arguments.as_slice(),
+            &[GenericArgumentIdentity::Const("u8:255".into())]
+        );
+    }
+
+    #[test]
+    fn rejects_untyped_integer_literal_outside_declared_const_type() {
+        assert!(
+            MethodSpecializationSpec::new(&OVERFLOW_ARGUMENT, NO_ADAPTERS)
+                .resolve(&PARAMETERS)
+                .is_err()
+        );
+    }
+}
 
 /// Visibility recorded for a method declaration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -545,6 +589,21 @@ impl EffectiveMethod {
     pub(crate) fn target_type_id(&self) -> std::any::TypeId {
         (self.target)().type_id()
     }
+
+    pub(crate) fn resolve_specializations(
+        &self,
+    ) -> Result<Box<[ResolvedMethodSpecialization]>, &'static str> {
+        if self.specialization_specs.is_empty() {
+            Ok(self.specializations.to_vec().into_boxed_slice())
+        } else {
+            self.specialization_specs
+                .iter()
+                .copied()
+                .map(|spec| spec.resolve(self.metadata.generics.parameters))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Vec::into_boxed_slice)
+        }
+    }
 }
 
 fn same_adapters(left: Option<InvocationAdapters>, right: Option<InvocationAdapters>) -> bool {
@@ -591,6 +650,7 @@ enum MethodSpecializationArgumentValue {
     Lifetime(&'static str),
     ConstSigned { kind: ConstIntegerKind, value: i128 },
     ConstUnsigned { kind: ConstIntegerKind, value: u128 },
+    ConstIntegerLiteral { negative: bool, magnitude: u128 },
     ConstBoolean(bool),
     ConstCharacter(char),
 }
@@ -637,6 +697,16 @@ impl MethodSpecializationArgument {
     pub const fn const_char(value: char) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstCharacter(value),
+        }
+    }
+
+    /// Records an unsuffixed integer literal for validation against its declaration.
+    pub const fn const_integer_literal(negative: bool, magnitude: u128) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::ConstIntegerLiteral {
+                negative,
+                magnitude,
+            },
         }
     }
 
@@ -749,13 +819,195 @@ impl MethodSpecializationSpec {
         self.adapters = NO_ADAPTERS;
         self
     }
+
+    fn resolve(
+        self,
+        parameters: &'static [GenericParameterMetadata],
+    ) -> Result<ResolvedMethodSpecialization, &'static str> {
+        if self.arguments.len() != parameters.len() {
+            return Err(
+                "method specialization argument count does not match its generic parameters",
+            );
+        }
+        let arguments = self
+            .arguments
+            .iter()
+            .zip(parameters)
+            .map(|(argument, parameter)| match argument.value {
+                MethodSpecializationArgumentValue::Type(type_name) => {
+                    Ok(GenericArgumentIdentity::Type(type_name().into()))
+                }
+                MethodSpecializationArgumentValue::Lifetime(name) => {
+                    Ok(GenericArgumentIdentity::Lifetime(name.into()))
+                }
+                MethodSpecializationArgumentValue::ConstSigned { kind, value } => Ok(
+                    GenericArgumentIdentity::Const(format!("{}:{value}", kind.type_name()).into()),
+                ),
+                MethodSpecializationArgumentValue::ConstUnsigned { kind, value } => Ok(
+                    GenericArgumentIdentity::Const(format!("{}:{value}", kind.type_name()).into()),
+                ),
+                MethodSpecializationArgumentValue::ConstIntegerLiteral {
+                    negative,
+                    magnitude,
+                } => {
+                    let GenericParameterMetadataKind::Const { ty, .. } = parameter.kind else {
+                        return Err(
+                            "integer specialization argument does not target a const parameter",
+                        );
+                    };
+                    let kind = integer_kind_for_expression(ty).ok_or(
+                        "unsuffixed integer specialization requires a primitive integer const type",
+                    )?;
+                    let value = kind.normalize(negative, magnitude).ok_or(
+                        "integer specialization literal is out of range for its const parameter",
+                    )?;
+                    Ok(GenericArgumentIdentity::Const(
+                        format!("{}:{value}", kind.type_name()).into(),
+                    ))
+                }
+                MethodSpecializationArgumentValue::ConstBoolean(value) => Ok(
+                    GenericArgumentIdentity::Const(format!("bool:{value}").into()),
+                ),
+                MethodSpecializationArgumentValue::ConstCharacter(value) => Ok(
+                    GenericArgumentIdentity::Const(format!("char:{value:?}").into()),
+                ),
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_boxed_slice();
+        Ok(ResolvedMethodSpecialization {
+            arguments: ResolvedMethodArguments::Owned(arguments),
+            availability: self.availability,
+            adapters: self.adapters,
+        })
+    }
+}
+
+fn integer_kind_for_expression(expression: &'static ExpressionData) -> Option<ConstIntegerKind> {
+    let ExpressionData::Named {
+        path,
+        definition,
+        arguments,
+    } = expression
+    else {
+        return None;
+    };
+    if definition.is_some() || !arguments.is_empty() {
+        return None;
+    }
+    match *path {
+        "i8" | "core::primitive::i8" | "std::primitive::i8" => Some(ConstIntegerKind::I8),
+        "i16" | "core::primitive::i16" | "std::primitive::i16" => Some(ConstIntegerKind::I16),
+        "i32" | "core::primitive::i32" | "std::primitive::i32" => Some(ConstIntegerKind::I32),
+        "i64" | "core::primitive::i64" | "std::primitive::i64" => Some(ConstIntegerKind::I64),
+        "i128" | "core::primitive::i128" | "std::primitive::i128" => Some(ConstIntegerKind::I128),
+        "isize" | "core::primitive::isize" | "std::primitive::isize" => {
+            Some(ConstIntegerKind::Isize)
+        }
+        "u8" | "core::primitive::u8" | "std::primitive::u8" => Some(ConstIntegerKind::U8),
+        "u16" | "core::primitive::u16" | "std::primitive::u16" => Some(ConstIntegerKind::U16),
+        "u32" | "core::primitive::u32" | "std::primitive::u32" => Some(ConstIntegerKind::U32),
+        "u64" | "core::primitive::u64" | "std::primitive::u64" => Some(ConstIntegerKind::U64),
+        "u128" | "core::primitive::u128" | "std::primitive::u128" => Some(ConstIntegerKind::U128),
+        "usize" | "core::primitive::usize" | "std::primitive::usize" => {
+            Some(ConstIntegerKind::Usize)
+        }
+        _ => None,
+    }
+}
+
+impl ConstIntegerKind {
+    fn type_name(self) -> &'static str {
+        match self {
+            Self::I8 => "i8",
+            Self::I16 => "i16",
+            Self::I32 => "i32",
+            Self::I64 => "i64",
+            Self::I128 => "i128",
+            Self::Isize => "isize",
+            Self::U8 => "u8",
+            Self::U16 => "u16",
+            Self::U32 => "u32",
+            Self::U64 => "u64",
+            Self::U128 => "u128",
+            Self::Usize => "usize",
+        }
+    }
+
+    fn normalize(self, negative: bool, magnitude: u128) -> Option<String> {
+        let (signed, bits) = match self {
+            Self::I8 => (true, 8),
+            Self::I16 => (true, 16),
+            Self::I32 => (true, 32),
+            Self::I64 => (true, 64),
+            Self::I128 => (true, 128),
+            Self::Isize => (true, usize::BITS),
+            Self::U8 => (false, 8),
+            Self::U16 => (false, 16),
+            Self::U32 => (false, 32),
+            Self::U64 => (false, 64),
+            Self::U128 => (false, 128),
+            Self::Usize => (false, usize::BITS),
+        };
+        if signed {
+            let negative_limit = 1_u128 << (bits - 1);
+            let positive_limit = negative_limit - 1;
+            if (negative && magnitude > negative_limit) || (!negative && magnitude > positive_limit)
+            {
+                return None;
+            }
+            let value = if negative {
+                if magnitude == (1_u128 << 127) {
+                    i128::MIN
+                } else {
+                    -(magnitude as i128)
+                }
+            } else {
+                magnitude as i128
+            };
+            Some(value.to_string())
+        } else if negative || (bits < 128 && magnitude >= (1_u128 << bits)) {
+            None
+        } else {
+            Some(magnitude.to_string())
+        }
+    }
 }
 
 /// A compile-time-bound implementation of one generic method.
+#[derive(Clone)]
 pub(crate) struct ResolvedMethodSpecialization {
-    pub(crate) arguments: &'static [GenericArgumentIdentity],
+    pub(crate) arguments: ResolvedMethodArguments,
     pub(crate) availability: InvocationAvailability,
-    pub(crate) adapters: &'static InvocationAdapters,
+    pub(crate) adapters: InvocationAdapters,
+}
+
+#[derive(Clone)]
+pub(crate) enum ResolvedMethodArguments {
+    Static(&'static [GenericArgumentIdentity]),
+    Owned(Box<[GenericArgumentIdentity]>),
+}
+
+impl ResolvedMethodArguments {
+    pub(crate) fn as_slice(&self) -> &[GenericArgumentIdentity] {
+        match self {
+            Self::Static(arguments) => arguments,
+            Self::Owned(arguments) => arguments,
+        }
+    }
+}
+
+pub(crate) struct ContextEffectiveMethod {
+    pub(crate) effective: EffectiveMethod,
+    pub(crate) specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+}
+
+impl ContextEffectiveMethod {
+    pub(crate) fn new(effective: EffectiveMethod) -> Result<Self, &'static str> {
+        Ok(Self {
+            specializations: std::sync::Arc::from(effective.resolve_specializations()?),
+            effective,
+        })
+    }
 }
 
 /// Mode-specific adapters generated for a concrete specialization.
@@ -834,26 +1086,42 @@ impl InvocationAdaptersBuilder {
 }
 
 /// A method declaration combined with its effective implementation in one context.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct MethodDescriptor<'ctx> {
     effective: EffectiveMethod,
+    specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> MethodDescriptor<'ctx> {
-    pub(crate) const fn new(effective: EffectiveMethod, context: &'ctx ReflectionContext) -> Self {
-        Self { effective, context }
+    pub(crate) fn new(effective: EffectiveMethod, context: &'ctx ReflectionContext) -> Self {
+        Self {
+            effective,
+            specializations: std::sync::Arc::from(effective.specializations),
+            context,
+        }
     }
-    pub(crate) fn context(self) -> &'ctx ReflectionContext {
+    pub(crate) fn with_resolved_specializations(
+        effective: EffectiveMethod,
+        specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+        context: &'ctx ReflectionContext,
+    ) -> Self {
+        Self {
+            effective,
+            specializations,
+            context,
+        }
+    }
+    pub(crate) fn context(&self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn target(self) -> TypeDescriptor<'ctx> {
+    pub(crate) fn target(&self) -> TypeDescriptor<'ctx> {
         TypeDescriptor::new((self.effective.target)(), self.context)
     }
-    pub fn name(self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         self.effective.metadata.name
     }
-    pub(crate) fn namespace(self) -> MethodNamespace<'ctx> {
+    pub(crate) fn namespace(&self) -> MethodNamespace<'ctx> {
         match &self.effective.metadata.namespace {
             MethodNamespaceMetadata::Inherent { implementation } => {
                 MethodNamespace::Inherent { implementation }
@@ -867,7 +1135,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
             },
         }
     }
-    pub(crate) fn qualified_name(self) -> MethodQualifiedName<'ctx> {
+    pub(crate) fn qualified_name(&self) -> MethodQualifiedName<'ctx> {
         match self.namespace() {
             MethodNamespace::Inherent { .. } => MethodQualifiedName::Inherent {
                 target: self.target(),
@@ -880,25 +1148,25 @@ impl<'ctx> MethodDescriptor<'ctx> {
             },
         }
     }
-    pub(crate) const fn visibility(self) -> MethodVisibility {
+    pub(crate) fn visibility(&self) -> MethodVisibility {
         self.effective.metadata.visibility
     }
-    pub(crate) const fn receiver(self) -> Option<ReceiverDescriptor> {
+    pub(crate) fn receiver(&self) -> Option<ReceiverDescriptor> {
         match self.effective.metadata.receiver {
             Some(receiver) => Some(receiver.for_target(self.effective.target)),
             None => None,
         }
     }
     pub(crate) fn parameters(
-        self,
+        &self,
     ) -> impl ExactSizeIterator<Item = ParameterDescriptor<'ctx>> + 'ctx {
-        self.effective
-            .metadata
-            .parameters
+        let context: &'ctx ReflectionContext = self.context;
+        let parameters: &'static [ParameterMetadata] = self.effective.metadata.parameters;
+        parameters
             .iter()
-            .map(move |parameter| ParameterDescriptor::new(parameter, self.context))
+            .map(move |parameter| ParameterDescriptor::new(parameter, context))
     }
-    pub(crate) fn parameter(self, name: &str) -> Result<ParameterDescriptor<'ctx>, LookupError> {
+    pub(crate) fn parameter(&self, name: &str) -> Result<ParameterDescriptor<'ctx>, LookupError> {
         let mut matches = self.effective.metadata.parameters.iter().filter(|parameter| matches!(parameter.pattern, ParameterPattern::Identifier(candidate) if candidate == name));
         let Some(first) = matches.next() else {
             return Err(LookupError::Missing {
@@ -918,23 +1186,23 @@ impl<'ctx> MethodDescriptor<'ctx> {
             }),
         }
     }
-    pub(crate) fn output(self) -> ReturnDescriptor<'ctx> {
+    pub(crate) fn output(&self) -> ReturnDescriptor<'ctx> {
         ReturnDescriptor::new(self.effective.metadata.output, self.context)
     }
-    pub(crate) const fn qualifiers(self) -> MethodQualifiers {
+    pub(crate) fn qualifiers(&self) -> MethodQualifiers {
         self.effective.metadata.qualifiers
     }
-    pub(crate) fn generics(self) -> GenericDefinitionDescriptor<'ctx> {
+    pub(crate) fn generics(&self) -> GenericDefinitionDescriptor<'ctx> {
         GenericDefinitionDescriptor::new(self.effective.metadata.generics, self.context)
     }
-    pub(crate) const fn implementation_source(self) -> MethodImplementationSource {
+    pub(crate) fn implementation_source(&self) -> MethodImplementationSource {
         self.effective.source
     }
-    pub(crate) fn availability(self) -> MethodAvailability {
+    pub(crate) fn availability(&self) -> MethodAvailability {
         if !self.effective.metadata.is_generic {
             return self.effective.availability;
         }
-        match self.effective.specializations {
+        match self.specializations.as_ref() {
             [] => MethodAvailability::RequiresSpecialization,
             [specialization] => match specialization.availability {
                 InvocationAvailability::Callable => MethodAvailability::Callable,
@@ -947,24 +1215,32 @@ impl<'ctx> MethodDescriptor<'ctx> {
             },
         }
     }
-    pub(crate) fn specializations(self) -> MethodSpecializations<'ctx> {
-        MethodSpecializations { method: self }
+    pub(crate) fn specializations(&self) -> MethodSpecializations<'ctx> {
+        MethodSpecializations {
+            method: self.clone(),
+        }
     }
     pub(crate) fn specialization(
-        self,
+        &self,
         arguments: &MethodArguments,
     ) -> Result<MethodSpecializationDescriptor<'ctx>, LookupError> {
         let matches = self
-            .effective
             .specializations
             .iter()
-            .filter(|candidate| candidate.arguments == arguments.arguments)
+            .enumerate()
+            .filter_map(|(index, candidate)| {
+                (candidate.arguments.as_slice() == arguments.arguments).then_some(index)
+            })
             .collect::<Vec<_>>();
         match matches.as_slice() {
-            [resolved] => Ok(MethodSpecializationDescriptor {
-                method: self,
-                resolved,
-            }),
+            [index] => {
+                let specializations = self.specializations.clone();
+                Ok(MethodSpecializationDescriptor {
+                    method: self.clone(),
+                    specializations,
+                    index: *index,
+                })
+            }
             [] => Err(LookupError::Missing {
                 subject: LookupSubject::MethodSpecialization,
                 query: LookupQuery::GenericArguments(
@@ -985,7 +1261,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
         }
     }
     pub(crate) fn invoke<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
         match self.invoke_inner(invocation, false, false) {
@@ -996,7 +1272,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
     }
 
     pub(crate) fn invoke_catching<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, CaughtInvocationFailure<'call, M>> {
         match self.invoke_inner(invocation, true, false) {
@@ -1017,7 +1293,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
     /// enforced by its source visibility.
     #[allow(unsafe_code)]
     pub(crate) unsafe fn invoke_unchecked<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
         match self.invoke_inner(invocation, false, true) {
@@ -1028,10 +1304,10 @@ impl<'ctx> MethodDescriptor<'ctx> {
     }
 
     pub(crate) fn invoke_pinned<'call, T: ?Sized + 'static, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         invocation: PinnedInvocation<'call, M, T>,
     ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
-        let specialization = match self.effective.specializations {
+        let specialization = match self.specializations.as_ref() {
             [specialization] => specialization,
             [] if !self.effective.metadata.is_generic => {
                 let availability = match self.effective.availability {
@@ -1054,11 +1330,8 @@ impl<'ctx> MethodDescriptor<'ctx> {
                         ));
                     }
                 };
-                return self.invoke_pinned_with(
-                    availability,
-                    self.effective.adapters.as_ref().unwrap_or(&NO_ADAPTERS),
-                    invocation,
-                );
+                let adapters = self.effective.adapters.unwrap_or(NO_ADAPTERS);
+                return self.invoke_pinned_with(availability, &adapters, invocation);
             }
             [] => {
                 return Err(PinnedInvocationFailure::new(
@@ -1075,15 +1348,16 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 ));
             }
         };
+        let specialization = specialization.clone();
         self.invoke_pinned_with(
             specialization.availability,
-            specialization.adapters,
+            &specialization.adapters,
             invocation,
         )
     }
 
     fn invoke_pinned_with<'call, T: ?Sized + 'static, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         availability: InvocationAvailability,
         adapters: &InvocationAdapters,
         invocation: PinnedInvocation<'call, M, T>,
@@ -1107,7 +1381,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 invocation,
             ));
         }
-        let validated = match invocation.validate(self) {
+        let validated = match invocation.validate(self.clone()) {
             Ok(validated) => validated,
             Err(failure) => return Err(failure),
         };
@@ -1130,21 +1404,17 @@ impl<'ctx> MethodDescriptor<'ctx> {
     }
 
     fn invoke_inner<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         invocation: Invocation<'call, M>,
         catching: bool,
         unchecked: bool,
     ) -> Result<InvocationOutput<'call, M>, InvocationAttempt<'call, M>> {
-        let specialization = match self.effective.specializations {
+        let specialization = match self.specializations.as_ref() {
             [specialization] => specialization,
             [] if !self.effective.metadata.is_generic => {
-                return self.invoke_with(
-                    self.effective.availability,
-                    self.effective.adapters.as_ref().unwrap_or(&NO_ADAPTERS),
-                    invocation,
-                    catching,
-                    unchecked,
-                );
+                let availability = self.effective.availability;
+                let adapters = self.effective.adapters.unwrap_or(NO_ADAPTERS);
+                return self.invoke_with(availability, &adapters, invocation, catching, unchecked);
             }
             [] => {
                 return Err(InvocationAttempt::Rejected(InvocationFailure::new(
@@ -1161,16 +1431,17 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 )));
             }
         };
+        let specialization = specialization.clone();
         self.invoke_with_availability(
             specialization.availability,
-            specialization.adapters,
+            &specialization.adapters,
             invocation,
             catching,
             unchecked,
         )
     }
     fn invoke_with<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         availability: MethodAvailability,
         adapters: &InvocationAdapters,
         invocation: Invocation<'call, M>,
@@ -1200,7 +1471,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
         self.invoke_with_availability(availability, adapters, invocation, catching, unchecked)
     }
     fn invoke_with_availability<'call, M: ValueMode + ModeAdapter>(
-        self,
+        &self,
         availability: InvocationAvailability,
         adapters: &InvocationAdapters,
         invocation: Invocation<'call, M>,
@@ -1231,7 +1502,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 invocation,
             )));
         }
-        let bound = match invocation.validate(self) {
+        let bound = match invocation.validate(self.clone()) {
             Ok(bound) => bound,
             Err(failure) => return Err(InvocationAttempt::Rejected(failure)),
         };
@@ -1285,7 +1556,37 @@ pub(crate) struct MethodCatalog<'ctx> {
 #[derive(Clone)]
 enum MethodCatalogMethods<'ctx> {
     Borrowed(&'ctx [EffectiveMethod]),
-    Shared(std::sync::Arc<[EffectiveMethod]>),
+    Shared(std::sync::Arc<[ContextEffectiveMethod]>),
+}
+
+enum MethodCatalogMethod<'a> {
+    Static(&'a EffectiveMethod),
+    Context(&'a ContextEffectiveMethod),
+}
+
+impl MethodCatalogMethod<'_> {
+    fn effective(&self) -> &EffectiveMethod {
+        match self {
+            Self::Static(method) => method,
+            Self::Context(method) => &method.effective,
+        }
+    }
+}
+
+enum MethodCatalogMethodIter<'a> {
+    Borrowed(std::slice::Iter<'a, EffectiveMethod>),
+    Shared(std::slice::Iter<'a, ContextEffectiveMethod>),
+}
+
+impl<'a> Iterator for MethodCatalogMethodIter<'a> {
+    type Item = MethodCatalogMethod<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Borrowed(methods) => methods.next().map(MethodCatalogMethod::Static),
+            Self::Shared(methods) => methods.next().map(MethodCatalogMethod::Context),
+        }
+    }
 }
 
 /// Static source metadata for a target's effective method catalog.
@@ -1323,7 +1624,7 @@ impl<'ctx> MethodCatalog<'ctx> {
 
     pub(crate) fn from_shared(
         target: TypeDescriptor<'ctx>,
-        methods: std::sync::Arc<[EffectiveMethod]>,
+        methods: std::sync::Arc<[ContextEffectiveMethod]>,
     ) -> Self {
         Self {
             target,
@@ -1331,10 +1632,14 @@ impl<'ctx> MethodCatalog<'ctx> {
         }
     }
 
-    fn methods(&self) -> &[EffectiveMethod] {
+    fn methods(&self) -> MethodCatalogMethodIter<'_> {
         match &self.methods {
-            MethodCatalogMethods::Borrowed(methods) => methods,
-            MethodCatalogMethods::Shared(methods) => methods,
+            MethodCatalogMethods::Borrowed(methods) => {
+                MethodCatalogMethodIter::Borrowed(methods.iter())
+            }
+            MethodCatalogMethods::Shared(methods) => {
+                MethodCatalogMethodIter::Shared(methods.iter())
+            }
         }
     }
     pub(crate) fn lookup_method(
@@ -1415,11 +1720,22 @@ impl<'ctx> MethodCatalog<'ctx> {
     ) -> Lookup<MethodDescriptor<'ctx>> {
         let mut matches = self
             .methods()
-            .iter()
             .filter(|method| {
-                (method.target)().type_id() == self.target.type_id() && predicate(method)
+                (method.effective().target)().type_id() == self.target.type_id()
+                    && predicate(method.effective())
             })
-            .map(|method| MethodDescriptor::new(*method, self.target.context()));
+            .map(|method| match method {
+                MethodCatalogMethod::Static(method) => {
+                    MethodDescriptor::new(*method, self.target.context())
+                }
+                MethodCatalogMethod::Context(method) => {
+                    MethodDescriptor::with_resolved_specializations(
+                        method.effective,
+                        method.specializations.clone(),
+                        self.target.context(),
+                    )
+                }
+            });
         let Some(first) = matches.next() else {
             return Lookup::Missing;
         };
@@ -1498,44 +1814,49 @@ impl<'ctx> MethodSpecializations<'ctx> {
     pub(crate) fn iter(
         self,
     ) -> impl ExactSizeIterator<Item = MethodSpecializationDescriptor<'ctx>> + 'ctx {
-        self.method
-            .effective
-            .specializations
-            .iter()
-            .map(move |resolved| MethodSpecializationDescriptor {
-                method: self.method,
-                resolved,
-            })
+        let method = self.method;
+        let specializations = method.specializations.clone();
+        (0..specializations.len()).map(move |index| MethodSpecializationDescriptor {
+            method: method.clone(),
+            specializations: specializations.clone(),
+            index,
+        })
     }
     pub(crate) fn len(self) -> usize {
-        self.method.effective.specializations.len()
+        self.method.specializations.len()
     }
 }
 
 /// One compile-time-bound method implementation.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct MethodSpecializationDescriptor<'ctx> {
     method: MethodDescriptor<'ctx>,
-    resolved: &'ctx ResolvedMethodSpecialization,
+    specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+    index: usize,
 }
 
 impl<'ctx> MethodSpecializationDescriptor<'ctx> {
-    pub(crate) const fn method(self) -> MethodDescriptor<'ctx> {
-        self.method
+    fn resolved(&self) -> &ResolvedMethodSpecialization {
+        &self.specializations[self.index]
     }
-    pub(crate) fn arguments(self) -> &'ctx [GenericArgumentIdentity] {
-        self.resolved.arguments
+    pub(crate) fn method(&self) -> MethodDescriptor<'ctx> {
+        self.method.clone()
     }
-    pub(crate) const fn availability(self) -> InvocationAvailability {
-        self.resolved.availability
+    pub(crate) fn arguments(&self) -> &[GenericArgumentIdentity] {
+        self.resolved().arguments.as_slice()
+    }
+    pub(crate) fn availability(&self) -> InvocationAvailability {
+        self.resolved().availability
     }
     pub(crate) fn invoke<'call, M: ValueMode + ModeAdapter>(
         self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
+        let availability = self.resolved().availability;
+        let adapters = self.resolved().adapters;
         match self.method.invoke_with_availability(
-            self.resolved.availability,
-            self.resolved.adapters,
+            availability,
+            &adapters,
             invocation,
             false,
             false,

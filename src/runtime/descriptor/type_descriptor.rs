@@ -65,12 +65,9 @@ impl<'ctx> TypeDescriptor<'ctx> {
         self.context.construction_plans(self.type_id())
     }
 
-    pub fn lookup_method(
-        self,
-        name: &str,
-    ) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
+    pub fn lookup_method(self, name: &str) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
         Ok(
-            MethodCatalog::new(self, self.context.methods_for(self.type_id())?)
+            MethodCatalog::from_shared(self, self.context.methods_for(self.type_id())?)
                 .lookup_method(name)?,
         )
     }

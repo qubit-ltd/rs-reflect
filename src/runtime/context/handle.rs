@@ -1,20 +1,19 @@
 use std::any::TypeId;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use crate::runtime::capability::capabilities::Capabilities;
 use crate::runtime::capability::capability_target::CapabilityTargetId;
 use crate::runtime::construct::ConstructionDescriptor;
-use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::descriptor::generic::{TypeDefinitionDescriptor, TypeDefinitionId};
 use crate::runtime::descriptor::impl_descriptor::{
     ImplDefinitionDescriptor, ImplDefinitionId, ImplDescriptor,
 };
-use crate::runtime::descriptor::method::EffectiveMethod;
 use crate::runtime::descriptor::trait_descriptor::{
     TraitDefinitionDescriptor, TraitDefinitionId, TraitDescriptor,
 };
 use crate::runtime::descriptor::type_kind::TypeKindMetadata;
+use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::error::ContextError;
 use crate::runtime::error::LookupError;
 use crate::runtime::error::LookupQuery;
@@ -210,7 +209,8 @@ impl ReflectionContext {
     pub(crate) fn methods_for(
         &self,
         id: TypeId,
-    ) -> Result<&'static [EffectiveMethod], ContextError> {
+    ) -> Result<Arc<[crate::runtime::descriptor::method::ContextEffectiveMethod]>, ContextError>
+    {
         Ok(self.data()?.methods(id))
     }
 

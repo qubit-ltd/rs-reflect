@@ -3,7 +3,8 @@ use crate::runtime::descriptor::method::{
     EffectiveMethod, FunctionAbi, GenericDefinitionMetadata, InvocationAdapters, MethodCatalog,
     MethodImplementationSource, MethodMetadata, MethodNamespaceMetadata, MethodQualifiers,
     MethodVisibility, ParameterMetadata, ParameterPattern, PassingMode, ReceiverDescriptor,
-    ReceiverKind, ResolvedMethodSpecialization, ReturnKind, ReturnMetadata, TypeMetadata,
+    ReceiverKind, ResolvedMethodArguments, ResolvedMethodSpecialization, ReturnKind,
+    ReturnMetadata, TypeMetadata,
 };
 use crate::runtime::descriptor::{Reflect, TypeDescriptor, TypeRegistration};
 use crate::runtime::expression::ExpressionData;
@@ -278,9 +279,9 @@ static PINNED_ADAPTERS: InvocationAdapters = InvocationAdapters {
     pinned_thread_safe: None,
 };
 static PINNED_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
-    arguments: &EMPTY_ARGUMENTS,
+    arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
     availability: InvocationAvailability::Callable,
-    adapters: &PINNED_ADAPTERS,
+    adapters: PINNED_ADAPTERS,
 }];
 
 static ADD_ADAPTER: AddAdapter = AddAdapter;
@@ -335,15 +336,15 @@ static ADD_BOTH_ADAPTERS: InvocationAdapters = InvocationAdapters {
 };
 static TWO_ARGUMENT_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] =
     [ResolvedMethodSpecialization {
-        arguments: &EMPTY_ARGUMENTS,
+        arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
         availability: InvocationAvailability::Callable,
-        adapters: &ADD_BOTH_ADAPTERS,
+        adapters: ADD_BOTH_ADAPTERS,
     }];
 static EMPTY_ARGUMENTS: [GenericArgumentIdentity; 0] = [];
 static SPECIALIZATION_SET: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
-    arguments: &EMPTY_ARGUMENTS,
+    arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
     availability: InvocationAvailability::Callable,
-    adapters: &ADAPTERS,
+    adapters: ADAPTERS,
 }];
 
 static UNSAFE_METHOD: MethodMetadata = MethodMetadata {
@@ -474,14 +475,14 @@ static NO_CATCH_ADAPTERS: InvocationAdapters = InvocationAdapters {
 };
 static NO_CATCH_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] =
     [ResolvedMethodSpecialization {
-        arguments: &EMPTY_ARGUMENTS,
+        arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
         availability: InvocationAvailability::Callable,
-        adapters: &NO_CATCH_ADAPTERS,
+        adapters: NO_CATCH_ADAPTERS,
     }];
 static PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
-    arguments: &EMPTY_ARGUMENTS,
+    arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
     availability: InvocationAvailability::Callable,
-    adapters: &PANICKING_ADAPTERS,
+    adapters: PANICKING_ADAPTERS,
 }];
 
 fn effective() -> EffectiveMethod {
@@ -578,12 +579,10 @@ fn lookup_preserves_missing_unique_and_ambiguous_states() {
     let methods = [inherent, trait_method];
     let catalog = MethodCatalog::new(type_descriptor(&context), &methods);
 
-    assert!(
-        catalog
-            .lookup_method("absent")
-            .expect("context")
-            .is_missing()
-    );
+    assert!(catalog
+        .lookup_method("absent")
+        .expect("context")
+        .is_missing());
     assert!(
         matches!(catalog.lookup_method("add").expect("context"), crate::runtime::lookup::Lookup::Ambiguous(candidates) if candidates.len() == 2)
     );

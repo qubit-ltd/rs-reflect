@@ -1,5 +1,4 @@
 use crate::runtime::context::ReflectionContext;
-use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::descriptor::generic::{GenericArguments, GenericDefinitionDescriptor};
 use crate::runtime::descriptor::method::{MethodCatalog, MethodDescriptor};
 use crate::runtime::descriptor::trait_descriptor::{
@@ -7,6 +6,7 @@ use crate::runtime::descriptor::trait_descriptor::{
     MethodDefinitionDescriptor, MethodDefinitionOwner, MethodDefinitions, TraitDescriptor,
     TraitExpressionDescriptor,
 };
+use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::error::{
     ContextError, LookupError, LookupQuery, LookupSubject, ReflectionError,
 };

@@ -1,9 +1,8 @@
 use qubit_reflect::__private::codegen_v4::expression::ExpressionData;
 use qubit_reflect::__private::codegen_v4::invoke::{
-    EffectiveMethod, FunctionInvocationAdapter, InvocationAdapter, InvocationAdapters,
-    InvocationOutput, InvocationUnavailableReason, MethodCatalogRegistration, MethodMetadata,
-    MethodMetadataSpec, MethodSpecializationArgument, MethodSpecializationSpec,
-    ValidatedInvocation,
+    EffectiveMethod, FunctionInvocationAdapter, InvocationAdapters, InvocationOutput,
+    InvocationUnavailableReason, MethodCatalogRegistration, MethodMetadata, MethodMetadataSpec,
+    MethodSpecializationArgument, MethodSpecializationSpec, ValidatedInvocation,
 };
 use qubit_reflect::__private::codegen_v4::invoke::{ReceiverDescriptor, ReceiverKind};
 use qubit_reflect::__private::codegen_v4::value::Local;
@@ -14,8 +13,8 @@ struct Fixture;
 struct CloneableFixture;
 
 impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Fixture {
-    fn __reflect_registration()
-    -> &'static qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<Self> {
+    fn __reflect_registration(
+    ) -> &'static qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<Self> {
         static REGISTRATION: qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<
             Fixture,
         > = qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration::new();
@@ -24,8 +23,8 @@ impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Fixture {
 }
 
 impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for CloneableFixture {
-    fn __reflect_registration()
-    -> &'static qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<Self> {
+    fn __reflect_registration(
+    ) -> &'static qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<Self> {
         static REGISTRATION: qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<
             CloneableFixture,
         > = qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration::new();
@@ -68,7 +67,7 @@ static UNAVAILABLE_METHOD: EffectiveMethod = EffectiveMethod::for_type::<Fixture
     ]);
 static SPECIALIZATION_ARGUMENTS: [MethodSpecializationArgument; 3] = [
     MethodSpecializationArgument::type_argument::<u64>(),
-    MethodSpecializationArgument::u32(4),
+    MethodSpecializationArgument::const_integer_literal(false, 4),
     MethodSpecializationArgument::lifetime("'static"),
 ];
 static SPECIALIZATIONS: [MethodSpecializationSpec; 1] = [MethodSpecializationSpec::new(
@@ -77,6 +76,9 @@ static SPECIALIZATIONS: [MethodSpecializationSpec; 1] = [MethodSpecializationSpe
 )];
 static SPECIALIZED_METHOD: EffectiveMethod =
     EffectiveMethod::for_type::<Fixture>(&METADATA).with_specializations(&SPECIALIZATIONS);
+static METHOD_BINDING: qubit_reflect::__private::codegen_v4::registration::MethodBinding<Fixture> =
+    qubit_reflect::__private::codegen_v4::registration::bind_method::<Fixture>(&METADATA, ADAPTERS)
+        .with_specializations(&SPECIALIZATIONS);
 static CATALOG: MethodCatalogRegistration = MethodCatalogRegistration::new::<Fixture>(&METHODS);
 
 #[test]
@@ -86,6 +88,7 @@ fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
         &TRAIT_SELF_RECEIVER,
         &UNAVAILABLE_METHOD,
         &SPECIALIZED_METHOD,
+        &METHOD_BINDING,
         CloneableFixture,
     );
     let _ = &CATALOG;

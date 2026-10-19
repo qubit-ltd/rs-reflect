@@ -87,6 +87,11 @@ pub enum ContextIssue {
         trait_: ItemIdentity,
         registrations: Box<[RegistrationOrigin]>,
     },
+    ConflictingMethod {
+        target: TypeIdentity,
+        namespace: Box<str>,
+        method: &'static str,
+    },
     DuplicateMethodSpecialization {
         method: ItemIdentity,
         arguments: Box<[GenericArgumentIdentity]>,
@@ -130,6 +135,14 @@ impl fmt::Display for ContextIssue {
             Self::DuplicateTraitImpl { target, trait_, .. } => write!(
                 formatter,
                 "duplicate trait implementation for {target:?} and {trait_:?}"
+            ),
+            Self::ConflictingMethod {
+                target,
+                namespace,
+                method,
+            } => write!(
+                formatter,
+                "duplicate method {method} in namespace {namespace} for {target:?}"
             ),
             Self::DuplicateMethodSpecialization {
                 method, arguments, ..

@@ -26,6 +26,24 @@ pub struct MethodBinding<T: crate::runtime::descriptor::Reflect> {
 }
 
 impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
+    /// Adds statically typed generic method specializations to this binding.
+    pub const fn with_specializations(
+        mut self,
+        specializations: &'static [crate::runtime::descriptor::method::MethodSpecializationSpec],
+    ) -> Self {
+        self.effective = self.effective.with_specializations(specializations);
+        self
+    }
+
+    /// Marks this binding unavailable with typed reasons.
+    pub const fn with_unavailable(
+        mut self,
+        reasons: &'static [crate::runtime::invoke::InvocationUnavailableReason],
+    ) -> Self {
+        self.effective = self.effective.with_unavailable(reasons);
+        self
+    }
+
     /// Returns the effective entry for inclusion in `T`'s method catalog.
     pub const fn effective(&self) -> crate::runtime::descriptor::method::EffectiveMethod {
         self.effective
