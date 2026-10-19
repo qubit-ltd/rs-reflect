@@ -40,7 +40,11 @@ use crate::ir::TypeKindIr;
 ///
 /// Returns token groups for methods, associated items, generic parameters and
 /// predicates.
-pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facade: &TokenStream) -> TraitMetadata {
+pub(super) fn build(
+    declaration: &TraitDeclarationIr,
+    trait_name: &LitStr,
+    facade: &TokenStream,
+) -> TraitMetadata {
     let trait_name_literal = trait_name;
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let methods: Vec<_> = declaration
@@ -61,18 +65,18 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
             let receiver = match &method.receiver {
                 Some(receiver) => match receiver.kind {
                     ReceiverKindIr::Value => {
-                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Owned))
+                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Owned))
                     }
                     ReceiverKindIr::SharedReference => {
-                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Shared))
+                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Shared))
                     }
                     ReceiverKindIr::MutableReference => {
-                        quote!(Some(#facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Mutable))
+                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Mutable))
                     }
                     ReceiverKindIr::Typed => {
                         let declaration = LitStr::new(&receiver.declaration.to_string(), receiver.span);
                         quote!(Some(
-                            #facade::__private::codegen_v3::descriptor::ReceiverDescriptor::Explicit(#declaration)
+                            #facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Explicit(#declaration)
                         ))
                     }
                 },
@@ -86,15 +90,15 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 };
                 let pattern = match parameter.pattern.kind {
                     ParameterPatternKindIr::Identifier => {
-                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Identifier)
+                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Identifier)
                     }
                     ParameterPatternKindIr::Wildcard => {
-                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Wildcard)
+                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Wildcard)
                     }
                     ParameterPatternKindIr::Destructure => {
                         let source = LitStr::new(&parameter.pattern.source, parameter.span);
                         quote!(
-                            #facade::__private::codegen_v3::descriptor::ParameterPatternDescriptor::Destructure(
+                            #facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Destructure(
                                 #source.into()
                             )
                         )
@@ -102,34 +106,34 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 };
                 let passing = match &parameter.ty.kind {
                     TypeKindIr::Reference { mutable: true, .. } => {
-                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::MutableBorrow)
+                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::MutableBorrow)
                     }
                     TypeKindIr::Reference { .. } => {
-                        quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::SharedBorrow)
+                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::SharedBorrow)
                     }
-                    _ => quote!(#facade::__private::codegen_v3::descriptor::ParameterPassingMode::Owned),
+                    _ => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::Owned),
                 };
                 let ty = type_expression(&parameter.ty, &method_environment, facade);
                 let index = parameter.index;
-                quote!(#facade::__private::codegen_v3::descriptor::ParameterDescriptor::new(
+                quote!(#facade::__private::codegen_v4::descriptor::ParameterDescriptor::new(
                     #index, #name, #pattern, #passing, #ty, None
                 ))
             });
             let return_value = match &method.return_type {
-                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v3::descriptor::ReturnDescriptor::unit()),
+                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::unit()),
                 ReturnTypeIr::Type(ty) => {
                     let expression = type_expression(ty, &method_environment, facade);
                     let kind = match ty.kind {
-                        TypeKindIr::Never => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Never),
+                        TypeKindIr::Never => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Never),
                         TypeKindIr::Reference { .. } => {
-                            quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Reference)
+                            quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Reference)
                         }
                         TypeKindIr::ImplTrait { .. } => {
-                            quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Opaque)
+                            quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Opaque)
                         }
-                        _ => quote!(#facade::__private::codegen_v3::descriptor::ReturnKind::Concrete),
+                        _ => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Concrete),
                     };
-                    quote!(#facade::__private::codegen_v3::descriptor::ReturnDescriptor::new(
+                    quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::new(
                         #kind, Some(#expression), None
                     ))
                 }
@@ -150,24 +154,24 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 None => quote!(None),
             };
             quote! {
-                #facade::__private::codegen_v3::descriptor::MethodDescriptor::builder(
-                    #facade::__private::codegen_v3::identity::MemberId::new(
+                #facade::__private::codegen_v4::descriptor::MethodDescriptor::builder(
+                    #facade::__private::codegen_v4::identity::MemberId::new(
                         #trait_name_literal,
                         "method",
                         #index,
-                        #facade::__private::codegen_v3::identity::FragmentIdentity::new(
+                        #facade::__private::codegen_v4::identity::FragmentIdentity::new(
                             env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "method", #index as u64,
                         ),
                     ),
                     #name,
                     #query,
-                    #facade::__private::codegen_v3::descriptor::MethodDeclarationOwner::Trait(definition),
+                    #facade::__private::codegen_v4::descriptor::MethodDeclarationOwner::Trait(definition),
                 )
-                .visibility(#facade::__private::codegen_v3::descriptor::MethodVisibility::InheritedFromTrait)
+                .visibility(#facade::__private::codegen_v4::descriptor::MethodVisibility::InheritedFromTrait)
                 .receiver(#receiver)
                 .parameters(vec![#(#parameters),*])
                 .return_value(#return_value)
-                .qualifiers(#facade::__private::codegen_v3::descriptor::MethodQualifiers::new(
+                .qualifiers(#facade::__private::codegen_v4::descriptor::MethodQualifiers::new(
                     #is_async, #is_unsafe, #is_const, #abi, #is_variadic,
                 ))
                 .generic_definition(&#method_generic_definition)
@@ -195,14 +199,14 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                         .map(|lifetime| lifetime_expression(lifetime, item.span, facade));
                     let modifier = match modifier {
                         crate::ir::TraitBoundModifierIr::None => {
-                            quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                            quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::None)
                         }
                         crate::ir::TraitBoundModifierIr::Maybe => {
-                            quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                            quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::Maybe)
                         }
                     };
-                    Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
-                        #facade::__private::codegen_v3::expression::parameter(#name),
+                    Some(quote!(#facade::__private::codegen_v4::expression::type_bound(
+                        #facade::__private::codegen_v4::expression::parameter(#name),
                         Box::new([#path]),
                         Box::new([#modifier]),
                         Box::new([#(#lifetimes),*]),
@@ -211,10 +215,10 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 GenericBoundIr::Lifetime(lifetime) => {
                     let lifetime = lifetime_expression(lifetime, item.span, facade);
                     Some(
-                        quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                            ty: #facade::__private::codegen_v3::expression::parameter(#name),
+                        quote!(#facade::__private::codegen_v4::expression::PredicateDescriptor::TypeOutlives {
+                            ty: #facade::__private::codegen_v4::expression::parameter(#name),
                             lifetime: #lifetime,
-                            diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                            diagnostic: #facade::__private::codegen_v4::expression::DiagnosticText::default(),
                         }),
                     )
                 }
@@ -229,7 +233,7 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 None => quote!(None),
             };
             let generic_definition = generic_definition(&item.generics, item.span, facade);
-            quote!(#facade::__private::codegen_v3::descriptor::AssociatedTypeDescriptor::new_with_generic_definition(
+            quote!(#facade::__private::codegen_v4::descriptor::AssociatedTypeDescriptor::new_with_generic_definition(
                 #index,
                 #name,
                 #name,
@@ -247,7 +251,7 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
             let name = LitStr::new(&item.name.to_string(), item.span);
             let ty = type_expression(&item.ty, &environment, facade);
             let has_default = item.value.is_some();
-            quote!(#facade::__private::codegen_v3::descriptor::AssociatedConstDescriptor::new(
+            quote!(#facade::__private::codegen_v4::descriptor::AssociatedConstDescriptor::new(
                 #index, #name, #name, #ty, #has_default
             ))
         })
@@ -280,14 +284,14 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                             .map(|lifetime| lifetime_expression(lifetime, declaration.span, facade));
                         let modifier = match modifier {
                             crate::ir::TraitBoundModifierIr::None => {
-                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                                quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::None)
                             }
                             crate::ir::TraitBoundModifierIr::Maybe => {
-                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                                quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::Maybe)
                             }
                         };
-                        Some(quote!(#facade::__private::codegen_v3::expression::type_bound(
-                            #facade::__private::codegen_v3::expression::parameter(#subject),
+                        Some(quote!(#facade::__private::codegen_v4::expression::type_bound(
+                            #facade::__private::codegen_v4::expression::parameter(#subject),
                             Box::new([#path]),
                             Box::new([#modifier]),
                             Box::new([#(#lifetimes),*]),
@@ -296,10 +300,10 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                     GenericBoundIr::Lifetime(lifetime) => {
                         let lifetime = lifetime_expression(lifetime, declaration.span, facade);
                         Some(
-                            quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
-                                ty: #facade::__private::codegen_v3::expression::parameter(#subject),
+                            quote!(#facade::__private::codegen_v4::expression::PredicateDescriptor::TypeOutlives {
+                                ty: #facade::__private::codegen_v4::expression::parameter(#subject),
                                 lifetime: #lifetime,
-                                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                                diagnostic: #facade::__private::codegen_v4::expression::DiagnosticText::default(),
                             }),
                         )
                     }
@@ -358,7 +362,7 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                     .iter()
                     .map(|bound| lifetime_expression(bound, declaration.span, facade))
                     .collect();
-                vec![quote!(#facade::__private::codegen_v3::expression::lifetime_outlives(
+                vec![quote!(#facade::__private::codegen_v4::expression::lifetime_outlives(
                     #lifetime,
                     Box::new([#(#bounds),*]),
                 ))]
@@ -386,17 +390,17 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                     .filter_map(|bound| match bound {
                         GenericBoundIr::Trait { modifier, .. } => Some(match modifier {
                             crate::ir::TraitBoundModifierIr::None => {
-                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::None)
+                                quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::None)
                             }
                             crate::ir::TraitBoundModifierIr::Maybe => {
-                                quote!(#facade::__private::codegen_v3::expression::TraitBoundModifier::Maybe)
+                                quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::Maybe)
                             }
                         }),
                         _ => None,
                     })
                     .collect();
                 let type_bound = (!trait_bounds.is_empty()).then(|| {
-                    quote!(#facade::__private::codegen_v3::expression::type_bound(
+                    quote!(#facade::__private::codegen_v4::expression::type_bound(
                         #subject,
                         Box::new([#(#trait_bounds),*]),
                         Box::new([#(#bound_modifiers),*]),
@@ -408,10 +412,10 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                         let lifetime = lifetime_expression(lifetime, declaration.span, facade);
                         let subject = type_expression(bounded_type, &environment, facade);
                         Some(
-                            quote!(#facade::__private::codegen_v3::expression::PredicateDescriptor::TypeOutlives {
+                            quote!(#facade::__private::codegen_v4::expression::PredicateDescriptor::TypeOutlives {
                                 ty: #subject,
                                 lifetime: #lifetime,
-                                diagnostic: #facade::__private::codegen_v3::expression::DiagnosticText::default(),
+                                diagnostic: #facade::__private::codegen_v4::expression::DiagnosticText::default(),
                             }),
                         )
                     }

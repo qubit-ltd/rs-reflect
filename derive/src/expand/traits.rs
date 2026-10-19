@@ -72,20 +72,20 @@ use crate::ir::WherePredicateIr;
 fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
     match &declaration.visibility {
         VisibilityIr::Public => {
-            quote!(#facade::__private::codegen_v3::identity::Visibility::Public)
+            quote!(#facade::__private::codegen_v4::identity::Visibility::Public)
         }
         VisibilityIr::Crate => {
-            quote!(#facade::__private::codegen_v3::identity::Visibility::Crate)
+            quote!(#facade::__private::codegen_v4::identity::Visibility::Crate)
         }
         VisibilityIr::Super => {
-            quote!(#facade::__private::codegen_v3::identity::Visibility::Super)
+            quote!(#facade::__private::codegen_v4::identity::Visibility::Super)
         }
         VisibilityIr::SelfValue | VisibilityIr::Inherited => {
-            quote!(#facade::__private::codegen_v3::identity::Visibility::Private)
+            quote!(#facade::__private::codegen_v4::identity::Visibility::Private)
         }
         VisibilityIr::Restricted(path) => {
             let path = LitStr::new(&path.source, declaration.span);
-            quote!(#facade::__private::codegen_v3::identity::Visibility::Restricted(#path.into()))
+            quote!(#facade::__private::codegen_v4::identity::Visibility::Restricted(#path.into()))
         }
     }
 }
@@ -120,7 +120,7 @@ fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) ->
                         .map(|segment| external_supertrait_arguments(&segment.arguments, declaration, facade))
                         .unwrap_or_default();
                     Some(
-                        quote!(#facade::__private::codegen_v3::descriptor::external_supertrait::<Self>(
+                        quote!(#facade::__private::codegen_v4::descriptor::external_supertrait::<Self>(
                             #id,
                             #diagnostic_path,
                             vec![#(#arguments),*],
@@ -157,24 +157,24 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
                 let identifier = Ident::new(&parameter.name, declaration.span);
                 let type_source = parameter.const_type.as_ref()?.source.as_str();
                 let expression = match type_source {
-                    "bool" => quote!(#facade::__private::codegen_v3::expression::ConstExpression::Boolean(#identifier)),
-                    "char" => quote!(#facade::__private::codegen_v3::expression::ConstExpression::Character(#identifier)),
+                    "bool" => quote!(#facade::__private::codegen_v4::expression::ConstExpression::Boolean(#identifier)),
+                    "char" => quote!(#facade::__private::codegen_v4::expression::ConstExpression::Character(#identifier)),
                     "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => {
-                        quote!(#facade::__private::codegen_v3::expression::ConstExpression::SignedInteger(#identifier as i128))
+                        quote!(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#identifier as i128))
                     }
                     "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
-                        quote!(#facade::__private::codegen_v3::expression::ConstExpression::UnsignedInteger(#identifier as u128))
+                        quote!(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#identifier as u128))
                     }
                     _ => return None,
                 };
                 let type_source = LitStr::new(type_source, declaration.span);
-                return Some(quote!(#facade::__private::codegen_v3::expression::GenericArgument::Const(
-                    #facade::__private::codegen_v3::expression::ConstGenericArgument::new(
-                        #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                            #facade::__private::codegen_v3::expression::concrete(
+                return Some(quote!(#facade::__private::codegen_v4::expression::GenericArgument::Const(
+                    #facade::__private::codegen_v4::expression::ConstGenericArgument::new(
+                        #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
+                            #facade::__private::codegen_v4::expression::concrete(
                                 vec![#type_source.into()].into_boxed_slice(),
                                 vec![].into_boxed_slice(),
-                                #facade::__private::codegen_v3::expression::DiagnosticText::from(#type_source),
+                                #facade::__private::codegen_v4::expression::DiagnosticText::from(#type_source),
                             ),
                         ),
                         #expression,
@@ -187,12 +187,12 @@ fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> 
             }
             let identifier = Ident::new(&parameter.name, declaration.span);
             Some(quote! {
-                #facade::__private::codegen_v3::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v3::expression::concrete(
+                #facade::__private::codegen_v4::expression::GenericArgument::Type(
+                    #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
+                        #facade::__private::codegen_v4::expression::concrete(
                             vec![std::any::type_name::<#identifier>().into()].into_boxed_slice(),
                             vec![].into_boxed_slice(),
-                            #facade::__private::codegen_v3::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
+                            #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
                         ),
                     ),
                 )
@@ -311,8 +311,11 @@ fn default_method_expansion(
 ///
 /// Returns resolver expressions, using `None` for generic associated types.
 #[must_use]
-fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v3);
+fn associated_type_resolver_entries(
+    declaration: &TraitDeclarationIr,
+    facade: &TokenStream,
+) -> Vec<TokenStream> {
+    let codegen = quote!(#facade::__private::codegen_v4);
     declaration
         .associated_types
         .iter()
@@ -321,7 +324,7 @@ fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &T
                 let name = &item.name;
                 quote!({
                     use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                    let probe = #facade::__private::codegen_v3::descriptor::ReflectArgumentProbe::<Self::#name>::new();
+                    let probe = #facade::__private::codegen_v4::descriptor::ReflectArgumentProbe::<Self::#name>::new();
                     (&probe).resolve_reflect_type_descriptor()
                 })
             } else {
@@ -346,16 +349,29 @@ fn associated_type_resolver_entries(declaration: &TraitDeclarationIr, facade: &T
 #[must_use]
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
-    let codegen = quote!(#facade::__private::codegen_v3);
+    let codegen = quote!(#facade::__private::codegen_v4);
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let suffix = format!("{fingerprint:016x}");
-    let marker = Ident::new(&format!("__QubitReflectTraitMarker_{suffix}"), declaration.span);
+    let marker = Ident::new(
+        &format!("__QubitReflectTraitMarker_{suffix}"),
+        declaration.span,
+    );
     let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
-    let definition_provider = format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
+    let definition_provider =
+        format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
     let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
-    let generic_factory = Ident::new(&format!("__qubit_reflect_trait_generics_{suffix}"), declaration.span);
-    let definition_factory = Ident::new(&format!("__qubit_reflect_trait_definition_{suffix}"), declaration.span);
-    let identity_factory = Ident::new(&format!("__qubit_reflect_trait_identity_{suffix}"), declaration.span);
+    let generic_factory = Ident::new(
+        &format!("__qubit_reflect_trait_generics_{suffix}"),
+        declaration.span,
+    );
+    let definition_factory = Ident::new(
+        &format!("__qubit_reflect_trait_definition_{suffix}"),
+        declaration.span,
+    );
+    let identity_factory = Ident::new(
+        &format!("__qubit_reflect_trait_identity_{suffix}"),
+        declaration.span,
+    );
     let payload_factory = Ident::new(
         &format!("__qubit_reflect_trait_fragment_payload_{suffix}"),
         declaration.span,
@@ -364,7 +380,10 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
         &format!("__qubit_reflect_dyn_trait_descriptor_{suffix}"),
         declaration.span,
     );
-    let support = Ident::new(&format!("__qubit_reflect_trait_support_{suffix}"), declaration.span);
+    let support = Ident::new(
+        &format!("__qubit_reflect_trait_support_{suffix}"),
+        declaration.span,
+    );
     let rust_path = Ident::new(
         &format!("__QUBIT_REFLECT_TRAIT_PATH_{}", suffix.to_ascii_uppercase()),
         declaration.span,
@@ -485,7 +504,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             let reader_entry = if has_proven_static_shape {
                 quote!({
                     use #codegen::descriptor::ResolveAssociatedConstReader as _;
-                    let probe = #facade::__private::codegen_v3::descriptor::AssociatedConstProbe::<
+                    let probe = #facade::__private::codegen_v4::descriptor::AssociatedConstProbe::<
                         #support::#provider<#(#generic_arguments,)* Self>
                     >::new();
                     (&probe).resolve_associated_const_reader()
@@ -496,13 +515,16 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
             (provider_item, reader_entry)
         })
         .collect();
-    let associated_const_provider_items = associated_const_providers.iter().map(|(provider, _)| provider);
+    let associated_const_provider_items = associated_const_providers
+        .iter()
+        .map(|(provider, _)| provider);
     let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
         quote! {
             use super::*;
         }
     });
-    let associated_const_reader_entries = associated_const_providers.iter().map(|(_, reader)| reader);
+    let associated_const_reader_entries =
+        associated_const_providers.iter().map(|(_, reader)| reader);
     let trait_metadata::TraitMetadata {
         methods,
         associated_types,
@@ -547,7 +569,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                         })
                         .unwrap_or_default();
                     return Some(
-                        quote!(#facade::__private::codegen_v3::descriptor::external_supertrait::<#support_dyn_type>(
+                        quote!(#facade::__private::codegen_v4::descriptor::external_supertrait::<#support_dyn_type>(
                             #id,
                             #diagnostic_path,
                             vec![#(#arguments),*],
@@ -556,7 +578,7 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 }
                 let path = dyn_reflected_supertrait_path(path, &declaration);
                 Some(quote!(
-                    #facade::__private::codegen_v3::descriptor::TypeDescriptor::of::<dyn #path>()
+                    #facade::__private::codegen_v4::descriptor::TypeDescriptor::of::<dyn #path>()
                         .as_trait_object()
                         .expect("a reflected dyn-compatible supertrait has a trait-object descriptor")
                         .trait_descriptor()
@@ -589,12 +611,12 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     });
     let dyn_reflect_impl = generate_dyn_descriptor.then(|| {
         quote! {
-            impl #dyn_impl_declaration #facade::__private::codegen_v3::descriptor::Reflect for #dyn_type
+            impl #dyn_impl_declaration #facade::__private::codegen_v4::descriptor::Reflect for #dyn_type
                 #dyn_where_clause
             {
-                fn type_descriptor() -> &'static #facade::__private::codegen_v3::descriptor::TypeDescriptor {
-                    #facade::__private::codegen_v3::descriptor::intern_type::<Self>(|| {
-                        #facade::__private::codegen_v3::descriptor::trait_object::<Self>(
+                fn type_descriptor() -> &'static #facade::__private::codegen_v4::descriptor::TypeDescriptor {
+                    #facade::__private::codegen_v4::descriptor::intern_type::<Self>(|| {
+                        #facade::__private::codegen_v4::descriptor::trait_object::<Self>(
                             #query_name_literal,
                             #support::#dyn_descriptor_factory::<#(#dyn_factory_arguments),*>,
                         )
@@ -616,18 +638,18 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     }
     let hook_item = match parse2(quote! {
         #[doc(hidden)]
-        fn #hook() -> #facade::__private::codegen_v3::descriptor::TraitImplPayload
+        fn #hook() -> #facade::__private::codegen_v4::descriptor::TraitImplPayload
         where
             Self: Sized + 'static,
             #(#hook_type_bounds,)*
         {
             let definition = #support::#definition_factory();
             let arguments = vec![#(#applied_arguments),*];
-            #facade::__private::codegen_v3::descriptor::TraitImplPayload::cached_with_arguments::<Self>(
+            #facade::__private::codegen_v4::descriptor::TraitImplPayload::cached_with_arguments::<Self>(
                 definition,
                 arguments,
                 |arguments| {
-                    #facade::__private::codegen_v3::descriptor::TraitDescriptor::builder(definition)
+                    #facade::__private::codegen_v4::descriptor::TraitDescriptor::builder(definition)
                         .arguments(arguments)
                         .direct_supertraits([#(#direct_supertraits),*])
                         .methods(Box::leak(vec![#(#methods),*].into_boxed_slice()))
@@ -665,14 +687,14 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
     }
     trait_item.items.push(reflected_marker_item);
     trait_item.items.push(hook_item);
-    quote! {
+    let tokens = quote! {
         #trait_item
 
         #dyn_reflect_impl
 
         #[doc(hidden)]
         #[allow(non_snake_case)]
-        pub fn #definition_provider() -> &'static #facade::__private::codegen_v3::descriptor::TraitDefinitionDescriptor {
+        pub fn #definition_provider() -> &'static #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor {
             #support::#definition_factory()
         }
 
@@ -751,7 +773,8 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
                 )
             }
         }
-    }
+    };
+    super::invocation::emit::rewrite_codegen_paths(tokens)
 }
 
 /// Builds a `'static` concrete dyn application from the trait declaration.
@@ -766,7 +789,11 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 ///
 /// Returns generated impl parameters, trait arguments, bounds and associated
 /// type expressions.
-fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade: &TokenStream) -> DynTraitGenerics {
+fn dyn_trait_generics(
+    item: &ItemTrait,
+    declaration: &TraitDeclarationIr,
+    facade: &TokenStream,
+) -> DynTraitGenerics {
     let mut impl_parameters = Vec::new();
     let mut impl_predicates = Vec::new();
     let mut application_arguments = Vec::new();
@@ -797,7 +824,9 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
     }
     let mut associated_type_arguments = Vec::new();
     for associated in item.items.iter().filter_map(|item| match item {
-        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => Some(associated),
+        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
+            Some(associated)
+        }
         _ => None,
     }) {
         let name = &associated.ident;
@@ -813,13 +842,13 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
         factory_arguments.push(quote!(#parameter));
         let name_literal = LitStr::new(&name.to_string(), name.span());
         associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v3::expression::associated_type(
+            #facade::__private::codegen_v4::expression::associated_type(
                 #name_literal,
-                #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v3::expression::concrete(
+                #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v4::expression::concrete(
                         vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
                         vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v3::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
+                        #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
                     ),
                 ),
             )
@@ -848,13 +877,13 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
         factory_arguments.push(quote!(#parameter));
         let name_literal = LitStr::new(&segment.name, declaration.span);
         associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v3::expression::associated_type(
+            #facade::__private::codegen_v4::expression::associated_type(
                 #name_literal,
-                #facade::__private::codegen_v3::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v3::expression::concrete(
+                #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
+                    #facade::__private::codegen_v4::expression::concrete(
                         vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
                         vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v3::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
+                        #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
                     ),
                 ),
             )
@@ -876,7 +905,8 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
         .iter()
         .flat_map(|clause| &clause.predicates)
         .map(|predicate| {
-            let predicate = replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
+            let predicate =
+                replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
             replace_self_associated_types(predicate, item, declaration)
         })
         .collect();
@@ -906,7 +936,10 @@ fn dyn_trait_generics(item: &ItemTrait, declaration: &TraitDeclarationIr, facade
 ///
 /// Returns rewritten tokens with token group spans retained.
 #[must_use]
-fn replace_declared_lifetimes_with_static(tokens: TokenStream, declaration: &TraitDeclarationIr) -> TokenStream {
+fn replace_declared_lifetimes_with_static(
+    tokens: TokenStream,
+    declaration: &TraitDeclarationIr,
+) -> TokenStream {
     let lifetime_names: HashSet<_> = declaration
         .generics
         .params

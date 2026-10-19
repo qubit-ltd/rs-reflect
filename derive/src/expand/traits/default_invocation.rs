@@ -60,7 +60,10 @@ pub(super) fn default_method_invocation_adapter(
         );
     let invocation_plan = crate::expand::invocation::analysis::analyze_method(
         method,
-        crate::expand::invocation::analysis::MethodContext::trait_default(&target, has_unproven_associated_type),
+        crate::expand::invocation::analysis::MethodContext::trait_default(
+            &target,
+            has_unproven_associated_type,
+        ),
     )
     .expect("validated method analysis is infallible");
     let typed_owned_receiver = invocation_plan.owned_receiver_type().cloned();
@@ -87,37 +90,47 @@ pub(super) fn default_method_invocation_adapter(
     let thread_safe = invocation_plan.modes.thread_safe;
     let catching_requested = invocation_plan.modes.catching;
     let mode = if thread_safe {
-        quote!(#facade::__private::codegen_v3::value::ThreadSafe)
+        quote!(#facade::__private::codegen_v4::value::ThreadSafe)
     } else {
-        quote!(#facade::__private::codegen_v3::value::Local)
+        quote!(#facade::__private::codegen_v4::value::Local)
     };
     let thread_safe_assertions = thread_safe.then(|| {
-        crate::expand::invocation::emit::thread_safe_assertions(method, &target, typed_owned_receiver.as_ref(), None)
+        crate::expand::invocation::emit::thread_safe_assertions(
+            method,
+            &target,
+            typed_owned_receiver.as_ref(),
+            None,
+        )
     });
     let catching_assertions = catching_requested.then(|| {
-        crate::expand::invocation::emit::catching_assertions(method, &target, typed_owned_receiver.as_ref(), None)
+        crate::expand::invocation::emit::catching_assertions(
+            method,
+            &target,
+            typed_owned_receiver.as_ref(),
+            None,
+        )
     });
     let receiver_expectation = if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
         Some(ReceiverKindIr::Value)
     ) {
-        quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::owned::<Self>())
+        quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::owned::<Self>())
     } else if let Some(receiver_type) = &typed_owned_receiver {
-        quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::owned::<#receiver_type>())
+        quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::owned::<#receiver_type>())
     } else {
         match method.receiver.as_ref().map(|receiver| receiver.kind) {
             Some(ReceiverKindIr::Value) => {
-                quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::owned::<Self>())
+                quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::owned::<Self>())
             }
             Some(ReceiverKindIr::MutableReference) => {
-                quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::borrowed_mut::<Self>())
+                quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::borrowed_mut::<Self>())
             }
             Some(ReceiverKindIr::SharedReference) => {
-                quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::borrowed::<Self>())
+                quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::borrowed::<Self>())
             }
             Some(ReceiverKindIr::Typed) => return None,
             None => {
-                quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::none())
+                quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::none())
             }
         }
     };
@@ -125,8 +138,8 @@ pub(super) fn default_method_invocation_adapter(
         Some(ReceiverKindIr::Value) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver: Self = match receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Owned(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::downcast::<Self>(value)
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Owned(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::downcast::<Self>(value)
                         .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                 _ => unreachable!("validation checked receiver mode"),
             };
@@ -136,8 +149,8 @@ pub(super) fn default_method_invocation_adapter(
             quote! {
                 let (receiver, arguments) = validated.into_parts();
                 let receiver: #receiver_type = match receiver {
-                    Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Owned(value)) =>
-                        #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::downcast::<#receiver_type>(value)
+                    Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Owned(value)) =>
+                        #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::downcast::<#receiver_type>(value)
                             .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                     _ => unreachable!("validation checked receiver mode"),
                 };
@@ -146,8 +159,8 @@ pub(super) fn default_method_invocation_adapter(
         Some(ReceiverKindIr::MutableReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver: &mut Self = match receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Mut(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicMut::<#mode>::downcast::<Self>(value)
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Mut(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicMut::<#mode>::downcast::<Self>(value)
                         .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
                 _ => unreachable!("validation checked receiver mode"),
             };
@@ -155,11 +168,11 @@ pub(super) fn default_method_invocation_adapter(
         Some(ReceiverKindIr::SharedReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver: &Self = match receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Ref(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicRef::<#mode>::downcast::<Self>(value)
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Ref(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicRef::<#mode>::downcast::<Self>(value)
                         .unwrap_or_else(|_| unreachable!("validation checked receiver type")),
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Mut(value)) => {
-                    let value = #facade::__private::codegen_v3::value::DynamicMut::<#mode>::downcast::<Self>(value)
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Mut(value)) => {
+                    let value = #facade::__private::codegen_v4::value::DynamicMut::<#mode>::downcast::<Self>(value)
                         .unwrap_or_else(|_| unreachable!("validation checked receiver type"));
                     &*value
                 }
@@ -179,7 +192,9 @@ pub(super) fn default_method_invocation_adapter(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -195,7 +210,7 @@ pub(super) fn default_method_invocation_adapter(
         method
             .receiver
             .is_some()
-            .then(|| quote!(#facade::__private::codegen_v3::invoke::BorrowOrigin::Receiver)),
+            .then(|| quote!(#facade::__private::codegen_v4::invoke::BorrowOrigin::Receiver)),
     )
     .flatten()
     .chain(
@@ -205,7 +220,7 @@ pub(super) fn default_method_invocation_adapter(
             .filter(|parameter| matches!(parameter.ty.kind, TypeKindIr::Reference { .. }))
             .map(|parameter| {
                 let index = parameter.index;
-                quote!(#facade::__private::codegen_v3::invoke::BorrowOrigin::Parameter(#index))
+                quote!(#facade::__private::codegen_v4::invoke::BorrowOrigin::Parameter(#index))
             }),
     )
     .collect();
@@ -215,7 +230,7 @@ pub(super) fn default_method_invocation_adapter(
             let mut arguments = arguments.into_vec().into_iter();
             #(#argument_bindings)*
             #call;
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Unit
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Unit
         },
         (
             false,
@@ -230,15 +245,15 @@ pub(super) fn default_method_invocation_adapter(
             }),
         ) => {
             let value = if crate::expand::invocation::analysis::is_str_type(element) {
-                quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
+                quote!(#facade::__private::codegen_v4::value::DynamicRef::<#mode>::new_str(#call))
             } else {
-                quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
+                quote!(#facade::__private::codegen_v4::value::DynamicRef::<#mode>::new(#call))
             };
             quote! {
                 #receiver_binding
                 let mut arguments = arguments.into_vec().into_iter();
                 #(#argument_bindings)*
-                #facade::__private::codegen_v3::invoke::InvocationOutput::Ref {
+                #facade::__private::codegen_v4::invoke::InvocationOutput::Ref {
                     value: #value,
                     origins: ::std::boxed::Box::new([#(#borrow_origins),*]),
                 }
@@ -247,24 +262,27 @@ pub(super) fn default_method_invocation_adapter(
         (
             false,
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }),
         ) => {
             let value = if crate::expand::invocation::analysis::is_str_type(element) {
-                quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
+                quote!(#facade::__private::codegen_v4::value::DynamicMut::<#mode>::new_str_mut(#call))
             } else {
-                quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))
+                quote!(#facade::__private::codegen_v4::value::DynamicMut::<#mode>::new(#call))
             };
             quote! {
                 #receiver_binding
                 let mut arguments = arguments.into_vec().into_iter();
                 #(#argument_bindings)*
-                #facade::__private::codegen_v3::invoke::InvocationOutput::Mut {
+                #facade::__private::codegen_v4::invoke::InvocationOutput::Mut {
                     value: #value,
-                    origin: #facade::__private::codegen_v3::invoke::BorrowOrigin::Receiver,
+                    origin: #facade::__private::codegen_v4::invoke::BorrowOrigin::Receiver,
                 }
             }
         }
@@ -284,18 +302,18 @@ pub(super) fn default_method_invocation_adapter(
             #receiver_binding
             let mut arguments = arguments.into_vec().into_iter();
             #(#argument_bindings)*
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::new(#call),
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::new(#call),
             )
         },
         (true, ReturnTypeIr::Unit) => quote! {
             #receiver_binding
             let mut arguments = arguments.into_vec().into_iter();
             #(#argument_bindings)*
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Future(
-                #facade::__private::codegen_v3::invoke::ReflectedFuture::<#mode>::new(async move {
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Future(
+                #facade::__private::codegen_v4::invoke::ReflectedFuture::<#mode>::new(async move {
                     #call.await;
-                    #facade::__private::codegen_v3::invoke::InvocationOutput::Unit
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::Unit
                 }),
             )
         },
@@ -309,8 +327,8 @@ pub(super) fn default_method_invocation_adapter(
             #receiver_binding
             let mut arguments = arguments.into_vec().into_iter();
             #(#argument_bindings)*
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Future(
-                #facade::__private::codegen_v3::invoke::ReflectedFuture::<#mode>::new(async move {
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Future(
+                #facade::__private::codegen_v4::invoke::ReflectedFuture::<#mode>::new(async move {
                     match #call.await {}
                 }),
             )
@@ -319,10 +337,10 @@ pub(super) fn default_method_invocation_adapter(
             #receiver_binding
             let mut arguments = arguments.into_vec().into_iter();
             #(#argument_bindings)*
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Future(
-                #facade::__private::codegen_v3::invoke::ReflectedFuture::<#mode>::new(async move {
-                    #facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                        #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::new(#call.await),
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Future(
+                #facade::__private::codegen_v4::invoke::ReflectedFuture::<#mode>::new(async move {
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                        #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::new(#call.await),
                     )
                 }),
             )
@@ -332,7 +350,7 @@ pub(super) fn default_method_invocation_adapter(
         let catching_call = match &method.return_type {
             ReturnTypeIr::Unit => quote! {
                 #call;
-                #facade::__private::codegen_v3::invoke::InvocationOutput::Unit
+                #facade::__private::codegen_v4::invoke::InvocationOutput::Unit
             },
             ReturnTypeIr::Type(TypeIr {
                 kind:
@@ -344,32 +362,35 @@ pub(super) fn default_method_invocation_adapter(
                 ..
             }) => {
                 let value = if crate::expand::invocation::analysis::is_str_type(element) {
-                    quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new_str(#call))
+                    quote!(#facade::__private::codegen_v4::value::DynamicRef::<#mode>::new_str(#call))
                 } else {
-                    quote!(#facade::__private::codegen_v3::value::DynamicRef::<#mode>::new(#call))
+                    quote!(#facade::__private::codegen_v4::value::DynamicRef::<#mode>::new(#call))
                 };
                 quote! {
-                    #facade::__private::codegen_v3::invoke::InvocationOutput::Ref {
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::Ref {
                         value: #value,
                         origins: ::std::boxed::Box::new([#(#borrow_origins),*]),
                     }
                 }
             }
             ReturnTypeIr::Type(TypeIr {
-                kind: TypeKindIr::Reference {
-                    mutable: true, element, ..
-                },
+                kind:
+                    TypeKindIr::Reference {
+                        mutable: true,
+                        element,
+                        ..
+                    },
                 ..
             }) => {
                 let value = if crate::expand::invocation::analysis::is_str_type(element) {
-                    quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new_str_mut(#call))
+                    quote!(#facade::__private::codegen_v4::value::DynamicMut::<#mode>::new_str_mut(#call))
                 } else {
-                    quote!(#facade::__private::codegen_v3::value::DynamicMut::<#mode>::new(#call))
+                    quote!(#facade::__private::codegen_v4::value::DynamicMut::<#mode>::new(#call))
                 };
                 quote! {
-                    #facade::__private::codegen_v3::invoke::InvocationOutput::Mut {
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::Mut {
                         value: #value,
-                        origin: #facade::__private::codegen_v3::invoke::BorrowOrigin::Receiver,
+                        origin: #facade::__private::codegen_v4::invoke::BorrowOrigin::Receiver,
                     }
                 }
             }
@@ -380,21 +401,21 @@ pub(super) fn default_method_invocation_adapter(
                 quote!(match #call {})
             }
             ReturnTypeIr::Type(_) => quote! {
-                #facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                    #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::new(#call),
+                #facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                    #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::new(#call),
                 )
             },
         };
         quote! {
             #[cfg(panic = "unwind")]
-            let catching_adapter: #facade::__private::codegen_v3::invoke::CatchingInvocationAdapter<#mode> =
+            let catching_adapter: #facade::__private::codegen_v4::invoke::CatchingInvocationAdapter<#mode> =
                 |_registry, invocation| {
                     #catching_assertions
-                    let identity = #facade::__private::codegen_v3::identity::MemberId::new(
+                    let identity = #facade::__private::codegen_v4::identity::MemberId::new(
                         #trait_name,
                         "default-method",
                         #index,
-                        #facade::__private::codegen_v3::identity::FragmentIdentity::new(
+                        #facade::__private::codegen_v4::identity::FragmentIdentity::new(
                             env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(),
                             "default-method", #index as u64,
                         ),
@@ -410,7 +431,7 @@ pub(super) fn default_method_invocation_adapter(
                     match ::std::panic::catch_unwind(|| { #catching_call }) {
                         Ok(output) => Ok(Ok(output)),
                         Err(payload) => Ok(Err(
-                            #facade::__private::codegen_v3::invoke::InvocationPanic::new(identity, payload),
+                            #facade::__private::codegen_v4::invoke::InvocationPanic::new(identity, payload),
                         )),
                     }
                 };
@@ -433,22 +454,22 @@ pub(super) fn default_method_invocation_adapter(
     let adapter_item = quote! {
         #[doc(hidden)]
         fn #adapter_name<'call>(
-            _registry: &#facade::__private::codegen_v3::invoke::ReflectRegistry,
-            invocation: #facade::__private::codegen_v3::invoke::Invocation<'call, #mode>,
+            _registry: &#facade::__private::codegen_v4::invoke::ReflectRegistry,
+            invocation: #facade::__private::codegen_v4::invoke::Invocation<'call, #mode>,
         ) -> ::core::result::Result<
-            #facade::__private::codegen_v3::invoke::InvocationOutput<'call, #mode>,
-            #facade::__private::codegen_v3::invoke::InvocationFailure<'call, #mode>,
+            #facade::__private::codegen_v4::invoke::InvocationOutput<'call, #mode>,
+            #facade::__private::codegen_v4::invoke::InvocationFailure<'call, #mode>,
         >
         where
             Self: Sized + 'static,
             #(#hook_type_bounds,)*
         {
             #thread_safe_assertions
-            let identity = #facade::__private::codegen_v3::identity::MemberId::new(
+            let identity = #facade::__private::codegen_v4::identity::MemberId::new(
                 #trait_name,
                 "default-method",
                 #index,
-                #facade::__private::codegen_v3::identity::FragmentIdentity::new(
+                #facade::__private::codegen_v4::identity::FragmentIdentity::new(
                     env!("CARGO_PKG_NAME"),
                     module_path!(),
                     line!(),
@@ -466,26 +487,26 @@ pub(super) fn default_method_invocation_adapter(
         }
     };
     let adapter_constructor = if catching_requested && thread_safe {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::thread_safe_with_catching(
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::thread_safe_with_catching(
             Self::#adapter_name,
             catching_adapter,
         ))
     } else if catching_requested {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::local_with_catching(
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::local_with_catching(
             Self::#adapter_name,
             catching_adapter,
         ))
     } else if thread_safe {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::thread_safe(Self::#adapter_name))
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::thread_safe(Self::#adapter_name))
     } else {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::local(Self::#adapter_name))
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::local(Self::#adapter_name))
     };
     let unavailable_catching_constructor = if thread_safe {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::thread_safe_with_unavailable_catching(
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::thread_safe_with_unavailable_catching(
             Self::#adapter_name,
         ))
     } else {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::local_with_unavailable_catching(
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::local_with_unavailable_catching(
             Self::#adapter_name,
         ))
     };
@@ -497,13 +518,13 @@ pub(super) fn default_method_invocation_adapter(
             #[cfg(panic = "abort")]
             let adapter = #unavailable_catching_constructor;
             Some(::std::boxed::Box::leak(::std::boxed::Box::new(adapter))
-                as &'static #facade::__private::codegen_v3::descriptor::InvocationAdapter)
+                as &'static #facade::__private::codegen_v4::descriptor::InvocationAdapter)
         }}
     } else {
         quote! {
             Some(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #adapter_constructor,
-            )) as &'static #facade::__private::codegen_v3::descriptor::InvocationAdapter)
+            )) as &'static #facade::__private::codegen_v4::descriptor::InvocationAdapter)
         }
     };
     Some((adapter_item, adapter_entry))
@@ -537,7 +558,7 @@ fn default_pinned_method_invocation_adapter(
 ) -> (TokenStream, TokenStream) {
     let adapter_name = format_ident!("__qubit_reflect_invoke_default_pinned_{suffix}_{index}");
     let method_name = &method.name;
-    let mode = quote!(#facade::__private::codegen_v3::value::Local);
+    let mode = quote!(#facade::__private::codegen_v4::value::Local);
     let parameter_expectations: Vec<_> = method
         .parameters
         .iter()
@@ -546,7 +567,9 @@ fn default_pinned_method_invocation_adapter(
     let argument_bindings: Vec<_> = method
         .parameters
         .iter()
-        .map(|parameter| crate::expand::invocation::emit::argument_binding(parameter, facade, &mode))
+        .map(|parameter| {
+            crate::expand::invocation::emit::argument_binding(parameter, facade, &mode)
+        })
         .collect();
     let call_arguments: Vec<_> = method
         .parameters
@@ -554,33 +577,33 @@ fn default_pinned_method_invocation_adapter(
         .map(|parameter| format_ident!("__qubit_reflect_argument_{}", parameter.index))
         .collect();
     let invocation_type = if pinned_mutable {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocation<'call, Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedMutInvocation<'call, Self, #mode>)
     } else {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedRefInvocation<'call, Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedRefInvocation<'call, Self, #mode>)
     };
     let failure_type = if pinned_mutable {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocationFailure<'call, Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedMutInvocationFailure<'call, Self, #mode>)
     } else {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedRefInvocationFailure<'call, Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedRefInvocationFailure<'call, Self, #mode>)
     };
     let adapter_type = if pinned_mutable {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedMutAdapter<Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedMutAdapter<Self, #mode>)
     } else {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedRefAdapter<Self, #mode>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedRefAdapter<Self, #mode>)
     };
     let call = quote!(Self::#method_name(receiver, #(#call_arguments),*));
     let output = match method.return_type {
         ReturnTypeIr::Unit => quote! {
             #call;
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Unit
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Unit
         },
         ReturnTypeIr::Type(TypeIr {
             kind: TypeKindIr::Never,
             ..
         }) => quote!(match #call {}),
         ReturnTypeIr::Type(_) => quote! {
-            #facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                #facade::__private::codegen_v3::value::DynamicOwned::<#mode>::new(#call),
+            #facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                #facade::__private::codegen_v4::value::DynamicOwned::<#mode>::new(#call),
             )
         },
     };
@@ -598,21 +621,21 @@ fn default_pinned_method_invocation_adapter(
     let adapter_item = quote! {
         #[doc(hidden)]
         fn #adapter_name<'call>(
-            _registry: &#facade::__private::codegen_v3::invoke::ReflectRegistry,
+            _registry: &#facade::__private::codegen_v4::invoke::ReflectRegistry,
             invocation: #invocation_type,
         ) -> ::core::result::Result<
-            #facade::__private::codegen_v3::invoke::InvocationOutput<'call, #mode>,
+            #facade::__private::codegen_v4::invoke::InvocationOutput<'call, #mode>,
             #failure_type,
         >
         where
             Self: Sized + 'static,
             #(#hook_type_bounds,)*
         {
-            let identity = #facade::__private::codegen_v3::identity::MemberId::new(
+            let identity = #facade::__private::codegen_v4::identity::MemberId::new(
                 #trait_name,
                 "default-method",
                 #index,
-                #facade::__private::codegen_v3::identity::FragmentIdentity::new(
+                #facade::__private::codegen_v4::identity::FragmentIdentity::new(
                     env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(),
                     "default-method", #index as u64,
                 ),
@@ -625,16 +648,16 @@ fn default_pinned_method_invocation_adapter(
         }
     };
     let constructor = if pinned_mutable {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::pinned_mut_local(adapter))
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::pinned_mut_local(adapter))
     } else {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::pinned_ref_local(adapter))
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::pinned_ref_local(adapter))
     };
     let adapter_entry = quote! {{
         let adapter: #adapter_type = Self::#adapter_name;
         let adapter: &'static #adapter_type =
             ::std::boxed::Box::leak(::std::boxed::Box::new(adapter));
         Some(::std::boxed::Box::leak(::std::boxed::Box::new(#constructor))
-            as &'static #facade::__private::codegen_v3::descriptor::InvocationAdapter)
+            as &'static #facade::__private::codegen_v4::descriptor::InvocationAdapter)
     }};
     (adapter_item, adapter_entry)
 }
@@ -653,9 +676,9 @@ fn default_pinned_method_invocation_adapter(
 pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => path_contains_associated_type(path),
-        TypeKindIr::Reference { element, .. } | TypeKindIr::Slice(element) | TypeKindIr::Pointer { element, .. } => {
-            type_contains_associated_type(element)
-        }
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Pointer { element, .. } => type_contains_associated_type(element),
         TypeKindIr::Tuple(elements) => elements.iter().any(type_contains_associated_type),
         TypeKindIr::Array { element, .. } => type_contains_associated_type(element),
         TypeKindIr::BareFunction { inputs, output, .. } => {
@@ -683,23 +706,30 @@ pub(super) fn type_contains_associated_type(ty: &TypeIr) -> bool {
 fn path_contains_associated_type(path: &crate::ir::PathIr) -> bool {
     path.qualified_self.is_some()
         || (path.segments.len() > 1 && path.segments[0].name == "Self")
-        || path.segments.iter().any(|segment| match &segment.arguments {
-            PathArgumentsIr::None => false,
-            PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
-                PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
-                    type_contains_associated_type(ty)
+        || path
+            .segments
+            .iter()
+            .any(|segment| match &segment.arguments {
+                PathArgumentsIr::None => false,
+                PathArgumentsIr::AngleBracketed(arguments) => {
+                    arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Type(ty) | PathArgumentIr::AssociatedType { ty, .. } => {
+                            type_contains_associated_type(ty)
+                        }
+                        PathArgumentIr::Constraint { bounds, .. } => {
+                            bounds.iter().any(bound_contains_associated_type)
+                        }
+                        PathArgumentIr::Other(_) => true,
+                        PathArgumentIr::Lifetime(_)
+                        | PathArgumentIr::Const(_)
+                        | PathArgumentIr::AssociatedConst { .. } => false,
+                    })
                 }
-                PathArgumentIr::Constraint { bounds, .. } => bounds.iter().any(bound_contains_associated_type),
-                PathArgumentIr::Other(_) => true,
-                PathArgumentIr::Lifetime(_) | PathArgumentIr::Const(_) | PathArgumentIr::AssociatedConst { .. } => {
-                    false
+                PathArgumentsIr::Parenthesized { inputs, output } => {
+                    inputs.iter().any(type_contains_associated_type)
+                        || output.as_deref().is_some_and(type_contains_associated_type)
                 }
-            }),
-            PathArgumentsIr::Parenthesized { inputs, output } => {
-                inputs.iter().any(type_contains_associated_type)
-                    || output.as_deref().is_some_and(type_contains_associated_type)
-            }
-        })
+            })
 }
 
 /// Checks whether one trait or lifetime bound contains an associated binding.

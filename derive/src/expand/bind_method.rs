@@ -53,15 +53,26 @@ impl Parse for BindingInput {
 
 /// Expands `bind_method!(path as fn(signature))` to a concrete binding value.
 pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
+    let context = ExpansionContext::from_attributes(&[])?;
+    expand_with_context(input, &context)
+}
+
+/// Expands a binding using a pre-resolved runtime facade.
+pub(crate) fn expand_with_context(
+    input: TokenStream,
+    context: &ExpansionContext,
+) -> Result<TokenStream> {
     let input: BindingInput = parse2(input)?;
     let asynchronous = input.asynchronous;
-    if input.signature.unsafety.is_some() || input.signature.abi.is_some() || input.signature.variadic.is_some() {
+    if input.signature.unsafety.is_some()
+        || input.signature.abi.is_some()
+        || input.signature.variadic.is_some()
+    {
         return Err(syn::Error::new_spanned(
             input.signature,
             "bind_method! requires a safe, Rust ABI, non-variadic function signature",
         ));
     }
-    let context = ExpansionContext::from_attributes(&[])?;
     let facade = context.facade().clone();
     let method_path = input.method;
     let signature = input.signature;
@@ -112,7 +123,8 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
     };
     let pinned_mut_receiver = receiver_ty.as_ref().is_some_and(is_pin_mut_type);
     let target_ir = crate::parse::convert_type(&target_type);
-    let target_application = super::traits::type_expression(&target_ir, &GenericEnvironment::new(), &facade);
+    let target_application =
+        super::traits::type_expression(&target_ir, &GenericEnvironment::new(), &facade);
     let target = quote!(#target_type);
     let expectations = input_types.iter().map(|ty| expectation(ty, &facade));
     let bindings = input_types
@@ -123,7 +135,7 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
         .map(|index| format_ident!("__arg_{index}"))
         .collect();
     let receiver_expectation = receiver_ty.as_ref().map_or_else(
-        || quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::none()),
+        || quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::none()),
         |ty| expectation_receiver(ty, &facade),
     );
     let receiver_binding = if pinned_mut_receiver {
@@ -140,17 +152,18 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
     let result = signature.output.clone();
     let output = match result {
         syn::ReturnType::Default => {
-            quote!({ __call; Ok(#facade::__private::codegen_v3::invoke::InvocationOutput::Unit) })
+            quote!({ __call; Ok(#facade::__private::codegen_v4::invoke::InvocationOutput::Unit) })
         }
-        syn::ReturnType::Type(_, ty) if matches!(*ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) => {
-            quote!({ __call; Ok(#facade::__private::codegen_v3::invoke::InvocationOutput::Unit) })
+        syn::ReturnType::Type(_, ty) if matches!(*ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) =>
+        {
+            quote!({ __call; Ok(#facade::__private::codegen_v4::invoke::InvocationOutput::Unit) })
         }
         syn::ReturnType::Type(_, _ty) if asynchronous => quote! {
-            Ok(#facade::__private::codegen_v3::invoke::InvocationOutput::Future(
-                #facade::__private::codegen_v3::invoke::ReflectedFuture::<#facade::__private::codegen_v3::value::Local>::new(async move {
+            Ok(#facade::__private::codegen_v4::invoke::InvocationOutput::Future(
+                #facade::__private::codegen_v4::invoke::ReflectedFuture::<#facade::__private::codegen_v4::value::Local>::new(async move {
                     let __value = __call.await;
-                    #facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                        #facade::__private::codegen_v3::value::DynamicOwned::<#facade::__private::codegen_v3::value::Local>::new(__value),
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                        #facade::__private::codegen_v4::value::DynamicOwned::<#facade::__private::codegen_v4::value::Local>::new(__value),
                     )
                 }),
             ))
@@ -162,23 +175,24 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
                 .as_ref()
                 .is_some_and(|receiver| matches!(receiver, Type::Reference(_)))
             {
-                origins.push(quote!(#facade::__private::codegen_v3::invoke::BorrowOrigin::Receiver));
+                origins
+                    .push(quote!(#facade::__private::codegen_v4::invoke::BorrowOrigin::Receiver));
             }
             for (index, argument) in input_types.iter().enumerate() {
                 if matches!(argument, Type::Reference(_)) {
-                    origins.push(quote!(#facade::__private::codegen_v3::invoke::BorrowOrigin::Parameter(#index)));
+                    origins.push(quote!(#facade::__private::codegen_v4::invoke::BorrowOrigin::Parameter(#index)));
                 }
             }
             quote! {
-                Ok(#facade::__private::codegen_v3::invoke::InvocationOutput::Ref {
-                    value: #facade::__private::codegen_v3::value::DynamicRef::<#facade::__private::codegen_v3::value::Local>::new(__call),
+                Ok(#facade::__private::codegen_v4::invoke::InvocationOutput::Ref {
+                    value: #facade::__private::codegen_v4::value::DynamicRef::<#facade::__private::codegen_v4::value::Local>::new(__call),
                     origins: ::std::vec![#(#origins),*].into_boxed_slice(),
                 })
             }
         }
         syn::ReturnType::Type(_, _ty) => quote! {
-            Ok(#facade::__private::codegen_v3::invoke::InvocationOutput::Owned(
-                #facade::__private::codegen_v3::value::DynamicOwned::<#facade::__private::codegen_v3::value::Local>::new(__call),
+            Ok(#facade::__private::codegen_v4::invoke::InvocationOutput::Owned(
+                #facade::__private::codegen_v4::value::DynamicOwned::<#facade::__private::codegen_v4::value::Local>::new(__call),
             ))
         },
     };
@@ -193,14 +207,14 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
         quote!(let __typed_method: #function_type = #method_path;)
     };
     let invocation_type = if pinned_mut_receiver {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocation<'call, #target, #facade::__private::codegen_v3::value::Local>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedMutInvocation<'call, #target, #facade::__private::codegen_v4::value::Local>)
     } else {
-        quote!(#facade::__private::codegen_v3::invoke::Invocation<'call, #facade::__private::codegen_v3::value::Local>)
+        quote!(#facade::__private::codegen_v4::invoke::Invocation<'call, #facade::__private::codegen_v4::value::Local>)
     };
     let failure_type = if pinned_mut_receiver {
-        quote!(#facade::__private::codegen_v3::invoke::PinnedMutInvocationFailure<'call, #target, #facade::__private::codegen_v3::value::Local>)
+        quote!(#facade::__private::codegen_v4::invoke::PinnedMutInvocationFailure<'call, #target, #facade::__private::codegen_v4::value::Local>)
     } else {
-        quote!(#facade::__private::codegen_v3::invoke::InvocationFailure<'call, #facade::__private::codegen_v3::value::Local>)
+        quote!(#facade::__private::codegen_v4::invoke::InvocationFailure<'call, #facade::__private::codegen_v4::value::Local>)
     };
     let validate = if pinned_mut_receiver {
         quote!(let __validated = __invocation.validate(&__identity, &[#(#expectations),*])?;)
@@ -209,24 +223,24 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
     };
     let adapter = if pinned_mut_receiver {
         quote!({
-            static ENTRY: #facade::__private::codegen_v3::invoke::PinnedMutAdapter<#target, #facade::__private::codegen_v3::value::Local> = __qubit_bind_method_adapter;
-            #facade::__private::codegen_v3::descriptor::InvocationAdapter::pinned_mut_local::<#target>(&ENTRY)
+            static ENTRY: #facade::__private::codegen_v4::invoke::PinnedMutAdapter<#target, #facade::__private::codegen_v4::value::Local> = __qubit_bind_method_adapter;
+            #facade::__private::codegen_v4::descriptor::InvocationAdapter::pinned_mut_local::<#target>(&ENTRY)
         })
     } else {
-        quote!(#facade::__private::codegen_v3::descriptor::InvocationAdapter::local(__qubit_bind_method_adapter))
+        quote!(#facade::__private::codegen_v4::descriptor::InvocationAdapter::local(__qubit_bind_method_adapter))
     };
     let shim = quote! {
         fn __qubit_bind_method_adapter<'registry, 'call>(
-            __registry: &'registry #facade::__private::codegen_v3::registry::ReflectRegistry,
+            __registry: &'registry #facade::__private::codegen_v4::registry::ReflectRegistry,
             __invocation: #invocation_type,
         ) -> ::core::result::Result<
-            #facade::__private::codegen_v3::invoke::InvocationOutput<'call, #facade::__private::codegen_v3::value::Local>,
+            #facade::__private::codegen_v4::invoke::InvocationOutput<'call, #facade::__private::codegen_v4::value::Local>,
             #failure_type,
         > {
             #typed_method
-            let __identity = #facade::__private::codegen_v3::identity::MemberId::new(
+            let __identity = #facade::__private::codegen_v4::identity::MemberId::new(
                 ::std::any::type_name::<#target>(), "method", 0,
-                #facade::__private::codegen_v3::identity::FragmentIdentity::new(env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "method-binding", 0),
+                #facade::__private::codegen_v4::identity::FragmentIdentity::new(env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "method-binding", 0),
             );
             #validate
             #receiver_binding
@@ -236,7 +250,7 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
             #call
             #output
         }
-        static __QUBIT_BIND_METHOD_ADAPTER: #facade::__private::codegen_v3::descriptor::InvocationAdapter = #adapter;
+        static __QUBIT_BIND_METHOD_ADAPTER: #facade::__private::codegen_v4::descriptor::InvocationAdapter = #adapter;
     };
     let method_ir = crate::parse::convert_path(&method_path.path);
     let method_arguments = method_ir
@@ -254,13 +268,19 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
     let binding_expr = if let Some(qself) = &method_path.qself {
         let trait_path = syn::Path {
             leading_colon: None,
-            segments: method_path.path.segments.iter().take(qself.position).cloned().collect(),
+            segments: method_path
+                .path
+                .segments
+                .iter()
+                .take(qself.position)
+                .cloned()
+                .collect(),
         };
         let trait_ir = crate::parse::convert_path(&trait_path);
         let trait_expression = path_type_expression(&trait_ir, &GenericEnvironment::new(), &facade);
         quote! {
-            #facade::__private::codegen_v3::registry::MethodBinding::trait_method(
-                #facade::__private::codegen_v3::TypeDescriptor::of::<#target>(),
+            #facade::__private::codegen_v4::registry::MethodBinding::trait_method(
+                #facade::__private::codegen_v4::TypeDescriptor::of::<#target>(),
                 <#target as #trait_path>::__qubit_reflect_trait_payload().definition().trait_id().clone(),
                 #trait_expression,
                 stringify!(#method_ident), vec![#(#method_arguments),*].into_boxed_slice(),
@@ -269,35 +289,45 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
         }
     } else {
         quote! {
-            #facade::__private::codegen_v3::registry::MethodBinding::inherent(
-                #facade::__private::codegen_v3::TypeDescriptor::of::<#target>(),
+            #facade::__private::codegen_v4::registry::MethodBinding::inherent(
+                #facade::__private::codegen_v4::TypeDescriptor::of::<#target>(),
                 stringify!(#method_ident), vec![#(#method_arguments),*].into_boxed_slice(),
                 &__QUBIT_BIND_METHOD_ADAPTER,
             ).with_target_application(#target_application)
         }
     };
-    Ok(quote! {{ #shim #binding_expr }})
+    Ok(crate::expand::invocation::emit::rewrite_codegen_paths(
+        quote! {{ #shim #binding_expr }},
+    ))
 }
 
 fn expectation(ty: &Type, facade: &TokenStream) -> TokenStream {
     match ty {
         Type::Reference(reference) if reference.mutability.is_some() => {
             let element = &reference.elem;
-            quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::borrowed_mut::<#element>())
+            quote!(#facade::__private::codegen_v4::invoke::ArgumentExpectation::borrowed_mut::<#element>())
         }
         Type::Reference(reference) => {
             let element = &reference.elem;
-            quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::borrowed::<#element>())
+            quote!(#facade::__private::codegen_v4::invoke::ArgumentExpectation::borrowed::<#element>())
         }
-        _ => quote!(#facade::__private::codegen_v3::invoke::ArgumentExpectation::owned::<#ty>()),
+        _ => quote!(#facade::__private::codegen_v4::invoke::ArgumentExpectation::owned::<#ty>()),
     }
 }
 
 fn receiver_target(ty: &Type) -> Option<&Type> {
     match ty {
         Type::Reference(reference) => Some(&reference.elem),
-        Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "Pin") => {
-            let syn::PathArguments::AngleBracketed(arguments) = &path.path.segments.last()?.arguments else {
+        Type::Path(path)
+            if path
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == "Pin") =>
+        {
+            let syn::PathArguments::AngleBracketed(arguments) =
+                &path.path.segments.last()?.arguments
+            else {
                 return None;
             };
             match arguments.args.first()? {
@@ -322,13 +352,13 @@ fn expectation_receiver(ty: &Type, facade: &TokenStream) -> TokenStream {
     match ty {
         Type::Reference(reference) if reference.mutability.is_some() => {
             let element = &reference.elem;
-            quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::borrowed_mut::<#element>())
+            quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::borrowed_mut::<#element>())
         }
         Type::Reference(reference) => {
             let element = &reference.elem;
-            quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::borrowed::<#element>())
+            quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::borrowed::<#element>())
         }
-        _ => quote!(#facade::__private::codegen_v3::invoke::ReceiverExpectation::owned::<#ty>()),
+        _ => quote!(#facade::__private::codegen_v4::invoke::ReceiverExpectation::owned::<#ty>()),
     }
 }
 
@@ -337,18 +367,18 @@ fn receiver_binding(ty: &Type, target: &TokenStream, facade: &TokenStream) -> To
         Type::Reference(reference) if reference.mutability.is_some() => quote! {
             let (__receiver, __arguments) = __validated.into_parts();
             let __receiver: &mut #target = match __receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Mut(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicMut::<#facade::__private::codegen_v3::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Mut(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicMut::<#facade::__private::codegen_v4::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
                 _ => unreachable!(),
             };
         },
         Type::Reference(_) => quote! {
             let (__receiver, __arguments) = __validated.into_parts();
             let __receiver: &#target = match __receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Ref(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicRef::<#facade::__private::codegen_v3::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Mut(value)) => {
-                    let value = #facade::__private::codegen_v3::value::DynamicMut::<#facade::__private::codegen_v3::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()); &*value
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Ref(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicRef::<#facade::__private::codegen_v4::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Mut(value)) => {
+                    let value = #facade::__private::codegen_v4::value::DynamicMut::<#facade::__private::codegen_v4::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()); &*value
                 }
                 _ => unreachable!(),
             };
@@ -356,8 +386,8 @@ fn receiver_binding(ty: &Type, target: &TokenStream, facade: &TokenStream) -> To
         _ => quote! {
             let (__receiver, __arguments) = __validated.into_parts();
             let __receiver: #target = match __receiver {
-                Some(#facade::__private::codegen_v3::invoke::InvocationReceiver::Owned(value)) =>
-                    #facade::__private::codegen_v3::value::DynamicOwned::<#facade::__private::codegen_v3::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
+                Some(#facade::__private::codegen_v4::invoke::InvocationReceiver::Owned(value)) =>
+                    #facade::__private::codegen_v4::value::DynamicOwned::<#facade::__private::codegen_v4::value::Local>::downcast::<#target>(value).unwrap_or_else(|_| unreachable!()),
                 _ => unreachable!(),
             };
         },
@@ -370,21 +400,21 @@ fn binding(ty: &Type, index: usize, facade: &TokenStream) -> TokenStream {
         Type::Reference(reference) if reference.mutability.is_some() => {
             let element = &reference.elem;
             quote! { let #value: &mut #element = match arguments.next().expect("validated argument") {
-                #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) =>
-                    #facade::__private::codegen_v3::value::DynamicMut::<#facade::__private::codegen_v3::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()),
+                #facade::__private::codegen_v4::invoke::InvocationArg::Mut(value) =>
+                    #facade::__private::codegen_v4::value::DynamicMut::<#facade::__private::codegen_v4::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()),
                 _ => unreachable!(),
             }; }
         }
         Type::Reference(reference) => {
             let element = &reference.elem;
             quote! { let #value: &#element = match arguments.next().expect("validated argument") {
-                #facade::__private::codegen_v3::invoke::InvocationArg::Ref(value) => #facade::__private::codegen_v3::value::DynamicRef::<#facade::__private::codegen_v3::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()),
-                #facade::__private::codegen_v3::invoke::InvocationArg::Mut(value) => { let value = #facade::__private::codegen_v3::value::DynamicMut::<#facade::__private::codegen_v3::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()); &*value },
+                #facade::__private::codegen_v4::invoke::InvocationArg::Ref(value) => #facade::__private::codegen_v4::value::DynamicRef::<#facade::__private::codegen_v4::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()),
+                #facade::__private::codegen_v4::invoke::InvocationArg::Mut(value) => { let value = #facade::__private::codegen_v4::value::DynamicMut::<#facade::__private::codegen_v4::value::Local>::downcast::<#element>(value).unwrap_or_else(|_| unreachable!()); &*value },
                 _ => unreachable!(),
             }; }
         }
         _ => quote! { let #value: #ty = match arguments.next().expect("validated argument") {
-            #facade::__private::codegen_v3::invoke::InvocationArg::Owned(value) => #facade::__private::codegen_v3::value::DynamicOwned::<#facade::__private::codegen_v3::value::Local>::downcast::<#ty>(value).unwrap_or_else(|_| unreachable!()),
+            #facade::__private::codegen_v4::invoke::InvocationArg::Owned(value) => #facade::__private::codegen_v4::value::DynamicOwned::<#facade::__private::codegen_v4::value::Local>::downcast::<#ty>(value).unwrap_or_else(|_| unreachable!()),
             _ => unreachable!(),
         }; },
     }

@@ -52,12 +52,18 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
 }
 
 /// Expands a declaration after resolving its runtime path.
-fn dispatch_with_context(declaration: DeclarationIr, context: &ExpansionContext) -> Result<TokenStream> {
+fn dispatch_with_context(
+    declaration: DeclarationIr,
+    context: &ExpansionContext,
+) -> Result<TokenStream> {
     match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
             TypeDeclarationKindIr::Struct => super::structs::expand(declaration, context),
             TypeDeclarationKindIr::Enum => super::enums::expand(declaration, context),
-            TypeDeclarationKindIr::Union => Err(syn::Error::new(declaration.span, "cannot expand Reflect for union")),
+            TypeDeclarationKindIr::Union => Err(syn::Error::new(
+                declaration.span,
+                "cannot expand Reflect for union",
+            )),
         },
         DeclarationIr::Trait(declaration) => Ok(super::traits::expand(declaration, context)),
         DeclarationIr::Impl(declaration) => Ok(super::impls::expand_impl(declaration, context)),
@@ -72,7 +78,9 @@ mod tests {
     use super::dispatch_with_context;
     use crate::expand::ExpansionContext;
     use crate::ir::DeclarationIr;
+    use crate::ir::ImplDeclarationIr;
     use crate::ir::MacroKind;
+    use crate::ir::TraitDeclarationIr;
     use crate::ir::TypeDeclarationIr;
     use crate::ir::TypeDeclarationKindIr;
     use crate::parse::parse_and_validate_declaration;
@@ -96,6 +104,39 @@ mod tests {
         declaration
     }
 
+    /// Parses one trait declaration through the production validation pipeline.
+    fn parse_trait(item: TokenStream) -> TraitDeclarationIr {
+        let parsed = parse_and_validate_declaration(MacroKind::Trait, TokenStream::new(), item)
+            .expect("the test trait should parse and validate");
+        let DeclarationIr::Trait(declaration) = parsed.declaration else {
+            panic!("the trait parser must produce a trait declaration");
+        };
+        declaration
+    }
+
+    /// Parses one impl declaration through the production validation pipeline.
+    fn parse_impl(item: TokenStream) -> ImplDeclarationIr {
+        let parsed = parse_and_validate_declaration(MacroKind::Impl, TokenStream::new(), item)
+            .expect("the test impl should parse and validate");
+        let DeclarationIr::Impl(declaration) = parsed.declaration else {
+            panic!("the impl parser must produce an impl declaration");
+        };
+        declaration
+    }
+
+    /// Asserts emitted executable tokens use only the v4 protocol.
+    fn assert_codegen_v4(tokens: &TokenStream) {
+        let source = tokens.to_string();
+        assert!(
+            source.contains("codegen_v4"),
+            "expected v4 token path in:\n{source}"
+        );
+        assert!(
+            !source.contains("codegen_v3"),
+            "found legacy v3 token path in:\n{source}"
+        );
+    }
+
     /// Confirms malformed type IR becomes an actionable compile error.
     ///
     /// # Parameters
@@ -116,7 +157,10 @@ mod tests {
             "diagnostic should include the expected detail: {error}",
         );
         assert!(
-            error.into_compile_error().to_string().contains("compile_error"),
+            error
+                .into_compile_error()
+                .to_string()
+                .contains("compile_error"),
             "diagnostic should convert to a compile_error token",
         );
     }
@@ -130,7 +174,11 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid generics");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for struct",
+            "invalid generics",
+        );
     }
 
     #[test]
@@ -142,7 +190,11 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid generics");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for enum",
+            "invalid generics",
+        );
     }
 
     #[test]
@@ -157,7 +209,11 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid where clause");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for struct",
+            "invalid where clause",
+        );
     }
 
     #[test]
@@ -172,7 +228,11 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid where clause");
+        assert_diagnostic(
+            declaration,
+            "cannot expand Reflect for enum",
+            "invalid where clause",
+        );
     }
 
     #[test]
@@ -183,15 +243,88 @@ mod tests {
         declaration.kind = TypeDeclarationKindIr::Union;
 
         let context = ExpansionContext::for_tests();
-        let error =
-            dispatch_with_context(DeclarationIr::Type(declaration), &context).expect_err("union must be rejected");
+        let error = dispatch_with_context(DeclarationIr::Type(declaration), &context)
+            .expect_err("union must be rejected");
         assert!(
-            error.to_string().contains("cannot expand Reflect for union"),
+            error
+                .to_string()
+                .contains("cannot expand Reflect for union"),
             "union declarations should report the unsupported type",
         );
         assert!(
-            error.into_compile_error().to_string().contains("compile_error"),
+            error
+                .into_compile_error()
+                .to_string()
+                .contains("compile_error"),
             "diagnostic should convert to a compile_error token",
         );
+    }
+
+    #[test]
+    fn test_trait_method_tokens_use_codegen_v4() {
+        let declaration = parse_trait(quote! {
+            trait Service<T> {
+                fn execute(&self, value: T) -> usize;
+                fn defaulted(&self) -> usize { 1 }
+            }
+        });
+        let context = ExpansionContext::for_tests();
+        let tokens = dispatch_with_context(DeclarationIr::Trait(declaration), &context)
+            .expect("trait tokens should be emitted");
+        assert_codegen_v4(&tokens);
+        assert!(
+            !tokens.to_string().contains("catch_unwind"),
+            "ordinary invocation tokens must not emit panic capture"
+        );
+    }
+
+    #[test]
+    fn test_concrete_impl_invocation_tokens_use_codegen_v4() {
+        let declaration = parse_impl(quote! {
+            impl Counter {
+                fn add(&mut self, value: u32) -> u32 { value }
+            }
+        });
+        let context = ExpansionContext::for_tests();
+        let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
+            .expect("concrete impl tokens should be emitted");
+        assert_codegen_v4(&tokens);
+        assert!(
+            tokens.to_string().contains("InvocationAdapter"),
+            "concrete executable methods should emit an invocation adapter"
+        );
+    }
+
+    #[test]
+    fn test_generic_impl_definition_tokens_use_codegen_v4_without_application() {
+        let declaration = parse_impl(quote! {
+            impl<T> Service<T> for Store<T> {
+                fn execute(&self, value: T) -> usize { 1 }
+            }
+        });
+        let context = ExpansionContext::for_tests();
+        let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
+            .expect("generic impl definition tokens should be emitted");
+        assert_codegen_v4(&tokens);
+        let source = tokens.to_string();
+        assert!(
+            source.contains("ImplDefinition"),
+            "generic impl should emit a definition: {source}"
+        );
+        assert!(
+            !source.contains("ImplApplication"),
+            "generic impl definition must not fabricate a concrete application: {source}"
+        );
+    }
+
+    #[test]
+    fn test_method_binding_tokens_use_codegen_v4() {
+        let context = ExpansionContext::for_tests();
+        let tokens = crate::expand::bind_method::expand_with_context(
+            quote!(demo::Counter::add as fn(&mut Counter, u32) -> u32),
+            &context,
+        )
+        .expect("a method binding should parse");
+        assert_codegen_v4(&tokens);
     }
 }
