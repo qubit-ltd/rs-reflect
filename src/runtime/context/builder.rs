@@ -86,7 +86,7 @@ impl ReflectionContextBuilder {
         }
         let mut registered_types: HashSet<_> = registrations
             .iter()
-            .map(|registration| registration.type_record().type_id())
+            .filter_map(|registration| registration.type_record().map(|record| record.type_id()))
             .collect();
         for (fragment, include) in fragments.iter().zip(&selected) {
             if *include && fragment.includes_type() {

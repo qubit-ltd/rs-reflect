@@ -17,6 +17,7 @@
 
 pub use crate::runtime::context::handle::registration::Registration;
 pub use crate::runtime::context::handle::registration::RegistrationFragment;
+pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 
 /// A method binding whose target type is fixed by `T`.
 pub struct MethodBinding<T: crate::runtime::descriptor::Reflect> {

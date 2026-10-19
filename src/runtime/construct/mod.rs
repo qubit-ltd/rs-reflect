@@ -11,12 +11,14 @@ pub(crate) use recovery::{
     ConstructionFailure, ConstructionRecovery, RecoveredConstructionInput, UpdateFailure,
     UpdateRecovery,
 };
+pub use schema::{
+    ConstructField, ConstructionAvailability, ConstructionFieldPolicy, ConstructionPlan,
+    ConstructionProviders, ConstructionShape, ConstructionUnavailableReason,
+    TypedConstructProvider, UpdateFieldPolicy, UpdateUnavailableReason,
+};
 pub(crate) use schema::{
-    ConstructField, ConstructProvider, ConstructVisibility, ConstructionAvailability,
-    ConstructionDescriptor, ConstructionError, ConstructionFieldPolicy, ConstructionPlan,
-    ConstructionProviders, ConstructionShape, ConstructionTarget, ConstructionTargetKind,
-    ConstructionUnavailableReason, UpdateError, UpdateFieldPolicy, UpdateUnavailableReason,
-    resolve_plan, resolve_variant_plan,
+    ConstructProvider, ConstructVisibility, ConstructionDescriptor, ConstructionError,
+    ConstructionTarget, ConstructionTargetKind, UpdateError, resolve_plan, resolve_variant_plan,
 };
 
 use crate::runtime::value::{DynamicOwned, TypeMismatch, ValueFor, ValueMode};
@@ -37,7 +39,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
                 input.into_input(),
             ));
         }
-        let expected = self.plan.target.identity.clone();
+        let expected = self.plan.target.identity();
         let actual = T::identity();
         if expected.type_id != actual.type_id {
             return Err(ConstructionFailure::new(
@@ -67,7 +69,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
                 input.into_input(),
             ));
         }
-        let expected = self.plan.target.identity.clone();
+        let expected = self.plan.target.identity();
         let actual = T::identity();
         if expected.type_id != actual.type_id {
             return Err(ConstructionFailure::new(
@@ -107,7 +109,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
 
         let values = take_bound_values(input, binding);
         let value = provider.construct(values);
-        debug_assert_eq!(value.type_id(), target.identity.type_id);
+        debug_assert_eq!(value.type_id(), target.identity().type_id);
         match value.downcast::<T>() {
             Ok(value) => Ok(value),
             Err(_) => panic!("construction provider returned a value with the wrong owner type"),
@@ -167,7 +169,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
             Err(error) => return Err(ConstructionFailure::new(error, input)),
         };
         let value = provider.construct(take_bound_values(input, binding));
-        if value.type_id() != self.plan.target.identity.type_id {
+        if value.type_id() != self.plan.target.identity().type_id {
             panic!("construction provider returned a value with the wrong owner type");
         }
         Ok(value)
@@ -178,7 +180,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         T: ValueFor<M>,
         M: ConstructionMode,
     {
-        let expected = self.plan.target.identity.clone();
+        let expected = self.plan.target.identity();
         let actual = T::identity();
         if expected.type_id != actual.type_id {
             return Err(UpdateFailure::new(
@@ -201,7 +203,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         T: ValueFor<M>,
         M: ConstructionMode,
     {
-        let expected = self.plan.target.identity.clone();
+        let expected = self.plan.target.identity();
         let actual = T::identity();
         if expected.type_id != actual.type_id {
             return Err(UpdateFailure::new(
@@ -222,8 +224,8 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         M: ConstructionMode,
     {
         let base_type = input.base.type_id();
-        if base_type != self.plan.target.identity.type_id {
-            let expected = self.plan.target.identity.clone();
+        if base_type != self.plan.target.identity().type_id {
+            let expected = self.plan.target.identity();
             let actual = input.base.ty().type_identity();
             return Err(UpdateFailure::new(
                 UpdateError::BaseTypeMismatch(TypeMismatch::new(expected, actual)),
@@ -250,7 +252,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         let UpdateInput { base, replacements } = input;
         let values = take_bound_values(replacements.into_input(), binding);
         let value = provider.update(base, values);
-        if value.type_id() != self.plan.target.identity.type_id {
+        if value.type_id() != self.plan.target.identity().type_id {
             panic!("update provider returned a value with the wrong owner type");
         }
         match value.downcast::<T>() {
@@ -282,10 +284,10 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         input: UpdateInput<M>,
         unchecked_visibility: bool,
     ) -> Result<DynamicOwned<M>, UpdateFailure<M>> {
-        if input.base.type_id() != self.plan.target.identity.type_id {
+        if input.base.type_id() != self.plan.target.identity().type_id {
             return Err(UpdateFailure::new(
                 UpdateError::BaseTypeMismatch(TypeMismatch::new(
-                    self.plan.target.identity.clone(),
+                    self.plan.target.identity(),
                     input.base.ty().type_identity(),
                 )),
                 input,
@@ -310,7 +312,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         };
         let UpdateInput { base, replacements } = input;
         let value = provider.update(base, take_bound_values(replacements.into_input(), binding));
-        if value.type_id() != self.plan.target.identity.type_id {
+        if value.type_id() != self.plan.target.identity().type_id {
             panic!("update provider returned a value with the wrong owner type");
         }
         Ok(value)
@@ -478,10 +480,11 @@ fn validate_value<M: ValueMode>(
     field: &ConstructField,
     value: &DynamicOwned<M>,
 ) -> Result<(), ConstructionError> {
-    if value.type_id() != field.value.type_id {
+    let field_identity = field.value_identity();
+    if value.type_id() != field_identity.type_id {
         return Err(ConstructionError::ValueTypeMismatch {
             field: field.name,
-            mismatch: TypeMismatch::new(field.value.clone(), value.ty().type_identity()),
+            mismatch: TypeMismatch::new(field_identity, value.ty().type_identity()),
         });
     }
     Ok(())

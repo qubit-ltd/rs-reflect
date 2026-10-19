@@ -14,3 +14,16 @@
 //! TypeExpression}` and `runtime::descriptor::generic` metadata. Those types and
 //! their fields are crate-private, so the façade must expose validated typed
 //! constructors rather than raw text or forgeable identities.
+
+pub use crate::runtime::descriptor::{
+    GenericArgumentMetadata, GenericDefinitionMetadata, GenericParameterMetadata,
+    GenericParameterMetadataKind, StructKind, TypeDefinitionKind, TypeDefinitionMetadata,
+};
+pub use crate::runtime::expression::{
+    ConstExpression, ExpressionData, FunctionPointerData, GenericExpressionArgument,
+    LifetimeExpression, OpaqueTypeData, PredicateData, TraitBoundModifier, TraitExpressionData,
+    TraitObjectData,
+};
+
+/// Static source-level expression data emitted by the derive crate.
+pub type TypeExpressionData = ExpressionData;

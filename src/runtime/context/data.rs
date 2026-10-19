@@ -74,6 +74,7 @@ impl ContextData {
             HashMap::<TraitDefinitionId, Vec<&'static TraitApplicationMetadata>>::new();
         let mut impl_applications =
             HashMap::<ImplDefinitionId, Vec<&'static ImplApplicationMetadata>>::new();
+        let mut registered_shapes = HashMap::<TypeId, &'static TypeKindMetadata>::new();
         let mut construction_plans = HashMap::<TypeId, Vec<&'static ConstructionPlan>>::new();
         let mut type_definition_origins =
             HashMap::<TypeDefinitionId, Vec<RegistrationOrigin>>::new();
@@ -136,8 +137,23 @@ impl ContextData {
                 }
             }
             capability_registrations.extend(registration.take_capabilities());
-            let type_record = registration.type_record();
+            let Some(type_record) = registration.type_record() else {
+                continue;
+            };
             let type_id = type_record.type_id();
+            if let Some(shape) = registration.shape() {
+                if registered_shapes.insert(type_id, shape).is_some() {
+                    return Err(
+                        ContextError::from_issues(vec![ContextIssue::InvalidMetadata {
+                            item: type_identity(type_id),
+                            reason: MetadataValidationError::new(
+                                "multiple type shape registrations",
+                            ),
+                        }])
+                        .expect("one context issue is nonempty"),
+                    );
+                }
+            }
             if let Some(definition) = registration.type_instance_of() {
                 type_instances.entry(definition).or_default().push(type_id);
             }
@@ -154,7 +170,7 @@ impl ContextData {
                     .push(*application);
             }
             for plan in registration.construction_plans() {
-                if plan.target.identity.type_id != type_id {
+                if plan.target.identity().type_id != type_id {
                     let item = type_identity(type_id);
                     return Err(
                         ContextError::from_issues(vec![ContextIssue::InvalidMetadata {
@@ -167,7 +183,7 @@ impl ContextData {
                     );
                 }
                 construction_plans
-                    .entry(plan.target.identity.type_id)
+                    .entry(plan.target.identity().type_id)
                     .or_default()
                     .push(*plan);
             }
@@ -355,7 +371,7 @@ impl ContextData {
                 );
             }
         }
-        let mut shapes = HashMap::new();
+        let mut shapes = registered_shapes;
         for registration in inventory::iter::<TypeShapeRegistration> {
             let type_id = registration.type_id();
             if !included_types.contains(&type_id) {

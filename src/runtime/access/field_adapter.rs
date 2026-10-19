@@ -10,7 +10,7 @@ use crate::runtime::value::{
     ValueMode,
 };
 
-use crate::runtime::descriptor::variant::VariantIdentity;
+use crate::runtime::descriptor::variant::{VariantIdentity, VariantMetadata};
 
 /// Concrete typed callbacks retained by reflected field metadata.
 pub(crate) trait FieldAdapter: Sync {
@@ -24,6 +24,12 @@ pub(crate) trait FieldAdapter: Sync {
     /// # Safety
     /// `owner` must be uniquely borrowed and point to the exact owner type.
     unsafe fn mut_ptr(&self, owner: *mut ()) -> Option<*mut ()>;
+
+    /// # Safety
+    /// `owner` must point to the exact owner type returned by `owner()`.
+    unsafe fn active_variant(&self, _owner: *const ()) -> Option<VariantIdentity> {
+        None
+    }
 }
 
 pub(crate) trait DynamicFieldAdapter<M: ValueMode>: Sync {
@@ -87,7 +93,12 @@ macro_rules! field_mode {
                 let Some(adapter) = metadata.$member else {
                     return Err(FieldAccessError::Unavailable(metadata.dynamic_unavailable));
                 };
-                adapter.get(target, metadata.variant.map(|variant| variant.identity()))
+                adapter.get(
+                    target,
+                    metadata
+                        .variant_metadata()
+                        .map(|variant| variant.identity()),
+                )
             }
 
             fn get_mut<'a>(
@@ -97,7 +108,12 @@ macro_rules! field_mode {
                 let Some(adapter) = metadata.$member else {
                     return Err(FieldAccessError::Unavailable(metadata.dynamic_unavailable));
                 };
-                adapter.get_mut(target, metadata.variant.map(|variant| variant.identity()))
+                adapter.get_mut(
+                    target,
+                    metadata
+                        .variant_metadata()
+                        .map(|variant| variant.identity()),
+                )
             }
 
             fn set<'a>(
@@ -114,7 +130,9 @@ macro_rules! field_mode {
                 adapter.set(
                     target,
                     value,
-                    metadata.variant.map(|variant| variant.identity()),
+                    metadata
+                        .variant_metadata()
+                        .map(|variant| variant.identity()),
                 )
             }
         }
@@ -129,6 +147,7 @@ pub struct TypedFieldAdapter<Owner: 'static, Value: 'static> {
     get_ref: for<'a> fn(&'a Owner) -> &'a Value,
     get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
     active_variant: Option<for<'a> fn(&'a Owner) -> VariantIdentity>,
+    active_variant_metadata: Option<for<'a> fn(&'a Owner) -> &'static VariantMetadata>,
 }
 
 /// A dynamic only adapter for an unsized owner or field value.
@@ -136,6 +155,7 @@ pub(crate) struct DynamicOnlyFieldAdapter<Owner: ?Sized + 'static, Value: ?Sized
     get_ref: for<'a> fn(&'a Owner) -> &'a Value,
     get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
     active_variant: Option<for<'a> fn(&'a Owner) -> VariantIdentity>,
+    active_variant_metadata: Option<for<'a> fn(&'a Owner) -> &'static VariantMetadata>,
 }
 
 impl<Owner: ?Sized + 'static, Value: ?Sized + 'static> DynamicOnlyFieldAdapter<Owner, Value> {
@@ -147,6 +167,21 @@ impl<Owner: ?Sized + 'static, Value: ?Sized + 'static> DynamicOnlyFieldAdapter<O
             get_ref,
             get_mut,
             active_variant: None,
+            active_variant_metadata: None,
+        }
+    }
+
+    /// Creates a field adapter usable only while the specified enum variant is active.
+    pub const fn for_variant(
+        get_ref: for<'a> fn(&'a Owner) -> &'a Value,
+        get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
+        active_variant: for<'a> fn(&'a Owner) -> &'static VariantMetadata,
+    ) -> Self {
+        Self {
+            get_ref,
+            get_mut,
+            active_variant: None,
+            active_variant_metadata: Some(active_variant),
         }
     }
 
@@ -159,7 +194,27 @@ impl<Owner: ?Sized + 'static, Value: ?Sized + 'static> DynamicOnlyFieldAdapter<O
             get_ref,
             get_mut,
             active_variant: Some(active_variant),
+            active_variant_metadata: None,
         }
+    }
+
+    fn check_variant(
+        &self,
+        owner: &Owner,
+        expected: Option<VariantIdentity>,
+    ) -> Result<(), (VariantIdentity, VariantIdentity)> {
+        let Some(expected) = expected else {
+            return Ok(());
+        };
+        if let Some(active) = self.active_variant {
+            let actual = active(owner);
+            return (actual == expected).then_some(()).ok_or((expected, actual));
+        }
+        if let Some(active) = self.active_variant_metadata {
+            let actual = active(owner).identity();
+            return (actual == expected).then_some(()).ok_or((expected, actual));
+        }
+        Err((expected, expected))
     }
 }
 
@@ -207,16 +262,8 @@ where
         let owner = target
             .downcast::<Owner>()
             .map_err(|failure| FieldAccessError::TargetTypeMismatch(failure.into_parts().0))?;
-        if let Some(expected) = expected_variant {
-            let Some(active) = self.active_variant else {
-                return Err(FieldAccessError::Unavailable(
-                    FieldAccessUnavailableReason::AdapterUnavailable,
-                ));
-            };
-            let actual = active(owner);
-            if actual != expected {
-                return Err(FieldAccessError::InactiveVariant { expected, actual });
-            }
+        if let Err((expected, actual)) = self.check_variant(owner, expected_variant) {
+            return Err(FieldAccessError::InactiveVariant { expected, actual });
         }
         Ok(DynamicRef::new((self.get_ref)(owner)))
     }
@@ -229,16 +276,8 @@ where
         let owner = target
             .downcast::<Owner>()
             .map_err(|failure| FieldAccessError::TargetTypeMismatch(failure.into_parts().0))?;
-        if let Some(expected) = expected_variant {
-            let Some(active) = self.active_variant else {
-                return Err(FieldAccessError::Unavailable(
-                    FieldAccessUnavailableReason::AdapterUnavailable,
-                ));
-            };
-            let actual = active(owner);
-            if actual != expected {
-                return Err(FieldAccessError::InactiveVariant { expected, actual });
-            }
+        if let Err((expected, actual)) = self.check_variant(owner, expected_variant) {
+            return Err(FieldAccessError::InactiveVariant { expected, actual });
         }
         Ok(DynamicMut::new((self.get_mut)(owner)))
     }
@@ -265,6 +304,21 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
             get_ref,
             get_mut,
             active_variant: None,
+            active_variant_metadata: None,
+        }
+    }
+
+    /// Creates an enum field adapter from a safe source variant selector.
+    pub const fn for_variant(
+        get_ref: for<'a> fn(&'a Owner) -> &'a Value,
+        get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
+        active_variant: for<'a> fn(&'a Owner) -> &'static VariantMetadata,
+    ) -> Self {
+        Self {
+            get_ref,
+            get_mut,
+            active_variant: None,
+            active_variant_metadata: Some(active_variant),
         }
     }
 
@@ -277,7 +331,17 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
             get_ref,
             get_mut,
             active_variant: Some(active_variant),
+            active_variant_metadata: None,
         }
+    }
+}
+
+impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
+    fn active_variant(&self, owner: &Owner) -> Option<VariantIdentity> {
+        self.active_variant.map(|active| active(owner)).or_else(|| {
+            self.active_variant_metadata
+                .map(|active| active(owner).identity())
+        })
     }
 }
 
@@ -296,12 +360,11 @@ where
             .downcast::<Owner>()
             .map_err(|failure| FieldAccessError::TargetTypeMismatch(failure.into_parts().0))?;
         if let Some(expected) = expected_variant {
-            let Some(active) = self.active_variant else {
+            let Some(actual) = self.active_variant(owner) else {
                 return Err(FieldAccessError::Unavailable(
                     FieldAccessUnavailableReason::AdapterUnavailable,
                 ));
             };
-            let actual = active(owner);
             if actual != expected {
                 return Err(FieldAccessError::InactiveVariant { expected, actual });
             }
@@ -318,12 +381,11 @@ where
             .downcast::<Owner>()
             .map_err(|failure| FieldAccessError::TargetTypeMismatch(failure.into_parts().0))?;
         if let Some(expected) = expected_variant {
-            let Some(active) = self.active_variant else {
+            let Some(actual) = self.active_variant(owner) else {
                 return Err(FieldAccessError::Unavailable(
                     FieldAccessUnavailableReason::AdapterUnavailable,
                 ));
             };
-            let actual = active(owner);
             if actual != expected {
                 return Err(FieldAccessError::InactiveVariant { expected, actual });
             }
@@ -348,13 +410,12 @@ where
             }
         };
         if let Some(expected) = expected_variant {
-            let Some(active) = self.active_variant else {
+            let Some(actual) = self.active_variant(owner) else {
                 return Err(FieldSetFailure::new(
                     FieldSetError::Unavailable(FieldAccessUnavailableReason::AdapterUnavailable),
                     value,
                 ));
             };
-            let actual = active(owner);
             if actual != expected {
                 return Err(FieldSetFailure::new(
                     FieldSetError::InactiveVariant { expected, actual },
@@ -429,5 +490,11 @@ impl<Owner: 'static, Value: 'static> FieldAdapter for TypedFieldAdapter<Owner, V
         // SAFETY: the descriptor checks the owner TypeId and has exclusive access.
         let owner = unsafe { &mut *owner.cast::<Owner>() };
         Some((self.get_mut)(owner) as *mut Value as *mut ())
+    }
+
+    unsafe fn active_variant(&self, owner: *const ()) -> Option<VariantIdentity> {
+        // SAFETY: required by this method's contract.
+        let owner = unsafe { &*owner.cast::<Owner>() };
+        self.active_variant(owner)
     }
 }

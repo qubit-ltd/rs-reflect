@@ -4,7 +4,7 @@ use std::any::TypeId;
 use std::fmt;
 
 use crate::runtime::access::FieldAdapter;
-use crate::runtime::access::{DynamicFieldAdapter, DynamicFieldMode};
+use crate::runtime::access::{DynamicFieldAdapter, DynamicFieldMode, TypedFieldAdapter};
 use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::expression::TypeExpression;
@@ -32,8 +32,18 @@ pub struct FieldAccess {
 }
 
 impl FieldAccess {
-    pub const fn new(readable: bool, mutable: bool, replaceable: bool, constructible: bool) -> Self {
-        Self { readable, mutable, replaceable, constructible }
+    pub const fn new(
+        readable: bool,
+        mutable: bool,
+        replaceable: bool,
+        constructible: bool,
+    ) -> Self {
+        Self {
+            readable,
+            mutable,
+            replaceable,
+            constructible,
+        }
     }
 }
 
@@ -143,6 +153,7 @@ pub struct FieldMetadata {
     pub(crate) type_expression: &'static crate::runtime::expression::ExpressionData,
     pub(crate) adapter: &'static dyn FieldAdapter,
     pub(crate) variant: Option<&'static VariantMetadata>,
+    pub(crate) variant_source: Option<fn() -> &'static VariantMetadata>,
     pub(crate) active_variant: Option<unsafe fn(*const ()) -> VariantIdentity>,
     pub(crate) dynamic_local:
         Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::Local>>,
@@ -157,18 +168,91 @@ impl FieldMetadata {
     pub const fn typed<Owner: 'static, Value: 'static>(
         index: usize,
         name: &'static str,
+        visibility: Visibility,
+        type_expression: &'static crate::runtime::expression::ExpressionData,
         adapter: &'static crate::runtime::access::TypedFieldAdapter<Owner, Value>,
+        access: FieldAccess,
     ) -> Self {
-        Self::new(
+        Self {
             index,
             name,
-            Visibility::Public,
-            &crate::runtime::expression::ExpressionData::Never,
+            visibility,
+            type_expression,
             adapter,
-            None,
-            None,
-            FieldAccess::new(true, true, true, true),
-        )
+            variant: None,
+            variant_source: None,
+            active_variant: None,
+            dynamic_local: None,
+            dynamic_thread_safe: None,
+            dynamic_unavailable: FieldAccessUnavailableReason::AdapterUnavailable,
+            access,
+        }
+    }
+
+    /// Creates metadata for a typed field declared inside an enum variant.
+    pub const fn typed_variant<Owner: 'static, Value: 'static>(
+        index: usize,
+        name: &'static str,
+        visibility: Visibility,
+        type_expression: &'static crate::runtime::expression::ExpressionData,
+        adapter: &'static TypedFieldAdapter<Owner, Value>,
+        variant: fn() -> &'static VariantMetadata,
+        access: FieldAccess,
+    ) -> Self {
+        Self {
+            index,
+            name,
+            visibility,
+            type_expression,
+            adapter,
+            variant: None,
+            variant_source: Some(variant),
+            active_variant: None,
+            dynamic_local: None,
+            dynamic_thread_safe: None,
+            dynamic_unavailable: FieldAccessUnavailableReason::AdapterUnavailable,
+            access,
+        }
+    }
+
+    /// Enables local dynamic access when both field types support reflection.
+    pub const fn with_local_dynamic<Owner, Value>(
+        mut self,
+        adapter: &'static TypedFieldAdapter<Owner, Value>,
+    ) -> Self
+    where
+        Owner: crate::runtime::descriptor::Reflect
+            + crate::runtime::value::ValueForRef<crate::runtime::value::Local>
+            + crate::runtime::value::ValueForMut<crate::runtime::value::Local>
+            + 'static,
+        Value: crate::runtime::descriptor::Reflect
+            + crate::runtime::value::ValueForRef<crate::runtime::value::Local>
+            + crate::runtime::value::ValueForMut<crate::runtime::value::Local>
+            + crate::runtime::value::ValueFor<crate::runtime::value::Local>
+            + 'static,
+    {
+        self.dynamic_local = Some(adapter.local_dynamic());
+        self
+    }
+
+    /// Enables thread-safe dynamic access when both field types are `Send + Sync`.
+    pub const fn with_thread_safe_dynamic<Owner, Value>(
+        mut self,
+        adapter: &'static TypedFieldAdapter<Owner, Value>,
+    ) -> Self
+    where
+        Owner: crate::runtime::descriptor::Reflect
+            + crate::runtime::value::ValueForRef<crate::runtime::value::ThreadSafe>
+            + crate::runtime::value::ValueForMut<crate::runtime::value::ThreadSafe>
+            + 'static,
+        Value: crate::runtime::descriptor::Reflect
+            + crate::runtime::value::ValueForRef<crate::runtime::value::ThreadSafe>
+            + crate::runtime::value::ValueForMut<crate::runtime::value::ThreadSafe>
+            + crate::runtime::value::ValueFor<crate::runtime::value::ThreadSafe>
+            + 'static,
+    {
+        self.dynamic_thread_safe = Some(adapter.thread_safe_dynamic());
+        self
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -189,12 +273,18 @@ impl FieldMetadata {
             type_expression,
             adapter,
             variant,
+            variant_source: None,
             active_variant,
             dynamic_local: None,
             dynamic_thread_safe: None,
             dynamic_unavailable: FieldAccessUnavailableReason::AdapterUnavailable,
             access,
         }
+    }
+
+    pub(crate) fn variant_metadata(&self) -> Option<&'static VariantMetadata> {
+        self.variant
+            .or_else(|| self.variant_source.map(|source| source()))
     }
 
     pub const fn with_dynamic_adapters(
@@ -587,16 +677,18 @@ impl<'ctx> FieldDescriptor<'ctx> {
     }
 
     fn check_variant(self, target: *const ()) -> Result<(), FieldAccessError> {
-        let Some(expected) = self.metadata.variant else {
+        let Some(expected) = self.metadata.variant_metadata() else {
             return Ok(());
         };
-        let Some(active_variant) = self.metadata.active_variant else {
-            return Err(FieldAccessError::Unavailable(
-                FieldAccessUnavailableReason::AdapterUnavailable,
-            ));
+        let actual = if let Some(active_variant) = self.metadata.active_variant {
+            // SAFETY: the enclosing access operation checked the owner TypeId.
+            unsafe { active_variant(target) }
+        } else {
+            // SAFETY: the enclosing access operation checked the owner TypeId.
+            unsafe { self.metadata.adapter.active_variant(target) }.ok_or(
+                FieldAccessError::Unavailable(FieldAccessUnavailableReason::AdapterUnavailable),
+            )?
         };
-        // SAFETY: the enclosing access operation checked the owner TypeId.
-        let actual = unsafe { active_variant(target) };
         (actual == expected.identity())
             .then_some(())
             .ok_or(FieldAccessError::InactiveVariant {

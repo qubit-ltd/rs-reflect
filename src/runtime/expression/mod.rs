@@ -3,7 +3,7 @@ mod error;
 mod predicate;
 mod type_expression;
 
-pub(crate) use data::{
+pub use data::{
     ConstExpression, ExpressionData, FunctionPointerData, GenericExpressionArgument,
     LifetimeExpression, OpaqueTypeData, PredicateData, TraitBoundModifier, TraitExpressionData,
     TraitObjectData,

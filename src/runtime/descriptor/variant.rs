@@ -50,6 +50,13 @@ pub struct VariantDiscriminant {
     pub(crate) numeric: Option<NumericDiscriminant>,
 }
 
+impl VariantDiscriminant {
+    /// Creates source origin and optional explicit numeric discriminant metadata.
+    pub const fn new(origin: DiscriminantOrigin, numeric: Option<NumericDiscriminant>) -> Self {
+        Self { origin, numeric }
+    }
+}
+
 /// Stable identity of one variant within its declaring enum.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct VariantIdentity {
@@ -67,12 +74,13 @@ pub trait VariantAdapter: Sync {
     fn is_active_dynamic(&self, value: DynamicRef<'_>) -> Result<bool, TypeMismatch>;
 }
 
-pub(crate) struct TypedVariantAdapter<Owner: 'static> {
+pub struct TypedVariantAdapter<Owner: 'static> {
     is_active: for<'a> fn(&'a Owner) -> bool,
 }
 
 impl<Owner: 'static> TypedVariantAdapter<Owner> {
-    pub(crate) const fn new(is_active: for<'a> fn(&'a Owner) -> bool) -> Self {
+    /// Creates a typed variant adapter from a safe match predicate.
+    pub const fn new(is_active: for<'a> fn(&'a Owner) -> bool) -> Self {
         Self { is_active }
     }
 }

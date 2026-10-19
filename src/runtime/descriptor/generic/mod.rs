@@ -50,7 +50,7 @@ impl Hash for TypeDefinitionId {
 
 /// Source kind of a generic type definition.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TypeDefinitionKind {
+pub enum TypeDefinitionKind {
     Struct(StructKind),
     Enum,
     Union,
@@ -59,7 +59,7 @@ pub(crate) enum TypeDefinitionKind {
 
 /// Struct shape retained as source metadata.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum StructKind {
+pub enum StructKind {
     Named,
     Tuple,
     Unit,
@@ -67,7 +67,7 @@ pub(crate) enum StructKind {
 
 /// Static source metadata for one generic declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct TypeDefinitionMetadata {
+pub struct TypeDefinitionMetadata {
     pub(crate) id: TypeDefinitionId,
     pub(crate) name: &'static str,
     pub(crate) path: &'static str,
@@ -77,14 +77,14 @@ pub(crate) struct TypeDefinitionMetadata {
 
 /// Generic declaration metadata in source order.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericDefinitionMetadata {
+pub struct GenericDefinitionMetadata {
     pub(crate) parameters: &'static [GenericParameterMetadata],
     pub(crate) predicates: &'static [PredicateData],
 }
 
 /// One lifetime, type, or const parameter declared by a generic definition.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericParameterMetadata {
+pub struct GenericParameterMetadata {
     pub(crate) name: &'static str,
     pub(crate) index: usize,
     pub(crate) kind: GenericParameterMetadataKind,
@@ -92,7 +92,7 @@ pub(crate) struct GenericParameterMetadata {
 
 /// Static facts specific to the parameter kind.
 #[derive(Clone, Copy)]
-pub(crate) enum GenericParameterMetadataKind {
+pub enum GenericParameterMetadataKind {
     Lifetime {
         bounds: &'static [LifetimeExpression],
     },
@@ -104,6 +104,80 @@ pub(crate) enum GenericParameterMetadataKind {
         ty: &'static ExpressionData,
         default: Option<ConstExpression>,
     },
+}
+
+impl TypeDefinitionMetadata {
+    /// Creates static metadata bound to a marker type chosen by generated code.
+    pub const fn new<T: 'static>(
+        name: &'static str,
+        path: &'static str,
+        kind: TypeDefinitionKind,
+        generics: &'static GenericDefinitionMetadata,
+    ) -> Self {
+        Self {
+            id: TypeDefinitionId::of::<T>(),
+            name,
+            path,
+            kind,
+            generics,
+        }
+    }
+}
+
+impl GenericDefinitionMetadata {
+    /// Creates static generic parameters and predicates in source order.
+    pub const fn new(
+        parameters: &'static [GenericParameterMetadata],
+        predicates: &'static [PredicateData],
+    ) -> Self {
+        Self {
+            parameters,
+            predicates,
+        }
+    }
+}
+
+impl GenericParameterMetadata {
+    /// Creates a lifetime parameter and its source bounds.
+    pub const fn lifetime(
+        name: &'static str,
+        index: usize,
+        bounds: &'static [LifetimeExpression],
+    ) -> Self {
+        Self {
+            name,
+            index,
+            kind: GenericParameterMetadataKind::Lifetime { bounds },
+        }
+    }
+
+    /// Creates a type parameter and its source bounds and optional default.
+    pub const fn type_parameter(
+        name: &'static str,
+        index: usize,
+        bounds: &'static [PredicateData],
+        default: Option<&'static ExpressionData>,
+    ) -> Self {
+        Self {
+            name,
+            index,
+            kind: GenericParameterMetadataKind::Type { bounds, default },
+        }
+    }
+
+    /// Creates a const parameter and its source type and optional default.
+    pub const fn const_parameter(
+        name: &'static str,
+        index: usize,
+        ty: &'static ExpressionData,
+        default: Option<ConstExpression>,
+    ) -> Self {
+        Self {
+            name,
+            index,
+            kind: GenericParameterMetadataKind::Const { ty, default },
+        }
+    }
 }
 
 /// Context-bound view of a generic type declaration.
@@ -278,7 +352,7 @@ pub(crate) enum GenericParameterKind<'ctx> {
 
 /// Static concrete type or const argument associated with a parameter.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericArgumentMetadata {
+pub struct GenericArgumentMetadata {
     pub(crate) parameter: &'static GenericParameterMetadata,
     pub(crate) kind: GenericArgumentMetadataKind,
 }
@@ -288,9 +362,50 @@ pub(crate) struct GenericArgumentMetadata {
 pub(crate) enum GenericArgumentMetadataKind {
     Type {
         expression: &'static ExpressionData,
-        concrete: Option<&'static TypeMetadata>,
+        concrete: Option<fn() -> &'static TypeMetadata>,
     },
     Const(ConstExpression),
+}
+
+impl GenericArgumentMetadata {
+    /// Creates a type argument tied to a reflected concrete Rust type.
+    pub const fn type_argument<T: crate::runtime::descriptor::Reflect>(
+        parameter: &'static GenericParameterMetadata,
+        expression: &'static ExpressionData,
+    ) -> Self {
+        Self {
+            parameter,
+            kind: GenericArgumentMetadataKind::Type {
+                expression,
+                concrete: Some(TypeMetadata::of::<T>),
+            },
+        }
+    }
+
+    /// Creates a type argument while retaining source syntax without requiring reflection.
+    pub const fn type_expression(
+        parameter: &'static GenericParameterMetadata,
+        expression: &'static ExpressionData,
+    ) -> Self {
+        Self {
+            parameter,
+            kind: GenericArgumentMetadataKind::Type {
+                expression,
+                concrete: None,
+            },
+        }
+    }
+
+    /// Creates a const argument associated with its declared parameter.
+    pub const fn const_argument(
+        parameter: &'static GenericParameterMetadata,
+        value: ConstExpression,
+    ) -> Self {
+        Self {
+            parameter,
+            kind: GenericArgumentMetadataKind::Const(value),
+        }
+    }
 }
 
 /// Context-bound collection of the type and const arguments of one application.
@@ -433,7 +548,7 @@ impl<'ctx> TypeArgumentDescriptor<'ctx> {
     pub(crate) fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Type { concrete, .. } => {
-                concrete.map(|metadata| TypeDescriptor::new(metadata, self.context))
+                concrete.map(|metadata| TypeDescriptor::new(metadata(), self.context))
             }
             GenericArgumentMetadataKind::Const(_) => None,
         }

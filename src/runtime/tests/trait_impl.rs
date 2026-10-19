@@ -141,12 +141,14 @@ static STRING_TRAIT_EXPRESSION_DATA: TraitExpressionData = TraitExpressionData {
     arguments: &[crate::runtime::expression::GenericExpressionArgument::Type(
         &STRING_EXPR,
     )],
+    lifetimes: &[],
 };
 static U64_TRAIT_EXPRESSION_DATA: TraitExpressionData = TraitExpressionData {
     path: "fixture::Convert",
     arguments: &[crate::runtime::expression::GenericExpressionArgument::Type(
         &U64_EXPR,
     )],
+    lifetimes: &[],
 };
 static STRING_TRAIT_EXPRESSION: TraitExpressionMetadata = TraitExpressionMetadata {
     expression: &STRING_TRAIT_EXPRESSION_DATA,

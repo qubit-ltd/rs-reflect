@@ -25,6 +25,7 @@ pub use crate::runtime::descriptor::field::Visibility;
 pub use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 pub use crate::runtime::descriptor::variant::DiscriminantOrigin;
 pub use crate::runtime::descriptor::variant::NumericDiscriminant;
+pub use crate::runtime::descriptor::variant::TypedVariantAdapter;
 pub use crate::runtime::descriptor::variant::VariantAdapter;
 pub use crate::runtime::descriptor::variant::VariantDiscriminant;
 pub use crate::runtime::descriptor::variant::VariantMetadata;

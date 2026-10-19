@@ -106,15 +106,18 @@ static FUNCTION_POINTER: super::super::expression::FunctionPointerData =
         unsafe_: true,
         abi: Some("C"),
         variadic: false,
+        lifetimes: &[],
     };
 static FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&FUNCTION_POINTER);
 static DISPLAY_TRAIT: TraitExpressionData = TraitExpressionData {
     path: "core::fmt::Display",
     arguments: &[],
+    lifetimes: &[],
 };
 static ITERATOR_TRAIT: TraitExpressionData = TraitExpressionData {
     path: "core::iter::Iterator",
     arguments: &[],
+    lifetimes: &[],
 };
 static DISPLAY_PREDICATE: PredicateData = PredicateData::TraitBound {
     ty: &T_EXPRESSION,
@@ -135,7 +138,7 @@ static BOUNDED_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
 };
 static ASSOCIATED_EXPRESSION: ExpressionData = ExpressionData::AssociatedType {
     self_type: &T_EXPRESSION,
-    trait_: &ITERATOR_TRAIT,
+    trait_: Some(&ITERATOR_TRAIT),
     name: "Item",
 };
 static TRAIT_OBJECT_DATA: super::super::expression::TraitObjectData =
@@ -189,8 +192,8 @@ fn definition_and_type_expression_remain_source_level() {
     let context = crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
         .register(
             crate::runtime::context::handle::registration::Registration::of::<EnvelopeU8>()
-                .with_type_definition(&DEFINITION)
-                .with_type_instance(TypeDefinitionId::of::<EnvelopeMarker>()),
+                .with_type_definition_metadata(&DEFINITION)
+                .with_type_instance_id(TypeDefinitionId::of::<EnvelopeMarker>()),
         )
         .build()
         .expect("fixture context builds");

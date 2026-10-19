@@ -2,7 +2,7 @@ use crate::runtime::descriptor::generic::GenericParameterMetadata;
 
 /// A lifetime retained in the source type expression.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum LifetimeExpression {
+pub enum LifetimeExpression {
     Static,
     Named(&'static str),
     Elided,
@@ -11,7 +11,7 @@ pub(crate) enum LifetimeExpression {
 
 /// A structural const expression; it never evaluates Rust const code.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ConstExpression {
+pub enum ConstExpression {
     SignedInteger(i128),
     UnsignedInteger(u128),
     Boolean(bool),
@@ -22,7 +22,7 @@ pub(crate) enum ConstExpression {
 
 /// A generic argument embedded in a source type path.
 #[derive(Clone, Copy)]
-pub(crate) enum GenericExpressionArgument {
+pub enum GenericExpressionArgument {
     Type(&'static ExpressionData),
     Lifetime(LifetimeExpression),
     Const(ConstExpression),
@@ -38,7 +38,7 @@ pub(crate) enum GenericExpressionArgument {
 
 /// A structural predicate copied from a declaration or where clause.
 #[derive(Clone, Copy)]
-pub(crate) enum PredicateData {
+pub enum PredicateData {
     TraitBound {
         ty: &'static ExpressionData,
         trait_: &'static TraitExpressionData,
@@ -61,31 +61,49 @@ pub(crate) enum PredicateData {
 
 /// The modifier syntax attached to a Rust trait bound.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TraitBoundModifier {
+pub enum TraitBoundModifier {
     None,
     Maybe,
 }
 
 /// A trait path and its source-level arguments.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitExpressionData {
-    pub(crate) path: &'static str,
-    pub(crate) arguments: &'static [GenericExpressionArgument],
+pub struct TraitExpressionData {
+    pub path: &'static str,
+    pub arguments: &'static [GenericExpressionArgument],
+    pub lifetimes: &'static [LifetimeExpression],
+}
+
+impl TraitExpressionData {
+    /// Creates static source facts for a trait path and its generic arguments.
+    pub const fn new(
+        path: &'static str,
+        arguments: &'static [GenericExpressionArgument],
+        lifetimes: &'static [LifetimeExpression],
+    ) -> Self {
+        Self {
+            path,
+            arguments,
+            lifetimes,
+        }
+    }
 }
 
 /// A source-level type expression independent of any runtime context.
 #[derive(Clone, Copy)]
-pub(crate) enum ExpressionData {
+pub enum ExpressionData {
     Named {
         path: &'static str,
         definition: Option<&'static super::super::descriptor::generic::TypeDefinitionMetadata>,
         arguments: &'static [GenericExpressionArgument],
     },
     Parameter(&'static GenericParameterMetadata),
+    /// A source generic parameter referenced by name when no definition link is available.
+    ParameterName(&'static str),
     SelfType,
     AssociatedType {
         self_type: &'static ExpressionData,
-        trait_: &'static TraitExpressionData,
+        trait_: Option<&'static TraitExpressionData>,
         name: &'static str,
     },
     Reference {
@@ -111,23 +129,62 @@ pub(crate) enum ExpressionData {
 
 /// Function pointer facts retained from source syntax.
 #[derive(Clone, Copy)]
-pub(crate) struct FunctionPointerData {
-    pub(crate) arguments: &'static [&'static ExpressionData],
-    pub(crate) result: Option<&'static ExpressionData>,
-    pub(crate) unsafe_: bool,
-    pub(crate) abi: Option<&'static str>,
-    pub(crate) variadic: bool,
+pub struct FunctionPointerData {
+    pub lifetimes: &'static [LifetimeExpression],
+    pub arguments: &'static [&'static ExpressionData],
+    pub result: Option<&'static ExpressionData>,
+    pub unsafe_: bool,
+    pub abi: Option<&'static str>,
+    pub variadic: bool,
+}
+
+impl FunctionPointerData {
+    /// Creates static source facts for a function pointer type.
+    pub const fn new(
+        arguments: &'static [&'static ExpressionData],
+        result: Option<&'static ExpressionData>,
+        unsafe_: bool,
+        abi: Option<&'static str>,
+        variadic: bool,
+        lifetimes: &'static [LifetimeExpression],
+    ) -> Self {
+        Self {
+            lifetimes,
+            arguments,
+            result,
+            unsafe_,
+            abi,
+            variadic,
+        }
+    }
 }
 
 /// Trait bounds retained for a trait-object expression.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitObjectData {
-    pub(crate) traits: &'static [TraitExpressionData],
-    pub(crate) lifetime: Option<LifetimeExpression>,
+pub struct TraitObjectData {
+    pub traits: &'static [TraitExpressionData],
+    pub lifetime: Option<LifetimeExpression>,
+}
+
+impl TraitObjectData {
+    /// Creates static source facts for a trait-object type.
+    pub const fn new(
+        traits: &'static [TraitExpressionData],
+        lifetime: Option<LifetimeExpression>,
+    ) -> Self {
+        Self { traits, lifetime }
+    }
 }
 
 /// Opaque source type facts; this does not claim the type can be navigated.
 #[derive(Clone, Copy)]
-pub(crate) struct OpaqueTypeData {
-    pub(crate) bounds: &'static [PredicateData],
+pub struct OpaqueTypeData {
+    pub bounds: &'static [PredicateData],
+}
+
+impl OpaqueTypeData {
+    /// Creates static source facts for an opaque type's bounds.
+    pub const fn new(bounds: &'static [PredicateData]) -> Self {
+        Self { bounds }
+    }
 }

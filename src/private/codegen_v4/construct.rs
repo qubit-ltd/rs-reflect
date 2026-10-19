@@ -14,3 +14,9 @@
 //! `ConstructionTarget`, `ConstructionInput`, and the validated adapter
 //! contracts under `runtime::construct`. They are currently crate-private;
 //! generated code must not construct or mutate validated inputs directly.
+
+pub use crate::runtime::construct::{
+    ConstructField, ConstructionAvailability, ConstructionFieldPolicy, ConstructionPlan,
+    ConstructionProviders, ConstructionShape, ConstructionUnavailableReason,
+    TypedConstructProvider as ConstructProvider, UpdateFieldPolicy, UpdateUnavailableReason,
+};

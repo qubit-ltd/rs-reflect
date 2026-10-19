@@ -61,13 +61,13 @@ fn freeze_probe_plan() -> &'static ConstructionPlan {
     FREEZE_PLAN.get_or_init(|| {
         ConstructionPlan::new(
             ConstructionTarget {
-                identity: type_identity::<Record>(),
+                identity: type_identity::<Record>,
                 kind: ConstructionTargetKind::Struct,
                 variant_index: None,
             },
             ConstructionShape::Unit,
             &[],
-            ConstructionProviders::new(Some(&FREEZE_PROVIDER), None),
+            ConstructionProviders::from_runtime_providers(Some(&FREEZE_PROVIDER), None),
             ConstructionAvailability::Available,
         )
     })
@@ -227,21 +227,21 @@ fn record_plan_with_policy(
     let fields = Box::leak(Box::new([
         ConstructField {
             name: "count",
-            value: type_identity::<u32>(),
+            value: type_identity::<u32>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Replaceable,
         },
         ConstructField {
             name: "title",
-            value: type_identity::<String>(),
+            value: type_identity::<String>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Replaceable,
         },
         ConstructField {
             name: "secret",
-            value: type_identity::<bool>(),
+            value: type_identity::<bool>,
             visibility: secret_visibility,
             policy: secret_policy,
             update_policy: UpdateFieldPolicy::Preserved,
@@ -250,13 +250,13 @@ fn record_plan_with_policy(
     let provider = Box::leak(Box::new(RecordProvider));
     ConstructionPlan::new(
         ConstructionTarget {
-            identity: type_identity::<Record>(),
+            identity: type_identity::<Record>,
             kind: ConstructionTargetKind::Struct,
             variant_index: None,
         },
         ConstructionShape::Named,
         fields,
-        ConstructionProviders::new(Some(provider), Some(provider)),
+        ConstructionProviders::from_runtime_providers(Some(provider), Some(provider)),
         ConstructionAvailability::Available,
     )
 }
@@ -265,21 +265,21 @@ fn record_plan_with_unavailable_update() -> ConstructionPlan {
     let fields = Box::leak(Box::new([
         ConstructField {
             name: "count",
-            value: type_identity::<u32>(),
+            value: type_identity::<u32>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Unavailable(UpdateUnavailableReason::NoProvider),
         },
         ConstructField {
             name: "title",
-            value: type_identity::<String>(),
+            value: type_identity::<String>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Replaceable,
         },
         ConstructField {
             name: "secret",
-            value: type_identity::<bool>(),
+            value: type_identity::<bool>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Defaulted,
             update_policy: UpdateFieldPolicy::Preserved,
@@ -288,13 +288,13 @@ fn record_plan_with_unavailable_update() -> ConstructionPlan {
     let provider = Box::leak(Box::new(RecordProvider));
     ConstructionPlan::new(
         ConstructionTarget {
-            identity: type_identity::<Record>(),
+            identity: type_identity::<Record>,
             kind: ConstructionTargetKind::Struct,
             variant_index: None,
         },
         ConstructionShape::Named,
         fields,
-        ConstructionProviders::new(Some(provider), Some(provider)),
+        ConstructionProviders::from_runtime_providers(Some(provider), Some(provider)),
         ConstructionAvailability::Available,
     )
 }
@@ -303,14 +303,14 @@ fn choice_variant_plan() -> ConstructionPlan {
     let fields = Box::leak(Box::new([
         ConstructField {
             name: "0",
-            value: type_identity::<i32>(),
+            value: type_identity::<i32>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Preserved,
         },
         ConstructField {
             name: "1",
-            value: type_identity::<i32>(),
+            value: type_identity::<i32>,
             visibility: ConstructVisibility::Public,
             policy: ConstructionFieldPolicy::Required,
             update_policy: UpdateFieldPolicy::Preserved,
@@ -319,13 +319,13 @@ fn choice_variant_plan() -> ConstructionPlan {
     let provider = Box::leak(Box::new(PairProvider));
     ConstructionPlan::new(
         ConstructionTarget {
-            identity: type_identity::<Choice>(),
+            identity: type_identity::<Choice>,
             kind: ConstructionTargetKind::Variant,
             variant_index: Some(1),
         },
         ConstructionShape::Positional,
         fields,
-        ConstructionProviders::new(Some(provider), None),
+        ConstructionProviders::from_runtime_providers(Some(provider), None),
         ConstructionAvailability::Available,
     )
 }
@@ -334,13 +334,13 @@ fn marker_plan() -> ConstructionPlan {
     let provider = Box::leak(Box::new(MarkerProvider));
     ConstructionPlan::new(
         ConstructionTarget {
-            identity: type_identity::<Marker>(),
+            identity: type_identity::<Marker>,
             kind: ConstructionTargetKind::Struct,
             variant_index: None,
         },
         ConstructionShape::Unit,
         &[],
-        ConstructionProviders::new(Some(provider), None),
+        ConstructionProviders::from_runtime_providers(Some(provider), None),
         ConstructionAvailability::Available,
     )
 }

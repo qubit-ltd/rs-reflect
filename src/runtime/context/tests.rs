@@ -2,9 +2,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::runtime::context::handle::ReflectionContext;
+use crate::runtime::context::handle::builder::ReflectionContextBuilder;
 use crate::runtime::context::handle::global::GlobalContext;
 use crate::runtime::context::handle::registration::Registration;
 use crate::runtime::context::handle::registration::RegistrationFragment;
+use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::descriptor::generic::{
     GenericDefinitionMetadata, TypeDefinitionId, TypeDefinitionKind, TypeDefinitionMetadata,
@@ -140,6 +142,40 @@ mod second {
 }
 
 #[test]
+fn metadata_only_fragments_register_definitions_without_a_type_record() {
+    struct DefinitionMarker;
+    static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
+    static DEFINITION: TypeDefinitionRegistration<DefinitionMarker> =
+        TypeDefinitionRegistration::new(
+            "Envelope",
+            "example::Envelope",
+            TypeDefinitionKind::Struct(crate::runtime::descriptor::generic::StructKind::Named),
+            &GENERICS,
+        );
+
+    fn registration() -> Registration {
+        Registration::metadata_only().with_type_definition(&DEFINITION)
+    }
+
+    let fragment =
+        RegistrationFragment::for_global_registration("envelope-definition", registration);
+    let registration = fragment.materialize().expect("fragment is well-formed");
+    assert!(registration.type_record().is_none());
+
+    let context = ReflectionContextBuilder::new()
+        .register(registration)
+        .build()
+        .expect("metadata-only registration builds a context");
+    assert_eq!(context.registered_type_count().unwrap(), 0);
+    assert!(
+        context
+            .type_definition(TypeDefinitionId::of::<DefinitionMarker>())
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[test]
 fn explicit_contexts_are_isolated_and_frozen() {
     let first = ReflectionContext::builder()
         .include_type::<First>()
@@ -191,8 +227,8 @@ fn generic_definitions_and_instances_are_context_bound() {
     let included = ReflectionContext::builder()
         .register(
             Registration::of::<First>()
-                .with_type_definition(&ENVELOPE_DEFINITION)
-                .with_type_instance(TypeDefinitionId::of::<EnvelopeMarker>()),
+                .with_type_definition_metadata(&ENVELOPE_DEFINITION)
+                .with_type_instance_id(TypeDefinitionId::of::<EnvelopeMarker>()),
         )
         .build()
         .expect("context builds");

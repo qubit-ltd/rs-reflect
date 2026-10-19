@@ -10,10 +10,12 @@ use crate::runtime::descriptor::impl_descriptor::{
 use crate::runtime::descriptor::trait_descriptor::{
     TraitApplicationMetadata, TraitDefinitionMetadata,
 };
+use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 use crate::runtime::descriptor::{Reflect, TypeDescriptor, TypeRegistration};
 use crate::runtime::error::{ContextError, ContextIssue, MetadataValidationError};
 use crate::runtime::identity::RegistrationOrigin;
 use crate::runtime::identity::{ItemIdentity, ItemKind, StableItemId};
+use std::marker::PhantomData;
 
 pub type RegistrationSortKey = (
     &'static str,
@@ -59,7 +61,8 @@ fn descriptor_for<'ctx, T: Reflect>(context: &'ctx ReflectionContext) -> TypeDes
 }
 
 pub struct Registration {
-    type_record: TypeRecord,
+    type_record: Option<TypeRecord>,
+    shape: Option<&'static TypeKindMetadata>,
     origin: RegistrationOrigin,
     type_definitions: Vec<&'static TypeDefinitionMetadata>,
     trait_definitions: Vec<&'static TraitDefinitionMetadata>,
@@ -71,6 +74,31 @@ pub struct Registration {
     construction_plans: Vec<&'static ConstructionPlan>,
 }
 
+/// A generic definition registration whose process-local identity is bound to `T`.
+pub struct TypeDefinitionRegistration<T: 'static> {
+    metadata: TypeDefinitionMetadata,
+    _marker: PhantomData<fn() -> T>,
+}
+
+impl<T: 'static> TypeDefinitionRegistration<T> {
+    /// Creates source metadata for a generic definition, binding identity to its marker type.
+    pub const fn new(
+        name: &'static str,
+        path: &'static str,
+        kind: crate::runtime::descriptor::generic::TypeDefinitionKind,
+        generics: &'static crate::runtime::descriptor::generic::GenericDefinitionMetadata,
+    ) -> Self {
+        Self {
+            metadata: TypeDefinitionMetadata::new::<T>(name, path, kind, generics),
+            _marker: PhantomData,
+        }
+    }
+
+    pub(crate) const fn metadata(&'static self) -> &'static TypeDefinitionMetadata {
+        &self.metadata
+    }
+}
+
 impl Registration {
     pub fn of<T: Reflect>() -> Self {
         Self::new::<T>()
@@ -78,8 +106,10 @@ impl Registration {
 
     fn new<T: Reflect>() -> Self {
         let type_record = TypeRecord::of::<T>();
+        let reflect_registration = T::__reflect_registration();
         Self {
-            type_record,
+            type_record: Some(type_record),
+            shape: reflect_registration.shape(),
             origin: RegistrationOrigin {
                 crate_name: "explicit",
                 crate_version: None,
@@ -88,6 +118,32 @@ impl Registration {
                 line: None,
                 column: None,
             },
+            type_definitions: reflect_registration.type_definition().into_iter().collect(),
+            trait_definitions: Vec::new(),
+            impl_definitions: Vec::new(),
+            capabilities: Vec::new(),
+            type_instance_of: reflect_registration
+                .type_definition()
+                .map(|definition| definition.id),
+            trait_applications: Vec::new(),
+            impl_applications: Vec::new(),
+            construction_plans: reflect_registration.construction_plans().iter().collect(),
+        }
+    }
+
+    /// Creates a registration that contributes definitions or applications without adding a type.
+    pub fn metadata_only() -> Self {
+        Self {
+            type_record: None,
+            origin: RegistrationOrigin {
+                crate_name: "generated",
+                crate_version: None,
+                module_path: "generated metadata",
+                file: None,
+                line: None,
+                column: None,
+            },
+            shape: None,
             type_definitions: Vec::new(),
             trait_definitions: Vec::new(),
             impl_definitions: Vec::new(),
@@ -99,7 +155,7 @@ impl Registration {
         }
     }
 
-    pub(crate) fn with_type_definition(
+    pub(crate) fn with_type_definition_metadata(
         mut self,
         metadata: &'static TypeDefinitionMetadata,
     ) -> Self {
@@ -107,24 +163,31 @@ impl Registration {
         self
     }
 
-    pub(crate) fn with_trait_definition(
+    /// Adds a generic definition without exposing its process-local identity.
+    pub fn with_type_definition<T: 'static>(
         mut self,
-        metadata: &'static TraitDefinitionMetadata,
+        registration: &'static TypeDefinitionRegistration<T>,
     ) -> Self {
+        self.type_definitions.push(registration.metadata());
+        self
+    }
+
+    pub fn with_trait_definition(mut self, metadata: &'static TraitDefinitionMetadata) -> Self {
         self.trait_definitions.push(metadata);
         self
     }
 
-    pub(crate) fn with_impl_definition(
-        mut self,
-        metadata: &'static ImplDefinitionMetadata,
-    ) -> Self {
+    pub fn with_impl_definition(mut self, metadata: &'static ImplDefinitionMetadata) -> Self {
         self.impl_definitions.push(metadata);
         self
     }
 
     pub(crate) fn type_definitions(&self) -> &[&'static TypeDefinitionMetadata] {
         &self.type_definitions
+    }
+
+    pub(crate) const fn shape(&self) -> Option<&'static TypeKindMetadata> {
+        self.shape
     }
 
     pub(crate) fn trait_definitions(&self) -> &[&'static TraitDefinitionMetadata] {
@@ -144,8 +207,14 @@ impl Registration {
         std::mem::take(&mut self.capabilities)
     }
 
-    pub(crate) fn with_type_instance(mut self, definition: TypeDefinitionId) -> Self {
+    pub(crate) fn with_type_instance_id(mut self, definition: TypeDefinitionId) -> Self {
         self.type_instance_of = Some(definition);
+        self
+    }
+
+    /// Associates this concrete type registration with a marker-bound definition.
+    pub fn with_type_instance<T: 'static>(mut self) -> Self {
+        self.type_instance_of = Some(TypeDefinitionId::of::<T>());
         self
     }
 
@@ -153,7 +222,7 @@ impl Registration {
         self.type_instance_of
     }
 
-    pub(crate) fn with_trait_application(
+    pub fn with_trait_application(
         mut self,
         application: &'static TraitApplicationMetadata,
     ) -> Self {
@@ -165,10 +234,7 @@ impl Registration {
         &self.trait_applications
     }
 
-    pub(crate) fn with_impl_application(
-        mut self,
-        application: &'static ImplApplicationMetadata,
-    ) -> Self {
+    pub fn with_impl_application(mut self, application: &'static ImplApplicationMetadata) -> Self {
         self.impl_applications.push(application);
         self
     }
@@ -186,7 +252,7 @@ impl Registration {
         &self.construction_plans
     }
 
-    pub(crate) const fn type_record(&self) -> TypeRecord {
+    pub(crate) const fn type_record(&self) -> Option<TypeRecord> {
         self.type_record
     }
 
@@ -202,7 +268,7 @@ impl Registration {
             self.origin.file,
             self.origin.line,
             self.origin.column,
-            self.type_record.rust_name(),
+            self.type_record.map_or("metadata", TypeRecord::rust_name),
         )
     }
 }
@@ -227,11 +293,41 @@ impl RegistrationFragment {
     /// Creates a type fragment with a runtime controlled stable origin.
     pub const fn for_reflected_type<T: Reflect>(label: &'static str) -> Self {
         Self {
-            sort_key: ("generated", None, "generated", Some(label), None, None, label),
+            sort_key: (
+                "generated",
+                None,
+                "generated",
+                Some(label),
+                None,
+                None,
+                label,
+            ),
             target_type_id: Some(TypeId::of::<T>),
             dependencies: no_dependencies,
             includes_type: true,
             registration: Registration::of::<T>,
+        }
+    }
+
+    /// Creates a metadata-only fragment with a typed registration factory.
+    pub const fn for_global_registration(
+        label: &'static str,
+        registration: fn() -> Registration,
+    ) -> Self {
+        Self {
+            sort_key: (
+                "generated",
+                None,
+                "generated",
+                Some(label),
+                None,
+                None,
+                label,
+            ),
+            target_type_id: None,
+            dependencies: no_dependencies,
+            includes_type: false,
+            registration,
         }
     }
 
@@ -279,7 +375,9 @@ impl RegistrationFragment {
     pub(crate) fn materialize(self) -> Result<Registration, ContextError> {
         let registration = (self.registration)();
         if let Some(target) = self.target_type_id() {
-            if self.includes_type && registration.type_record().type_id() != target {
+            if self.includes_type
+                && registration.type_record().map(TypeRecord::type_id) != Some(target)
+            {
                 let name = format!("{target:?}");
                 return Err(
                     ContextError::from_issues(vec![ContextIssue::InvalidMetadata {

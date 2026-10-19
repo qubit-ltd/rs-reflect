@@ -45,6 +45,7 @@ impl<'ctx> TypeExpression<'ctx> {
             ExpressionData::Parameter(parameter) => TypeExpressionKind::Parameter(
                 GenericParameterDescriptor::new(parameter, self.context),
             ),
+            ExpressionData::ParameterName(name) => TypeExpressionKind::ParameterName(name),
             ExpressionData::SelfType => TypeExpressionKind::SelfType,
             ExpressionData::AssociatedType {
                 self_type,
@@ -52,10 +53,10 @@ impl<'ctx> TypeExpression<'ctx> {
                 name,
             } => TypeExpressionKind::AssociatedType(AssociatedTypeExpression {
                 self_type: Self::new(self_type, self.context),
-                trait_: TraitExpression {
-                    data: trait_,
+                trait_: trait_.map(|data| TraitExpression {
+                    data,
                     context: self.context,
-                },
+                }),
                 name,
             }),
             ExpressionData::Reference {
@@ -115,6 +116,7 @@ impl<'ctx> TypeExpression<'ctx> {
 pub(crate) enum TypeExpressionKind<'ctx> {
     Named(NamedTypeExpression<'ctx>),
     Parameter(GenericParameterDescriptor<'ctx>),
+    ParameterName(&'static str),
     SelfType,
     AssociatedType(AssociatedTypeExpression<'ctx>),
     Reference {
@@ -176,7 +178,7 @@ impl<'ctx> NamedTypeExpression<'ctx> {
 #[derive(Clone, Copy)]
 pub(crate) struct AssociatedTypeExpression<'ctx> {
     self_type: TypeExpression<'ctx>,
-    trait_: TraitExpression<'ctx>,
+    trait_: Option<TraitExpression<'ctx>>,
     name: &'static str,
 }
 
@@ -184,7 +186,7 @@ impl<'ctx> AssociatedTypeExpression<'ctx> {
     pub(crate) const fn self_type(self) -> TypeExpression<'ctx> {
         self.self_type
     }
-    pub(crate) const fn trait_(self) -> TraitExpression<'ctx> {
+    pub(crate) const fn trait_(self) -> Option<TraitExpression<'ctx>> {
         self.trait_
     }
     pub(crate) const fn name(self) -> &'static str {
@@ -213,6 +215,10 @@ impl<'ctx> TraitExpression<'ctx> {
 
     pub(crate) const fn path(self) -> &'static str {
         self.data.path
+    }
+
+    pub(crate) const fn lifetimes(self) -> &'static [LifetimeExpression] {
+        self.data.lifetimes
     }
     pub(crate) fn arguments(self) -> Box<[GenericExpressionArgumentView<'ctx>]> {
         self.data
@@ -385,17 +391,28 @@ impl fmt::Display for ExpressionDisplay<'_> {
                 Ok(())
             }
             ExpressionData::Parameter(parameter) => formatter.write_str(parameter.name),
+            ExpressionData::ParameterName(name) => formatter.write_str(name),
             ExpressionData::SelfType => formatter.write_str("Self"),
             ExpressionData::AssociatedType {
                 self_type,
                 trait_,
                 name,
-            } => write!(
-                formatter,
-                "<{} as {}>::{name}",
-                TypeExpression::new(self_type, self.expression.context).display(),
-                trait_.path
-            ),
+            } => {
+                if let Some(trait_) = trait_ {
+                    write!(
+                        formatter,
+                        "<{} as {}>::{name}",
+                        TypeExpression::new(self_type, self.expression.context).display(),
+                        trait_.path
+                    )
+                } else {
+                    write!(
+                        formatter,
+                        "{}::{name}",
+                        TypeExpression::new(self_type, self.expression.context).display()
+                    )
+                }
+            }
             ExpressionData::Reference {
                 lifetime,
                 mutable,

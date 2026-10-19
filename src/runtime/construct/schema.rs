@@ -1,9 +1,10 @@
+use crate::runtime::descriptor::{Reflect, field::Visibility};
 use crate::runtime::identity::TypeIdentity;
 use crate::runtime::value::{DynamicOwned, Local, ThreadSafe, ValueMode};
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ConstructionShape {
+pub enum ConstructionShape {
     Named,
     Positional,
     Unit,
@@ -24,7 +25,7 @@ impl ConstructVisibility {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ConstructionFieldPolicy {
+pub enum ConstructionFieldPolicy {
     /// The caller must supply this field.
     Required,
     /// The provider initializes this field when the caller omits it.
@@ -37,7 +38,7 @@ pub(crate) enum ConstructionFieldPolicy {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ConstructionUnavailableReason {
+pub enum ConstructionUnavailableReason {
     NoProvider,
     FieldNotReflectable,
     UnsupportedShape,
@@ -45,7 +46,7 @@ pub(crate) enum ConstructionUnavailableReason {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum UpdateFieldPolicy {
+pub enum UpdateFieldPolicy {
     /// The caller may replace this field.
     Replaceable,
     /// The existing value is preserved and cannot be replaced.
@@ -56,17 +57,44 @@ pub(crate) enum UpdateFieldPolicy {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum UpdateUnavailableReason {
+pub enum UpdateUnavailableReason {
     NoProvider,
     FieldNotReplaceable,
 }
 
-pub(crate) struct ConstructField {
+pub struct ConstructField {
     pub(crate) name: &'static str,
-    pub(crate) value: TypeIdentity,
+    pub(crate) value: fn() -> TypeIdentity,
     pub(crate) visibility: ConstructVisibility,
     pub(crate) policy: ConstructionFieldPolicy,
     pub(crate) update_policy: UpdateFieldPolicy,
+}
+
+impl ConstructField {
+    /// Creates field policy metadata bound to the field's Rust type.
+    pub const fn typed<T: 'static>(
+        name: &'static str,
+        visibility: Visibility,
+        policy: ConstructionFieldPolicy,
+        update_policy: UpdateFieldPolicy,
+    ) -> Self {
+        Self {
+            name,
+            value: type_identity::<T>,
+            visibility: match visibility {
+                Visibility::Public => ConstructVisibility::Public,
+                Visibility::Crate => ConstructVisibility::Crate,
+                Visibility::Restricted(path) => ConstructVisibility::Restricted(path),
+                Visibility::Private => ConstructVisibility::Private,
+            },
+            policy,
+            update_policy,
+        }
+    }
+
+    pub(crate) fn value_identity(&self) -> TypeIdentity {
+        (self.value)()
+    }
 }
 
 /// Type checked providers invoked only after all input validation succeeds.
@@ -82,17 +110,82 @@ pub(crate) trait ConstructProvider<M: ValueMode>: Sync {
     ) -> DynamicOwned<M>;
 }
 
-pub(crate) struct ConstructionProviders {
+pub struct TypedConstructProvider<T: 'static, M: ValueMode> {
+    construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
+    update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
+    _type: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T: 'static, M: ValueMode> TypedConstructProvider<T, M> {
+    /// Creates typed construction and update callbacks for one concrete target type.
+    pub const fn new(
+        construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
+        update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
+    ) -> Self {
+        Self {
+            construct,
+            update,
+            _type: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T, M> ConstructProvider<M> for TypedConstructProvider<T, M>
+where
+    T: crate::runtime::value::ValueFor<M>,
+    M: ValueMode,
+{
+    fn construct(&self, fields: Vec<Option<DynamicOwned<M>>>) -> DynamicOwned<M> {
+        DynamicOwned::new((self.construct)(fields))
+    }
+
+    fn update(
+        &self,
+        base: DynamicOwned<M>,
+        replacements: Vec<Option<DynamicOwned<M>>>,
+    ) -> DynamicOwned<M> {
+        let base = match base.downcast::<T>() {
+            Ok(value) => value,
+            Err(_) => panic!("validated update base must match its typed provider"),
+        };
+        DynamicOwned::new((self.update)(base, replacements))
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct ConstructionProviders {
     local: Option<&'static dyn ConstructProvider<Local>>,
     thread_safe: Option<&'static dyn ConstructProvider<ThreadSafe>>,
 }
 
 impl ConstructionProviders {
-    pub(crate) const fn new(
+    pub(crate) const fn from_runtime_providers(
         local: Option<&'static dyn ConstructProvider<Local>>,
         thread_safe: Option<&'static dyn ConstructProvider<ThreadSafe>>,
     ) -> Self {
         Self { local, thread_safe }
+    }
+
+    /// Creates providers with the local mode, which works for all reflected values.
+    pub const fn new<T: crate::runtime::value::ValueFor<Local>>(
+        local: Option<&'static TypedConstructProvider<T, Local>>,
+    ) -> Self {
+        Self {
+            local: match local {
+                Some(provider) => Some(provider),
+                None => None,
+            },
+            thread_safe: None,
+        }
+    }
+
+    /// Adds a thread-safe provider when the target and its fields are `Send + Sync`.
+    pub const fn with_thread_safe<T: crate::runtime::value::ValueFor<ThreadSafe>>(
+        mut self,
+        provider: &'static TypedConstructProvider<T, ThreadSafe>,
+    ) -> Self {
+        self.thread_safe = Some(provider);
+        self
     }
 
     pub(crate) fn for_mode<M: ConstructionMode>(&self) -> Option<&dyn ConstructProvider<M>> {
@@ -121,7 +214,7 @@ impl ConstructionMode for ThreadSafe {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum ConstructionAvailability {
+pub enum ConstructionAvailability {
     Available,
     Unavailable {
         reasons: Box<[ConstructionUnavailableReason]>,
@@ -129,9 +222,15 @@ pub(crate) enum ConstructionAvailability {
 }
 
 pub(crate) struct ConstructionTarget {
-    pub(crate) identity: TypeIdentity,
+    identity: fn() -> TypeIdentity,
     pub(crate) kind: ConstructionTargetKind,
     pub(crate) variant_index: Option<usize>,
+}
+
+impl ConstructionTarget {
+    pub(crate) fn identity(&self) -> TypeIdentity {
+        (self.identity)()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -141,7 +240,7 @@ pub(crate) enum ConstructionTargetKind {
     Unsupported,
 }
 
-pub(crate) struct ConstructionPlan {
+pub struct ConstructionPlan {
     pub(crate) target: ConstructionTarget,
     pub(crate) shape: ConstructionShape,
     pub(crate) fields: &'static [ConstructField],
@@ -150,6 +249,47 @@ pub(crate) struct ConstructionPlan {
 }
 
 impl ConstructionPlan {
+    /// Creates a plan for a concrete struct target.
+    pub const fn for_type<T: Reflect>(
+        shape: ConstructionShape,
+        fields: &'static [ConstructField],
+        provider: ConstructionProviders,
+        availability: ConstructionAvailability,
+    ) -> Self {
+        Self::new(
+            ConstructionTarget {
+                identity: type_identity::<T>,
+                kind: ConstructionTargetKind::Struct,
+                variant_index: None,
+            },
+            shape,
+            fields,
+            provider,
+            availability,
+        )
+    }
+
+    /// Creates a plan for one enum variant of a concrete owner type.
+    pub const fn for_variant<T: Reflect>(
+        variant_index: usize,
+        shape: ConstructionShape,
+        fields: &'static [ConstructField],
+        provider: ConstructionProviders,
+        availability: ConstructionAvailability,
+    ) -> Self {
+        Self::new(
+            ConstructionTarget {
+                identity: type_identity::<T>,
+                kind: ConstructionTargetKind::Variant,
+                variant_index: Some(variant_index),
+            },
+            shape,
+            fields,
+            provider,
+            availability,
+        )
+    }
+
     pub(crate) const fn new(
         target: ConstructionTarget,
         shape: ConstructionShape,
@@ -204,6 +344,13 @@ impl ConstructionPlan {
     }
 }
 
+fn type_identity<T: 'static>() -> TypeIdentity {
+    TypeIdentity {
+        type_id: std::any::TypeId::of::<T>(),
+        rust_name: std::any::type_name::<T>(),
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct ConstructionDescriptor<'ctx> {
     pub(crate) plan: &'ctx ConstructionPlan,
@@ -215,7 +362,7 @@ pub(crate) fn resolve_plan<'a>(
 ) -> Result<&'a ConstructionPlan, ConstructionError> {
     let mut matching = plans.iter().filter(|plan| {
         plan.target.kind == ConstructionTargetKind::Struct
-            && plan.target.identity.type_id == target.type_id
+            && plan.target.identity().type_id == target.type_id
     });
     let Some(plan) = matching.next() else {
         return Err(ConstructionError::MissingProvider);
@@ -225,7 +372,7 @@ pub(crate) fn resolve_plan<'a>(
             .iter()
             .filter(|plan| {
                 plan.target.kind == ConstructionTargetKind::Struct
-                    && plan.target.identity.type_id == target.type_id
+                    && plan.target.identity().type_id == target.type_id
             })
             .count();
         return Err(ConstructionError::AmbiguousProvider { target, count });
@@ -240,7 +387,7 @@ pub(crate) fn resolve_variant_plan<'a>(
 ) -> Result<&'a ConstructionPlan, ConstructionError> {
     let mut matching = plans.iter().filter(|plan| {
         plan.target.kind == ConstructionTargetKind::Variant
-            && plan.target.identity.type_id == owner.type_id
+            && plan.target.identity().type_id == owner.type_id
             && plan.target.variant_index == Some(variant_index)
     });
     let Some(plan) = matching.next() else {
@@ -251,7 +398,7 @@ pub(crate) fn resolve_variant_plan<'a>(
             .iter()
             .filter(|plan| {
                 plan.target.kind == ConstructionTargetKind::Variant
-                    && plan.target.identity.type_id == owner.type_id
+                    && plan.target.identity().type_id == owner.type_id
                     && plan.target.variant_index == Some(variant_index)
             })
             .count();

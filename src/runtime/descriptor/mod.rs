@@ -11,6 +11,10 @@ pub(crate) mod type_kind;
 pub(crate) mod variant;
 
 pub(crate) use field::{FieldAccessError, FieldDescriptor, FieldSetError};
+pub use generic::{
+    GenericArgumentMetadata, GenericDefinitionMetadata, GenericParameterMetadata,
+    GenericParameterMetadataKind, StructKind, TypeDefinitionKind, TypeDefinitionMetadata,
+};
 pub(crate) use method::{MethodCatalog, MethodCatalogRegistration, MethodDescriptor};
 pub(crate) use reflect::{Reflect, TypeRegistration};
 pub(crate) use type_descriptor::TypeDescriptor;
