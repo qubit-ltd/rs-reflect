@@ -13,8 +13,8 @@ pub(crate) use recovery::{
 };
 pub use schema::{
     ConstructField, ConstructionAvailability, ConstructionFieldPolicy, ConstructionPlan,
-    ConstructionProviders, ConstructionShape, ConstructionUnavailableReason,
-    TypedConstructProvider, UpdateFieldPolicy, UpdateUnavailableReason,
+    ConstructionProviders, ConstructionShape, ConstructionUnavailableReason, UpdateFieldPolicy,
+    UpdateUnavailableReason,
 };
 pub(crate) use schema::{
     ConstructProvider, ConstructVisibility, ConstructionDescriptor, ConstructionError,

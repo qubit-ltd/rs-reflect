@@ -110,48 +110,6 @@ pub(crate) trait ConstructProvider<M: ValueMode>: Sync {
     ) -> DynamicOwned<M>;
 }
 
-pub struct TypedConstructProvider<T: 'static, M: ValueMode> {
-    construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
-    update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
-    _type: std::marker::PhantomData<fn() -> T>,
-}
-
-impl<T: 'static, M: ValueMode> TypedConstructProvider<T, M> {
-    /// Creates typed construction and update callbacks for one concrete target type.
-    pub const fn new(
-        construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
-        update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
-    ) -> Self {
-        Self {
-            construct,
-            update,
-            _type: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<T, M> ConstructProvider<M> for TypedConstructProvider<T, M>
-where
-    T: crate::runtime::value::ValueFor<M>,
-    M: ValueMode,
-{
-    fn construct(&self, fields: Vec<Option<DynamicOwned<M>>>) -> DynamicOwned<M> {
-        DynamicOwned::new((self.construct)(fields))
-    }
-
-    fn update(
-        &self,
-        base: DynamicOwned<M>,
-        replacements: Vec<Option<DynamicOwned<M>>>,
-    ) -> DynamicOwned<M> {
-        let base = match base.downcast::<T>() {
-            Ok(value) => value,
-            Err(_) => panic!("validated update base must match its typed provider"),
-        };
-        DynamicOwned::new((self.update)(base, replacements))
-    }
-}
-
 #[derive(Clone, Copy)]
 pub struct ConstructionProviders {
     local: Option<&'static dyn ConstructProvider<Local>>,
@@ -166,23 +124,9 @@ impl ConstructionProviders {
         Self { local, thread_safe }
     }
 
-    /// Creates providers with the local mode, which works for all reflected values.
-    pub const fn new<T: crate::runtime::value::ValueFor<Local>>(
-        local: Option<&'static TypedConstructProvider<T, Local>>,
-    ) -> Self {
-        Self {
-            local: match local {
-                Some(provider) => Some(provider),
-                None => None,
-            },
-            thread_safe: None,
-        }
-    }
-
-    /// Adds a thread-safe provider when the target and its fields are `Send + Sync`.
-    pub const fn with_thread_safe<T: crate::runtime::value::ValueFor<ThreadSafe>>(
+    pub(crate) const fn with_runtime_thread_safe(
         mut self,
-        provider: &'static TypedConstructProvider<T, ThreadSafe>,
+        provider: &'static dyn ConstructProvider<ThreadSafe>,
     ) -> Self {
         self.thread_safe = Some(provider);
         self

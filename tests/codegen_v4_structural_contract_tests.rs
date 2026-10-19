@@ -14,7 +14,7 @@ use expression::{
     TypeDefinitionMetadata,
 };
 use qubit_reflect::__private::codegen_v4::descriptor::{Reflect, TypeRegistration};
-use qubit_reflect::__private::codegen_v4::value::{DynamicOwned, Local};
+use qubit_reflect::__private::codegen_v4::value::{DynamicOwned, Local, ThreadSafe};
 
 struct Record {
     value: u8,
@@ -175,6 +175,30 @@ fn update_record(mut record: Record, replacements: Vec<Option<DynamicOwned<Local
     record
 }
 
+fn construct_record_thread_safe(fields: Vec<Option<DynamicOwned<ThreadSafe>>>) -> Record {
+    let [Some(value)] = fields.as_slice() else {
+        panic!("the validated construction input has one field");
+    };
+    Record {
+        value: *value
+            .downcast_ref::<u8>()
+            .expect("the runtime validates construction field types"),
+    }
+}
+
+fn update_record_thread_safe(
+    mut record: Record,
+    replacements: Vec<Option<DynamicOwned<ThreadSafe>>>,
+) -> Record {
+    let [Some(value)] = replacements.as_slice() else {
+        return record;
+    };
+    record.value = *value
+        .downcast_ref::<u8>()
+        .expect("the runtime validates replacement field types");
+    record
+}
+
 #[test]
 fn test_codegen_v4_exposes_typed_structural_metadata_constructors() {
     static VALUE_EXPRESSION: ExpressionData = ExpressionData::Named {
@@ -249,6 +273,28 @@ fn test_codegen_v4_exposes_typed_construction_provider_and_plan() {
     static PROVIDER: ConstructProvider<Record, Local> =
         ConstructProvider::new(construct_record, update_record);
     static PROVIDERS: ConstructionProviders = ConstructionProviders::new::<Record>(Some(&PROVIDER));
+    static FIELDS: [ConstructField; 1] = [ConstructField::typed::<u8>(
+        "value",
+        Visibility::Public,
+        ConstructionFieldPolicy::Required,
+        UpdateFieldPolicy::Replaceable,
+    )];
+    static PLAN: ConstructionPlan = ConstructionPlan::for_type::<Record>(
+        ConstructionShape::Named,
+        &FIELDS,
+        PROVIDERS,
+        ConstructionAvailability::Available,
+    );
+
+    let _ = PLAN;
+}
+
+#[test]
+fn test_codegen_v4_exposes_thread_safe_construction_provider() {
+    static PROVIDER: ConstructProvider<Record, ThreadSafe> =
+        ConstructProvider::new(construct_record_thread_safe, update_record_thread_safe);
+    static PROVIDERS: ConstructionProviders =
+        ConstructionProviders::new::<Record>(None).with_thread_safe::<Record>(&PROVIDER);
     static FIELDS: [ConstructField; 1] = [ConstructField::typed::<u8>(
         "value",
         Visibility::Public,
