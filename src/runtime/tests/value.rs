@@ -20,13 +20,6 @@ impl Reflect for Dropped {
     }
 }
 
-impl Reflect for String {
-    fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        static REGISTRATION: TypeRegistration<String> = TypeRegistration::new();
-        &REGISTRATION
-    }
-}
-
 impl Reflect for u64 {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         static REGISTRATION: TypeRegistration<u64> = TypeRegistration::new();

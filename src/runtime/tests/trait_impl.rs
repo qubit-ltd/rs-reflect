@@ -212,7 +212,6 @@ static TRAIT_DEFINITION: TraitDefinitionMetadata = TraitDefinitionMetadata {
     methods: TRAIT_METHODS,
     associated_types: ASSOCIATED_TYPES,
     associated_consts: ASSOCIATED_CONSTS,
-    applications: trait_applications,
 };
 static STRING_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
     definition: &TRAIT_DEFINITION,
@@ -232,12 +231,6 @@ static U64_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
     supertrait_completeness:
         crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
 };
-fn trait_applications(
-    _: &ReflectionContext,
-) -> Result<Box<[&'static TraitApplicationMetadata]>, crate::runtime::error::ContextError> {
-    Ok(vec![&STRING_TRAIT, &U64_TRAIT].into_boxed_slice())
-}
-
 fn dynamic_answer_local() -> DynamicOwned<Local> {
     DynamicOwned::new(Answer(42))
 }
@@ -285,7 +278,6 @@ static STRING_IMPL_DEF: ImplDefinitionMetadata = ImplDefinitionMetadata {
     methods: EMPTY_METHODS,
     associated_types: ASSOCIATED_TYPES,
     associated_consts: ASSOCIATED_CONSTS,
-    instances: string_impls,
 };
 static U64_IMPL_DEF: ImplDefinitionMetadata = ImplDefinitionMetadata {
     id: ImplDefinitionId::of::<U64ImplMarker>(),
@@ -297,7 +289,6 @@ static U64_IMPL_DEF: ImplDefinitionMetadata = ImplDefinitionMetadata {
     methods: EMPTY_METHODS,
     associated_types: NO_ASSOCIATED_TYPES,
     associated_consts: NO_ASSOCIATED_CONSTS,
-    instances: u64_impls,
 };
 static STRING_IMPL: ImplApplicationMetadata = ImplApplicationMetadata {
     definition: &STRING_IMPL_DEF,
@@ -319,19 +310,20 @@ static U64_IMPL: ImplApplicationMetadata = ImplApplicationMetadata {
     associated_types: U64_TYPES,
     associated_consts: U64_CONSTS,
 };
-fn string_impls(
-    _: &ReflectionContext,
-) -> Result<Box<[&'static ImplApplicationMetadata]>, crate::runtime::error::ContextError> {
-    Ok(vec![&STRING_IMPL].into_boxed_slice())
-}
-fn u64_impls(
-    _: &ReflectionContext,
-) -> Result<Box<[&'static ImplApplicationMetadata]>, crate::runtime::error::ContextError> {
-    Ok(vec![&U64_IMPL].into_boxed_slice())
-}
-
 fn make_context() -> ReflectionContext {
-    ReflectionContext::empty()
+    crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
+        .register(
+            crate::runtime::context::handle::registration::Registration::of::<CustomerId>()
+                .with_trait_definition(&TRAIT_DEFINITION)
+                .with_trait_application(&STRING_TRAIT)
+                .with_trait_application(&U64_TRAIT)
+                .with_impl_definition(&STRING_IMPL_DEF)
+                .with_impl_definition(&U64_IMPL_DEF)
+                .with_impl_application(&STRING_IMPL)
+                .with_impl_application(&U64_IMPL),
+        )
+        .build()
+        .expect("fixture context builds")
 }
 
 #[test]

@@ -21,6 +21,18 @@ impl TypeMismatch {
     }
 }
 
+impl std::fmt::Display for TypeMismatch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "type mismatch: expected {:?}, got {:?}",
+            self.expected, self.actual
+        )
+    }
+}
+
+impl std::error::Error for TypeMismatch {}
+
 #[must_use]
 pub(crate) struct DowncastFailure<V> {
     mismatch: TypeMismatch,

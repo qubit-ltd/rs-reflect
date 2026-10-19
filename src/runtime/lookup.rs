@@ -10,9 +10,15 @@ pub enum Lookup<T> {
 }
 
 impl<T> Lookup<T> {
-    pub fn is_missing(&self) -> bool { matches!(self, Self::Missing) }
-    pub fn is_unique(&self) -> bool { matches!(self, Self::Unique(_)) }
-    pub fn is_ambiguous(&self) -> bool { matches!(self, Self::Ambiguous(_)) }
+    pub fn is_missing(&self) -> bool {
+        matches!(self, Self::Missing)
+    }
+    pub fn is_unique(&self) -> bool {
+        matches!(self, Self::Unique(_))
+    }
+    pub fn is_ambiguous(&self) -> bool {
+        matches!(self, Self::Ambiguous(_))
+    }
 
     pub fn len(&self) -> usize {
         match self {
@@ -22,7 +28,9 @@ impl<T> Lookup<T> {
         }
     }
 
-    pub fn is_empty(&self) -> bool { self.is_missing() }
+    pub fn is_empty(&self) -> bool {
+        self.is_missing()
+    }
 
     pub fn candidates(&self) -> &[T] {
         match self {

@@ -12,10 +12,10 @@ use super::capability_target::CapabilityTargetId;
 
 /// A validated registration carrying an adapter under its declared contract.
 pub(crate) struct CapabilityRegistration {
-    pub(super) target: CapabilityTargetId,
-    pub(super) id: crate::identity::CapabilityId,
-    pub(super) adapter: Box<dyn Any + Send + Sync>,
-    pub(super) origin: CapabilityOrigin,
+    pub(crate) target: CapabilityTargetId,
+    pub(crate) id: crate::identity::CapabilityId,
+    pub(crate) adapter: Box<dyn Any + Send + Sync>,
+    pub(crate) origin: CapabilityOrigin,
 }
 
 impl CapabilityRegistration {

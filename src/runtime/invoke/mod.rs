@@ -1,6 +1,6 @@
 //! Safe invocation inputs, preflight validation, outputs, and recovery.
 
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -74,6 +74,9 @@ pub(crate) trait InvocationAdapter<M: ValueMode>: Sync {
 
 /// Adapter for a method whose receiver is pinned.
 pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
+    fn receiver_type_id(&self) -> TypeId;
+    fn receiver_kind(&self) -> ReceiverKind;
+
     fn invoke<'call>(
         &self,
         receiver: PinnedReceiver<'call>,
@@ -81,52 +84,109 @@ pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
     ) -> InvocationOutput<'call, M>;
 }
 
-/// A pinned receiver erased for a generated pinned adapter.
-pub(crate) enum PinnedReceiver<'call> {
-    Shared(Pin<&'call dyn Any>),
-    Mutable(Pin<&'call mut dyn Any>),
+trait ErasedPinnedReceiver {
+    fn type_id(&self) -> TypeId;
+    fn holder_ptr(&mut self) -> *mut ();
+    fn is_mutable(&self) -> bool;
+}
+
+struct PinnedSharedHolder<'call, T: ?Sized + 'static> {
+    receiver: Pin<&'call T>,
+}
+
+impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedSharedHolder<'_, T> {
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+    fn holder_ptr(&mut self) -> *mut () {
+        self as *mut Self as *mut ()
+    }
+    fn is_mutable(&self) -> bool {
+        false
+    }
+}
+
+struct PinnedMutableHolder<'call, T: ?Sized + 'static> {
+    receiver: Option<Pin<&'call mut T>>,
+}
+
+impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedMutableHolder<'_, T> {
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+    fn holder_ptr(&mut self) -> *mut () {
+        self as *mut Self as *mut ()
+    }
+    fn is_mutable(&self) -> bool {
+        true
+    }
+}
+
+/// A pinned receiver erased for a generated typed adapter. The holder retains
+/// the typed Pin, including any DST metadata, until the adapter downcasts it.
+pub(crate) struct PinnedReceiver<'call> {
+    inner: PinnedReceiverKind<'call>,
+}
+
+enum PinnedReceiverKind<'call> {
+    Shared(Box<dyn ErasedPinnedReceiver + 'call>),
+    Mutable(Box<dyn ErasedPinnedReceiver + 'call>),
 }
 
 impl<'call> PinnedReceiver<'call> {
     pub(crate) fn type_id(&self) -> TypeId {
-        match self {
-            Self::Shared(receiver) => Any::type_id(receiver.get_ref()),
-            Self::Mutable(receiver) => Any::type_id(receiver.as_ref().get_ref()),
+        match &self.inner {
+            PinnedReceiverKind::Shared(holder) | PinnedReceiverKind::Mutable(holder) => {
+                ErasedPinnedReceiver::type_id(holder.as_ref())
+            }
         }
     }
+    pub(crate) fn is_mutable(&self) -> bool {
+        matches!(self.inner, PinnedReceiverKind::Mutable(_))
+    }
+
     #[allow(unsafe_code)]
-    pub(crate) fn downcast_ref<T: Any>(self) -> Option<Pin<&'call T>> {
-        match self {
-            Self::Shared(receiver) if receiver.get_ref().is::<T>() => {
-                // SAFETY: `Any::is` checks that the projection names this exact pinned value.
-                Some(unsafe {
-                    Pin::map_unchecked(receiver, |value: &dyn Any| {
-                        value.downcast_ref::<T>().expect("checked type")
-                    })
-                })
+    pub(crate) fn downcast_ref<T: ?Sized + 'static>(self) -> Option<Pin<&'call T>> {
+        match self.inner {
+            PinnedReceiverKind::Shared(mut holder)
+                if ErasedPinnedReceiver::type_id(holder.as_ref()) == TypeId::of::<T>() =>
+            {
+                // SAFETY: `ErasedPinnedReceiver` is private and only the two holder
+                // structs in this module implement it. This receiver's exact TypeId
+                // matches T, so the holder pointer has `PinnedSharedHolder<T>` layout;
+                // its typed Pin field retains any DST metadata.
+                let holder =
+                    unsafe { &*(holder.holder_ptr() as *const PinnedSharedHolder<'call, T>) };
+                Some(holder.receiver)
             }
-            Self::Mutable(receiver) if receiver.as_ref().get_ref().is::<T>() => {
-                let receiver = Pin::into_ref(receiver);
-                // SAFETY: `Any::is` checks that the projection names this exact pinned value.
-                Some(unsafe {
-                    Pin::map_unchecked(receiver, |value| {
-                        value.downcast_ref::<T>().expect("checked type")
-                    })
-                })
+            PinnedReceiverKind::Mutable(mut holder)
+                if ErasedPinnedReceiver::type_id(holder.as_ref()) == TypeId::of::<T>() =>
+            {
+                // SAFETY: `ErasedPinnedReceiver` is private and only the two holder
+                // structs in this module implement it. This receiver's exact TypeId
+                // matches T, so the holder pointer has `PinnedMutableHolder<T>` layout;
+                // its typed Pin field retains any DST metadata.
+                let holder =
+                    unsafe { &mut *(holder.holder_ptr() as *mut PinnedMutableHolder<'call, T>) };
+                holder.receiver.take().map(Pin::into_ref)
             }
             _ => None,
         }
     }
+
     #[allow(unsafe_code)]
-    pub(crate) fn downcast_mut<T: Any>(self) -> Option<Pin<&'call mut T>> {
-        match self {
-            Self::Mutable(receiver) if receiver.as_ref().get_ref().is::<T>() => {
-                // SAFETY: the checked mutable projection stays at the pinned value's address.
-                Some(unsafe {
-                    Pin::map_unchecked_mut(receiver, |value| {
-                        value.downcast_mut::<T>().expect("checked type")
-                    })
-                })
+    pub(crate) fn downcast_mut<T: ?Sized + 'static>(self) -> Option<Pin<&'call mut T>> {
+        match self.inner {
+            PinnedReceiverKind::Mutable(mut holder)
+                if ErasedPinnedReceiver::type_id(holder.as_ref()) == TypeId::of::<T>() =>
+            {
+                // SAFETY: `ErasedPinnedReceiver` is private and only the two holder
+                // structs in this module implement it. This receiver's exact TypeId
+                // matches T, so the holder pointer has `PinnedMutableHolder<T>` layout;
+                // its typed Pin field retains any DST metadata.
+                let holder =
+                    unsafe { &mut *(holder.holder_ptr() as *mut PinnedMutableHolder<'call, T>) };
+                holder.receiver.take()
             }
             _ => None,
         }
@@ -326,7 +386,7 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
 }
 
 /// A typed pinned receiver and its caller-ordered arguments.
-pub(crate) enum PinnedInvocation<'call, T: Any, M: ValueMode = Local> {
+pub(crate) enum PinnedInvocation<'call, M: ValueMode, T: ?Sized + 'static> {
     Shared {
         receiver: Pin<&'call T>,
         arguments: Invocation<'call, M>,
@@ -337,7 +397,7 @@ pub(crate) enum PinnedInvocation<'call, T: Any, M: ValueMode = Local> {
     },
 }
 
-impl<'call, T: Any, M: ValueMode> PinnedInvocation<'call, T, M> {
+impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
     pub(crate) fn shared(receiver: Pin<&'call T>) -> Self {
         Self::Shared {
             receiver,
@@ -419,33 +479,32 @@ impl<'call, T: Any, M: ValueMode> PinnedInvocation<'call, T, M> {
             Self::Shared { arguments, .. } | Self::Mutable { arguments, .. } => arguments,
         }
     }
-    fn pinned_kind_and_type(&self) -> (ReceiverKind, TypeId) {
+    pub(crate) fn pinned_kind_and_type(&self) -> (ReceiverKind, TypeId) {
         match self {
             Self::Shared { .. } => (ReceiverKind::PinnedShared, TypeId::of::<T>()),
             Self::Mutable { .. } => (ReceiverKind::PinnedMutable, TypeId::of::<T>()),
         }
     }
-    #[allow(unsafe_code)]
-    fn into_parts(self) -> (PinnedReceiver<'call>, Invocation<'call, M>) {
+    pub(crate) fn into_parts(self) -> (PinnedReceiver<'call>, Invocation<'call, M>) {
         match self {
             Self::Shared {
                 receiver,
                 arguments,
             } => (
-                // SAFETY: this is only an unsized view of the same pinned allocation.
-                PinnedReceiver::Shared(unsafe {
-                    Pin::map_unchecked(receiver, |value| value as &dyn Any)
-                }),
+                PinnedReceiver {
+                    inner: PinnedReceiverKind::Shared(Box::new(PinnedSharedHolder { receiver })),
+                },
                 arguments,
             ),
             Self::Mutable {
                 receiver,
                 arguments,
             } => (
-                // SAFETY: this is only an unsized view of the same pinned allocation.
-                PinnedReceiver::Mutable(unsafe {
-                    Pin::map_unchecked_mut(receiver, |value| value as &mut dyn Any)
-                }),
+                PinnedReceiver {
+                    inner: PinnedReceiverKind::Mutable(Box::new(PinnedMutableHolder {
+                        receiver: Some(receiver),
+                    })),
+                },
                 arguments,
             ),
         }
@@ -453,7 +512,7 @@ impl<'call, T: Any, M: ValueMode> PinnedInvocation<'call, T, M> {
     pub(crate) fn validate(
         self,
         method: MethodDescriptor<'_>,
-    ) -> Result<ValidatedPinnedInvocation<'call, T, M>, PinnedInvocationFailure<'call, T, M>> {
+    ) -> Result<ValidatedPinnedInvocation<'call, M, T>, PinnedInvocationFailure<'call, M, T>> {
         let (kind, type_id) = self.pinned_kind_and_type();
         let order = match validate_bindings(self.arguments(), method, Some((kind, type_id))) {
             Ok(order) => order,
@@ -471,12 +530,12 @@ impl<'call, T: Any, M: ValueMode> PinnedInvocation<'call, T, M> {
     }
 }
 
-pub(crate) struct ValidatedPinnedInvocation<'call, T: Any, M: ValueMode> {
-    invocation: PinnedInvocation<'call, T, M>,
+pub(crate) struct ValidatedPinnedInvocation<'call, M: ValueMode, T: ?Sized + 'static> {
+    invocation: PinnedInvocation<'call, M, T>,
     order: Vec<(usize, usize)>,
 }
 
-impl<'call, T: Any, M: ValueMode> ValidatedPinnedInvocation<'call, T, M> {
+impl<'call, M: ValueMode, T: ?Sized + 'static> ValidatedPinnedInvocation<'call, M, T> {
     pub(crate) fn into_parts(self) -> (PinnedReceiver<'call>, ValidatedInvocation<'call, M>) {
         let (receiver, invocation) = self.invocation.into_parts();
         (
@@ -487,25 +546,25 @@ impl<'call, T: Any, M: ValueMode> ValidatedPinnedInvocation<'call, T, M> {
             },
         )
     }
-    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, T, M> {
+    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, M, T> {
         self.invocation
     }
 }
 
 /// A failed pinned invocation with the original Pin and all arguments retained.
-pub(crate) struct PinnedInvocationFailure<'call, T: Any, M: ValueMode = Local> {
+pub(crate) struct PinnedInvocationFailure<'call, M: ValueMode, T: ?Sized + 'static> {
     error: InvocationError,
-    invocation: PinnedInvocation<'call, T, M>,
+    invocation: PinnedInvocation<'call, M, T>,
 }
 
-impl<'call, T: Any, M: ValueMode> PinnedInvocationFailure<'call, T, M> {
-    pub(crate) fn new(error: InvocationError, invocation: PinnedInvocation<'call, T, M>) -> Self {
+impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocationFailure<'call, M, T> {
+    pub(crate) fn new(error: InvocationError, invocation: PinnedInvocation<'call, M, T>) -> Self {
         Self { error, invocation }
     }
     pub(crate) const fn error(&self) -> &InvocationError {
         &self.error
     }
-    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, T, M> {
+    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, M, T> {
         self.invocation
     }
 }
@@ -827,6 +886,14 @@ impl InvocationError {
         &self.kind
     }
 }
+
+impl std::fmt::Display for InvocationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:?}", self.kind)
+    }
+}
+
+impl std::error::Error for InvocationError {}
 
 /// A precise reason that invocation could not begin.
 #[derive(Clone, Debug, Eq, PartialEq)]

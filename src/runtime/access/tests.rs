@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use crate::runtime::access::{DynamicOnlyFieldAdapter, FieldAdapter, TypedFieldAdapter};
 use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::collections::TypeShapeRegistration;
@@ -31,20 +33,6 @@ struct Record {
 impl Reflect for Record {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         static REGISTRATION: TypeRegistration<Record> = TypeRegistration::new();
-        &REGISTRATION
-    }
-}
-
-impl Reflect for u32 {
-    fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        static REGISTRATION: TypeRegistration<u32> = TypeRegistration::new();
-        &REGISTRATION
-    }
-}
-
-impl Reflect for String {
-    fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        static REGISTRATION: TypeRegistration<String> = TypeRegistration::new();
         &REGISTRATION
     }
 }
@@ -344,9 +332,13 @@ fn inaccessible_field_is_described_but_not_read() {
 
 #[test]
 fn descriptor_collections_preserve_order_and_strict_lookup_errors() {
-    let context = ReflectionContext::empty();
+    let context = ReflectionContext::builder()
+        .include_type::<Record>()
+        .include_type::<Choice>()
+        .build()
+        .expect("context includes descriptor shape registrations");
     let record = TypeDescriptor::of_in::<Record>(&context);
-    let fields = record.fields();
+    let fields = record.fields().expect("context is valid");
     assert_eq!(fields.len(), 1);
     assert_eq!(fields.iter().len(), 1);
     assert_eq!(fields.get_at(0).map(FieldDescriptor::name), Some("id"));
@@ -354,10 +346,10 @@ fn descriptor_collections_preserve_order_and_strict_lookup_errors() {
     assert!(fields.get("missing").is_none());
     assert_eq!(record.field("id").expect("strict field").name(), "id");
     assert!(record.field("missing").is_err());
-    assert!(record.variants().is_empty());
+    assert!(record.variants().expect("context is valid").is_empty());
 
     let choice = TypeDescriptor::of_in::<Choice>(&context);
-    let variants = choice.variants();
+    let variants = choice.variants().expect("context is valid");
     assert_eq!(variants.len(), 2);
     assert_eq!(variants.iter().len(), 2);
     assert_eq!(
@@ -375,7 +367,7 @@ fn descriptor_collections_preserve_order_and_strict_lookup_errors() {
         "Count"
     );
     assert!(choice.variant("missing").is_err());
-    assert!(choice.fields().is_empty());
+    assert!(choice.fields().expect("context is valid").is_empty());
 }
 
 #[test]

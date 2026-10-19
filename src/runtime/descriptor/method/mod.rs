@@ -15,6 +15,7 @@ use crate::runtime::invoke::{
     PinnedInvocation, PinnedInvocationAdapter, PinnedInvocationFailure, ThreadSafe, ValueMode,
 };
 use crate::runtime::lookup::Lookup;
+use std::any::TypeId;
 
 pub(crate) use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
 pub(crate) use crate::runtime::descriptor::metadata::TypeMetadata;
@@ -482,10 +483,10 @@ impl<'ctx> MethodDescriptor<'ctx> {
         }
     }
 
-    pub(crate) fn invoke_pinned<'call, T: std::any::Any, M: ValueMode + ModeAdapter>(
+    pub(crate) fn invoke_pinned<'call, T: ?Sized + 'static, M: ValueMode + ModeAdapter>(
         self,
-        invocation: PinnedInvocation<'call, T, M>,
-    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, T, M>> {
+        invocation: PinnedInvocation<'call, M, T>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
         let specialization = match self.effective.specializations {
             [specialization] => specialization,
             [] if !self.effective.metadata.is_generic => {
@@ -533,12 +534,13 @@ impl<'ctx> MethodDescriptor<'ctx> {
         )
     }
 
-    fn invoke_pinned_with<'call, T: std::any::Any, M: ValueMode + ModeAdapter>(
+    fn invoke_pinned_with<'call, T: ?Sized + 'static, M: ValueMode + ModeAdapter>(
         self,
         availability: InvocationAvailability,
         adapters: &InvocationAdapters,
-        invocation: PinnedInvocation<'call, T, M>,
-    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, T, M>> {
+        invocation: PinnedInvocation<'call, M, T>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
+        let expected_kind = invocation.pinned_kind_and_type().0;
         if self.visibility() != MethodVisibility::Public {
             return Err(PinnedInvocationFailure::new(
                 InvocationError::new(InvocationErrorKind::VisibilityDenied),
@@ -567,6 +569,14 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 validated.into_invocation(),
             ));
         };
+        if adapter.receiver_type_id() != TypeId::of::<T>()
+            || adapter.receiver_kind() != expected_kind
+        {
+            return Err(PinnedInvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::ReceiverAdapterUnavailable),
+                validated.into_invocation(),
+            ));
+        }
         let (receiver, invocation) = validated.into_parts();
         Ok(adapter.invoke(receiver, invocation))
     }
@@ -713,6 +723,31 @@ pub(crate) struct MethodCatalog<'ctx> {
     target: TypeDescriptor<'ctx>,
     methods: &'ctx [EffectiveMethod],
 }
+
+/// Static source metadata for a target's effective method catalog.
+pub(crate) struct MethodCatalogRegistration {
+    type_id: fn() -> TypeId,
+    methods: &'static [EffectiveMethod],
+}
+
+impl MethodCatalogRegistration {
+    pub(crate) const fn new<T: 'static>(methods: &'static [EffectiveMethod]) -> Self {
+        Self {
+            type_id: TypeId::of::<T>,
+            methods,
+        }
+    }
+
+    pub(crate) fn type_id(&self) -> TypeId {
+        (self.type_id)()
+    }
+
+    pub(crate) fn methods(&self) -> &'static [EffectiveMethod] {
+        self.methods
+    }
+}
+
+inventory::collect!(MethodCatalogRegistration);
 
 impl<'ctx> MethodCatalog<'ctx> {
     pub(crate) const fn new(

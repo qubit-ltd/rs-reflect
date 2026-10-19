@@ -1,12 +1,12 @@
 use std::any::TypeId;
 
-use super::builtin::{CloneCapability, SendCapability};
-use super::capabilities::Capabilities;
-use super::capability::CapabilitySpec;
-use super::capability_error::{CapabilityContractError, CapabilityError};
-use super::capability_origin::CapabilityOrigin;
-use super::capability_registration::CapabilityRegistration;
-use super::capability_target::CapabilityTargetId;
+use crate::runtime::capability::builtin::{CloneCapability, SendCapability};
+use crate::runtime::capability::capabilities::Capabilities;
+use crate::runtime::capability::capability::CapabilitySpec;
+use crate::runtime::capability::capability_error::{CapabilityContractError, CapabilityError};
+use crate::runtime::capability::capability_origin::CapabilityOrigin;
+use crate::runtime::capability::capability_registration::CapabilityRegistration;
+use crate::runtime::capability::capability_target::CapabilityTargetId;
 use crate::runtime::identity::TypeIdentity;
 use crate::runtime::value::{DynamicRef, Local, ThreadSafe};
 
@@ -164,11 +164,17 @@ fn builtin_registrations_require_the_corresponding_rust_trait_bound() {
 
     let sync = CapabilityRegistration::sync::<String>(CapabilityOrigin::Intrinsic)
         .expect("String is Sync");
-    assert_eq!(sync.id.as_str(), super::builtin::SyncCapability::ID);
+    assert_eq!(
+        sync.id.as_str(),
+        crate::runtime::capability::builtin::SyncCapability::ID
+    );
 
     let default = CapabilityRegistration::default::<Cloneable>(CapabilityOrigin::Intrinsic)
         .expect("Cloneable implements Default");
-    assert_eq!(default.id.as_str(), super::builtin::DefaultCapability::ID);
+    assert_eq!(
+        default.id.as_str(),
+        crate::runtime::capability::builtin::DefaultCapability::ID
+    );
 }
 
 #[test]
@@ -178,7 +184,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             .expect("Cloneable implements Clone");
     let clone_adapter = clone_registration
         .adapter
-        .downcast_ref::<super::builtin::CloneAdapter>()
+        .downcast_ref::<crate::runtime::capability::builtin::CloneAdapter>()
         .expect("registration carries a clone adapter");
     let source = Cloneable(47);
     let cloned = clone_adapter
@@ -205,7 +211,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("the exact value TypeId is checked");
     assert!(matches!(
         mismatch,
-        super::capability_error::CapabilityInvocationError::TypeMismatch {
+        crate::runtime::capability::capability_error::CapabilityInvocationError::TypeMismatch {
             expected,
             actual,
         } if expected == TypeId::of::<Cloneable>() && actual == TypeId::of::<Other>()
@@ -216,7 +222,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             .expect("Cloneable is Clone + Send + Sync");
     let thread_safe_adapter = thread_safe_registration
         .adapter
-        .downcast_ref::<super::builtin::CloneAdapter>()
+        .downcast_ref::<crate::runtime::capability::builtin::CloneAdapter>()
         .expect("registration carries a clone adapter");
     let thread_safe_clone = thread_safe_adapter
         .clone_dynamic::<ThreadSafe>(DynamicRef::<ThreadSafe>::new(&source))
@@ -234,7 +240,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("thread-safe mode retains the same type mismatch category");
     assert!(matches!(
         thread_safe_mismatch,
-        super::capability_error::CapabilityInvocationError::TypeMismatch {
+        crate::runtime::capability::capability_error::CapabilityInvocationError::TypeMismatch {
             expected,
             actual,
         } if expected == TypeId::of::<Cloneable>() && actual == TypeId::of::<Other>()
@@ -245,7 +251,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             .expect("Cloneable implements Default");
     let default_adapter = default_registration
         .adapter
-        .downcast_ref::<super::builtin::DefaultAdapter>()
+        .downcast_ref::<crate::runtime::capability::builtin::DefaultAdapter>()
         .expect("registration carries a default adapter");
     assert_eq!(
         default_adapter
@@ -262,9 +268,9 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("local-only registration rejects thread-safe creation");
     assert!(matches!(
         unsupported_mode,
-        super::capability_error::CapabilityInvocationError::UnsupportedMode {
+        crate::runtime::capability::capability_error::CapabilityInvocationError::UnsupportedMode {
             expected_type,
-            mode: super::capability_error::CapabilityInvocationMode::ThreadSafe,
+            mode: crate::runtime::capability::capability_error::CapabilityInvocationMode::ThreadSafe,
         } if expected_type == TypeId::of::<Cloneable>()
     ));
 
@@ -273,7 +279,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             .expect("Cloneable is Default + Send + Sync");
     let thread_safe_default_adapter = thread_safe_default_registration
         .adapter
-        .downcast_ref::<super::builtin::DefaultAdapter>()
+        .downcast_ref::<crate::runtime::capability::builtin::DefaultAdapter>()
         .expect("registration carries a default adapter");
     assert_eq!(
         thread_safe_default_adapter
@@ -303,7 +309,7 @@ fn invalid_external_capability_id_is_rejected_during_registration() {
     .expect("malformed namespaced ID is rejected");
     assert!(matches!(
         error,
-        super::capability_error::CapabilityRegistrationError::InvalidId(_)
+        crate::runtime::capability::capability_error::CapabilityRegistrationError::InvalidId(_)
     ));
 
     struct ReservedCapability;
@@ -320,7 +326,7 @@ fn invalid_external_capability_id_is_rejected_during_registration() {
     .expect("external specs cannot use the built-in namespace");
     assert!(matches!(
         error,
-        super::capability_error::CapabilityRegistrationError::InvalidId(_)
+        crate::runtime::capability::capability_error::CapabilityRegistrationError::InvalidId(_)
     ));
 }
 

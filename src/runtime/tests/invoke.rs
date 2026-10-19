@@ -14,6 +14,7 @@ use crate::runtime::invoke::{
     ThreadSafe, ValidatedInvocation,
 };
 use std::marker::PhantomPinned;
+use std::pin::Pin;
 
 struct Counter(u64);
 impl Reflect for Counter {
@@ -27,6 +28,22 @@ struct Wrong(String);
 struct PinnedCounter {
     value: u64,
     _pin: PhantomPinned,
+}
+
+trait PinnedProbe {
+    fn probe(&self) -> u32;
+}
+
+struct PinnedProbeValue(u32, PhantomPinned);
+struct OtherPinnedCounter {
+    value: u64,
+    _pin: PhantomPinned,
+}
+
+impl PinnedProbe for PinnedProbeValue {
+    fn probe(&self) -> u32 {
+        self.0
+    }
 }
 impl Reflect for Amount {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
@@ -222,6 +239,12 @@ impl InvocationAdapter<ThreadSafe> for AddThreadSafeAdapter {
 
 struct PinnedReadAdapter;
 impl PinnedInvocationAdapter<Local> for PinnedReadAdapter {
+    fn receiver_type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<PinnedCounter>()
+    }
+    fn receiver_kind(&self) -> ReceiverKind {
+        ReceiverKind::PinnedMutable
+    }
     fn invoke<'call>(
         &self,
         receiver: PinnedReceiver<'call>,
@@ -834,7 +857,7 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
     });
     {
         let output = method
-            .invoke_pinned(PinnedInvocation::<_, Local>::mutable(pinned.as_mut()).arg(Amount(5)));
+            .invoke_pinned(PinnedInvocation::<Local, _>::mutable(pinned.as_mut()).arg(Amount(5)));
         match output {
             Ok(output) => match output.into_unit() {
                 Ok(()) => {}
@@ -845,7 +868,7 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
     }
     {
         let failure = match method.invoke_pinned(
-            PinnedInvocation::<_, Local>::mutable(pinned.as_mut())
+            PinnedInvocation::<Local, _>::mutable(pinned.as_mut())
                 .arg(Wrong(String::from("wrong"))),
         ) {
             Ok(_) => panic!("wrong argument type is rejected before pinned adapter"),
@@ -864,4 +887,67 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
         );
         drop(recovered);
     }
+}
+
+#[test]
+fn pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
+    let context = ReflectionContext::empty();
+    let effective = EffectiveMethod {
+        target: &PINNED_COUNTER_TYPE,
+        metadata: &PINNED_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &PINNED_SPECIALIZATIONS,
+    };
+    let methods = [effective];
+    let method = MethodCatalog::new(
+        TypeDescriptor::new(&PINNED_COUNTER_TYPE, &context),
+        &methods,
+    )
+    .method("pinned_read")
+    .expect("method");
+    let mut pinned = Box::pin(OtherPinnedCounter {
+        value: 41,
+        _pin: PhantomPinned,
+    });
+    let failure = match method
+        .invoke_pinned(PinnedInvocation::<Local, _>::mutable(pinned.as_mut()).arg(Amount(7)))
+    {
+        Ok(_) => panic!("receiver with a different type is rejected before dispatch"),
+        Err(failure) => failure,
+    };
+    assert!(matches!(
+        failure.error().kind(),
+        InvocationErrorKind::ReceiverTypeMismatch { .. }
+    ));
+    let (receiver, arguments) = failure.into_invocation().into_parts();
+    assert_eq!(arguments.argument_count(), 1);
+    let receiver = receiver
+        .downcast_mut::<OtherPinnedCounter>()
+        .expect("recovery retains the original pinned receiver type");
+    assert_eq!(receiver.as_ref().get_ref().value, 41);
+}
+
+#[test]
+fn pinned_holder_preserves_trait_object_and_slice_metadata() {
+    let trait_object: Pin<Box<dyn PinnedProbe>> = Box::pin(PinnedProbeValue(73, PhantomPinned));
+    let (receiver, arguments) =
+        PinnedInvocation::<Local, _>::shared(trait_object.as_ref()).into_parts();
+    assert_eq!(arguments.argument_count(), 0);
+    let receiver = receiver
+        .downcast_ref::<dyn PinnedProbe>()
+        .expect("typed erased holder preserves trait-object receiver");
+    assert_eq!(receiver.probe(), 73);
+
+    let mut values = [4_u32, 9_u32];
+    let pinned_slice = Pin::new(&mut values[..]);
+    let (receiver, arguments) = PinnedInvocation::<Local, _>::mutable(pinned_slice).into_parts();
+    assert_eq!(arguments.argument_count(), 0);
+    let mut receiver = receiver
+        .downcast_mut::<[u32]>()
+        .expect("typed erased holder preserves slice metadata");
+    receiver.as_mut().get_mut()[1] = 17;
+    drop(receiver);
+    drop(arguments);
+    assert_eq!(values, [4, 17]);
 }

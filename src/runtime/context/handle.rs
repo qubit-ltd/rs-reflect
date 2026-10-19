@@ -2,7 +2,19 @@ use std::any::TypeId;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::runtime::capability::capabilities::Capabilities;
+use crate::runtime::capability::capability_target::CapabilityTargetId;
+use crate::runtime::construct::ConstructionDescriptor;
 use crate::runtime::descriptor::TypeDescriptor;
+use crate::runtime::descriptor::generic::{TypeDefinitionDescriptor, TypeDefinitionId};
+use crate::runtime::descriptor::impl_descriptor::{
+    ImplDefinitionDescriptor, ImplDefinitionId, ImplDescriptor,
+};
+use crate::runtime::descriptor::method::EffectiveMethod;
+use crate::runtime::descriptor::trait_descriptor::{
+    TraitDefinitionDescriptor, TraitDefinitionId, TraitDescriptor,
+};
+use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 use crate::runtime::error::ContextError;
 use crate::runtime::error::LookupError;
 use crate::runtime::error::LookupQuery;
@@ -12,18 +24,19 @@ use crate::runtime::identity::ItemIdentity;
 use crate::runtime::identity::ItemKind;
 use crate::runtime::identity::LookupCandidate;
 use crate::runtime::identity::StableItemId;
+use crate::runtime::identity::TypeIdentity;
 use crate::runtime::lookup::Lookup;
 
 #[path = "builder.rs"]
-mod builder;
+pub(crate) mod builder;
 #[path = "data.rs"]
-mod data;
+pub(crate) mod data;
 #[path = "global.rs"]
-mod global;
+pub(crate) mod global;
 #[path = "indexes.rs"]
-mod indexes;
+pub(crate) mod indexes;
 #[path = "registration.rs"]
-mod registration;
+pub(crate) mod registration;
 use data::ContextData;
 use global::GlobalContext;
 
@@ -108,6 +121,10 @@ impl ReflectionContext {
             .map(|type_record| type_record.descriptor(self)))
     }
 
+    pub(crate) fn contains_type_id(&self, id: TypeId) -> Result<bool, ContextError> {
+        Ok(self.data()?.contains_type_id(id))
+    }
+
     pub(crate) fn lookup_type_by_name(
         &self,
         name: &str,
@@ -181,6 +198,112 @@ impl ReflectionContext {
 
     pub(crate) fn registered_type_count(&self) -> Result<usize, ContextError> {
         Ok(self.data()?.types.len())
+    }
+
+    pub(crate) fn shape_for(
+        &self,
+        id: TypeId,
+    ) -> Result<Option<&'static TypeKindMetadata>, ContextError> {
+        Ok(self.data()?.shape(id))
+    }
+
+    pub(crate) fn methods_for(
+        &self,
+        id: TypeId,
+    ) -> Result<&'static [EffectiveMethod], ContextError> {
+        Ok(self.data()?.methods(id))
+    }
+
+    pub(crate) fn type_definition(
+        &self,
+        id: TypeDefinitionId,
+    ) -> Result<Option<TypeDefinitionDescriptor<'_>>, ContextError> {
+        Ok(self
+            .data()?
+            .type_definition(id)
+            .map(|metadata| TypeDefinitionDescriptor::new(metadata, self)))
+    }
+
+    pub(crate) fn trait_definition(
+        &self,
+        id: TraitDefinitionId,
+    ) -> Result<Option<TraitDefinitionDescriptor<'_>>, ContextError> {
+        Ok(self
+            .data()?
+            .trait_definition(id)
+            .map(|metadata| TraitDefinitionDescriptor::new(metadata, self)))
+    }
+
+    pub(crate) fn impl_definition(
+        &self,
+        id: ImplDefinitionId,
+    ) -> Result<Option<ImplDefinitionDescriptor<'_>>, ContextError> {
+        Ok(self
+            .data()?
+            .impl_definition(id)
+            .map(|metadata| ImplDefinitionDescriptor::new(metadata, self)))
+    }
+
+    pub(crate) fn capabilities_for_type(
+        &self,
+        type_id: TypeId,
+        rust_name: &'static str,
+    ) -> Result<Option<Arc<Capabilities>>, ContextError> {
+        Ok(self
+            .data()?
+            .capabilities(&CapabilityTargetId::Type(TypeIdentity {
+                type_id,
+                rust_name,
+            })))
+    }
+
+    pub(crate) fn type_instances(
+        &self,
+        definition: TypeDefinitionId,
+    ) -> Result<Box<[TypeDescriptor<'_>]>, ContextError> {
+        let data = self.data()?;
+        Ok(data
+            .type_instances(definition)
+            .iter()
+            .filter_map(|type_id| data.type_by_id(*type_id))
+            .map(|record| record.descriptor(self))
+            .collect())
+    }
+
+    pub(crate) fn trait_applications(
+        &self,
+        definition: TraitDefinitionId,
+    ) -> Result<Box<[TraitDescriptor<'_>]>, ContextError> {
+        let data = self.data()?;
+        Ok(data
+            .trait_applications(definition)
+            .iter()
+            .map(|metadata| TraitDescriptor::new(metadata, self))
+            .collect())
+    }
+
+    pub(crate) fn impl_applications(
+        &self,
+        definition: ImplDefinitionId,
+    ) -> Result<Box<[ImplDescriptor<'_>]>, ContextError> {
+        let data = self.data()?;
+        Ok(data
+            .impl_applications(definition)
+            .iter()
+            .map(|metadata| ImplDescriptor::new(metadata, self))
+            .collect())
+    }
+
+    pub(crate) fn construction_plans(
+        &self,
+        target: TypeId,
+    ) -> Result<Box<[ConstructionDescriptor<'_>]>, ContextError> {
+        let data = self.data()?;
+        Ok(data
+            .construction_plans(target)
+            .iter()
+            .map(|plan| ConstructionDescriptor::new(*plan))
+            .collect())
     }
 
     pub(crate) fn handle(&self) -> ContextHandle<'_> {

@@ -21,52 +21,51 @@ impl TypeShapeRegistration {
         }
     }
 
-    fn matches(&self, type_id: TypeId) -> bool {
-        (self.type_id)() == type_id
+    pub(crate) fn type_id(&self) -> TypeId {
+        (self.type_id)()
+    }
+
+    pub(crate) fn metadata(&self) -> &'static TypeKindMetadata {
+        self.metadata
     }
 }
 
 inventory::collect!(TypeShapeRegistration);
 
-fn shape_metadata(type_id: TypeId) -> Option<&'static TypeKindMetadata> {
-    inventory::iter::<TypeShapeRegistration>
-        .into_iter()
-        .find(|registration| registration.matches(type_id))
-        .map(|registration| registration.metadata)
-}
-
 const NO_FIELDS: &[FieldMetadata] = &[];
 const NO_VARIANTS: &[VariantMetadata] = &[];
 
 impl<'ctx> TypeDescriptor<'ctx> {
-    pub(crate) fn kind(self) -> TypeKind<'ctx> {
-        let metadata = shape_metadata(self.type_id())
+    pub(crate) fn kind(self) -> Result<TypeKind<'ctx>, crate::runtime::error::ContextError> {
+        let metadata = self
+            .context()
+            .shape_for(self.type_id())?
             .copied()
             .unwrap_or(TypeKindMetadata::Opaque);
-        TypeKind::from_metadata(self, metadata)
+        Ok(TypeKind::from_metadata(self, metadata))
     }
 
-    pub(crate) fn fields(self) -> Fields<'ctx> {
-        match self.kind() {
+    pub(crate) fn fields(self) -> Result<Fields<'ctx>, crate::runtime::error::ContextError> {
+        Ok(match self.kind()? {
             TypeKind::Struct(view) => view.fields(),
             TypeKind::Tuple(view) => view.fields(),
             _ => Fields::new(self, NO_FIELDS, None),
-        }
+        })
     }
 
     pub(crate) fn field(self, name: &str) -> Result<FieldDescriptor<'ctx>, LookupError> {
-        self.fields().require(name)
+        self.fields().map_err(LookupError::Context)?.require(name)
     }
 
-    pub(crate) fn variants(self) -> Variants<'ctx> {
-        match self.kind() {
+    pub(crate) fn variants(self) -> Result<Variants<'ctx>, crate::runtime::error::ContextError> {
+        Ok(match self.kind()? {
             TypeKind::Enum(view) => view.variants(),
             _ => Variants::new(self, NO_VARIANTS),
-        }
+        })
     }
 
     pub(crate) fn variant(self, name: &str) -> Result<VariantDescriptor<'ctx>, LookupError> {
-        self.variants().require(name)
+        self.variants().map_err(LookupError::Context)?.require(name)
     }
 }
 

@@ -1,7 +1,13 @@
 use std::any::TypeId;
 
+use crate::runtime::capability::capabilities::Capabilities;
+use crate::runtime::construct::ConstructionDescriptor;
 use crate::runtime::context::ReflectionContext;
+use crate::runtime::descriptor::method::{MethodCatalog, MethodDescriptor};
+use crate::runtime::error::{ContextError, LookupError};
 use crate::runtime::identity::TypeIdentity;
+use crate::runtime::lookup::Lookup;
+use std::sync::Arc;
 
 use super::metadata::TypeMetadata;
 use super::reflect::Reflect;
@@ -45,5 +51,36 @@ impl<'ctx> TypeDescriptor<'ctx> {
 
     pub(crate) fn context(self) -> &'ctx ReflectionContext {
         self.context
+    }
+
+    pub(crate) fn capabilities(self) -> Result<Option<Arc<Capabilities>>, ContextError> {
+        let identity = self.type_identity();
+        self.context
+            .capabilities_for_type(identity.type_id, identity.rust_name)
+    }
+
+    pub(crate) fn construction_plans(
+        self,
+    ) -> Result<Box<[ConstructionDescriptor<'ctx>]>, ContextError> {
+        self.context.construction_plans(self.type_id())
+    }
+
+    pub(crate) fn lookup_method(
+        self,
+        name: &str,
+    ) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
+        Ok(
+            MethodCatalog::new(self, self.context.methods_for(self.type_id())?)
+                .lookup_method(name)?,
+        )
+    }
+
+    pub(crate) fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
+        self.lookup_method(name)
+            .map_err(LookupError::Context)?
+            .into_unique(
+                crate::runtime::error::LookupSubject::Method,
+                crate::runtime::error::LookupQuery::Name(name.into()),
+            )
     }
 }

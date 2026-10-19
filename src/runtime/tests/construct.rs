@@ -1,6 +1,8 @@
 #![allow(unsafe_code)]
 
 use std::any::TypeId;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::runtime::construct::{
     ConstructField, ConstructProvider, ConstructVisibility, ConstructionAvailability,
@@ -32,6 +34,45 @@ struct Marker;
 #[derive(Debug)]
 struct Wrong;
 
+static FREEZE_PROVIDER_CALLS: AtomicUsize = AtomicUsize::new(0);
+struct FreezeProbeProvider;
+impl ConstructProvider<Local> for FreezeProbeProvider {
+    fn construct(&self, _: Vec<Option<DynamicOwned<Local>>>) -> DynamicOwned<Local> {
+        FREEZE_PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
+        DynamicOwned::new(Record {
+            count: 0,
+            title: String::new(),
+            secret: false,
+        })
+    }
+    fn update(
+        &self,
+        base: DynamicOwned<Local>,
+        _: Vec<Option<DynamicOwned<Local>>>,
+    ) -> DynamicOwned<Local> {
+        FREEZE_PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
+        base
+    }
+}
+static FREEZE_PROVIDER: FreezeProbeProvider = FreezeProbeProvider;
+static FREEZE_PLAN: OnceLock<ConstructionPlan> = OnceLock::new();
+
+fn freeze_probe_plan() -> &'static ConstructionPlan {
+    FREEZE_PLAN.get_or_init(|| {
+        ConstructionPlan::new(
+            ConstructionTarget {
+                identity: type_identity::<Record>(),
+                kind: ConstructionTargetKind::Struct,
+                variant_index: None,
+            },
+            ConstructionShape::Unit,
+            &[],
+            ConstructionProviders::new(Some(&FREEZE_PROVIDER), None),
+            ConstructionAvailability::Available,
+        )
+    })
+}
+
 macro_rules! reflect_type {
     ($type:ty, $registration:ident) => {
         impl Reflect for $type {
@@ -47,10 +88,8 @@ reflect_type!(Record, RECORD_REGISTRATION);
 reflect_type!(Choice, CHOICE_REGISTRATION);
 reflect_type!(Marker, MARKER_REGISTRATION);
 reflect_type!(Wrong, WRONG_REGISTRATION);
-reflect_type!(u32, U32_REGISTRATION);
 reflect_type!(i32, I32_REGISTRATION);
 reflect_type!(bool, BOOL_REGISTRATION);
-reflect_type!(String, STRING_REGISTRATION);
 
 struct RecordProvider;
 
@@ -608,4 +647,22 @@ fn provider_lookup_reports_missing_and_ambiguous_metadata() {
         resolve_variant_plan(type_identity::<Choice>(), 1, &[pair, duplicate_variant]),
         Err(ConstructionError::AmbiguousProvider { count: 2, .. })
     ));
+}
+
+#[test]
+fn context_freezes_construction_plans_without_calling_providers() {
+    FREEZE_PROVIDER_CALLS.store(0, Ordering::SeqCst);
+    let context = crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
+        .register(
+            crate::runtime::context::handle::registration::Registration::of::<Record>()
+                .with_construction_plan(freeze_probe_plan()),
+        )
+        .build()
+        .expect("construction plan context builds");
+    let plans = context
+        .type_of::<Record>()
+        .construction_plans()
+        .expect("construction plans are indexed");
+    assert_eq!(plans.len(), 1);
+    assert_eq!(FREEZE_PROVIDER_CALLS.load(Ordering::SeqCst), 0);
 }

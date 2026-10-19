@@ -2,9 +2,15 @@ use std::any::TypeId;
 use std::fmt;
 use std::sync::Arc;
 
+use super::capability::CapabilityError;
+use super::construct::{ConstructionError, UpdateError};
+use super::descriptor::field::{FieldAccessError, FieldSetError};
+use super::expression::{GenericArgumentError, TypeExpressionError};
 use super::identity::{
     GenericArgumentIdentity, ItemIdentity, LookupCandidate, RegistrationOrigin, TypeIdentity,
 };
+use super::invoke::InvocationError;
+use super::value::TypeMismatch;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContextError {
@@ -17,18 +23,24 @@ struct ContextErrorData {
 }
 
 impl ContextErrorData {
-    fn new(issues: Box<[ContextIssue]>) -> Self { Self { issues } }
+    fn new(issues: Box<[ContextIssue]>) -> Self {
+        Self { issues }
+    }
 }
 
 impl ContextError {
     pub fn new(message: impl Into<Arc<str>>) -> Self {
         let issue = ContextIssue::Message(message.into());
-        Self { data: Arc::new(ContextErrorData::new(vec![issue].into_boxed_slice())) }
+        Self {
+            data: Arc::new(ContextErrorData::new(vec![issue].into_boxed_slice())),
+        }
     }
 
     pub fn from_issues(issues: impl Into<Box<[ContextIssue]>>) -> Option<Self> {
         let issues = issues.into();
-        (!issues.is_empty()).then(|| Self { data: Arc::new(ContextErrorData::new(issues)) })
+        (!issues.is_empty()).then(|| Self {
+            data: Arc::new(ContextErrorData::new(issues)),
+        })
     }
 
     pub fn issues(&self) -> &[ContextIssue] {
@@ -58,32 +70,94 @@ impl std::error::Error for ContextError {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ContextIssue {
-    DuplicateTypeIdentity { type_id: TypeId, registrations: Box<[RegistrationOrigin]> },
-    ConflictingTypeDefinition { identity: ItemIdentity, registrations: Box<[RegistrationOrigin]> },
-    ConflictingTraitDefinition { identity: ItemIdentity, registrations: Box<[RegistrationOrigin]> },
-    DuplicateTraitImpl { target: TypeIdentity, trait_: ItemIdentity, registrations: Box<[RegistrationOrigin]> },
-    DuplicateMethodSpecialization { method: ItemIdentity, arguments: Box<[GenericArgumentIdentity]>, registrations: Box<[RegistrationOrigin]> },
-    ConflictingCapability { target: TypeIdentity, capability: ItemIdentity, registrations: Box<[RegistrationOrigin]> },
-    MissingDependency { item: ItemIdentity, dependency: ItemIdentity },
-    DependencyCycle { items: Box<[ItemIdentity]> },
-    InvalidAdapter { item: ItemIdentity, reason: AdapterValidationError },
-    InvalidMetadata { item: ItemIdentity, reason: MetadataValidationError },
+    DuplicateTypeIdentity {
+        type_id: TypeId,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    ConflictingTypeDefinition {
+        identity: ItemIdentity,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    ConflictingTraitDefinition {
+        identity: ItemIdentity,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    DuplicateTraitImpl {
+        target: TypeIdentity,
+        trait_: ItemIdentity,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    DuplicateMethodSpecialization {
+        method: ItemIdentity,
+        arguments: Box<[GenericArgumentIdentity]>,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    ConflictingCapability {
+        target: TypeIdentity,
+        capability: ItemIdentity,
+        registrations: Box<[RegistrationOrigin]>,
+    },
+    MissingDependency {
+        item: ItemIdentity,
+        dependency: ItemIdentity,
+    },
+    DependencyCycle {
+        items: Box<[ItemIdentity]>,
+    },
+    InvalidAdapter {
+        item: ItemIdentity,
+        reason: AdapterValidationError,
+    },
+    InvalidMetadata {
+        item: ItemIdentity,
+        reason: MetadataValidationError,
+    },
     Message(Arc<str>),
 }
 
 impl fmt::Display for ContextIssue {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DuplicateTypeIdentity { type_id, .. } => write!(formatter, "duplicate type identity {type_id:?}"),
-            Self::ConflictingTypeDefinition { identity, .. } => write!(formatter, "conflicting type definition {identity:?}"),
-            Self::ConflictingTraitDefinition { identity, .. } => write!(formatter, "conflicting trait definition {identity:?}"),
-            Self::DuplicateTraitImpl { target, trait_, .. } => write!(formatter, "duplicate trait implementation for {target:?} and {trait_:?}"),
-            Self::DuplicateMethodSpecialization { method, arguments, .. } => write!(formatter, "duplicate specialization of {method:?} for {} arguments", arguments.len()),
-            Self::ConflictingCapability { target, capability, .. } => write!(formatter, "conflicting capability {capability:?} for {target:?}"),
-            Self::MissingDependency { item, dependency } => write!(formatter, "{item:?} requires missing {dependency:?}"),
-            Self::DependencyCycle { items } => write!(formatter, "registration dependency cycle among {} items", items.len()),
-            Self::InvalidAdapter { item, reason } => write!(formatter, "invalid adapter for {item:?}: {reason}"),
-            Self::InvalidMetadata { item, reason } => write!(formatter, "invalid metadata for {item:?}: {reason}"),
+            Self::DuplicateTypeIdentity { type_id, .. } => {
+                write!(formatter, "duplicate type identity {type_id:?}")
+            }
+            Self::ConflictingTypeDefinition { identity, .. } => {
+                write!(formatter, "conflicting type definition {identity:?}")
+            }
+            Self::ConflictingTraitDefinition { identity, .. } => {
+                write!(formatter, "conflicting trait definition {identity:?}")
+            }
+            Self::DuplicateTraitImpl { target, trait_, .. } => write!(
+                formatter,
+                "duplicate trait implementation for {target:?} and {trait_:?}"
+            ),
+            Self::DuplicateMethodSpecialization {
+                method, arguments, ..
+            } => write!(
+                formatter,
+                "duplicate specialization of {method:?} for {} arguments",
+                arguments.len()
+            ),
+            Self::ConflictingCapability {
+                target, capability, ..
+            } => write!(
+                formatter,
+                "conflicting capability {capability:?} for {target:?}"
+            ),
+            Self::MissingDependency { item, dependency } => {
+                write!(formatter, "{item:?} requires missing {dependency:?}")
+            }
+            Self::DependencyCycle { items } => write!(
+                formatter,
+                "registration dependency cycle among {} items",
+                items.len()
+            ),
+            Self::InvalidAdapter { item, reason } => {
+                write!(formatter, "invalid adapter for {item:?}: {reason}")
+            }
+            Self::InvalidMetadata { item, reason } => {
+                write!(formatter, "invalid metadata for {item:?}: {reason}")
+            }
             Self::Message(message) => formatter.write_str(message),
         }
     }
@@ -93,22 +167,30 @@ impl fmt::Display for ContextIssue {
 pub struct AdapterValidationError(Box<str>);
 
 impl AdapterValidationError {
-    pub fn new(message: impl Into<Box<str>>) -> Self { Self(message.into()) }
+    pub fn new(message: impl Into<Box<str>>) -> Self {
+        Self(message.into())
+    }
 }
 
 impl fmt::Display for AdapterValidationError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(&self.0) }
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MetadataValidationError(Box<str>);
 
 impl MetadataValidationError {
-    pub fn new(message: impl Into<Box<str>>) -> Self { Self(message.into()) }
+    pub fn new(message: impl Into<Box<str>>) -> Self {
+        Self(message.into())
+    }
 }
 
 impl fmt::Display for MetadataValidationError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(&self.0) }
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -144,7 +226,10 @@ pub enum LookupQuery {
 #[non_exhaustive]
 pub enum LookupError {
     Context(ContextError),
-    Missing { subject: LookupSubject, query: LookupQuery },
+    Missing {
+        subject: LookupSubject,
+        query: LookupQuery,
+    },
     Ambiguous {
         subject: LookupSubject,
         query: LookupQuery,
@@ -156,8 +241,14 @@ impl fmt::Display for LookupError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Context(error) => write!(formatter, "reflection context failed: {error}"),
-            Self::Missing { subject, query } => write!(formatter, "missing {subject:?} for {query:?}"),
-            Self::Ambiguous { subject, query, candidates } => write!(
+            Self::Missing { subject, query } => {
+                write!(formatter, "missing {subject:?} for {query:?}")
+            }
+            Self::Ambiguous {
+                subject,
+                query,
+                candidates,
+            } => write!(
                 formatter,
                 "ambiguous {subject:?} for {query:?} ({} candidates)",
                 candidates.len(),
@@ -176,9 +267,20 @@ impl std::error::Error for LookupError {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ReflectionError {
     Lookup(LookupError),
     Context(ContextError),
+    TypeMismatch(TypeMismatch),
+    FieldAccess(FieldAccessError),
+    FieldSet(FieldSetError),
+    Invocation(InvocationError),
+    Construction(ConstructionError),
+    Update(UpdateError),
+    Capability(CapabilityError),
+    GenericArgument(GenericArgumentError),
+    TypeExpression(TypeExpressionError),
+    Unsupported(UnsupportedOperationError),
 }
 
 impl fmt::Display for ReflectionError {
@@ -186,6 +288,16 @@ impl fmt::Display for ReflectionError {
         match self {
             Self::Lookup(error) => error.fmt(formatter),
             Self::Context(error) => error.fmt(formatter),
+            Self::TypeMismatch(error) => error.fmt(formatter),
+            Self::FieldAccess(error) => error.fmt(formatter),
+            Self::FieldSet(error) => error.fmt(formatter),
+            Self::Invocation(error) => error.fmt(formatter),
+            Self::Construction(error) => error.fmt(formatter),
+            Self::Update(error) => error.fmt(formatter),
+            Self::Capability(error) => error.fmt(formatter),
+            Self::GenericArgument(error) => error.fmt(formatter),
+            Self::TypeExpression(error) => error.fmt(formatter),
+            Self::Unsupported(error) => error.fmt(formatter),
         }
     }
 }
@@ -195,9 +307,59 @@ impl std::error::Error for ReflectionError {
         match self {
             Self::Lookup(error) => Some(error),
             Self::Context(error) => Some(error),
+            Self::TypeMismatch(error) => Some(error),
+            Self::FieldAccess(error) => Some(error),
+            Self::FieldSet(error) => Some(error),
+            Self::Invocation(error) => Some(error),
+            Self::Construction(error) => Some(error),
+            Self::Update(error) => Some(error),
+            Self::Capability(error) => Some(error),
+            Self::GenericArgument(error) => Some(error),
+            Self::TypeExpression(error) => Some(error),
+            Self::Unsupported(error) => Some(error),
         }
     }
 }
+
+macro_rules! reflection_from {
+    ($source:ty, $variant:ident) => {
+        impl From<$source> for ReflectionError {
+            fn from(error: $source) -> Self {
+                Self::$variant(error)
+            }
+        }
+    };
+}
+
+reflection_from!(ContextError, Context);
+reflection_from!(LookupError, Lookup);
+reflection_from!(TypeMismatch, TypeMismatch);
+reflection_from!(FieldAccessError, FieldAccess);
+reflection_from!(FieldSetError, FieldSet);
+reflection_from!(InvocationError, Invocation);
+reflection_from!(ConstructionError, Construction);
+reflection_from!(UpdateError, Update);
+reflection_from!(CapabilityError, Capability);
+reflection_from!(GenericArgumentError, GenericArgument);
+reflection_from!(TypeExpressionError, TypeExpression);
+reflection_from!(UnsupportedOperationError, Unsupported);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnsupportedOperationError(Box<str>);
+
+impl UnsupportedOperationError {
+    pub fn new(message: impl Into<Box<str>>) -> Self {
+        Self(message.into())
+    }
+}
+
+impl fmt::Display for UnsupportedOperationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for UnsupportedOperationError {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RecoverableFailureParts<E, R> {

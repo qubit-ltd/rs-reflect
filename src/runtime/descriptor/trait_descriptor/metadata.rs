@@ -1,7 +1,6 @@
 use std::any::TypeId;
 use std::hash::{Hash, Hasher};
 
-use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
 use crate::runtime::descriptor::method::MethodMetadata;
 use crate::runtime::expression::{ExpressionData, PredicateData, TraitExpressionData};
@@ -134,10 +133,4 @@ pub(crate) struct TraitDefinitionMetadata {
     pub(crate) methods: &'static [MethodMetadata],
     pub(crate) associated_types: &'static [AssociatedTypeDefinitionMetadata],
     pub(crate) associated_consts: &'static [AssociatedConstDefinitionMetadata],
-    pub(crate) applications: for<'ctx> fn(
-        &'ctx ReflectionContext,
-    ) -> Result<
-        Box<[&'static TraitApplicationMetadata]>,
-        crate::runtime::error::ContextError,
-    >,
 }

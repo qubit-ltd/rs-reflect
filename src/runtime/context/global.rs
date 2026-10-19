@@ -38,7 +38,7 @@ impl GlobalContext {
         })
     }
 
-    pub(super) fn get_or_initialize(
+    pub(crate) fn get_or_initialize(
         &self,
         initialize: impl FnOnce() -> Result<ContextData, ContextError>,
     ) -> Result<Arc<ContextData>, ContextError> {

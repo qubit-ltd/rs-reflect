@@ -73,8 +73,6 @@ pub(crate) struct TypeDefinitionMetadata {
     pub(crate) path: &'static str,
     pub(crate) kind: TypeDefinitionKind,
     pub(crate) generics: &'static GenericDefinitionMetadata,
-    pub(crate) instances:
-        for<'ctx> fn(&'ctx ReflectionContext) -> Result<Box<[TypeDescriptor<'ctx>]>, ContextError>,
 }
 
 /// Generic declaration metadata in source order.
@@ -141,7 +139,7 @@ impl<'ctx> TypeDefinitionDescriptor<'ctx> {
         GenericDefinitionDescriptor::new(self.metadata.generics, self.context)
     }
     pub(crate) fn instances(self) -> Result<Box<[TypeDescriptor<'ctx>]>, ContextError> {
-        (self.metadata.instances)(self.context)
+        self.context.type_instances(self.metadata.id)
     }
 }
 

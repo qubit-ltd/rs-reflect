@@ -31,7 +31,13 @@ fn of_uses_the_global_context_without_building_aggregate_state() {
     let descriptor = TypeDescriptor::of::<Fixture>();
 
     assert_eq!(descriptor.type_id(), std::any::TypeId::of::<Fixture>());
-    assert!(std::ptr::eq(descriptor.context(), ReflectionContext::global()));
-    assert_eq!(before, ReflectionContext::global() as *const ReflectionContext);
+    assert!(std::ptr::eq(
+        descriptor.context(),
+        ReflectionContext::global()
+    ));
+    assert_eq!(
+        before,
+        ReflectionContext::global() as *const ReflectionContext
+    );
     assert_eq!(REGISTRATION_CALLS.load(Ordering::SeqCst), 1);
 }

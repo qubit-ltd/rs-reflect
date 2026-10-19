@@ -115,16 +115,9 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
             })
     }
     pub(crate) fn instances(self) -> Result<Impls<'ctx>, ContextError> {
-        (self.metadata.instances)(self.context).map(|applications| {
-            Impls::new(
-                applications
-                    .into_vec()
-                    .into_iter()
-                    .map(|application| ImplDescriptor::new(application, self.context))
-                    .collect(),
-                self.context,
-            )
-        })
+        self.context
+            .impl_applications(self.metadata.id)
+            .map(|applications| Impls::new(applications, self.context))
     }
 }
 

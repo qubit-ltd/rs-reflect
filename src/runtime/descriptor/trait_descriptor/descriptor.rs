@@ -115,16 +115,9 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
         )
     }
     pub(crate) fn applications(self) -> Result<Traits<'ctx>, ContextError> {
-        (self.metadata.applications)(self.context).map(|applications| {
-            Traits::new(
-                applications
-                    .into_vec()
-                    .into_iter()
-                    .map(|application| TraitDescriptor::new(application, self.context))
-                    .collect(),
-                self.context,
-            )
-        })
+        self.context
+            .trait_applications(self.metadata.id)
+            .map(|applications| Traits::new(applications, self.context))
     }
 }
 

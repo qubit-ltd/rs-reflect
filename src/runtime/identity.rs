@@ -64,5 +64,7 @@ pub trait IntoLookupCandidate {
 }
 
 impl IntoLookupCandidate for LookupCandidate {
-    fn into_lookup_candidate(self) -> LookupCandidate { self }
+    fn into_lookup_candidate(self) -> LookupCandidate {
+        self
+    }
 }

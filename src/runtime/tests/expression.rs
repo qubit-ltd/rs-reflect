@@ -4,8 +4,6 @@ use crate::runtime::descriptor::generic::{
     GenericDefinitionDescriptor, GenericDefinitionMetadata, GenericParameterMetadata,
     GenericParameterMetadataKind, TypeDefinitionDescriptor, TypeDefinitionId, TypeDefinitionKind,
 };
-use crate::runtime::descriptor::metadata::TypeMetadata;
-use crate::runtime::error::ContextError;
 use crate::runtime::expression::{
     ConstExpression, ExpressionData, GenericExpressionArgument, LifetimeExpression, PredicateData,
     PredicateKind, TraitBoundModifier, TraitExpressionData, TypeExpression, TypeExpressionKind,
@@ -13,8 +11,13 @@ use crate::runtime::expression::{
 
 struct EnvelopeMarker;
 struct EnvelopeU8;
-
-static ENVELOPE_U8_METADATA: TypeMetadata = TypeMetadata::new::<EnvelopeU8>();
+impl crate::runtime::descriptor::Reflect for EnvelopeU8 {
+    fn __reflect_registration() -> &'static crate::runtime::descriptor::TypeRegistration<Self> {
+        static REGISTRATION: crate::runtime::descriptor::TypeRegistration<EnvelopeU8> =
+            crate::runtime::descriptor::TypeRegistration::new();
+        &REGISTRATION
+    }
+}
 
 static TYPE_PARAMETER: GenericParameterMetadata = GenericParameterMetadata {
     name: "T",
@@ -63,17 +66,7 @@ static DEFINITION: super::super::descriptor::generic::TypeDefinitionMetadata =
         path: "fixture::Envelope",
         kind: TypeDefinitionKind::Struct(super::super::descriptor::generic::StructKind::Named),
         generics: &GENERICS,
-        instances: envelope_instances,
     };
-
-fn envelope_instances(
-    context: &ReflectionContext,
-) -> Result<Box<[crate::runtime::descriptor::TypeDescriptor<'_>]>, ContextError> {
-    Ok(Box::new([crate::runtime::descriptor::TypeDescriptor::new(
-        &ENVELOPE_U8_METADATA,
-        context,
-    )]))
-}
 
 static T_EXPRESSION: ExpressionData = ExpressionData::Parameter(&TYPE_PARAMETER);
 static VEC_EXPRESSION: ExpressionData = ExpressionData::Named {
@@ -193,7 +186,14 @@ static DUPLICATE_ARGUMENTS: [GenericArgumentMetadata; 2] = [
 
 #[test]
 fn definition_and_type_expression_remain_source_level() {
-    let context = ReflectionContext::empty();
+    let context = crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
+        .register(
+            crate::runtime::context::handle::registration::Registration::of::<EnvelopeU8>()
+                .with_type_definition(&DEFINITION)
+                .with_type_instance(TypeDefinitionId::of::<EnvelopeMarker>()),
+        )
+        .build()
+        .expect("fixture context builds");
     let definition = TypeDefinitionDescriptor::new(&DEFINITION, &context);
     let generic_definition = definition.generics();
     let parameter = generic_definition.parameter("T").expect("T is declared");

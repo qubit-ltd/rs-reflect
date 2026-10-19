@@ -1,13 +1,13 @@
 //! Typed capability contracts and immutable per-target capability sets.
 
-mod builtin;
-mod capabilities;
-mod capability;
-mod capability_error;
-mod capability_id;
-mod capability_origin;
-mod capability_registration;
-mod capability_target;
+pub(crate) mod builtin;
+pub(crate) mod capabilities;
+pub(crate) mod capability;
+pub(crate) mod capability_error;
+pub(crate) mod capability_id;
+pub(crate) mod capability_origin;
+pub(crate) mod capability_registration;
+pub(crate) mod capability_target;
 
 pub(crate) use builtin::{
     CloneAdapter, CloneCapability, DefaultAdapter, DefaultCapability, SendCapability,
@@ -23,6 +23,3 @@ pub(crate) use capability_id::CapabilityIdentifier as CapabilityId;
 pub(crate) use capability_origin::CapabilityOrigin;
 pub(crate) use capability_registration::CapabilityRegistration;
 pub(crate) use capability_target::CapabilityTargetId;
-
-#[cfg(test)]
-mod tests;

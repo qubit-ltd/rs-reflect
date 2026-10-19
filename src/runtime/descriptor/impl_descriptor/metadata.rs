@@ -1,7 +1,6 @@
 use std::any::TypeId;
 use std::hash::{Hash, Hasher};
 
-use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
 use crate::runtime::descriptor::metadata::TypeMetadata;
 use crate::runtime::descriptor::method::{EffectiveMethod, MethodMetadata};
@@ -101,7 +100,6 @@ pub(crate) struct ImplDefinitionMetadata {
     pub(crate) methods: &'static [MethodMetadata],
     pub(crate) associated_types: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata],
     pub(crate) associated_consts: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata],
-    pub(crate) instances: for<'ctx> fn(&'ctx ReflectionContext) -> Result<Box<[&'static ImplApplicationMetadata]>, crate::runtime::error::ContextError>,
 }
 
 /// Static metadata for one compiled implementation application.
