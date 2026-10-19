@@ -68,6 +68,19 @@ impl<D: 'static> TraitDefinitionSpec<D> {
         &self.metadata
     }
 
+    /// Returns a method declaration by its source-order index.
+    pub const fn method_at(&'static self, index: usize) -> &'static MethodMetadata {
+        if index >= self.metadata.methods.len() {
+            panic!("method index is out of range");
+        }
+        &self.metadata.methods[index]
+    }
+
+    /// Returns the number of method declarations in this trait.
+    pub const fn method_count(&self) -> usize {
+        self.metadata.methods.len()
+    }
+
     /// Returns an associated type declaration by its source-order index.
     pub const fn associated_type_at(
         &'static self,
