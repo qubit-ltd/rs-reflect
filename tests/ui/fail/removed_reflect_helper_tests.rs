@@ -6,24 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use std::cell::Cell;
-
-
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
-struct Fragile {
-    state: Cell<u8>,
-}
-
-#[qubit_reflect::Reflect]
-struct Worker;
+struct RemovedHelper;
 
 #[qubit_reflect::ReflectImpl]
-impl Worker {
+impl RemovedHelper {
     #[reflect(catch_unwind)]
-    fn run(value: &Fragile) -> u8 {
-        value.state.get()
-    }
+    fn action() {}
 }
 
 fn main() {}

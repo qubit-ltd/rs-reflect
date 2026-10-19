@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::{StructKind, TypeKind};
+use qubit_reflect::descriptor::{StructKind, TypeDefinitionKind};
 
 #[Reflect]
 struct NamedRecord {
@@ -49,7 +49,10 @@ fn test_derive_struct_preserves_named_fields_and_source_positions() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     let fields = descriptor.fields();
 
-    assert!(matches!(descriptor.kind(), TypeKind::Struct(view) if view.kind() == StructKind::Named));
+    assert!(matches!(
+        descriptor.definition().unwrap().kind(),
+        TypeDefinitionKind::Struct(StructKind::Named)
+    ));
     assert_eq!(fields.len(), 2);
     assert_eq!(fields.get("visible").unwrap().index(), 0);
     assert_eq!(fields.get("visible").unwrap().name(), "visible");
@@ -58,16 +61,25 @@ fn test_derive_struct_preserves_named_fields_and_source_positions() {
     assert!(fields.get_at(1).is_none());
 }
 
-/// Verifies tuple, newtype, and unit structs retain distinct structural kinds.
+/// Verifies tuple, newtype, and unit structs retain source shape and fields.
 #[test]
 fn test_derive_struct_preserves_tuple_newtype_and_unit_shapes() {
     let tuple = TypeDescriptor::of::<TupleRecord>();
     let newtype = TypeDescriptor::of::<NewtypeRecord>();
     let unit = TypeDescriptor::of::<UnitRecord>();
 
-    assert!(matches!(tuple.kind(), TypeKind::Struct(view) if view.kind() == StructKind::Tuple));
-    assert!(matches!(newtype.kind(), TypeKind::Struct(view) if view.kind() == StructKind::Newtype));
-    assert!(matches!(unit.kind(), TypeKind::Struct(view) if view.kind() == StructKind::Unit));
+    assert!(matches!(
+        tuple.definition().unwrap().kind(),
+        TypeDefinitionKind::Struct(StructKind::Tuple)
+    ));
+    assert!(matches!(
+        newtype.definition().unwrap().kind(),
+        TypeDefinitionKind::Struct(StructKind::Tuple)
+    ));
+    assert!(matches!(
+        unit.definition().unwrap().kind(),
+        TypeDefinitionKind::Struct(StructKind::Unit)
+    ));
     assert_eq!(tuple.fields().get_at(0).unwrap().name(), "0");
     assert_eq!(tuple.fields().get_at(1).unwrap().name(), "1");
     assert_eq!(newtype.fields().len(), 1);
@@ -79,10 +91,18 @@ fn test_derive_struct_preserves_tuple_newtype_and_unit_shapes() {
 #[test]
 fn test_derive_struct_preserves_recursive_field_expression() {
     let descriptor = TypeDescriptor::of::<RecursiveRecord>();
-    let field = descriptor.field("next").expect("recursive field is described");
+    let field = descriptor
+        .field("next")
+        .expect("recursive field is described");
 
     assert_eq!(field.index(), 0);
-    assert!(format!("{}", field.type_expression()).contains("RecursiveRecord"));
+    assert!(
+        field
+            .type_expression()
+            .display()
+            .to_string()
+            .contains("RecursiveRecord")
+    );
 }
 
 /// Verifies generic field expressions do not impose a `Reflect` bound on the
@@ -90,10 +110,12 @@ fn test_derive_struct_preserves_recursive_field_expression() {
 #[test]
 fn test_derive_struct_preserves_unreflectable_generic_field() {
     let descriptor = TypeDescriptor::of::<GenericRecord<Rc<()>>>();
-    let field = descriptor.field("item").expect("generic field is described");
+    let field = descriptor
+        .field("item")
+        .expect("generic field is described");
 
     assert!(field.find_concrete_type().is_none());
-    assert!(format!("{}", field.type_expression()).contains("Rc"));
+    assert!(field.type_expression().display().to_string().contains("Rc"));
 }
 
 /// Verifies concurrent lookup preserves the concrete type identity.

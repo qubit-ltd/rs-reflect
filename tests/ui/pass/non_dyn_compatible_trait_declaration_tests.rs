@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-
 #[qubit_reflect::Reflect]
 trait Service {
     const LIMIT: usize;
@@ -14,9 +13,11 @@ trait Service {
     fn transform<T>(&self, value: T) -> T;
 }
 
-#[qubit_reflect::Reflect(external_trait(Sized, id = "core.marker.Sized"))]
-trait SizedService: Sized {
-    fn value(&self) -> usize;
+#[qubit_reflect::Reflect]
+trait SizedService {
+    fn value(&self) -> usize
+    where
+        Self: Sized;
 }
 
 #[qubit_reflect::Reflect]

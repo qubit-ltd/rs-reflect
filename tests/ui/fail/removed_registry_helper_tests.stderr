@@ -3,4 +3,3 @@ error[E0432]: unresolved import `qubit_reflect::ReflectRegistry`
   |
 1 | use qubit_reflect::ReflectRegistry;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in the root
-

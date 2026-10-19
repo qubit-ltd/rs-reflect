@@ -10,7 +10,6 @@ use std::cell::Cell;
 
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Worker {
     state: Cell<u8>,
 }

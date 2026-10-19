@@ -6,11 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use qubit_reflect::value::{DynamicRef, Local};
 
-#[qubit_reflect::Reflect]
-struct Invalid {
-    #[reflect(thread_safe)]
-    value: u32,
+fn wrap(value: &[u8]) {
+    let _ = DynamicRef::<Local>::new(value);
 }
 
 fn main() {}

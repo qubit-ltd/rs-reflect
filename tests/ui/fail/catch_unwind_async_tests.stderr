@@ -1,5 +1,0 @@
-error: `catch_unwind` cannot be used on an async method; panics raised while polling follow ordinary Future semantics
-  --> tests/ui/fail/catch_unwind_async_tests.rs:15:15
-   |
-15 |     #[reflect(catch_unwind)]
-   |               ^^^^^^^^^^^^

@@ -1,20 +1,17 @@
-error[E0038]: the trait `InvalidProof` is not dyn compatible
-  --> tests/ui/fail/invalid_dyn_compatible_proof_tests.rs:14:1
+error: reflection helper `external_trait` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/invalid_dyn_compatible_proof_tests.rs:15:5
    |
-14 | / #[qubit_reflect::Reflect(
-15 | |     external_trait(External, id = "example.External"),
-16 | |     dyn_compatible
-17 | | )]
-   | |__^ `InvalidProof` is not dyn compatible
+15 |     external_trait(External, id = "example.External"),
+   |     ^^^^^^^^^^^^^^
+
+error: reflection helper `dyn_compatible` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/invalid_dyn_compatible_proof_tests.rs:16:5
    |
-note: for a trait to be dyn compatible it needs to allow building a vtable
-      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
-  --> tests/ui/fail/invalid_dyn_compatible_proof_tests.rs:11:8
+16 |     dyn_compatible
+   |     ^^^^^^^^^^^^^^
+
+error: direct supertrait `External` needs #[reflect(supertrait(External))] or #[reflect(external_trait(External, id = "..."))]
+  --> tests/ui/fail/invalid_dyn_compatible_proof_tests.rs:18:7
    |
-11 |     fn generic<T>(&self, value: T);
-   |        ^^^^^^^ ...because method `generic` has generic type parameters
-...
 18 | trait InvalidProof: External {}
-   |       ------------ this trait is not dyn compatible...
-   = help: consider moving `generic` to another trait
-   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
+   |       ^^^^^^^^^^^^

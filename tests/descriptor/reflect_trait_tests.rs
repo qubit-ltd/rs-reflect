@@ -31,21 +31,29 @@ fn test_reflect_trait_preserves_identity_generics_and_visible_method_metadata() 
         .trait_definition_by_name(concat!(module_path!(), "::GenericService"))
         .expect("the reflected trait definition is registered");
 
-    assert_eq!(definition.rust_name(), "GenericService");
-    assert_eq!(definition.generic_definition().parameters().len(), 1);
+    assert_eq!(definition.name(), "GenericService");
+    assert_eq!(definition.generics().parameters().len(), 1);
     assert_eq!(
         definition
             .methods()
             .iter()
-            .map(|method| method.rust_name())
+            .map(|method| method.name())
             .collect::<Vec<_>>(),
         ["required", "convert"]
     );
-    assert_eq!(definition.methods()[1].generic_definition().parameters().len(), 1);
+    assert_eq!(
+        definition
+            .method("convert")
+            .expect("generic method exists")
+            .generics()
+            .parameters()
+            .len(),
+        1
+    );
     assert!(
         definition
             .methods()
             .iter()
-            .all(|method| method.rust_name() != "omitted")
+            .all(|method| method.name() != "omitted")
     );
 }

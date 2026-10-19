@@ -12,9 +12,10 @@ use std::marker::PhantomData;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
 use qubit_reflect::descriptor::ImplKind;
-use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 struct Service<T: 'static>(PhantomData<T>);
@@ -52,26 +53,24 @@ impl<T: 'static> Service<T> {
 }
 
 fn implementation_definition_for(trait_name: Option<&str>) -> ImplDefinitionDescriptor<'static> {
-    let context = ReflectionContext::global();
-    context.initialize().expect("implementation fragments must validate");
-    context
-        .impl_definitions()
-        .expect("implementation definitions are available")
+    TypeDescriptor::of::<Service<u8>>()
+        .impls()
+        .expect("implementation applications are available")
         .iter()
-        .copied()
+        .map(|implementation| implementation.definition())
         .find(|definition| match trait_name {
             Some(name) => {
                 definition.kind() == ImplKind::Trait
-                    && definition.implemented_trait().is_some_and(|trait_| {
-                        trait_.path().ends_with(name)
-                    })
+                    && definition
+                        .implemented_trait()
+                        .is_some_and(|trait_| trait_.path().ends_with(name))
             }
             None => {
                 definition.kind() == ImplKind::Inherent
                     && definition
                         .methods()
                         .iter()
-                        .any(|method| method.rust_name() == "inherent")
+                        .any(|method| method.name() == "inherent")
             }
         })
         .expect("the requested implementation definition must be registered")
@@ -83,8 +82,11 @@ fn test_reflect_impl_preserves_method_declarations_and_generic_parameters() {
     let methods = implementation.methods();
 
     assert_eq!(methods.len(), 1);
-    assert_eq!(methods[0].rust_name(), "inherent");
-    assert_eq!(methods[0].generic_definition().parameters().len(), 1);
+    let method = methods
+        .get("inherent")
+        .expect("the inherent method declaration is present");
+    assert_eq!(method.name(), "inherent");
+    assert_eq!(method.generics().parameters().len(), 1);
 }
 
 #[test]
@@ -99,7 +101,7 @@ fn test_reflect_impl_skip_omits_method_without_changing_trait_declaration() {
     let trait_methods: Vec<_> = trait_definition
         .methods()
         .iter()
-        .map(|method| method.rust_name())
+        .map(|method| method.name())
         .collect();
     assert_eq!(trait_methods, ["convert"]);
 
@@ -107,7 +109,7 @@ fn test_reflect_impl_skip_omits_method_without_changing_trait_declaration() {
     let method_names: Vec<_> = implementation
         .methods()
         .iter()
-        .map(|method| method.rust_name())
+        .map(|method| method.name())
         .collect();
     assert_eq!(method_names, ["convert"]);
 }

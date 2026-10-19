@@ -1,5 +1,0 @@
-error: `no_construct` was removed; construction support is determined by the v3 descriptor API
-  --> tests/ui/fail/conflicting_skip_no_construct_tests.rs:12:21
-   |
-12 |     #[reflect(skip, no_construct)]
-   |                     ^^^^^^^^^^^^

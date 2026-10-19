@@ -1,14 +1,30 @@
-error[E0277]: the size for values of type `dyn Service` cannot be known at compilation time
+warning: type `__QubitReflectTraitDef_Service` should have an upper camel case name
+  --> tests/ui/fail/dyn_trait_dynamic_value_tests.rs:13:7
+   |
+13 | trait Service {
+   |       ^^^^^^^ help: convert the identifier to upper camel case: `QubitReflectTraitDefService`
+   |
+   = note: `#[warn(non_camel_case_types)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+error[E0277]: the trait bound `dyn Service: qubit_reflect::value::ValueForRef<Local>` is not satisfied
   --> tests/ui/fail/dyn_trait_dynamic_value_tests.rs:18:38
    |
 18 |     let _ = DynamicRef::<Local>::new(value);
-   |             ------------------------ ^^^^^ doesn't have a size known at compile-time
+   |             ------------------------ ^^^^^ the trait `Reflect` is not implemented for `dyn Service`
    |             |
    |             required by a bound introduced by this call
    |
-   = help: the trait `Sized` is not implemented for `dyn Service`
-note: required by a bound in `DynamicRef::<'a, qubit_reflect::value::Local>::new`
-  --> src/value/dynamic_ref.rs
+help: the following other types implement trait `Reflect`
+  --> src/runtime/value/builtin.rs
    |
-   |     pub fn new<T: Sized + 'static>(value: &'a T) -> Self {
-   |                   ^^^^^ required by this bound in `DynamicRef::<'a, Local>::new`
+   | impl Reflect for dyn std::fmt::Debug {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn Debug`
+...
+   | impl Reflect for dyn std::any::Any {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn Any`
+   = note: required for `dyn Service` to implement `qubit_reflect::value::ValueForRef<Local>`
+note: required by a bound in `qubit_reflect::value::DynamicRef::<'a, M>::new`
+  --> src/runtime/value/borrowed.rs
+   |
+   |     pub fn new<T: ValueForRef<M> + ?Sized>(value: &'a T) -> Self {
+   |                   ^^^^^^^^^^^^^^ required by this bound in `DynamicRef::<'a, M>::new`

@@ -10,7 +10,6 @@ use std::marker::PhantomData;
 
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Constrained<T>(PhantomData<T>);
 
 #[qubit_reflect::ReflectImpl(specialize(T = String))]

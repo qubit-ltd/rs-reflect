@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 // =============================================================================
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
@@ -14,7 +14,6 @@ use qubit_reflect::Reflect;
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-
 
 #[qubit_reflect::Reflect]
 enum Event<T> {
@@ -25,5 +24,5 @@ enum Event<T> {
 fn main() {
     let _ = Event::Value(7_u8);
     let _ = Event::<String>::Empty;
-    let _ = Event::<u8>::type_descriptor();
+    assert_eq!(TypeDescriptor::of::<Event<u8>>().name(), "Event");
 }

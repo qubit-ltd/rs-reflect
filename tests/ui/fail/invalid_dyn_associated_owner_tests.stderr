@@ -1,5 +1,25 @@
-error: `dyn_compatible` associated-type prefixes must name a direct supertrait
+error: reflection helper `supertrait` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:15:26
+   |
+15 | #[qubit_reflect::Reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
+   |                          ^^^^^^^^^^
+
+error: reflection helper `dyn_compatible` is unsupported; only `skip` is accepted
   --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:15:46
    |
 15 | #[qubit_reflect::Reflect(supertrait(Parent), dyn_compatible(Fake::Item))]
    |                                              ^^^^^^^^^^^^^^
+
+error: direct supertrait `Parent` needs #[reflect(supertrait(Parent))] or #[reflect(external_trait(Parent, id = "..."))]
+  --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:16:7
+   |
+16 | trait InvalidOwner: Parent {}
+   |       ^^^^^^^^^^^^
+
+warning: type `__QubitReflectTraitDef_Parent` should have an upper camel case name
+  --> tests/ui/fail/invalid_dyn_associated_owner_tests.rs:11:7
+   |
+11 | trait Parent {
+   |       ^^^^^^ help: convert the identifier to upper camel case: `QubitReflectTraitDefParent`
+   |
+   = note: `#[warn(non_camel_case_types)]` (part of `#[warn(nonstandard_style)]`) on by default

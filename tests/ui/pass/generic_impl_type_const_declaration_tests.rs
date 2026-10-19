@@ -8,11 +8,11 @@
 
 use std::marker::PhantomData;
 
-use qubit_reflect::Reflect;
-
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::Reflect as ReflectTrait;
 
 trait Element {
-    type Tail: Reflect;
+    type Tail: ReflectTrait;
 }
 
 struct Bytes;
@@ -22,7 +22,6 @@ impl Element for Bytes {
 }
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Buffer<T, const N: usize>(PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl]
@@ -37,5 +36,5 @@ impl<T: Element, const N: usize> Buffer<T, N> {
 }
 
 fn main() {
-    let _ = Buffer::<Bytes, 4>::type_descriptor();
+    assert_eq!(TypeDescriptor::of::<Buffer<Bytes, 4>>().name(), "Buffer");
 }

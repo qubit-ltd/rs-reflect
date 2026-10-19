@@ -1,5 +1,0 @@
-error: `no_invoke` cannot be combined with `catch_unwind`
-  --> tests/ui/fail/no_invoke_catch_unwind_tests.rs:15:26
-   |
-15 |     #[reflect(no_invoke, catch_unwind)]
-   |                          ^^^^^^^^^^^^

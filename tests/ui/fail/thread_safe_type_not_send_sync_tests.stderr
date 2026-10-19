@@ -1,5 +1,0 @@
-error: `thread_safe` was removed; use the local or thread-safe value API explicitly
-  --> tests/ui/fail/thread_safe_type_not_send_sync_tests.rs:10:11
-   |
-10 | #[reflect(thread_safe)]
-   |           ^^^^^^^^^^^

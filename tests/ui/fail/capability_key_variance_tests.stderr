@@ -1,8 +1,24 @@
-error[E0308]: mismatched types
-  --> tests/ui/fail/capability_key_variance_tests.rs:13:5
+warning: unused import: `qubit_reflect::capability::CloneCapability`
+  --> tests/ui/fail/capability_key_variance_tests.rs:10:5
    |
-13 |     key
-   |     ^^^ one type is more general than the other
+10 | use qubit_reflect::capability::CloneCapability;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = note: expected struct `CapabilityKey<fn(&str)>`
-              found struct `CapabilityKey<for<'a> fn(&'a str)>`
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0277]: the trait bound `NotClone: Clone` is not satisfied
+  --> tests/ui/fail/capability_key_variance_tests.rs:15:22
+   |
+15 | register_capability!(NotClone: CloneCapability);
+   |                      ^^^^^^^^ the trait `Clone` is not implemented for `NotClone`
+   |
+note: required by a bound in `register_clone`
+  --> src/private/codegen_v4/capability.rs
+   |
+   | pub fn register_clone<T: crate::runtime::descriptor::Reflect + std::clone::Clone + 'static>(
+   |                                                                ^^^^^^^^^^^^^^^^^ required by this bound in `register_clone`
+help: consider annotating `NotClone` with `#[derive(Clone)]`
+   |
+13 + #[derive(Clone)]
+14 | struct NotClone;
+   |

@@ -10,7 +10,6 @@ use std::rc::Rc;
 
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Opaque<T> {
     value: T,
 }

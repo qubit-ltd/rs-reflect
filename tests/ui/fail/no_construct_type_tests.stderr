@@ -1,5 +1,0 @@
-error: `no_construct` was removed; construction support is determined by the v3 descriptor API
-  --> tests/ui/fail/no_construct_type_tests.rs:11:11
-   |
-11 | #[reflect(no_construct)]
-   |           ^^^^^^^^^^^^

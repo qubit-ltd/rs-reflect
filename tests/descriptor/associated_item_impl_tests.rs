@@ -11,16 +11,15 @@
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::AssociatedConstImplementationSource;
+use qubit_reflect::descriptor::AssociatedItemSource;
 use qubit_reflect::descriptor::ImplDescriptor;
-use qubit_reflect::expression::TypeExpression;
 
 #[Reflect]
 struct AssociatedItemTarget;
 
 #[Reflect]
 trait AssociatedContract {
-    type Output: Reflect;
+    type Output: qubit_reflect::descriptor::Reflect;
 
     const DEFAULTED: u32 = 17;
     const OVERRIDDEN: u32 = 19;
@@ -33,16 +32,18 @@ impl AssociatedContract for AssociatedItemTarget {
     const OVERRIDDEN: u32 = 23;
 }
 
-fn implementation_for<T: Reflect>(trait_name: &str) -> ImplDescriptor<'static> {
+fn implementation_for<T: qubit_reflect::descriptor::Reflect>(
+    trait_name: &str,
+) -> ImplDescriptor<'static> {
     TypeDescriptor::of::<T>()
         .trait_impls()
         .expect("associated-item fragments must initialize")
         .iter()
-        .copied()
         .find(|implementation| {
             implementation
                 .implemented_trait()
-                .is_some_and(|descriptor| descriptor.definition().rust_name() == trait_name)
+                .and_then(|descriptor| descriptor.definition())
+                .is_some_and(|definition| definition.name() == trait_name)
         })
         .expect("the reflected trait implementation must be registered")
 }
@@ -50,35 +51,27 @@ fn implementation_for<T: Reflect>(trait_name: &str) -> ImplDescriptor<'static> {
 #[test]
 fn test_reflect_impl_records_associated_type_and_constant_bindings() {
     let implementation = implementation_for::<AssociatedItemTarget>("AssociatedContract");
-    let [output] = implementation.associated_types() else {
-        panic!("the associated type binding must be present")
-    };
-    assert_eq!(output.declaration().rust_name(), "Output");
-    assert!(matches!(
-        output.value(),
-        TypeExpression::Concrete(value)
-            if value.path().last().is_some_and(|segment| segment.as_ref() == "u16")
-    ));
-    assert!(std::ptr::eq(
+    let output = implementation
+        .associated_type("Output")
+        .expect("the associated type binding must be present");
+    assert_eq!(output.definition().name(), "Output");
+    assert!(format!("{}", output.expression().display()).contains("u16"));
+    assert_eq!(
         output
-            .concrete_type()
-            .expect("the declared Reflect bound proves a descriptor"),
-        TypeDescriptor::of::<u16>(),
-    ));
+            .find_concrete_type()
+            .expect("the declared Reflect bound proves a descriptor")
+            .type_id(),
+        TypeDescriptor::of::<u16>().type_id(),
+    );
 
-    let [defaulted, overridden] = implementation.associated_consts() else {
-        panic!("both associated constants must be described")
-    };
-    assert_eq!(defaulted.declaration().rust_name(), "DEFAULTED");
-    assert_eq!(overridden.declaration().rust_name(), "OVERRIDDEN");
-    assert_eq!(
-        defaulted.implementation_source(),
-        AssociatedConstImplementationSource::Defaulted
-    );
-    assert_eq!(
-        overridden.implementation_source(),
-        AssociatedConstImplementationSource::Overridden
-    );
-    assert_eq!(defaulted.read::<u32>().expect("default const reader"), Ok(17));
-    assert_eq!(overridden.read::<u32>().expect("override const reader"), Ok(23));
+    let defaulted = implementation
+        .associated_const("DEFAULTED")
+        .expect("the defaulted constant must be described");
+    let overridden = implementation
+        .associated_const("OVERRIDDEN")
+        .expect("the overridden constant must be described");
+    assert_eq!(defaulted.definition().name(), "DEFAULTED");
+    assert_eq!(overridden.definition().name(), "OVERRIDDEN");
+    assert_eq!(defaulted.source(), AssociatedItemSource::Defaulted);
+    assert_eq!(overridden.source(), AssociatedItemSource::Overridden);
 }

@@ -1,7 +1,13 @@
-error[E0308]: mismatched types
-  --> tests/ui/fail/reflected_trait_external_id_tests.rs:19:1
+error: reflection helper `external_trait_id` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/reflected_trait_external_id_tests.rs:18:30
    |
-19 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid.reflected.service")]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `()`, found `bool`
+18 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid.reflected.service")]
+   |                              ^^^^^^^^^^^^^^^^^
+
+warning: type `__QubitReflectTraitDef_ReflectedService` should have an upper camel case name
+  --> tests/ui/fail/reflected_trait_external_id_tests.rs:14:7
    |
-   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
+14 | trait ReflectedService {
+   |       ^^^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `QubitReflectTraitDefReflectedService`
+   |
+   = note: `#[warn(non_camel_case_types)]` (part of `#[warn(nonstandard_style)]`) on by default

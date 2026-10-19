@@ -1,0 +1,5 @@
+error: reflection helper `catch_unwind` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/removed_reflect_helper_tests.rs:14:15
+   |
+14 |     #[reflect(catch_unwind)]
+   |               ^^^^^^^^^^^^

@@ -1,5 +1,5 @@
-error: `invalid..identifier` is not a dot-separated stable identifier
-  --> tests/ui/fail/external_trait_id_tests.rs:13:50
+error: reflection helper `external_trait_id` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/external_trait_id_tests.rs:13:30
    |
 13 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid..identifier")]
-   |                                                  ^^^^^^^^^^^^^^^^^^^^^
+   |                              ^^^^^^^^^^^^^^^^^

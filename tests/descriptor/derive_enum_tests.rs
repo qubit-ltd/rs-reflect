@@ -11,11 +11,10 @@
 
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::access::{FieldAccessError, FieldSetError};
-use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::{FieldAccessError, FieldSetError, TypeKind};
 use qubit_reflect::value::{DynamicRef, Local};
 
-#[derive(Reflect)]
+#[Reflect]
 enum Event {
     Ready,
     Number(u32),

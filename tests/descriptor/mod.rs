@@ -21,11 +21,8 @@ mod default_trait_invocation_tests;
 mod derive_enum_tests;
 #[cfg(feature = "derive")]
 mod derive_struct_tests;
-mod expression_tests;
 #[cfg(feature = "derive")]
 mod generic_tests;
-mod identity_tests;
-mod method_descriptor_tests;
 mod optional_projection_tests;
 #[cfg(feature = "derive")]
 mod reflect_impl_tests;

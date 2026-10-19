@@ -1,5 +1,0 @@
-error[E0432]: unresolved import `qubit_reflect::ReflectedRef`
- --> tests/ui/fail/thread_safe_borrow_bound_tests.rs:9:5
-  |
-9 | use qubit_reflect::ReflectedRef;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectedRef` in the root

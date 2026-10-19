@@ -86,8 +86,8 @@ impl ConditionalTarget {
     }
 }
 
-fn method_names(definition: &TraitDefinitionDescriptor) -> Vec<&str> {
-    definition.methods().iter().map(|method| method.rust_name()).collect()
+fn method_names(definition: TraitDefinitionDescriptor<'_>) -> Vec<&'static str> {
+    definition.methods().iter().map(|method| method.name()).collect()
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn test_inactive_impl_member_has_no_descriptor_or_adapter() {
             implementation
                 .methods()
                 .iter()
-                .any(|method| method.rust_name() == "enabled")
+                .any(|method| method.name() == "enabled")
         })
         .expect("the active method's implementation must be registered");
 
@@ -158,7 +158,7 @@ fn test_inactive_impl_member_has_no_descriptor_or_adapter() {
         implementation
             .methods()
             .iter()
-            .map(|method| method.rust_name())
+            .map(|method| method.name())
             .collect::<Vec<_>>(),
         ["enabled", "configured_method"]
     );

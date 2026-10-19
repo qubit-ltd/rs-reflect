@@ -8,7 +8,6 @@
 
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct DefaultStrSample;
 
 #[qubit_reflect::Reflect]

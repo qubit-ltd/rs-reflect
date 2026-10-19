@@ -6,7 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::Reflect;
+use std::marker::PhantomData;
+
+use qubit_reflect::TypeDescriptor;
 // =============================================================================
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
@@ -15,13 +17,14 @@ use qubit_reflect::Reflect;
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-
 #[qubit_reflect::Reflect]
-struct Borrowed<'a> {
-    value: &'a str,
+struct Borrowed<'scope> {
+    marker: PhantomData<&'scope ()>,
 }
 
 fn main() {
-    let _ = Borrowed { value: "static" };
-    let _ = Borrowed::<'static>::type_descriptor();
+    let _ = Borrowed {
+        marker: PhantomData,
+    };
+    assert_eq!(TypeDescriptor::of::<Borrowed<'static>>().name(), "Borrowed");
 }

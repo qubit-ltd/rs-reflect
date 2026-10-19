@@ -8,23 +8,27 @@
 
 use std::marker::PhantomData;
 
+use qubit_reflect::TypeDescriptor;
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Constrained<T>(PhantomData<T>);
 
 #[qubit_reflect::ReflectImpl]
-impl<T: Clone + Send> Constrained<T>
-where
-    T: Sync,
-{
-}
+impl<T: Clone + Send> Constrained<T> where T: Sync {}
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
-struct Borrowed<'a, T>(PhantomData<&'a T>);
+struct Borrowed<'scope, T>(PhantomData<&'scope T>);
 
 #[qubit_reflect::ReflectImpl]
-impl<'a, T: 'a> Borrowed<'a, T> {}
+impl<'scope, T: 'scope> Borrowed<'scope, T> {}
 
-fn main() {}
+fn main() {
+    assert_eq!(
+        TypeDescriptor::of::<Constrained<u8>>().name(),
+        "Constrained"
+    );
+    assert_eq!(
+        TypeDescriptor::of::<Borrowed<'static, u8>>().name(),
+        "Borrowed"
+    );
+}

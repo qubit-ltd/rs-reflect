@@ -10,14 +10,12 @@ use std::marker::PhantomData;
 
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Missing<T, const N: usize>(PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl(specialize(T = u8))]
 impl<T, const N: usize> Missing<T, N> {}
 
 #[qubit_reflect::Reflect]
-#[reflect(opaque)]
 struct Duplicate<T, const N: usize>(PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl(specialize(T = u8, T = u16, N = 4))]

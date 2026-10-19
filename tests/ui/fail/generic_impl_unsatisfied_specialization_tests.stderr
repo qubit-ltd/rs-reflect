@@ -1,5 +1,5 @@
-error: `specialize` was removed; bind generic methods at the call site with `bind_method!`
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs:16:30
+error: reflection helper `specialize` is unsupported; only `skip` is accepted
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs:15:30
    |
-16 | #[qubit_reflect::ReflectImpl(specialize(T = String))]
+15 | #[qubit_reflect::ReflectImpl(specialize(T = String))]
    |                              ^^^^^^^^^^
