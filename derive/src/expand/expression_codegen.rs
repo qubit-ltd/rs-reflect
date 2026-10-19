@@ -233,6 +233,11 @@ fn leak_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
     ))
 }
 
+fn leak_expression_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
+    let values = values.into_iter().map(|value| quote!(&*#value));
+    leak_slice(values)
+}
+
 fn leaked_expression(expression: TokenStream) -> TokenStream {
     quote!(::std::boxed::Box::leak(::std::boxed::Box::new(#expression)))
 }
@@ -346,7 +351,7 @@ pub(crate) fn type_expression(
             let elements = elements
                 .iter()
                 .map(|element| type_expression(element, environment, facade));
-            let elements = leak_slice(elements);
+            let elements = leak_expression_slice(elements);
             leaked_expression(
                 quote!(#facade::__private::codegen_v4::expression::ExpressionData::Tuple(#elements)),
             )
@@ -385,7 +390,7 @@ pub(crate) fn type_expression(
             let parameters = inputs
                 .iter()
                 .map(|value| type_expression(value, environment, facade));
-            let parameters = leak_slice(parameters);
+            let parameters = leak_expression_slice(parameters);
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
@@ -1072,6 +1077,16 @@ mod tests {
     }
 
     /// Verifies generic arguments remain attached to every path segment.
+    #[test]
+    fn test_type_expression_leaks_immutable_function_argument_slice() {
+        let generated = render_type("for<'a> fn(&'a u8)", &GenericEnvironment::new());
+
+        assert!(
+            generated.contains("& *"),
+            "function argument slices must coerce leaked expressions to shared references"
+        );
+    }
+
     #[test]
     fn test_type_expression_preserves_arguments_on_each_path_segment() {
         let rendered = render_type("Outer<u8>::Inner<u16>", &GenericEnvironment::new());

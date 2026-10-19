@@ -247,7 +247,7 @@ fn emit_default_method(
                 TypeKindIr::Reference { .. } => {
                     quote!(#codegen::invoke::InvocationOutput::shared_with_origins(
                         #call,
-                        ::std::vec![#(#borrow_origins),*].into_boxed_slice(),
+                        &[#(#borrow_origins),*],
                     ))
                 }
                 _ => quote!(#codegen::invoke::InvocationOutput::owned(#call)),
