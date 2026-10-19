@@ -216,7 +216,7 @@ impl<'ctx> Methods<'ctx> {
     pub(crate) fn iter(&self) -> impl ExactSizeIterator<Item = MethodDescriptor<'ctx>> + '_ {
         self.values
             .iter()
-            .map(|method| MethodDescriptor::new(method, self.context))
+            .map(|method| MethodDescriptor::new(*method, self.context))
     }
     pub(crate) fn len(&self) -> usize {
         self.values.len()
@@ -228,7 +228,7 @@ impl<'ctx> Methods<'ctx> {
         self.values
             .iter()
             .find(|method| method.metadata.name == name)
-            .map(|method| MethodDescriptor::new(method, self.context))
+            .map(|method| MethodDescriptor::new(*method, self.context))
     }
 }
 
