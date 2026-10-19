@@ -106,14 +106,14 @@ static STRING_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata {
     parameter: &TRAIT_PARAMETER,
     kind: GenericArgumentMetadataKind::Type {
         expression: &STRING_EXPR,
-        concrete: Some(&STRING_METADATA),
+        concrete: Some(string_type_metadata),
     },
 };
 static U64_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata {
     parameter: &TRAIT_PARAMETER,
     kind: GenericArgumentMetadataKind::Type {
         expression: &U64_EXPR,
-        concrete: Some(&U64_METADATA),
+        concrete: Some(u64_type_metadata),
     },
 };
 static STRING_ARGUMENTS: &[GenericArgumentMetadata] = &[STRING_ARGUMENT];

@@ -74,10 +74,10 @@ impl CapabilityValueMode for ThreadSafe {
     }
 }
 
-pub(crate) struct SendCapability;
-pub(crate) struct SyncCapability;
-pub(crate) struct CloneCapability;
-pub(crate) struct DefaultCapability;
+pub struct SendCapability;
+pub struct SyncCapability;
+pub struct CloneCapability;
+pub struct DefaultCapability;
 
 impl CapabilitySpec for SendCapability {
     type Adapter = ();

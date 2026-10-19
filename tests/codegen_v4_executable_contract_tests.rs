@@ -1,11 +1,16 @@
+use qubit_reflect::__private::codegen_v4::expression::ExpressionData;
 use qubit_reflect::__private::codegen_v4::invoke::{
     EffectiveMethod, FunctionInvocationAdapter, InvocationAdapter, InvocationAdapters,
     InvocationOutput, MethodCatalogRegistration, MethodMetadata, MethodMetadataSpec,
     ValidatedInvocation,
 };
+use qubit_reflect::__private::codegen_v4::invoke::{ReceiverDescriptor, ReceiverKind};
 use qubit_reflect::__private::codegen_v4::value::Local;
 
 struct Fixture;
+
+#[derive(Clone)]
+struct CloneableFixture;
 
 impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Fixture {
     fn __reflect_registration()
@@ -16,6 +21,24 @@ impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Fixture {
         &REGISTRATION
     }
 }
+
+impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for CloneableFixture {
+    fn __reflect_registration()
+    -> &'static qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<Self> {
+        static REGISTRATION: qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration<
+            CloneableFixture,
+        > = qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration::new();
+        &REGISTRATION
+    }
+}
+
+static SELF_EXPRESSION: ExpressionData = ExpressionData::SelfType;
+static TRAIT_SELF_RECEIVER: ReceiverDescriptor =
+    ReceiverDescriptor::trait_self(ReceiverKind::Shared, &SELF_EXPRESSION);
+
+qubit_reflect::__private::codegen_v4::capability::register_capability!(
+    CloneableFixture: CloneCapability
+);
 
 fn return_argument<'call>(
     invocation: ValidatedInvocation<'call, Local>,
@@ -42,5 +65,6 @@ static CATALOG: MethodCatalogRegistration = MethodCatalogRegistration::new::<Fix
 #[test]
 fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
     assert_eq!(qubit_reflect::__private::codegen_v4::PROTOCOL_VERSION, 4);
+    let _ = (&TRAIT_SELF_RECEIVER, CloneableFixture);
     let _ = &CATALOG;
 }
