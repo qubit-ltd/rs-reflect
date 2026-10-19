@@ -40,6 +40,7 @@ pub use crate::runtime::invoke::FunctionInvocationAdapter;
 pub use crate::runtime::invoke::InvocationAdapter;
 pub use crate::runtime::invoke::InvocationOutput;
 pub use crate::runtime::invoke::InvocationReceiver;
+pub use crate::runtime::invoke::InvocationUnavailableReason;
 pub use crate::runtime::invoke::InvocationValue;
 pub use crate::runtime::invoke::PinnedFunctionInvocationAdapter;
 pub use crate::runtime::invoke::PinnedReceiver;

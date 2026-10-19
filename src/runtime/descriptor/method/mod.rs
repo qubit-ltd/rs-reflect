@@ -500,10 +500,54 @@ impl EffectiveMethod {
         self
     }
 
+    /// Records why this implementation cannot be called through dynamic invocation.
+    pub const fn with_unavailable(
+        mut self,
+        reasons: &'static [InvocationUnavailableReason],
+    ) -> Self {
+        self.availability = MethodAvailability::Unavailable { reasons };
+        self.specializations = &[];
+        self.adapters = None;
+        self
+    }
+
     /// Records whether the callable implementation is declared, defaulted, or overridden.
     pub const fn with_source(mut self, source: MethodImplementationSource) -> Self {
         self.source = source;
         self
+    }
+
+    pub(crate) fn same_registration(&self, other: &Self) -> bool {
+        self.target_type_id() == other.target_type_id()
+            && std::ptr::eq(self.metadata, other.metadata)
+            && self.source == other.source
+            && self.availability == other.availability
+            && std::ptr::eq(self.specializations, other.specializations)
+            && same_adapters(self.adapters, other.adapters)
+    }
+
+    pub(crate) fn target_type_id(&self) -> std::any::TypeId {
+        (self.target)().type_id()
+    }
+}
+
+fn same_adapters(left: Option<InvocationAdapters>, right: Option<InvocationAdapters>) -> bool {
+    let (Some(left), Some(right)) = (left, right) else {
+        return left.is_none() && right.is_none();
+    };
+    same_adapter(left.local, right.local)
+        && same_adapter(left.thread_safe, right.thread_safe)
+        && same_adapter(left.catching_local, right.catching_local)
+        && same_adapter(left.catching_thread_safe, right.catching_thread_safe)
+        && same_adapter(left.pinned_local, right.pinned_local)
+        && same_adapter(left.pinned_thread_safe, right.pinned_thread_safe)
+}
+
+fn same_adapter<T: ?Sized>(left: Option<&'static T>, right: Option<&'static T>) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => std::ptr::eq(left, right),
+        (None, None) => true,
+        _ => false,
     }
 }
 
@@ -603,15 +647,12 @@ impl InvocationAdaptersBuilder {
 /// A method declaration combined with its effective implementation in one context.
 #[derive(Clone, Copy)]
 pub struct MethodDescriptor<'ctx> {
-    effective: &'ctx EffectiveMethod,
+    effective: EffectiveMethod,
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> MethodDescriptor<'ctx> {
-    pub(crate) const fn new(
-        effective: &'ctx EffectiveMethod,
-        context: &'ctx ReflectionContext,
-    ) -> Self {
+    pub(crate) const fn new(effective: EffectiveMethod, context: &'ctx ReflectionContext) -> Self {
         Self { effective, context }
     }
     pub(crate) fn context(self) -> &'ctx ReflectionContext {
@@ -1046,10 +1087,16 @@ impl InvocationAdapters {
 }
 
 /// An explicit set of methods used by context registration to build lookups.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct MethodCatalog<'ctx> {
     target: TypeDescriptor<'ctx>,
-    methods: &'ctx [EffectiveMethod],
+    methods: MethodCatalogMethods<'ctx>,
+}
+
+#[derive(Clone)]
+enum MethodCatalogMethods<'ctx> {
+    Borrowed(&'ctx [EffectiveMethod]),
+    Shared(std::sync::Arc<[EffectiveMethod]>),
 }
 
 /// Static source metadata for a target's effective method catalog.
@@ -1078,25 +1125,42 @@ impl MethodCatalogRegistration {
 inventory::collect!(MethodCatalogRegistration);
 
 impl<'ctx> MethodCatalog<'ctx> {
-    pub(crate) const fn new(
+    pub(crate) fn new(target: TypeDescriptor<'ctx>, methods: &'ctx [EffectiveMethod]) -> Self {
+        Self {
+            target,
+            methods: MethodCatalogMethods::Borrowed(methods),
+        }
+    }
+
+    pub(crate) fn from_shared(
         target: TypeDescriptor<'ctx>,
-        methods: &'ctx [EffectiveMethod],
+        methods: std::sync::Arc<[EffectiveMethod]>,
     ) -> Self {
-        Self { target, methods }
+        Self {
+            target,
+            methods: MethodCatalogMethods::Shared(methods),
+        }
+    }
+
+    fn methods(&self) -> &[EffectiveMethod] {
+        match &self.methods {
+            MethodCatalogMethods::Borrowed(methods) => methods,
+            MethodCatalogMethods::Shared(methods) => methods,
+        }
     }
     pub(crate) fn lookup_method(
-        self,
+        &self,
         name: &str,
     ) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
         Ok(self.lookup(|method| method.metadata.name == name))
     }
-    pub(crate) fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
+    pub(crate) fn method(&self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.lookup_method(name)
             .map_err(LookupError::Context)?
             .into_unique(LookupSubject::Method, LookupQuery::Name(name.into()))
     }
     pub(crate) fn find_inherent_method(
-        self,
+        &self,
         name: &str,
     ) -> Result<Option<MethodDescriptor<'ctx>>, ContextError> {
         match self.lookup(|method| {
@@ -1113,7 +1177,10 @@ impl<'ctx> MethodCatalog<'ctx> {
             }
         }
     }
-    pub(crate) fn inherent_method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
+    pub(crate) fn inherent_method(
+        &self,
+        name: &str,
+    ) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.find_inherent_method(name)
             .map_err(LookupError::Context)?
             .ok_or_else(|| LookupError::Missing {
@@ -1122,14 +1189,14 @@ impl<'ctx> MethodCatalog<'ctx> {
             })
     }
     pub(crate) fn lookup_trait_method(
-        self,
+        &self,
         trait_: &str,
         name: &str,
     ) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
         Ok(self.lookup(|method| method.metadata.name == name && matches!(method.metadata.namespace, MethodNamespaceMetadata::Trait { trait_: candidate, .. } if candidate == trait_)))
     }
     pub(crate) fn find_trait_method(
-        self,
+        &self,
         trait_: &str,
         name: &str,
     ) -> Result<Option<MethodDescriptor<'ctx>>, ContextError> {
@@ -1142,7 +1209,7 @@ impl<'ctx> MethodCatalog<'ctx> {
         }
     }
     pub(crate) fn trait_method(
-        self,
+        &self,
         trait_: &str,
         name: &str,
     ) -> Result<MethodDescriptor<'ctx>, LookupError> {
@@ -1154,16 +1221,16 @@ impl<'ctx> MethodCatalog<'ctx> {
             })
     }
     fn lookup(
-        self,
+        &self,
         predicate: impl Fn(&EffectiveMethod) -> bool,
     ) -> Lookup<MethodDescriptor<'ctx>> {
         let mut matches = self
-            .methods
+            .methods()
             .iter()
             .filter(|method| {
                 (method.target)().type_id() == self.target.type_id() && predicate(method)
             })
-            .map(|method| MethodDescriptor::new(method, self.target.context()));
+            .map(|method| MethodDescriptor::new(*method, self.target.context()));
         let Some(first) = matches.next() else {
             return Lookup::Missing;
         };
@@ -1316,4 +1383,3 @@ fn specialization_candidate(index: usize) -> LookupCandidate {
         origin: None,
     }
 }
-

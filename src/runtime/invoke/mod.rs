@@ -1022,7 +1022,7 @@ pub(crate) enum InvocationAvailability {
 
 /// Reasons a method cannot cross the dynamic invocation boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum InvocationUnavailableReason {
+pub enum InvocationUnavailableReason {
     UnsupportedReceiver,
     AdapterUnavailable,
     UnsupportedParameterPattern,

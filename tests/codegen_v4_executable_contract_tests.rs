@@ -1,8 +1,8 @@
 use qubit_reflect::__private::codegen_v4::expression::ExpressionData;
 use qubit_reflect::__private::codegen_v4::invoke::{
     EffectiveMethod, FunctionInvocationAdapter, InvocationAdapter, InvocationAdapters,
-    InvocationOutput, MethodCatalogRegistration, MethodMetadata, MethodMetadataSpec,
-    ValidatedInvocation,
+    InvocationOutput, InvocationUnavailableReason, MethodCatalogRegistration, MethodMetadata,
+    MethodMetadataSpec, ValidatedInvocation,
 };
 use qubit_reflect::__private::codegen_v4::invoke::{ReceiverDescriptor, ReceiverKind};
 use qubit_reflect::__private::codegen_v4::value::Local;
@@ -60,11 +60,16 @@ static METADATA: MethodMetadata =
 static ADAPTERS: InvocationAdapters = InvocationAdapters::builder().local(&ADAPTER).build();
 static METHODS: [EffectiveMethod; 1] =
     [EffectiveMethod::for_type::<Fixture>(&METADATA).with_adapters(ADAPTERS)];
+static UNAVAILABLE_METHOD: EffectiveMethod = EffectiveMethod::for_type::<Fixture>(&METADATA)
+    .with_unavailable(&[
+        InvocationUnavailableReason::UnsupportedReceiver,
+        InvocationUnavailableReason::UnsafeMethod,
+    ]);
 static CATALOG: MethodCatalogRegistration = MethodCatalogRegistration::new::<Fixture>(&METHODS);
 
 #[test]
 fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
     assert_eq!(qubit_reflect::__private::codegen_v4::PROTOCOL_VERSION, 4);
-    let _ = (&TRAIT_SELF_RECEIVER, CloneableFixture);
+    let _ = (&TRAIT_SELF_RECEIVER, &UNAVAILABLE_METHOD, CloneableFixture);
     let _ = &CATALOG;
 }
