@@ -11,7 +11,9 @@
 
 use std::marker::PhantomData;
 
-use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
+use crate::runtime::descriptor::generic::{
+    GenericArgumentMetadata, GenericDefinitionMetadata, GenericParameterMetadata,
+};
 use crate::runtime::descriptor::impl_descriptor::{
     AssociatedConstBindingMetadata, AssociatedTypeBindingMetadata, ImplApplicationMetadata,
     ImplDefinitionMetadata, ImplKind, ImplQualifiers,
@@ -70,6 +72,17 @@ impl<D: 'static> ImplDefinitionSpec<D> {
     /// Borrows this static definition for a typed application.
     pub const fn metadata(&'static self) -> &'static ImplDefinitionMetadata {
         &self.metadata
+    }
+
+    /// Returns an impl generic parameter by its source-order index.
+    pub const fn generic_parameter_at(
+        &'static self,
+        index: usize,
+    ) -> &'static GenericParameterMetadata {
+        if index >= self.metadata.generics.parameters.len() {
+            panic!("impl generic parameter index is out of range");
+        }
+        &self.metadata.generics.parameters[index]
     }
 }
 
@@ -152,6 +165,14 @@ pub fn register_impl_definition<D: 'static>(
         .with_impl_definition(definition.metadata())
 }
 
+/// Builds an impl definition registration from a cached static metadata provider.
+#[doc(hidden)]
+pub fn register_impl_definition_from<D: 'static>(
+    definition: fn() -> &'static ImplDefinitionSpec<D>,
+) -> crate::__private::codegen_v4::registration::Registration {
+    register_impl_definition(definition())
+}
+
 /// Builds a concrete registration value from an impl application.
 #[doc(hidden)]
 pub fn register_impl_application<T: crate::runtime::descriptor::Reflect + 'static>(
@@ -159,6 +180,14 @@ pub fn register_impl_application<T: crate::runtime::descriptor::Reflect + 'stati
 ) -> crate::__private::codegen_v4::registration::Registration {
     crate::__private::codegen_v4::registration::Registration::of::<T>()
         .with_impl_application(application.metadata())
+}
+
+/// Builds an impl application registration from a cached static metadata provider.
+#[doc(hidden)]
+pub fn register_impl_application_from<T: crate::runtime::descriptor::Reflect + 'static>(
+    application: fn() -> &'static ImplApplicationSpec<T>,
+) -> crate::__private::codegen_v4::registration::Registration {
+    register_impl_application(application())
 }
 
 const fn no_dependencies() -> &'static [std::any::TypeId] {
@@ -202,7 +231,22 @@ pub const fn impl_application_fragment<T: crate::runtime::descriptor::Reflect + 
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __qubit_reflect_submit_impl_definition {
-    ($marker:ty, $definition:expr) => {
+    ($marker:ty, $definition:path) => {
+        const _: () = {
+            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
+                $crate::__private::codegen_v4::impls::register_impl_definition_from::<$marker>(
+                    $definition,
+                )
+            }
+            $crate::__private::__inventory::submit! {
+                $crate::__private::codegen_v4::impls::impl_definition_fragment(
+                    stringify!($marker),
+                    registration,
+                )
+            }
+        };
+    };
+    ($marker:ty, static $definition:expr) => {
         const _: () = {
             static DEFINITION: $crate::__private::codegen_v4::impls::ImplDefinitionSpec<$marker> =
                 $definition;
@@ -226,7 +270,22 @@ pub use crate::__qubit_reflect_submit_impl_definition as submit_impl_definition;
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __qubit_reflect_submit_impl_application {
-    ($target:ty, $application:expr) => {
+    ($target:ty, $application:path) => {
+        const _: () = {
+            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
+                $crate::__private::codegen_v4::impls::register_impl_application_from::<$target>(
+                    $application,
+                )
+            }
+            $crate::__private::__inventory::submit! {
+                $crate::__private::codegen_v4::impls::impl_application_fragment::<$target>(
+                    concat!(stringify!($target), "::impl-application"),
+                    registration,
+                )
+            }
+        };
+    };
+    ($target:ty, static $application:expr) => {
         const _: () = {
             static APPLICATION: $crate::__private::codegen_v4::impls::ImplApplicationSpec<$target> =
                 $application;

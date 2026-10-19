@@ -11,6 +11,7 @@
 
 use std::marker::PhantomData;
 
+use crate::runtime::descriptor::generic::GenericParameterMetadata;
 use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
 use crate::runtime::descriptor::method::MethodMetadata;
 use crate::runtime::descriptor::trait_descriptor::{
@@ -92,6 +93,38 @@ impl<D: 'static> TraitDefinitionSpec<D> {
         &self.metadata.associated_types[index]
     }
 
+    /// Returns the number of associated type declarations.
+    pub const fn associated_type_count(&self) -> usize {
+        self.metadata.associated_types.len()
+    }
+
+    /// Finds an associated type declaration by its Rust item name.
+    pub const fn associated_type_named(
+        &'static self,
+        name: &'static str,
+    ) -> &'static AssociatedTypeDefinitionMetadata {
+        let mut index = 0;
+        while index < self.metadata.associated_types.len() {
+            let item = &self.metadata.associated_types[index];
+            if const_str_eq(item.name, name) {
+                return item;
+            }
+            index += 1;
+        }
+        panic!("associated type name is not declared by this trait");
+    }
+
+    /// Returns a trait generic parameter by its source-order index.
+    pub const fn generic_parameter_at(
+        &'static self,
+        index: usize,
+    ) -> &'static GenericParameterMetadata {
+        if index >= self.metadata.generics.parameters.len() {
+            panic!("trait generic parameter index is out of range");
+        }
+        &self.metadata.generics.parameters[index]
+    }
+
     /// Returns an associated constant declaration by its source-order index.
     pub const fn associated_const_at(
         &'static self,
@@ -102,6 +135,43 @@ impl<D: 'static> TraitDefinitionSpec<D> {
         }
         &self.metadata.associated_consts[index]
     }
+
+    /// Returns the number of associated constant declarations.
+    pub const fn associated_const_count(&self) -> usize {
+        self.metadata.associated_consts.len()
+    }
+
+    /// Finds an associated constant declaration by its Rust item name.
+    pub const fn associated_const_named(
+        &'static self,
+        name: &'static str,
+    ) -> &'static AssociatedConstDefinitionMetadata {
+        let mut index = 0;
+        while index < self.metadata.associated_consts.len() {
+            let item = &self.metadata.associated_consts[index];
+            if const_str_eq(item.name, name) {
+                return item;
+            }
+            index += 1;
+        }
+        panic!("associated constant name is not declared by this trait");
+    }
+}
+
+const fn const_str_eq(left: &str, right: &str) -> bool {
+    let left_bytes = left.as_bytes();
+    let right_bytes = right.as_bytes();
+    if left_bytes.len() != right_bytes.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left_bytes.len() {
+        if left_bytes[index] != right_bytes[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }
 
 /// Marker-bound static metadata for one compiled trait application.
@@ -187,6 +257,14 @@ pub fn register_trait_definition<D: 'static>(
         .with_trait_definition(definition.metadata())
 }
 
+/// Builds a trait definition registration from a cached static metadata provider.
+#[doc(hidden)]
+pub fn register_trait_definition_from<D: 'static>(
+    definition: fn() -> &'static TraitDefinitionSpec<D>,
+) -> crate::__private::codegen_v4::registration::Registration {
+    register_trait_definition(definition())
+}
+
 /// Builds a concrete trait application registration for target `T`.
 #[doc(hidden)]
 pub fn register_trait_application<T: crate::runtime::descriptor::Reflect + 'static>(
@@ -194,6 +272,14 @@ pub fn register_trait_application<T: crate::runtime::descriptor::Reflect + 'stat
 ) -> crate::__private::codegen_v4::registration::Registration {
     crate::__private::codegen_v4::registration::Registration::of::<T>()
         .with_trait_application(application.metadata())
+}
+
+/// Builds an application registration from a cached static metadata provider.
+#[doc(hidden)]
+pub fn register_trait_application_from<T: crate::runtime::descriptor::Reflect + 'static>(
+    application: fn() -> &'static TraitApplicationSpec<T>,
+) -> crate::__private::codegen_v4::registration::Registration {
+    register_trait_application(application())
 }
 
 /// Creates a global metadata fragment without exposing raw inventory payloads.
@@ -233,7 +319,22 @@ pub const fn trait_application_fragment<T: crate::runtime::descriptor::Reflect +
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __qubit_reflect_submit_trait_definition {
-    ($marker:ty, $definition:expr) => {
+    ($marker:ty, $definition:path) => {
+        const _: () = {
+            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
+                $crate::__private::codegen_v4::traits::register_trait_definition_from::<$marker>(
+                    $definition,
+                )
+            }
+            $crate::__private::__inventory::submit! {
+                $crate::__private::codegen_v4::traits::trait_definition_fragment(
+                    stringify!($marker),
+                    registration,
+                )
+            }
+        };
+    };
+    ($marker:ty, static $definition:expr) => {
         const _: () = {
             static DEFINITION: $crate::__private::codegen_v4::traits::TraitDefinitionSpec<$marker> =
                 $definition;
@@ -257,7 +358,22 @@ pub use crate::__qubit_reflect_submit_trait_definition as submit_trait_definitio
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __qubit_reflect_submit_trait_application {
-    ($target:ty, $application:expr) => {
+    ($target:ty, $application:path) => {
+        const _: () = {
+            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
+                $crate::__private::codegen_v4::traits::register_trait_application_from::<$target>(
+                    $application,
+                )
+            }
+            $crate::__private::__inventory::submit! {
+                $crate::__private::codegen_v4::traits::trait_application_fragment::<$target>(
+                    concat!(stringify!($target), "::trait-application"),
+                    registration,
+                )
+            }
+        };
+    };
+    ($target:ty, static $application:expr) => {
         const _: () = {
             static APPLICATION: $crate::__private::codegen_v4::traits::TraitApplicationSpec<
                 $target,
