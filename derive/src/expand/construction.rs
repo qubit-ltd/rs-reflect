@@ -32,7 +32,10 @@ use crate::ir::VariantKindIr;
 ///
 /// Returns generated local adapters.
 #[must_use]
-pub(crate) fn struct_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) -> TokenStream {
+pub(crate) fn struct_adapters(
+    declaration: &TypeDeclarationIr,
+    facade: &TokenStream,
+) -> TokenStream {
     if super::generics::has_skipped_field(declaration, None) {
         return TokenStream::new();
     }
@@ -145,7 +148,8 @@ fn struct_local_adapters(declaration: &TypeDeclarationIr, facade: &TokenStream) 
         FieldShapeIr::Named => {
             let assignments = declaration.fields.iter().zip(values).map(|(field, value)| {
                 let name = field.name.as_ref().expect("named struct field");
-                let cfg_attributes = super::generics::field_cfg_attributes(declaration, None, field.index);
+                let cfg_attributes =
+                    super::generics::field_cfg_attributes(declaration, None, field.index);
                 quote!(#(#cfg_attributes)* #name: #value)
             });
             quote!(Self { #(#assignments),* })
@@ -287,7 +291,11 @@ pub(crate) fn variant_adapters(
 /// Returns generated items, or an empty stream when construction is disabled
 /// for the variant.
 #[must_use]
-fn variant_local_adapter(declaration: &TypeDeclarationIr, variant: &VariantIr, facade: &TokenStream) -> TokenStream {
+fn variant_local_adapter(
+    declaration: &TypeDeclarationIr,
+    variant: &VariantIr,
+    facade: &TokenStream,
+) -> TokenStream {
     if variant
         .attributes
         .iter()
@@ -296,17 +304,22 @@ fn variant_local_adapter(declaration: &TypeDeclarationIr, variant: &VariantIr, f
         return TokenStream::new();
     }
     let variant_index = variant.index;
-    let variant_cfg_attributes = super::generics::variant_cfg_attributes(declaration, variant_index);
+    let variant_cfg_attributes =
+        super::generics::variant_cfg_attributes(declaration, variant_index);
     let constructor = format_ident!("__qubit_reflect_variant_constructor_{variant_index}");
     let adapter = format_ident!("__qubit_reflect_construct_variant_{variant_index}");
     let mode = quote!(#facade::__private::codegen_v3::value::Local);
     let default_providers = variant.fields.iter().filter_map(|field| {
-        let cfg_attributes = super::generics::field_cfg_attributes(declaration, Some(variant_index), field.index);
+        let cfg_attributes =
+            super::generics::field_cfg_attributes(declaration, Some(variant_index), field.index);
         let default = field
             .attributes
             .iter()
             .find(|attribute| attribute.name == HelperName::Default)?;
-        let provider = format_ident!("__qubit_reflect_default_variant_{variant_index}_field_{}", field.index);
+        let provider = format_ident!(
+            "__qubit_reflect_default_variant_{variant_index}_field_{}",
+            field.index
+        );
         let ty = &field.ty.tokens;
         let expression = match &default.value {
             HelperValueIr::DefaultPath(None) => {
@@ -361,7 +374,8 @@ fn variant_local_adapter(declaration: &TypeDeclarationIr, variant: &VariantIr, f
         quote!(#(#variant_cfg_attributes)* #(#cfg_attributes)* #index => #policy)
     });
     let values = fields.clone().map(|field| {
-        let cfg_attributes = super::generics::field_cfg_attributes(declaration, Some(variant_index), field.index);
+        let cfg_attributes =
+            super::generics::field_cfg_attributes(declaration, Some(variant_index), field.index);
         let ty = &field.ty.tokens;
         quote!(
             #(#variant_cfg_attributes)*
@@ -378,8 +392,11 @@ fn variant_local_adapter(declaration: &TypeDeclarationIr, variant: &VariantIr, f
         VariantKindIr::Struct => {
             let assignments = variant.fields.iter().zip(values).map(|(field, value)| {
                 let name = field.name.as_ref().expect("named variant field");
-                let cfg_attributes =
-                    super::generics::field_cfg_attributes(declaration, Some(variant_index), field.index);
+                let cfg_attributes = super::generics::field_cfg_attributes(
+                    declaration,
+                    Some(variant_index),
+                    field.index,
+                );
                 quote!(#(#variant_cfg_attributes)* #(#cfg_attributes)* #name: #value)
             });
             quote!(Self::#variant_name { #(#assignments),* })
@@ -413,6 +430,90 @@ fn variant_local_adapter(declaration: &TypeDeclarationIr, variant: &VariantIr, f
                 ),
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+
+    use crate::expand::ExpansionContext;
+    use crate::ir::DeclarationIr;
+    use crate::ir::MacroKind;
+    use crate::parse::parse_declaration;
+
+    #[test]
+    fn test_struct_construction_emits_codegen_v4_only() {
+        let parsed = parse_declaration(
+            MacroKind::Derive,
+            quote!(),
+            quote! {
+                struct Fixture {
+                    value: u8,
+                }
+            },
+        )
+        .expect("the construction fixture must parse");
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("the construction fixture must produce a type declaration");
+        };
+        let generated = crate::expand::structs::expand(declaration, &ExpansionContext::for_tests())
+            .expect("the struct should expand")
+            .to_string();
+
+        assert!(
+            generated.contains("codegen_v4"),
+            "struct construction must use the v4 protocol"
+        );
+        assert!(
+            !generated.contains("codegen_v3"),
+            "struct construction must not use the v3 protocol"
+        );
+        assert!(
+            generated.contains("ConstructProvider"),
+            "struct construction must emit a typed provider"
+        );
+        assert!(
+            generated.contains("ConstructionPlan :: for_type"),
+            "struct construction must emit a plan"
+        );
+    }
+
+    #[test]
+    fn test_variant_construction_emits_codegen_v4_only() {
+        let parsed = parse_declaration(
+            MacroKind::Derive,
+            quote!(),
+            quote! {
+                enum Fixture {
+                    Value(u8),
+                }
+            },
+        )
+        .expect("the construction fixture must parse");
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("the construction fixture must produce a type declaration");
+        };
+        let generated = crate::expand::enums::expand(declaration, &ExpansionContext::for_tests())
+            .expect("the enum should expand")
+            .to_string();
+
+        assert!(
+            generated.contains("codegen_v4"),
+            "variant construction must use the v4 protocol"
+        );
+        assert!(
+            !generated.contains("codegen_v3"),
+            "variant construction must not use the v3 protocol"
+        );
+        assert!(
+            generated.contains("ConstructProvider"),
+            "variant construction must emit a typed provider"
+        );
+        assert!(
+            generated.contains("ConstructionPlan :: for_variant"),
+            "variant construction must emit a plan"
+        );
     }
 }
 

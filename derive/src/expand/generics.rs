@@ -1227,7 +1227,7 @@ mod tests {
                 struct Transparent<T, U> {
                     nested: std::vec::Vec<std::boxed::Box<T>>,
                     custom: Custom<U>,
-                    #[reflect(opaque)]
+                    #[reflect(skip)]
                     hidden: U,
                 }
             },
@@ -1246,6 +1246,41 @@ mod tests {
             parameters,
             ["T"],
             "only parameters under known transparent containers should be reflected",
+        );
+    }
+
+    #[test]
+    fn test_generic_definition_emits_codegen_v4_without_codegen_v3() {
+        let parsed = parse_declaration(
+            MacroKind::Derive,
+            quote!(),
+            quote! {
+                struct Generic<'a, T: Copy, const N: usize>
+                where
+                    T: 'a,
+                {
+                    value: Unreflected<'a, T, N>,
+                }
+            },
+        )
+        .expect("the generic fixture must parse");
+        let DeclarationIr::Type(declaration) = parsed.declaration else {
+            panic!("the generic fixture must produce a type declaration");
+        };
+        let generated = super::super::expression_codegen::generic_definition(
+            &declaration.generics,
+            declaration.span,
+            &quote!(qubit_reflect),
+        )
+        .to_string();
+
+        assert!(
+            generated.contains("codegen_v4"),
+            "generic definitions must use the v4 protocol"
+        );
+        assert!(
+            !generated.contains("codegen_v3"),
+            "generic definitions must not use the v3 protocol"
         );
     }
 }
