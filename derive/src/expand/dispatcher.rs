@@ -316,6 +316,13 @@ mod tests {
             tokens.to_string()
         );
         assert!(
+            tokens
+                .to_string()
+                .contains("InvocationUnavailableReason :: UnspecializedGeneric"),
+            "generic default methods without a binding need structured specialization state: {}",
+            tokens.to_string()
+        );
+        assert!(
             !tokens.to_string().contains("catch_unwind"),
             "ordinary invocation tokens must not emit panic capture"
         );
@@ -337,6 +344,11 @@ mod tests {
             source.contains("PinnedFunctionInvocationAdapter")
                 && source.contains("pinned_local :: < __QubitReflectTarget >"),
             "pinned default methods should emit the typed pinned adapter: {source}"
+        );
+        assert!(
+            !source.contains("pinned_thread_safe")
+                && !source.contains("InvocationUnavailableReason :: ValueModeUnavailable"),
+            "a Local-only pinned default should leave ThreadSafe availability to the missing adapter slot: {source}"
         );
     }
 
@@ -475,6 +487,23 @@ mod tests {
         assert!(source.contains("lifetime (\"'static\")"), "{source}");
         assert!(source.contains("usize (3usize)"), "{source}");
         assert!(source.contains("with_specializations"), "{source}");
+    }
+
+    #[test]
+    fn test_thread_safe_method_binding_uses_thread_safe_adapter_slot() {
+        let context = ExpansionContext::for_tests();
+        let tokens = crate::expand::bind_method::expand_with_context(
+            quote!(demo::Counter::map::<u32> as thread_safe fn(&Counter, u32) -> u32),
+            &context,
+        )
+        .expect("a ThreadSafe generic method binding should parse");
+        assert_codegen_v4(&tokens);
+        let source = tokens.to_string();
+        assert!(source.contains("value :: ThreadSafe"), "{source}");
+        assert!(
+            source.contains("thread_safe (& __QUBIT_BIND_METHOD_ADAPTER)"),
+            "{source}"
+        );
     }
 
     #[test]

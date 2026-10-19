@@ -583,7 +583,7 @@ fn expand_concrete_impl(
         .iter()
         .map(|method| syn::LitStr::new(&method.name.to_string(), method.span));
     let default_methods = trait_default_methods_provider.as_ref().map_or_else(
-        || quote!(::std::vec::Vec::new().into_boxed_slice()),
+        || quote!(::std::vec::Vec::<#codegen::invoke::EffectiveMethod>::new().into_boxed_slice()),
         |provider| quote!(#provider #trait_default_provider_arguments(&[#(#overridden_method_names),*])),
     );
     let (trait_application_arguments, trait_argument_identity) = declaration
@@ -665,7 +665,9 @@ fn expand_concrete_impl(
                     &[],
                 ),
             )));
-            quote!(Some(#codegen::traits::trait_expression_for(#expression, #provider())))
+            quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
+                #codegen::traits::trait_expression_for(#expression, #provider()),
+            ))))
         }
         _ => quote!(None),
     };
@@ -866,7 +868,8 @@ fn expand_concrete_impl(
                 static VALUE: ::std::sync::OnceLock<::std::boxed::Box<[#codegen::invoke::EffectiveMethod]>> = ::std::sync::OnceLock::new();
                 VALUE.get_or_init(|| {
                     let methods = methods();
-                    let mut effective_methods = ::std::vec![#(#effective_methods),*];
+                    let mut effective_methods: ::std::vec::Vec<#codegen::invoke::EffectiveMethod> =
+                        ::std::vec![#(#effective_methods),*];
                     effective_methods.extend(#default_methods.into_vec());
                     effective_methods.into_boxed_slice()
                 })

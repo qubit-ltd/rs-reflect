@@ -23,12 +23,24 @@ struct BindingInput {
     method: ExprPath,
     signature: TypeFnPtr,
     asynchronous: bool,
+    thread_safe: bool,
 }
 
 impl Parse for BindingInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let method = input.parse()?;
         input.parse::<Token![as]>()?;
+        let thread_safe = input.peek(syn::Ident)
+            && input.fork().parse::<syn::Ident>()?.to_string() == "thread_safe";
+        if thread_safe {
+            let mode = input.parse::<syn::Ident>()?;
+            if mode != "thread_safe" {
+                return Err(syn::Error::new_spanned(
+                    mode,
+                    "expected `thread_safe` adapter mode",
+                ));
+            }
+        }
         let asynchronous = input.peek(Token![async]);
         if asynchronous {
             input.parse::<Token![async]>()?;
@@ -47,6 +59,7 @@ impl Parse for BindingInput {
             method,
             signature,
             asynchronous,
+            thread_safe,
         })
     }
 }
@@ -64,6 +77,7 @@ pub(crate) fn expand_with_context(
 ) -> Result<TokenStream> {
     let input: BindingInput = parse2(input)?;
     let asynchronous = input.asynchronous;
+    let thread_safe = input.thread_safe;
     if input.signature.unsafety.is_some()
         || input.signature.abi.is_some()
         || input.signature.variadic.is_some()
@@ -248,21 +262,30 @@ pub(crate) fn expand_with_context(
     };
     let qualifiers = quote!(#facade::__private::codegen_v4::invoke::MethodQualifiers::new(false, #asynchronous, false, false));
     let metadata = quote! {
-        static __QUBIT_BIND_METHOD_METADATA: #facade::__private::codegen_v4::invoke::MethodMetadata =
-            #facade::__private::codegen_v4::invoke::MethodMetadata::from_spec(
-                #facade::__private::codegen_v4::invoke::MethodMetadataSpec::new(
-                    #method_name,
-                    #namespace,
-                    #facade::__private::codegen_v4::invoke::MethodVisibility::Public,
-                    #receiver_metadata,
-                    &[#(#parameters),*],
-                    &#return_metadata,
-                    #qualifiers,
-                    &#generic_definition,
-                    #is_generic,
-                    false,
-                ),
-            );
+        fn __qubit_bind_method_metadata() -> &'static #facade::__private::codegen_v4::invoke::MethodMetadata {
+            static VALUE: ::std::sync::OnceLock<#facade::__private::codegen_v4::invoke::MethodMetadata> = ::std::sync::OnceLock::new();
+            VALUE.get_or_init(|| {
+                static GENERICS: #facade::__private::codegen_v4::expression::GenericDefinitionMetadata = #generic_definition;
+                let parameters = ::std::boxed::Box::leak(
+                    ::std::vec![#(#parameters),*].into_boxed_slice(),
+                );
+                let output = ::std::boxed::Box::leak(::std::boxed::Box::new(#return_metadata));
+                #facade::__private::codegen_v4::invoke::MethodMetadata::from_spec(
+                    #facade::__private::codegen_v4::invoke::MethodMetadataSpec::new(
+                        #method_name,
+                        #namespace,
+                        #facade::__private::codegen_v4::invoke::MethodVisibility::Public,
+                        #receiver_metadata,
+                        parameters,
+                        output,
+                        #qualifiers,
+                        &GENERICS,
+                        #is_generic,
+                        false,
+                    ),
+                )
+            })
+        }
     };
     let argument_names: Vec<_> = (0..input_types.len())
         .map(|index| format_ident!("__arg_{index}"))
@@ -342,7 +365,11 @@ pub(crate) fn expand_with_context(
         "Never" => quote!(match __call {}),
         _ => quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::owned(__call)),
     };
-    let mode = quote!(#facade::__private::codegen_v4::value::Local);
+    let mode = if thread_safe {
+        quote!(#facade::__private::codegen_v4::value::ThreadSafe)
+    } else {
+        quote!(#facade::__private::codegen_v4::value::Local)
+    };
     let adapter_fn = format_ident!("__qubit_bind_method_adapter");
     let pinned = receiver_ty
         .as_ref()
@@ -373,12 +400,22 @@ pub(crate) fn expand_with_context(
     };
     let adapters = if pinned {
         if receiver_ty.as_ref().is_some_and(is_pin_mut_type) {
-            quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            if thread_safe {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_thread_safe::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            } else {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            }
         } else {
-            quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            if thread_safe {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_thread_safe::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            } else {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+            }
         }
+    } else if thread_safe {
+        quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().thread_safe(&__QUBIT_BIND_METHOD_ADAPTER).build())
     } else {
-        quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
+        quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().local(&__QUBIT_BIND_METHOD_ADAPTER).build())
     };
     let binding = if is_generic {
         let specialization_argument_count = specialization_arguments.len();
@@ -393,13 +430,14 @@ pub(crate) fn expand_with_context(
                     #adapters,
                 ),
             ];
-            #facade::__private::codegen_v4::invoke::EffectiveMethod::for_type::<#target>(
-                &__QUBIT_BIND_METHOD_METADATA,
+            #facade::__private::codegen_v4::registration::bind_method::<#target>(
+                __qubit_bind_method_metadata(),
+                #adapters,
             )
             .with_specializations(&__QUBIT_BIND_METHOD_SPECIALIZATIONS)
         }
     } else {
-        quote!(#facade::__private::codegen_v4::registration::bind_method::<#target>(&__QUBIT_BIND_METHOD_METADATA, #adapters))
+        quote!(#facade::__private::codegen_v4::registration::bind_method::<#target>(__qubit_bind_method_metadata(), #adapters))
     };
     let shim = quote! {
         #metadata

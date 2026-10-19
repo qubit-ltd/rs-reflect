@@ -53,7 +53,7 @@ pub(super) fn default_methods_provider(
         .count();
     helper_generic_parameters.insert(
         lifetime_count,
-        quote!(__QubitReflectTarget: #facade::Reflect + 'static),
+        quote!(__QubitReflectTarget: #codegen::descriptor::Reflect + 'static),
     );
     let helper_generics = quote!(<#(#helper_generic_parameters),*>);
     let helper_generic_arguments = generic_arguments[..lifetime_count]
@@ -114,12 +114,8 @@ fn emit_default_method(
     let plan = crate::expand::invocation::analysis::analyze_method(method, method_context)
         .expect("validated trait method analysis is infallible");
     if !plan.is_executable() || !method.generics.params.is_empty() {
-        let availability = if method.generics.params.is_empty() {
-            let reasons = crate::expand::invocation::emit::emit_unavailable_reasons(&plan, context);
-            quote!(.with_unavailable(#reasons))
-        } else {
-            quote!()
-        };
+        let reasons = crate::expand::invocation::emit::emit_unavailable_reasons(&plan, context);
+        let availability = quote!(.with_unavailable(#reasons));
         let overridden_name = LitStr::new(&method.name.to_string(), method.span);
         return Some(quote! {
             if !overridden.iter().any(|name| *name == #overridden_name) {
@@ -289,6 +285,7 @@ fn emit_default_method(
                 #adapter_arguments
             ) -> #codegen::invoke::InvocationOutput<'call, #mode>
             where
+                __QubitReflectTarget: #codegen::descriptor::Reflect + 'static,
                 __QubitReflectTarget: #trait_path,
             {
                 #receiver
