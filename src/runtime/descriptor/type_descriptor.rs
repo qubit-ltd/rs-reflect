@@ -14,7 +14,16 @@ pub(crate) struct TypeDescriptor<'ctx> {
 
 impl TypeDescriptor<'static> {
     pub(crate) fn of<T: Reflect>() -> Self {
-        Self::new(T::__reflect_registration().metadata(), ReflectionContext::global())
+        Self::new(
+            T::__reflect_registration().metadata(),
+            ReflectionContext::global(),
+        )
+    }
+}
+
+impl<'ctx> TypeDescriptor<'ctx> {
+    pub(crate) fn of_in<T: Reflect + ?Sized>(context: &'ctx ReflectionContext) -> Self {
+        Self::new(super::metadata::TypeMetadata::of::<T>(), context)
     }
 }
 
@@ -28,7 +37,10 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     pub(crate) fn type_identity(self) -> TypeIdentity {
-        TypeIdentity { type_id: self.type_id(), rust_name: self.metadata.rust_name() }
+        TypeIdentity {
+            type_id: self.type_id(),
+            rust_name: self.metadata.rust_name(),
+        }
     }
 
     pub(crate) fn context(self) -> &'ctx ReflectionContext {

@@ -15,7 +15,10 @@ pub(crate) struct TypeRegistration<T: 'static> {
 
 impl<T: 'static> TypeRegistration<T> {
     pub(crate) const fn new() -> Self {
-        Self { metadata: TypeMetadata::new::<T>(), _type: PhantomData }
+        Self {
+            metadata: TypeMetadata::new::<T>(),
+            _type: PhantomData,
+        }
     }
 
     pub(crate) fn metadata(&'static self) -> &'static TypeMetadata {
