@@ -9,8 +9,10 @@ use crate::runtime::identity::{
     GenericArgumentIdentity, ItemIdentity, ItemKind, LookupCandidate, StableItemId,
 };
 use crate::runtime::invoke::{
-    Invocation, InvocationAdapter, InvocationAvailability, InvocationError, InvocationFailure,
-    InvocationOutput, InvocationUnavailableReason, Local, ModeAdapter, ThreadSafe, ValueMode,
+    CaughtInvocationFailure, Invocation, InvocationAdapter, InvocationAttempt,
+    InvocationAvailability, InvocationError, InvocationErrorKind, InvocationFailure,
+    InvocationOutput, InvocationPanic, InvocationUnavailableReason, Local, ModeAdapter,
+    PinnedInvocation, PinnedInvocationAdapter, PinnedInvocationFailure, ThreadSafe, ValueMode,
 };
 use crate::runtime::lookup::Lookup;
 
@@ -271,11 +273,19 @@ pub(crate) struct ResolvedMethodSpecialization {
 pub(crate) struct InvocationAdapters {
     pub(crate) local: Option<&'static dyn InvocationAdapter<Local>>,
     pub(crate) thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    pub(crate) catching_local: Option<&'static dyn InvocationAdapter<Local>>,
+    pub(crate) catching_thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    pub(crate) pinned_local: Option<&'static dyn PinnedInvocationAdapter<Local>>,
+    pub(crate) pinned_thread_safe: Option<&'static dyn PinnedInvocationAdapter<ThreadSafe>>,
 }
 
 static NO_ADAPTERS: InvocationAdapters = InvocationAdapters {
     local: None,
     thread_safe: None,
+    catching_local: None,
+    catching_thread_safe: None,
+    pinned_local: None,
+    pinned_thread_safe: None,
 };
 
 /// A method declaration combined with its effective implementation in one context.
@@ -433,32 +443,172 @@ impl<'ctx> MethodDescriptor<'ctx> {
         self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
+        match self.invoke_inner(invocation, false, false) {
+            Ok(output) => Ok(output),
+            Err(InvocationAttempt::Rejected(failure)) => Err(failure),
+            Err(InvocationAttempt::Panicked(_)) => unreachable!("ordinary invoke does not catch"),
+        }
+    }
+
+    pub(crate) fn invoke_catching<'call, M: ValueMode + ModeAdapter>(
+        self,
+        invocation: Invocation<'call, M>,
+    ) -> Result<InvocationOutput<'call, M>, CaughtInvocationFailure<'call, M>> {
+        match self.invoke_inner(invocation, true, false) {
+            Ok(output) => Ok(output),
+            Err(InvocationAttempt::Rejected(failure)) => {
+                Err(CaughtInvocationFailure::Rejected(failure))
+            }
+            Err(InvocationAttempt::Panicked(panic)) => {
+                Err(CaughtInvocationFailure::Panicked(panic))
+            }
+        }
+    }
+
+    /// Invokes a method while bypassing its visibility and unsafe-call checks.
+    ///
+    /// # Safety
+    /// The caller must satisfy the method's Rust safety contract and any invariants
+    /// enforced by its source visibility.
+    #[allow(unsafe_code)]
+    pub(crate) unsafe fn invoke_unchecked<'call, M: ValueMode + ModeAdapter>(
+        self,
+        invocation: Invocation<'call, M>,
+    ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
+        match self.invoke_inner(invocation, false, true) {
+            Ok(output) => Ok(output),
+            Err(InvocationAttempt::Rejected(failure)) => Err(failure),
+            Err(InvocationAttempt::Panicked(_)) => unreachable!("ordinary invoke does not catch"),
+        }
+    }
+
+    pub(crate) fn invoke_pinned<'call, T: std::any::Any, M: ValueMode + ModeAdapter>(
+        self,
+        invocation: PinnedInvocation<'call, T, M>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, T, M>> {
         let specialization = match self.effective.specializations {
             [specialization] => specialization,
             [] if !self.effective.metadata.is_generic => {
-                return self.invoke_with(self.effective.availability, &NO_ADAPTERS, invocation);
+                let availability = match self.effective.availability {
+                    MethodAvailability::Callable => InvocationAvailability::Callable,
+                    MethodAvailability::Unavailable { reasons } => {
+                        InvocationAvailability::Unavailable { reasons }
+                    }
+                    MethodAvailability::RequiresSpecialization => {
+                        return Err(PinnedInvocationFailure::new(
+                            InvocationError::new(InvocationErrorKind::SpecializationRequired),
+                            invocation,
+                        ));
+                    }
+                    MethodAvailability::RequiresSpecializationSelection { count } => {
+                        return Err(PinnedInvocationFailure::new(
+                            InvocationError::new(
+                                InvocationErrorKind::SpecializationSelectionRequired { count },
+                            ),
+                            invocation,
+                        ));
+                    }
+                };
+                return self.invoke_pinned_with(availability, &NO_ADAPTERS, invocation);
             }
             [] => {
-                return Err(InvocationFailure::new(
-                    InvocationError::new(
-                        crate::runtime::invoke::InvocationErrorKind::SpecializationRequired,
-                    ),
+                return Err(PinnedInvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationRequired),
                     invocation,
                 ));
             }
-            many => return Err(InvocationFailure::new(
-                InvocationError::new(
-                    crate::runtime::invoke::InvocationErrorKind::SpecializationSelectionRequired {
+            many => {
+                return Err(PinnedInvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationSelectionRequired {
                         count: many.len(),
-                    },
-                ),
+                    }),
+                    invocation,
+                ));
+            }
+        };
+        self.invoke_pinned_with(
+            specialization.availability,
+            specialization.adapters,
+            invocation,
+        )
+    }
+
+    fn invoke_pinned_with<'call, T: std::any::Any, M: ValueMode + ModeAdapter>(
+        self,
+        availability: InvocationAvailability,
+        adapters: &InvocationAdapters,
+        invocation: PinnedInvocation<'call, T, M>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, T, M>> {
+        if self.visibility() != MethodVisibility::Public {
+            return Err(PinnedInvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::VisibilityDenied),
                 invocation,
-            )),
+            ));
+        }
+        if self.qualifiers().is_unsafe {
+            return Err(PinnedInvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::UnsafeMethod),
+                invocation,
+            ));
+        }
+        if let InvocationAvailability::Unavailable { reasons } = availability {
+            return Err(PinnedInvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::MethodUnavailable { reasons }),
+                invocation,
+            ));
+        }
+        let validated = match invocation.validate(self) {
+            Ok(validated) => validated,
+            Err(failure) => return Err(failure),
+        };
+        let Some(adapter) = M::select_pinned_adapter(adapters) else {
+            return Err(PinnedInvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::ReceiverAdapterUnavailable),
+                validated.into_invocation(),
+            ));
+        };
+        let (receiver, invocation) = validated.into_parts();
+        Ok(adapter.invoke(receiver, invocation))
+    }
+
+    fn invoke_inner<'call, M: ValueMode + ModeAdapter>(
+        self,
+        invocation: Invocation<'call, M>,
+        catching: bool,
+        unchecked: bool,
+    ) -> Result<InvocationOutput<'call, M>, InvocationAttempt<'call, M>> {
+        let specialization = match self.effective.specializations {
+            [specialization] => specialization,
+            [] if !self.effective.metadata.is_generic => {
+                return self.invoke_with(
+                    self.effective.availability,
+                    &NO_ADAPTERS,
+                    invocation,
+                    catching,
+                    unchecked,
+                );
+            }
+            [] => {
+                return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationRequired),
+                    invocation,
+                )));
+            }
+            many => {
+                return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationSelectionRequired {
+                        count: many.len(),
+                    }),
+                    invocation,
+                )));
+            }
         };
         self.invoke_with_availability(
             specialization.availability,
             specialization.adapters,
             invocation,
+            catching,
+            unchecked,
         )
     }
     fn invoke_with<'call, M: ValueMode + ModeAdapter>(
@@ -466,49 +616,88 @@ impl<'ctx> MethodDescriptor<'ctx> {
         availability: MethodAvailability,
         adapters: &InvocationAdapters,
         invocation: Invocation<'call, M>,
-    ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
-        let availability = match availability { MethodAvailability::Callable => InvocationAvailability::Callable, MethodAvailability::RequiresSpecialization => return Err(InvocationFailure::new(InvocationError::new(crate::runtime::invoke::InvocationErrorKind::SpecializationRequired), invocation)), MethodAvailability::RequiresSpecializationSelection { count } => return Err(InvocationFailure::new(InvocationError::new(crate::runtime::invoke::InvocationErrorKind::SpecializationSelectionRequired { count }), invocation)), MethodAvailability::Unavailable { reasons } => InvocationAvailability::Unavailable { reasons } };
-        self.invoke_with_availability(availability, adapters, invocation)
+        catching: bool,
+        unchecked: bool,
+    ) -> Result<InvocationOutput<'call, M>, InvocationAttempt<'call, M>> {
+        let availability = match availability {
+            MethodAvailability::Callable => InvocationAvailability::Callable,
+            MethodAvailability::RequiresSpecialization => {
+                return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationRequired),
+                    invocation,
+                )));
+            }
+            MethodAvailability::RequiresSpecializationSelection { count } => {
+                return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                    InvocationError::new(InvocationErrorKind::SpecializationSelectionRequired {
+                        count,
+                    }),
+                    invocation,
+                )));
+            }
+            MethodAvailability::Unavailable { reasons } => {
+                InvocationAvailability::Unavailable { reasons }
+            }
+        };
+        self.invoke_with_availability(availability, adapters, invocation, catching, unchecked)
     }
     fn invoke_with_availability<'call, M: ValueMode + ModeAdapter>(
         self,
         availability: InvocationAvailability,
         adapters: &InvocationAdapters,
         invocation: Invocation<'call, M>,
-    ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
-        if self.visibility() != MethodVisibility::Public {
-            return Err(InvocationFailure::new(
-                InvocationError::new(crate::runtime::invoke::InvocationErrorKind::VisibilityDenied),
+        catching: bool,
+        unchecked: bool,
+    ) -> Result<InvocationOutput<'call, M>, InvocationAttempt<'call, M>> {
+        if !unchecked && self.visibility() != MethodVisibility::Public {
+            return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::VisibilityDenied),
                 invocation,
-            ));
+            )));
         }
-        if self.qualifiers().is_unsafe {
-            return Err(InvocationFailure::new(
-                InvocationError::new(crate::runtime::invoke::InvocationErrorKind::UnsafeMethod),
+        if !unchecked && self.qualifiers().is_unsafe {
+            return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::UnsafeMethod),
                 invocation,
-            ));
+            )));
         }
         if let InvocationAvailability::Unavailable { reasons } = availability {
-            return Err(InvocationFailure::new(
-                InvocationError::new(
-                    crate::runtime::invoke::InvocationErrorKind::MethodUnavailable { reasons },
-                ),
+            return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::MethodUnavailable { reasons }),
                 invocation,
-            ));
+            )));
+        }
+        if catching && (cfg!(panic = "abort") || self.qualifiers().is_async) {
+            return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::ValueModeUnavailable),
+                invocation,
+            )));
         }
         let bound = match invocation.validate(self) {
             Ok(bound) => bound,
-            Err(failure) => return Err(failure),
+            Err(failure) => return Err(InvocationAttempt::Rejected(failure)),
         };
-        let Some(adapter) = adapters.adapter::<M>() else {
-            return Err(InvocationFailure::new(
-                InvocationError::new(
-                    crate::runtime::invoke::InvocationErrorKind::ValueModeUnavailable,
-                ),
+        let adapter = if catching {
+            M::select_catching_adapter(adapters)
+        } else {
+            adapters.adapter::<M>()
+        };
+        let Some(adapter) = adapter else {
+            return Err(InvocationAttempt::Rejected(InvocationFailure::new(
+                InvocationError::new(InvocationErrorKind::ValueModeUnavailable),
                 bound.into_invocation(),
-            ));
+            )));
         };
-        Ok(adapter.invoke(bound))
+        if catching {
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| adapter.invoke(bound))) {
+                Ok(output) => Ok(output),
+                Err(payload) => Err(InvocationAttempt::Panicked(InvocationPanic::from_payload(
+                    payload,
+                ))),
+            }
+        } else {
+            Ok(adapter.invoke(bound))
+        }
     }
 }
 
@@ -723,11 +912,17 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
         self,
         invocation: Invocation<'call, M>,
     ) -> Result<InvocationOutput<'call, M>, InvocationFailure<'call, M>> {
-        self.method.invoke_with_availability(
+        match self.method.invoke_with_availability(
             self.resolved.availability,
             self.resolved.adapters,
             invocation,
-        )
+            false,
+            false,
+        ) {
+            Ok(output) => Ok(output),
+            Err(InvocationAttempt::Rejected(failure)) => Err(failure),
+            Err(InvocationAttempt::Panicked(_)) => unreachable!("ordinary invoke does not catch"),
+        }
     }
 }
 

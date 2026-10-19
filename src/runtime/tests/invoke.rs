@@ -10,8 +10,10 @@ use crate::runtime::expression::ExpressionData;
 use crate::runtime::identity::GenericArgumentIdentity;
 use crate::runtime::invoke::{
     Invocation, InvocationAdapter, InvocationAvailability, InvocationErrorKind, InvocationOutput,
-    InvocationReceiver, Local, ThreadSafe, ValidatedInvocation,
+    InvocationReceiver, Local, PinnedInvocation, PinnedInvocationAdapter, PinnedReceiver,
+    ThreadSafe, ValidatedInvocation,
 };
+use std::marker::PhantomPinned;
 
 struct Counter(u64);
 impl Reflect for Counter {
@@ -22,6 +24,10 @@ impl Reflect for Counter {
 }
 struct Amount(u64);
 struct Wrong(String);
+struct PinnedCounter {
+    value: u64,
+    _pin: PhantomPinned,
+}
 impl Reflect for Amount {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         static REGISTRATION: TypeRegistration<Amount> = TypeRegistration::new();
@@ -34,8 +40,15 @@ impl Reflect for Wrong {
         &REGISTRATION
     }
 }
+impl Reflect for PinnedCounter {
+    fn __reflect_registration() -> &'static TypeRegistration<Self> {
+        static REGISTRATION: TypeRegistration<PinnedCounter> = TypeRegistration::new();
+        &REGISTRATION
+    }
+}
 
 static COUNTER_TYPE: TypeMetadata = TypeMetadata::new::<Counter>();
+static PINNED_COUNTER_TYPE: TypeMetadata = TypeMetadata::new::<PinnedCounter>();
 static AMOUNT_TYPE: TypeMetadata = TypeMetadata::new::<Amount>();
 static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
     parameters: &[],
@@ -49,6 +62,10 @@ static U64_EXPRESSION: ExpressionData = ExpressionData::Named {
 static COUNTER_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
     kind: ReceiverKind::Mutable,
     type_metadata: &COUNTER_TYPE,
+};
+static PINNED_MUT_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
+    kind: ReceiverKind::PinnedMutable,
+    type_metadata: &PINNED_COUNTER_TYPE,
 };
 static VALUE_PARAMETER: ParameterMetadata = ParameterMetadata {
     index: 0,
@@ -203,11 +220,44 @@ impl InvocationAdapter<ThreadSafe> for AddThreadSafeAdapter {
     }
 }
 
+struct PinnedReadAdapter;
+impl PinnedInvocationAdapter<Local> for PinnedReadAdapter {
+    fn invoke<'call>(
+        &self,
+        receiver: PinnedReceiver<'call>,
+        _invocation: ValidatedInvocation<'call, Local>,
+    ) -> InvocationOutput<'call, Local> {
+        let Some(receiver) = receiver.downcast_mut::<PinnedCounter>() else {
+            panic!("validated pinned receiver type and mode")
+        };
+        let _value = receiver.as_ref().get_ref().value;
+        InvocationOutput::Unit
+    }
+}
+static PINNED_READ_ADAPTER: PinnedReadAdapter = PinnedReadAdapter;
+static PINNED_ADAPTERS: InvocationAdapters = InvocationAdapters {
+    local: None,
+    thread_safe: None,
+    catching_local: None,
+    catching_thread_safe: None,
+    pinned_local: Some(&PINNED_READ_ADAPTER),
+    pinned_thread_safe: None,
+};
+static PINNED_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
+    arguments: &EMPTY_ARGUMENTS,
+    availability: InvocationAvailability::Callable,
+    adapters: &PINNED_ADAPTERS,
+}];
+
 static ADD_ADAPTER: AddAdapter = AddAdapter;
 static ADD_THREAD_SAFE_ADAPTER: AddThreadSafeAdapter = AddThreadSafeAdapter;
 static ADAPTERS: InvocationAdapters = InvocationAdapters {
     local: Some(&ADD_ADAPTER),
     thread_safe: Some(&ADD_THREAD_SAFE_ADAPTER),
+    catching_local: Some(&ADD_ADAPTER),
+    catching_thread_safe: Some(&ADD_THREAD_SAFE_ADAPTER),
+    pinned_local: None,
+    pinned_thread_safe: None,
 };
 struct AddBothAdapter;
 impl InvocationAdapter<Local> for AddBothAdapter {
@@ -244,6 +294,10 @@ static ADD_BOTH_ADAPTER: AddBothAdapter = AddBothAdapter;
 static ADD_BOTH_ADAPTERS: InvocationAdapters = InvocationAdapters {
     local: Some(&ADD_BOTH_ADAPTER),
     thread_safe: None,
+    catching_local: Some(&ADD_BOTH_ADAPTER),
+    catching_thread_safe: None,
+    pinned_local: None,
+    pinned_thread_safe: None,
 };
 static TWO_ARGUMENT_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] =
     [ResolvedMethodSpecialization {
@@ -278,6 +332,46 @@ static UNSAFE_METHOD: MethodMetadata = MethodMetadata {
     is_generic: false,
     default_body: false,
 };
+static PRIVATE_METHOD: MethodMetadata = MethodMetadata {
+    name: "private_add",
+    namespace: MethodNamespaceMetadata::Inherent {
+        implementation: "Counter::inherent",
+    },
+    visibility: MethodVisibility::Private,
+    receiver: Some(COUNTER_RECEIVER),
+    parameters: &[VALUE_PARAMETER],
+    output: &UNIT_RETURN,
+    qualifiers: MethodQualifiers {
+        is_const: false,
+        is_async: false,
+        is_unsafe: false,
+        abi: None,
+        is_variadic: false,
+    },
+    generics: &EMPTY_GENERICS,
+    is_generic: false,
+    default_body: false,
+};
+static ASYNC_METHOD: MethodMetadata = MethodMetadata {
+    name: "async_add",
+    namespace: MethodNamespaceMetadata::Inherent {
+        implementation: "Counter::inherent",
+    },
+    visibility: MethodVisibility::Public,
+    receiver: Some(COUNTER_RECEIVER),
+    parameters: &[VALUE_PARAMETER],
+    output: &UNIT_RETURN,
+    qualifiers: MethodQualifiers {
+        is_const: false,
+        is_async: true,
+        is_unsafe: false,
+        abi: None,
+        is_variadic: false,
+    },
+    generics: &EMPTY_GENERICS,
+    is_generic: false,
+    default_body: false,
+};
 static PANIC_METHOD: MethodMetadata = MethodMetadata {
     name: "panic_after_start",
     namespace: MethodNamespaceMetadata::Inherent {
@@ -285,6 +379,26 @@ static PANIC_METHOD: MethodMetadata = MethodMetadata {
     },
     visibility: MethodVisibility::Public,
     receiver: Some(COUNTER_RECEIVER),
+    parameters: &[VALUE_PARAMETER],
+    output: &UNIT_RETURN,
+    qualifiers: MethodQualifiers {
+        is_const: false,
+        is_async: false,
+        is_unsafe: false,
+        abi: None,
+        is_variadic: false,
+    },
+    generics: &EMPTY_GENERICS,
+    is_generic: false,
+    default_body: false,
+};
+static PINNED_METHOD: MethodMetadata = MethodMetadata {
+    name: "pinned_read",
+    namespace: MethodNamespaceMetadata::Inherent {
+        implementation: "PinnedCounter::inherent",
+    },
+    visibility: MethodVisibility::Public,
+    receiver: Some(PINNED_MUT_RECEIVER),
     parameters: &[VALUE_PARAMETER],
     output: &UNIT_RETURN,
     qualifiers: MethodQualifiers {
@@ -311,7 +425,25 @@ static PANICKING_ADAPTER: PanickingAdapter = PanickingAdapter;
 static PANICKING_ADAPTERS: InvocationAdapters = InvocationAdapters {
     local: Some(&PANICKING_ADAPTER),
     thread_safe: None,
+    catching_local: Some(&PANICKING_ADAPTER),
+    catching_thread_safe: None,
+    pinned_local: None,
+    pinned_thread_safe: None,
 };
+static NO_CATCH_ADAPTERS: InvocationAdapters = InvocationAdapters {
+    local: Some(&ADD_ADAPTER),
+    thread_safe: None,
+    catching_local: None,
+    catching_thread_safe: None,
+    pinned_local: None,
+    pinned_thread_safe: None,
+};
+static NO_CATCH_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] =
+    [ResolvedMethodSpecialization {
+        arguments: &EMPTY_ARGUMENTS,
+        availability: InvocationAvailability::Callable,
+        adapters: &NO_CATCH_ADAPTERS,
+    }];
 static PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
     arguments: &EMPTY_ARGUMENTS,
     availability: InvocationAvailability::Callable,
@@ -468,6 +600,7 @@ fn preflight_failure_keeps_inputs_available_for_correction_and_retry() {
 }
 
 #[test]
+#[allow(unsafe_code)]
 fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
     let context = ReflectionContext::empty();
     let methods = [effective_for(&UNSAFE_METHOD)];
@@ -487,6 +620,57 @@ fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
     assert_eq!(recovered.argument_count(), 1);
     drop(recovered);
     assert_eq!(counter.0, 10);
+
+    let mut counter = Counter(10);
+    {
+        let output = unsafe {
+            method.invoke_unchecked(Invocation::<Local>::on_mut(&mut counter).arg(Amount(3)))
+        };
+        let output = match output {
+            Ok(output) => output,
+            Err(_) => panic!("unchecked invocation is callable"),
+        };
+        match output.into_unit() {
+            Ok(()) => {}
+            Err(_) => panic!("unchecked invocation returns unit"),
+        }
+    }
+    assert_eq!(counter.0, 13);
+
+    let private = EffectiveMethod {
+        target: &COUNTER_TYPE,
+        metadata: &PRIVATE_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &SPECIALIZATION_SET,
+    };
+    let methods = [private];
+    let method = MethodCatalog::new(type_descriptor(&context), &methods)
+        .method("private_add")
+        .expect("private method");
+    let mut counter = Counter(1);
+    let failure = match method.invoke(Invocation::<Local>::on_mut(&mut counter).arg(Amount(1))) {
+        Ok(_) => panic!("safe invocation rejects private method"),
+        Err(failure) => failure,
+    };
+    assert!(matches!(
+        failure.error().kind(),
+        InvocationErrorKind::VisibilityDenied
+    ));
+    drop(failure.into_invocation());
+    {
+        let output = unsafe {
+            method.invoke_unchecked(Invocation::<Local>::on_mut(&mut counter).arg(Amount(2)))
+        };
+        match output {
+            Ok(output) => match output.into_unit() {
+                Ok(()) => {}
+                Err(_) => panic!("private adapter returns unit"),
+            },
+            Err(_) => panic!("unchecked call bypasses visibility"),
+        }
+    }
+    assert_eq!(counter.0, 3);
 }
 
 #[test]
@@ -513,4 +697,171 @@ fn ordinary_invoke_leaves_user_panics_unwinding() {
         "invoke does not intercept the method panic"
     );
     assert_eq!(counter.0, 11);
+}
+
+#[test]
+fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
+    let context = ReflectionContext::empty();
+    let method = EffectiveMethod {
+        target: &COUNTER_TYPE,
+        metadata: &PANIC_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &PANIC_SPECIALIZATIONS,
+    };
+    let methods = [method];
+    let method = MethodCatalog::new(type_descriptor(&context), &methods)
+        .method("panic_after_start")
+        .expect("method");
+    let mut counter = Counter(11);
+    let failure =
+        match method.invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(Amount(1))) {
+            Ok(_) => panic!("catching call returns the panic"),
+            Err(failure) => failure,
+        };
+    match failure {
+        crate::runtime::invoke::CaughtInvocationFailure::Panicked(panic) => {
+            assert_eq!(panic.message(), Some("user method panic"));
+        }
+        crate::runtime::invoke::CaughtInvocationFailure::Rejected(_) => {
+            panic!("valid invocation reaches the adapter")
+        }
+    }
+
+    let mut counter = Counter(11);
+    let failure = match method
+        .invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(Wrong(String::from("x"))))
+    {
+        Ok(_) => panic!("wrong argument is rejected before adapter execution"),
+        Err(failure) => failure,
+    };
+    match failure {
+        crate::runtime::invoke::CaughtInvocationFailure::Rejected(failure) => {
+            assert!(matches!(
+                failure.error().kind(),
+                InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
+            ));
+            let recovered = failure.into_invocation();
+            assert_eq!(recovered.argument_count(), 1);
+            drop(recovered);
+        }
+        crate::runtime::invoke::CaughtInvocationFailure::Panicked(_) => {
+            panic!("preflight rejection is not a panic")
+        }
+    }
+
+    let no_catch = EffectiveMethod {
+        target: &COUNTER_TYPE,
+        metadata: &METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &NO_CATCH_SPECIALIZATIONS,
+    };
+    let methods = [no_catch];
+    let method = MethodCatalog::new(type_descriptor(&context), &methods)
+        .method("add")
+        .expect("method");
+    let mut counter = Counter(0);
+    let failure =
+        match method.invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(Amount(4))) {
+            Ok(_) => panic!("missing catching adapter is recoverable"),
+            Err(failure) => failure,
+        };
+    {
+        match failure {
+            crate::runtime::invoke::CaughtInvocationFailure::Rejected(failure) => {
+                assert!(matches!(
+                    failure.error().kind(),
+                    InvocationErrorKind::ValueModeUnavailable
+                ));
+                let recovered = failure.into_invocation();
+                assert_eq!(recovered.argument_count(), 1);
+                drop(recovered);
+            }
+            crate::runtime::invoke::CaughtInvocationFailure::Panicked(_) => {
+                panic!("missing adapter must be rejected before execution")
+            }
+        }
+    }
+
+    let asynchronous = EffectiveMethod {
+        target: &COUNTER_TYPE,
+        metadata: &ASYNC_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &SPECIALIZATION_SET,
+    };
+    let methods = [asynchronous];
+    let method = MethodCatalog::new(type_descriptor(&context), &methods)
+        .method("async_add")
+        .expect("async method");
+    let mut counter = Counter(0);
+    let failure =
+        match method.invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(Amount(1))) {
+            Ok(_) => panic!("synchronous catcher declines async methods"),
+            Err(crate::runtime::invoke::CaughtInvocationFailure::Rejected(failure)) => failure,
+            Err(crate::runtime::invoke::CaughtInvocationFailure::Panicked(_)) => {
+                panic!("async method is rejected before execution")
+            }
+        };
+    assert!(matches!(
+        failure.error().kind(),
+        InvocationErrorKind::ValueModeUnavailable
+    ));
+    drop(failure.into_invocation());
+}
+
+#[test]
+fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure() {
+    let context = ReflectionContext::empty();
+    let effective = EffectiveMethod {
+        target: &PINNED_COUNTER_TYPE,
+        metadata: &PINNED_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &PINNED_SPECIALIZATIONS,
+    };
+    let methods = [effective];
+    let method = MethodCatalog::new(
+        TypeDescriptor::new(&PINNED_COUNTER_TYPE, &context),
+        &methods,
+    )
+    .method("pinned_read")
+    .expect("method");
+    let mut pinned = Box::pin(PinnedCounter {
+        value: 19,
+        _pin: PhantomPinned,
+    });
+    {
+        let output = method
+            .invoke_pinned(PinnedInvocation::<_, Local>::mutable(pinned.as_mut()).arg(Amount(5)));
+        match output {
+            Ok(output) => match output.into_unit() {
+                Ok(()) => {}
+                Err(_) => panic!("pinned adapter returns unit"),
+            },
+            Err(_) => panic!("valid pinned invocation succeeds"),
+        }
+    }
+    {
+        let failure = match method.invoke_pinned(
+            PinnedInvocation::<_, Local>::mutable(pinned.as_mut())
+                .arg(Wrong(String::from("wrong"))),
+        ) {
+            Ok(_) => panic!("wrong argument type is rejected before pinned adapter"),
+            Err(failure) => failure,
+        };
+        assert!(matches!(
+            failure.error().kind(),
+            InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
+        ));
+        let recovered = failure.into_invocation();
+        assert_eq!(recovered.argument_count(), 1);
+        assert!(recovered.receiver_is_mutable());
+        assert_eq!(
+            recovered.receiver_type_id(),
+            std::any::TypeId::of::<PinnedCounter>()
+        );
+        drop(recovered);
+    }
 }

@@ -1,6 +1,6 @@
 //! Safe invocation inputs, preflight validation, outputs, and recovery.
 
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -19,6 +19,12 @@ pub(crate) trait ModeAdapter: ValueMode {
     fn select_adapter(
         adapters: &InvocationAdapters,
     ) -> Option<&'static dyn InvocationAdapter<Self>>;
+    fn select_catching_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn InvocationAdapter<Self>>;
+    fn select_pinned_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn PinnedInvocationAdapter<Self>>;
 }
 
 impl ModeAdapter for Local {
@@ -27,6 +33,16 @@ impl ModeAdapter for Local {
     ) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.local
     }
+    fn select_catching_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn InvocationAdapter<Self>> {
+        adapters.catching_local
+    }
+    fn select_pinned_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn PinnedInvocationAdapter<Self>> {
+        adapters.pinned_local
+    }
 }
 
 impl ModeAdapter for ThreadSafe {
@@ -34,6 +50,16 @@ impl ModeAdapter for ThreadSafe {
         adapters: &InvocationAdapters,
     ) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.thread_safe
+    }
+    fn select_catching_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn InvocationAdapter<Self>> {
+        adapters.catching_thread_safe
+    }
+    fn select_pinned_adapter(
+        adapters: &InvocationAdapters,
+    ) -> Option<&'static dyn PinnedInvocationAdapter<Self>> {
+        adapters.pinned_thread_safe
     }
 }
 
@@ -44,6 +70,67 @@ pub(crate) trait InvocationAdapter<M: ValueMode>: Sync {
         &self,
         invocation: ValidatedInvocation<'call, M>,
     ) -> InvocationOutput<'call, M>;
+}
+
+/// Adapter for a method whose receiver is pinned.
+pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
+    fn invoke<'call>(
+        &self,
+        receiver: PinnedReceiver<'call>,
+        invocation: ValidatedInvocation<'call, M>,
+    ) -> InvocationOutput<'call, M>;
+}
+
+/// A pinned receiver erased for a generated pinned adapter.
+pub(crate) enum PinnedReceiver<'call> {
+    Shared(Pin<&'call dyn Any>),
+    Mutable(Pin<&'call mut dyn Any>),
+}
+
+impl<'call> PinnedReceiver<'call> {
+    pub(crate) fn type_id(&self) -> TypeId {
+        match self {
+            Self::Shared(receiver) => Any::type_id(receiver.get_ref()),
+            Self::Mutable(receiver) => Any::type_id(receiver.as_ref().get_ref()),
+        }
+    }
+    #[allow(unsafe_code)]
+    pub(crate) fn downcast_ref<T: Any>(self) -> Option<Pin<&'call T>> {
+        match self {
+            Self::Shared(receiver) if receiver.get_ref().is::<T>() => {
+                // SAFETY: `Any::is` checks that the projection names this exact pinned value.
+                Some(unsafe {
+                    Pin::map_unchecked(receiver, |value: &dyn Any| {
+                        value.downcast_ref::<T>().expect("checked type")
+                    })
+                })
+            }
+            Self::Mutable(receiver) if receiver.as_ref().get_ref().is::<T>() => {
+                let receiver = Pin::into_ref(receiver);
+                // SAFETY: `Any::is` checks that the projection names this exact pinned value.
+                Some(unsafe {
+                    Pin::map_unchecked(receiver, |value| {
+                        value.downcast_ref::<T>().expect("checked type")
+                    })
+                })
+            }
+            _ => None,
+        }
+    }
+    #[allow(unsafe_code)]
+    pub(crate) fn downcast_mut<T: Any>(self) -> Option<Pin<&'call mut T>> {
+        match self {
+            Self::Mutable(receiver) if receiver.as_ref().get_ref().is::<T>() => {
+                // SAFETY: the checked mutable projection stays at the pinned value's address.
+                Some(unsafe {
+                    Pin::map_unchecked_mut(receiver, |value| {
+                        value.downcast_mut::<T>().expect("checked type")
+                    })
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 /// A shared or mutable receiver passed to an invocation.
@@ -118,6 +205,12 @@ pub(crate) struct Invocation<'call, M: ValueMode = Local> {
 }
 
 impl<'call, M: ValueMode> Invocation<'call, M> {
+    fn empty() -> Self {
+        Self {
+            receiver: None,
+            bindings: Vec::new(),
+        }
+    }
     /// Adds an owned positional argument.
     pub(crate) fn arg<T: ValueFor<M>>(self, value: T) -> Self {
         self.arg_dynamic(DynamicOwned::new(value))
@@ -207,7 +300,7 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self,
         method: MethodDescriptor<'_>,
     ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>> {
-        match validate_bindings(&self, method) {
+        match validate_bindings(&self, method, None) {
             Ok(order) => Ok(ValidatedInvocation {
                 invocation: self,
                 order,
@@ -229,6 +322,191 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
                 .map(|binding| binding.expect("validated invocation has every parameter bound"))
                 .collect(),
         }
+    }
+}
+
+/// A typed pinned receiver and its caller-ordered arguments.
+pub(crate) enum PinnedInvocation<'call, T: Any, M: ValueMode = Local> {
+    Shared {
+        receiver: Pin<&'call T>,
+        arguments: Invocation<'call, M>,
+    },
+    Mutable {
+        receiver: Pin<&'call mut T>,
+        arguments: Invocation<'call, M>,
+    },
+}
+
+impl<'call, T: Any, M: ValueMode> PinnedInvocation<'call, T, M> {
+    pub(crate) fn shared(receiver: Pin<&'call T>) -> Self {
+        Self::Shared {
+            receiver,
+            arguments: Invocation::empty(),
+        }
+    }
+    pub(crate) fn mutable(receiver: Pin<&'call mut T>) -> Self {
+        Self::Mutable {
+            receiver,
+            arguments: Invocation::empty(),
+        }
+    }
+    pub(crate) fn arg<U: ValueFor<M>>(mut self, value: U) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: None,
+            value: InvocationValue::Owned(DynamicOwned::new(value)),
+        });
+        self
+    }
+    pub(crate) fn arg_ref<U: ValueForRef<M> + ?Sized>(mut self, value: &'call U) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: None,
+            value: InvocationValue::Ref(DynamicRef::new(value)),
+        });
+        self
+    }
+    pub(crate) fn arg_mut<U: ValueForMut<M> + ?Sized>(mut self, value: &'call mut U) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: None,
+            value: InvocationValue::Mut(DynamicMut::new(value)),
+        });
+        self
+    }
+    pub(crate) fn named_arg<U: ValueFor<M>>(mut self, name: impl Into<Box<str>>, value: U) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: Some(name.into()),
+            value: InvocationValue::Owned(DynamicOwned::new(value)),
+        });
+        self
+    }
+    pub(crate) fn named_arg_ref<U: ValueForRef<M> + ?Sized>(
+        mut self,
+        name: impl Into<Box<str>>,
+        value: &'call U,
+    ) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: Some(name.into()),
+            value: InvocationValue::Ref(DynamicRef::new(value)),
+        });
+        self
+    }
+    pub(crate) fn named_arg_mut<U: ValueForMut<M> + ?Sized>(
+        mut self,
+        name: impl Into<Box<str>>,
+        value: &'call mut U,
+    ) -> Self {
+        self.arguments_mut().bindings.push(Binding {
+            name: Some(name.into()),
+            value: InvocationValue::Mut(DynamicMut::new(value)),
+        });
+        self
+    }
+    pub(crate) fn argument_count(&self) -> usize {
+        self.arguments().bindings.len()
+    }
+    pub(crate) fn receiver_type_id(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+    pub(crate) fn receiver_is_mutable(&self) -> bool {
+        matches!(self, Self::Mutable { .. })
+    }
+    fn arguments(&self) -> &Invocation<'call, M> {
+        match self {
+            Self::Shared { arguments, .. } | Self::Mutable { arguments, .. } => arguments,
+        }
+    }
+    fn arguments_mut(&mut self) -> &mut Invocation<'call, M> {
+        match self {
+            Self::Shared { arguments, .. } | Self::Mutable { arguments, .. } => arguments,
+        }
+    }
+    fn pinned_kind_and_type(&self) -> (ReceiverKind, TypeId) {
+        match self {
+            Self::Shared { .. } => (ReceiverKind::PinnedShared, TypeId::of::<T>()),
+            Self::Mutable { .. } => (ReceiverKind::PinnedMutable, TypeId::of::<T>()),
+        }
+    }
+    #[allow(unsafe_code)]
+    fn into_parts(self) -> (PinnedReceiver<'call>, Invocation<'call, M>) {
+        match self {
+            Self::Shared {
+                receiver,
+                arguments,
+            } => (
+                // SAFETY: this is only an unsized view of the same pinned allocation.
+                PinnedReceiver::Shared(unsafe {
+                    Pin::map_unchecked(receiver, |value| value as &dyn Any)
+                }),
+                arguments,
+            ),
+            Self::Mutable {
+                receiver,
+                arguments,
+            } => (
+                // SAFETY: this is only an unsized view of the same pinned allocation.
+                PinnedReceiver::Mutable(unsafe {
+                    Pin::map_unchecked_mut(receiver, |value| value as &mut dyn Any)
+                }),
+                arguments,
+            ),
+        }
+    }
+    pub(crate) fn validate(
+        self,
+        method: MethodDescriptor<'_>,
+    ) -> Result<ValidatedPinnedInvocation<'call, T, M>, PinnedInvocationFailure<'call, T, M>> {
+        let (kind, type_id) = self.pinned_kind_and_type();
+        let order = match validate_bindings(self.arguments(), method, Some((kind, type_id))) {
+            Ok(order) => order,
+            Err(error) => {
+                return Err(PinnedInvocationFailure {
+                    error: InvocationError::new(error),
+                    invocation: self,
+                });
+            }
+        };
+        Ok(ValidatedPinnedInvocation {
+            invocation: self,
+            order,
+        })
+    }
+}
+
+pub(crate) struct ValidatedPinnedInvocation<'call, T: Any, M: ValueMode> {
+    invocation: PinnedInvocation<'call, T, M>,
+    order: Vec<(usize, usize)>,
+}
+
+impl<'call, T: Any, M: ValueMode> ValidatedPinnedInvocation<'call, T, M> {
+    pub(crate) fn into_parts(self) -> (PinnedReceiver<'call>, ValidatedInvocation<'call, M>) {
+        let (receiver, invocation) = self.invocation.into_parts();
+        (
+            receiver,
+            ValidatedInvocation {
+                invocation,
+                order: self.order,
+            },
+        )
+    }
+    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, T, M> {
+        self.invocation
+    }
+}
+
+/// A failed pinned invocation with the original Pin and all arguments retained.
+pub(crate) struct PinnedInvocationFailure<'call, T: Any, M: ValueMode = Local> {
+    error: InvocationError,
+    invocation: PinnedInvocation<'call, T, M>,
+}
+
+impl<'call, T: Any, M: ValueMode> PinnedInvocationFailure<'call, T, M> {
+    pub(crate) fn new(error: InvocationError, invocation: PinnedInvocation<'call, T, M>) -> Self {
+        Self { error, invocation }
+    }
+    pub(crate) const fn error(&self) -> &InvocationError {
+        &self.error
+    }
+    pub(crate) fn into_invocation(self) -> PinnedInvocation<'call, T, M> {
+        self.invocation
     }
 }
 
@@ -350,6 +628,7 @@ impl<'call, M: ValueMode> ValidatedInvocation<'call, M> {
 fn validate_bindings<M: ValueMode>(
     invocation: &Invocation<'_, M>,
     method: MethodDescriptor<'_>,
+    pinned_receiver: Option<(ReceiverKind, TypeId)>,
 ) -> Result<Vec<(usize, usize)>, InvocationErrorKind> {
     let parameters = method.parameters().collect::<Vec<_>>();
     let mut order = Vec::with_capacity(invocation.bindings.len());
@@ -402,37 +681,61 @@ fn validate_bindings<M: ValueMode>(
         order.push(parameter_index);
     }
 
-    match (method.receiver(), invocation.receiver.as_ref()) {
-        (None, Some(_)) => return Err(InvocationErrorKind::UnexpectedReceiver),
-        (Some(_), None) => return Err(InvocationErrorKind::ReceiverMissing),
-        (Some(expected), Some(actual)) => {
-            if matches!(
-                expected.kind,
-                ReceiverKind::PinnedShared | ReceiverKind::PinnedMutable
-            ) {
-                return Err(InvocationErrorKind::ReceiverAdapterUnavailable);
-            }
-            let mode_matches = match expected.kind {
-                ReceiverKind::Owned => actual.kind() == InvocationValueKind::Owned,
-                ReceiverKind::Shared => matches!(
-                    actual.kind(),
-                    InvocationValueKind::Ref | InvocationValueKind::Mut
-                ),
-                ReceiverKind::Mutable => actual.kind() == InvocationValueKind::Mut,
-                ReceiverKind::PinnedShared | ReceiverKind::PinnedMutable => false,
-            };
-            if !mode_matches {
-                return Err(InvocationErrorKind::ReceiverModeMismatch);
-            }
-            let expected_type = expected.type_metadata.type_id();
-            if actual.type_id() != expected_type {
-                return Err(InvocationErrorKind::ReceiverTypeMismatch {
-                    expected: expected_type,
-                    actual: actual.type_id(),
-                });
+    if let Some((actual_kind, actual_type)) = pinned_receiver {
+        match method.receiver() {
+            None => return Err(InvocationErrorKind::UnexpectedReceiver),
+            Some(expected) => {
+                let mode_matches = match (expected.kind, actual_kind) {
+                    (ReceiverKind::PinnedShared, ReceiverKind::PinnedShared)
+                    | (ReceiverKind::PinnedShared, ReceiverKind::PinnedMutable)
+                    | (ReceiverKind::PinnedMutable, ReceiverKind::PinnedMutable) => true,
+                    _ => false,
+                };
+                if !mode_matches {
+                    return Err(InvocationErrorKind::ReceiverModeMismatch);
+                }
+                let expected_type = expected.type_metadata.type_id();
+                if actual_type != expected_type {
+                    return Err(InvocationErrorKind::ReceiverTypeMismatch {
+                        expected: expected_type,
+                        actual: actual_type,
+                    });
+                }
             }
         }
-        (None, None) => {}
+    } else {
+        match (method.receiver(), invocation.receiver.as_ref()) {
+            (None, Some(_)) => return Err(InvocationErrorKind::UnexpectedReceiver),
+            (Some(_), None) => return Err(InvocationErrorKind::ReceiverMissing),
+            (Some(expected), Some(actual)) => {
+                if matches!(
+                    expected.kind,
+                    ReceiverKind::PinnedShared | ReceiverKind::PinnedMutable
+                ) {
+                    return Err(InvocationErrorKind::ReceiverAdapterUnavailable);
+                }
+                let mode_matches = match expected.kind {
+                    ReceiverKind::Owned => actual.kind() == InvocationValueKind::Owned,
+                    ReceiverKind::Shared => matches!(
+                        actual.kind(),
+                        InvocationValueKind::Ref | InvocationValueKind::Mut
+                    ),
+                    ReceiverKind::Mutable => actual.kind() == InvocationValueKind::Mut,
+                    ReceiverKind::PinnedShared | ReceiverKind::PinnedMutable => false,
+                };
+                if !mode_matches {
+                    return Err(InvocationErrorKind::ReceiverModeMismatch);
+                }
+                let expected_type = expected.type_metadata.type_id();
+                if actual.type_id() != expected_type {
+                    return Err(InvocationErrorKind::ReceiverTypeMismatch {
+                        expected: expected_type,
+                        actual: actual.type_id(),
+                    });
+                }
+            }
+            (None, None) => {}
+        }
     }
 
     if invocation.bindings.len() > parameters.len() {
@@ -609,6 +912,38 @@ impl<'call, M: ValueMode> InvocationFailure<'call, M> {
     pub(crate) fn into_invocation(self) -> Invocation<'call, M> {
         self.recovery.into_invocation()
     }
+}
+
+/// Result of an invocation attempt that may reject inputs or catch a panic.
+pub(crate) enum InvocationAttempt<'call, M: ValueMode> {
+    Rejected(InvocationFailure<'call, M>),
+    Panicked(InvocationPanic),
+}
+
+/// A panic raised by a user adapter after invocation started.
+#[derive(Debug)]
+pub(crate) struct InvocationPanic {
+    message: Option<Box<str>>,
+}
+
+impl InvocationPanic {
+    pub(crate) fn from_payload(payload: Box<dyn std::any::Any + Send>) -> Self {
+        let message = payload
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| payload.downcast_ref::<&'static str>().copied())
+            .map(Into::into);
+        Self { message }
+    }
+    pub(crate) fn message(&self) -> Option<&str> {
+        self.message.as_deref()
+    }
+}
+
+/// Failure from explicit panic-catching invocation.
+pub(crate) enum CaughtInvocationFailure<'call, M: ValueMode> {
+    Rejected(InvocationFailure<'call, M>),
+    Panicked(InvocationPanic),
 }
 
 /// The origin of a borrow returned from a reflected method.
