@@ -25,10 +25,14 @@ pub mod construct;
 pub mod descriptor;
 /// Structural generic and type-expression contracts used by generated code.
 pub mod expression;
+/// Typed implementation declaration and application metadata used by generated code.
+pub mod impls;
 /// Typed invocation adapter contracts used by generated implementations.
 pub mod invoke;
 /// Compile-time handshake for derive/runtime compatibility.
 pub mod protocol;
+/// Typed trait declaration and application metadata used by generated code.
+pub mod traits;
 
 pub use protocol::PROTOCOL_VERSION;
 /// Linked registration contracts consumed while building reflection contexts.

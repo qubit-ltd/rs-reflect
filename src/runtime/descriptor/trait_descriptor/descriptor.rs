@@ -277,11 +277,15 @@ impl<'ctx> ReceiverDefinitionDescriptor<'ctx> {
     pub(crate) const fn kind(self) -> ReceiverKind {
         self.receiver.kind
     }
-    pub(crate) fn concrete_type(self) -> crate::runtime::descriptor::TypeDescriptor<'ctx> {
-        crate::runtime::descriptor::TypeDescriptor::new(
-            (self.receiver.type_metadata)(),
-            self.context,
-        )
+    pub(crate) fn concrete_type(self) -> Option<crate::runtime::descriptor::TypeDescriptor<'ctx>> {
+        self.receiver.type_metadata.map(|metadata| {
+            crate::runtime::descriptor::TypeDescriptor::new(metadata(), self.context)
+        })
+    }
+    pub(crate) const fn expression(
+        self,
+    ) -> Option<&'static crate::runtime::expression::ExpressionData> {
+        self.receiver.expression
     }
 }
 

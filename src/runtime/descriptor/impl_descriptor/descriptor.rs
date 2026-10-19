@@ -145,7 +145,7 @@ impl<'ctx> ImplDescriptor<'ctx> {
         self.metadata.definition.kind
     }
     pub(crate) fn target(self) -> TypeDescriptor<'ctx> {
-        TypeDescriptor::new(self.metadata.target, self.context)
+        TypeDescriptor::new((self.metadata.target)(), self.context)
     }
     pub(crate) fn implemented_trait(self) -> Option<TraitDescriptor<'ctx>> {
         self.metadata
@@ -365,7 +365,7 @@ impl<'ctx> AssociatedTypeBindingDescriptor<'ctx> {
     pub(crate) fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
         self.metadata
             .concrete
-            .map(|metadata| TypeDescriptor::new(metadata, self.context))
+            .map(|metadata| TypeDescriptor::new(metadata(), self.context))
     }
     pub(crate) const fn source(self) -> AssociatedItemSource {
         self.metadata.source

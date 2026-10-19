@@ -8,8 +8,8 @@ pub(crate) use descriptor::{
     AssociatedTypeBindingDescriptor, AssociatedTypeBindings, ImplDefinitionDescriptor,
     ImplDefinitions, ImplDescriptor, Impls, Methods,
 };
-pub(crate) use metadata::{
-    AssociatedConstBindingMetadata, AssociatedConstValueAdapter, AssociatedItemSource,
-    AssociatedTypeBindingMetadata, ImplApplicationMetadata, ImplDefinitionId,
-    ImplDefinitionMetadata, ImplKind, ImplQualifiers,
+pub use metadata::{
+    AssociatedConstBindingMetadata, AssociatedItemSource, AssociatedTypeBindingMetadata,
+    ImplApplicationMetadata, ImplDefinitionMetadata, ImplKind, ImplQualifiers,
 };
+pub(crate) use metadata::{AssociatedConstValueAdapter, ImplDefinitionId};

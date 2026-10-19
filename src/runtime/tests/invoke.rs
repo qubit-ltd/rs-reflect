@@ -87,12 +87,12 @@ static U64_EXPRESSION: ExpressionData = ExpressionData::Named {
 };
 static COUNTER_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
     kind: ReceiverKind::Mutable,
-    type_metadata: counter_type_metadata,
+    type_metadata: Some(counter_type_metadata),
     expression: None,
 };
 static PINNED_MUT_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
     kind: ReceiverKind::PinnedMutable,
-    type_metadata: pinned_counter_type_metadata,
+    type_metadata: Some(pinned_counter_type_metadata),
     expression: None,
 };
 static VALUE_PARAMETER: ParameterMetadata = ParameterMetadata {

@@ -69,6 +69,15 @@ static TRAIT_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
 static STRING_METADATA: TypeMetadata = TypeMetadata::new::<String>();
 static U64_METADATA: TypeMetadata = TypeMetadata::new::<u64>();
 static TARGET_METADATA: TypeMetadata = TypeMetadata::new::<CustomerId>();
+fn string_type_metadata() -> &'static TypeMetadata {
+    &STRING_METADATA
+}
+fn u64_type_metadata() -> &'static TypeMetadata {
+    &U64_METADATA
+}
+fn error_type_metadata() -> &'static TypeMetadata {
+    &ERROR_METADATA
+}
 fn target_type_metadata() -> &'static TypeMetadata {
     &TARGET_METADATA
 }
@@ -251,7 +260,7 @@ static ANSWER_ADAPTER: AssociatedConstValueAdapter = AssociatedConstValueAdapter
 static ERROR_BINDING: AssociatedTypeBindingMetadata = AssociatedTypeBindingMetadata {
     definition: &ASSOCIATED_TYPE_ERROR,
     expression: &ERROR_EXPR,
-    concrete: Some(&ERROR_METADATA),
+    concrete: Some(error_type_metadata),
     source: AssociatedItemSource::Declared,
 };
 static DEFAULT_ERROR_BINDING: AssociatedTypeBindingMetadata = AssociatedTypeBindingMetadata {
@@ -299,7 +308,7 @@ static U64_IMPL_DEF: ImplDefinitionMetadata = ImplDefinitionMetadata {
 };
 static STRING_IMPL: ImplApplicationMetadata = ImplApplicationMetadata {
     definition: &STRING_IMPL_DEF,
-    target: &TARGET_METADATA,
+    target: target_type_metadata,
     implemented_trait: Some(&STRING_TRAIT),
     arguments: STRING_ARGUMENTS,
     identity: STRING_IDENTITY,
@@ -309,7 +318,7 @@ static STRING_IMPL: ImplApplicationMetadata = ImplApplicationMetadata {
 };
 static U64_IMPL: ImplApplicationMetadata = ImplApplicationMetadata {
     definition: &U64_IMPL_DEF,
-    target: &TARGET_METADATA,
+    target: target_type_metadata,
     implemented_trait: Some(&U64_TRAIT),
     arguments: U64_ARGUMENTS,
     identity: U64_IDENTITY,

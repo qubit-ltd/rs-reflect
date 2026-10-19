@@ -909,7 +909,11 @@ fn validate_bindings<M: ValueMode>(
                 if !mode_matches {
                     return Err(InvocationErrorKind::ReceiverModeMismatch);
                 }
-                let expected_type = (expected.type_metadata)().type_id();
+                let expected_type = (expected
+                    .type_metadata
+                    .expect("effective method receiver is bound to its target"))(
+                )
+                .type_id();
                 if actual_type != expected_type {
                     return Err(InvocationErrorKind::ReceiverTypeMismatch {
                         expected: expected_type,
@@ -941,7 +945,11 @@ fn validate_bindings<M: ValueMode>(
                 if !mode_matches {
                     return Err(InvocationErrorKind::ReceiverModeMismatch);
                 }
-                let expected_type = (expected.type_metadata)().type_id();
+                let expected_type = (expected
+                    .type_metadata
+                    .expect("effective method receiver is bound to its target"))(
+                )
+                .type_id();
                 if actual.type_id() != expected_type {
                     return Err(InvocationErrorKind::ReceiverTypeMismatch {
                         expected: expected_type,

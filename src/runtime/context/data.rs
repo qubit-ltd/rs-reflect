@@ -317,7 +317,7 @@ impl ContextData {
             }
             if let Some(application) = applications
                 .iter()
-                .find(|application| !included_types.contains(&application.target.type_id()))
+                .find(|application| !included_types.contains(&(application.target)().type_id()))
             {
                 return Err(
                     ContextError::from_issues(vec![ContextIssue::MissingDependency {
@@ -326,7 +326,7 @@ impl ContextData {
                             format!("{:?}", application.definition.id).as_str(),
                             "impl application",
                         ),
-                        dependency: type_identity(application.target.type_id()),
+                        dependency: type_identity((application.target)().type_id()),
                     }])
                     .expect("one context issue is nonempty"),
                 );

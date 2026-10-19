@@ -9,8 +9,9 @@ pub(crate) use descriptor::{
     MethodDefinitionOwner, MethodDefinitions, TraitDefinitionDescriptor, TraitDefinitions,
     TraitDescriptor, TraitExpressionDescriptor, TraitExpressions, Traits,
 };
-pub(crate) use metadata::{
+pub(crate) use metadata::TraitDefinitionId;
+pub use metadata::{
     AssociatedConstDefinitionMetadata, AssociatedTypeDefinitionMetadata, SupertraitCompleteness,
-    TraitApplicationMetadata, TraitArgumentIdentity, TraitCompleteness, TraitDefinitionId,
-    TraitDefinitionMetadata, TraitExpressionMetadata, Visibility,
+    TraitApplicationMetadata, TraitArgumentIdentity, TraitCompleteness, TraitDefinitionMetadata,
+    TraitExpressionMetadata, Visibility,
 };

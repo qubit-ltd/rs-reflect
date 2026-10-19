@@ -42,7 +42,8 @@ pub enum ReceiverKind {
 #[derive(Clone, Copy)]
 pub struct ReceiverDescriptor {
     pub(crate) kind: ReceiverKind,
-    pub(crate) type_metadata: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    pub(crate) type_metadata:
+        Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
     pub(crate) expression: Option<&'static ExpressionData>,
 }
 
@@ -51,9 +52,29 @@ impl ReceiverDescriptor {
     pub const fn for_type<T: super::Reflect>(kind: ReceiverKind) -> Self {
         Self {
             kind,
-            type_metadata: crate::runtime::descriptor::metadata::TypeMetadata::of::<T>,
+            type_metadata: Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>),
             expression: None,
         }
+    }
+
+    /// Creates receiver metadata whose concrete type is supplied by an effective method.
+    pub const fn trait_self(kind: ReceiverKind, expression: &'static ExpressionData) -> Self {
+        Self {
+            kind,
+            type_metadata: None,
+            expression: Some(expression),
+        }
+    }
+
+    /// Binds an unbound receiver declaration to its effective target type.
+    pub(crate) const fn for_target(
+        mut self,
+        target: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    ) -> Self {
+        if self.type_metadata.is_none() {
+            self.type_metadata = Some(target);
+        }
+        self
     }
 
     /// Retains the source type expression for an explicitly typed receiver.
@@ -627,7 +648,10 @@ impl<'ctx> MethodDescriptor<'ctx> {
         self.effective.metadata.visibility
     }
     pub(crate) const fn receiver(self) -> Option<ReceiverDescriptor> {
-        self.effective.metadata.receiver
+        match self.effective.metadata.receiver {
+            Some(receiver) => Some(receiver.for_target(self.effective.target)),
+            None => None,
+        }
     }
     pub(crate) fn parameters(
         self,

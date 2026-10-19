@@ -42,21 +42,21 @@ impl Hash for TraitDefinitionId {
 
 /// Whether complete source metadata is known for a trait.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TraitCompleteness {
+pub enum TraitCompleteness {
     Complete,
     ExternalIncomplete,
 }
 
 /// Completeness of a resolved trait's transitive supertrait closure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum SupertraitCompleteness {
+pub enum SupertraitCompleteness {
     Complete,
     Incomplete,
 }
 
 /// Visibility retained from a Rust declaration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Visibility {
+pub enum Visibility {
     Public,
     Restricted(&'static str),
     RestrictedUnknown,
@@ -65,7 +65,7 @@ pub(crate) enum Visibility {
 
 /// Static source facts for an associated type declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct AssociatedTypeDefinitionMetadata {
+pub struct AssociatedTypeDefinitionMetadata {
     pub(crate) name: &'static str,
     pub(crate) visibility: Visibility,
     pub(crate) bounds: &'static [PredicateData],
@@ -74,7 +74,7 @@ pub(crate) struct AssociatedTypeDefinitionMetadata {
 
 /// Static source facts for an associated constant declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct AssociatedConstDefinitionMetadata {
+pub struct AssociatedConstDefinitionMetadata {
     pub(crate) name: &'static str,
     pub(crate) visibility: Visibility,
     pub(crate) ty: &'static ExpressionData,
@@ -83,14 +83,14 @@ pub(crate) struct AssociatedConstDefinitionMetadata {
 
 /// A trait expression occurring in a declaration's source syntax.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitExpressionMetadata {
+pub struct TraitExpressionMetadata {
     pub(crate) expression: &'static TraitExpressionData,
     pub(crate) definition: Option<&'static TraitDefinitionMetadata>,
 }
 
 /// One concrete, target-independent application of a trait.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitApplicationMetadata {
+pub struct TraitApplicationMetadata {
     pub(crate) definition: &'static TraitDefinitionMetadata,
     pub(crate) arguments: &'static [GenericArgumentMetadata],
     pub(crate) identity: &'static [TraitArgumentIdentity],
@@ -99,9 +99,30 @@ pub(crate) struct TraitApplicationMetadata {
     pub(crate) supertrait_completeness: SupertraitCompleteness,
 }
 
+impl TraitApplicationMetadata {
+    /// Creates an application linked to marker-bound declaration metadata.
+    pub const fn new(
+        definition: &'static TraitDefinitionMetadata,
+        arguments: &'static [GenericArgumentMetadata],
+        identity: &'static [TraitArgumentIdentity],
+        direct_supertraits: &'static [&'static TraitApplicationMetadata],
+        all_supertraits: &'static [&'static TraitApplicationMetadata],
+        supertrait_completeness: SupertraitCompleteness,
+    ) -> Self {
+        Self {
+            definition,
+            arguments,
+            identity,
+            direct_supertraits,
+            all_supertraits,
+            supertrait_completeness,
+        }
+    }
+}
+
 /// Const-safe key used to distinguish compiled generic applications.
 #[derive(Clone, Copy)]
-pub(crate) enum TraitArgumentIdentity {
+pub enum TraitArgumentIdentity {
     Type(fn() -> TypeId),
     Const(crate::runtime::expression::ConstExpression),
     Lifetime(&'static str),
@@ -122,7 +143,7 @@ impl PartialEq for TraitArgumentIdentity {
 impl Eq for TraitArgumentIdentity {}
 
 /// Static source facts for a trait declaration and applications visible to a context.
-pub(crate) struct TraitDefinitionMetadata {
+pub struct TraitDefinitionMetadata {
     pub(crate) id: TraitDefinitionId,
     pub(crate) name: &'static str,
     pub(crate) path: &'static str,
@@ -133,4 +154,110 @@ pub(crate) struct TraitDefinitionMetadata {
     pub(crate) methods: &'static [MethodMetadata],
     pub(crate) associated_types: &'static [AssociatedTypeDefinitionMetadata],
     pub(crate) associated_consts: &'static [AssociatedConstDefinitionMetadata],
+}
+
+impl TraitDefinitionMetadata {
+    /// Creates declaration metadata bound to marker type `D`.
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new<D: 'static>(
+        name: &'static str,
+        path: &'static str,
+        visibility: Visibility,
+        completeness: TraitCompleteness,
+        generics: &'static GenericDefinitionMetadata,
+        supertraits: &'static [TraitExpressionMetadata],
+        methods: &'static [MethodMetadata],
+        associated_types: &'static [AssociatedTypeDefinitionMetadata],
+        associated_consts: &'static [AssociatedConstDefinitionMetadata],
+    ) -> Self {
+        Self {
+            id: TraitDefinitionId::of::<D>(),
+            name,
+            path,
+            visibility,
+            completeness,
+            generics,
+            supertraits,
+            methods,
+            associated_types,
+            associated_consts,
+        }
+    }
+}
+
+impl TraitExpressionMetadata {
+    /// Retains a trait expression when its declaration is external or unresolved.
+    pub const fn unresolved(expression: &'static TraitExpressionData) -> Self {
+        Self {
+            expression,
+            definition: None,
+        }
+    }
+
+    /// Associates an expression with the marker-bound local declaration.
+    pub const fn for_definition(
+        expression: &'static TraitExpressionData,
+        definition: &'static TraitDefinitionMetadata,
+    ) -> Self {
+        Self {
+            expression,
+            definition: Some(definition),
+        }
+    }
+}
+
+impl TraitArgumentIdentity {
+    /// Binds an application argument identity to concrete Rust type `T`.
+    pub const fn type_argument<T: 'static>() -> Self {
+        Self::Type(TypeId::of::<T>)
+    }
+
+    /// Records a const argument value as its typed identity.
+    pub const fn const_argument(value: crate::runtime::expression::ConstExpression) -> Self {
+        Self::Const(value)
+    }
+
+    /// Records a lifetime argument without exposing an identity token.
+    pub const fn lifetime(value: &'static str) -> Self {
+        Self::Lifetime(value)
+    }
+
+    /// Records an unresolved source argument expression.
+    pub const fn expression(value: &'static str) -> Self {
+        Self::Expression(value)
+    }
+}
+
+impl AssociatedTypeDefinitionMetadata {
+    /// Creates typed source metadata for a trait associated type.
+    pub const fn new(
+        name: &'static str,
+        visibility: Visibility,
+        bounds: &'static [PredicateData],
+        default: Option<&'static ExpressionData>,
+    ) -> Self {
+        Self {
+            name,
+            visibility,
+            bounds,
+            default,
+        }
+    }
+}
+
+impl AssociatedConstDefinitionMetadata {
+    /// Creates typed source metadata for a trait associated constant.
+    pub const fn new(
+        name: &'static str,
+        visibility: Visibility,
+        ty: &'static ExpressionData,
+        default: Option<crate::runtime::expression::ConstExpression>,
+    ) -> Self {
+        Self {
+            name,
+            visibility,
+            ty,
+            default,
+        }
+    }
 }
