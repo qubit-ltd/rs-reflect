@@ -34,6 +34,14 @@ pub struct ItemIdentity {
     pub display_name: Box<str>,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum GenericArgumentIdentity {
+    Type(Box<str>),
+    Const(Box<str>),
+    Lifetime(Box<str>),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegistrationOrigin {
     pub crate_name: &'static str,

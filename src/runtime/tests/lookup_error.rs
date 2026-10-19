@@ -1,4 +1,4 @@
-use crate::runtime::error::{LookupError, LookupQuery, LookupSubject};
+use crate::runtime::error::{ContextError, LookupError, LookupQuery, LookupSubject};
 use crate::runtime::identity::{ItemIdentity, ItemKind, LookupCandidate, StableItemId};
 use crate::runtime::lookup::Lookup;
 
@@ -43,4 +43,14 @@ fn into_unique_retains_all_ambiguous_candidates_as_owned_summaries() {
         }
         other => panic!("expected ambiguous lookup error, got {other:?}"),
     }
+}
+
+#[test]
+fn context_error_clone_shares_structured_issues() {
+    let error = ContextError::new("invalid registration");
+    let clone = error.clone();
+
+    assert_eq!(error.issues().len(), 1);
+    assert!(std::ptr::eq(error.primary_issue(), clone.primary_issue()));
+    assert_eq!(error.to_string(), "invalid registration");
 }
