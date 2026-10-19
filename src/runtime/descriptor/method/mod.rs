@@ -1310,3 +1310,9 @@ fn specialization_candidate(index: usize) -> LookupCandidate {
         origin: None,
     }
 }
+
+    /// Records whether the callable implementation is declared, defaulted, or overridden.
+    pub const fn with_source(mut self, source: MethodImplementationSource) -> Self {
+        self.source = source;
+        self
+    }
