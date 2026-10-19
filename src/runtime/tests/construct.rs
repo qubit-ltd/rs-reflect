@@ -7,9 +7,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::runtime::construct::{
     ConstructField, ConstructProvider, ConstructVisibility, ConstructionAvailability,
     ConstructionDescriptor, ConstructionError, ConstructionFieldPolicy, ConstructionPlan,
-    ConstructionProviders, ConstructionShape, ConstructionTarget, ConstructionTargetKind,
-    NamedFields, PositionalFields, RecoveredConstructionInput, UnitFields, UpdateError,
-    UpdateFieldPolicy, UpdateInput, UpdateUnavailableReason, resolve_plan, resolve_variant_plan,
+    ConstructionProviders, ConstructionShape, NamedFields, PositionalFields,
+    RecoveredConstructionInput, UnitFields, UpdateError, UpdateFieldPolicy, UpdateInput,
+    UpdateUnavailableReason, resolve_plan, resolve_variant_plan,
 };
 use crate::runtime::descriptor::{Reflect, TypeRegistration};
 use crate::runtime::identity::TypeIdentity;
@@ -59,12 +59,7 @@ static FREEZE_PLAN: OnceLock<ConstructionPlan> = OnceLock::new();
 
 fn freeze_probe_plan() -> &'static ConstructionPlan {
     FREEZE_PLAN.get_or_init(|| {
-        ConstructionPlan::new(
-            ConstructionTarget {
-                identity: type_identity::<Record>,
-                kind: ConstructionTargetKind::Struct,
-                variant_index: None,
-            },
+        ConstructionPlan::for_type::<Record>(
             ConstructionShape::Unit,
             &[],
             ConstructionProviders::from_runtime_providers(Some(&FREEZE_PROVIDER), None),
@@ -246,12 +241,7 @@ fn record_plan_with_policy(
         },
     ]));
     let provider = Box::leak(Box::new(RecordProvider));
-    ConstructionPlan::new(
-        ConstructionTarget {
-            identity: type_identity::<Record>,
-            kind: ConstructionTargetKind::Struct,
-            variant_index: None,
-        },
+    ConstructionPlan::for_type::<Record>(
         ConstructionShape::Named,
         fields,
         ConstructionProviders::from_runtime_providers(Some(provider), Some(provider)),
@@ -284,12 +274,7 @@ fn record_plan_with_unavailable_update() -> ConstructionPlan {
         },
     ]));
     let provider = Box::leak(Box::new(RecordProvider));
-    ConstructionPlan::new(
-        ConstructionTarget {
-            identity: type_identity::<Record>,
-            kind: ConstructionTargetKind::Struct,
-            variant_index: None,
-        },
+    ConstructionPlan::for_type::<Record>(
         ConstructionShape::Named,
         fields,
         ConstructionProviders::from_runtime_providers(Some(provider), Some(provider)),
@@ -315,12 +300,8 @@ fn choice_variant_plan() -> ConstructionPlan {
         },
     ]));
     let provider = Box::leak(Box::new(PairProvider));
-    ConstructionPlan::new(
-        ConstructionTarget {
-            identity: type_identity::<Choice>,
-            kind: ConstructionTargetKind::Variant,
-            variant_index: Some(1),
-        },
+    ConstructionPlan::for_variant::<Choice>(
+        1,
         ConstructionShape::Positional,
         fields,
         ConstructionProviders::from_runtime_providers(Some(provider), None),
@@ -330,12 +311,7 @@ fn choice_variant_plan() -> ConstructionPlan {
 
 fn marker_plan() -> ConstructionPlan {
     let provider = Box::leak(Box::new(MarkerProvider));
-    ConstructionPlan::new(
-        ConstructionTarget {
-            identity: type_identity::<Marker>,
-            kind: ConstructionTargetKind::Struct,
-            variant_index: None,
-        },
+    ConstructionPlan::for_type::<Marker>(
         ConstructionShape::Unit,
         &[],
         ConstructionProviders::from_runtime_providers(Some(provider), None),
