@@ -1,6 +1,6 @@
 use qubit_reflect::__private::codegen_v4::descriptor::{Reflect, TypeRegistration};
 use qubit_reflect::__private::codegen_v4::value::{
-    DynamicMut, DynamicOwned, DynamicRef, Local, ThreadSafe,
+    DynamicMut, DynamicOwned, DynamicRef, Local, ThreadSafe, ValueFor,
 };
 
 struct ContractValue(String);
@@ -90,4 +90,30 @@ fn external_codegen_value_facade_supports_string_slices() {
     let dynamic = DynamicMut::<Local>::new_str_mut(text.as_mut_str());
     dynamic.into_str_mut().unwrap().make_ascii_uppercase();
     assert_eq!(text, "MUTABLE TEXT");
+}
+
+#[test]
+fn external_codegen_value_facade_accepts_builtin_scalars_and_unit() {
+    fn assert_builtin<T: ValueFor<Local>>(value: T) {
+        drop(DynamicOwned::<Local>::new(value));
+    }
+
+    assert_builtin(false);
+    assert_builtin('x');
+    assert_builtin(1_i8);
+    assert_builtin(2_i16);
+    assert_builtin(3_i32);
+    assert_builtin(4_i64);
+    assert_builtin(5_i128);
+    assert_builtin(6_isize);
+    assert_builtin(7_u8);
+    assert_builtin(8_u16);
+    assert_builtin(9_u32);
+    assert_builtin(10_u64);
+    assert_builtin(11_u128);
+    assert_builtin(12_usize);
+    assert_builtin(1.0_f32);
+    assert_builtin(2.0_f64);
+    assert_builtin(String::from("builtin string"));
+    assert_builtin(());
 }
