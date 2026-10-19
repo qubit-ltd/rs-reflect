@@ -58,8 +58,8 @@ pub(crate) trait ValueMode: sealed::Sealed + 'static {
     fn reborrow_mut<'a, 'b>(value: &'b mut Self::Mutable<'a>) -> Self::Mutable<'b>;
 }
 
-pub(crate) enum Local {}
-pub(crate) enum ThreadSafe {}
+pub enum Local {}
+pub enum ThreadSafe {}
 
 pub(crate) struct LocalOwned(pub(super) Box<dyn ErasedOwned>);
 pub(crate) struct ThreadSafeOwned(pub(super) Box<dyn ErasedOwnedThreadSafe>);

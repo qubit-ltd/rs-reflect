@@ -27,7 +27,6 @@ impl Reflect for u64 {
     }
 }
 
-impl Reflect for str {}
 impl Reflect for [u64] {}
 
 #[test]
