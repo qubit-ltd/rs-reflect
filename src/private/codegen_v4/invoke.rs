@@ -27,6 +27,8 @@ pub use crate::runtime::descriptor::method::MethodMetadata;
 pub use crate::runtime::descriptor::method::MethodMetadataSpec;
 pub use crate::runtime::descriptor::method::MethodNamespaceMetadata;
 pub use crate::runtime::descriptor::method::MethodQualifiers;
+pub use crate::runtime::descriptor::method::MethodSpecializationArgument;
+pub use crate::runtime::descriptor::method::MethodSpecializationSpec;
 pub use crate::runtime::descriptor::method::MethodVisibility;
 pub use crate::runtime::descriptor::method::ParameterMetadata;
 pub use crate::runtime::descriptor::method::ParameterPattern;

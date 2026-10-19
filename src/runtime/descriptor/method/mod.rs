@@ -488,6 +488,7 @@ impl EffectiveMethod {
                 reasons: &NO_METHOD_ADAPTER,
             },
             specializations: &[],
+            specialization_specs: &[],
             adapters: None,
         }
     }
@@ -496,7 +497,20 @@ impl EffectiveMethod {
     pub const fn with_adapters(mut self, adapters: InvocationAdapters) -> Self {
         self.availability = MethodAvailability::Callable;
         self.specializations = &[];
+        self.specialization_specs = &[];
         self.adapters = Some(adapters);
+        self
+    }
+
+    /// Adds statically typed generic method bindings for this target.
+    pub const fn with_specializations(
+        mut self,
+        specializations: &'static [MethodSpecializationSpec],
+    ) -> Self {
+        self.availability = MethodAvailability::RequiresSpecialization;
+        self.specializations = &[];
+        self.specialization_specs = specializations;
+        self.adapters = None;
         self
     }
 
@@ -507,6 +521,7 @@ impl EffectiveMethod {
     ) -> Self {
         self.availability = MethodAvailability::Unavailable { reasons };
         self.specializations = &[];
+        self.specialization_specs = &[];
         self.adapters = None;
         self
     }
@@ -523,6 +538,7 @@ impl EffectiveMethod {
             && self.source == other.source
             && self.availability == other.availability
             && std::ptr::eq(self.specializations, other.specializations)
+            && std::ptr::eq(self.specialization_specs, other.specialization_specs)
             && same_adapters(self.adapters, other.adapters)
     }
 
@@ -559,7 +575,180 @@ pub struct EffectiveMethod {
     pub(crate) source: MethodImplementationSource,
     pub(crate) availability: MethodAvailability,
     pub(crate) specializations: &'static [ResolvedMethodSpecialization],
+    pub(crate) specialization_specs: &'static [MethodSpecializationSpec],
     pub(crate) adapters: Option<InvocationAdapters>,
+}
+
+/// A typed generic argument used by a statically registered method specialization.
+#[derive(Clone, Copy)]
+pub struct MethodSpecializationArgument {
+    value: MethodSpecializationArgumentValue,
+}
+
+#[derive(Clone, Copy)]
+enum MethodSpecializationArgumentValue {
+    Type(fn() -> &'static str),
+    Lifetime(&'static str),
+    ConstSigned { kind: ConstIntegerKind, value: i128 },
+    ConstUnsigned { kind: ConstIntegerKind, value: u128 },
+    ConstBoolean(bool),
+    ConstCharacter(char),
+}
+
+#[derive(Clone, Copy)]
+enum ConstIntegerKind {
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+}
+
+impl MethodSpecializationArgument {
+    /// Records a concrete type argument without exposing runtime identity data.
+    pub const fn type_argument<T: 'static>() -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::Type(specialization_type_name::<T>),
+        }
+    }
+
+    /// Records a concrete lifetime argument for exact specialization selection.
+    pub const fn lifetime(name: &'static str) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::Lifetime(name),
+        }
+    }
+
+    /// Records a boolean const argument.
+    pub const fn const_bool(value: bool) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::ConstBoolean(value),
+        }
+    }
+
+    /// Records a character const argument.
+    pub const fn const_char(value: char) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::ConstCharacter(value),
+        }
+    }
+
+    /// Records a signed integer const argument.
+    const fn const_signed(kind: ConstIntegerKind, value: i128) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::ConstSigned { kind, value },
+        }
+    }
+
+    /// Records an unsigned integer const argument.
+    const fn const_unsigned(kind: ConstIntegerKind, value: u128) -> Self {
+        Self {
+            value: MethodSpecializationArgumentValue::ConstUnsigned { kind, value },
+        }
+    }
+
+    /// Records an `i8` const argument.
+    pub const fn i8(value: i8) -> Self {
+        Self::const_signed(ConstIntegerKind::I8, value as i128)
+    }
+
+    /// Records an `i16` const argument.
+    pub const fn i16(value: i16) -> Self {
+        Self::const_signed(ConstIntegerKind::I16, value as i128)
+    }
+
+    /// Records an `i32` const argument.
+    pub const fn i32(value: i32) -> Self {
+        Self::const_signed(ConstIntegerKind::I32, value as i128)
+    }
+
+    /// Records an `i64` const argument.
+    pub const fn i64(value: i64) -> Self {
+        Self::const_signed(ConstIntegerKind::I64, value as i128)
+    }
+
+    /// Records an `i128` const argument.
+    pub const fn i128(value: i128) -> Self {
+        Self::const_signed(ConstIntegerKind::I128, value)
+    }
+
+    /// Records an `isize` const argument.
+    pub const fn isize(value: isize) -> Self {
+        Self::const_signed(ConstIntegerKind::Isize, value as i128)
+    }
+
+    /// Records a `u8` const argument.
+    pub const fn u8(value: u8) -> Self {
+        Self::const_unsigned(ConstIntegerKind::U8, value as u128)
+    }
+
+    /// Records a `u16` const argument.
+    pub const fn u16(value: u16) -> Self {
+        Self::const_unsigned(ConstIntegerKind::U16, value as u128)
+    }
+
+    /// Records a `u32` const argument.
+    pub const fn u32(value: u32) -> Self {
+        Self::const_unsigned(ConstIntegerKind::U32, value as u128)
+    }
+
+    /// Records a `u64` const argument.
+    pub const fn u64(value: u64) -> Self {
+        Self::const_unsigned(ConstIntegerKind::U64, value as u128)
+    }
+
+    /// Records a `u128` const argument.
+    pub const fn u128(value: u128) -> Self {
+        Self::const_unsigned(ConstIntegerKind::U128, value)
+    }
+
+    /// Records a `usize` const argument.
+    pub const fn usize(value: usize) -> Self {
+        Self::const_unsigned(ConstIntegerKind::Usize, value as u128)
+    }
+}
+
+fn specialization_type_name<T: 'static>() -> &'static str {
+    std::any::type_name::<T>()
+}
+
+/// A concrete specialization declaration with typed arguments and adapters.
+#[derive(Clone, Copy)]
+pub struct MethodSpecializationSpec {
+    arguments: &'static [MethodSpecializationArgument],
+    availability: InvocationAvailability,
+    adapters: InvocationAdapters,
+}
+
+impl MethodSpecializationSpec {
+    /// Creates a callable specialization declaration.
+    pub const fn new(
+        arguments: &'static [MethodSpecializationArgument],
+        adapters: InvocationAdapters,
+    ) -> Self {
+        Self {
+            arguments,
+            availability: InvocationAvailability::Callable,
+            adapters,
+        }
+    }
+
+    /// Marks this specialization unavailable with typed reasons.
+    pub const fn with_unavailable(
+        mut self,
+        reasons: &'static [InvocationUnavailableReason],
+    ) -> Self {
+        self.availability = InvocationAvailability::Unavailable { reasons };
+        self.adapters = NO_ADAPTERS;
+        self
+    }
 }
 
 /// A compile-time-bound implementation of one generic method.

@@ -495,6 +495,7 @@ fn effective_for(metadata: &'static MethodMetadata) -> EffectiveMethod {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        specialization_specs: &[],
         adapters: None,
     }
 }
@@ -545,6 +546,7 @@ fn caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declaration
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &TWO_ARGUMENT_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [method];
@@ -679,6 +681,7 @@ fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [private];
@@ -719,6 +722,7 @@ fn ordinary_invoke_leaves_user_panics_unwinding() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PANIC_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [method];
@@ -746,6 +750,7 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PANIC_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [method];
@@ -795,6 +800,7 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &NO_CATCH_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [no_catch];
@@ -830,6 +836,7 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [asynchronous];
@@ -861,6 +868,7 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PINNED_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [effective];
@@ -917,6 +925,7 @@ fn pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PINNED_SPECIALIZATIONS,
+        specialization_specs: &[],
         adapters: None,
     };
     let methods = [effective];

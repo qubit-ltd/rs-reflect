@@ -206,6 +206,7 @@ static DEFAULT_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
     source: MethodImplementationSource::Defaulted,
     availability: MethodAvailability::Callable,
     specializations: &[],
+    specialization_specs: &[],
     adapters: None,
 }];
 static OVERRIDE_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
@@ -214,6 +215,7 @@ static OVERRIDE_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
     source: MethodImplementationSource::Overridden,
     availability: MethodAvailability::Callable,
     specializations: &[],
+    specialization_specs: &[],
     adapters: None,
 }];
 
