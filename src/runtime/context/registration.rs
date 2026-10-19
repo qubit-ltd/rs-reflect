@@ -77,6 +77,10 @@ impl Registration {
         self.type_record
     }
 
+    pub(crate) fn origin(&self) -> &RegistrationOrigin {
+        &self.origin
+    }
+
     pub(crate) fn sort_key(&self) -> RegistrationSortKey {
         (
             self.origin.crate_name,
