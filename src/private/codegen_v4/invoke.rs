@@ -17,11 +17,14 @@
 //! signatures.
 
 pub use crate::runtime::descriptor::method::EffectiveMethod;
+pub use crate::runtime::descriptor::method::FunctionAbi;
 pub use crate::runtime::descriptor::method::InvocationAdapters;
+pub use crate::runtime::descriptor::method::InvocationAdaptersBuilder;
 pub use crate::runtime::descriptor::method::MethodAvailability;
 pub use crate::runtime::descriptor::method::MethodCatalogRegistration;
 pub use crate::runtime::descriptor::method::MethodImplementationSource;
 pub use crate::runtime::descriptor::method::MethodMetadata;
+pub use crate::runtime::descriptor::method::MethodMetadataSpec;
 pub use crate::runtime::descriptor::method::MethodNamespaceMetadata;
 pub use crate::runtime::descriptor::method::MethodQualifiers;
 pub use crate::runtime::descriptor::method::MethodVisibility;
@@ -32,8 +35,15 @@ pub use crate::runtime::descriptor::method::ReceiverDescriptor;
 pub use crate::runtime::descriptor::method::ReceiverKind;
 pub use crate::runtime::descriptor::method::ReturnKind;
 pub use crate::runtime::descriptor::method::ReturnMetadata;
+pub use crate::runtime::invoke::BorrowOrigin;
+pub use crate::runtime::invoke::FunctionInvocationAdapter;
 pub use crate::runtime::invoke::InvocationAdapter;
-pub use crate::runtime::invoke::PinnedInvocationAdapter;
+pub use crate::runtime::invoke::InvocationOutput;
+pub use crate::runtime::invoke::InvocationReceiver;
+pub use crate::runtime::invoke::InvocationValue;
+pub use crate::runtime::invoke::PinnedFunctionInvocationAdapter;
+pub use crate::runtime::invoke::PinnedReceiver;
+pub use crate::runtime::invoke::ValidatedInvocation;
 pub use crate::runtime::lookup::Lookup;
 
 /// Submits an effective method catalog for its exact target type.

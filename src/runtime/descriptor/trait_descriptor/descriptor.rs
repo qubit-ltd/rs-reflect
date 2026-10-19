@@ -278,7 +278,10 @@ impl<'ctx> ReceiverDefinitionDescriptor<'ctx> {
         self.receiver.kind
     }
     pub(crate) fn concrete_type(self) -> crate::runtime::descriptor::TypeDescriptor<'ctx> {
-        crate::runtime::descriptor::TypeDescriptor::new(self.receiver.type_metadata, self.context)
+        crate::runtime::descriptor::TypeDescriptor::new(
+            (self.receiver.type_metadata)(),
+            self.context,
+        )
     }
 }
 

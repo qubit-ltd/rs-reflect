@@ -69,6 +69,9 @@ static TRAIT_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
 static STRING_METADATA: TypeMetadata = TypeMetadata::new::<String>();
 static U64_METADATA: TypeMetadata = TypeMetadata::new::<u64>();
 static TARGET_METADATA: TypeMetadata = TypeMetadata::new::<CustomerId>();
+fn target_type_metadata() -> &'static TypeMetadata {
+    &TARGET_METADATA
+}
 static ERROR_METADATA: TypeMetadata = TypeMetadata::new::<ErrorValue>();
 static STRING_EXPR: ExpressionData = ExpressionData::Named {
     path: "alloc::string::String",
@@ -187,18 +190,20 @@ static OVERRIDE_METHODS: [MethodMetadata; 1] = [make_method(false)];
 static TRAIT_METHODS: &[MethodMetadata] = &DEFAULT_METHODS;
 static EMPTY_METHODS: &[MethodMetadata] = &[];
 static DEFAULT_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
-    target: &TARGET_METADATA,
+    target: target_type_metadata,
     metadata: &DEFAULT_METHODS[0],
     source: MethodImplementationSource::Defaulted,
     availability: MethodAvailability::Callable,
     specializations: &[],
+    adapters: None,
 }];
 static OVERRIDE_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
-    target: &TARGET_METADATA,
+    target: target_type_metadata,
     metadata: &OVERRIDE_METHODS[0],
     source: MethodImplementationSource::Overridden,
     availability: MethodAvailability::Callable,
     specializations: &[],
+    adapters: None,
 }];
 
 static TRAIT_DEFINITION: TraitDefinitionMetadata = TraitDefinitionMetadata {

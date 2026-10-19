@@ -72,8 +72,35 @@ pub trait InvocationAdapter<M: ValueMode>: Sync {
     ) -> InvocationOutput<'call, M>;
 }
 
+/// Function-pointer adapter for generated method bodies.
+pub struct FunctionInvocationAdapter<M: ValueMode> {
+    invoke: for<'call> fn(ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
+    _mode: std::marker::PhantomData<fn() -> M>,
+}
+
+impl<M: ValueMode> FunctionInvocationAdapter<M> {
+    /// Binds a generated function to the invocation adapter contract.
+    pub const fn new(
+        invoke: for<'call> fn(ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
+    ) -> Self {
+        Self {
+            invoke,
+            _mode: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<M: ValueMode> InvocationAdapter<M> for FunctionInvocationAdapter<M> {
+    fn invoke<'call>(
+        &self,
+        invocation: ValidatedInvocation<'call, M>,
+    ) -> InvocationOutput<'call, M> {
+        (self.invoke)(invocation)
+    }
+}
+
 /// Adapter for a method whose receiver is pinned.
-pub trait PinnedInvocationAdapter<M: ValueMode>: Sync {
+pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
     fn receiver_type_id(&self) -> TypeId;
     fn receiver_kind(&self) -> ReceiverKind;
 
@@ -82,6 +109,69 @@ pub trait PinnedInvocationAdapter<M: ValueMode>: Sync {
         receiver: PinnedReceiver<'call>,
         invocation: ValidatedInvocation<'call, M>,
     ) -> InvocationOutput<'call, M>;
+}
+
+/// Function-pointer adapter for a receiver whose type and pin mode are fixed.
+pub struct PinnedFunctionInvocationAdapter<M: ValueMode, T: ?Sized + 'static> {
+    kind: ReceiverKind,
+    invoke: for<'call> fn(
+        PinnedReceiver<'call>,
+        ValidatedInvocation<'call, M>,
+    ) -> InvocationOutput<'call, M>,
+    _receiver: std::marker::PhantomData<fn(&T)>,
+    _mode: std::marker::PhantomData<fn() -> M>,
+}
+
+impl<M: ValueMode, T: ?Sized + 'static> PinnedFunctionInvocationAdapter<M, T> {
+    /// Creates a pinned shared-receiver adapter for the exact type `T`.
+    pub const fn shared(
+        invoke: for<'call> fn(
+            PinnedReceiver<'call>,
+            ValidatedInvocation<'call, M>,
+        ) -> InvocationOutput<'call, M>,
+    ) -> Self {
+        Self {
+            kind: ReceiverKind::PinnedShared,
+            invoke,
+            _receiver: std::marker::PhantomData,
+            _mode: std::marker::PhantomData,
+        }
+    }
+
+    /// Creates a pinned mutable-receiver adapter for the exact type `T`.
+    pub const fn mutable(
+        invoke: for<'call> fn(
+            PinnedReceiver<'call>,
+            ValidatedInvocation<'call, M>,
+        ) -> InvocationOutput<'call, M>,
+    ) -> Self {
+        Self {
+            kind: ReceiverKind::PinnedMutable,
+            invoke,
+            _receiver: std::marker::PhantomData,
+            _mode: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<M: ValueMode, T: ?Sized + 'static> PinnedInvocationAdapter<M>
+    for PinnedFunctionInvocationAdapter<M, T>
+{
+    fn receiver_type_id(&self) -> TypeId {
+        TypeId::of::<T>()
+    }
+
+    fn receiver_kind(&self) -> ReceiverKind {
+        self.kind
+    }
+
+    fn invoke<'call>(
+        &self,
+        receiver: PinnedReceiver<'call>,
+        invocation: ValidatedInvocation<'call, M>,
+    ) -> InvocationOutput<'call, M> {
+        (self.invoke)(receiver, invocation)
+    }
 }
 
 trait ErasedPinnedReceiver {
@@ -124,7 +214,7 @@ impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedMutableHolder<'_, T> {
 
 /// A pinned receiver erased for a generated typed adapter. The holder retains
 /// the typed Pin, including any DST metadata, until the adapter downcasts it.
-pub(crate) struct PinnedReceiver<'call> {
+pub struct PinnedReceiver<'call> {
     inner: PinnedReceiverKind<'call>,
 }
 
@@ -134,19 +224,19 @@ enum PinnedReceiverKind<'call> {
 }
 
 impl<'call> PinnedReceiver<'call> {
-    pub(crate) fn type_id(&self) -> TypeId {
+    fn type_id(&self) -> TypeId {
         match &self.inner {
             PinnedReceiverKind::Shared(holder) | PinnedReceiverKind::Mutable(holder) => {
                 ErasedPinnedReceiver::type_id(holder.as_ref())
             }
         }
     }
-    pub(crate) fn is_mutable(&self) -> bool {
+    fn is_mutable(&self) -> bool {
         matches!(self.inner, PinnedReceiverKind::Mutable(_))
     }
 
     #[allow(unsafe_code)]
-    pub(crate) fn downcast_ref<T: ?Sized + 'static>(self) -> Option<Pin<&'call T>> {
+    pub fn downcast_ref<T: ?Sized + 'static>(self) -> Option<Pin<&'call T>> {
         match self.inner {
             PinnedReceiverKind::Shared(mut holder)
                 if ErasedPinnedReceiver::type_id(holder.as_ref()) == TypeId::of::<T>() =>
@@ -175,7 +265,7 @@ impl<'call> PinnedReceiver<'call> {
     }
 
     #[allow(unsafe_code)]
-    pub(crate) fn downcast_mut<T: ?Sized + 'static>(self) -> Option<Pin<&'call mut T>> {
+    pub fn downcast_mut<T: ?Sized + 'static>(self) -> Option<Pin<&'call mut T>> {
         match self.inner {
             PinnedReceiverKind::Mutable(mut holder)
                 if ErasedPinnedReceiver::type_id(holder.as_ref()) == TypeId::of::<T>() =>
@@ -194,13 +284,13 @@ impl<'call> PinnedReceiver<'call> {
 }
 
 /// A shared or mutable receiver passed to an invocation.
-pub(crate) enum InvocationReceiver<'call, M: ValueMode> {
+pub enum InvocationReceiver<'call, M: ValueMode> {
     Owned(DynamicOwned<M>),
     Ref(DynamicRef<'call, M>),
     Mut(DynamicMut<'call, M>),
 }
 
-impl<M: ValueMode> InvocationReceiver<'_, M> {
+impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
     fn kind(&self) -> InvocationValueKind {
         match self {
             Self::Owned(_) => InvocationValueKind::Owned,
@@ -215,10 +305,43 @@ impl<M: ValueMode> InvocationReceiver<'_, M> {
             Self::Mut(value) => value.type_id(),
         }
     }
+
+    /// Recovers an owned receiver of its validated concrete type.
+    pub fn into_owned<T: ValueFor<M>>(self) -> Result<T, Self> {
+        match self {
+            Self::Owned(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Owned(failure.into_value())),
+            },
+            receiver => Err(receiver),
+        }
+    }
+
+    /// Recovers a shared receiver of its validated concrete type.
+    pub fn into_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<&'call T, Self> {
+        match self {
+            Self::Ref(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Ref(failure.into_value())),
+            },
+            receiver => Err(receiver),
+        }
+    }
+
+    /// Recovers a mutable receiver of its validated concrete type.
+    pub fn into_mut<T: ValueForMut<M> + ?Sized>(self) -> Result<&'call mut T, Self> {
+        match self {
+            Self::Mut(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Mut(failure.into_value())),
+            },
+            receiver => Err(receiver),
+        }
+    }
 }
 
 /// A bound input value, preserving whether it is owned or borrowed.
-pub(crate) enum InvocationValue<'call, M: ValueMode> {
+pub enum InvocationValue<'call, M: ValueMode> {
     Owned(DynamicOwned<M>),
     Ref(DynamicRef<'call, M>),
     Mut(DynamicMut<'call, M>),
@@ -242,6 +365,39 @@ impl<'call, M: ValueMode> InvocationValue<'call, M> {
             Self::Owned(value) => value.type_id(),
             Self::Ref(value) => value.clone().type_id(),
             Self::Mut(value) => value.type_id(),
+        }
+    }
+
+    /// Recovers an owned argument of its validated concrete type.
+    pub fn into_owned<T: ValueFor<M>>(self) -> Result<T, Self> {
+        match self {
+            Self::Owned(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Owned(failure.into_value())),
+            },
+            value => Err(value),
+        }
+    }
+
+    /// Recovers a shared argument of its validated concrete type.
+    pub fn into_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<&'call T, Self> {
+        match self {
+            Self::Ref(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Ref(failure.into_value())),
+            },
+            value => Err(value),
+        }
+    }
+
+    /// Recovers a mutable argument of its validated concrete type.
+    pub fn into_mut<T: ValueForMut<M> + ?Sized>(self) -> Result<&'call mut T, Self> {
+        match self {
+            Self::Mut(value) => match value.downcast::<T>() {
+                Ok(value) => Ok(value),
+                Err(failure) => Err(Self::Mut(failure.into_value())),
+            },
+            value => Err(value),
         }
     }
 }
@@ -646,24 +802,24 @@ impl<'call> Invocation<'call, ThreadSafe> {
 }
 
 /// An invocation after declaration-order binding and all dynamic checks passed.
-pub(crate) struct ValidatedInvocation<'call, M: ValueMode> {
+pub struct ValidatedInvocation<'call, M: ValueMode> {
     invocation: Invocation<'call, M>,
     order: Vec<(usize, usize)>,
 }
 
 impl<'call, M: ValueMode> ValidatedInvocation<'call, M> {
     /// Returns the receiver for a generated adapter.
-    pub(crate) fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
+    pub fn receiver(&self) -> Option<&InvocationReceiver<'call, M>> {
         self.invocation.receiver.as_ref()
     }
     /// Returns arguments in declaration order for a generated adapter.
-    pub(crate) fn arguments(&self) -> impl ExactSizeIterator<Item = &InvocationValue<'call, M>> {
+    pub fn arguments(&self) -> impl ExactSizeIterator<Item = &InvocationValue<'call, M>> {
         self.order
             .iter()
             .map(|(binding_index, _)| &self.invocation.bindings[*binding_index].value)
     }
     /// Consumes the validated inputs for adapter execution.
-    pub(crate) fn into_parts(
+    pub fn into_parts(
         self,
     ) -> (
         Option<InvocationReceiver<'call, M>>,
@@ -753,7 +909,7 @@ fn validate_bindings<M: ValueMode>(
                 if !mode_matches {
                     return Err(InvocationErrorKind::ReceiverModeMismatch);
                 }
-                let expected_type = expected.type_metadata.type_id();
+                let expected_type = (expected.type_metadata)().type_id();
                 if actual_type != expected_type {
                     return Err(InvocationErrorKind::ReceiverTypeMismatch {
                         expected: expected_type,
@@ -785,7 +941,7 @@ fn validate_bindings<M: ValueMode>(
                 if !mode_matches {
                     return Err(InvocationErrorKind::ReceiverModeMismatch);
                 }
-                let expected_type = expected.type_metadata.type_id();
+                let expected_type = (expected.type_metadata)().type_id();
                 if actual.type_id() != expected_type {
                     return Err(InvocationErrorKind::ReceiverTypeMismatch {
                         expected: expected_type,
@@ -1016,7 +1172,7 @@ pub(crate) enum CaughtInvocationFailure<'call, M: ValueMode> {
 
 /// The origin of a borrow returned from a reflected method.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum BorrowOrigin {
+pub enum BorrowOrigin {
     Receiver,
     Parameter(usize),
 }
@@ -1045,7 +1201,7 @@ impl<'call, M: ValueMode> Future for ReflectedFuture<'call, M> {
 
 /// A reflected method's result, retaining the borrow origins of reference outputs.
 #[must_use]
-pub(crate) enum InvocationOutput<'call, M: ValueMode = Local> {
+pub enum InvocationOutput<'call, M: ValueMode = Local> {
     Unit,
     Owned(DynamicOwned<M>),
     Ref {
@@ -1078,13 +1234,52 @@ impl<O> OutputMismatch<O> {
 }
 
 impl<'call, M: ValueMode> InvocationOutput<'call, M> {
-    pub(crate) fn into_unit(self) -> Result<(), OutputMismatch<Self>> {
+    /// Creates a unit result.
+    pub fn unit() -> Self {
+        Self::Unit
+    }
+
+    /// Erases an owned result while retaining its value mode.
+    pub fn owned<T: ValueFor<M>>(value: T) -> Self {
+        Self::Owned(DynamicOwned::new(value))
+    }
+
+    /// Erases a shared result and records which validated input it borrows.
+    pub fn shared<T: ValueForRef<M> + ?Sized>(value: &'call T, origin: BorrowOrigin) -> Self {
+        Self::shared_with_origins(value, &[origin])
+    }
+
+    /// Erases a shared result with all validated input origins it may borrow.
+    pub fn shared_with_origins<T: ValueForRef<M> + ?Sized>(
+        value: &'call T,
+        origins: &[BorrowOrigin],
+    ) -> Self {
+        Self::Ref {
+            value: DynamicRef::new(value),
+            origins: origins.into(),
+        }
+    }
+
+    /// Erases a mutable result and records which validated input it borrows.
+    pub fn mutable<T: ValueForMut<M> + ?Sized>(value: &'call mut T, origin: BorrowOrigin) -> Self {
+        Self::Mut {
+            value: DynamicMut::new(value),
+            origin,
+        }
+    }
+
+    /// Erases an asynchronous result for the invocation's selected value mode.
+    pub fn future(future: impl Future<Output = Self> + 'call) -> Self {
+        Self::Future(ReflectedFuture::new(future))
+    }
+
+    pub fn into_unit(self) -> Result<(), OutputMismatch<Self>> {
         match self {
             Self::Unit => Ok(()),
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_owned<T: ValueFor<M>>(self) -> Result<T, OutputMismatch<Self>> {
+    pub fn into_owned<T: ValueFor<M>>(self) -> Result<T, OutputMismatch<Self>> {
         match self {
             Self::Owned(value) => match value.downcast::<T>() {
                 Ok(value) => Ok(value),
@@ -1095,9 +1290,7 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_ref<T: ValueForRef<M> + ?Sized>(
-        self,
-    ) -> Result<&'call T, OutputMismatch<Self>> {
+    pub fn into_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<&'call T, OutputMismatch<Self>> {
         match self {
             Self::Ref { value, origins } => match value.downcast::<T>() {
                 Ok(value) => Ok(value),
@@ -1111,7 +1304,7 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_mut<T: ValueForMut<M> + ?Sized>(
+    pub fn into_mut<T: ValueForMut<M> + ?Sized>(
         self,
     ) -> Result<&'call mut T, OutputMismatch<Self>> {
         match self {
@@ -1127,7 +1320,7 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_optional_ref<T: ValueForRef<M> + ?Sized>(
+    pub fn into_optional_ref<T: ValueForRef<M> + ?Sized>(
         self,
     ) -> Result<Option<&'call T>, OutputMismatch<Self>> {
         match self {
@@ -1147,7 +1340,7 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_ref_slice<T: ValueForRef<M> + ?Sized>(
+    pub fn into_ref_slice<T: ValueForRef<M> + ?Sized>(
         self,
     ) -> Result<Box<[&'call T]>, OutputMismatch<Self>> {
         match self {
@@ -1168,7 +1361,7 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
             output => Err(OutputMismatch { output }),
         }
     }
-    pub(crate) fn into_future(self) -> Result<ReflectedFuture<'call, M>, OutputMismatch<Self>> {
+    pub fn into_future(self) -> Result<ReflectedFuture<'call, M>, OutputMismatch<Self>> {
         match self {
             Self::Future(future) => Ok(future),
             output => Err(OutputMismatch { output }),

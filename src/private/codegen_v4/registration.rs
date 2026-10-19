@@ -18,6 +18,31 @@
 pub use crate::runtime::context::handle::registration::Registration;
 pub use crate::runtime::context::handle::registration::RegistrationFragment;
 
+/// A method binding whose target type is fixed by `T`.
+pub struct MethodBinding<T: crate::runtime::descriptor::Reflect> {
+    effective: crate::runtime::descriptor::method::EffectiveMethod,
+    _target: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
+    /// Returns the effective entry for inclusion in `T`'s method catalog.
+    pub const fn effective(&self) -> crate::runtime::descriptor::method::EffectiveMethod {
+        self.effective
+    }
+}
+
+/// Binds method metadata and generated adapters to their concrete target type.
+pub const fn bind_method<T: crate::runtime::descriptor::Reflect>(
+    metadata: &'static crate::runtime::descriptor::method::MethodMetadata,
+    adapters: crate::runtime::descriptor::method::InvocationAdapters,
+) -> MethodBinding<T> {
+    MethodBinding {
+        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata)
+            .with_adapters(adapters),
+        _target: std::marker::PhantomData,
+    }
+}
+
 /// Submits a type registration without exposing the inventory dependency.
 #[doc(hidden)]
 #[macro_export]
@@ -31,3 +56,29 @@ macro_rules! __qubit_reflect_submit_type {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_type as submit_type;
+
+/// Creates a statically typed method binding for the exact target type.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_bind_method {
+    ($ty:ty, $metadata:expr, $adapters:expr) => {
+        $crate::__private::codegen_v4::registration::bind_method::<$ty>($metadata, $adapters)
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_bind_method as bind_method;
+
+/// Submits a target's method catalog without exposing the inventory dependency.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_register_method_binding {
+    ($ty:ty, $methods:expr) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::invoke::MethodCatalogRegistration::new::<$ty>($methods)
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_register_method_binding as register_method_binding;

@@ -67,6 +67,15 @@ impl Reflect for PinnedCounter {
 static COUNTER_TYPE: TypeMetadata = TypeMetadata::new::<Counter>();
 static PINNED_COUNTER_TYPE: TypeMetadata = TypeMetadata::new::<PinnedCounter>();
 static AMOUNT_TYPE: TypeMetadata = TypeMetadata::new::<Amount>();
+fn counter_type_metadata() -> &'static TypeMetadata {
+    &COUNTER_TYPE
+}
+fn amount_type_metadata() -> &'static TypeMetadata {
+    &AMOUNT_TYPE
+}
+fn pinned_counter_type_metadata() -> &'static TypeMetadata {
+    &PINNED_COUNTER_TYPE
+}
 static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
     parameters: &[],
     predicates: &[],
@@ -78,32 +87,34 @@ static U64_EXPRESSION: ExpressionData = ExpressionData::Named {
 };
 static COUNTER_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
     kind: ReceiverKind::Mutable,
-    type_metadata: &COUNTER_TYPE,
+    type_metadata: counter_type_metadata,
+    expression: None,
 };
 static PINNED_MUT_RECEIVER: ReceiverDescriptor = ReceiverDescriptor {
     kind: ReceiverKind::PinnedMutable,
-    type_metadata: &PINNED_COUNTER_TYPE,
+    type_metadata: pinned_counter_type_metadata,
+    expression: None,
 };
 static VALUE_PARAMETER: ParameterMetadata = ParameterMetadata {
     index: 0,
     pattern: ParameterPattern::Identifier("amount"),
     passing: PassingMode::Owned,
     expression: &U64_EXPRESSION,
-    concrete_type: Some(&AMOUNT_TYPE),
+    concrete_type: Some(amount_type_metadata),
 };
 static FIRST_PARAMETER: ParameterMetadata = ParameterMetadata {
     index: 0,
     pattern: ParameterPattern::Identifier("first"),
     passing: PassingMode::Owned,
     expression: &U64_EXPRESSION,
-    concrete_type: Some(&AMOUNT_TYPE),
+    concrete_type: Some(amount_type_metadata),
 };
 static SECOND_PARAMETER: ParameterMetadata = ParameterMetadata {
     index: 1,
     pattern: ParameterPattern::Identifier("second"),
     passing: PassingMode::Owned,
     expression: &U64_EXPRESSION,
-    concrete_type: Some(&AMOUNT_TYPE),
+    concrete_type: Some(amount_type_metadata),
 };
 static TWO_PARAMETERS: [ParameterMetadata; 2] = [FIRST_PARAMETER, SECOND_PARAMETER];
 static UNIT_RETURN: ReturnMetadata = ReturnMetadata {
@@ -479,11 +490,12 @@ fn effective() -> EffectiveMethod {
 
 fn effective_for(metadata: &'static MethodMetadata) -> EffectiveMethod {
     EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        adapters: None,
     }
 }
 
@@ -528,11 +540,12 @@ fn thread_safe_mode_selects_a_send_sync_adapter() {
 fn caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declaration_order() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &TWO_ARGUMENT_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &TWO_ARGUMENT_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -661,11 +674,12 @@ fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
     assert_eq!(counter.0, 13);
 
     let private = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &PRIVATE_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        adapters: None,
     };
     let methods = [private];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -700,11 +714,12 @@ fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
 fn ordinary_invoke_leaves_user_panics_unwinding() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &PANIC_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PANIC_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -726,11 +741,12 @@ fn ordinary_invoke_leaves_user_panics_unwinding() {
 fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &PANIC_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PANIC_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -774,11 +790,12 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
     }
 
     let no_catch = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &NO_CATCH_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [no_catch];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -808,11 +825,12 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
     }
 
     let asynchronous = EffectiveMethod {
-        target: &COUNTER_TYPE,
+        target: counter_type_metadata,
         metadata: &ASYNC_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &SPECIALIZATION_SET,
+        adapters: None,
     };
     let methods = [asynchronous];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -838,11 +856,12 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
 fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure() {
     let context = ReflectionContext::empty();
     let effective = EffectiveMethod {
-        target: &PINNED_COUNTER_TYPE,
+        target: pinned_counter_type_metadata,
         metadata: &PINNED_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PINNED_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [effective];
     let method = MethodCatalog::new(
@@ -893,11 +912,12 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
 fn pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
     let context = ReflectionContext::empty();
     let effective = EffectiveMethod {
-        target: &PINNED_COUNTER_TYPE,
+        target: pinned_counter_type_metadata,
         metadata: &PINNED_METHOD,
         source: MethodImplementationSource::Declared,
         availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
         specializations: &PINNED_SPECIALIZATIONS,
+        adapters: None,
     };
     let methods = [effective];
     let method = MethodCatalog::new(

@@ -42,7 +42,25 @@ pub enum ReceiverKind {
 #[derive(Clone, Copy)]
 pub struct ReceiverDescriptor {
     pub(crate) kind: ReceiverKind,
-    pub(crate) type_metadata: &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    pub(crate) type_metadata: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    pub(crate) expression: Option<&'static ExpressionData>,
+}
+
+impl ReceiverDescriptor {
+    /// Creates receiver metadata for one concrete reflected target type.
+    pub const fn for_type<T: super::Reflect>(kind: ReceiverKind) -> Self {
+        Self {
+            kind,
+            type_metadata: crate::runtime::descriptor::metadata::TypeMetadata::of::<T>,
+            expression: None,
+        }
+    }
+
+    /// Retains the source type expression for an explicitly typed receiver.
+    pub const fn with_expression(mut self, expression: &'static ExpressionData) -> Self {
+        self.expression = Some(expression);
+        self
+    }
 }
 
 /// Source pattern retained for a non-receiver parameter.
@@ -51,6 +69,7 @@ pub enum ParameterPattern {
     Identifier(&'static str),
     Wildcard,
     Destructure,
+    DestructurePattern(&'static str),
 }
 
 /// How a method parameter receives its value.
@@ -68,7 +87,32 @@ pub struct ParameterMetadata {
     pub(crate) pattern: ParameterPattern,
     pub(crate) passing: PassingMode,
     pub(crate) expression: &'static ExpressionData,
-    pub(crate) concrete_type: Option<&'static crate::runtime::descriptor::metadata::TypeMetadata>,
+    pub(crate) concrete_type:
+        Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
+}
+
+impl ParameterMetadata {
+    /// Creates static metadata for one method parameter.
+    pub const fn new(
+        index: usize,
+        pattern: ParameterPattern,
+        passing: PassingMode,
+        expression: &'static ExpressionData,
+    ) -> Self {
+        Self {
+            index,
+            pattern,
+            passing,
+            expression,
+            concrete_type: None,
+        }
+    }
+
+    /// Records the exact concrete Rust type when the parameter has one.
+    pub const fn with_concrete_type<T: super::Reflect>(mut self) -> Self {
+        self.concrete_type = Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>);
+        self
+    }
 }
 
 /// A context-bound view of one method parameter.
@@ -106,13 +150,14 @@ impl<'ctx> ParameterDescriptor<'ctx> {
     pub(crate) fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
         self.metadata
             .concrete_type
-            .map(|metadata| TypeDescriptor::new(metadata, self.context))
+            .map(|metadata| TypeDescriptor::new(metadata(), self.context))
     }
 }
 
 /// The declared kind and optional type expression for a return value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReturnKind {
+    Never,
     Unit,
     Owned,
     Shared,
@@ -128,7 +173,34 @@ pub enum ReturnKind {
 pub struct ReturnMetadata {
     pub(crate) kind: ReturnKind,
     pub(crate) expression: Option<&'static ExpressionData>,
-    pub(crate) concrete_type: Option<&'static crate::runtime::descriptor::metadata::TypeMetadata>,
+    pub(crate) concrete_type:
+        Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
+}
+
+impl ReturnMetadata {
+    /// Creates unit return metadata.
+    pub const fn unit() -> Self {
+        Self {
+            kind: ReturnKind::Unit,
+            expression: None,
+            concrete_type: None,
+        }
+    }
+
+    /// Creates metadata for a non-unit return value.
+    pub const fn new(kind: ReturnKind, expression: &'static ExpressionData) -> Self {
+        Self {
+            kind,
+            expression: Some(expression),
+            concrete_type: None,
+        }
+    }
+
+    /// Records the exact concrete Rust type when the return value has one.
+    pub const fn with_concrete_type<T: super::Reflect>(mut self) -> Self {
+        self.concrete_type = Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>);
+        self
+    }
 }
 
 /// A context-bound view of a method's declared return value.
@@ -156,7 +228,7 @@ impl<'ctx> ReturnDescriptor<'ctx> {
     pub(crate) fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
         self.metadata
             .concrete_type
-            .map(|metadata| TypeDescriptor::new(metadata, self.context))
+            .map(|metadata| TypeDescriptor::new(metadata(), self.context))
     }
 }
 
@@ -170,9 +242,28 @@ pub struct MethodQualifiers {
     pub(crate) is_variadic: bool,
 }
 
+impl MethodQualifiers {
+    /// Creates source qualifiers without a custom ABI.
+    pub const fn new(is_const: bool, is_async: bool, is_unsafe: bool, is_variadic: bool) -> Self {
+        Self {
+            is_const,
+            is_async,
+            is_unsafe,
+            abi: None,
+            is_variadic,
+        }
+    }
+
+    /// Records a non-default ABI without accepting runtime identity data.
+    pub const fn with_abi(mut self, abi: Option<FunctionAbi>) -> Self {
+        self.abi = abi;
+        self
+    }
+}
+
 /// Function ABI facts retained from the source declaration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum FunctionAbi {
+pub enum FunctionAbi {
     Rust,
     C,
     System,
@@ -266,6 +357,22 @@ static UNIT_OUTPUT: ReturnMetadata = ReturnMetadata {
 };
 
 impl MethodMetadata {
+    /// Creates method metadata from a complete typed specification.
+    pub const fn from_spec(spec: MethodMetadataSpec) -> Self {
+        Self {
+            name: spec.name,
+            namespace: spec.namespace,
+            visibility: spec.visibility,
+            receiver: spec.receiver,
+            parameters: spec.parameters,
+            output: spec.output,
+            qualifiers: spec.qualifiers,
+            generics: spec.generics,
+            is_generic: spec.is_generic,
+            default_body: spec.default_body,
+        }
+    }
+
     /// Creates a zero-argument inherent method declaration with unit output.
     pub const fn inherent(name: &'static str, implementation: &'static str) -> Self {
         Self {
@@ -289,6 +396,66 @@ impl MethodMetadata {
     }
 }
 
+/// Static source facts used to create a method declaration.
+pub struct MethodMetadataSpec {
+    name: &'static str,
+    namespace: MethodNamespaceMetadata,
+    visibility: MethodVisibility,
+    receiver: Option<ReceiverDescriptor>,
+    parameters: &'static [ParameterMetadata],
+    output: &'static ReturnMetadata,
+    qualifiers: MethodQualifiers,
+    generics: &'static GenericDefinitionMetadata,
+    is_generic: bool,
+    default_body: bool,
+}
+
+impl MethodMetadataSpec {
+    /// Creates an inherent method specification with no receiver or parameters.
+    pub const fn inherent(name: &'static str, implementation: &'static str) -> Self {
+        Self {
+            name,
+            namespace: MethodNamespaceMetadata::Inherent { implementation },
+            visibility: MethodVisibility::Public,
+            receiver: None,
+            parameters: &[],
+            output: &UNIT_OUTPUT,
+            qualifiers: MethodQualifiers::new(false, false, false, false),
+            generics: &EMPTY_GENERICS,
+            is_generic: false,
+            default_body: false,
+        }
+    }
+
+    /// Creates a complete method specification from typed static metadata.
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new(
+        name: &'static str,
+        namespace: MethodNamespaceMetadata,
+        visibility: MethodVisibility,
+        receiver: Option<ReceiverDescriptor>,
+        parameters: &'static [ParameterMetadata],
+        output: &'static ReturnMetadata,
+        qualifiers: MethodQualifiers,
+        generics: &'static GenericDefinitionMetadata,
+        is_generic: bool,
+        default_body: bool,
+    ) -> Self {
+        Self {
+            name,
+            namespace,
+            visibility,
+            receiver,
+            parameters,
+            output,
+            qualifiers,
+            generics,
+            is_generic,
+            default_body,
+        }
+    }
+}
+
 impl EffectiveMethod {
     /// Binds a method declaration to its exact reflected target type.
     pub const fn for_type<T: super::Reflect>(metadata: &'static MethodMetadata) -> Self {
@@ -296,19 +463,32 @@ impl EffectiveMethod {
             target: crate::runtime::descriptor::metadata::TypeMetadata::of::<T>,
             metadata,
             source: MethodImplementationSource::Declared,
-            availability: MethodAvailability::Unavailable { reasons: &NO_METHOD_ADAPTER },
+            availability: MethodAvailability::Unavailable {
+                reasons: &NO_METHOD_ADAPTER,
+            },
             specializations: &[],
+            adapters: None,
         }
+    }
+
+    /// Binds generated adapters to the method's exact target type.
+    pub const fn with_adapters(mut self, adapters: InvocationAdapters) -> Self {
+        self.availability = MethodAvailability::Callable;
+        self.specializations = &[];
+        self.adapters = Some(adapters);
+        self
     }
 }
 
 /// The callable implementation selected for a target type.
+#[derive(Clone, Copy)]
 pub struct EffectiveMethod {
     pub(crate) target: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
     pub(crate) metadata: &'static MethodMetadata,
     pub(crate) source: MethodImplementationSource,
     pub(crate) availability: MethodAvailability,
     pub(crate) specializations: &'static [ResolvedMethodSpecialization],
+    pub(crate) adapters: Option<InvocationAdapters>,
 }
 
 /// A compile-time-bound implementation of one generic method.
@@ -337,6 +517,61 @@ static NO_ADAPTERS: InvocationAdapters = InvocationAdapters {
     pinned_local: None,
     pinned_thread_safe: None,
 };
+
+/// Builder for an immutable set of generated invocation adapters.
+pub struct InvocationAdaptersBuilder {
+    local: Option<&'static dyn InvocationAdapter<Local>>,
+    thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    pinned_local: Option<&'static dyn PinnedInvocationAdapter<Local>>,
+    pinned_thread_safe: Option<&'static dyn PinnedInvocationAdapter<ThreadSafe>>,
+}
+
+impl InvocationAdaptersBuilder {
+    /// Sets the local adapter.
+    pub const fn local(mut self, adapter: &'static dyn InvocationAdapter<Local>) -> Self {
+        self.local = Some(adapter);
+        self
+    }
+
+    /// Sets the thread-safe adapter.
+    pub const fn thread_safe(
+        mut self,
+        adapter: &'static dyn InvocationAdapter<ThreadSafe>,
+    ) -> Self {
+        self.thread_safe = Some(adapter);
+        self
+    }
+
+    /// Sets the local pinned receiver adapter.
+    pub const fn pinned_local<T: ?Sized + 'static>(
+        mut self,
+        adapter: &'static crate::runtime::invoke::PinnedFunctionInvocationAdapter<Local, T>,
+    ) -> Self {
+        self.pinned_local = Some(adapter);
+        self
+    }
+
+    /// Sets the thread-safe pinned receiver adapter.
+    pub const fn pinned_thread_safe<T: ?Sized + 'static>(
+        mut self,
+        adapter: &'static crate::runtime::invoke::PinnedFunctionInvocationAdapter<ThreadSafe, T>,
+    ) -> Self {
+        self.pinned_thread_safe = Some(adapter);
+        self
+    }
+
+    /// Finishes the immutable adapter set.
+    pub const fn build(self) -> InvocationAdapters {
+        InvocationAdapters {
+            local: self.local,
+            thread_safe: self.thread_safe,
+            catching_local: None,
+            catching_thread_safe: None,
+            pinned_local: self.pinned_local,
+            pinned_thread_safe: self.pinned_thread_safe,
+        }
+    }
+}
 
 /// A method declaration combined with its effective implementation in one context.
 #[derive(Clone, Copy)]
@@ -559,7 +794,11 @@ impl<'ctx> MethodDescriptor<'ctx> {
                         ));
                     }
                 };
-                return self.invoke_pinned_with(availability, &NO_ADAPTERS, invocation);
+                return self.invoke_pinned_with(
+                    availability,
+                    self.effective.adapters.as_ref().unwrap_or(&NO_ADAPTERS),
+                    invocation,
+                );
             }
             [] => {
                 return Err(PinnedInvocationFailure::new(
@@ -641,7 +880,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
             [] if !self.effective.metadata.is_generic => {
                 return self.invoke_with(
                     self.effective.availability,
-                    &NO_ADAPTERS,
+                    self.effective.adapters.as_ref().unwrap_or(&NO_ADAPTERS),
                     invocation,
                     catching,
                     unchecked,
@@ -761,6 +1000,16 @@ impl<'ctx> MethodDescriptor<'ctx> {
 }
 
 impl InvocationAdapters {
+    /// Starts building a typed adapter set with no mutable slots exposed.
+    pub const fn builder() -> InvocationAdaptersBuilder {
+        InvocationAdaptersBuilder {
+            local: None,
+            thread_safe: None,
+            pinned_local: None,
+            pinned_thread_safe: None,
+        }
+    }
+
     fn adapter<M: ValueMode + ModeAdapter>(&self) -> Option<&'static dyn InvocationAdapter<M>> {
         M::select_adapter(self)
     }
@@ -881,7 +1130,9 @@ impl<'ctx> MethodCatalog<'ctx> {
         let mut matches = self
             .methods
             .iter()
-            .filter(|method| (method.target)().type_id() == self.target.type_id() && predicate(method))
+            .filter(|method| {
+                (method.target)().type_id() == self.target.type_id() && predicate(method)
+            })
             .map(|method| MethodDescriptor::new(method, self.target.context()));
         let Some(first) = matches.next() else {
             return Lookup::Missing;
