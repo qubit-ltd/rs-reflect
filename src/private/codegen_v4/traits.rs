@@ -161,7 +161,7 @@ pub const fn associated_const(
     AssociatedConstDefinitionMetadata::new(name, visibility, ty, default)
 }
 
-fn no_dependencies() -> &'static [std::any::TypeId] {
+const fn no_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
 
@@ -185,7 +185,7 @@ pub fn register_trait_application<T: crate::runtime::descriptor::Reflect + 'stat
 
 /// Creates a global metadata fragment without exposing raw inventory payloads.
 #[doc(hidden)]
-pub fn trait_definition_fragment(
+pub const fn trait_definition_fragment(
     label: &'static str,
     registration: fn() -> crate::__private::codegen_v4::registration::Registration,
 ) -> crate::__private::codegen_v4::registration::RegistrationFragment {
@@ -197,7 +197,7 @@ pub fn trait_definition_fragment(
 
 /// Creates an application fragment bound to target `T`.
 #[doc(hidden)]
-pub fn trait_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
+pub const fn trait_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
     label: &'static str,
     registration: fn() -> crate::__private::codegen_v4::registration::Registration,
 ) -> crate::__private::codegen_v4::registration::RegistrationFragment {

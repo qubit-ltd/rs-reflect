@@ -161,13 +161,13 @@ pub fn register_impl_application<T: crate::runtime::descriptor::Reflect + 'stati
         .with_impl_application(application.metadata())
 }
 
-fn no_dependencies() -> &'static [std::any::TypeId] {
+const fn no_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
 
 /// Creates a global definition fragment without exposing inventory payloads.
 #[doc(hidden)]
-pub fn impl_definition_fragment(
+pub const fn impl_definition_fragment(
     label: &'static str,
     registration: fn() -> crate::__private::codegen_v4::registration::Registration,
 ) -> crate::__private::codegen_v4::registration::RegistrationFragment {
@@ -179,7 +179,7 @@ pub fn impl_definition_fragment(
 
 /// Creates an impl application fragment bound to `T`.
 #[doc(hidden)]
-pub fn impl_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
+pub const fn impl_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
     label: &'static str,
     registration: fn() -> crate::__private::codegen_v4::registration::Registration,
 ) -> crate::__private::codegen_v4::registration::RegistrationFragment {
