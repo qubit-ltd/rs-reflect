@@ -142,7 +142,7 @@ pub(crate) fn analyze_method(
     let output = output_plan(&method.return_type);
     let modes = AdapterModes {
         thread_safe: has_helper(method, HelperName::ThreadSafe),
-        catching: has_helper(method, HelperName::CatchUnwind) && !method.qualifiers.is_async,
+        catching: false,
         asynchronous: method.qualifiers.is_async,
     };
     let pinned = matches!(receiver, Some(ReceiverPlan::Pinned { .. }));
@@ -158,14 +158,10 @@ pub(crate) fn analyze_method(
     let default_blocked = context.default_method
         && (!method.has_default || unproven_default_constraint || unproven_associated_type);
     let mode_blocked = pinned
-        && (method.qualifiers.is_async
-            || is_borrow_return(&method.return_type)
-            || modes.thread_safe
-            || modes.catching);
+        && (method.qualifiers.is_async || is_borrow_return(&method.return_type) || modes.catching);
     let executable = supported_receiver
         && supported_parameters
         && method.generics.params.is_empty()
-        && !method.qualifiers.is_unsafe
         && method.qualifiers.abi.is_none()
         && !method.qualifiers.is_variadic
         && supported_borrow
@@ -316,7 +312,7 @@ fn output_plan(return_type: &ReturnTypeIr) -> OutputPlan {
 ///
 /// Returns `true` when the method declares that helper.
 #[must_use]
-fn has_helper(method: &MethodIr, helper: HelperName) -> bool {
+pub(crate) fn has_helper(method: &MethodIr, helper: HelperName) -> bool {
     method
         .attributes
         .iter()
@@ -391,13 +387,13 @@ pub(crate) fn supports_invocation_return(return_type: &ReturnTypeIr) -> bool {
 ///
 /// # Returns
 ///
-/// Returns `true` for `no_invoke` or `skip`.
+/// Returns `true` when `skip` disables invocation.
 #[must_use]
 fn invocation_disabled_by_policy(method: &MethodIr) -> bool {
     method
         .attributes
         .iter()
-        .any(|attribute| matches!(attribute.name, HelperName::NoInvoke | HelperName::Skip))
+        .any(|attribute| attribute.name == HelperName::Skip)
 }
 
 /// Returns whether a reference type contains an unsupported unsized value.

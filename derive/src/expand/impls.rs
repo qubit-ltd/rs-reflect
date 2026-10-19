@@ -8,25 +8,18 @@
 
 //! Expansion of distributed registration fragments for `#[reflect_impl]`.
 
-mod concrete_emission;
-mod concrete_impl_emission;
 mod internal;
 mod invocation_adapter;
 mod specialization_codegen;
 
-use concrete_impl_emission::ConcreteImplEmission;
-use internal::generic_substituter::substitute_type_syntax;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
-use specialization_codegen::specialization_arguments;
-use specialization_codegen::specialized_method;
 use specialization_codegen::typed_extension_receiver_type;
 
 use crate::expand::ExpansionContext;
 use crate::expand::generic_environment::GenericEnvironment;
-use crate::ir::HelperName;
 use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
@@ -35,6 +28,170 @@ use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::VisibilityIr;
+
+/// Emits typed codegen_v4 metadata for one implementation method.
+fn method_metadata(
+    method: &MethodIr,
+    environment: &GenericEnvironment,
+    target: &TokenStream,
+    namespace: &TokenStream,
+    facade: &TokenStream,
+    symbolic_target: bool,
+) -> TokenStream {
+    let method_environment = environment.clone().with_generics(&method.generics);
+    let query = method
+        .attributes
+        .iter()
+        .find_map(|attribute| attribute.rename())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| method.name.to_string());
+    let query = syn::LitStr::new(&query, method.span);
+    let visibility = match method.visibility {
+        VisibilityIr::Public => {
+            quote!(#facade::__private::codegen_v4::invoke::MethodVisibility::Public)
+        }
+        VisibilityIr::Restricted(_) => {
+            quote!(#facade::__private::codegen_v4::invoke::MethodVisibility::Restricted)
+        }
+        VisibilityIr::Crate
+        | VisibilityIr::Super
+        | VisibilityIr::SelfValue
+        | VisibilityIr::Inherited => {
+            quote!(#facade::__private::codegen_v4::invoke::MethodVisibility::Private)
+        }
+    };
+    let receiver = match &method.receiver {
+        Some(receiver_ir) => {
+            let (receiver_ty, kind) = match receiver_ir.kind {
+                ReceiverKindIr::Value => (target.clone(), quote!(Owned)),
+                ReceiverKindIr::SharedReference => (target.clone(), quote!(Shared)),
+                ReceiverKindIr::MutableReference => (target.clone(), quote!(Mutable)),
+                ReceiverKindIr::Typed => {
+                    let kind =
+                        if super::invocation::analysis::typed_pinned_receiver_mutable(receiver_ir)
+                            == Some(true)
+                        {
+                            quote!(PinnedMutable)
+                        } else if super::invocation::analysis::typed_pinned_receiver_mutable(
+                            receiver_ir,
+                        ) == Some(false)
+                        {
+                            quote!(PinnedShared)
+                        } else {
+                            quote!(Owned)
+                        };
+                    (receiver_ir.ty.tokens.clone(), kind)
+                }
+            };
+            let receiver_kind = quote!(#facade::__private::codegen_v4::invoke::ReceiverKind::#kind);
+            if symbolic_target {
+                let expression = if matches!(receiver_ir.kind, ReceiverKindIr::Typed) {
+                    super::traits::type_expression(&receiver_ir.ty, &method_environment, facade)
+                } else {
+                    target.clone()
+                };
+                quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                    #receiver_kind,
+                    #expression,
+                )))
+            } else {
+                let receiver_descriptor = quote!(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#receiver_ty>(#receiver_kind));
+                if matches!(receiver_ir.kind, ReceiverKindIr::Typed) {
+                    let expression = super::traits::type_expression(
+                        &receiver_ir.ty,
+                        &method_environment,
+                        facade,
+                    );
+                    quote!(Some(#receiver_descriptor.with_expression(#expression)))
+                } else {
+                    quote!(Some(#receiver_descriptor))
+                }
+            }
+        }
+        None => quote!(None),
+    };
+    let parameters = method.parameters.iter().map(|parameter| {
+        let pattern = match parameter.pattern.kind {
+            ParameterPatternKindIr::Identifier => {
+                let name = syn::LitStr::new(parameter.name.as_deref().unwrap_or(""), parameter.span);
+                quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::Identifier(#name))
+            }
+            ParameterPatternKindIr::Wildcard => {
+                quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::Wildcard)
+            }
+            ParameterPatternKindIr::Destructure => {
+                let pattern = syn::LitStr::new(&parameter.pattern.source, parameter.span);
+                quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::DestructurePattern(#pattern))
+            }
+        };
+        let passing = match &parameter.ty.kind {
+            TypeKindIr::Reference { mutable: true, .. } => {
+                quote!(#facade::__private::codegen_v4::invoke::PassingMode::Mutable)
+            }
+            TypeKindIr::Reference { .. } => {
+                quote!(#facade::__private::codegen_v4::invoke::PassingMode::Shared)
+            }
+            _ => quote!(#facade::__private::codegen_v4::invoke::PassingMode::Owned),
+        };
+        let expression = super::traits::type_expression(&parameter.ty, &method_environment, facade);
+        let index = parameter.index;
+        quote!(#facade::__private::codegen_v4::invoke::ParameterMetadata::new(#index, #pattern, #passing, #expression))
+    });
+    let output = match &method.return_type {
+        ReturnTypeIr::Unit => {
+            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit())
+        }
+        ReturnTypeIr::Type(ty) => {
+            let expression = super::traits::type_expression(ty, &method_environment, facade);
+            let kind = if method.qualifiers.is_async {
+                quote!(Future)
+            } else {
+                match ty.kind {
+                    TypeKindIr::Never => quote!(Never),
+                    TypeKindIr::Reference { mutable: true, .. } => quote!(Mutable),
+                    TypeKindIr::Reference { .. } => quote!(Shared),
+                    TypeKindIr::ImplTrait { .. } => quote!(Opaque),
+                    _ => quote!(Owned),
+                }
+            };
+            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
+                #facade::__private::codegen_v4::invoke::ReturnKind::#kind,
+                #expression,
+            ))
+        }
+    };
+    let qualifiers = &method.qualifiers;
+    let generics = super::traits::generic_definition(&method.generics, method.span, facade);
+    let is_const = qualifiers.is_const;
+    let is_async = qualifiers.is_async;
+    let is_unsafe = qualifiers.is_unsafe;
+    let is_variadic = qualifiers.is_variadic;
+    let abi = qualifiers
+        .abi
+        .as_deref()
+        .map(|abi| crate::expand::expression_codegen::function_abi(Some(abi), method.span, facade));
+    let abi = abi.map_or_else(|| quote!(None), |abi| quote!(Some(#abi)));
+    let has_default = method.has_default;
+    let is_generic = !method.generics.params.is_empty();
+    quote! {
+        #facade::__private::codegen_v4::invoke::MethodMetadata::from_spec(
+            #facade::__private::codegen_v4::invoke::MethodMetadataSpec::new(
+                #query,
+                #namespace,
+                #visibility,
+                #receiver,
+                ::std::boxed::Box::leak(::std::vec![#(#parameters),*].into_boxed_slice()),
+                ::std::boxed::Box::leak(::std::boxed::Box::new(#output)),
+                #facade::__private::codegen_v4::invoke::MethodQualifiers::new(
+                    #is_const, #is_async, #is_unsafe, #is_variadic,
+                ).with_abi(#abi),
+                ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
+                #is_generic,
+                #has_default,
+            ),
+        )
+    }
+}
 
 /// Expands an impl unchanged and submits a lazily-built implementation
 /// fragment.
@@ -95,200 +252,124 @@ fn expand_generic_impl_definition(
     context: &ExpansionContext,
 ) -> TokenStream {
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
-    let location = declaration.span.start();
-    let line = location.line as u32;
-    let column = location.column as u32;
     let module = generic_impl_definition_module(declaration);
+    let marker = format_ident!("__QubitReflectImplDef_{fingerprint:016x}");
+    let provider = format_ident!("__qubit_reflect_impl_definition_provider_{fingerprint:016x}");
+    let codegen = quote!(#facade::__private::codegen_v4);
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let target = super::traits::type_expression(&declaration.target_type, &environment, facade);
     let generics =
         super::traits::generic_definition(&declaration.generics, declaration.span, facade);
-    let methods = definition_method_entries(declaration, facade);
-    let associated_types = declaration.associated_types.iter().map(|item| {
-        let rust_name = syn::LitStr::new(&item.name.to_string(), item.span);
-        quote!(#facade::__private::codegen_v4::descriptor::ImplAssociatedTypeDescriptor::new(#rust_name))
-    });
-    let associated_consts = declaration.associated_consts.iter().map(|item| {
-        let rust_name = syn::LitStr::new(&item.name.to_string(), item.span);
-        let declared_type = super::traits::type_expression(&item.ty, &environment, facade);
-        quote!(#facade::__private::codegen_v4::descriptor::ImplAssociatedConstDescriptor::new(
-            #rust_name,
-            #declared_type,
-        ))
-    });
-    let external_id = declaration
-        .attributes
+    let target_source = syn::LitStr::new(&declaration.target_type.source, declaration.span);
+    let namespace = if let Some(path) = &declaration.trait_path {
+        let trait_name = syn::LitStr::new(&path.source, declaration.span);
+        quote!(#codegen::invoke::MethodNamespaceMetadata::Trait {
+            trait_: #trait_name,
+            implementation: #target_source,
+        })
+    } else {
+        quote!(#codegen::invoke::MethodNamespaceMetadata::Inherent {
+            implementation: #target_source,
+        })
+    };
+    let methods: Vec<_> = declaration
+        .methods
         .iter()
-        .find_map(|attribute| match &attribute.value {
-            HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
-            _ => None,
-        });
-    let reflected_provider =
-        declaration
-            .attributes
-            .iter()
-            .find_map(|attribute| match &attribute.value {
-                HelperValueIr::DefinitionProviderV2(provider) => Some(provider),
-                _ => None,
+        .map(|method| method_metadata(method, &environment, &target, &namespace, facade, true))
+        .collect();
+    let associated_types: Vec<_> = declaration
+        .associated_types
+        .iter()
+        .map(|item| {
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let value = item
+                .value
+                .as_ref()
+                .map(|value| super::traits::type_expression(value, &environment, facade));
+            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            quote!(#codegen::traits::associated_type(
+                #name,
+                #codegen::traits::TraitVisibility::Public,
+                &[],
+                #value,
+            ))
+        })
+        .collect();
+    let associated_consts: Vec<_> = declaration
+        .associated_consts
+        .iter()
+        .map(|item| {
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let ty = super::traits::type_expression(&item.ty, &environment, facade);
+            let value = item.value.as_ref().map(|value| {
+                super::expression_codegen::const_expression(value, &environment, facade)
             });
-    let reflected_provider_import =
-        reflected_provider.map(|provider| quote!(use super::#provider;));
-    let initialize_methods = if let Some(provider) = reflected_provider {
-        quote! {
-            let mut methods = ::std::vec![#(#methods),*];
-            methods.retain(|method| {
-                #provider().methods().iter().any(|declaration| declaration.rust_name() == method.rust_name())
+            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            quote!(#codegen::traits::associated_const(
+                #name,
+                #codegen::traits::TraitVisibility::Public,
+                #ty,
+                #value,
+            ))
+        })
+        .collect();
+    let implemented_trait = match &declaration.trait_path {
+        Some(path) => {
+            let name = syn::LitStr::new(&path.source, path.span);
+            let arguments = path.segments.iter().flat_map(|segment| {
+                super::expression_codegen::path_arguments(
+                    &segment.arguments,
+                    &environment,
+                    facade,
+                    path.span,
+                )
             });
-            methods.into_boxed_slice()
+            quote!(Some(#codegen::traits::unresolved_trait_expression(
+                ::std::boxed::Box::leak(::std::boxed::Box::new(
+                    #codegen::expression::TraitExpressionData::new(
+                        #name,
+                        ::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()),
+                        &[],
+                    ),
+                )),
+            )))
         }
-    } else {
-        quote!(::std::vec![#(#methods),*].into_boxed_slice())
+        None => quote!(None),
     };
-    let definition_constructor = if let Some(trait_path) = &declaration.trait_path {
-        let path = trait_path
-            .segments
-            .iter()
-            .map(|segment| segment.name.as_str())
-            .collect::<Vec<_>>()
-            .join("::");
-        let path = syn::LitStr::new(&path, declaration.span);
-        let trait_id = match external_id {
-            Some(id) => {
-                quote!(Some(#facade::__private::codegen_v4::descriptor::TraitId::External(
-                    #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                        .expect("validated external trait ID"),
-                )))
-            }
-            None => {
-                if let Some(provider) = reflected_provider {
-                    quote!(Some(#provider().trait_id().clone()))
-                } else {
-                    quote!(None)
-                }
-            }
-        };
-        let trait_application =
-            super::expression_codegen::path_type_expression(trait_path, &environment, facade);
-        quote! {
-            #facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor::new_unresolved_trait_with_expression(
-                fragment_identity(),
-                #target,
-                #path,
-                #trait_id,
-                #trait_application,
-                ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
-            )
-        }
+    let kind = if declaration.trait_path.is_some() {
+        quote!(#codegen::impls::Kind::Trait)
     } else {
-        quote! {
-            #facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor::new(
-                fragment_identity(),
-                #target,
-                #facade::__private::codegen_v4::descriptor::ImplKind::Inherent,
-                None,
-                ::std::boxed::Box::leak(::std::boxed::Box::new(#generics)),
-            ).expect("generated generic impl definition is consistent")
-        }
-    };
-    let external_registration = match (declaration.trait_path.as_ref(), external_id) {
-        (Some(path), Some(id)) => {
-            let path = path.tokens.clone();
-            quote! {
-                fn external_trait_runtime_identity() -> #facade::__private::codegen_v4::registration::RuntimeIdentity {
-                    #facade::__private::codegen_v4::registration::RuntimeIdentity::Trait(
-                        #facade::__private::codegen_v4::descriptor::TraitId::External(
-                            #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                                .expect("validated external trait ID"),
-                        ),
-                    )
-                }
-
-                fn external_trait_payload() -> #facade::__private::codegen_v4::registration::FragmentPayload {
-                    static TRAIT: ::std::sync::OnceLock<#facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor> =
-                        ::std::sync::OnceLock::new();
-                    let descriptor = TRAIT.get_or_init(|| {
-                        #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor::new(
-                            #facade::__private::codegen_v4::descriptor::TraitId::External(
-                                #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                                    .expect("validated external trait ID"),
-                            ),
-                            stringify!(#path),
-                            stringify!(#path),
-                            stringify!(#path),
-                            #facade::__private::codegen_v4::descriptor::TraitCompleteness::ExternalIncomplete,
-                            ::std::boxed::Box::leak(::std::boxed::Box::new(
-                                #facade::__private::codegen_v4::expression::GenericDefinitionDescriptor::new(
-                                    ::std::vec::Vec::<#facade::__private::codegen_v4::expression::GenericParameterDescriptor>::new(),
-                                    ::std::vec::Vec::<#facade::__private::codegen_v4::expression::PredicateDescriptor>::new(),
-                                ),
-                            )),
-                        )
-                    });
-                    #facade::__private::codegen_v4::registration::FragmentPayload::Trait(descriptor)
-                }
-
-                #facade::__private::codegen_v4::inventory::submit! {
-                    #facade::__private::codegen_v4::registration::RegistrationFragment::new(
-                        #facade::__private::codegen_v4::registration::FragmentKind::Trait,
-                        #facade::__private::codegen_v4::registration::StaticFragmentIdentity::new(
-                            env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
-                            "external-trait", #fingerprint ^ 0x9e3779b97f4a7c15_u64,
-                        ),
-                        external_trait_runtime_identity,
-                        external_trait_payload,
-                    )
-                }
-            }
-        }
-        _ => TokenStream::new(),
+        quote!(#codegen::impls::Kind::Inherent)
     };
     quote! {
         #[doc(hidden)]
         mod #module {
-            #reflected_provider_import
+            use super::*;
 
-            fn fragment_identity() -> #facade::__private::codegen_v4::identity::FragmentIdentity {
-                #facade::__private::codegen_v4::identity::FragmentIdentity::new(
-                    env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
-                    "impl-definition", #fingerprint,
-                )
+            #[doc(hidden)]
+            pub struct #marker;
+
+            fn #provider() -> &'static #codegen::impls::ImplDefinitionSpec<#marker> {
+                static VALUE: ::std::sync::OnceLock<#codegen::impls::ImplDefinitionSpec<#marker>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| {
+                    let generics = #generics;
+                    let methods = ::std::boxed::Box::leak(::std::vec![#(#methods),*].into_boxed_slice());
+                    let associated_types = ::std::boxed::Box::leak(::std::vec![#(#associated_types),*].into_boxed_slice());
+                    let associated_consts = ::std::boxed::Box::leak(::std::vec![#(#associated_consts),*].into_boxed_slice());
+                    #codegen::impls::ImplDefinitionSpec::new(
+                        #kind,
+                        #target,
+                        #implemented_trait,
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(generics)),
+                        #codegen::impls::Qualifiers::new(false),
+                        methods,
+                        associated_types,
+                        associated_consts,
+                    )
+                })
             }
 
-            pub(super) fn definition() -> &'static #facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor {
-                static DEFINITION: ::std::sync::OnceLock<#facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor> =
-                    ::std::sync::OnceLock::new();
-                let definition = DEFINITION.get_or_init(|| #definition_constructor);
-                definition.initialize_methods(|_definition| { #initialize_methods });
-                definition.initialize_associated_items(|_| (
-                    ::std::vec![#(#associated_types),*].into_boxed_slice(),
-                    ::std::vec![#(#associated_consts),*].into_boxed_slice(),
-                ));
-                definition
-            }
-
-            fn runtime_identity() -> #facade::__private::codegen_v4::registration::RuntimeIdentity {
-                #facade::__private::codegen_v4::registration::RuntimeIdentity::ImplDefinition(
-                    fragment_identity(),
-                )
-            }
-
-            fn payload() -> #facade::__private::codegen_v4::registration::FragmentPayload {
-                #facade::__private::codegen_v4::registration::FragmentPayload::ImplDefinition(definition())
-            }
-
-            #facade::__private::codegen_v4::inventory::submit! {
-                #facade::__private::codegen_v4::registration::RegistrationFragment::new(
-                    #facade::__private::codegen_v4::registration::FragmentKind::ImplDefinition,
-                    #facade::__private::codegen_v4::registration::StaticFragmentIdentity::new(
-                        env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
-                        "impl-definition", #fingerprint,
-                    ),
-                    runtime_identity,
-                    payload,
-                )
-            }
-
-            #external_registration
+            #codegen::impls::submit_impl_definition!(#marker, #provider);
         }
     }
 }
@@ -315,162 +396,6 @@ fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
     )
 }
 
-/// Builds declaration-level method descriptors without concrete adapters or
-/// instances.
-///
-/// # Parameters
-///
-/// - `declaration`: Generic impl declaration containing method signatures.
-/// - `facade`: Runtime facade path used in generated references.
-///
-/// # Returns
-///
-/// Returns method descriptor expressions in declaration order.
-#[must_use]
-fn definition_method_entries(
-    declaration: &ImplDeclarationIr,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
-    let target_source = declaration.target_type.source.as_str();
-    let environment = GenericEnvironment::from_generics(&declaration.generics);
-    declaration
-        .methods
-        .iter()
-        .enumerate()
-        .map(|(index, method)| {
-            let method_environment = environment.clone().with_generics(&method.generics);
-            let rust_name = method.name.to_string();
-            let query_name = method
-                .attributes
-                .iter()
-                .find(|attribute| attribute.name == HelperName::Rename)
-                .and_then(|attribute| attribute.rename())
-                .unwrap_or(&rust_name)
-                .to_owned();
-            let receiver = match &method.receiver {
-                Some(receiver) => match receiver.kind {
-                    ReceiverKindIr::Value => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Owned)),
-                    ReceiverKindIr::SharedReference => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Shared)),
-                    ReceiverKindIr::MutableReference => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Mutable)),
-                    ReceiverKindIr::Typed => {
-                        let value = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span);
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Explicit(#value)))
-                    }
-                },
-                None => quote!(None),
-            };
-            let parameters = method.parameters.iter().map(|parameter| {
-                let name = parameter
-                    .name
-                    .as_deref()
-                    .map(|name| syn::LitStr::new(name, parameter.span));
-                let name = match name {
-                    Some(value) => quote!(Some(#value)),
-                    None => quote!(None),
-                };
-                let pattern = match parameter.pattern.kind {
-                    ParameterPatternKindIr::Identifier => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Identifier)
-                    }
-                    ParameterPatternKindIr::Wildcard => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Wildcard)
-                    }
-                    ParameterPatternKindIr::Destructure => {
-                        let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Destructure(#source.into()))
-                    }
-                };
-                let passing = match &parameter.ty.kind {
-                    TypeKindIr::Reference { mutable: true, .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::MutableBorrow)
-                    }
-                    TypeKindIr::Reference { .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::SharedBorrow)
-                    }
-                    _ => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::Owned),
-                };
-                let ty = super::traits::type_expression(
-                    &parameter.ty,
-                    &method_environment,
-                    facade,
-                );
-                let parameter_index = parameter.index;
-                quote!(#facade::__private::codegen_v4::descriptor::ParameterDescriptor::new(
-                    #parameter_index, #name, #pattern, #passing, #ty, None,
-                ))
-            });
-            let return_value = match &method.return_type {
-                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::unit()),
-                ReturnTypeIr::Type(ty) => {
-                    let expression =
-                        super::traits::type_expression(ty, &method_environment, facade);
-                    let kind = match &ty.kind {
-                        TypeKindIr::Never => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Never),
-                        TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Reference),
-                        TypeKindIr::ImplTrait { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Opaque),
-                        _ => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Concrete),
-                    };
-                    quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::new(#kind, Some(#expression), None))
-                }
-            };
-            let visibility = match &method.visibility {
-                VisibilityIr::Public => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(
-                    #facade::__private::codegen_v4::identity::Visibility::Public,
-                )),
-                VisibilityIr::Crate => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(
-                    #facade::__private::codegen_v4::identity::Visibility::Crate,
-                )),
-                VisibilityIr::Super => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(
-                    #facade::__private::codegen_v4::identity::Visibility::Super,
-                )),
-                VisibilityIr::Restricted(path) => {
-                    let path = syn::LitStr::new(&path.source, method.span);
-                    quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(
-                        #facade::__private::codegen_v4::identity::Visibility::Restricted(#path.into()),
-                    ))
-                }
-                VisibilityIr::SelfValue | VisibilityIr::Inherited => {
-                    quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(
-                        #facade::__private::codegen_v4::identity::Visibility::Private,
-                    ))
-                }
-            };
-            let generic_definition = super::traits::generic_definition(&method.generics, method.span, facade);
-            let qualifiers = &method.qualifiers;
-            let is_async = qualifiers.is_async;
-            let is_unsafe = qualifiers.is_unsafe;
-            let is_const = qualifiers.is_const;
-            let is_variadic = qualifiers.is_variadic;
-            let abi = qualifiers.abi.as_deref().map(|abi| {
-                super::expression_codegen::function_abi(Some(abi), method.span, facade)
-            });
-            let abi = match abi {
-                Some(value) => quote!(Some(#value)),
-                None => quote!(None),
-            };
-            quote! {
-                #facade::__private::codegen_v4::descriptor::MethodDescriptor::builder(
-                    #facade::__private::codegen_v4::identity::MemberId::new(
-                        #target_source, "method", #index, fragment_identity(),
-                    ),
-                    #rust_name,
-                    #query_name,
-                    #facade::__private::codegen_v4::descriptor::MethodDeclarationOwner::Impl(definition),
-                )
-                .visibility(#visibility)
-                .receiver(#receiver)
-                .parameters(::std::vec![#(#parameters),*])
-                .return_value(#return_value)
-                .qualifiers(#facade::__private::codegen_v4::descriptor::MethodQualifiers::new(
-                    #is_async, #is_unsafe, #is_const, #abi, #is_variadic,
-                ))
-                .generic_definition(&#generic_definition)
-                .build()
-            }
-        })
-        .collect()
-}
-
 /// Expands one concrete implementation registration fragment.
 ///
 /// # Parameters
@@ -490,72 +415,302 @@ fn definition_method_entries(
 #[must_use]
 fn expand_concrete_impl(
     declaration: ImplDeclarationIr,
-    impl_arguments: TokenStream,
-    shared_definition: Option<TokenStream>,
-    applicability_witness: Option<TokenStream>,
-    specialized_associated_type_resolver_arms: Vec<TokenStream>,
+    _impl_arguments: TokenStream,
+    _shared_definition: Option<TokenStream>,
+    _applicability_witness: Option<TokenStream>,
+    _specialized_associated_type_resolver_arms: Vec<TokenStream>,
     facade: &TokenStream,
     context: &ExpansionContext,
 ) -> TokenStream {
     let facade = facade.clone();
+    let codegen = quote!(#facade::__private::codegen_v4);
+    let target = declaration.target_type.tokens.clone();
     let environment = GenericEnvironment::from_generics(&declaration.generics);
-    let external_trait_metadata = declaration.trait_path.as_ref().map(|path| {
-        let rust_name = path
-            .segments
-            .last()
-            .map(|segment| segment.name.clone())
-            .expect("a trait path has at least one segment");
-        let mut rust_path = path
-            .segments
-            .iter()
-            .map(|segment| segment.name.as_str())
-            .collect::<Vec<_>>()
-            .join("::");
-        if path.leading_colon {
-            rust_path.insert_str(0, "::");
+    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
+    let location = declaration.span.start();
+    let module = format_ident!(
+        "__qubit_reflect_impl_{fingerprint:x}_{}_{}",
+        location.line,
+        location.column,
+    );
+    let marker = format_ident!("__QubitReflectImplDef_{fingerprint:016x}");
+    let target_expression =
+        super::traits::type_expression(&declaration.target_type, &environment, &facade);
+    let generic_definition =
+        super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
+    let implementation_name = syn::LitStr::new(&declaration.target_type.source, declaration.span);
+    let namespace = match &declaration.trait_path {
+        Some(path) => {
+            let trait_name = syn::LitStr::new(&path.source, declaration.span);
+            quote!(#codegen::invoke::MethodNamespaceMetadata::Trait {
+                trait_: #trait_name,
+                implementation: #implementation_name,
+            })
         }
-        let arguments = path
+        None => quote!(#codegen::invoke::MethodNamespaceMetadata::Inherent {
+            implementation: #implementation_name,
+        }),
+    };
+    let methods: Vec<_> = declaration
+        .methods
+        .iter()
+        .map(|method| method_metadata(method, &environment, &target, &namespace, &facade, false))
+        .collect();
+    let associated_types: Vec<_> = declaration
+        .associated_types
+        .iter()
+        .map(|item| {
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let value = item
+                .value
+                .as_ref()
+                .map(|value| super::traits::type_expression(value, &environment, &facade));
+            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            quote!(#codegen::traits::associated_type(
+                #name,
+                #codegen::traits::TraitVisibility::Public,
+                &[],
+                #value,
+            ))
+        })
+        .collect();
+    let associated_consts: Vec<_> = declaration
+        .associated_consts
+        .iter()
+        .map(|item| {
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let ty = super::traits::type_expression(&item.ty, &environment, &facade);
+            let value = item.value.as_ref().map(|value| {
+                super::expression_codegen::const_expression(value, &environment, &facade)
+            });
+            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            quote!(#codegen::traits::associated_const(
+                #name,
+                #codegen::traits::TraitVisibility::Public,
+                #ty,
+                #value,
+            ))
+        })
+        .collect();
+    let kind = if declaration.trait_path.is_some() {
+        quote!(#codegen::impls::Kind::Trait)
+    } else {
+        quote!(#codegen::impls::Kind::Inherent)
+    };
+    let is_external_trait = declaration
+        .attributes
+        .iter()
+        .any(|attribute| matches!(attribute.value, HelperValueIr::ExternalTraitId(_)));
+    let trait_definition_provider = declaration
+        .trait_path
+        .as_ref()
+        .filter(|_| !is_external_trait)
+        .map(|path| {
+            let mut provider_path: syn::Path =
+                syn::parse2(path.tokens.clone()).expect("validated trait path parses");
+            let Some(last) = provider_path.segments.last_mut() else {
+                unreachable!()
+            };
+            last.arguments = syn::PathArguments::None;
+            last.ident = format_ident!("__QubitReflectTraitDef_{}_SPEC", last.ident);
+            quote!(#provider_path)
+        });
+    let trait_marker_path = declaration
+        .trait_path
+        .as_ref()
+        .filter(|_| !is_external_trait)
+        .map(|path| {
+            let mut marker_path: syn::Path =
+                syn::parse2(path.tokens.clone()).expect("validated trait path parses");
+            let Some(last) = marker_path.segments.last_mut() else {
+                unreachable!()
+            };
+            last.arguments = syn::PathArguments::None;
+            last.ident = format_ident!("__QubitReflectTraitDef_{}", last.ident);
+            quote!(#marker_path)
+        });
+    let trait_default_methods_provider = trait_marker_path.as_ref().map(|marker_path| {
+        let mut provider_path: syn::Path =
+            syn::parse2(marker_path.clone()).expect("validated trait marker path parses");
+        let last = provider_path
             .segments
-            .last()
-            .map(|segment| {
+            .last_mut()
+            .expect("validated trait path has a final segment");
+        last.ident = format_ident!("{}_DEFAULT_METHODS", last.ident);
+        last.arguments = syn::PathArguments::None;
+        quote!(#provider_path)
+    });
+    let trait_default_method_arguments = declaration
+        .trait_path
+        .as_ref()
+        .and_then(|path| syn::parse2::<syn::Path>(path.tokens.clone()).ok())
+        .and_then(|path| {
+            path.segments
+                .last()
+                .map(|segment| segment.arguments.clone())
+        })
+        .and_then(|arguments| match arguments {
+            syn::PathArguments::AngleBracketed(arguments) => Some(
+                arguments
+                    .args
+                    .iter()
+                    .filter_map(|argument| match argument {
+                        syn::GenericArgument::Lifetime(lifetime) => Some(quote!(#lifetime)),
+                        syn::GenericArgument::Type(ty) => Some(quote!(#ty)),
+                        syn::GenericArgument::Const(value) => Some(quote!(#value)),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+            _ => None,
+        })
+        .unwrap_or_default();
+    let trait_default_provider_arguments = {
+        let lifetime_arguments = trait_default_method_arguments
+            .iter()
+            .filter(|argument| argument.to_string().starts_with('\''))
+            .cloned()
+            .collect::<Vec<_>>();
+        let type_const_arguments = trait_default_method_arguments
+            .iter()
+            .filter(|argument| !argument.to_string().starts_with('\''))
+            .cloned()
+            .collect::<Vec<_>>();
+        quote!(::<#(#lifetime_arguments,)* #target, #(#type_const_arguments),*>)
+    };
+    let overridden_method_names = declaration
+        .methods
+        .iter()
+        .map(|method| syn::LitStr::new(&method.name.to_string(), method.span));
+    let default_methods = trait_default_methods_provider.as_ref().map_or_else(
+        || quote!(::std::vec::Vec::new().into_boxed_slice()),
+        |provider| quote!(#provider #trait_default_provider_arguments(&[#(#overridden_method_names),*])),
+    );
+    let (trait_application_arguments, trait_argument_identity) = declaration
+        .trait_path
+        .as_ref()
+        .and_then(|path| path.segments.last())
+        .map(|segment| {
+            let mut arguments = Vec::new();
+            let mut identity = Vec::new();
+            if let crate::ir::PathArgumentsIr::AngleBracketed(source_arguments) = &segment.arguments {
+                for (index, argument) in source_arguments.iter().enumerate() {
+                    match argument {
+                        crate::ir::PathArgumentIr::Type(ty) => {
+                            let parameter = quote!(definition.generic_parameter_at(#index));
+                            let expression = super::traits::type_expression(ty, &environment, &facade);
+                            let concrete_type = ty.tokens.clone();
+                            arguments.push(quote!(#codegen::expression::GenericArgumentMetadata::type_argument::<#concrete_type>(#parameter, #expression)));
+                            identity.push(quote!(#codegen::traits::ArgumentIdentity::type_argument::<#concrete_type>()));
+                        }
+                        crate::ir::PathArgumentIr::Const(value) => {
+                            let value = super::expression_codegen::const_expression(value, &environment, &facade);
+                            let parameter = quote!(definition.generic_parameter_at(#index));
+                            arguments.push(quote!(#codegen::expression::GenericArgumentMetadata::const_argument(#parameter, #value)));
+                            identity.push(quote!(#codegen::traits::ArgumentIdentity::const_argument(#value)));
+                        }
+                        crate::ir::PathArgumentIr::Lifetime(value) => {
+                            let value = syn::LitStr::new(value, declaration.span);
+                            identity.push(quote!(#codegen::traits::ArgumentIdentity::lifetime(#value)));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            (arguments, identity)
+        })
+        .unwrap_or_default();
+    let trait_application_provider = match (
+        trait_definition_provider.as_ref(),
+        trait_marker_path.as_ref(),
+    ) {
+        (Some(provider), Some(trait_marker)) => Some(quote! {
+            fn trait_application_provider() -> &'static #codegen::traits::TraitApplicationSpec<#target> {
+                static VALUE: ::std::sync::OnceLock<#codegen::traits::TraitApplicationSpec<#target>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| {
+                    let definition = #provider();
+                    let arguments = ::std::boxed::Box::leak(::std::vec![#(#trait_application_arguments),*].into_boxed_slice());
+                    let identity = ::std::boxed::Box::leak(::std::vec![#(#trait_argument_identity),*].into_boxed_slice());
+                    #codegen::traits::TraitApplicationSpec::for_target::<#trait_marker>(
+                        definition,
+                        arguments,
+                        identity,
+                        &[],
+                        &[],
+                        #codegen::traits::SupertraitStatus::Incomplete,
+                    )
+                })
+            }
+        }),
+        _ => None,
+    };
+    let implemented_trait = match (
+        trait_definition_provider.as_ref(),
+        declaration.trait_path.as_ref(),
+    ) {
+        (Some(provider), Some(path)) => {
+            let name = syn::LitStr::new(&path.source, path.span);
+            let expression_args = path.segments.iter().flat_map(|segment| {
                 super::expression_codegen::path_arguments(
                     &segment.arguments,
                     &environment,
                     &facade,
                     path.span,
                 )
-            })
-            .unwrap_or_default();
-        (
-            syn::LitStr::new(&rust_name, path.span),
-            syn::LitStr::new(&rust_path, path.span),
-            arguments,
-        )
-    });
-    let retained = declaration.retained_tokens;
-    let target = declaration.target_type.tokens.clone();
-    let impl_generic_definition =
-        super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
-    let trait_path = declaration
-        .trait_path
-        .as_ref()
-        .map(|path| path.tokens.clone());
-    let trait_call_path = trait_path.clone();
-    let has_trait = trait_path.is_some();
-    let external_id = declaration
-        .attributes
+            });
+            let expression = quote!(::std::boxed::Box::leak(::std::boxed::Box::new(
+                #codegen::expression::TraitExpressionData::new(
+                    #name,
+                    ::std::boxed::Box::leak(::std::vec![#(#expression_args),*].into_boxed_slice()),
+                    &[],
+                ),
+            )));
+            quote!(Some(#codegen::traits::trait_expression_for(#expression, #provider())))
+        }
+        _ => quote!(None),
+    };
+    let associated_type_bindings: Vec<_> = declaration
+        .associated_types
         .iter()
-        .find_map(|attribute| match &attribute.value {
-            HelperValueIr::ExternalTraitId(value) => Some(value.as_str()),
-            _ => None,
-        });
-    let fingerprint = context.fingerprint(&format!("{}{}", retained, target));
-    let location = declaration.span.start();
-    let line = location.line as u32;
-    let column = location.column as u32;
-    let module = format_ident!("__qubit_reflect_impl_{fingerprint:x}_{line}_{column}");
-    let target_source = declaration.target_type.source.clone();
-    let invocation_adapter_definitions: Vec<_> = declaration
+        .filter_map(|item| {
+            let value = item.value.as_ref()?;
+            let (Some(provider), Some(_)) = (
+                trait_definition_provider.as_ref(),
+                declaration.trait_path.as_ref(),
+            ) else {
+                return None;
+            };
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let expression = super::traits::type_expression(value, &environment, &facade);
+            Some(quote!(#codegen::impls::associated_type_binding(
+                #provider().associated_type_named(#name),
+                #expression,
+                #codegen::impls::ItemSource::Overridden,
+            )))
+        })
+        .collect();
+    let associated_const_bindings: Vec<_> = declaration
+        .associated_consts
+        .iter()
+        .filter_map(|item| {
+            let value = item.value.as_ref()?;
+            let (Some(provider), Some(_)) = (
+                trait_definition_provider.as_ref(),
+                declaration.trait_path.as_ref(),
+            ) else {
+                return None;
+            };
+            let name = syn::LitStr::new(&item.name.to_string(), item.span);
+            let expression =
+                super::expression_codegen::const_expression(value, &environment, &facade);
+            Some(quote!(#codegen::impls::associated_const_binding(
+                #provider().associated_const_named(#name),
+                #expression,
+                #codegen::impls::ItemSource::Overridden,
+            )))
+        })
+        .collect();
+    let adapter_definitions: Vec<_> = declaration
         .methods
         .iter()
         .enumerate()
@@ -564,618 +719,174 @@ fn expand_concrete_impl(
                 method,
                 index,
                 &target,
-                &trait_call_path,
-                &target_source,
+                &declaration
+                    .trait_path
+                    .as_ref()
+                    .map(|path| path.tokens.clone()),
+                &declaration.target_type.source,
                 &facade,
             )
         })
         .collect();
-    let invocation_adapter_entries =
-        declaration
-            .methods
-            .iter()
-            .enumerate()
-            .map(|(index, method)| {
-                let typed_extension_receiver = method
-                    .receiver
-                    .as_ref()
-                    .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
-                let mut method_context =
-                    super::invocation::analysis::MethodContext::implementation(&target);
-                method_context.extension_receiver = typed_extension_receiver.clone();
-                let invocation_plan =
-                    super::invocation::analysis::analyze_method(method, method_context)
-                        .expect("validated method analysis is infallible");
-                debug_assert_eq!(invocation_plan.parameter_count(), method.parameters.len());
-                if invocation_plan.pinned_receiver_mutability().is_some() {
-                    let is_safe_pinned_invocation = invocation_plan.is_executable();
-                    if is_safe_pinned_invocation {
-                        let descriptor_name =
-                            format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-                        return quote!(Some(&#descriptor_name));
-                    }
-                    return quote!(None);
-                }
-                let is_safe_invocation = invocation_plan.is_executable();
-                if is_safe_invocation {
-                    let descriptor_name =
-                        format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-                    quote!(Some(&#descriptor_name))
-                } else {
-                    quote!(None)
-                }
-            });
-    let invocation_unavailable_reason_entries: Vec<_> = declaration
-        .methods
-        .iter()
-        .map(|method| invocation_unavailable_reason_entry(method, &target, context))
-        .collect();
-    let generic_specialization_adapter_definitions = declaration
+    let adapter_slots: Vec<_> = declaration
         .methods
         .iter()
         .enumerate()
-        .flat_map(|(method_index, method)| {
-            let target = target.clone();
-            let target_source = target_source.clone();
-            let facade = facade.clone();
-            let trait_call_path = trait_call_path.clone();
-            method.specializations.iter().enumerate().filter_map(
-                move |(specialization_index, specialization)| {
-                    let (method, generic_arguments) = specialized_method(method, specialization)?;
-                    invocation_adapter::specialization_definition(
-                        &method,
-                        method_index,
-                        (specialization_index, &generic_arguments),
-                        &target,
-                        &trait_call_path,
-                        &target_source,
-                        &facade,
-                    )
-                },
-            )
-        });
-    let method_specialization_entries = declaration.methods.iter().enumerate().map(|(method_index, method)| {
-        let entries = method
-            .specializations
-            .iter()
-            .enumerate()
-            .map(|(specialization_index, specialization)| {
-                let arguments = specialization_arguments(specialization, &method.generics, &facade);
-                let Some((concrete, generic_arguments)) = specialized_method(method, specialization) else {
-                    return quote!((#arguments, None, &[
-                        #facade::__private::codegen_v4::descriptor::InvocationUnavailableReason::UnsupportedSpecialization,
-                    ]));
-                };
-                let mut method_context =
-                    super::invocation::analysis::MethodContext::implementation(&target);
-                method_context.extension_receiver = concrete
-                    .receiver
-                    .as_ref()
-                    .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
-                let plan = super::invocation::analysis::analyze_method(&concrete, method_context)
-                    .expect("validated specialized method analysis is infallible");
-                let unavailable_reasons =
-                    super::invocation::emit::emit_unavailable_reasons(&plan, context);
-                let adapter_name = invocation_adapter::specialization_descriptor_name(
-                    method_index,
-                    specialization_index,
-                );
-                if invocation_adapter::specialization_definition(
-                    &concrete,
-                    method_index,
-                    (specialization_index, &generic_arguments),
-                    &target,
-                    &trait_call_path,
-                    &target_source,
-                    &facade,
-                ).is_some() {
-                    quote!((#arguments, Some(&#adapter_name), #unavailable_reasons))
-                } else {
-                    quote!((#arguments, None, #unavailable_reasons))
-                }
-            });
-        quote!(::std::vec![#(#entries),*])
-    });
-    let method_entries = declaration
-        .methods
-        .iter()
-        .enumerate()
-        .map(|(index, method)| {
-        let method_environment = environment.clone().with_generics(&method.generics);
-        let rust_name = method.name.to_string();
-        let query_name = method
-            .attributes
-            .iter()
-            .find(|attribute| attribute.name == HelperName::Rename)
-            .and_then(|attribute| attribute.rename())
-            .unwrap_or(&rust_name)
-            .to_owned();
-        let receiver = match &method.receiver {
-            Some(receiver) => match receiver.kind {
-                ReceiverKindIr::Value => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Owned)),
-                ReceiverKindIr::SharedReference => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Shared)),
-                ReceiverKindIr::MutableReference => quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Mutable)),
-                ReceiverKindIr::Typed => {
-                    let value = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span);
-                    quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Explicit(#value)))
-                }
-            },
-            None => quote!(None),
-        };
-        let parameters = method.parameters.iter().map(|parameter| {
-            let name = parameter.name.as_deref().map(|name| syn::LitStr::new(name, parameter.span));
-            let name = match name { Some(value) => quote!(Some(#value)), None => quote!(None) };
-            let pattern = match parameter.pattern.kind {
-                ParameterPatternKindIr::Identifier => quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Identifier),
-                ParameterPatternKindIr::Wildcard => quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Wildcard),
-                ParameterPatternKindIr::Destructure => {
-                    let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
-                    quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Destructure(#source.into()))
-                }
-            };
-            let passing = match &parameter.ty.kind {
-                TypeKindIr::Reference { mutable: true, .. } => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::MutableBorrow),
-                TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::SharedBorrow),
-                _ => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::Owned),
-            };
-            let ty = super::traits::type_expression(
-                &parameter.ty,
-                &method_environment,
-                &facade,
-            );
-            let parameter_index = parameter.index;
-            quote!(#facade::__private::codegen_v4::descriptor::ParameterDescriptor::new(#parameter_index, #name, #pattern, #passing, #ty, None))
-        });
-        let return_value = match &method.return_type {
-            ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::unit()),
-            ReturnTypeIr::Type(ty) => {
-                let expression =
-                    super::traits::type_expression(ty, &method_environment, &facade);
-                let kind = match &ty.kind {
-                    TypeKindIr::Never => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Never),
-                    TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Reference),
-                    TypeKindIr::ImplTrait { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Opaque),
-                    _ => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Concrete),
-                };
-                quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::new(#kind, Some(#expression), None))
-            }
-        };
-        let visibility = match &method.visibility {
-            VisibilityIr::Public => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(#facade::__private::codegen_v4::identity::Visibility::Public)),
-            VisibilityIr::Crate => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(#facade::__private::codegen_v4::identity::Visibility::Crate)),
-            VisibilityIr::Super => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(#facade::__private::codegen_v4::identity::Visibility::Super)),
-            VisibilityIr::Restricted(path) => { let path = syn::LitStr::new(&path.source, method.span); quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(#facade::__private::codegen_v4::identity::Visibility::Restricted(#path.into()))) },
-            VisibilityIr::SelfValue | VisibilityIr::Inherited => quote!(#facade::__private::codegen_v4::descriptor::MethodVisibility::Declared(#facade::__private::codegen_v4::identity::Visibility::Private)),
-        };
-        let generic_definition = super::traits::generic_definition(&method.generics, method.span, &facade);
-        let qualifiers = &method.qualifiers;
-        let is_async = qualifiers.is_async;
-        let is_unsafe = qualifiers.is_unsafe;
-        let is_const = qualifiers.is_const;
-        let is_variadic = qualifiers.is_variadic;
-        let abi = qualifiers.abi.as_deref().map(|abi| {
-            super::expression_codegen::function_abi(Some(abi), method.span, &facade)
-        });
-        let abi = match abi { Some(value) => quote!(Some(#value)), None => quote!(None) };
-        quote! {
-            #facade::__private::codegen_v4::descriptor::MethodDescriptor::builder(
-                #facade::__private::codegen_v4::identity::MemberId::new(
-                    #target_source,
-                    "method",
-                    #index,
-                    fragment_identity(),
-                ),
-                #rust_name,
-                #query_name,
-                #facade::__private::codegen_v4::descriptor::MethodDeclarationOwner::Impl(definition),
-            )
-            .visibility(#visibility)
-            .receiver(#receiver)
-            .parameters(vec![#(#parameters),*])
-            .return_value(#return_value)
-            .qualifiers(#facade::__private::codegen_v4::descriptor::MethodQualifiers::new(
-                #is_async, #is_unsafe, #is_const, #abi, #is_variadic,
-            ))
-            .generic_definition(&#generic_definition)
-            .build()
-        }
-    });
-    let external_method_entries = declaration
-        .methods
-        .iter()
-        .enumerate()
-        .map(|(index, method)| {
-            let method_environment = environment.clone().with_generics(&method.generics);
-            let rust_name = method.name.to_string();
-            let query_name = method
-                .attributes
-                .iter()
-                .find(|attribute| attribute.name == HelperName::Rename)
-                .and_then(|attribute| attribute.rename())
-                .unwrap_or(&rust_name)
-                .to_owned();
-            let receiver = match &method.receiver {
-                Some(receiver) => match receiver.kind {
-                    ReceiverKindIr::Value => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Owned))
-                    }
-                    ReceiverKindIr::SharedReference => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Shared))
-                    }
-                    ReceiverKindIr::MutableReference => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Mutable))
-                    }
-                    ReceiverKindIr::Typed => {
-                        let value = syn::LitStr::new(&receiver.declaration.to_string(), receiver.span);
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Explicit(#value)))
-                    }
-                },
-                None => quote!(None),
-            };
-            let parameters = method.parameters.iter().map(|parameter| {
-                let name = parameter.name.as_deref().map(|name| syn::LitStr::new(name, parameter.span));
-                let name = match name {
-                    Some(value) => quote!(Some(#value)),
-                    None => quote!(None),
-                };
-                let pattern = match parameter.pattern.kind {
-                    ParameterPatternKindIr::Identifier => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Identifier)
-                    }
-                    ParameterPatternKindIr::Wildcard => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Wildcard)
-                    }
-                    ParameterPatternKindIr::Destructure => {
-                        let source = syn::LitStr::new(&parameter.pattern.source, parameter.span);
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Destructure(#source.into()))
-                    }
-                };
-                let passing = match &parameter.ty.kind {
-                    TypeKindIr::Reference { mutable: true, .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::MutableBorrow)
-                    }
-                    TypeKindIr::Reference { .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::SharedBorrow)
-                    }
-                    _ => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::Owned),
-                };
-                let ty = super::traits::type_expression(
-                    &parameter.ty,
-                    &method_environment,
-                    &facade,
-                );
-                let parameter_index = parameter.index;
-                quote!(#facade::__private::codegen_v4::descriptor::ParameterDescriptor::new(
-                    #parameter_index,
-                    #name,
-                    #pattern,
-                    #passing,
-                    #ty,
-                    None,
-                ))
-            });
-            let return_value = match &method.return_type {
-                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::unit()),
-                ReturnTypeIr::Type(ty) => {
-                    let expression = super::traits::type_expression(ty, &method_environment, &facade);
-                    let kind = match &ty.kind {
-                        TypeKindIr::Never => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Never),
-                        TypeKindIr::Reference { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Reference),
-                        TypeKindIr::ImplTrait { .. } => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Opaque),
-                        _ => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Concrete),
-                    };
-                    quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::new(
-                        #kind,
-                        Some(#expression),
-                        None,
-                    ))
-                }
-            };
-            let generic_definition = super::traits::generic_definition(&method.generics, method.span, &facade);
-            let qualifiers = &method.qualifiers;
-            let is_async = qualifiers.is_async;
-            let is_unsafe = qualifiers.is_unsafe;
-            let is_const = qualifiers.is_const;
-            let is_variadic = qualifiers.is_variadic;
-            let abi = qualifiers.abi.as_deref().map(|abi| {
-                super::expression_codegen::function_abi(Some(abi), method.span, &facade)
-            });
-            let abi = match abi { Some(value) => quote!(Some(#value)), None => quote!(None) };
-            quote! {
-                #facade::__private::codegen_v4::descriptor::MethodDescriptor::builder(
-                    #facade::__private::codegen_v4::identity::MemberId::new(
-                        #target_source, "external-method", #index, fragment_identity(),
-                    ),
-                    #rust_name, #query_name,
-                    #facade::__private::codegen_v4::descriptor::MethodDeclarationOwner::Trait(external),
-                )
-                .visibility(#facade::__private::codegen_v4::descriptor::MethodVisibility::InheritedFromTrait)
-                .receiver(#receiver)
-                .parameters(vec![#(#parameters),*])
-                .return_value(#return_value)
-                .qualifiers(#facade::__private::codegen_v4::descriptor::MethodQualifiers::new(
-                    #is_async, #is_unsafe, #is_const, #abi, #is_variadic,
-                ))
-                .generic_definition(&#generic_definition)
-                .build()
-            }
-        });
-    let associated_type_binding_arms: Vec<_> = declaration
-        .associated_types
-        .iter()
-        .filter_map(|item| {
-            let value = item.value.as_ref()?;
-            let name = syn::LitStr::new(&item.name.to_string(), item.span);
-            let value = super::traits::type_expression(value, &environment, &facade);
-            Some(quote!(#name => #value))
-        })
-        .collect();
-    let associated_const_override_arms: Vec<_> = declaration
-        .associated_consts
-        .iter()
-        .map(|item| {
-            let name = syn::LitStr::new(&item.name.to_string(), item.span);
-            quote!(#name => #facade::__private::codegen_v4::descriptor::AssociatedConstImplementationSource::Overridden)
-        })
-        .collect();
-    let associated_const_reader_override_arms: Vec<_> = trait_path
-        .as_ref()
-        .map(|path| {
-            declaration
-                .associated_consts
-                .iter()
-                .map(|item| {
-                    let rust_name = syn::LitStr::new(&item.name.to_string(), item.span);
-                    let const_name = &item.name;
-                    let qualified_target = quote!(<#target as #path>);
-                    let value_type =
-                        substitute_type_syntax(&item.ty.tokens, &[(Ident::new("Self", item.span), qualified_target)]);
-                    quote!(
-                        #rust_name => Some(
-                            #facade::__private::codegen_v4::descriptor::associated_const_reader::<#value_type>(
-                                || <#target as #path>::#const_name,
-                            ),
-                        )
-                    )
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let kind = if has_trait {
-        quote!(#facade::__private::codegen_v4::descriptor::ImplKind::Trait)
-    } else {
-        quote!(#facade::__private::codegen_v4::descriptor::ImplKind::Inherent)
-    };
-    let trait_setup = match (trait_path, external_id) {
-        (None, _) => quote!((None, None, &[], &[], &[], &[])),
-        (Some(_path), Some(id)) => {
-            let (rust_name, rust_path, arguments) = external_trait_metadata
+        .filter_map(|(index, method)| {
+            let mut method_context =
+                super::invocation::analysis::MethodContext::implementation(&target);
+            method_context.extension_receiver = method
+                .receiver
                 .as_ref()
-                .expect("external trait metadata exists for a trait impl");
-            quote!({
-                let external: &'static #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor =
-                    ::std::boxed::Box::leak(::std::boxed::Box::new(
-                    #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor::new(
-                        #facade::__private::codegen_v4::descriptor::TraitId::External(
-                            #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                                .expect("validated external trait ID"),
-                        ),
-                        #rust_name,
-                        #rust_path,
-                        #rust_name,
-                        #facade::__private::codegen_v4::descriptor::TraitCompleteness::ExternalIncomplete,
-                        ::std::boxed::Box::leak(::std::boxed::Box::new(
-                            #facade::__private::codegen_v4::expression::GenericDefinitionDescriptor::new(
-                                ::std::vec::Vec::<#facade::__private::codegen_v4::expression::GenericParameterDescriptor>::new(),
-                                ::std::vec::Vec::<#facade::__private::codegen_v4::expression::PredicateDescriptor>::new(),
-                            ),
-                        )),
-                    ),
-                ));
-                let applied: &'static #facade::__private::codegen_v4::descriptor::TraitDescriptor =
-                    ::std::boxed::Box::leak(::std::boxed::Box::new(
-                    {
-                        let methods: &'static [#facade::__private::codegen_v4::descriptor::MethodDescriptor] =
-                            ::std::boxed::Box::leak(::std::vec![#(#external_method_entries),*].into_boxed_slice());
-                    #facade::__private::codegen_v4::descriptor::TraitDescriptor::builder(external)
-                        .arguments(::std::vec![#(#arguments),*])
-                        .methods(methods)
-                        .build()
-                        .expect("external trait application is valid")
-                    }
-                ));
-                (Some(external), Some(applied), &[], &[], &[], &[])
-            })
+                .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
+            let plan = super::invocation::analysis::analyze_method(method, method_context)
+                .expect("validated method analysis is infallible");
+            if !plan.is_executable() {
+                return None;
+            }
+            let name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
+            let slot = if plan.pinned_receiver_mutability().is_some() {
+                if plan.modes.thread_safe {
+                    quote!(.pinned_thread_safe::<#target>(&#name))
+                } else {
+                    quote!(.pinned_local::<#target>(&#name))
+                }
+            } else if plan.modes.thread_safe {
+                quote!(.thread_safe(&#name))
+            } else {
+                quote!(.local(&#name))
+            };
+            Some((index, slot))
+        })
+        .collect();
+    let effective_methods: Vec<_> = declaration
+        .methods
+        .iter()
+        .enumerate()
+        .map(|(index, method)| {
+            let slots = adapter_slots
+                .iter()
+                .filter(|(slot_index, _)| *slot_index == index)
+                .map(|(_, slot)| slot)
+                .collect::<Vec<_>>();
+            let adapters = if slots.is_empty() {
+                quote!()
+            } else {
+                quote!(.with_adapters(#codegen::invoke::InvocationAdapters::builder()#(#slots)*.build()))
+            };
+            let mut method_context =
+                super::invocation::analysis::MethodContext::implementation(&target);
+            method_context.extension_receiver = method
+                .receiver
+                .as_ref()
+                .and_then(|receiver| typed_extension_receiver_type(receiver, &target));
+            let plan = super::invocation::analysis::analyze_method(method, method_context)
+                .expect("validated method analysis is infallible");
+            let availability = if slots.is_empty() {
+                let reasons = if plan.is_executable() {
+                    quote!(::std::boxed::Box::leak(::std::boxed::Box::new([
+                        #codegen::invoke::InvocationUnavailableReason::AdapterUnavailable,
+                    ])))
+                } else {
+                    super::invocation::emit::emit_unavailable_reasons(&plan, context)
+                };
+                quote!(.with_unavailable(#reasons))
+            } else {
+                quote!()
+            };
+            let source = if declaration.trait_path.is_some() {
+                quote!(#codegen::invoke::MethodImplementationSource::Overridden)
+            } else {
+                quote!(#codegen::invoke::MethodImplementationSource::Declared)
+            };
+            quote!(#codegen::invoke::EffectiveMethod::for_type::<#target>(&methods[#index])
+            #adapters
+            #availability
+            .with_source(#source))
+        })
+        .collect();
+    let retained = declaration.retained_tokens;
+    let registration = if trait_application_provider.is_some() {
+        quote! {
+            #codegen::traits::submit_trait_application!(#target, trait_application_provider);
+            #codegen::impls::submit_impl_definition!(#marker, impl_definition_provider);
+            #codegen::impls::submit_impl_application!(#target, impl_application_provider);
         }
-        (Some(path), None) => quote!({
-            let payload = <#target as #path>::__qubit_reflect_trait_payload();
-            (
-                Some(payload.definition()),
-                Some(payload.applied()),
-                payload.default_method_adapters(),
-                payload.default_method_unavailable_reasons(),
-                payload.associated_type_resolvers(),
-                payload.associated_const_readers(),
-            )
-        }),
+    } else {
+        quote! {
+            #codegen::impls::submit_impl_definition!(#marker, impl_definition_provider);
+            #codegen::impls::submit_impl_application!(#target, impl_application_provider);
+        }
     };
-    let implemented_trait = if has_trait {
-        quote!(implemented_trait)
+    let trait_application = if declaration.trait_path.is_some() {
+        quote!(Some(trait_application_provider().metadata()))
     } else {
         quote!(None)
     };
-    let external_registration = match external_id {
-        Some(id) => {
-            let (rust_name, rust_path, _) = external_trait_metadata
-                .as_ref()
-                .expect("external trait ID is valid only on a trait impl");
-            let trait_guard_path = trait_call_path
-                .as_ref()
-                .expect("external trait ID is valid only on a trait impl");
-            quote! {
-                trait __QubitReflectExternalTraitGuard {
-                    fn __qubit_reflect_reflected_trait_marker(&self);
-                }
+    let tokens = quote! {
+        #retained
 
-                impl<T: ?Sized> __QubitReflectExternalTraitGuard for T {
-                    fn __qubit_reflect_reflected_trait_marker(&self) {}
-                }
+        #[doc(hidden)]
+        mod #module {
+            use super::*;
+            struct #marker;
+            #(#adapter_definitions)*
+            #trait_application_provider
 
-                fn __qubit_reflect_assert_external_trait<T>(value: &T)
-                where
-                    T: #trait_guard_path + Sized + 'static,
-                {
-                    // A reflected trait contributes a same-named method with
-                    // a distinct return type, making this compile-time guard
-                    // ambiguous instead of silently accepting an external ID.
-                    let _: () = value.__qubit_reflect_reflected_trait_marker();
-                }
-
-                fn external_trait_runtime_identity() -> #facade::__private::codegen_v4::registration::RuntimeIdentity {
-                    #facade::__private::codegen_v4::registration::RuntimeIdentity::Trait(
-                        #facade::__private::codegen_v4::descriptor::TraitId::External(
-                            #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                                .expect("validated external trait ID"),
-                        ),
-                    )
-                }
-
-                fn external_trait_payload() -> #facade::__private::codegen_v4::registration::FragmentPayload {
-                    static DESCRIPTOR: ::std::sync::OnceLock<#facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor> =
-                        ::std::sync::OnceLock::new();
-                    let descriptor = DESCRIPTOR.get_or_init(|| #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor::new(
-                        #facade::__private::codegen_v4::descriptor::TraitId::External(
-                            #facade::__private::codegen_v4::identity::ExternalTraitId::new(#id)
-                                .expect("validated external trait ID"),
-                        ),
-                        #rust_name, #rust_path, #rust_name,
-                        #facade::__private::codegen_v4::descriptor::TraitCompleteness::ExternalIncomplete,
-                        ::std::boxed::Box::leak(::std::boxed::Box::new(
-                            #facade::__private::codegen_v4::expression::GenericDefinitionDescriptor::new(
-                                ::std::vec::Vec::<#facade::__private::codegen_v4::expression::GenericParameterDescriptor>::new(),
-                                ::std::vec::Vec::<#facade::__private::codegen_v4::expression::PredicateDescriptor>::new(),
-                            ),
-                        )),
-                    ));
-                    #facade::__private::codegen_v4::registration::FragmentPayload::Trait(descriptor)
-                }
-
-                #facade::__private::codegen_v4::inventory::submit! {
-                    #facade::__private::codegen_v4::registration::RegistrationFragment::new(
-                        #facade::__private::codegen_v4::registration::FragmentKind::Trait,
-                        #facade::__private::codegen_v4::registration::StaticFragmentIdentity::new(
-                            env!("CARGO_PKG_NAME"), module_path!(), #line, #column,
-                            "external-trait", #fingerprint ^ 0x9e3779b97f4a7c15_u64,
-                        ),
-                        external_trait_runtime_identity,
-                        external_trait_payload,
-                    )
-                }
+            fn methods() -> &'static [#codegen::invoke::MethodMetadata] {
+                static VALUE: ::std::sync::OnceLock<::std::boxed::Box<[#codegen::invoke::MethodMetadata]>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| ::std::vec![#(#methods),*].into_boxed_slice())
             }
+            fn associated_types() -> &'static [#codegen::traits::AssociatedType] {
+                static VALUE: ::std::sync::OnceLock<::std::boxed::Box<[#codegen::traits::AssociatedType]>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| ::std::vec![#(#associated_types),*].into_boxed_slice())
+            }
+            fn associated_consts() -> &'static [#codegen::traits::AssociatedConst] {
+                static VALUE: ::std::sync::OnceLock<::std::boxed::Box<[#codegen::traits::AssociatedConst]>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| ::std::vec![#(#associated_consts),*].into_boxed_slice())
+            }
+            fn generic_definition() -> &'static #codegen::expression::GenericDefinitionMetadata {
+                static VALUE: ::std::sync::OnceLock<#codegen::expression::GenericDefinitionMetadata> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| #generic_definition)
+            }
+            fn impl_definition_provider() -> &'static #codegen::impls::ImplDefinitionSpec<#marker> {
+                static VALUE: ::std::sync::OnceLock<#codegen::impls::ImplDefinitionSpec<#marker>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| #codegen::impls::ImplDefinitionSpec::new(
+                    #kind,
+                    #target_expression,
+                    #implemented_trait,
+                    generic_definition(),
+                    #codegen::impls::Qualifiers::new(false),
+                    methods(),
+                    associated_types(),
+                    associated_consts(),
+                ))
+            }
+            fn effective_methods() -> &'static [#codegen::invoke::EffectiveMethod] {
+                static VALUE: ::std::sync::OnceLock<::std::boxed::Box<[#codegen::invoke::EffectiveMethod]>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| {
+                    let methods = methods();
+                    let mut effective_methods = ::std::vec![#(#effective_methods),*];
+                    effective_methods.extend(#default_methods.into_vec());
+                    effective_methods.into_boxed_slice()
+                })
+            }
+            fn impl_application_provider() -> &'static #codegen::impls::ImplApplicationSpec<#target> {
+                static VALUE: ::std::sync::OnceLock<#codegen::impls::ImplApplicationSpec<#target>> = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| #codegen::impls::ImplApplicationSpec::for_target::<#marker>(
+                    impl_definition_provider(),
+                    #trait_application,
+                    &[],
+                    &[],
+                    effective_methods(),
+                    ::std::boxed::Box::leak(::std::vec![#(#associated_type_bindings),*].into_boxed_slice()),
+                    ::std::boxed::Box::leak(::std::vec![#(#associated_const_bindings),*].into_boxed_slice()),
+                ))
+            }
+            #registration
         }
-        None => quote!(),
     };
-    let definition_setup = shared_definition.unwrap_or_else(|| {
-        if let Some(trait_path) = declaration.trait_path.as_ref() {
-            let target_expression = super::traits::type_expression(
-                &declaration.target_type,
-                &environment,
-                &facade,
-            );
-            let trait_application = super::expression_codegen::path_type_expression(
-                trait_path,
-                &environment,
-                &facade,
-            );
-            let trait_name = trait_path.source.as_str();
-            quote! {
-                ::std::boxed::Box::leak(::std::boxed::Box::new(
-                    #facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor::new_unresolved_trait_with_expression(
-                        fragment_identity(),
-                        #target_expression,
-                        #trait_name,
-                        trait_definition.map(|definition| definition.trait_id().clone()),
-                        #trait_application,
-                        ::std::boxed::Box::leak(::std::boxed::Box::new(#impl_generic_definition)),
-                    ),
-                ))
-            }
-        } else {
-            quote! {
-                ::std::boxed::Box::leak(::std::boxed::Box::new(
-                    #facade::__private::codegen_v4::descriptor::ImplDefinitionDescriptor::new(
-                        fragment_identity(),
-                        #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
-                            #facade::__private::codegen_v4::expression::concrete(
-                                vec![#target_source.into()].into_boxed_slice(),
-                                ::std::vec::Vec::new().into_boxed_slice(),
-                                #facade::__private::codegen_v4::expression::DiagnosticText::from(#target_source),
-                            ),
-                        ),
-                        #kind,
-                        None,
-                        ::std::boxed::Box::leak(::std::boxed::Box::new(#impl_generic_definition)),
-                    ).expect("generated impl definition is consistent"),
-                ))
-            }
-        }
-    });
-    let generic_specialization_adapter_definitions =
-        generic_specialization_adapter_definitions.collect();
-    let method_entries = method_entries.collect();
-    let invocation_adapter_entries = invocation_adapter_entries.collect();
-    let method_specialization_entries = method_specialization_entries.collect();
-    concrete_emission::emit(ConcreteImplEmission {
-        retained,
-        module,
-        applicability_witness,
-        invocation_adapter_definitions,
-        generic_specialization_adapter_definitions,
-        facade,
-        line,
-        column,
-        fingerprint,
-        target,
-        trait_setup,
-        definition_setup,
-        method_entries,
-        invocation_adapter_entries,
-        invocation_unavailable_reason_entries,
-        method_specialization_entries,
-        implemented_trait,
-        associated_type_binding_arms,
-        specialized_associated_type_resolver_arms,
-        associated_const_override_arms,
-        associated_const_reader_override_arms,
-        impl_arguments,
-        external_registration,
-    })
+    super::invocation::emit::rewrite_codegen_paths(tokens)
 }
 
 // Generic specialization generation lives in `impls::specialization_codegen`.
-
-/// Expands every statically applicable invocation blocker in canonical enum
-/// order.
-///
-/// # Parameters
-///
-/// - `method`: Validated method signature to analyze.
-/// - `target`: Concrete implementation target type tokens.
-/// - `context`: Expansion context used to emit runtime reason paths.
-///
-/// # Returns
-///
-/// Returns generated tokens for the method's ordered unavailable reasons.
-#[must_use]
-pub(super) fn invocation_unavailable_reason_entry(
-    method: &MethodIr,
-    target: &TokenStream,
-    context: &ExpansionContext,
-) -> TokenStream {
-    let plan = super::invocation::analysis::analyze_method(
-        method,
-        super::invocation::analysis::MethodContext::implementation(target),
-    )
-    .expect("validated method analysis is infallible");
-    super::invocation::emit::emit_unavailable_reasons(&plan, context)
-}

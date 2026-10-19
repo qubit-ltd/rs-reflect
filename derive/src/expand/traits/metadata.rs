@@ -50,8 +50,7 @@ pub(super) fn build(
     let methods: Vec<_> = declaration
         .methods
         .iter()
-        .enumerate()
-        .map(|(method_index, method)| {
+        .map(|method| {
             let method_environment = environment.clone().with_generics(&method.generics);
             let name = LitStr::new(&method.name.to_string(), method.span);
             let query = method
@@ -61,81 +60,94 @@ pub(super) fn build(
                 .map(ToOwned::to_owned)
                 .unwrap_or_else(|| method.name.to_string());
             let query = LitStr::new(&query, method.span);
-            let index = method_index;
             let receiver = match &method.receiver {
                 Some(receiver) => match receiver.kind {
                     ReceiverKindIr::Value => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Owned))
+                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                            #facade::__private::codegen_v4::invoke::ReceiverKind::Owned
+                            , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
+                        )))
                     }
                     ReceiverKindIr::SharedReference => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Shared))
+                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                            #facade::__private::codegen_v4::invoke::ReceiverKind::Shared
+                            , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
+                        )))
                     }
                     ReceiverKindIr::MutableReference => {
-                        quote!(Some(#facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Mutable))
+                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                            #facade::__private::codegen_v4::invoke::ReceiverKind::Mutable
+                            , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
+                        )))
                     }
                     ReceiverKindIr::Typed => {
-                        let declaration = LitStr::new(&receiver.declaration.to_string(), receiver.span);
+                        let receiver_expression = type_expression(&receiver.ty, &method_environment, facade);
+                        let kind = if crate::expand::invocation::analysis::typed_pinned_receiver_mutable(receiver)
+                            == Some(true)
+                        {
+                            quote!(#facade::__private::codegen_v4::invoke::ReceiverKind::PinnedMutable)
+                        } else if crate::expand::invocation::analysis::typed_pinned_receiver_mutable(receiver)
+                            == Some(false)
+                        {
+                            quote!(#facade::__private::codegen_v4::invoke::ReceiverKind::PinnedShared)
+                        } else {
+                            quote!(#facade::__private::codegen_v4::invoke::ReceiverKind::Owned)
+                        };
                         quote!(Some(
-                            #facade::__private::codegen_v4::descriptor::ReceiverDescriptor::Explicit(#declaration)
+                            #facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(#kind, #receiver_expression)
                         ))
                     }
                 },
                 None => quote!(None),
             };
             let parameters = method.parameters.iter().map(|parameter| {
-                let name = parameter.name.as_deref().map(|name| LitStr::new(name, parameter.span));
-                let name = match name {
-                    Some(name) => quote!(Some(#name)),
-                    None => quote!(None),
-                };
                 let pattern = match parameter.pattern.kind {
                     ParameterPatternKindIr::Identifier => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Identifier)
+                        let name = parameter.name.as_deref().unwrap_or("");
+                        let name = LitStr::new(name, parameter.span);
+                        quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::Identifier(#name))
                     }
                     ParameterPatternKindIr::Wildcard => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Wildcard)
+                        quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::Wildcard)
                     }
                     ParameterPatternKindIr::Destructure => {
-                        let source = LitStr::new(&parameter.pattern.source, parameter.span);
-                        quote!(
-                            #facade::__private::codegen_v4::descriptor::ParameterPatternDescriptor::Destructure(
-                                #source.into()
-                            )
-                        )
+                        let pattern = LitStr::new(&parameter.pattern.source, parameter.span);
+                        quote!(#facade::__private::codegen_v4::invoke::ParameterPattern::DestructurePattern(#pattern))
                     }
                 };
                 let passing = match &parameter.ty.kind {
                     TypeKindIr::Reference { mutable: true, .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::MutableBorrow)
+                        quote!(#facade::__private::codegen_v4::invoke::PassingMode::Mutable)
                     }
                     TypeKindIr::Reference { .. } => {
-                        quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::SharedBorrow)
+                        quote!(#facade::__private::codegen_v4::invoke::PassingMode::Shared)
                     }
-                    _ => quote!(#facade::__private::codegen_v4::descriptor::ParameterPassingMode::Owned),
+                    _ => quote!(#facade::__private::codegen_v4::invoke::PassingMode::Owned),
                 };
                 let ty = type_expression(&parameter.ty, &method_environment, facade);
                 let index = parameter.index;
-                quote!(#facade::__private::codegen_v4::descriptor::ParameterDescriptor::new(
-                    #index, #name, #pattern, #passing, #ty, None
+                quote!(#facade::__private::codegen_v4::invoke::ParameterMetadata::new(
+                    #index, #pattern, #passing, #ty
                 ))
             });
-            let return_value = match &method.return_type {
-                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::unit()),
+            let output = match &method.return_type {
+                ReturnTypeIr::Unit => quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
                 ReturnTypeIr::Type(ty) => {
                     let expression = type_expression(ty, &method_environment, facade);
                     let kind = match ty.kind {
-                        TypeKindIr::Never => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Never),
+                        TypeKindIr::Never => quote!(#facade::__private::codegen_v4::invoke::ReturnKind::Never),
+                        TypeKindIr::Reference { mutable: true, .. } => {
+                            quote!(#facade::__private::codegen_v4::invoke::ReturnKind::Mutable)
+                        }
                         TypeKindIr::Reference { .. } => {
-                            quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Reference)
+                            quote!(#facade::__private::codegen_v4::invoke::ReturnKind::Shared)
                         }
                         TypeKindIr::ImplTrait { .. } => {
-                            quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Opaque)
+                            quote!(#facade::__private::codegen_v4::invoke::ReturnKind::Opaque)
                         }
-                        _ => quote!(#facade::__private::codegen_v4::descriptor::ReturnKind::Concrete),
+                        _ => quote!(#facade::__private::codegen_v4::invoke::ReturnKind::Owned),
                     };
-                    quote!(#facade::__private::codegen_v4::descriptor::ReturnDescriptor::new(
-                        #kind, Some(#expression), None
-                    ))
+                    quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(#kind, #expression))
                 }
             };
             let qualifiers = &method.qualifiers;
@@ -144,7 +156,6 @@ pub(super) fn build(
             let is_unsafe = qualifiers.is_unsafe;
             let is_const = qualifiers.is_const;
             let is_variadic = qualifiers.is_variadic;
-            let has_default = method.has_default;
             let abi = qualifiers
                 .abi
                 .as_deref()
@@ -153,38 +164,35 @@ pub(super) fn build(
                 Some(abi) => quote!(Some(#abi)),
                 None => quote!(None),
             };
+            let has_default = method.has_default;
+            let is_generic = !method.generics.params.is_empty();
             quote! {
-                #facade::__private::codegen_v4::descriptor::MethodDescriptor::builder(
-                    #facade::__private::codegen_v4::identity::MemberId::new(
-                        #trait_name_literal,
-                        "method",
-                        #index,
-                        #facade::__private::codegen_v4::identity::FragmentIdentity::new(
-                            env!("CARGO_PKG_NAME"), module_path!(), line!(), column!(), "method", #index as u64,
-                        ),
+                #facade::__private::codegen_v4::invoke::MethodMetadata::from_spec(
+                    #facade::__private::codegen_v4::invoke::MethodMetadataSpec::new(
+                        #query,
+                        #facade::__private::codegen_v4::invoke::MethodNamespaceMetadata::Trait {
+                            trait_: #trait_name_literal,
+                            implementation: #name,
+                        },
+                        #facade::__private::codegen_v4::invoke::MethodVisibility::Public,
+                        #receiver,
+                        ::std::boxed::Box::leak(::std::vec![#(#parameters),*].into_boxed_slice()),
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(#output)),
+                        #facade::__private::codegen_v4::invoke::MethodQualifiers::new(
+                            #is_const, #is_async, #is_unsafe, #is_variadic,
+                        ).with_abi(#abi),
+                        ::std::boxed::Box::leak(::std::boxed::Box::new(#method_generic_definition)),
+                        #is_generic,
+                        #has_default,
                     ),
-                    #name,
-                    #query,
-                    #facade::__private::codegen_v4::descriptor::MethodDeclarationOwner::Trait(definition),
                 )
-                .visibility(#facade::__private::codegen_v4::descriptor::MethodVisibility::InheritedFromTrait)
-                .receiver(#receiver)
-                .parameters(vec![#(#parameters),*])
-                .return_value(#return_value)
-                .qualifiers(#facade::__private::codegen_v4::descriptor::MethodQualifiers::new(
-                    #is_async, #is_unsafe, #is_const, #abi, #is_variadic,
-                ))
-                .generic_definition(&#method_generic_definition)
-                .has_default(#has_default)
-                .build()
             }
         })
         .collect();
     let associated_types: Vec<_> = declaration
         .associated_types
         .iter()
-        .enumerate()
-        .map(|(index, item)| {
+        .map(|item| {
             let name = LitStr::new(&item.name.to_string(), item.span);
             let item_environment = environment.clone().with_generics(&item.generics);
             let bounds = item.bounds.iter().filter_map(|bound| match bound {
@@ -232,27 +240,30 @@ pub(super) fn build(
                 Some(value) => quote!(Some(#value)),
                 None => quote!(None),
             };
-            let generic_definition = generic_definition(&item.generics, item.span, facade);
-            quote!(#facade::__private::codegen_v4::descriptor::AssociatedTypeDescriptor::new_with_generic_definition(
-                #index,
+            quote!(#facade::__private::codegen_v4::traits::associated_type(
                 #name,
-                #name,
-                Box::new([#(#bounds),*]),
+                #facade::__private::codegen_v4::traits::TraitVisibility::Public,
+                &[#(#bounds),*],
                 #default,
-                #generic_definition,
             ))
         })
         .collect();
     let associated_consts: Vec<_> = declaration
         .associated_consts
         .iter()
-        .enumerate()
-        .map(|(index, item)| {
+        .map(|item| {
             let name = LitStr::new(&item.name.to_string(), item.span);
             let ty = type_expression(&item.ty, &environment, facade);
-            let has_default = item.value.is_some();
-            quote!(#facade::__private::codegen_v4::descriptor::AssociatedConstDescriptor::new(
-                #index, #name, #name, #ty, #has_default
+            let default = item
+                .value
+                .as_ref()
+                .map(|value| const_expression(value, &environment, facade))
+                .unwrap_or_else(|| quote!(None));
+            quote!(#facade::__private::codegen_v4::traits::associated_const(
+                #name,
+                #facade::__private::codegen_v4::traits::TraitVisibility::Public,
+                #ty,
+                #default,
             ))
         })
         .collect();

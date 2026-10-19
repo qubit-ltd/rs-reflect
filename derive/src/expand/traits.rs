@@ -2,1049 +2,131 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Expansion of reflected trait declarations and their registration fragments.
+//! Expansion of reflected trait declarations to typed codegen v4 metadata.
 
-use std::collections::HashSet;
-
-mod associated_const;
 mod default_invocation;
-mod default_method_expansion;
-mod dyn_compatibility;
-mod dyn_trait_generics;
 mod metadata;
-mod token_rewrite;
 mod trait_metadata;
 
-use proc_macro2::Group;
-use proc_macro2::Ident;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use proc_macro2::TokenTree;
-use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
-use syn::Error;
-use syn::GenericParam;
-use syn::ItemFn;
 use syn::ItemTrait;
-use syn::Lifetime;
 use syn::LitStr;
-use syn::PathArguments as SynPathArguments;
-use syn::TraitItem;
-use syn::WherePredicate as SynWherePredicate;
-use syn::parse_quote_spanned;
 use syn::parse2;
 
-use self::default_method_expansion::DefaultMethodExpansion;
-use self::dyn_compatibility::associated_type_requires_dyn_binding;
-use self::dyn_compatibility::dyn_inherited_arguments_for_supertrait;
-use self::dyn_compatibility::dyn_inherited_associated_types;
-use self::dyn_compatibility::dyn_reflected_supertrait_path;
-use self::dyn_compatibility::is_provably_dyn_compatible;
-use self::dyn_trait_generics::DynTraitGenerics;
-use self::token_rewrite::replace_self_with_owner;
-use super::expression_codegen::external_supertrait_arguments;
+use super::ExpansionContext;
 pub(crate) use super::expression_codegen::generic_definition;
 pub(crate) use super::expression_codegen::type_expression;
-use crate::expand::ExpansionContext;
 use crate::ir::GenericBoundIr;
-use crate::ir::GenericKindIr;
-use crate::ir::ReturnTypeIr;
 use crate::ir::TraitDeclarationIr;
 use crate::ir::VisibilityIr;
-use crate::ir::WherePredicateIr;
 
-/// Emits the normalized visibility carried by one reflected trait.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait declaration containing source visibility.
-/// - `facade`: Runtime facade path used by generated references.
-///
-/// # Returns
-///
-/// Returns the corresponding runtime visibility expression.
-#[must_use]
-fn trait_visibility(declaration: &TraitDeclarationIr, facade: &TokenStream) -> TokenStream {
-    match &declaration.visibility {
-        VisibilityIr::Public => {
-            quote!(#facade::__private::codegen_v4::identity::Visibility::Public)
-        }
-        VisibilityIr::Crate => {
-            quote!(#facade::__private::codegen_v4::identity::Visibility::Crate)
-        }
-        VisibilityIr::Super => {
-            quote!(#facade::__private::codegen_v4::identity::Visibility::Super)
-        }
-        VisibilityIr::SelfValue | VisibilityIr::Inherited => {
-            quote!(#facade::__private::codegen_v4::identity::Visibility::Private)
-        }
-        VisibilityIr::Restricted(path) => {
-            let path = LitStr::new(&path.source, declaration.span);
-            quote!(#facade::__private::codegen_v4::identity::Visibility::Restricted(#path.into()))
-        }
-    }
-}
-
-/// Emits direct reflected and external supertrait applications.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait and its supertrait metadata.
-/// - `facade`: Runtime facade path used by generated references.
-///
-/// # Returns
-///
-/// Returns expressions for each supported direct supertrait.
-#[must_use]
-fn direct_supertraits(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
-    declaration
-        .supertraits
-        .iter()
-        .filter_map(|bound| match bound {
-            GenericBoundIr::Trait { path, .. } => {
-                if let Some(external) = declaration
-                    .external_traits
-                    .iter()
-                    .find(|external| external.path.source == path.source)
-                {
-                    let id = LitStr::new(&external.id, declaration.span);
-                    let diagnostic_path = LitStr::new(&path.source, declaration.span);
-                    let arguments = path
-                        .segments
-                        .last()
-                        .map(|segment| external_supertrait_arguments(&segment.arguments, declaration, facade))
-                        .unwrap_or_default();
-                    Some(
-                        quote!(#facade::__private::codegen_v4::descriptor::external_supertrait::<Self>(
-                            #id,
-                            #diagnostic_path,
-                            vec![#(#arguments),*],
-                        )),
-                    )
-                } else {
-                    let path = &path.tokens;
-                    Some(quote!(<Self as #path>::__qubit_reflect_trait_payload().applied()))
-                }
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-/// Emits concrete arguments applied to the reflected trait payload.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait generic parameter metadata.
-/// - `facade`: Runtime facade path used by generated references.
-///
-/// # Returns
-///
-/// Returns supported concrete type and const generic argument expressions.
-#[must_use]
-fn applied_arguments(declaration: &TraitDeclarationIr, facade: &TokenStream) -> Vec<TokenStream> {
-    declaration
-        .generics
-        .params
-        .iter()
-        .filter_map(|parameter| {
-            if parameter.kind == GenericKindIr::Const {
-                let identifier = Ident::new(&parameter.name, declaration.span);
-                let type_source = parameter.const_type.as_ref()?.source.as_str();
-                let expression = match type_source {
-                    "bool" => quote!(#facade::__private::codegen_v4::expression::ConstExpression::Boolean(#identifier)),
-                    "char" => quote!(#facade::__private::codegen_v4::expression::ConstExpression::Character(#identifier)),
-                    "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => {
-                        quote!(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#identifier as i128))
-                    }
-                    "u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
-                        quote!(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#identifier as u128))
-                    }
-                    _ => return None,
-                };
-                let type_source = LitStr::new(type_source, declaration.span);
-                return Some(quote!(#facade::__private::codegen_v4::expression::GenericArgument::Const(
-                    #facade::__private::codegen_v4::expression::ConstGenericArgument::new(
-                        #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
-                            #facade::__private::codegen_v4::expression::concrete(
-                                vec![#type_source.into()].into_boxed_slice(),
-                                vec![].into_boxed_slice(),
-                                #facade::__private::codegen_v4::expression::DiagnosticText::from(#type_source),
-                            ),
-                        ),
-                        #expression,
-                        stringify!(#identifier),
-                    ),
-                )));
-            }
-            if parameter.kind != GenericKindIr::Type {
-                return None;
-            }
-            let identifier = Ident::new(&parameter.name, declaration.span);
-            Some(quote! {
-                #facade::__private::codegen_v4::expression::GenericArgument::Type(
-                    #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
-                        #facade::__private::codegen_v4::expression::concrete(
-                            vec![std::any::type_name::<#identifier>().into()].into_boxed_slice(),
-                            vec![].into_boxed_slice(),
-                            #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#identifier>()),
-                        ),
-                    ),
-                )
-            })
-        })
-        .collect()
-}
-
-/// Emits the `'static` bounds required by generated trait payload hooks.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait generic parameter metadata.
-///
-/// # Returns
-///
-/// Returns bounds for every type parameter.
-#[must_use]
-fn hook_type_bounds(declaration: &TraitDeclarationIr) -> Vec<TokenStream> {
-    declaration
-        .generics
-        .params
-        .iter()
-        .filter(|parameter| parameter.kind == GenericKindIr::Type)
-        .map(|parameter| {
-            let identifier = Ident::new(&parameter.name, declaration.span);
-            quote!(#identifier: 'static)
-        })
-        .collect()
-}
-
-/// Analyzes and emits all default-method adapter protocol entries.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait declaration and methods.
-/// - `suffix`: Stable generated-name suffix for this trait.
-/// - `trait_name`: Diagnostic trait name for invocation identities.
-/// - `hook_type_bounds`: Bounds required by generated payload hooks.
-/// - `facade`: Runtime facade path used by generated references.
-/// - `context`: Expansion configuration and runtime facade resolver.
-///
-/// # Returns
-///
-/// Returns generated adapter items and corresponding descriptor entries.
-fn default_method_expansion(
-    declaration: &TraitDeclarationIr,
-    suffix: &str,
-    trait_name: &LitStr,
-    hook_type_bounds: &[TokenStream],
-    facade: &TokenStream,
-    context: &ExpansionContext,
-) -> DefaultMethodExpansion {
-    let adapters: Vec<_> = declaration
-        .methods
-        .iter()
-        .enumerate()
-        .map(|(index, method)| {
-            default_invocation::default_method_invocation_adapter(
-                method,
-                index,
-                suffix,
-                trait_name,
-                hook_type_bounds,
-                facade,
-                context,
-            )
-        })
-        .collect();
-    let adapter_items = adapters
-        .iter()
-        .filter_map(|adapter| adapter.as_ref().map(|(item, _)| item.clone()))
-        .collect();
-    let adapter_entries = adapters
-        .iter()
-        .map(|adapter| match adapter {
-            Some((_, entry)) => entry.clone(),
-            None => quote!(None),
-        })
-        .collect();
-    let unavailable_reason_entries = declaration
-        .methods
-        .iter()
-        .map(|method| {
-            let has_unproven_associated_type = method
-                .parameters
-                .iter()
-                .any(|parameter| default_invocation::type_contains_associated_type(&parameter.ty))
-                || matches!(&method.return_type, ReturnTypeIr::Type(ty) if default_invocation::type_contains_associated_type(ty));
-            let plan = super::invocation::analysis::analyze_method(
-                method,
-                super::invocation::analysis::MethodContext::trait_default(
-                    &quote!(Self),
-                    has_unproven_associated_type,
-                ),
-            )
-            .expect("validated method analysis is infallible");
-            super::invocation::emit::emit_unavailable_reasons(&plan, context)
-        })
-        .collect();
-    DefaultMethodExpansion {
-        adapter_items,
-        adapter_entries,
-        unavailable_reason_entries,
-    }
-}
-
-/// Emits optional concrete resolvers for nongeneric associated types.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait associated type metadata.
-/// - `facade`: Runtime facade path used by generated references.
-///
-/// # Returns
-///
-/// Returns resolver expressions, using `None` for generic associated types.
-#[must_use]
-fn associated_type_resolver_entries(
-    declaration: &TraitDeclarationIr,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
-    let codegen = quote!(#facade::__private::codegen_v4);
-    declaration
-        .associated_types
-        .iter()
-        .map(|item| {
-            if item.generics.params.is_empty() {
-                let name = &item.name;
-                quote!({
-                    use #codegen::descriptor::ResolveReflectTypeDescriptor as _;
-                    let probe = #facade::__private::codegen_v4::descriptor::ReflectArgumentProbe::<Self::#name>::new();
-                    (&probe).resolve_reflect_type_descriptor()
-                })
-            } else {
-                quote!(None)
-            }
-        })
-        .collect()
-}
-
-/// Expands a validated reflected trait without changing its ordinary Rust
-/// semantics.
-///
-/// # Parameters
-///
-/// - `declaration`: Validated trait declaration and retained source tokens.
-/// - `context`: Expansion configuration and runtime facade resolver.
-///
-/// # Returns
-///
-/// Returns the original trait augmented with hidden reflection hooks and
-/// generated support items.
-#[must_use]
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
     let codegen = quote!(#facade::__private::codegen_v4);
-    let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
-    let suffix = format!("{fingerprint:016x}");
-    let marker = Ident::new(
-        &format!("__QubitReflectTraitMarker_{suffix}"),
-        declaration.span,
-    );
-    let hook = Ident::new("__qubit_reflect_trait_payload", declaration.span);
-    let definition_provider =
-        format_ident!("__qubit_reflect_trait_definition_{}", declaration.name);
-    let reflected_marker = Ident::new("__qubit_reflect_reflected_trait_marker", declaration.span);
-    let generic_factory = Ident::new(
-        &format!("__qubit_reflect_trait_generics_{suffix}"),
-        declaration.span,
-    );
-    let definition_factory = Ident::new(
-        &format!("__qubit_reflect_trait_definition_{suffix}"),
-        declaration.span,
-    );
-    let identity_factory = Ident::new(
-        &format!("__qubit_reflect_trait_identity_{suffix}"),
-        declaration.span,
-    );
-    let payload_factory = Ident::new(
-        &format!("__qubit_reflect_trait_fragment_payload_{suffix}"),
-        declaration.span,
-    );
-    let dyn_descriptor_factory = Ident::new(
-        &format!("__qubit_reflect_dyn_trait_descriptor_{suffix}"),
-        declaration.span,
-    );
-    let support = Ident::new(
-        &format!("__qubit_reflect_trait_support_{suffix}"),
-        declaration.span,
-    );
-    let rust_path = Ident::new(
-        &format!("__QUBIT_REFLECT_TRAIT_PATH_{}", suffix.to_ascii_uppercase()),
-        declaration.span,
+    let marker = format_ident!("__QubitReflectTraitDef_{}", declaration.name);
+    let spec_provider = format_ident!("__QubitReflectTraitDef_{}_SPEC", declaration.name);
+    let default_methods_provider = format_ident!(
+        "__QubitReflectTraitDef_{}_DEFAULT_METHODS",
+        declaration.name
     );
     let trait_name = declaration.name.to_string();
     let trait_name_literal = LitStr::new(&trait_name, declaration.span);
-    let query_name = declaration
-        .attributes
-        .iter()
-        .find_map(|attribute| attribute.rename())
-        .unwrap_or(&trait_name)
-        .to_owned();
-    let query_name_literal = LitStr::new(&query_name, declaration.span);
-    let visibility = trait_visibility(&declaration, &facade);
-    let direct_supertraits = direct_supertraits(&declaration, &facade);
-    let applied_arguments = applied_arguments(&declaration, &facade);
-    let hook_type_bounds = hook_type_bounds(&declaration);
-    let DefaultMethodExpansion {
-        adapter_items: default_method_adapter_items,
-        adapter_entries: default_method_adapter_entries,
-        unavailable_reason_entries: default_method_unavailable_reason_entries,
-    } = default_method_expansion(
+    let visibility = match &declaration.visibility {
+        VisibilityIr::Public => quote!(#codegen::traits::TraitVisibility::Public),
+        VisibilityIr::Restricted(path) => {
+            let path = LitStr::new(&path.source, declaration.span);
+            quote!(#codegen::traits::TraitVisibility::Restricted(#path))
+        }
+        VisibilityIr::Crate
+        | VisibilityIr::Super
+        | VisibilityIr::SelfValue
+        | VisibilityIr::Inherited => {
+            quote!(#codegen::traits::TraitVisibility::Private)
+        }
+    };
+    let generic_definition =
+        super::traits::generic_definition(&declaration.generics, declaration.span, &facade);
+    let trait_metadata = metadata::build(&declaration, &trait_name_literal, &facade);
+    let methods = trait_metadata.methods;
+    let associated_types = trait_metadata.associated_types;
+    let associated_consts = trait_metadata.associated_consts;
+    let supertraits = declaration.supertraits.iter().filter_map(|bound| match bound {
+        GenericBoundIr::Trait { path, lifetimes, .. } => {
+            let name = LitStr::new(&path.source, path.span);
+            let environment = crate::expand::generic_environment::GenericEnvironment::from_generics(&declaration.generics);
+            let arguments = path.segments.iter().flat_map(|segment| {
+                crate::expand::expression_codegen::path_arguments(
+                    &segment.arguments,
+                    &environment,
+                    &facade,
+                    path.span,
+                )
+            });
+            let lifetimes = lifetimes.iter().map(|lifetime| {
+                crate::expand::expression_codegen::lifetime_expression(lifetime, path.span, &facade)
+            });
+            Some(quote!(#codegen::traits::unresolved_trait_expression(
+                ::std::boxed::Box::leak(::std::boxed::Box::new(
+                    #codegen::expression::TraitExpressionData::new(
+                        #name,
+                        ::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()),
+                        ::std::boxed::Box::leak(::std::vec![#(#lifetimes),*].into_boxed_slice()),
+                    ),
+                )),
+            )))
+        }
+        _ => None,
+    });
+    let retained = match parse2::<ItemTrait>(declaration.retained_tokens.clone()) {
+        Ok(item) => item,
+        Err(error) => return error.into_compile_error(),
+    };
+    let default_methods = super::traits::default_invocation::default_methods_provider(
         &declaration,
-        &suffix,
-        &trait_name_literal,
-        &hook_type_bounds,
+        &retained,
+        &declaration.name,
+        &spec_provider,
+        &default_methods_provider,
         &facade,
         context,
     );
-    let associated_type_resolver_entries = associated_type_resolver_entries(&declaration, &facade);
-    let associated_const_providers: Vec<_> = declaration
-        .associated_consts
-        .iter()
-        .enumerate()
-        .map(|(index, item)| {
-            let provider = format_ident!("__QubitReflectAssociatedConstProvider_{suffix}_{index}");
-            let owner = format_ident!("__QubitReflectAssociatedConstOwner");
-            let generic_declaration = replace_self_with_owner(declaration.generics.impl_declaration.clone(), &owner);
-            let dummy: ItemFn = parse2(quote!(fn __qubit_reflect_dummy #generic_declaration() {}))
-                .expect("validated trait generics can be reused by an associated-const provider");
-            let mut provider_generics = dummy.sig.generics;
-            provider_generics
-                .params
-                .push(parse_quote_spanned!(declaration.span=> #owner: ?Sized));
-            let provider_declaration = quote!(#provider_generics);
-            let (provider_impl_generics, provider_type_generics, _) = provider_generics.split_for_impl();
-            let provider_impl_generics = quote!(#provider_impl_generics);
-            let provider_type_generics = quote!(#provider_type_generics);
-            let generic_arguments: Vec<_> = declaration
-                .generics
-                .params
-                .iter()
-                .map(|parameter| {
-                    let name = Ident::new(&parameter.name, declaration.span);
-                    if parameter.kind == GenericKindIr::Lifetime {
-                        let lifetime = Lifetime::new(&format!("'{}", parameter.name), declaration.span);
-                        quote!(#lifetime)
-                    } else {
-                        quote!(#name)
-                    }
-                })
-                .collect();
-            let marker_types: Vec<_> = declaration
-                .generics
-                .params
-                .iter()
-                .filter_map(|parameter| {
-                    let name = Ident::new(&parameter.name, declaration.span);
-                    match parameter.kind {
-                        GenericKindIr::Lifetime => {
-                            let lifetime = Lifetime::new(&format!("'{}", parameter.name), declaration.span);
-                            Some(quote!(&#lifetime ()))
-                        }
-                        GenericKindIr::Type => Some(quote!(*const #name)),
-                        GenericKindIr::Const => None,
-                    }
-                })
-                .collect();
-            let where_predicates = declaration.generics.where_predicates.iter().map(|predicate| {
-                let tokens = match predicate {
-                    WherePredicateIr::Lifetime { declaration, .. } | WherePredicateIr::Type { declaration, .. } => {
-                        declaration.clone()
-                    }
-                    WherePredicateIr::Other(tokens) => tokens.clone(),
-                };
-                replace_self_with_owner(tokens, &owner)
-            });
-            let trait_name = &declaration.name;
-            let trait_arguments = &declaration.generics.arguments;
-            let const_name = &item.name;
-            let value_type = replace_self_with_owner(item.ty.tokens.clone(), &owner);
-            let has_proven_static_shape = associated_const::has_proven_static_shape(&item.ty);
-            let provider_item = quote! {
-                #[allow(non_camel_case_types)]
-                pub(super) struct #provider #provider_declaration {
-                    marker: ::core::marker::PhantomData<fn(
-                        #(#marker_types,)*
-                        *const #owner,
-                    )>,
-                }
-
-                impl #provider_impl_generics __qubit_reflect_codegen::descriptor::AssociatedConstProvider
-                    for #provider #provider_type_generics
-                where
-                    #(#where_predicates,)*
-                    #owner: super::#trait_name #trait_arguments,
-                {
-                    type Value = #value_type;
-
-                    fn get() -> Self::Value
-                    where
-                        Self::Value: Sized,
-                    {
-                        <#owner as super::#trait_name #trait_arguments>::#const_name
-                    }
-                }
-            };
-            let reader_entry = if has_proven_static_shape {
-                quote!({
-                    use #codegen::descriptor::ResolveAssociatedConstReader as _;
-                    let probe = #facade::__private::codegen_v4::descriptor::AssociatedConstProbe::<
-                        #support::#provider<#(#generic_arguments,)* Self>
-                    >::new();
-                    (&probe).resolve_associated_const_reader()
-                })
-            } else {
-                quote!(None)
-            };
-            (provider_item, reader_entry)
-        })
-        .collect();
-    let associated_const_provider_items = associated_const_providers
-        .iter()
-        .map(|(provider, _)| provider);
-    let associated_const_scope_import = (!associated_const_providers.is_empty()).then(|| {
-        quote! {
-            use super::*;
-        }
-    });
-    let associated_const_reader_entries =
-        associated_const_providers.iter().map(|(_, reader)| reader);
-    let trait_metadata::TraitMetadata {
-        methods,
-        associated_types,
-        associated_consts,
-        parameters,
-        where_predicates,
-    } = metadata::build(&declaration, &trait_name_literal, &facade);
-    let mut trait_item: ItemTrait = match parse2(declaration.retained_tokens.clone()) {
-        Ok(item) => item,
-        Err(error) => return error.into_compile_error(),
-    };
-    let generate_dyn_descriptor = is_provably_dyn_compatible(&trait_item, &declaration);
-    let trait_ident = &declaration.name;
-    let dyn_generics = dyn_trait_generics(&trait_item, &declaration, &facade);
-    let dyn_impl_declaration = &dyn_generics.impl_declaration;
-    let dyn_application = &dyn_generics.trait_application;
-    let dyn_factory_arguments = &dyn_generics.factory_arguments;
-    let dyn_where_clause = &dyn_generics.where_clause;
-    let dyn_type = quote!(dyn #trait_ident #dyn_application);
-    let support_dyn_type = quote!(dyn super::#trait_ident #dyn_application);
-    let associated_type_arguments = dyn_generics.associated_type_arguments.iter();
-    let dyn_direct_supertraits: Vec<_> = declaration
-        .supertraits
-        .iter()
-        .filter_map(|bound| match bound {
-            GenericBoundIr::Trait { path, .. } => {
-                if let Some(external) = declaration
-                    .external_traits
-                    .iter()
-                    .find(|external| external.path.source == path.source)
-                {
-                    let id = LitStr::new(&external.id, declaration.span);
-                    let diagnostic_path = LitStr::new(&path.source, declaration.span);
-                    let arguments = path
-                        .segments
-                        .last()
-                        .map(|segment| {
-                            let mut arguments =
-                                external_supertrait_arguments(&segment.arguments, &declaration, &facade);
-                            arguments.extend(dyn_inherited_arguments_for_supertrait(path, &declaration, &facade));
-                            arguments
-                        })
-                        .unwrap_or_default();
-                    return Some(
-                        quote!(#facade::__private::codegen_v4::descriptor::external_supertrait::<#support_dyn_type>(
-                            #id,
-                            #diagnostic_path,
-                            vec![#(#arguments),*],
-                        )),
-                    );
-                }
-                let path = dyn_reflected_supertrait_path(path, &declaration);
-                Some(quote!(
-                    #facade::__private::codegen_v4::descriptor::TypeDescriptor::of::<dyn #path>()
-                        .as_trait_object()
-                        .expect("a reflected dyn-compatible supertrait has a trait-object descriptor")
-                        .trait_descriptor()
-                ))
-            }
-            _ => None,
-        })
-        .collect();
-    let dyn_support = generate_dyn_descriptor.then(|| {
-        quote! {
-            #[doc(hidden)]
-            pub(super) fn #dyn_descriptor_factory #dyn_impl_declaration ()
-                -> &'static __qubit_reflect_codegen::descriptor::TraitDescriptor
-                #dyn_where_clause
-            {
-            __qubit_reflect_codegen::descriptor::cached_trait_object_descriptor::<#support_dyn_type>(|| {
-                        let definition = #definition_factory();
-                        __qubit_reflect_codegen::descriptor::TraitDescriptor::builder(definition)
-                            .arguments(vec![#(#applied_arguments),*])
-                            .direct_supertraits([#(#dyn_direct_supertraits),*])
-                            .methods(Box::leak(vec![#(#methods),*].into_boxed_slice()))
-                            .associated_types(vec![#(#associated_types),*])
-                            .associated_consts(vec![#(#associated_consts),*])
-                            .associated_type_arguments(vec![#(#associated_type_arguments),*])
-                            .build()
-                            .expect("a generated dyn-compatible trait descriptor must be valid")
-                })
-            }
-        }
-    });
-    let dyn_reflect_impl = generate_dyn_descriptor.then(|| {
-        quote! {
-            impl #dyn_impl_declaration #facade::__private::codegen_v4::descriptor::Reflect for #dyn_type
-                #dyn_where_clause
-            {
-                fn type_descriptor() -> &'static #facade::__private::codegen_v4::descriptor::TypeDescriptor {
-                    #facade::__private::codegen_v4::descriptor::intern_type::<Self>(|| {
-                        #facade::__private::codegen_v4::descriptor::trait_object::<Self>(
-                            #query_name_literal,
-                            #support::#dyn_descriptor_factory::<#(#dyn_factory_arguments),*>,
-                        )
-                    })
-                }
-            }
-        }
-    });
-    if trait_item
-        .items
-        .iter()
-        .any(|item| matches!(item, TraitItem::Fn(function) if function.sig.ident == hook || function.sig.ident == reflected_marker))
-    {
-        return Error::new(
-            declaration.span,
-            "`__qubit_reflect_trait_payload` and `__qubit_reflect_reflected_trait_marker` are reserved by #[reflect]",
-        )
-        .into_compile_error();
-    }
-    let hook_item = match parse2(quote! {
-        #[doc(hidden)]
-        fn #hook() -> #facade::__private::codegen_v4::descriptor::TraitImplPayload
-        where
-            Self: Sized + 'static,
-            #(#hook_type_bounds,)*
-        {
-            let definition = #support::#definition_factory();
-            let arguments = vec![#(#applied_arguments),*];
-            #facade::__private::codegen_v4::descriptor::TraitImplPayload::cached_with_arguments::<Self>(
-                definition,
-                arguments,
-                |arguments| {
-                    #facade::__private::codegen_v4::descriptor::TraitDescriptor::builder(definition)
-                        .arguments(arguments)
-                        .direct_supertraits([#(#direct_supertraits),*])
-                        .methods(Box::leak(vec![#(#methods),*].into_boxed_slice()))
-                        .associated_types(vec![#(#associated_types),*])
-                        .associated_consts(vec![#(#associated_consts),*])
-                        .build()
-                },
-                || vec![#(#default_method_adapter_entries),*],
-                || vec![#(#default_method_unavailable_reason_entries),*],
-                || vec![#(#associated_type_resolver_entries),*],
-                || vec![#(#associated_const_reader_entries),*],
-            )
-        }
-    }) {
-        Ok(item) => item,
-        Err(error) => return error.into_compile_error(),
-    };
-    let reflected_marker_item = match parse2(quote! {
-        #[doc(hidden)]
-        fn #reflected_marker(&self) -> bool
-        where
-            Self: Sized,
-        {
-            true
-        }
-    }) {
-        Ok(item) => item,
-        Err(error) => return error.into_compile_error(),
-    };
-    for item in default_method_adapter_items {
-        match parse2(item.clone()) {
-            Ok(item) => trait_item.items.push(item),
-            Err(error) => return error.into_compile_error(),
-        }
-    }
-    trait_item.items.push(reflected_marker_item);
-    trait_item.items.push(hook_item);
     let tokens = quote! {
-        #trait_item
-
-        #dyn_reflect_impl
+        #retained
 
         #[doc(hidden)]
-        #[allow(non_snake_case)]
-        pub fn #definition_provider() -> &'static #facade::__private::codegen_v4::descriptor::TraitDefinitionDescriptor {
-            #support::#definition_factory()
+        pub struct #marker;
+
+        #[doc(hidden)]
+        pub fn #spec_provider() -> &'static #codegen::traits::TraitDefinitionSpec<#marker> {
+            static VALUE: ::std::sync::OnceLock<#codegen::traits::TraitDefinitionSpec<#marker>> =
+                ::std::sync::OnceLock::new();
+            VALUE.get_or_init(|| {
+                let generics = #generic_definition;
+                let supertraits = ::std::boxed::Box::leak(::std::vec![#(#supertraits),*].into_boxed_slice());
+                let methods = ::std::boxed::Box::leak(::std::vec![#(#methods),*].into_boxed_slice());
+                let associated_types = ::std::boxed::Box::leak(::std::vec![#(#associated_types),*].into_boxed_slice());
+                let associated_consts = ::std::boxed::Box::leak(::std::vec![#(#associated_consts),*].into_boxed_slice());
+                #codegen::traits::TraitDefinitionSpec::new(
+                    #trait_name_literal,
+                    concat!(module_path!(), "::", #trait_name_literal),
+                    #visibility,
+                    #codegen::traits::Completeness::Complete,
+                    ::std::boxed::Box::leak(::std::boxed::Box::new(generics)),
+                    supertraits,
+                    methods,
+                    associated_types,
+                    associated_consts,
+                )
+            })
         }
 
-        #[doc(hidden)]
-        const #rust_path: &str = concat!(module_path!(), "::", #trait_name_literal);
+        #default_methods
 
-        #[doc(hidden)]
-        mod #support {
-            use #codegen as __qubit_reflect_codegen;
-            #associated_const_scope_import
-
-            #[allow(non_camel_case_types)]
-            #[doc(hidden)]
-            struct #marker;
-
-            #(#associated_const_provider_items)*
-
-            #[doc(hidden)]
-            fn #generic_factory() -> &'static __qubit_reflect_codegen::expression::GenericDefinitionDescriptor {
-                static VALUE: std::sync::LazyLock<__qubit_reflect_codegen::expression::GenericDefinitionDescriptor> =
-                    std::sync::LazyLock::new(|| __qubit_reflect_codegen::expression::GenericDefinitionDescriptor::new(
-                        ::std::vec::Vec::from([#(#parameters),*]).into_boxed_slice(),
-                        ::std::vec::Vec::from([#(#where_predicates),*]).into_boxed_slice(),
-                    ));
-                &VALUE
-            }
-
-            #[doc(hidden)]
-            pub(super) fn #definition_factory() -> &'static __qubit_reflect_codegen::descriptor::TraitDefinitionDescriptor {
-                static VALUE: std::sync::LazyLock<__qubit_reflect_codegen::descriptor::TraitDefinitionDescriptor> =
-                    std::sync::LazyLock::new(|| __qubit_reflect_codegen::descriptor::TraitDefinitionDescriptor::new_with_visibility(
-                        __qubit_reflect_codegen::descriptor::TraitId::Reflected(std::any::TypeId::of::<#marker>()),
-                        #trait_name_literal,
-                        super::#rust_path,
-                        #query_name_literal,
-                        __qubit_reflect_codegen::descriptor::TraitCompleteness::Complete,
-                        #generic_factory(),
-                        #visibility,
-                    ));
-                let definition = &*VALUE;
-                definition.initialize_members(|definition| (
-                    vec![#(#methods),*].into_boxed_slice(),
-                    vec![#(#associated_types),*].into_boxed_slice(),
-                    vec![#(#associated_consts),*].into_boxed_slice(),
-                ));
-                definition
-            }
-
-            #dyn_support
-
-            #[doc(hidden)]
-            fn #identity_factory() -> __qubit_reflect_codegen::registration::RuntimeIdentity {
-                __qubit_reflect_codegen::registration::RuntimeIdentity::Trait(
-                    __qubit_reflect_codegen::descriptor::TraitId::Reflected(std::any::TypeId::of::<#marker>()),
-                )
-            }
-
-            #[doc(hidden)]
-            fn #payload_factory() -> __qubit_reflect_codegen::registration::FragmentPayload {
-                __qubit_reflect_codegen::registration::FragmentPayload::Trait(#definition_factory())
-            }
-
-            __qubit_reflect_codegen::inventory::submit! {
-                __qubit_reflect_codegen::registration::RegistrationFragment::new(
-                    __qubit_reflect_codegen::registration::FragmentKind::Trait,
-                    __qubit_reflect_codegen::registration::StaticFragmentIdentity::new(
-                        env!("CARGO_PKG_NAME"),
-                        module_path!(),
-                        line!(),
-                        column!(),
-                        "trait",
-                        #fingerprint,
-                    ),
-                    #identity_factory,
-                    #payload_factory,
-                )
-            }
-        }
+        #codegen::traits::submit_trait_definition!(#marker, #spec_provider);
     };
     super::invocation::emit::rewrite_codegen_paths(tokens)
 }
-
-/// Builds a `'static` concrete dyn application from the trait declaration.
-///
-/// # Parameters
-///
-/// - `item`: Parsed Rust trait item used for syntactic generic facts.
-/// - `declaration`: Validated trait declaration used for normalized metadata.
-/// - `facade`: Runtime facade path used by generated references.
-///
-/// # Returns
-///
-/// Returns generated impl parameters, trait arguments, bounds and associated
-/// type expressions.
-fn dyn_trait_generics(
-    item: &ItemTrait,
-    declaration: &TraitDeclarationIr,
-    facade: &TokenStream,
-) -> DynTraitGenerics {
-    let mut impl_parameters = Vec::new();
-    let mut impl_predicates = Vec::new();
-    let mut application_arguments = Vec::new();
-    let mut factory_arguments = Vec::new();
-    for parameter in &item.generics.params {
-        match parameter {
-            GenericParam::Lifetime(_) => application_arguments.push(quote!('static)),
-            GenericParam::Type(parameter) => {
-                let name = &parameter.ident;
-                let bounds = &parameter.bounds;
-                impl_parameters.push(quote!(#name));
-                if bounds.is_empty() {
-                    impl_predicates.push(quote!(#name: 'static));
-                } else {
-                    impl_predicates.push(quote!(#name: #bounds + 'static));
-                }
-                application_arguments.push(quote!(#name));
-                factory_arguments.push(quote!(#name));
-            }
-            GenericParam::Const(parameter) => {
-                let name = &parameter.ident;
-                let ty = &parameter.ty;
-                impl_parameters.push(quote!(const #name: #ty));
-                application_arguments.push(quote!(#name));
-                factory_arguments.push(quote!(#name));
-            }
-        }
-    }
-    let mut associated_type_arguments = Vec::new();
-    for associated in item.items.iter().filter_map(|item| match item {
-        TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
-            Some(associated)
-        }
-        _ => None,
-    }) {
-        let name = &associated.ident;
-        let parameter = format_ident!("__QubitReflectAssociated{}", name);
-        let bounds = &associated.bounds;
-        impl_parameters.push(quote!(#parameter));
-        if bounds.is_empty() {
-            impl_predicates.push(quote!(#parameter: 'static));
-        } else {
-            impl_predicates.push(quote!(#parameter: #bounds + 'static));
-        }
-        application_arguments.push(quote!(#name = #parameter));
-        factory_arguments.push(quote!(#parameter));
-        let name_literal = LitStr::new(&name.to_string(), name.span());
-        associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v4::expression::associated_type(
-                #name_literal,
-                #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v4::expression::concrete(
-                        vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
-                        vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
-                    ),
-                ),
-            )
-        ));
-    }
-    let direct_associated_names: HashSet<_> = item
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            TraitItem::Type(associated) => Some(associated.ident.to_string()),
-            _ => None,
-        })
-        .collect();
-    for inherited in dyn_inherited_associated_types(declaration) {
-        let Some(segment) = inherited.segments.last() else {
-            continue;
-        };
-        if direct_associated_names.contains(&segment.name) {
-            continue;
-        }
-        let name = Ident::new(&segment.name, declaration.span);
-        let parameter = format_ident!("__QubitReflectAssociated{}", name);
-        impl_parameters.push(quote!(#parameter));
-        impl_predicates.push(quote!(#parameter: 'static));
-        application_arguments.push(quote!(#name = #parameter));
-        factory_arguments.push(quote!(#parameter));
-        let name_literal = LitStr::new(&segment.name, declaration.span);
-        associated_type_arguments.push(quote!(
-            #facade::__private::codegen_v4::expression::associated_type(
-                #name_literal,
-                #facade::__private::codegen_v4::expression::TypeExpression::Concrete(
-                    #facade::__private::codegen_v4::expression::concrete(
-                        vec![std::any::type_name::<#parameter>().into()].into_boxed_slice(),
-                        vec![].into_boxed_slice(),
-                        #facade::__private::codegen_v4::expression::DiagnosticText::from(std::any::type_name::<#parameter>()),
-                    ),
-                ),
-            )
-        ));
-    }
-    let impl_declaration = if impl_parameters.is_empty() {
-        TokenStream::new()
-    } else {
-        quote!(<#(#impl_parameters),*>)
-    };
-    let trait_application = if application_arguments.is_empty() {
-        TokenStream::new()
-    } else {
-        quote!(<#(#application_arguments),*>)
-    };
-    let declared_predicates: Vec<_> = item
-        .generics
-        .where_clause
-        .iter()
-        .flat_map(|clause| &clause.predicates)
-        .map(|predicate| {
-            let predicate =
-                replace_declared_lifetimes_with_static(predicate.to_token_stream(), declaration);
-            replace_self_associated_types(predicate, item, declaration)
-        })
-        .collect();
-    let where_clause = if declared_predicates.is_empty() && impl_predicates.is_empty() {
-        TokenStream::new()
-    } else {
-        quote!(where #(#declared_predicates,)* #(#impl_predicates),*)
-    };
-    DynTraitGenerics {
-        impl_declaration,
-        trait_application,
-        factory_arguments,
-        where_clause,
-        associated_type_arguments,
-    }
-}
-
-/// Replaces declared trait lifetime arguments with `'static` in generated dyn
-/// applications and their where predicates.
-///
-/// # Parameters
-///
-/// - `tokens`: Predicate or application tokens to rewrite recursively.
-/// - `declaration`: Trait declaration whose lifetime parameters are replaced.
-///
-/// # Returns
-///
-/// Returns rewritten tokens with token group spans retained.
-#[must_use]
-fn replace_declared_lifetimes_with_static(
-    tokens: TokenStream,
-    declaration: &TraitDeclarationIr,
-) -> TokenStream {
-    let lifetime_names: HashSet<_> = declaration
-        .generics
-        .params
-        .iter()
-        .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
-        .map(|parameter| parameter.name.as_str())
-        .collect();
-    let mut input = tokens.into_iter().peekable();
-    let mut output = TokenStream::new();
-    while let Some(token) = input.next() {
-        if matches!(&token, TokenTree::Punct(punctuation) if punctuation.as_char() == '\'')
-            && input.peek().is_some_and(
-                |next| matches!(next, TokenTree::Ident(identifier) if lifetime_names.contains(identifier.to_string().as_str())),
-            )
-        {
-            output.extend([token]);
-            let _ = input.next();
-            output.extend([TokenTree::Ident(Ident::new("static", Span::call_site()))]);
-            continue;
-        }
-        output.extend([match token {
-            TokenTree::Group(group) => {
-                let mut replaced = Group::new(
-                    group.delimiter(),
-                    replace_declared_lifetimes_with_static(group.stream(), declaration),
-                );
-                replaced.set_span(group.span());
-                TokenTree::Group(replaced)
-            }
-            token => token,
-        }]);
-    }
-    output
-}
-
-/// Rewrites `Self::Assoc` predicates to the generated dyn binding parameter.
-///
-/// # Parameters
-///
-/// - `tokens`: Predicate tokens to rewrite recursively.
-/// - `item`: Parsed trait item used to identify associated types.
-/// - `declaration`: Validated declaration used to identify inherited associated
-///   types.
-///
-/// # Returns
-///
-/// Returns rewritten tokens with token group spans retained.
-#[must_use]
-fn replace_self_associated_types(
-    tokens: TokenStream,
-    item: &ItemTrait,
-    declaration: &TraitDeclarationIr,
-) -> TokenStream {
-    let mut associated: HashSet<_> = item
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            TraitItem::Type(associated) if associated_type_requires_dyn_binding(associated) => {
-                Some(associated.ident.to_string())
-            }
-            _ => None,
-        })
-        .collect();
-    associated.extend(
-        dyn_inherited_associated_types(declaration)
-            .filter_map(|path| path.segments.last().map(|segment| segment.name.clone())),
-    );
-    let input: Vec<_> = tokens.into_iter().collect();
-    let mut output = TokenStream::new();
-    let mut index = 0;
-    while index < input.len() {
-        if let Some(
-            [
-                TokenTree::Ident(self_type),
-                TokenTree::Punct(first),
-                TokenTree::Punct(second),
-                TokenTree::Ident(name),
-            ],
-        ) = input.get(index..index + 4)
-            && self_type == "Self"
-            && first.as_char() == ':'
-            && second.as_char() == ':'
-            && associated.contains(&name.to_string())
-        {
-            output.extend([TokenTree::Ident(Ident::new(
-                &format!("__QubitReflectAssociated{name}"),
-                name.span(),
-            ))]);
-            index += 4;
-            continue;
-        }
-        output.extend([match input[index].clone() {
-            TokenTree::Group(group) => {
-                let mut replaced = Group::new(
-                    group.delimiter(),
-                    replace_self_associated_types(group.stream(), item, declaration),
-                );
-                replaced.set_span(group.span());
-                TokenTree::Group(replaced)
-            }
-            token => token,
-        }]);
-        index += 1;
-    }
-    output
-}
-
-// Expression generation lives in `expand::expression_codegen`.
