@@ -29,13 +29,27 @@ qubit-reflect = "0.2"
 
 ## 快速开始
 
-下面通过生成的描述符定位字段，读取并替换精确类型的值。普通字段操作接受 Rust 引用和值。安全入口拒绝私有 `secret` 字段；示例明确给出 safety 理由后使用文档规定的 `_unsafe` 入口。`internal_note` 保留在 Rust 结构体中，但被 skip 后不会进入反射元数据。
+下面在类型上使用 `#[Reflect]`，在方法实现上使用 `#[ReflectImpl]`。同一个
+示例先通过类型描述符定位字段，读取并替换精确类型的值，再从注册表按名称
+找到并调用 `raise_credit_limit`。安全入口拒绝私有 `secret` 字段；示例明确
+给出 safety 理由后使用文档规定的 `_unsafe` 入口。`internal_note` 保留在
+Rust 结构体中，但被 skip 后不会进入反射元数据。
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
+use std::error::Error;
+use std::io;
+
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectRegistry;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::access::FieldAccessError;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Customer {
@@ -47,9 +61,23 @@ struct Customer {
     internal_note: String,
 }
 
-/// Runs the example and panics if a business assertion or reflection operation
-/// fails.
-fn main() {
+#[ReflectImpl]
+impl Customer {
+    /// Raises the credit limit, returning false when the requested limit is not
+    /// greater than the current one.
+    pub fn raise_credit_limit(&mut self, credit_limit_cents: u64) -> bool {
+        if credit_limit_cents <= self.credit_limit_cents {
+            return false;
+        }
+        self.credit_limit_cents = credit_limit_cents;
+        true
+    }
+}
+
+/// Runs the example, returning reflection setup and operation failures to the
+/// caller.
+fn main() -> Result<(), Box<dyn Error>> {
+    let registry = ReflectRegistry::initialize()?;
     let descriptor = TypeDescriptor::of::<Customer>();
     let mut customer = Customer {
         id: 1001,
@@ -59,32 +87,49 @@ fn main() {
         internal_note: String::from("not reflected"),
     };
 
-    let email = descriptor.field("email").expect("derived field");
-    email
-        .set(&mut customer, String::from("ada@corp.example"))
-        .expect("exactly typed replacement");
+    let email_field = descriptor
+        .field("email")
+        .ok_or(io::Error::other("missing reflected email field"))?;
+    email_field.set(&mut customer, String::from("ada@corp.example"))?;
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current: &String = email.get(&customer).expect("shared read");
+    let current: &String = email_field.get(&customer)?;
     assert_eq!(current, "ada@corp.example");
 
-    let secret = descriptor.field("secret").expect("private field is described");
+    let secret_field = descriptor
+        .field("secret")
+        .ok_or(io::Error::other("missing reflected secret field"))?;
     assert!(matches!(
-        secret.get::<_, String>(&customer),
+        secret_field.get::<_, String>(&customer),
         Err(FieldAccessError::NotPublic { .. })
     ));
     // SAFETY: this example owns Customer and intentionally demonstrates the
     // visibility bypass.
-    assert_eq!(
-        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
-        "private"
-    );
+    assert_eq!(unsafe { secret_field.get_unsafe::<_, String>(&customer) }?, "private");
     // SAFETY: this example owns Customer and maintains the String field's type
     // invariant.
-    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    unsafe { secret_field.set_unsafe(&mut customer, String::from("updated")) }?;
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
     assert_eq!(customer.internal_note, "not reflected");
+
+    let MethodLookup::Unique(raise_credit_limit) = descriptor.methods_named_in(registry, "raise_credit_limit") else {
+        return Err(io::Error::other("expected exactly one method named raise_credit_limit").into());
+    };
+    {
+        let invocation = Invocation::receiver_mut(&mut customer).arg(75_000_u64);
+        let output = raise_credit_limit
+            .invoke(registry, invocation)
+            .map_err(|failure| io::Error::other(failure.to_string()))?;
+        let InvocationOutput::Owned(changed) = output else {
+            return Err(io::Error::other("raise_credit_limit did not return an owned value").into());
+        };
+        let changed = DynamicOwned::<Local>::downcast::<bool>(changed)
+            .map_err(|_| io::Error::other("raise_credit_limit did not return bool"))?;
+        assert!(changed);
+    }
+    assert_eq!(customer.credit_limit_cents, 75_000);
+    Ok(())
 }
 ```
 
@@ -113,7 +158,10 @@ cargo run --example support_action
 
 ### 反射方法与实现块
 
-需要反射方法时，用 `#[ReflectImpl]` 标注 `impl` 块，启动时初始化一次 `ReflectRegistry`，再使用选定的注册表按名称查找并调用受支持的方法。[`examples/support_action.rs`](examples/support_action.rs) 展示完整调用；[用户手册](doc/user_guide.zh_CN.md#按名称调用业务方法)解释查找结果、调用错误和输入恢复。要描述 trait 声明，使用 `#[Reflect]`；其实现仍由 `#[ReflectImpl]` 标注。
+上面的快速开始展示了 inherent impl。描述 trait 声明时使用 `#[Reflect]`，
+其实现仍由 `#[ReflectImpl]` 标注。[`examples/support_action.rs`](examples/support_action.rs)
+提供另一份可运行的方法调用场景；[方法调用指南](doc/user_guide.zh_CN.md#按名称调用业务方法)
+进一步解释查找结果、调用错误和输入恢复。
 
 ## 能力与边界
 
