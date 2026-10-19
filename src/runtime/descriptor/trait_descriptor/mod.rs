@@ -3,11 +3,12 @@
 mod descriptor;
 mod metadata;
 
+pub use descriptor::{TraitDescriptor, TraitExpressionDescriptor};
 pub(crate) use descriptor::{
     AssociatedConstDefinitionDescriptor, AssociatedConstDefinitions,
     AssociatedTypeDefinitionDescriptor, AssociatedTypeDefinitions, MethodDefinitionDescriptor,
     MethodDefinitionOwner, MethodDefinitions, TraitDefinitionDescriptor, TraitDefinitions,
-    TraitDescriptor, TraitExpressionDescriptor, TraitExpressions, Traits,
+    TraitExpressions, Traits,
 };
 pub(crate) use metadata::TraitDefinitionId;
 pub use metadata::{

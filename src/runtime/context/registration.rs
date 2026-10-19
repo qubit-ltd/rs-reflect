@@ -72,6 +72,38 @@ pub struct Registration {
     trait_applications: Vec<&'static TraitApplicationMetadata>,
     impl_applications: Vec<&'static ImplApplicationMetadata>,
     construction_plans: Vec<&'static ConstructionPlan>,
+    trait_objects: Vec<TraitObjectRegistration>,
+}
+
+/// A compiler-checked trait-object type recorded in a reflection context.
+#[derive(Clone, Copy)]
+pub struct TraitObjectRegistration {
+    type_id: fn() -> TypeId,
+    rust_name: fn() -> &'static str,
+    trait_path: &'static str,
+}
+
+impl TraitObjectRegistration {
+    /// Creates a registration bound to the exact Rust trait-object type `T`.
+    pub const fn of<T: ?Sized + 'static>(trait_path: &'static str) -> Self {
+        Self {
+            type_id: TypeId::of::<T>,
+            rust_name: std::any::type_name::<T>,
+            trait_path,
+        }
+    }
+
+    pub(crate) fn type_id(self) -> TypeId {
+        (self.type_id)()
+    }
+
+    pub(crate) fn rust_name(self) -> &'static str {
+        (self.rust_name)()
+    }
+
+    pub(crate) const fn trait_path(self) -> &'static str {
+        self.trait_path
+    }
 }
 
 /// A generic definition registration whose process-local identity is bound to `T`.
@@ -128,6 +160,7 @@ impl Registration {
             trait_applications: Vec::new(),
             impl_applications: Vec::new(),
             construction_plans: reflect_registration.construction_plans().iter().collect(),
+            trait_objects: Vec::new(),
         }
     }
 
@@ -152,6 +185,7 @@ impl Registration {
             trait_applications: Vec::new(),
             impl_applications: Vec::new(),
             construction_plans: Vec::new(),
+            trait_objects: Vec::new(),
         }
     }
 
@@ -182,6 +216,12 @@ impl Registration {
         self
     }
 
+    /// Associates a compiler-checked trait object with this registration.
+    pub fn with_trait_object(mut self, registration: TraitObjectRegistration) -> Self {
+        self.trait_objects.push(registration);
+        self
+    }
+
     pub(crate) fn type_definitions(&self) -> &[&'static TypeDefinitionMetadata] {
         &self.type_definitions
     }
@@ -196,6 +236,10 @@ impl Registration {
 
     pub(crate) fn impl_definitions(&self) -> &[&'static ImplDefinitionMetadata] {
         &self.impl_definitions
+    }
+
+    pub(crate) fn trait_objects(&self) -> &[TraitObjectRegistration] {
+        &self.trait_objects
     }
 
     pub(crate) fn with_capability(mut self, registration: CapabilityRegistration) -> Self {

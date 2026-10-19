@@ -10,10 +10,12 @@ use crate::runtime::descriptor::impl_descriptor::{
     ImplDefinitionDescriptor, ImplDefinitionId, ImplDescriptor,
 };
 use crate::runtime::descriptor::trait_descriptor::{
-    TraitDefinitionDescriptor, TraitDefinitionId, TraitDescriptor,
+    TraitCompleteness, TraitDefinitionDescriptor, TraitDefinitionId, TraitDescriptor,
+    TraitDefinitionMetadata,
 };
 use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 use crate::runtime::descriptor::TypeDescriptor;
+use crate::runtime::context::handle::registration::TraitObjectRegistration;
 use crate::runtime::error::ContextError;
 use crate::runtime::error::LookupError;
 use crate::runtime::error::LookupQuery;
@@ -55,12 +57,109 @@ pub struct ReflectionContext {
     state: ContextState,
 }
 
+/// Context-bound description of one registered Rust trait-object type.
+#[derive(Clone, Copy)]
+pub struct TraitObjectDescriptor<'ctx> {
+    registration: TraitObjectRegistration,
+    _context: std::marker::PhantomData<&'ctx ReflectionContext>,
+}
+
+/// Context-bound declaration facts for one marker-identified trait.
+#[derive(Clone, Copy)]
+pub struct RegisteredTraitDescriptor<'ctx> {
+    metadata: &'static TraitDefinitionMetadata,
+    _context: std::marker::PhantomData<&'ctx ReflectionContext>,
+}
+
+impl RegisteredTraitDescriptor<'_> {
+    /// Returns the source trait path retained by the registration.
+    pub const fn path(self) -> &'static str {
+        self.metadata.path
+    }
+
+    /// Returns the declared trait name retained by the registration.
+    pub const fn name(self) -> &'static str {
+        self.metadata.name
+    }
+
+    /// Returns whether complete source metadata is available.
+    pub const fn completeness(self) -> TraitCompleteness {
+        self.metadata.completeness
+    }
+}
+
+impl TraitObjectDescriptor<'_> {
+    /// Returns the source path supplied when the trait object was registered.
+    pub const fn trait_path(self) -> &'static str {
+        self.registration.trait_path()
+    }
+
+    /// Returns Rust's compiler-provided type name for the registered object.
+    /// Returns Rust's compiler-provided type name for the registered object.
+    pub fn rust_type_name(self) -> &'static str {
+        self.registration.rust_name()
+    }
+}
+
 enum ContextState {
     Explicit(Arc<ContextData>),
     Global(&'static GlobalContext),
 }
 
 impl ReflectionContext {
+    /// Looks up a trait declaration by its opaque marker identity.
+    pub fn trait_definition_for<D: 'static>(
+        &self,
+    ) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
+        Ok(self
+            .data()?
+            .trait_definition(TraitDefinitionId::of::<D>())
+            .map(|metadata| RegisteredTraitDescriptor {
+                metadata,
+                _context: std::marker::PhantomData,
+            }))
+    }
+
+    /// Looks up a uniquely registered incomplete external trait by source path.
+    pub fn external_trait_definition(
+        &self,
+        path: &str,
+    ) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
+        Ok(self
+            .external_trait_definition_by_path(path)?
+            .map(|metadata| RegisteredTraitDescriptor {
+                metadata,
+                _context: std::marker::PhantomData,
+            }))
+    }
+
+    /// Returns retained trait applications whose original source path matches exactly.
+    ///
+    /// Applications without a registered identity handle remain queryable and report
+    /// [`TraitCompleteness::ExternalIncomplete`] through their descriptors.
+    pub fn trait_applications_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Box<[TraitDescriptor<'_>]>, ContextError> {
+        Ok(self
+            .data()?
+            .trait_applications_by_path(path)
+            .iter()
+            .map(|metadata| TraitDescriptor::new(metadata, self))
+            .collect())
+    }
+
+    /// Looks up a compiler-checked registered trait-object type.
+    pub fn trait_object<T: ?Sized + 'static>(
+        &self,
+    ) -> Result<Option<TraitObjectDescriptor<'_>>, ContextError> {
+        Ok(self.data()?.trait_object(TypeId::of::<T>()).map(|registration| {
+            TraitObjectDescriptor {
+                registration,
+                _context: std::marker::PhantomData,
+            }
+        }))
+    }
     pub fn global() -> &'static Self {
         global::global_context()
     }
@@ -232,6 +331,23 @@ impl ReflectionContext {
             .data()?
             .trait_definition(id)
             .map(|metadata| TraitDefinitionDescriptor::new(metadata, self)))
+    }
+
+    pub(crate) fn external_trait_definition_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<&'static TraitDefinitionMetadata>, ContextError> {
+        Ok(self
+            .data()?
+            .trait_definition_by_path(path)
+            .filter(|metadata| metadata.completeness == TraitCompleteness::ExternalIncomplete))
+    }
+
+    pub(crate) fn trait_definition_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<&'static TraitDefinitionMetadata>, ContextError> {
+        Ok(self.data()?.trait_definition_by_path(path))
     }
 
     pub(crate) fn impl_definition(

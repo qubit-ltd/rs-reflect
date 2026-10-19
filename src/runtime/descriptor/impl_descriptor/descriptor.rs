@@ -24,7 +24,7 @@ use super::metadata::{
 
 /// Context-bound view of an `impl` source declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct ImplDefinitionDescriptor<'ctx> {
+pub struct ImplDefinitionDescriptor<'ctx> {
     metadata: &'static ImplDefinitionMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -48,7 +48,7 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
     pub(crate) fn target(self) -> TypeExpression<'ctx> {
         TypeExpression::new(self.metadata.target, self.context)
     }
-    pub(crate) fn implemented_trait(self) -> Option<TraitExpressionDescriptor<'ctx>> {
+    pub fn implemented_trait(self) -> Option<TraitExpressionDescriptor<'ctx>> {
         self.metadata
             .implemented_trait
             .map(|metadata| TraitExpressionDescriptor::new(metadata, self.context))
@@ -123,7 +123,7 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
 
 /// Context-bound view of one compiled `impl` application.
 #[derive(Clone, Copy)]
-pub(crate) struct ImplDescriptor<'ctx> {
+pub struct ImplDescriptor<'ctx> {
     metadata: &'static ImplApplicationMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -147,7 +147,7 @@ impl<'ctx> ImplDescriptor<'ctx> {
     pub(crate) fn target(self) -> TypeDescriptor<'ctx> {
         TypeDescriptor::new((self.metadata.target)(), self.context)
     }
-    pub(crate) fn implemented_trait(self) -> Option<TraitDescriptor<'ctx>> {
+    pub fn implemented_trait(self) -> Option<TraitDescriptor<'ctx>> {
         self.metadata
             .implemented_trait
             .map(|metadata| TraitDescriptor::new(metadata, self.context))
@@ -302,7 +302,11 @@ impl<'ctx> Impls<'ctx> {
         let mut matches = self.values.iter().copied().filter(|implementation| {
             implementation
                 .implemented_trait()
-                .is_some_and(|trait_| trait_.definition().id() == definition.id())
+                .is_some_and(|trait_| {
+                    trait_
+                        .find_definition()
+                        .is_some_and(|linked| linked.id() == definition.id())
+                })
         });
         let Some(first) = matches.next() else {
             return Ok(Lookup::Missing);

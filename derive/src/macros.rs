@@ -9,11 +9,16 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
+use quote::format_ident;
 use quote::quote;
 use syn::Item;
 use syn::ItemEnum;
 use syn::ItemStruct;
 use syn::parse2;
+use syn::spanned::Spanned;
+use syn::parse::Parse;
+use syn::parse::ParseStream;
+use syn::Token;
 
 use crate::configure;
 use crate::entry;
@@ -30,6 +35,128 @@ pub fn bind_method(input: TokenStream) -> TokenStream {
 /// Parses and expands a linked method binding registration.
 pub fn register_method_binding(input: TokenStream) -> TokenStream {
     match crate::expand::bind_method::expand_registered(input.into()) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+struct ExternalTraitInput {
+    visibility: syn::Visibility,
+    marker: syn::Ident,
+    path: syn::Path,
+}
+
+impl Parse for ExternalTraitInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let visibility = input.parse()?;
+        let marker = input.parse()?;
+        input.parse::<Token![=]>()?;
+        let path = input.parse()?;
+        input.parse::<Token![;]>()?;
+        if !input.is_empty() {
+            return Err(input.error("unexpected tokens after external trait declaration"));
+        }
+        Ok(Self { visibility, marker, path })
+    }
+}
+
+/// Expands a typed marker and linked identity registration for an external trait.
+pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
+    let result: syn::Result<TokenStream2> = (|| {
+        let input: ExternalTraitInput = parse2(input.into())?;
+        let context = crate::expand::ExpansionContext::from_attributes(&[])?;
+        let facade = context.facade();
+        let ExternalTraitInput { visibility, marker, path } = input;
+        let source_path = path
+            .segments
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+        let source_path = if path.leading_colon.is_some() {
+            format!("::{source_path}")
+        } else {
+            source_path
+        };
+        let source = syn::LitStr::new(&source_path, path.span());
+        let fingerprint = context.fingerprint(&source_path);
+        let marker_provider =
+            format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
+        Ok(quote! {
+            #[doc(hidden)]
+            #visibility struct #marker;
+
+            impl #marker {
+                #[doc(hidden)]
+                pub fn __qubit_reflect_trait_definition()
+                    -> &'static #facade::__private::codegen_v4::traits::TraitDefinitionSpec<Self>
+                {
+                    #marker_provider()
+                }
+            }
+
+            #[doc(hidden)]
+            fn #marker_provider()
+                -> &'static #facade::__private::codegen_v4::traits::TraitDefinitionSpec<#marker>
+            {
+                static VALUE: ::std::sync::OnceLock<
+                    #facade::__private::codegen_v4::traits::TraitDefinitionSpec<#marker>
+                > = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(||
+                    #facade::__private::codegen_v4::traits::external_trait_definition::<#marker>(
+                        stringify!(#marker), #source,
+                    )
+                )
+            }
+
+            const _: () = {
+                fn registration() -> #facade::__private::codegen_v4::registration::Registration {
+                    #facade::__private::codegen_v4::traits::register_trait_definition_from::<#marker>(
+                        #marker_provider,
+                    )
+                }
+                #facade::__private::__inventory::submit! {
+                    #facade::__private::codegen_v4::traits::trait_definition_fragment(
+                        concat!(module_path!(), "::", stringify!(#marker)), registration,
+                    )
+                }
+            };
+        })
+    })();
+    match result {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+/// Expands a compiler-checked trait-object registration fragment.
+pub fn register_trait_object(input: TokenStream) -> TokenStream {
+    let result: syn::Result<TokenStream2> = (|| {
+        let object: syn::Type = parse2(input.into())?;
+        if !matches!(object, syn::Type::TraitObject(_)) {
+            return Err(syn::Error::new_spanned(object, "expected a trait object such as `dyn Trait`"));
+        }
+        let facade = crate::expand::ExpansionContext::from_attributes(&[])?;
+        let facade = facade.facade();
+        Ok(quote! {
+            const _: () = {
+                fn registration() -> #facade::__private::codegen_v4::registration::Registration {
+                    #facade::__private::codegen_v4::registration::Registration::metadata_only()
+                        .with_trait_object(
+                            #facade::__private::codegen_v4::registration::TraitObjectRegistration::of::<#object>(
+                                stringify!(#object),
+                            ),
+                        )
+                }
+                #facade::__private::__inventory::submit! {
+                    #facade::__private::codegen_v4::registration::trait_object_fragment(
+                        concat!(module_path!(), "::", stringify!(#object)), registration,
+                    )
+                }
+            };
+        })
+    })();
+    match result {
         Ok(tokens) => tokens.into(),
         Err(error) => error.into_compile_error().into(),
     }

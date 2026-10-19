@@ -91,7 +91,8 @@ pub struct TraitExpressionMetadata {
 /// One concrete, target-independent application of a trait.
 #[derive(Clone, Copy)]
 pub struct TraitApplicationMetadata {
-    pub(crate) definition: &'static TraitDefinitionMetadata,
+    pub(crate) definition: Option<&'static TraitDefinitionMetadata>,
+    pub(crate) expression: Option<&'static TraitExpressionData>,
     pub(crate) arguments: &'static [GenericArgumentMetadata],
     pub(crate) identity: &'static [TraitArgumentIdentity],
     pub(crate) direct_supertraits: &'static [&'static TraitApplicationMetadata],
@@ -110,12 +111,30 @@ impl TraitApplicationMetadata {
         supertrait_completeness: SupertraitCompleteness,
     ) -> Self {
         Self {
-            definition,
+            definition: Some(definition),
+            expression: None,
             arguments,
             identity,
             direct_supertraits,
             all_supertraits,
             supertrait_completeness,
+        }
+    }
+
+    /// Creates an application whose trait definition is resolved by source path in its context.
+    pub const fn unresolved(
+        expression: &'static TraitExpressionData,
+        arguments: &'static [GenericArgumentMetadata],
+        identity: &'static [TraitArgumentIdentity],
+    ) -> Self {
+        Self {
+            definition: None,
+            expression: Some(expression),
+            arguments,
+            identity,
+            direct_supertraits: &[],
+            all_supertraits: &[],
+            supertrait_completeness: SupertraitCompleteness::Incomplete,
         }
     }
 }

@@ -54,6 +54,18 @@ pub fn register_method_binding(input: TokenStream) -> TokenStream {
     macros::register_method_binding(input)
 }
 
+/// Defines an opaque identity handle for an external trait declaration.
+#[proc_macro]
+pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
+    macros::reflect_external_trait(input)
+}
+
+/// Registers a compiler-checked Rust trait-object type in linked contexts.
+#[proc_macro]
+pub fn register_trait_object(input: TokenStream) -> TokenStream {
+    macros::register_trait_object(input)
+}
+
 #[proc_macro_derive(
     ConfiguredReflection,
     attributes(

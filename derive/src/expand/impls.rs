@@ -20,7 +20,6 @@ use specialization_codegen::typed_extension_receiver_type;
 
 use crate::expand::ExpansionContext;
 use crate::expand::generic_environment::GenericEnvironment;
-use crate::ir::HelperValueIr;
 use crate::ir::ImplDeclarationIr;
 use crate::ir::MethodIr;
 use crate::ir::ParameterPatternKindIr;
@@ -262,7 +261,7 @@ fn expand_generic_impl_definition(
         super::traits::generic_definition(&declaration.generics, declaration.span, facade);
     let target_source = syn::LitStr::new(&declaration.target_type.source, declaration.span);
     let namespace = if let Some(path) = &declaration.trait_path {
-        let trait_name = syn::LitStr::new(&path.source, declaration.span);
+        let trait_name = syn::LitStr::new(&trait_source_path(path), declaration.span);
         quote!(#codegen::invoke::MethodNamespaceMetadata::Trait {
             trait_: #trait_name,
             implementation: #target_source,
@@ -441,7 +440,7 @@ fn expand_concrete_impl(
     let implementation_name = syn::LitStr::new(&declaration.target_type.source, declaration.span);
     let namespace = match &declaration.trait_path {
         Some(path) => {
-            let trait_name = syn::LitStr::new(&path.source, declaration.span);
+            let trait_name = syn::LitStr::new(&trait_source_path(path), declaration.span);
             quote!(#codegen::invoke::MethodNamespaceMetadata::Trait {
                 trait_: #trait_name,
                 implementation: #implementation_name,
@@ -497,14 +496,10 @@ fn expand_concrete_impl(
     } else {
         quote!(#codegen::impls::Kind::Inherent)
     };
-    let is_external_trait = declaration
-        .attributes
-        .iter()
-        .any(|attribute| matches!(attribute.value, HelperValueIr::ExternalTraitId(_)));
     let trait_definition_provider = declaration
         .trait_path
         .as_ref()
-        .filter(|_| !is_external_trait)
+        .filter(|_| false)
         .map(|path| {
             let mut provider_path: syn::Path =
                 syn::parse2(path.tokens.clone()).expect("validated trait path parses");
@@ -518,7 +513,7 @@ fn expand_concrete_impl(
     let trait_marker_path = declaration
         .trait_path
         .as_ref()
-        .filter(|_| !is_external_trait)
+        .filter(|_| false)
         .map(|path| {
             let mut marker_path: syn::Path =
                 syn::parse2(path.tokens.clone()).expect("validated trait path parses");
@@ -586,27 +581,21 @@ fn expand_concrete_impl(
         || quote!(::std::vec::Vec::<#codegen::invoke::EffectiveMethod>::new().into_boxed_slice()),
         |provider| quote!(#provider #trait_default_provider_arguments(&[#(#overridden_method_names),*])),
     );
-    let (trait_application_arguments, trait_argument_identity) = declaration
+    let trait_argument_identity = declaration
         .trait_path
         .as_ref()
         .and_then(|path| path.segments.last())
         .map(|segment| {
-            let mut arguments = Vec::new();
             let mut identity = Vec::new();
             if let crate::ir::PathArgumentsIr::AngleBracketed(source_arguments) = &segment.arguments {
-                for (index, argument) in source_arguments.iter().enumerate() {
+                for argument in source_arguments {
                     match argument {
                         crate::ir::PathArgumentIr::Type(ty) => {
-                            let parameter = quote!(definition.generic_parameter_at(#index));
-                            let expression = super::traits::type_expression(ty, &environment, &facade);
                             let concrete_type = ty.tokens.clone();
-                            arguments.push(quote!(#codegen::expression::GenericArgumentMetadata::type_argument::<#concrete_type>(#parameter, #expression)));
                             identity.push(quote!(#codegen::traits::ArgumentIdentity::type_argument::<#concrete_type>()));
                         }
                         crate::ir::PathArgumentIr::Const(value) => {
                             let value = super::expression_codegen::const_expression(value, &environment, &facade);
-                            let parameter = quote!(definition.generic_parameter_at(#index));
-                            arguments.push(quote!(#codegen::expression::GenericArgumentMetadata::const_argument(#parameter, #value)));
                             identity.push(quote!(#codegen::traits::ArgumentIdentity::const_argument(#value)));
                         }
                         crate::ir::PathArgumentIr::Lifetime(value) => {
@@ -617,39 +606,43 @@ fn expand_concrete_impl(
                     }
                 }
             }
-            (arguments, identity)
+            identity
         })
         .unwrap_or_default();
-    let trait_application_provider = match (
-        trait_definition_provider.as_ref(),
-        trait_marker_path.as_ref(),
-    ) {
-        (Some(provider), Some(trait_marker)) => Some(quote! {
+    let trait_application_provider = declaration.trait_path.as_ref().map(|path| {
+        let trait_path = syn::LitStr::new(&trait_source_path(path), path.span);
+        let expression_args = path.segments.iter().flat_map(|segment| {
+            super::expression_codegen::path_arguments(
+                &segment.arguments,
+                &environment,
+                &facade,
+                path.span,
+            )
+        });
+        quote! {
             fn trait_application_provider() -> &'static #codegen::traits::TraitApplicationSpec<#target> {
                 static VALUE: ::std::sync::OnceLock<#codegen::traits::TraitApplicationSpec<#target>> = ::std::sync::OnceLock::new();
                 VALUE.get_or_init(|| {
-                    let definition = #provider();
-                    let arguments = ::std::boxed::Box::leak(::std::vec![#(#trait_application_arguments),*].into_boxed_slice());
+                    let expression = ::std::boxed::Box::leak(::std::boxed::Box::new(
+                        #codegen::expression::TraitExpressionData::new(
+                            #trait_path,
+                            ::std::boxed::Box::leak(::std::vec![#(#expression_args),*].into_boxed_slice()),
+                            &[],
+                        ),
+                    ));
                     let identity = ::std::boxed::Box::leak(::std::vec![#(#trait_argument_identity),*].into_boxed_slice());
-                    #codegen::traits::TraitApplicationSpec::for_target::<#trait_marker>(
-                        definition,
-                        arguments,
+                    #codegen::traits::TraitApplicationSpec::<#target>::unresolved_for_target(
+                        expression,
+                        &[],
                         identity,
-                        &[],
-                        &[],
-                        #codegen::traits::SupertraitStatus::Incomplete,
                     )
                 })
             }
-        }),
-        _ => None,
-    };
-    let implemented_trait = match (
-        trait_definition_provider.as_ref(),
-        declaration.trait_path.as_ref(),
-    ) {
-        (Some(provider), Some(path)) => {
-            let name = syn::LitStr::new(&path.source, path.span);
+        }
+    });
+    let implemented_trait = match declaration.trait_path.as_ref() {
+        Some(path) => {
+            let name = syn::LitStr::new(&trait_source_path(path), path.span);
             let expression_args = path.segments.iter().flat_map(|segment| {
                 super::expression_codegen::path_arguments(
                     &segment.arguments,
@@ -666,7 +659,7 @@ fn expand_concrete_impl(
                 ),
             )));
             quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
-                #codegen::traits::trait_expression_for(#expression, #provider()),
+                #codegen::traits::unresolved_trait_expression(#expression),
             ))))
         }
         _ => quote!(None),
@@ -899,6 +892,19 @@ fn expand_concrete_impl(
         }
     };
     super::invocation::emit::rewrite_codegen_paths(tokens)
+}
+
+fn trait_source_path(path: &crate::ir::PathIr) -> String {
+    let mut source = path
+        .segments
+        .iter()
+        .map(|segment| segment.name.as_str())
+        .collect::<Vec<_>>()
+        .join("::");
+    if path.leading_colon {
+        source.insert_str(0, "::");
+    }
+    source
 }
 
 // Generic specialization generation lives in `impls::specialization_codegen`.

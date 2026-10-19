@@ -28,7 +28,7 @@ use crate::runtime::identity::{
 };
 
 use super::indexes::ContextIndexes;
-use super::registration::{Registration, TypeRecord};
+use super::registration::{Registration, TraitObjectRegistration, TypeRecord};
 
 pub(crate) struct ContextData {
     pub(crate) types: Box<[TypeRecord]>,
@@ -41,8 +41,10 @@ pub(crate) struct ContextData {
     capabilities: HashMap<CapabilityTargetId, Arc<Capabilities>>,
     type_instances: HashMap<TypeDefinitionId, Box<[TypeId]>>,
     trait_applications: HashMap<TraitDefinitionId, Box<[&'static TraitApplicationMetadata]>>,
+    trait_applications_by_path: HashMap<&'static str, Box<[&'static TraitApplicationMetadata]>>,
     impl_applications: HashMap<ImplDefinitionId, Box<[&'static ImplApplicationMetadata]>>,
     construction_plans: HashMap<TypeId, Box<[&'static ConstructionPlan]>>,
+    trait_objects: HashMap<TypeId, TraitObjectRegistration>,
 }
 
 impl ContextData {
@@ -58,8 +60,10 @@ impl ContextData {
             capabilities: HashMap::new(),
             type_instances: HashMap::new(),
             trait_applications: HashMap::new(),
+            trait_applications_by_path: HashMap::new(),
             impl_applications: HashMap::new(),
             construction_plans: HashMap::new(),
+            trait_objects: HashMap::new(),
         }
     }
 
@@ -74,21 +78,40 @@ impl ContextData {
         let mut impl_definitions = HashMap::new();
         let mut capability_registrations = Vec::<CapabilityRegistration>::new();
         let mut type_instances = HashMap::<TypeDefinitionId, Vec<TypeId>>::new();
+        let mut trait_applications_pending = Vec::<&'static TraitApplicationMetadata>::new();
         let mut trait_applications =
             HashMap::<TraitDefinitionId, Vec<&'static TraitApplicationMetadata>>::new();
+        let mut trait_applications_by_path =
+            HashMap::<&'static str, Vec<&'static TraitApplicationMetadata>>::new();
         let mut impl_applications =
             HashMap::<ImplDefinitionId, Vec<&'static ImplApplicationMetadata>>::new();
         let mut impl_application_origins =
             Vec::<(&'static ImplApplicationMetadata, RegistrationOrigin)>::new();
         let mut registered_shapes = HashMap::<TypeId, &'static TypeKindMetadata>::new();
         let mut construction_plans = HashMap::<TypeId, Vec<&'static ConstructionPlan>>::new();
+        let mut trait_objects = HashMap::<TypeId, TraitObjectRegistration>::new();
         let mut type_definition_origins =
             HashMap::<TypeDefinitionId, Vec<RegistrationOrigin>>::new();
         let mut trait_definition_origins =
             HashMap::<TraitDefinitionId, Vec<RegistrationOrigin>>::new();
+        let mut trait_definition_ids_by_path = HashMap::<&'static str, TraitDefinitionId>::new();
         let mut impl_definition_origins =
             HashMap::<ImplDefinitionId, Vec<RegistrationOrigin>>::new();
         for mut registration in registrations {
+            for trait_object in registration.trait_objects() {
+                let type_id = trait_object.type_id();
+                if let Some(previous) = trait_objects.insert(type_id, *trait_object) {
+                    if previous.trait_path() != trait_object.trait_path() {
+                        return Err(ContextError::from_issues(vec![ContextIssue::InvalidMetadata {
+                            item: item_identity(ItemKind::Type, trait_object.rust_name(), "trait object"),
+                            reason: MetadataValidationError::new(
+                                "trait object type has conflicting registered trait paths",
+                            ),
+                        }])
+                        .expect("one context issue is nonempty"));
+                    }
+                }
+            }
             for metadata in registration.type_definitions() {
                 let origins = type_definition_origins.entry(metadata.id).or_default();
                 origins.push(registration.origin().clone());
@@ -107,6 +130,19 @@ impl ContextData {
                 }
             }
             for metadata in registration.trait_definitions() {
+                if let Some(previous) = trait_definition_ids_by_path
+                    .insert(metadata.path, metadata.id)
+                {
+                    if previous != metadata.id {
+                        return Err(ContextError::from_issues(vec![ContextIssue::InvalidMetadata {
+                            item: item_identity(ItemKind::TraitDefinition, metadata.path, metadata.name),
+                            reason: MetadataValidationError::new(
+                                "multiple trait identity handles use the same source path",
+                            ),
+                        }])
+                        .expect("one context issue is nonempty"));
+                    }
+                }
                 let origins = trait_definition_origins.entry(metadata.id).or_default();
                 origins.push(registration.origin().clone());
                 if trait_definitions.insert(metadata.id, *metadata).is_some() {
@@ -143,6 +179,9 @@ impl ContextData {
                 }
             }
             capability_registrations.extend(registration.take_capabilities());
+            for application in registration.trait_applications() {
+                trait_applications_pending.push(*application);
+            }
             let Some(type_record) = registration.type_record() else {
                 continue;
             };
@@ -162,12 +201,6 @@ impl ContextData {
             }
             if let Some(definition) = registration.type_instance_of() {
                 type_instances.entry(definition).or_default().push(type_id);
-            }
-            for application in registration.trait_applications() {
-                trait_applications
-                    .entry(application.definition.id)
-                    .or_default()
-                    .push(*application);
             }
             for application in registration.impl_applications() {
                 let applications = impl_applications
@@ -210,6 +243,21 @@ impl ContextData {
             origins.push(registration.origin().clone());
             if origins.len() == 1 {
                 types.push(type_record);
+            }
+        }
+
+        for application in trait_applications_pending {
+            let definition = resolve_trait_application_definition(
+                application,
+                &trait_definitions,
+                &trait_definition_ids_by_path,
+            )?;
+            let path = trait_application_path(application).or_else(|| definition.map(|value| value.path));
+            if let Some(path) = path {
+                trait_applications_by_path.entry(path).or_default().push(application);
+            }
+            if let Some(definition) = definition {
+                trait_applications.entry(definition.id).or_default().push(application);
             }
         }
 
@@ -289,7 +337,13 @@ impl ContextData {
                     .iter()
                     .chain(application.all_supertraits.iter())
                 {
-                    if !trait_definitions.contains_key(&supertrait.definition.id) {
+                    let supertrait_definition = resolve_trait_application_definition(
+                        supertrait,
+                        &trait_definitions,
+                        &trait_definition_ids_by_path,
+                    )?;
+                    if let Some(supertrait_definition) = supertrait_definition {
+                    if !trait_definitions.contains_key(&supertrait_definition.id) {
                         return Err(ContextError::from_issues(vec![
                             ContextIssue::MissingDependency {
                                 item: item_identity(
@@ -299,12 +353,13 @@ impl ContextData {
                                 ),
                                 dependency: item_identity(
                                     ItemKind::TraitDefinition,
-                                    format!("{:?}", supertrait.definition.id).as_str(),
-                                    supertrait.definition.name,
+                                    format!("{:?}", supertrait_definition.id).as_str(),
+                                    supertrait_definition.name,
                                 ),
                             },
                         ])
                         .expect("one context issue is nonempty"));
+                    }
                     }
                 }
             }
@@ -343,14 +398,27 @@ impl ContextData {
                     .expect("one context issue is nonempty"),
                 );
             }
+            for application in applications {
+                if let Some(trait_application) = application.implemented_trait {
+                    resolve_trait_application_definition(
+                        trait_application,
+                        &trait_definitions,
+                        &trait_definition_ids_by_path,
+                    )?;
+                }
+            }
             if let Some(application) = applications.iter().find(|application| {
-                application
-                    .implemented_trait
-                    .is_some_and(|trait_application| {
-                        !trait_definitions.contains_key(&trait_application.definition.id)
-                    })
+                application.implemented_trait.is_some_and(|trait_application| {
+                    resolve_trait_application_definition(
+                        trait_application,
+                        &trait_definitions,
+                        &trait_definition_ids_by_path,
+                    )
+                    .is_err()
+                })
             }) {
                 let trait_application = application.implemented_trait.expect("checked above");
+                let trait_path = trait_application.expression.map_or("<unresolved trait>", |expr| expr.path);
                 return Err(
                     ContextError::from_issues(vec![ContextIssue::MissingDependency {
                         item: item_identity(
@@ -360,8 +428,8 @@ impl ContextData {
                         ),
                         dependency: item_identity(
                             ItemKind::TraitDefinition,
-                            format!("{:?}", trait_application.definition.id).as_str(),
-                            trait_application.definition.name,
+                            trait_path,
+                            trait_path,
                         ),
                     }])
                     .expect("one context issue is nonempty"),
@@ -399,13 +467,19 @@ impl ContextData {
                 );
             }
         }
-        validate_trait_impl_uniqueness(&impl_application_origins)?;
+        validate_trait_impl_uniqueness(
+            &impl_application_origins,
+            &trait_definitions,
+            &trait_definition_ids_by_path,
+        )?;
         let method_catalog_registrations: Vec<_> =
             inventory::iter::<MethodCatalogRegistration>().collect();
         let methods = aggregate_method_catalogs(
             &included_types,
             &impl_applications,
             &method_catalog_registrations,
+            &trait_definitions,
+            &trait_definition_ids_by_path,
         )?;
         let mut grouped_capabilities =
             HashMap::<CapabilityTargetId, Vec<CapabilityRegistration>>::new();
@@ -471,6 +545,10 @@ impl ContextData {
             .into_iter()
             .map(|(definition, applications)| (definition, applications.into_boxed_slice()))
             .collect();
+        let trait_applications_by_path = trait_applications_by_path
+            .into_iter()
+            .map(|(path, applications)| (path, applications.into_boxed_slice()))
+            .collect();
         let impl_applications = impl_applications
             .into_iter()
             .map(|(definition, applications)| (definition, applications.into_boxed_slice()))
@@ -491,8 +569,10 @@ impl ContextData {
             capabilities,
             type_instances,
             trait_applications,
+            trait_applications_by_path,
             impl_applications,
             construction_plans,
+            trait_objects,
         })
     }
 
@@ -532,6 +612,18 @@ impl ContextData {
         self.trait_definitions.get(&id).copied()
     }
 
+    pub(crate) fn trait_definition_by_path(
+        &self,
+        path: &str,
+    ) -> Option<&'static TraitDefinitionMetadata> {
+        let mut matches = self
+            .trait_definitions
+            .values()
+            .filter(|metadata| metadata.path == path);
+        let definition = matches.next()?;
+        matches.next().is_none().then_some(definition)
+    }
+
     pub(crate) fn impl_definition(
         &self,
         id: ImplDefinitionId,
@@ -560,6 +652,16 @@ impl ContextData {
             .unwrap_or(&[])
     }
 
+    pub(crate) fn trait_applications_by_path(
+        &self,
+        path: &str,
+    ) -> &[&'static TraitApplicationMetadata] {
+        self.trait_applications_by_path
+            .get(path)
+            .map(Box::as_ref)
+            .unwrap_or(&[])
+    }
+
     pub(crate) fn impl_applications(
         &self,
         definition: ImplDefinitionId,
@@ -575,6 +677,10 @@ impl ContextData {
             .get(&target)
             .map(Box::as_ref)
             .unwrap_or(&[])
+    }
+
+    pub(crate) fn trait_object(&self, type_id: TypeId) -> Option<TraitObjectRegistration> {
+        self.trait_objects.get(&type_id).copied()
     }
 }
 
@@ -595,26 +701,47 @@ struct MethodEntry {
 
 fn validate_trait_impl_uniqueness(
     registrations: &[(&'static ImplApplicationMetadata, RegistrationOrigin)],
+    definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
+    definitions_by_path: &HashMap<&'static str, TraitDefinitionId>,
 ) -> Result<(), ContextError> {
     for (index, (application, origin)) in registrations.iter().enumerate() {
         let Some(trait_application) = application.implemented_trait else {
             continue;
         };
         let target = (application.target)();
+        let definition = resolve_trait_application_definition(
+            trait_application,
+            definitions,
+            definitions_by_path,
+        )?;
         let duplicate_origins: Vec<_> = registrations[..index]
             .iter()
             .filter_map(|(previous, previous_origin)| {
                 let previous_trait = previous.implemented_trait?;
                 let same_target = (previous.target)().type_id() == target.type_id();
-                let same_application = previous_trait.definition.id
-                    == trait_application.definition.id
+                let previous_definition = resolve_trait_application_definition(
+                    previous_trait,
+                    definitions,
+                    definitions_by_path,
+                ).ok()?;
+                let same_trait = match (previous_definition, definition) {
+                    (Some(previous), Some(current)) => previous.id == current.id,
+                    (None, None) => trait_application_path(previous_trait)
+                        == trait_application_path(trait_application),
+                    _ => false,
+                };
+                let same_application = same_trait
                     && previous_trait.identity == trait_application.identity;
                 (same_target && same_application).then(|| previous_origin.clone())
             })
             .chain(std::iter::once(origin.clone()))
             .collect();
         if duplicate_origins.len() > 1 {
-            let definition = trait_application.definition;
+            let path = definition.map_or_else(
+                || trait_application_path(trait_application).unwrap_or("<unknown trait path>"),
+                |definition| definition.path,
+            );
+            let name = definition.map_or(path, |definition| definition.name);
             return Err(
                 ContextError::from_issues(vec![ContextIssue::DuplicateTraitImpl {
                     target: TypeIdentity {
@@ -623,8 +750,8 @@ fn validate_trait_impl_uniqueness(
                     },
                     trait_: item_identity(
                         ItemKind::TraitDefinition,
-                        definition.path,
-                        definition.name,
+                        path,
+                        name,
                     ),
                     registrations: duplicate_origins.into_boxed_slice(),
                 }])
@@ -635,10 +762,40 @@ fn validate_trait_impl_uniqueness(
     Ok(())
 }
 
+fn resolve_trait_application_definition(
+    application: &TraitApplicationMetadata,
+    definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
+    definitions_by_path: &HashMap<&'static str, TraitDefinitionId>,
+) -> Result<Option<&'static TraitDefinitionMetadata>, ContextError> {
+    let definition = application
+        .expression
+        .and_then(|expression| definitions_by_path.get(expression.path).copied())
+        .or_else(|| application.definition.map(|definition| definition.id))
+        .and_then(|id| definitions.get(&id).copied());
+    if definition.is_none() && application.definition.is_some() {
+        let definition = application.definition.expect("checked above");
+        return Err(ContextError::from_issues(vec![ContextIssue::MissingDependency {
+            item: item_identity(ItemKind::TraitApplication, definition.path, "trait application"),
+            dependency: item_identity(ItemKind::TraitDefinition, definition.path, definition.name),
+        }])
+        .expect("one context issue is nonempty"));
+    }
+    Ok(definition)
+}
+
+fn trait_application_path(application: &TraitApplicationMetadata) -> Option<&'static str> {
+    application
+        .expression
+        .map(|expression| expression.path)
+        .or_else(|| application.definition.map(|definition| definition.path))
+}
+
 fn aggregate_method_catalogs(
     included_types: &std::collections::HashSet<TypeId>,
     impl_applications: &HashMap<ImplDefinitionId, Vec<&'static ImplApplicationMetadata>>,
     catalog_registrations: &[&MethodCatalogRegistration],
+    definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
+    definitions_by_path: &HashMap<&'static str, TraitDefinitionId>,
 ) -> Result<HashMap<TypeId, Arc<[ContextEffectiveMethod]>>, ContextError> {
     let mut applications_by_target =
         HashMap::<TypeId, Vec<&'static ImplApplicationMetadata>>::new();
@@ -655,10 +812,23 @@ fn aggregate_method_catalogs(
             .or_default()
             .push(application);
         let namespace = match application.implemented_trait {
-            Some(trait_application) => MethodNamespaceKey::TraitApplication {
-                definition: trait_application.definition.id,
-                identity: trait_application.identity,
-            },
+            Some(trait_application) => {
+                let definition = resolve_trait_application_definition(
+                    trait_application,
+                    definitions,
+                    definitions_by_path,
+                )?;
+                match definition {
+                    Some(definition) => MethodNamespaceKey::TraitApplication {
+                        definition: definition.id,
+                        identity: trait_application.identity,
+                    },
+                    None => MethodNamespaceKey::TraitPath(
+                        trait_application_path(trait_application)
+                            .expect("source trait application has a path"),
+                    ),
+                }
+            }
             None => MethodNamespaceKey::Inherent,
         };
         for method in application.methods {
@@ -671,11 +841,12 @@ fn aggregate_method_catalogs(
             let namespace_matches = match (namespace, method.metadata.namespace) {
                 (MethodNamespaceKey::Inherent, MethodNamespaceMetadata::Inherent { .. }) => true,
                 (
-                    MethodNamespaceKey::TraitApplication { .. },
+                    MethodNamespaceKey::TraitApplication { .. } | MethodNamespaceKey::TraitPath(_),
                     MethodNamespaceMetadata::Trait { trait_, .. },
                 ) => application
                     .implemented_trait
-                    .is_some_and(|trait_application| trait_application.definition.path == trait_),
+                    .and_then(trait_application_path)
+                    .is_some_and(|path| path == trait_),
                 _ => false,
             };
             if !namespace_matches {
@@ -716,7 +887,7 @@ fn aggregate_method_catalogs(
                         .flatten()
                         .filter_map(|application| {
                             let trait_application = application.implemented_trait?;
-                            (trait_application.definition.path == trait_)
+                            (trait_application_path(trait_application) == Some(trait_))
                                 .then_some((application, trait_application))
                         })
                         .collect::<Vec<_>>();
@@ -737,10 +908,20 @@ fn aggregate_method_catalogs(
                     };
                     match matches.as_slice() {
                         [] => MethodNamespaceKey::TraitPath(trait_),
-                        [(_, trait_application)] => MethodNamespaceKey::TraitApplication {
-                            definition: trait_application.definition.id,
-                            identity: trait_application.identity,
-                        },
+                        [(_, trait_application)] => match resolve_trait_application_definition(
+                                trait_application,
+                                definitions,
+                                definitions_by_path,
+                            )? {
+                                Some(definition) => MethodNamespaceKey::TraitApplication {
+                                    definition: definition.id,
+                                    identity: trait_application.identity,
+                                },
+                                None => MethodNamespaceKey::TraitPath(
+                                    trait_application_path(trait_application)
+                                        .expect("source trait application has a path"),
+                                ),
+                            },
                         _ => {
                             return Err(invalid_method_metadata(
                                 *method,
@@ -893,7 +1074,7 @@ mod tests {
     use crate::runtime::descriptor::trait_descriptor::{
         TraitApplicationMetadata, TraitCompleteness, TraitDefinitionMetadata, Visibility,
     };
-    use crate::runtime::expression::ExpressionData;
+    use crate::runtime::expression::{ExpressionData, TraitExpressionData};
     use crate::runtime::invoke::{
         FunctionInvocationAdapter, Invocation, InvocationOutput, Local, ValidatedInvocation,
     };
@@ -903,6 +1084,7 @@ mod tests {
     struct ImplOne;
     struct ImplTwo;
     struct TraitMarker;
+    struct ExternalTraitMarker;
 
     impl crate::runtime::descriptor::Reflect for Target {
         fn __reflect_registration() -> &'static crate::runtime::descriptor::TypeRegistration<Self> {
@@ -917,10 +1099,39 @@ mod tests {
         &TARGET_METADATA
     }
 
+    #[test]
+    fn resolves_unlinked_trait_application_by_exact_registered_path() {
+        let registration = Registration::metadata_only()
+            .with_trait_definition(&EXTERNAL_TRAIT_DEFINITION)
+            .with_trait_application(&EXTERNAL_TRAIT_APPLICATION);
+        let context = ContextData::build(vec![registration])
+            .expect("an unresolved application links to the exact trait handle path");
+
+        let applications = context.trait_applications(TraitDefinitionId::of::<ExternalTraitMarker>());
+        assert_eq!(applications.len(), 1);
+        assert!(std::ptr::eq(applications[0], &EXTERNAL_TRAIT_APPLICATION));
+    }
+
     static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
         parameters: &[],
         predicates: &[],
     };
+    static EXTERNAL_TRAIT_DEFINITION: TraitDefinitionMetadata =
+        TraitDefinitionMetadata::new::<ExternalTraitMarker>(
+            "ExternalTrait",
+            "example :: ExternalTrait",
+            Visibility::Public,
+            TraitCompleteness::ExternalIncomplete,
+            &EMPTY_GENERICS,
+            &[],
+            &[],
+            &[],
+            &[],
+        );
+    static EXTERNAL_TRAIT_EXPRESSION: TraitExpressionData =
+        TraitExpressionData::new("example :: ExternalTrait", &[], &[]);
+    static EXTERNAL_TRAIT_APPLICATION: TraitApplicationMetadata =
+        TraitApplicationMetadata::unresolved(&EXTERNAL_TRAIT_EXPRESSION, &[], &[]);
     static SELF_EXPRESSION: ExpressionData = ExpressionData::SelfType;
     static EMPTY_RETURN: ReturnMetadata = ReturnMetadata {
         kind: ReturnKind::Unit,
@@ -1148,7 +1359,7 @@ mod tests {
     fn aggregates_inherent_methods_from_separate_impl_applications() {
         let applications = application_map(&[&IMPL_ONE, &IMPL_TWO]);
         let catalog = catalog(CATALOG_WITH_RESET);
-        let methods = aggregate_method_catalogs(&included_types(), &applications, &[&catalog])
+        let methods = aggregate_method_catalogs(&included_types(), &applications, &[&catalog], &HashMap::new(), &HashMap::new())
             .expect("distinct inherent methods aggregate");
         let methods = methods
             .get(&TypeId::of::<Target>())
@@ -1169,7 +1380,7 @@ mod tests {
     #[test]
     fn provider_catalog_is_frozen_and_its_adapter_remains_invokable() {
         let catalogs = [&PROVIDER_CATALOG];
-        let methods = aggregate_method_catalogs(&included_types(), &HashMap::new(), &catalogs)
+        let methods = aggregate_method_catalogs(&included_types(), &HashMap::new(), &catalogs, &HashMap::new(), &HashMap::new())
             .expect("provider catalog is valid");
         let target_methods = methods
             .get(&TypeId::of::<Target>())
@@ -1193,7 +1404,7 @@ mod tests {
     #[test]
     fn allows_same_method_name_in_distinct_trait_namespaces() {
         let catalog = catalog(TRAIT_METHODS);
-        let methods = aggregate_method_catalogs(&included_types(), &HashMap::new(), &[&catalog])
+        let methods = aggregate_method_catalogs(&included_types(), &HashMap::new(), &[&catalog], &HashMap::new(), &HashMap::new())
             .expect("trait namespaces are distinct");
         assert_eq!(methods[&TypeId::of::<Target>()].len(), 2);
     }
@@ -1201,7 +1412,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_method_name_in_one_inherent_namespace() {
         let applications = application_map(&[&IMPL_ONE, &CONFLICTING_IMPL]);
-        let error = match aggregate_method_catalogs(&included_types(), &applications, &[]) {
+        let error = match aggregate_method_catalogs(&included_types(), &applications, &[], &HashMap::new(), &HashMap::new()) {
             Ok(_) => panic!("duplicate inherent names reject the context"),
             Err(error) => error,
         };
@@ -1219,7 +1430,7 @@ mod tests {
     fn rejects_catalog_method_with_ambiguous_generic_trait_path() {
         let applications = application_map(&[&GENERIC_IMPL_ONE, &GENERIC_IMPL_TWO]);
         let catalog = catalog(AMBIGUOUS_TRAIT_METHODS);
-        let error = match aggregate_method_catalogs(&included_types(), &applications, &[&catalog]) {
+        let error = match aggregate_method_catalogs(&included_types(), &applications, &[&catalog], &HashMap::new(), &HashMap::new()) {
             Ok(_) => panic!("one trait path cannot select between generic applications"),
             Err(error) => error,
         };
@@ -1236,14 +1447,14 @@ mod tests {
             (&GENERIC_IMPL_ONE, origin("impl_a")),
             (&GENERIC_IMPL_TWO, origin("impl_b")),
         ];
-        validate_trait_impl_uniqueness(&distinct)
+        validate_trait_impl_uniqueness(&distinct, &HashMap::new(), &HashMap::new())
             .expect("distinct trait arguments are distinct impls");
 
         let duplicate = [
             (&GENERIC_IMPL_ONE, origin("impl_a")),
             (&DUPLICATE_GENERIC_IMPL, origin("impl_b")),
         ];
-        let error = match validate_trait_impl_uniqueness(&duplicate) {
+        let error = match validate_trait_impl_uniqueness(&duplicate, &HashMap::new(), &HashMap::new()) {
             Ok(()) => panic!("duplicate trait application rejects the context"),
             Err(error) => error,
         };

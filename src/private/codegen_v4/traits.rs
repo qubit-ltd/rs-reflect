@@ -203,6 +203,18 @@ impl<T: crate::runtime::descriptor::Reflect + 'static> TraitApplicationSpec<T> {
         }
     }
 
+    /// Creates a typed application whose definition is resolved from its exact source path.
+    pub const fn unresolved_for_target(
+        expression: &'static TraitExpressionData,
+        arguments: &'static [GenericArgumentMetadata],
+        identity: &'static [TraitArgumentIdentity],
+    ) -> Self {
+        Self {
+            metadata: TraitApplicationMetadata::unresolved(expression, arguments, identity),
+            _target: PhantomData,
+        }
+    }
+
     /// Borrows this static application metadata for an implementation binding.
     pub const fn metadata(&'static self) -> &'static TraitApplicationMetadata {
         &self.metadata
@@ -263,6 +275,26 @@ pub fn register_trait_definition_from<D: 'static>(
     definition: fn() -> &'static TraitDefinitionSpec<D>,
 ) -> crate::__private::codegen_v4::registration::Registration {
     register_trait_definition(definition())
+}
+
+/// Creates metadata for an external trait whose declaration is unavailable.
+#[doc(hidden)]
+pub fn external_trait_definition<D: 'static>(
+    name: &'static str,
+    path: &'static str,
+) -> TraitDefinitionSpec<D> {
+    static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
+    TraitDefinitionSpec::new(
+        name,
+        path,
+        Visibility::Public,
+        TraitCompleteness::ExternalIncomplete,
+        &EMPTY_GENERICS,
+        &[],
+        &[],
+        &[],
+        &[],
+    )
 }
 
 /// Builds a concrete trait application registration for target `T`.

@@ -3,10 +3,10 @@
 mod descriptor;
 mod metadata;
 
+pub use descriptor::{ImplDefinitionDescriptor, ImplDescriptor};
 pub(crate) use descriptor::{
     AssociatedConstBindingDescriptor, AssociatedConstBindings, AssociatedConstValueMode,
-    AssociatedTypeBindingDescriptor, AssociatedTypeBindings, ImplDefinitionDescriptor,
-    ImplDefinitions, ImplDescriptor, Impls, Methods,
+    AssociatedTypeBindingDescriptor, AssociatedTypeBindings, ImplDefinitions, Impls, Methods,
 };
 pub use metadata::{
     AssociatedConstBindingMetadata, AssociatedItemSource, AssociatedTypeBindingMetadata,

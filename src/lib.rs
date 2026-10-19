@@ -169,6 +169,12 @@ pub use qubit_reflect_derive::bind_method;
 /// Register one monomorphized generic method in the linked method catalog.
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::register_method_binding;
+/// Define an identity handle for an external trait.
+#[cfg(feature = "derive")]
+pub use qubit_reflect_derive::reflect_external_trait;
+/// Register a compiler-checked trait-object type.
+#[cfg(feature = "derive")]
+pub use qubit_reflect_derive::register_trait_object;
 /// Register a built-in capability for a reflected type.
 #[cfg(feature = "derive")]
 pub use __private::codegen_v4::capability::register_capability;

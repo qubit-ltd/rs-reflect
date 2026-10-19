@@ -123,7 +123,7 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
 
 /// Context-bound view of a compiled, target-independent trait application.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitDescriptor<'ctx> {
+pub struct TraitDescriptor<'ctx> {
     metadata: &'static TraitApplicationMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -138,17 +138,44 @@ impl<'ctx> TraitDescriptor<'ctx> {
     pub(crate) const fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn definition(self) -> TraitDefinitionDescriptor<'ctx> {
-        TraitDefinitionDescriptor::new(self.metadata.definition, self.context)
+    pub(crate) fn definition(self) -> Option<TraitDefinitionDescriptor<'ctx>> {
+        let definition = self.metadata.definition.or_else(|| {
+            let path = self.metadata.expression?.path;
+            self.context
+                .trait_definition_by_path(path)
+                .expect("trait application context is valid")
+        });
+        definition.map(|metadata| TraitDefinitionDescriptor::new(metadata, self.context))
     }
     pub(crate) fn arguments(self) -> GenericArguments<'ctx> {
         GenericArguments::new(self.metadata.arguments, self.context)
     }
-    pub(crate) const fn name(self) -> &'static str {
-        self.metadata.definition.name
+    pub fn name(self) -> &'static str {
+        self.find_definition().map_or_else(
+            || self.path().rsplit(" :: ").next().unwrap_or(self.path()),
+            TraitDefinitionDescriptor::name,
+        )
     }
-    pub(crate) const fn path(self) -> &'static str {
-        self.metadata.definition.path
+    pub fn path(self) -> &'static str {
+        self.metadata
+            .expression
+            .map_or_else(|| self.metadata.definition.expect("linked application").path, |expr| expr.path)
+    }
+    pub fn completeness(self) -> super::TraitCompleteness {
+        self.find_definition()
+            .map_or(super::TraitCompleteness::ExternalIncomplete, TraitDefinitionDescriptor::completeness)
+    }
+    pub(crate) fn find_definition(self) -> Option<TraitDefinitionDescriptor<'ctx>> {
+        self.metadata
+            .definition
+            .or_else(|| {
+                let path = self.metadata.expression?.path;
+                self.context
+                    .trait_definition_by_path(path)
+                    .ok()
+                    .flatten()
+            })
+            .map(|metadata| TraitDefinitionDescriptor::new(metadata, self.context))
     }
     pub(crate) fn direct_supertraits(self) -> Traits<'ctx> {
         Traits::from_metadata(self.metadata.direct_supertraits, self.context)
@@ -160,15 +187,20 @@ impl<'ctx> TraitDescriptor<'ctx> {
         self.metadata.supertrait_completeness
     }
     pub(crate) fn same_application(self, other: Self) -> bool {
+        let same_trait = match (self.find_definition(), other.find_definition()) {
+            (Some(left), Some(right)) => left.id() == right.id(),
+            (None, None) => self.path() == other.path(),
+            _ => false,
+        };
         self.context.id() == other.context.id()
-            && self.definition().id() == other.definition().id()
+            && same_trait
             && self.metadata.identity == other.metadata.identity
     }
 }
 
 /// A trait expression retained in source syntax.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitExpressionDescriptor<'ctx> {
+pub struct TraitExpressionDescriptor<'ctx> {
     metadata: &'static TraitExpressionMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -186,9 +218,19 @@ impl<'ctx> TraitExpressionDescriptor<'ctx> {
     pub(crate) fn find_definition(self) -> Option<TraitDefinitionDescriptor<'ctx>> {
         self.metadata
             .definition
+            .or_else(|| {
+                self.context
+                    .trait_definition_by_path(self.metadata.expression.path)
+                    .ok()
+                    .flatten()
+            })
             .map(|definition| TraitDefinitionDescriptor::new(definition, self.context))
     }
-    pub(crate) const fn path(self) -> &'static str {
+    pub fn completeness(self) -> super::TraitCompleteness {
+        self.find_definition()
+            .map_or(super::TraitCompleteness::ExternalIncomplete, TraitDefinitionDescriptor::completeness)
+    }
+    pub const fn path(self) -> &'static str {
         self.metadata.expression.path
     }
     pub(crate) fn arguments(
@@ -641,5 +683,67 @@ impl IntoLookupCandidate for AssociatedConstDefinitionDescriptor<'_> {
             display_name,
             origin: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod external_identity_tests {
+    use super::{TraitDescriptor, TraitExpressionDescriptor};
+    use crate::runtime::context::ReflectionContext;
+    use crate::runtime::context::handle::data::ContextData;
+    use crate::runtime::context::handle::registration::Registration;
+    use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
+    use crate::runtime::descriptor::trait_descriptor::{
+        TraitApplicationMetadata, TraitCompleteness, TraitDefinitionMetadata,
+        TraitExpressionMetadata, Visibility,
+    };
+    use crate::runtime::expression::TraitExpressionData;
+
+    struct ExternalDisplay;
+
+    static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
+    static DEFINITION: TraitDefinitionMetadata = TraitDefinitionMetadata::new::<ExternalDisplay>(
+        "Display",
+        "std :: fmt :: Display",
+        Visibility::Public,
+        TraitCompleteness::ExternalIncomplete,
+        &GENERICS,
+        &[],
+        &[],
+        &[],
+        &[],
+    );
+    static EXPRESSION: TraitExpressionData =
+        TraitExpressionData::new("std :: fmt :: Display", &[], &[]);
+    static UNRESOLVED: TraitExpressionMetadata = TraitExpressionMetadata::unresolved(&EXPRESSION);
+    static UNREGISTERED_EXPRESSION: TraitExpressionData =
+        TraitExpressionData::new("std :: fmt :: Debug", &[], &[]);
+    static UNREGISTERED_APPLICATION: TraitApplicationMetadata =
+        TraitApplicationMetadata::unresolved(&UNREGISTERED_EXPRESSION, &[], &[]);
+
+    #[test]
+    fn unresolved_impl_trait_expression_resolves_through_external_handle_path() {
+        let registration = Registration::metadata_only().with_trait_definition(&DEFINITION);
+        let context = ReflectionContext::from_data(
+            ContextData::build(vec![registration]).expect("valid external trait registration"),
+        );
+        let expression = TraitExpressionDescriptor::new(&UNRESOLVED, &context);
+
+        let definition = expression
+            .find_definition()
+            .expect("external handle path resolves to its marker definition");
+        assert_eq!(definition.name(), "Display");
+        assert_eq!(definition.path(), "std :: fmt :: Display");
+        assert_eq!(definition.completeness(), TraitCompleteness::ExternalIncomplete);
+    }
+
+    #[test]
+    fn unregistered_external_application_remains_incomplete_with_its_source_path() {
+        let context = ReflectionContext::from_data(ContextData::empty());
+        let application = TraitDescriptor::new(&UNREGISTERED_APPLICATION, &context);
+
+        assert_eq!(application.path(), "std :: fmt :: Debug");
+        assert_eq!(application.completeness(), TraitCompleteness::ExternalIncomplete);
+        assert!(application.find_definition().is_none());
     }
 }

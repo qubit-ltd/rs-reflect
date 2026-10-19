@@ -232,7 +232,8 @@ static TRAIT_DEFINITION: TraitDefinitionMetadata = TraitDefinitionMetadata {
     associated_consts: ASSOCIATED_CONSTS,
 };
 static STRING_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
-    definition: &TRAIT_DEFINITION,
+    definition: Some(&TRAIT_DEFINITION),
+    expression: None,
     arguments: STRING_ARGUMENTS,
     identity: STRING_IDENTITY,
     direct_supertraits: &[],
@@ -241,7 +242,8 @@ static STRING_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
         crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
 };
 static U64_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
-    definition: &TRAIT_DEFINITION,
+    definition: Some(&TRAIT_DEFINITION),
+    expression: None,
     arguments: U64_ARGUMENTS,
     identity: U64_IDENTITY,
     direct_supertraits: &[],
