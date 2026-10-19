@@ -1,7 +1,7 @@
 use std::any::TypeId;
 use std::collections::HashSet;
 
-use crate::runtime::error::ContextError;
+use crate::runtime::error::{ContextError, ContextIssue};
 
 use super::indexes::ContextIndexes;
 use super::registration::{Registration, TypeRecord};
@@ -28,10 +28,12 @@ impl ContextData {
             let type_record = registration.type_record();
             let type_id = type_record.type_id();
             if !seen.insert(type_id) {
-                return Err(ContextError::new(format!(
-                    "multiple registrations claim Rust type {}",
-                    type_record.rust_name(),
-                )));
+                let issue = ContextIssue::DuplicateTypeIdentity {
+                    type_id,
+                    registrations: Box::new([]),
+                };
+                return Err(ContextError::from_issues(vec![issue].into_boxed_slice())
+                    .expect("one issue was provided"));
             }
             types.push(type_record);
         }

@@ -102,7 +102,11 @@ fn duplicate_type_registration_fails_without_publishing_a_context() {
         .err()
         .expect("duplicate type registration fails");
 
-    assert!(error.message().contains("multiple registrations"));
+    assert!(matches!(
+        error.primary_issue(),
+        crate::runtime::error::ContextIssue::DuplicateTypeIdentity { type_id, .. }
+            if *type_id == std::any::TypeId::of::<First>()
+    ));
 }
 
 #[test]
