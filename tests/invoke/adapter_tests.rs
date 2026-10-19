@@ -1,43 +1,23 @@
-// =============================================================================
-//    Copyright (c) 2025 - 2026 Haixing Hu.
-//
-//    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
-// =============================================================================
+use super::fixtures::{Worker, method};
+use qubit_reflect::{Invocation, InvocationOutput};
 
-//! Integration coverage for callable invocation adapter descriptors.
-use qubit_reflect::ReflectRegistry;
-use qubit_reflect::descriptor::InvocationAdapter;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationFailure;
-use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
+#[test]
+fn test_method_descriptor_invokes_generated_local_adapter() {
+    let mut worker = Worker::default();
+    let output = method("add")
+        .invoke(Invocation::on_mut(&mut worker).arg(7_i32))
+        .expect("the generated method adapter should run");
 
-/// Returns one owned output through the local invocation boundary.
-fn return_seven<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, Local>,
-) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(7_u8)))
+    assert!(matches!(output, InvocationOutput::Unit));
+    assert_eq!(worker.value, 7);
 }
 
 #[test]
-fn test_invocation_adapter_local_descriptor_invokes_its_typed_entry_point() {
-    let adapter = InvocationAdapter::local(return_seven);
-    let output = adapter
-        .invoke_local(
-            ReflectRegistry::initialize().expect("valid fixture registry"),
-            Invocation::associated([]),
-        )
-        .expect("the local entry point must be present")
-        .expect("the local adapter must be callable");
-    let InvocationOutput::Owned(value) = output else {
-        panic!("adapter must retain its owned output");
-    };
-    let Ok(value) = DynamicOwned::<Local>::downcast::<u8>(value) else {
-        panic!("output type must be u8");
-    };
-    assert_eq!(value, 7);
+fn test_method_descriptor_returns_owned_output_from_generated_adapter() {
+    let worker = Worker { value: 5 };
+    let output = method("sum")
+        .invoke(Invocation::on_ref(&worker).arg(3_i32).arg(4_i32))
+        .expect("the generated method adapter should run");
+
+    assert_eq!(output.into_owned::<i32>().expect("sum returns i32"), 12);
 }

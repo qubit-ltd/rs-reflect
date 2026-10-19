@@ -12,9 +12,12 @@
 mod adapter_tests;
 #[cfg(feature = "derive")]
 mod dispatch_tests;
+#[cfg(feature = "derive")]
 mod dispatch_types_tests;
 #[cfg(feature = "derive")]
 mod error_tests;
+#[cfg(feature = "derive")]
+mod fixtures;
 #[cfg(feature = "derive")]
 mod pinned_tests;
 #[cfg(feature = "derive")]

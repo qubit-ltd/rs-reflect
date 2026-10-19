@@ -1,70 +1,52 @@
-// =============================================================================
-//    Copyright (c) 2025 - 2026 Haixing Hu.
-//
-//    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
-// =============================================================================
+#![cfg(feature = "derive")]
 
-//! Standalone coverage for invocation capability descriptor state.
-use qubit_reflect::ReflectRegistry;
-use qubit_reflect::descriptor::CatchingAvailability;
-use qubit_reflect::descriptor::InvocationAdapter;
-use qubit_reflect::invoke::CatchingInvocationResult;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationFailure;
-use qubit_reflect::invoke::InvocationOutput;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
+use qubit_reflect::{CaughtInvocationFailure, Invocation, InvocationOutput, Reflect, ReflectImpl};
 
-fn return_seven<'call>(
-    _registry: &ReflectRegistry,
-    _invocation: Invocation<'call, Local>,
-) -> Result<InvocationOutput<'call, Local>, InvocationFailure<'call, Local>> {
-    Ok(InvocationOutput::Owned(DynamicOwned::<Local>::new(7_u8)))
+#[Reflect]
+struct Counter {
+    value: u32,
 }
 
-fn catch_seven<'call>(
-    _registry: &ReflectRegistry,
-    invocation: Invocation<'call, Local>,
-) -> CatchingInvocationResult<'call, Local> {
-    return_seven(_registry, invocation).map(Ok)
+#[ReflectImpl]
+impl Counter {
+    pub fn increment(&mut self, by: u32) {
+        self.value += by;
+    }
+
+    pub async fn async_value(&self) -> u32 {
+        self.value
+    }
+}
+
+fn method(name: &str) -> qubit_reflect::MethodDescriptor<'static> {
+    qubit_reflect::ReflectionContext::global()
+        .type_of::<Counter>()
+        .method(name)
+        .expect("the reflected method must be registered")
 }
 
 #[test]
-fn test_invocation_adapter_reports_explicit_catching_availability_by_mode() {
-    let local = InvocationAdapter::local_with_catching(return_seven, catch_seven);
-    assert_eq!(local.catching_availability(), CatchingAvailability::Available);
-    assert!(
-        local
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .expect("the local catching entry point must be present")
-            .expect("validation must succeed")
-            .is_ok(),
-        "the local catching entry point must return an invocation output"
-    );
+fn test_catching_capability_runs_generated_method_adapter() {
+    let mut counter = Counter { value: 5 };
+    let output = method("increment")
+        .invoke_catching(Invocation::on_mut(&mut counter).arg(3_u32))
+        .expect("synchronous catching adapter should be present");
+
+    assert!(matches!(output, InvocationOutput::Unit));
+    assert_eq!(counter.value, 8);
 }
 
 #[test]
-fn test_invocation_adapter_distinguishes_unrequested_and_abort_unavailable_catching() {
-    let unrequested = InvocationAdapter::local(return_seven);
-    assert_eq!(unrequested.catching_availability(), CatchingAvailability::NotRequested);
-
-    let unavailable = InvocationAdapter::local_with_unavailable_catching(return_seven);
-    assert_eq!(
-        unavailable.catching_availability(),
-        CatchingAvailability::UnavailablePanicAbort
-    );
-    assert!(
-        unavailable
-            .invoke_catching_local(
-                ReflectRegistry::initialize().expect("valid fixture registry"),
-                Invocation::associated([])
-            )
-            .is_err(),
-        "unavailable catching invocation must return an error"
-    );
+fn test_catching_capability_rejects_async_before_dispatch_and_keeps_inputs() {
+    let counter = Counter { value: 13 };
+    let failure = method("async_value")
+        .invoke_catching(Invocation::on_ref(&counter))
+        .expect_err("synchronous catching cannot dispatch async methods");
+    let CaughtInvocationFailure::Rejected(rejected) = failure else {
+        panic!("async rejection occurs before user method entry");
+    };
+    let retry = method("async_value")
+        .invoke_catching(rejected.into_invocation())
+        .expect_err("recovered receiver must remain available");
+    assert!(matches!(retry, CaughtInvocationFailure::Rejected(_)));
 }

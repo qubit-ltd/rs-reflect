@@ -1,52 +1,21 @@
-// =============================================================================
-//    Copyright (c) 2025 - 2026 Haixing Hu.
-//
-//    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
-// =============================================================================
-
-//! Remaining dispatch diagnostics and local invocation paths.
-
-use qubit_reflect::invoke::InvocationDispatchMode;
-use qubit_reflect::invoke::InvocationDispatchReason;
+use super::fixtures::{Worker, method};
+use qubit_reflect::{Invocation, ThreadSafe};
 
 #[test]
-fn test_local_dispatch_modes_have_stable_names() {
-    let modes = [
-        InvocationDispatchMode::Local,
-        InvocationDispatchMode::CatchingLocal,
-        InvocationDispatchMode::PinnedRefLocal,
-        InvocationDispatchMode::PinnedMutLocal,
-    ];
-    for mode in modes {
-        let label = match mode {
-            InvocationDispatchMode::Local => "Local",
-            InvocationDispatchMode::CatchingLocal => "CatchingLocal",
-            InvocationDispatchMode::PinnedRefLocal => "PinnedRefLocal",
-            InvocationDispatchMode::PinnedMutLocal => "PinnedMutLocal",
-            _ => panic!("thread-safe dispatch modes are not part of the v3 contract"),
-        };
-        assert_eq!(format!("{mode:?}"), label);
-    }
-}
+fn test_invocation_mode_selects_local_or_thread_safe_adapter() {
+    let worker = Worker { value: 8 };
 
-#[test]
-fn test_dispatch_reasons_are_exhaustive() {
-    let reasons = [
-        InvocationDispatchReason::NoAdapter { reasons: Box::new([]) },
-        InvocationDispatchReason::MissingEntry,
-        InvocationDispatchReason::CatchingNotRequested,
-        InvocationDispatchReason::PanicAbort,
-        InvocationDispatchReason::PinnedReceiverTypeMismatch,
-    ];
-    for reason in reasons {
-        match reason {
-            InvocationDispatchReason::NoAdapter { reasons } => assert!(reasons.is_empty()),
-            InvocationDispatchReason::MissingEntry
-            | InvocationDispatchReason::CatchingNotRequested
-            | InvocationDispatchReason::PanicAbort
-            | InvocationDispatchReason::PinnedReceiverTypeMismatch => {}
-        }
-    }
+    let local = method("sum")
+        .invoke(Invocation::on_ref(&worker).arg(1_i32).arg(2_i32))
+        .expect("the local adapter should be available");
+    let shared = method("sum")
+        .invoke(
+            Invocation::<ThreadSafe>::on_ref(&worker)
+                .arg(1_i32)
+                .arg(2_i32),
+        )
+        .expect("the thread-safe adapter should be available for a Sync target");
+
+    assert_eq!(local.into_owned::<i32>().expect("i32 output"), 11);
+    assert_eq!(shared.into_owned::<i32>().expect("i32 output"), 11);
 }

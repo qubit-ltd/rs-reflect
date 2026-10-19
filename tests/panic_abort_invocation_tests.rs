@@ -1,55 +1,58 @@
-// =============================================================================
-//    Copyright (c) 2025 - 2026 Haixing Hu.
-//
-//    SPDX-License-Identifier: Apache-2.0
-//
-//    Licensed under the Apache License, Version 2.0.
-// =============================================================================
-
-//! Abort-on-panic configuration contract for explicit catching descriptors.
-
 #![cfg(feature = "derive")]
 #![cfg(panic = "abort")]
 
-use qubit_reflect as reflect;
-use qubit_reflect::Reflect;
-use qubit_reflect::ReflectImpl;
-use qubit_reflect::descriptor::CatchingAvailability;
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::descriptor::MethodQualifier;
-use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationDispatchMode;
-use qubit_reflect::invoke::InvocationDispatchReason;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::{
+    CaughtInvocationFailure, Invocation, InvocationErrorKind, Reflect, ReflectImpl,
+};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[Reflect]
+struct AbortPayload {
+    drops: Arc<AtomicUsize>,
+}
+
+impl Drop for AbortPayload {
+    fn drop(&mut self) {
+        self.drops.fetch_add(1, Ordering::SeqCst);
+    }
+}
 
 #[Reflect]
 struct Worker;
 
 #[ReflectImpl]
 impl Worker {
-    #[reflect(catch_unwind)]
-    fn marked() {}
+    pub fn panic(&self, value: String) {
+        panic!("must not run: {value}");
+    }
 }
 
 #[test]
-fn test_abort_configuration_reports_requested_catching_as_unavailable() {
-    let registry = ReflectRegistry::initialize().expect("generated fragments must validate");
-    let implementations = registry.implementations(Worker::type_descriptor().type_id());
-    let MethodLookup::Unique(method) =
-        reflect::descriptor::ImplDescriptor::lookup_method(implementations, MethodQualifier::Inherent, "marked")
-    else {
-        panic!("the marked method must be discoverable")
+fn test_abort_configuration_rejects_catching_before_method_entry_and_recovers_input() {
+    let worker = Worker;
+    let drops = Arc::new(AtomicUsize::new(0));
+    let payload = AbortPayload {
+        drops: Arc::clone(&drops),
     };
-    let adapter = method.adapter().expect("the normal adapter remains available");
-    assert_eq!(
-        adapter.catching_availability(),
-        CatchingAvailability::UnavailablePanicAbort
-    );
-    let result = method.invoke_catching_local(registry, Invocation::associated([]));
-    let Err(unavailable) = result else {
-        panic!("abort mode cannot dispatch catching")
+    let method = qubit_reflect::ReflectionContext::global()
+        .type_of::<Worker>()
+        .method("panic")
+        .expect("the panic method must be registered");
+    let failure = method
+        .invoke_catching(Invocation::on_ref(&worker).arg(payload))
+        .expect_err("panic=abort cannot support catching dispatch");
+    let CaughtInvocationFailure::Rejected(rejected) = failure else {
+        panic!("abort mode must reject before entering the user method");
     };
-    assert_eq!(unavailable.mode(), InvocationDispatchMode::CatchingLocal);
-    assert_eq!(unavailable.reason(), &InvocationDispatchReason::PanicAbort);
-    assert!(unavailable.into_invocation().arguments().is_empty());
+    assert!(matches!(
+        rejected.error().kind(),
+        InvocationErrorKind::ValueModeUnavailable
+    ));
+
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    let recovered = rejected.into_invocation();
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    drop(recovered);
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
