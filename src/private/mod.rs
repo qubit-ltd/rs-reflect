@@ -11,6 +11,9 @@
 /// Versioned protocol consumed by code generated for this release.
 #[doc(hidden)]
 pub mod codegen_v3;
+/// Versioned protocol consumed by code generated for the vNext runtime.
+#[doc(hidden)]
+pub mod codegen_v4;
 /// Conformance hooks kept separate from the generated-code ABI.
 #[doc(hidden)]
 pub mod testing;
@@ -23,6 +26,8 @@ pub(crate) mod descriptor;
 mod lazy_type_ref;
 mod lazy_type_ref_list;
 pub(crate) mod registration;
+#[doc(hidden)]
+pub use inventory as __inventory;
 mod type_ref_list_source;
 mod type_ref_source;
 

@@ -125,7 +125,7 @@ field_mode!(Local, dynamic_local);
 field_mode!(ThreadSafe, dynamic_thread_safe);
 
 /// An adapter generated from field accessors for a concrete owner and value.
-pub(crate) struct TypedFieldAdapter<Owner: 'static, Value: 'static> {
+pub struct TypedFieldAdapter<Owner: 'static, Value: 'static> {
     get_ref: for<'a> fn(&'a Owner) -> &'a Value,
     get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
     active_variant: Option<for<'a> fn(&'a Owner) -> VariantIdentity>,
@@ -139,7 +139,7 @@ pub(crate) struct DynamicOnlyFieldAdapter<Owner: ?Sized + 'static, Value: ?Sized
 }
 
 impl<Owner: ?Sized + 'static, Value: ?Sized + 'static> DynamicOnlyFieldAdapter<Owner, Value> {
-    pub(crate) const fn new(
+    pub const fn new(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
     ) -> Self {
@@ -257,7 +257,7 @@ where
 }
 
 impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
-    pub(crate) const fn new(
+    pub const fn new(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
     ) -> Self {

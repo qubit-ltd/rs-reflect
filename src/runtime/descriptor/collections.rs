@@ -8,13 +8,13 @@ use super::type_kind::{TypeKind, TypeKindMetadata};
 use super::variant::{VariantDescriptor, VariantMetadata};
 
 /// Generated source metadata for fields, variants, and the concrete type kind.
-pub(crate) struct TypeShapeRegistration {
+pub struct TypeShapeRegistration {
     type_id: fn() -> TypeId,
     metadata: &'static TypeKindMetadata,
 }
 
 impl TypeShapeRegistration {
-    pub(crate) const fn new<T: 'static>(metadata: &'static TypeKindMetadata) -> Self {
+    pub const fn new<T: super::Reflect>(metadata: &'static TypeKindMetadata) -> Self {
         Self {
             type_id: TypeId::of::<T>,
             metadata,
@@ -53,7 +53,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
         })
     }
 
-    pub(crate) fn field(self, name: &str) -> Result<FieldDescriptor<'ctx>, LookupError> {
+    pub fn field(self, name: &str) -> Result<FieldDescriptor<'ctx>, LookupError> {
         self.fields().map_err(LookupError::Context)?.require(name)
     }
 

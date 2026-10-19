@@ -15,7 +15,7 @@ use super::variant::{VariantDescriptor, VariantIdentity, VariantMetadata};
 
 /// Source visibility retained for a reflected field or variant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Visibility {
+pub enum Visibility {
     Public,
     Crate,
     Restricted(&'static str),
@@ -24,17 +24,23 @@ pub(crate) enum Visibility {
 
 /// Safe access capabilities available for one field.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct FieldAccess {
+pub struct FieldAccess {
     pub(crate) readable: bool,
     pub(crate) mutable: bool,
     pub(crate) replaceable: bool,
     pub(crate) constructible: bool,
 }
 
+impl FieldAccess {
+    pub const fn new(readable: bool, mutable: bool, replaceable: bool, constructible: bool) -> Self {
+        Self { readable, mutable, replaceable, constructible }
+    }
+}
+
 /// Why a reflected field adapter cannot be used dynamically.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum FieldAccessUnavailableReason {
+pub enum FieldAccessUnavailableReason {
     FieldTypeNotReflectable,
     UnsupportedFieldShape,
     AdapterUnavailable,
@@ -43,7 +49,7 @@ pub(crate) enum FieldAccessUnavailableReason {
 /// A failure to read or mutate a field.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum FieldAccessError {
+pub enum FieldAccessError {
     TargetTypeMismatch(TypeMismatch),
     ValueTypeMismatch(TypeMismatch),
     Unavailable(FieldAccessUnavailableReason),
@@ -67,7 +73,7 @@ impl std::error::Error for FieldAccessError {}
 /// The diagnostic part of a failed field replacement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum FieldSetError {
+pub enum FieldSetError {
     TargetTypeMismatch(TypeMismatch),
     ValueTypeMismatch(TypeMismatch),
     Unavailable(FieldAccessUnavailableReason),
@@ -89,7 +95,7 @@ impl std::error::Error for FieldSetError {}
 
 /// A failed replacement that returns the original replacement value.
 #[must_use]
-pub(crate) struct FieldSetFailure<V> {
+pub struct FieldSetFailure<V> {
     error: FieldSetError,
     replacement: V,
 }
@@ -130,7 +136,7 @@ fn identity<T: 'static>() -> TypeIdentity {
 }
 
 /// Static source facts for a field, consumed when binding a descriptor.
-pub(crate) struct FieldMetadata {
+pub struct FieldMetadata {
     pub(crate) index: usize,
     pub(crate) name: &'static str,
     pub(crate) visibility: Visibility,
@@ -147,8 +153,26 @@ pub(crate) struct FieldMetadata {
 }
 
 impl FieldMetadata {
+    /// Creates metadata for a statically typed field adapter.
+    pub const fn typed<Owner: 'static, Value: 'static>(
+        index: usize,
+        name: &'static str,
+        adapter: &'static crate::runtime::access::TypedFieldAdapter<Owner, Value>,
+    ) -> Self {
+        Self::new(
+            index,
+            name,
+            Visibility::Public,
+            &crate::runtime::expression::ExpressionData::Never,
+            adapter,
+            None,
+            None,
+            FieldAccess::new(true, true, true, true),
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
-    pub(crate) const fn new(
+    pub const fn new(
         index: usize,
         name: &'static str,
         visibility: Visibility,
@@ -173,7 +197,7 @@ impl FieldMetadata {
         }
     }
 
-    pub(crate) const fn with_dynamic_adapters(
+    pub const fn with_dynamic_adapters(
         mut self,
         local: Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::Local>>,
         thread_safe: Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::ThreadSafe>>,
@@ -183,7 +207,7 @@ impl FieldMetadata {
         self
     }
 
-    pub(crate) const fn with_dynamic_unavailable_reason(
+    pub const fn with_dynamic_unavailable_reason(
         mut self,
         reason: FieldAccessUnavailableReason,
     ) -> Self {
@@ -194,7 +218,7 @@ impl FieldMetadata {
 
 /// A context-bound view of one reflected field.
 #[derive(Clone, Copy)]
-pub(crate) struct FieldDescriptor<'ctx> {
+pub struct FieldDescriptor<'ctx> {
     pub(crate) metadata: &'static FieldMetadata,
     declaring_type: TypeDescriptor<'ctx>,
     declaring_variant: Option<VariantDescriptor<'ctx>>,
@@ -229,7 +253,7 @@ impl<'ctx> FieldDescriptor<'ctx> {
         self.metadata.index
     }
 
-    pub(crate) fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         self.metadata.name
     }
 

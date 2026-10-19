@@ -15,7 +15,7 @@ use crate::runtime::error::{ContextError, ContextIssue, MetadataValidationError}
 use crate::runtime::identity::RegistrationOrigin;
 use crate::runtime::identity::{ItemIdentity, ItemKind, StableItemId};
 
-type RegistrationSortKey = (
+pub type RegistrationSortKey = (
     &'static str,
     Option<&'static str>,
     &'static str,
@@ -58,7 +58,7 @@ fn descriptor_for<'ctx, T: Reflect>(context: &'ctx ReflectionContext) -> TypeDes
     TypeDescriptor::new(T::__reflect_registration().metadata(), context)
 }
 
-pub(crate) struct Registration {
+pub struct Registration {
     type_record: TypeRecord,
     origin: RegistrationOrigin,
     type_definitions: Vec<&'static TypeDefinitionMetadata>,
@@ -72,7 +72,7 @@ pub(crate) struct Registration {
 }
 
 impl Registration {
-    pub(crate) fn of<T: Reflect>() -> Self {
+    pub fn of<T: Reflect>() -> Self {
         Self::new::<T>()
     }
 
@@ -215,7 +215,7 @@ impl<T: Reflect> From<&'static TypeRegistration<T>> for Registration {
 
 /// A statically linked type registration consumed while building a context.
 #[derive(Clone, Copy)]
-pub(crate) struct RegistrationFragment {
+pub struct RegistrationFragment {
     sort_key: RegistrationSortKey,
     target_type_id: Option<fn() -> TypeId>,
     dependencies: fn() -> &'static [TypeId],
@@ -224,6 +224,17 @@ pub(crate) struct RegistrationFragment {
 }
 
 impl RegistrationFragment {
+    /// Creates a type fragment with a runtime controlled stable origin.
+    pub const fn for_reflected_type<T: Reflect>(label: &'static str) -> Self {
+        Self {
+            sort_key: ("generated", None, "generated", Some(label), None, None, label),
+            target_type_id: Some(TypeId::of::<T>),
+            dependencies: no_dependencies,
+            includes_type: true,
+            registration: Registration::of::<T>,
+        }
+    }
+
     pub(crate) const fn new(
         sort_key: RegistrationSortKey,
         registration: fn() -> Registration,

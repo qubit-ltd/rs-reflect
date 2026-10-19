@@ -6,7 +6,7 @@ use super::variant::VariantMetadata;
 
 /// Static kind facts supplied by the type registration.
 #[derive(Clone, Copy)]
-pub(crate) enum TypeKindMetadata {
+pub enum TypeKindMetadata {
     Primitive,
     Text,
     Struct(&'static [FieldMetadata]),

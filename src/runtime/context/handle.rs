@@ -51,7 +51,7 @@ impl ReflectionContextId {
     }
 }
 
-pub(crate) struct ReflectionContext {
+pub struct ReflectionContext {
     id: ReflectionContextId,
     state: ContextState,
 }
@@ -62,7 +62,7 @@ enum ContextState {
 }
 
 impl ReflectionContext {
-    pub(crate) fn global() -> &'static Self {
+    pub fn global() -> &'static Self {
         global::global_context()
     }
 

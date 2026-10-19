@@ -13,13 +13,13 @@ use super::metadata::TypeMetadata;
 use super::reflect::Reflect;
 
 #[derive(Clone, Copy)]
-pub(crate) struct TypeDescriptor<'ctx> {
+pub struct TypeDescriptor<'ctx> {
     metadata: &'static TypeMetadata,
     context: &'ctx ReflectionContext,
 }
 
 impl TypeDescriptor<'static> {
-    pub(crate) fn of<T: Reflect>() -> Self {
+    pub fn of<T: Reflect>() -> Self {
         Self::new(
             T::__reflect_registration().metadata(),
             ReflectionContext::global(),
@@ -28,7 +28,7 @@ impl TypeDescriptor<'static> {
 }
 
 impl<'ctx> TypeDescriptor<'ctx> {
-    pub(crate) fn of_in<T: Reflect + ?Sized>(context: &'ctx ReflectionContext) -> Self {
+    pub fn of_in<T: Reflect + ?Sized>(context: &'ctx ReflectionContext) -> Self {
         Self::new(super::metadata::TypeMetadata::of::<T>(), context)
     }
 }
@@ -49,7 +49,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
         }
     }
 
-    pub(crate) fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
 
@@ -65,7 +65,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
         self.context.construction_plans(self.type_id())
     }
 
-    pub(crate) fn lookup_method(
+    pub fn lookup_method(
         self,
         name: &str,
     ) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
@@ -75,7 +75,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
         )
     }
 
-    pub(crate) fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
+    pub fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.lookup_method(name)
             .map_err(LookupError::Context)?
             .into_unique(

@@ -64,7 +64,7 @@ impl ModeAdapter for ThreadSafe {
 }
 
 /// A mode-specific adapter generated for one statically bound Rust method.
-pub(crate) trait InvocationAdapter<M: ValueMode>: Sync {
+pub trait InvocationAdapter<M: ValueMode>: Sync {
     /// Executes a previously validated invocation.
     fn invoke<'call>(
         &self,
@@ -73,7 +73,7 @@ pub(crate) trait InvocationAdapter<M: ValueMode>: Sync {
 }
 
 /// Adapter for a method whose receiver is pinned.
-pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
+pub trait PinnedInvocationAdapter<M: ValueMode>: Sync {
     fn receiver_type_id(&self) -> TypeId;
     fn receiver_kind(&self) -> ReceiverKind;
 
@@ -860,6 +860,7 @@ pub(crate) enum InvocationAvailability {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum InvocationUnavailableReason {
     UnsupportedReceiver,
+    AdapterUnavailable,
     UnsupportedParameterPattern,
     UnspecializedGeneric,
     UnsafeMethod,

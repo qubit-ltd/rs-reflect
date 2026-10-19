@@ -15,3 +15,41 @@
 //! `Invocation`; these are currently crate-private. Adapter factories must
 //! preserve receiver, argument, output, and value-mode types in their
 //! signatures.
+
+pub use crate::runtime::descriptor::method::EffectiveMethod;
+pub use crate::runtime::descriptor::method::InvocationAdapters;
+pub use crate::runtime::descriptor::method::MethodAvailability;
+pub use crate::runtime::descriptor::method::MethodCatalogRegistration;
+pub use crate::runtime::descriptor::method::MethodImplementationSource;
+pub use crate::runtime::descriptor::method::MethodMetadata;
+pub use crate::runtime::descriptor::method::MethodNamespaceMetadata;
+pub use crate::runtime::descriptor::method::MethodQualifiers;
+pub use crate::runtime::descriptor::method::MethodVisibility;
+pub use crate::runtime::descriptor::method::ParameterMetadata;
+pub use crate::runtime::descriptor::method::ParameterPattern;
+pub use crate::runtime::descriptor::method::PassingMode;
+pub use crate::runtime::descriptor::method::ReceiverDescriptor;
+pub use crate::runtime::descriptor::method::ReceiverKind;
+pub use crate::runtime::descriptor::method::ReturnKind;
+pub use crate::runtime::descriptor::method::ReturnMetadata;
+pub use crate::runtime::invoke::InvocationAdapter;
+pub use crate::runtime::invoke::PinnedInvocationAdapter;
+pub use crate::runtime::lookup::Lookup;
+
+/// Submits an effective method catalog for its exact target type.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_submit_method_catalog {
+    ($ty:ty, $methods:expr) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::invoke::MethodCatalogRegistration::new::<$ty>($methods)
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_submit_method_catalog as submit_method_catalog;
+
+/// Registers a method declaration using its concrete reflected owner type.
+#[doc(hidden)]
+pub use crate::runtime::descriptor::method::EffectiveMethod as RuntimeEffectiveMethod;

@@ -22,7 +22,7 @@ pub(crate) use crate::runtime::descriptor::metadata::TypeMetadata;
 
 /// Visibility recorded for a method declaration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum MethodVisibility {
+pub enum MethodVisibility {
     Public,
     Restricted,
     Private,
@@ -30,7 +30,7 @@ pub(crate) enum MethodVisibility {
 
 /// The receiver form declared by a method.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ReceiverKind {
+pub enum ReceiverKind {
     Owned,
     Shared,
     Mutable,
@@ -40,14 +40,14 @@ pub(crate) enum ReceiverKind {
 
 /// Metadata for the receiver parameter.
 #[derive(Clone, Copy)]
-pub(crate) struct ReceiverDescriptor {
+pub struct ReceiverDescriptor {
     pub(crate) kind: ReceiverKind,
     pub(crate) type_metadata: &'static crate::runtime::descriptor::metadata::TypeMetadata,
 }
 
 /// Source pattern retained for a non-receiver parameter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ParameterPattern {
+pub enum ParameterPattern {
     Identifier(&'static str),
     Wildcard,
     Destructure,
@@ -55,7 +55,7 @@ pub(crate) enum ParameterPattern {
 
 /// How a method parameter receives its value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum PassingMode {
+pub enum PassingMode {
     Owned,
     Shared,
     Mutable,
@@ -63,7 +63,7 @@ pub(crate) enum PassingMode {
 
 /// Static facts about one declared parameter.
 #[derive(Clone, Copy)]
-pub(crate) struct ParameterMetadata {
+pub struct ParameterMetadata {
     pub(crate) index: usize,
     pub(crate) pattern: ParameterPattern,
     pub(crate) passing: PassingMode,
@@ -112,7 +112,7 @@ impl<'ctx> ParameterDescriptor<'ctx> {
 
 /// The declared kind and optional type expression for a return value.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ReturnKind {
+pub enum ReturnKind {
     Unit,
     Owned,
     Shared,
@@ -125,7 +125,7 @@ pub(crate) enum ReturnKind {
 
 /// Static return metadata for a method declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct ReturnMetadata {
+pub struct ReturnMetadata {
     pub(crate) kind: ReturnKind,
     pub(crate) expression: Option<&'static ExpressionData>,
     pub(crate) concrete_type: Option<&'static crate::runtime::descriptor::metadata::TypeMetadata>,
@@ -162,7 +162,7 @@ impl<'ctx> ReturnDescriptor<'ctx> {
 
 /// Source-level method qualifiers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct MethodQualifiers {
+pub struct MethodQualifiers {
     pub(crate) is_const: bool,
     pub(crate) is_async: bool,
     pub(crate) is_unsafe: bool,
@@ -207,7 +207,7 @@ pub(crate) enum MethodQualifiedName<'ctx> {
 
 /// Why the effective implementation came from its current source.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum MethodImplementationSource {
+pub enum MethodImplementationSource {
     Declared,
     Required,
     Defaulted,
@@ -216,7 +216,7 @@ pub(crate) enum MethodImplementationSource {
 
 /// Callability reasons recorded during registration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum MethodAvailability {
+pub enum MethodAvailability {
     Callable,
     RequiresSpecialization,
     RequiresSpecializationSelection {
@@ -228,7 +228,7 @@ pub(crate) enum MethodAvailability {
 }
 
 /// Source declaration metadata, shared by all effective implementations.
-pub(crate) struct MethodMetadata {
+pub struct MethodMetadata {
     pub(crate) name: &'static str,
     pub(crate) namespace: MethodNamespaceMetadata,
     pub(crate) visibility: MethodVisibility,
@@ -243,7 +243,7 @@ pub(crate) struct MethodMetadata {
 
 /// Static namespace identity used before it is bound to a reflection context.
 #[derive(Clone, Copy)]
-pub(crate) enum MethodNamespaceMetadata {
+pub enum MethodNamespaceMetadata {
     Inherent {
         implementation: &'static str,
     },
@@ -253,9 +253,58 @@ pub(crate) enum MethodNamespaceMetadata {
     },
 }
 
+static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
+    parameters: &[],
+    predicates: &[],
+};
+static NO_METHOD_ADAPTER: [InvocationUnavailableReason; 1] =
+    [InvocationUnavailableReason::AdapterUnavailable];
+static UNIT_OUTPUT: ReturnMetadata = ReturnMetadata {
+    kind: ReturnKind::Unit,
+    expression: None,
+    concrete_type: None,
+};
+
+impl MethodMetadata {
+    /// Creates a zero-argument inherent method declaration with unit output.
+    pub const fn inherent(name: &'static str, implementation: &'static str) -> Self {
+        Self {
+            name,
+            namespace: MethodNamespaceMetadata::Inherent { implementation },
+            visibility: MethodVisibility::Public,
+            receiver: None,
+            parameters: &[],
+            output: &UNIT_OUTPUT,
+            qualifiers: MethodQualifiers {
+                is_const: false,
+                is_async: false,
+                is_unsafe: false,
+                abi: None,
+                is_variadic: false,
+            },
+            generics: &EMPTY_GENERICS,
+            is_generic: false,
+            default_body: false,
+        }
+    }
+}
+
+impl EffectiveMethod {
+    /// Binds a method declaration to its exact reflected target type.
+    pub const fn for_type<T: super::Reflect>(metadata: &'static MethodMetadata) -> Self {
+        Self {
+            target: crate::runtime::descriptor::metadata::TypeMetadata::of::<T>,
+            metadata,
+            source: MethodImplementationSource::Declared,
+            availability: MethodAvailability::Unavailable { reasons: &NO_METHOD_ADAPTER },
+            specializations: &[],
+        }
+    }
+}
+
 /// The callable implementation selected for a target type.
-pub(crate) struct EffectiveMethod {
-    pub(crate) target: &'static crate::runtime::descriptor::metadata::TypeMetadata,
+pub struct EffectiveMethod {
+    pub(crate) target: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
     pub(crate) metadata: &'static MethodMetadata,
     pub(crate) source: MethodImplementationSource,
     pub(crate) availability: MethodAvailability,
@@ -271,7 +320,7 @@ pub(crate) struct ResolvedMethodSpecialization {
 
 /// Mode-specific adapters generated for a concrete specialization.
 #[derive(Clone, Copy)]
-pub(crate) struct InvocationAdapters {
+pub struct InvocationAdapters {
     pub(crate) local: Option<&'static dyn InvocationAdapter<Local>>,
     pub(crate) thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
     pub(crate) catching_local: Option<&'static dyn InvocationAdapter<Local>>,
@@ -291,7 +340,7 @@ static NO_ADAPTERS: InvocationAdapters = InvocationAdapters {
 
 /// A method declaration combined with its effective implementation in one context.
 #[derive(Clone, Copy)]
-pub(crate) struct MethodDescriptor<'ctx> {
+pub struct MethodDescriptor<'ctx> {
     effective: &'ctx EffectiveMethod,
     context: &'ctx ReflectionContext,
 }
@@ -307,9 +356,9 @@ impl<'ctx> MethodDescriptor<'ctx> {
         self.context
     }
     pub(crate) fn target(self) -> TypeDescriptor<'ctx> {
-        TypeDescriptor::new(self.effective.target, self.context)
+        TypeDescriptor::new((self.effective.target)(), self.context)
     }
-    pub(crate) const fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         self.effective.metadata.name
     }
     pub(crate) fn namespace(self) -> MethodNamespace<'ctx> {
@@ -725,13 +774,13 @@ pub(crate) struct MethodCatalog<'ctx> {
 }
 
 /// Static source metadata for a target's effective method catalog.
-pub(crate) struct MethodCatalogRegistration {
+pub struct MethodCatalogRegistration {
     type_id: fn() -> TypeId,
     methods: &'static [EffectiveMethod],
 }
 
 impl MethodCatalogRegistration {
-    pub(crate) const fn new<T: 'static>(methods: &'static [EffectiveMethod]) -> Self {
+    pub const fn new<T: super::Reflect>(methods: &'static [EffectiveMethod]) -> Self {
         Self {
             type_id: TypeId::of::<T>,
             methods,
@@ -832,7 +881,7 @@ impl<'ctx> MethodCatalog<'ctx> {
         let mut matches = self
             .methods
             .iter()
-            .filter(|method| method.target.type_id() == self.target.type_id() && predicate(method))
+            .filter(|method| (method.target)().type_id() == self.target.type_id() && predicate(method))
             .map(|method| MethodDescriptor::new(method, self.target.context()));
         let Some(first) = matches.next() else {
             return Lookup::Missing;

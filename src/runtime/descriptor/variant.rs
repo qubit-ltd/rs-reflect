@@ -13,7 +13,7 @@ use super::field::{FieldMetadata, Visibility};
 
 /// The source shape of an enum variant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum VariantShape {
+pub enum VariantShape {
     Unit,
     Tuple,
     Struct,
@@ -21,14 +21,14 @@ pub(crate) enum VariantShape {
 
 /// Whether a discriminant came from an explicit source expression.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum DiscriminantOrigin {
+pub enum DiscriminantOrigin {
     Implicit,
     Explicit,
 }
 
 /// A numeric discriminant with its declared representation preserved.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum NumericDiscriminant {
+pub enum NumericDiscriminant {
     I8(i8),
     I16(i16),
     I32(i32),
@@ -45,7 +45,7 @@ pub(crate) enum NumericDiscriminant {
 
 /// The source origin and optional numeric value of a variant discriminant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct VariantDiscriminant {
+pub struct VariantDiscriminant {
     pub(crate) origin: DiscriminantOrigin,
     pub(crate) numeric: Option<NumericDiscriminant>,
 }
@@ -59,7 +59,7 @@ pub(crate) struct VariantIdentity {
 }
 
 /// Typed variant activity adapter.
-pub(crate) trait VariantAdapter: Sync {
+pub trait VariantAdapter: Sync {
     fn owner(&self) -> TypeIdentity;
     /// # Safety
     /// `value` must point to the exact owner type returned by `owner()`.
@@ -99,7 +99,7 @@ impl<Owner: Reflect + ValueForRef<Local> + 'static> VariantAdapter for TypedVari
 }
 
 /// Static source facts for one enum variant.
-pub(crate) struct VariantMetadata {
+pub struct VariantMetadata {
     pub(crate) index: usize,
     pub(crate) name: &'static str,
     pub(crate) shape: VariantShape,
@@ -110,7 +110,7 @@ pub(crate) struct VariantMetadata {
 }
 
 impl VariantMetadata {
-    pub(crate) const fn new(
+    pub const fn new(
         index: usize,
         name: &'static str,
         shape: VariantShape,

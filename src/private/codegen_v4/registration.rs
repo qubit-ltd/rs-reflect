@@ -14,3 +14,20 @@
 //! `Reflect` type to its generated registration and source origin. It must not
 //! expose caller-constructed fragment identities, raw payload variants, or the
 //! inventory macro as part of this protocol.
+
+pub use crate::runtime::context::handle::registration::Registration;
+pub use crate::runtime::context::handle::registration::RegistrationFragment;
+
+/// Submits a type registration without exposing the inventory dependency.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_submit_type {
+    ($ty:ty) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::registration::RegistrationFragment::for_reflected_type::<$ty>(stringify!($ty))
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_submit_type as submit_type;

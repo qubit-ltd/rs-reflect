@@ -29,6 +29,8 @@ pub mod expression;
 pub mod invoke;
 /// Compile-time handshake for derive/runtime compatibility.
 pub mod protocol;
+
+pub use protocol::PROTOCOL_VERSION;
 /// Linked registration contracts consumed while building reflection contexts.
 pub mod registration;
 /// Shared dynamic-value mode and typed value conversion contracts.
