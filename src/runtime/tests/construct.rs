@@ -88,8 +88,6 @@ reflect_type!(Record, RECORD_REGISTRATION);
 reflect_type!(Choice, CHOICE_REGISTRATION);
 reflect_type!(Marker, MARKER_REGISTRATION);
 reflect_type!(Wrong, WRONG_REGISTRATION);
-reflect_type!(i32, I32_REGISTRATION);
-reflect_type!(bool, BOOL_REGISTRATION);
 
 struct RecordProvider;
 
