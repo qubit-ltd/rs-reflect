@@ -15,8 +15,7 @@ use std::marker::PhantomData;
 use EmptyTrait as EmptyAlias;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 trait EmptyTrait {
@@ -28,9 +27,11 @@ struct EmptyTarget<T>(PhantomData<T>);
 #[ReflectImpl]
 impl<T> EmptyAlias for EmptyTarget<T> {}
 
-/// Verifies an alias without declaration facts cannot become marker identity.
+/// Verifies an empty trait alias still retains its compiler-resolved identity.
 #[test]
-fn test_generic_impl_definition_rejects_fact_free_alias() {
-    let error = ReflectRegistry::initialize().expect_err("a fact-free alias must not infer a reflected marker");
-    assert_eq!(error.kind(), RegistryErrorKind::ImplTraitResolution);
+fn test_generic_impl_definition_retains_fact_free_trait_identity() {
+    ReflectionContext::builder()
+        .include_linked()
+        .build()
+        .expect("an empty trait impl retains its written trait identity");
 }

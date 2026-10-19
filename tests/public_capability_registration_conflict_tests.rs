@@ -8,19 +8,37 @@
 
 //! Public capability registration conflict integration tests.
 
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::register_type_capabilities;
-use qubit_reflect::registry::ReflectRegistry;
+#![cfg(feature = "derive")]
 
-register_type_capabilities!(String: Clone);
-register_type_capabilities!(String: Clone);
+use qubit_reflect::{Reflect, ReflectionContext};
+use qubit_reflect::capability::{CloneAdapter, CloneCapability};
+use qubit_reflect::registration::CapabilityRegistration;
+use qubit_reflect::error::ContextIssue;
 
-/// Verifies duplicate public capability registrations fail central registry
-/// initialization.
+#[Reflect]
+#[derive(Clone)]
+struct DuplicateCapabilityTarget;
+
+fn clone_registration() -> CapabilityRegistration {
+    CapabilityRegistration::for_type::<DuplicateCapabilityTarget, CloneCapability>(
+        CloneAdapter::for_type::<DuplicateCapabilityTarget>(),
+    )
+}
+
 #[test]
-fn test_duplicate_public_capability_registration_returns_registry_error() {
-    let error = ReflectRegistry::initialize()
-        .expect_err("duplicate public capability registrations must invalidate the registry");
+fn duplicate_public_capability_registration_returns_context_conflict() {
+    let result = ReflectionContext::builder()
+        .include_type::<DuplicateCapabilityTarget>()
+        .register(clone_registration())
+        .register(clone_registration())
+        .build();
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("duplicate typed capability registrations must be rejected"),
+    };
 
-    assert_eq!(error.kind(), RegistryErrorKind::CapabilityConflict);
+    assert!(matches!(
+        error.primary_issue(),
+        ContextIssue::ConflictingCapability { .. }
+    ));
 }

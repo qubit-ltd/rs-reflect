@@ -6,185 +6,92 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Shared public-API invariants for deterministic seeds and snapshot fuzzing.
-use qubit_reflect::RegistryError;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::capability::CapabilityDescriptor;
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::identity::FragmentIdentity;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::registry::RegistrySnapshotBuilder;
+//! Shared public-API invariants for deterministic context-model seeds.
+
+use std::any::TypeId;
+
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::context::ReflectionContextBuilder;
+use qubit_reflect::error::ContextError;
 
 const MAX_INPUT_BYTES: usize = 4_096;
-const MAX_FRAGMENTS: usize = 32;
-const MAX_SOURCES: u8 = 16;
-const IDS: [&str; 8] = [
-    "fuzz.a", "fuzz.b", "fuzz.c", "fuzz.d", "fuzz.e", "fuzz.f", "fuzz.g", "fuzz.h",
-];
+const MAX_TYPES: usize = 32;
 
-/// Selects from a fixed universe without per-input interning or leaked strings.
-fn descriptor(index: u8) -> &'static TypeDescriptor {
+fn include_type(builder: ReflectionContextBuilder, index: u8) -> ReflectionContextBuilder {
     match index % 4 {
-        0 => TypeDescriptor::of::<u8>(),
-        1 => TypeDescriptor::of::<u16>(),
-        2 => TypeDescriptor::of::<u32>(),
-        _ => TypeDescriptor::of::<u64>(),
+        0 => builder.include_type::<u8>(),
+        1 => builder.include_type::<u16>(),
+        2 => builder.include_type::<u32>(),
+        _ => builder.include_type::<u64>(),
     }
 }
 
-/// Creates one of eight static adapter keys.
-fn key(index: u8) -> CapabilityKey<u32> {
-    CapabilityKey::new(
-        CapabilityId::new(IDS[usize::from(index) % IDS.len()]).expect("fixture capability ID must be valid"),
-    )
-}
-
-/// Creates one of sixteen fixed source identities.
-fn source(index: u8) -> FragmentIdentity {
-    let index = index % MAX_SOURCES;
-    FragmentIdentity::new(
-        "snapshot-fuzz",
-        "fixed-source",
-        u32::from(index),
-        1,
-        "fact",
-        u64::from(index),
-    )
-}
-
-/// Reconstructs facts in either order without duplicating validator logic.
-fn build<'a>(operations: impl Iterator<Item = &'a [u8]>) -> Result<ReflectRegistry, RegistryError> {
-    let mut builder = RegistrySnapshotBuilder::new();
-    for operation in operations {
-        let target = descriptor(operation[1]);
-        if operation[0] % 2 == 0 {
-            builder.add_type(target, source(operation[2]));
-        } else {
-            builder.add_type_capabilities(
-                target,
-                vec![CapabilityDescriptor::with_adapter(
-                    key(operation[3]),
-                    u32::from(operation[4]),
-                )],
-                source(operation[2]),
-            );
-        }
-    }
+fn build<'a>(operations: impl Iterator<Item = &'a u8>) -> Result<ReflectionContext, ContextError> {
+    let builder = operations
+        .take(MAX_TYPES)
+        .fold(ReflectionContext::builder(), |builder, operation| {
+            include_type(builder, *operation)
+        });
     builder.build()
 }
 
-/// Captures observable membership and adapter values in a fixed order.
-fn observations(registry: &ReflectRegistry) -> Vec<(bool, Vec<Option<u32>>)> {
-    (0..4)
-        .map(|index| {
-            let target = descriptor(index);
-            (
-                registry.get(target.type_id()).is_some(),
-                (0..8)
-                    .map(|id| {
-                        registry
-                            .capability(target, key(id))
-                            .expect("fixture capability contract must match")
-                            .copied()
-                    })
-                    .collect(),
-            )
-        })
-        .collect()
+fn contains(context: &ReflectionContext, id: TypeId) -> bool {
+    context
+        .find_type_by_id(id)
+        .expect("a frozen context can answer type-identity lookups")
+        .is_some()
 }
 
-/// Checks order invariance, conflict atomicity, membership, and independence.
+fn observations(context: &ReflectionContext) -> [bool; 4] {
+    [
+        contains(context, TypeId::of::<u8>()),
+        contains(context, TypeId::of::<u16>()),
+        contains(context, TypeId::of::<u32>()),
+        contains(context, TypeId::of::<u64>()),
+    ]
+}
+
+/// Checks insertion-order invariance and explicit-context isolation.
 ///
 /// # Parameters
 ///
-/// - `unbounded`: Arbitrary input bytes, limited internally to the fixture's
-///   maximum input length.
+/// - `unbounded`: Arbitrary input bytes, limited internally to 4 KiB and 32 type registrations.
 ///
 /// # Panics
 ///
-/// Panics if snapshot validity or observable registry state depends on input
-/// order, or if an isolated fixture does not retain its expected capability.
+/// Panics if context validity or indexed types depend on registration order, or if one explicit
+/// context changes another context's frozen type set.
 pub fn check(unbounded: &[u8]) {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
-    let operations: Vec<_> = data.chunks_exact(5).take(MAX_FRAGMENTS).collect();
-    let first = build(operations.iter().copied());
-    let reversed = build(operations.iter().rev().copied());
+    let first = build(data.iter());
+    let reversed = build(data.iter().rev());
     match (first, reversed) {
-        (Ok(first), Ok(reversed)) => {
-            assert_eq!(
-                observations(&first),
-                observations(&reversed),
-                "registry observations must not depend on insertion order"
-            )
-        }
+        (Ok(first), Ok(reversed)) => assert_eq!(
+            observations(&first),
+            observations(&reversed),
+            "context indexes must not depend on registration order"
+        ),
         (Err(first), Err(reversed)) => {
             assert!(
-                !first.to_string().is_empty(),
-                "the forward snapshot error must include a diagnostic"
+                !first.issues().is_empty(),
+                "the forward context error must identify its validation issue"
             );
             assert!(
-                !reversed.to_string().is_empty(),
-                "the reversed snapshot error must include a diagnostic"
+                !reversed.issues().is_empty(),
+                "the reversed context error must identify its validation issue"
             );
         }
-        _ => panic!("validity must not depend on insertion order"),
+        _ => panic!("context validity must not depend on registration order"),
     }
-    let value = u32::from(data.first().copied().unwrap_or(0));
-    let isolated = |value| {
-        let mut builder = RegistrySnapshotBuilder::new();
-        builder.add_type_capabilities(
-            descriptor(0),
-            vec![CapabilityDescriptor::with_adapter(key(0), value)],
-            source(0),
-        );
-        builder.build().expect("isolated fixture snapshot must be valid")
-    };
-    let first = isolated(value);
-    let second = isolated(value + 1);
-    assert!(
-        first.types().is_empty(),
-        "an isolated fixture must contain no registered types"
-    );
-    assert!(
-        second.types().is_empty(),
-        "the second isolated fixture must contain no registered types"
-    );
-    let before = observations(&first);
-    let mut duplicate = RegistrySnapshotBuilder::new();
-    duplicate
-        .add_type(descriptor(0), source(0))
-        .add_type(descriptor(0), source(0));
-    assert!(duplicate.build().is_err(), "duplicate type facts must be rejected");
-    let mut conflicting = RegistrySnapshotBuilder::new();
-    for id in 0..2 {
-        conflicting.add_type_capabilities(
-            descriptor(0),
-            vec![CapabilityDescriptor::with_adapter(key(0), u32::from(id))],
-            source(id),
-        );
-    }
-    assert!(
-        conflicting.build().is_err(),
-        "conflicting adapter values must be rejected"
-    );
-    assert_eq!(
-        observations(&first),
-        before,
-        "building invalid snapshots must not mutate an existing registry"
-    );
-    assert_eq!(
-        first
-            .capability(descriptor(0), key(0))
-            .expect("first snapshot capability contract must match"),
-        Some(&value),
-        "the first snapshot must retain its own adapter value"
-    );
-    assert_eq!(
-        second
-            .capability(descriptor(0), key(0))
-            .expect("second snapshot capability contract must match"),
-        Some(&(value + 1)),
-        "the second snapshot must retain its own adapter value"
-    );
+
+    let first = ReflectionContext::builder()
+        .include_type::<u32>()
+        .build()
+        .expect("a single builtin registration is valid");
+    let second = ReflectionContext::builder()
+        .include_type::<u64>()
+        .build()
+        .expect("another isolated builtin registration is valid");
+    assert_eq!(observations(&first), [false, false, true, false]);
+    assert_eq!(observations(&second), [false, false, false, true]);
 }

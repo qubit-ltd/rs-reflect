@@ -6,12 +6,12 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Deterministic seeds retained alongside the bounded snapshot fuzzer.
+//! Deterministic seeds retained alongside the bounded context-model fuzzer.
 
 mod internal;
 
 #[test]
-fn test_snapshot_order_duplicates_and_capability_isolation() {
+fn test_context_registration_order_and_isolation() {
     for seed in [
         vec![],
         vec![0; 10],

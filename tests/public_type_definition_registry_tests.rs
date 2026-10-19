@@ -6,458 +6,49 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public integration tests for first-class generic type declarations.
+//! Public contracts for generic definitions discovered by a context.
 
 #![cfg(feature = "derive")]
 
-use std::any::TypeId;
-use std::thread;
+use qubit_reflect::{Reflect, ReflectionContext, TypeDescriptor};
 
-use qubit_reflect::__private::codegen_v3::inventory;
-use qubit_reflect::__private::codegen_v3::registration::CapabilityRegistration;
-use qubit_reflect::__private::codegen_v3::registration::CapabilityTarget;
-use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::capability::CapabilityDescriptor;
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::capability::CapabilityLookup;
-use qubit_reflect::capability::CapabilityOrigin;
-use qubit_reflect::capability::clone_key;
-use qubit_reflect::capability::default_key;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeDefinitionData;
-use qubit_reflect::descriptor::TypeDefinitionDescriptor;
-use qubit_reflect::descriptor::TypeDefinitionId;
-use qubit_reflect::descriptor::VariantKind;
-use qubit_reflect::expression::GenericDefinitionDescriptor;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::identity::FragmentIdentity;
-use qubit_reflect::identity::VisibilityKind;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-
-#[derive(Clone)]
 #[Reflect]
-#[reflect(capabilities(Clone))]
-struct GenericRecord<T: Clone> {
+struct GenericContextRecord<T> {
     value: T,
 }
 
-#[Reflect]
-enum GenericEnum<T> {
-    Unit,
-    Tuple(T),
-    Struct { value: T },
-}
-
-/// Returns the typed declaration capability used by this fixture.
-fn definition_key() -> CapabilityKey<u32> {
-    CapabilityKey::new(CapabilityId::new("example.generic_definition").expect("valid capability ID"))
-}
-
-/// Verifies definition-member lookup states retain source and origin evidence.
 #[test]
-fn test_snapshot_definition_capability_members_retain_lookup_and_provenance() {
-    let found_key = CapabilityKey::new(CapabilityId::new("example.definition.found").expect("valid ID"));
-    let fact_key = CapabilityKey::<String>::new(CapabilityId::new("example.definition.fact").expect("valid ID"));
-    let mismatch_key = CapabilityKey::<usize>::new(CapabilityId::new("example.definition.mismatch").expect("valid ID"));
-    let missing_key = CapabilityKey::<usize>::new(CapabilityId::new("example.definition.missing").expect("valid ID"));
-    let definition = TypeDescriptor::of::<GenericRecord<u8>>()
-        .type_definition()
-        .expect("generic definition");
-    let capability_source = FragmentIdentity::new("fixture", "definitions", 30, 1, "capability", 30);
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_definition(
-        definition,
-        FragmentIdentity::new("fixture", "definitions", 10, 1, "definition", 10),
-    );
-    builder.add_definition_capabilities(
-        definition,
-        vec![
-            CapabilityDescriptor::with_adapter(found_key, 42_usize),
-            CapabilityDescriptor::without_adapter(fact_key),
-            CapabilityDescriptor::without_adapter(CapabilityKey::<u64>::new(*mismatch_key.id())),
-        ],
-        capability_source.clone(),
-    );
-    let capability_only_definition = TypeDescriptor::of::<GenericEnum<u8>>()
-        .type_definition()
-        .expect("generic definition");
-    builder.add_definition_capabilities(
-        capability_only_definition,
-        vec![CapabilityDescriptor::with_adapter(found_key, 44_usize)],
-        FragmentIdentity::new("fixture", "definitions", 32, 1, "capability", 32),
-    );
-    let registry = builder.build().expect("valid definition capability snapshot");
+fn generic_definition_is_available_from_the_concrete_type_descriptor() {
+    let context = ReflectionContext::builder()
+        .include_type::<GenericContextRecord<u32>>()
+        .build()
+        .expect("a concrete generic type registration is valid");
+    let concrete = context.type_of::<GenericContextRecord<u32>>();
+    let definition = concrete
+        .definition()
+        .expect("generic type has a definition");
 
-    let found_member = registry
-        .definition_capability_members(found_key)
-        .next()
-        .expect("registered definition member");
-    assert_eq!(found_member.target().id(), definition.id());
-    assert!(matches!(
-        found_member.lookup(),
-        CapabilityLookup::Found(value) if **value == 42,
-    ));
-    assert_eq!(found_member.source(), &capability_source);
+    assert_eq!(definition.name(), "GenericContextRecord");
+    assert!(definition.path().ends_with("GenericContextRecord"));
+    assert_eq!(concrete.generic_arguments().len(), 1);
     assert_eq!(
-        found_member.origin(),
-        &CapabilityOrigin::Registered {
-            source: capability_source,
-        },
+        concrete
+            .field("value")
+            .expect("field metadata is retained")
+            .name(),
+        "value"
     );
-    assert!(matches!(
-        registry
-            .definition_capability_members(fact_key)
-            .next()
-            .expect("fact-only member")
-            .lookup(),
-        CapabilityLookup::FactOnly(_),
-    ));
-    assert!(matches!(
-        registry
-            .definition_capability_members(mismatch_key)
-            .next()
-            .expect("mismatched member")
-            .lookup(),
-        CapabilityLookup::AdapterTypeMismatch { .. },
-    ));
-    assert!(registry.definition_capability_members(missing_key).next().is_none());
-    assert_eq!(registry.definitions().len(), 1);
+
+    let found = context
+        .type_definition_by_name(definition.path())
+        .expect("the context indexes the source definition");
+    assert_eq!(found.id(), definition.id());
+    assert!(std::ptr::eq(found.context(), &context));
     assert_eq!(
-        registry
-            .capability_only_definition_targets(found_key.id().as_str())
-            .len(),
-        1
+        TypeDescriptor::of::<GenericContextRecord<u32>>()
+            .definition()
+            .expect("static descriptor also retains the definition")
+            .id(),
+        definition.id()
     );
-}
-
-/// Declares one capability fragment targeting the generic definition itself.
-mod definition_capability_registration {
-    use super::__qubit_reflect_type_definition_GenericRecord;
-    use super::CapabilityDescriptor;
-    use super::CapabilityRegistration;
-    use super::CapabilityTarget;
-    use super::FragmentKind;
-    use super::FragmentPayload;
-    use super::RegistrationFragment;
-    use super::RuntimeIdentity;
-    use super::StaticFragmentIdentity;
-    use super::definition_key;
-    use super::inventory;
-
-    /// Returns the exact definition capability target.
-    fn runtime_identity() -> RuntimeIdentity {
-        RuntimeIdentity::Capabilities(CapabilityTarget::TypeDefinition(
-            __qubit_reflect_type_definition_GenericRecord().id(),
-        ))
-    }
-
-    /// Builds the typed definition capability payload.
-    fn payload() -> FragmentPayload {
-        FragmentPayload::Capability(CapabilityRegistration::for_definition(
-            __qubit_reflect_type_definition_GenericRecord(),
-            vec![CapabilityDescriptor::with_adapter(definition_key(), 7_u32)],
-        ))
-    }
-
-    inventory::submit! {
-        RegistrationFragment::new(
-            FragmentKind::Capability,
-            StaticFragmentIdentity::new(
-                env!("CARGO_PKG_NAME"),
-                module_path!(),
-                line!(),
-                column!(),
-                "definition-capability",
-                1,
-            ),
-            runtime_identity,
-            payload,
-        )
-    }
-}
-
-/// Verifies a generic declaration is registered without registering a
-/// concrete monomorph as a root.
-#[test]
-fn test_registry_registers_generic_type_definition() {
-    let registry = ReflectRegistry::initialize().expect("generic definitions must register");
-    let concrete = TypeDescriptor::of::<GenericRecord<u8>>();
-    let definition = concrete.type_definition().expect("generic source definition");
-
-    assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
-        definition,
-    ));
-    assert_eq!(definition.query_name(), "GenericRecord");
-    assert!(definition.rust_path().ends_with("::GenericRecord"));
-    assert_eq!(definition.generics().parameters().len(), 1);
-    assert_eq!(definition.fields().expect("struct fields").len(), 1);
-    assert!(registry.definition_source(definition.id()).is_some());
-    assert_eq!(
-        registry.definitions_with_identity().count(),
-        registry.definitions().len()
-    );
-    assert_eq!(
-        registry.definition_capability(definition.id(), definition_key()),
-        Ok(Some(&7_u32)),
-    );
-    assert!(
-        registry
-            .definition_capability_by_id(definition.id(), "example.generic_definition")
-            .is_some()
-    );
-    let definition_members: Vec<_> = registry.definition_capability_members(definition_key()).collect();
-    assert_eq!(definition_members.len(), 1);
-    assert_eq!(definition_members[0].target().id(), definition.id());
-    assert!(matches!(
-        definition_members[0].lookup(),
-        CapabilityLookup::Found(value) if **value == 7_u32,
-    ));
-    assert_eq!(
-        definition_members[0].source(),
-        registry
-            .definition_capability_source(definition.id(), definition_key().id().as_str())
-            .expect("registered definition capability source"),
-    );
-    assert!(
-        registry
-            .find_definitions_by_query_name("GenericRecord")
-            .iter()
-            .any(|candidate| candidate.id() == definition.id())
-    );
-    assert!(registry.get(concrete.type_id()).is_none());
-    assert!(
-        registry
-            .capability(concrete, clone_key())
-            .expect("valid capability declarations")
-            .is_some()
-    );
-}
-
-/// Verifies concrete monomorphs share one declaration identity while retaining
-/// distinct runtime type identities.
-#[test]
-fn test_concrete_monomorphs_share_definition_identity() {
-    let left = TypeDescriptor::of::<GenericRecord<u8>>();
-    let right = TypeDescriptor::of::<GenericRecord<String>>();
-
-    assert_eq!(left.definition_id(), right.definition_id());
-    assert_ne!(left.type_id(), right.type_id());
-    assert_ne!(
-        left.generic_arguments()
-            .and_then(|arguments| arguments.type_argument(0))
-            .expect("left concrete argument")
-            .type_id(),
-        right
-            .generic_arguments()
-            .and_then(|arguments| arguments.type_argument(0))
-            .expect("right concrete argument")
-            .type_id(),
-    );
-}
-
-/// Verifies enum declaration accessors expose only source-level structure.
-#[test]
-fn test_generic_enum_definition_exposes_source_structure() {
-    let _values = [
-        GenericEnum::Unit,
-        GenericEnum::Tuple(1_u8),
-        GenericEnum::Struct { value: 2_u8 },
-    ];
-    let descriptor = TypeDescriptor::of::<GenericEnum<u8>>();
-    let definition = descriptor.type_definition().expect("generic enum definition");
-    let variants = definition.variants().expect("enum variants");
-
-    assert!(matches!(definition.data(), TypeDefinitionData::Enum { .. }));
-    assert_eq!(
-        definition.id().marker_type_id(),
-        descriptor
-            .definition_id()
-            .expect("generic definition ID")
-            .marker_type_id()
-    );
-    assert_eq!(variants.len(), 3);
-    assert_eq!(variants[0].index(), 0);
-    assert_eq!(variants[0].rust_name(), "Unit");
-    assert_eq!(variants[0].query_name(), "Unit");
-    assert_eq!(variants[0].kind(), VariantKind::Unit);
-    assert!(variants[0].fields().is_empty());
-
-    let tuple_field = &variants[1].fields()[0];
-    assert_eq!(tuple_field.index(), 0);
-    assert_eq!(tuple_field.rust_name(), None);
-    assert_eq!(tuple_field.query_name(), None);
-    let _declared_type = tuple_field.ty();
-    assert_eq!(tuple_field.visibility().kind(), VisibilityKind::Private);
-
-    let registry = ReflectRegistry::initialize().expect("generic enum must register");
-    let candidates = registry.find_definitions_by_rust_path(definition.rust_path());
-    assert_eq!(candidates.len(), 1);
-    assert!(!candidates.is_empty());
-    assert_eq!(candidates.iter().count(), 1);
-    assert!(std::ptr::eq(
-        candidates.only().expect("sole definition candidate"),
-        definition,
-    ));
-    let missing = TypeDefinitionId::of::<MissingDefinition>();
-    assert!(registry.definition(missing).is_none());
-    assert!(registry.definition_capabilities(missing).is_none());
-    assert!(
-        registry
-            .definition_capability(missing, definition_key())
-            .expect("missing definition capability lookup is valid")
-            .is_none()
-    );
-    assert!(
-        registry
-            .definition_capability_by_id(missing, "example.generic_definition")
-            .is_none()
-    );
-}
-
-struct MissingDefinition;
-
-/// Verifies all declaration constructors preserve their kind-specific shape.
-#[test]
-fn test_type_definition_constructors_preserve_declared_shape() {
-    let generics = Box::leak(Box::new(GenericDefinitionDescriptor::new([], [])));
-    let opaque = TypeDefinitionDescriptor::opaque(
-        TypeDefinitionId::of::<OpaqueMarker>(),
-        "example::Opaque",
-        "Opaque",
-        generics,
-    );
-    let structure = TypeDefinitionDescriptor::struct_type(
-        TypeDefinitionId::of::<StructMarker>(),
-        "example::Structure",
-        "Structure",
-        generics,
-        StructKind::Unit,
-        &[],
-    );
-    let enumeration = TypeDefinitionDescriptor::enum_type(
-        TypeDefinitionId::of::<EnumMarker>(),
-        "example::Enumeration",
-        "Enumeration",
-        generics,
-        &[],
-    );
-
-    assert!(matches!(opaque.data(), TypeDefinitionData::Opaque));
-    assert!(opaque.fields().is_none());
-    assert!(opaque.variants().is_none());
-    assert!(structure.fields().expect("struct fields").is_empty());
-    assert!(structure.variants().is_none());
-    assert!(enumeration.variants().expect("enum variants").is_empty());
-    assert!(enumeration.fields().is_none());
-}
-
-struct OpaqueMarker;
-struct StructMarker;
-struct EnumMarker;
-
-#[derive(Clone, Default)]
-#[Reflect]
-#[reflect(capabilities(Clone, Default, concrete_provider))]
-struct CapabilityRecord<T: Clone + Default> {
-    value: T,
-}
-
-#[derive(Clone)]
-#[Reflect]
-#[reflect(capabilities(Clone, concrete_provider))]
-enum CapabilityEnum<T: Clone> {
-    Value(T),
-}
-
-/// Returns the exact concrete identity through a custom typed adapter.
-fn concrete_provider<T: 'static>() -> CapabilityDescriptor {
-    CapabilityDescriptor::with_adapter(concrete_key(), TypeId::of::<T> as fn() -> TypeId)
-}
-
-/// Identifies the custom provider contract shared by all concrete instances.
-fn concrete_key() -> CapabilityKey<fn() -> std::any::TypeId> {
-    CapabilityKey::new(CapabilityId::new("example.concrete_identity").expect("valid capability ID"))
-}
-
-/// Executes adapters instead of merely checking that capability IDs exist.
-fn assert_concrete_capabilities<T: Reflect + Clone>(value: T, registry: &ReflectRegistry) {
-    let descriptor = TypeDescriptor::of::<T>();
-    let cloned = registry
-        .capability(descriptor, clone_key())
-        .expect("valid capability declarations")
-        .expect("clone adapter")
-        .clone_value(&value as &dyn std::any::Any)
-        .expect("clone must accept its exact monomorph");
-    assert!(cloned.downcast_ref::<T>().is_some());
-    assert_eq!(
-        registry
-            .capability(descriptor, concrete_key())
-            .expect("valid capability declarations")
-            .expect("custom provider")(),
-        TypeId::of::<T>()
-    );
-    if let Some(default) = registry
-        .capability(descriptor, default_key())
-        .expect("valid capability declarations")
-    {
-        assert!(
-            default.create().downcast_ref::<T>().is_some(),
-            "default must create its exact monomorph"
-        );
-    }
-}
-
-/// Different generic arguments must never share concrete capability adapters.
-#[test]
-fn test_generic_capabilities_preserve_each_monomorph() {
-    let registry = ReflectRegistry::initialize().expect("valid registry");
-    assert_concrete_capabilities(CapabilityRecord { value: 7_u32 }, registry);
-    assert_concrete_capabilities(
-        CapabilityRecord {
-            value: String::from("second"),
-        },
-        registry,
-    );
-    assert_concrete_capabilities(CapabilityEnum::Value(String::from("first")), registry);
-    assert_concrete_capabilities(CapabilityEnum::Value(9_u32), registry);
-    thread::scope(|scope| {
-        for _ in 0..8 {
-            scope.spawn(|| {
-                assert_concrete_capabilities(CapabilityRecord { value: 3_u64 }, registry);
-                assert_concrete_capabilities(CapabilityRecord { value: false }, registry);
-            });
-        }
-    });
-}
-
-#[Reflect]
-#[reflect(definition_provider_v2 = domain_definition)]
-struct DomainDefinition<T> {
-    value: T,
-}
-
-/// The facade chooses the provider name through the versioned contract.
-#[test]
-fn test_explicit_definition_provider_needs_no_monomorph() {
-    let registry = ReflectRegistry::initialize().expect("valid definitions");
-    let definition = domain_definition();
-    assert!(std::ptr::eq(
-        registry.definition(definition.id()).expect("registered definition"),
-        definition
-    ));
-    assert_eq!(definition.query_name(), "DomainDefinition");
-    assert!(std::ptr::eq(
-        TypeDescriptor::of::<DomainDefinition<u8>>()
-            .type_definition()
-            .expect("concrete link"),
-        definition
-    ));
 }

@@ -6,39 +6,36 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public reflected-type registration integration tests.
+//! Public contracts for derive-generated type registrations.
+
+#![cfg(feature = "derive")]
 
 use std::any::TypeId;
 
-use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
-use qubit_reflect::descriptor::Reflect;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::register_reflected_type;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::{Reflect, ReflectionContext};
 
-struct ManuallyReflected;
-
-static MANUALLY_REFLECTED_DESCRIPTOR: TypeDescriptor = opaque_root::<ManuallyReflected>("ManuallyReflected");
-
-impl Reflect for ManuallyReflected {
-    /// Returns the manually authored descriptor used by this integration test.
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &MANUALLY_REFLECTED_DESCRIPTOR
-    }
+#[Reflect]
+struct DerivedRegistration {
+    id: u16,
 }
 
-register_reflected_type!(ManuallyReflected);
-
-/// Verifies the public registration macro contributes to the central registry.
 #[test]
-fn test_register_reflected_type_adds_type_to_reflect_registry() {
-    let registry = ReflectRegistry::initialize().expect("the registration must produce a valid registry");
-    let registered = registry
-        .get(TypeId::of::<ManuallyReflected>())
-        .expect("the manually registered type must be discoverable");
+fn derived_registration_is_discovered_by_an_explicit_context() {
+    let context = ReflectionContext::builder()
+        .include_linked_for::<DerivedRegistration>()
+        .build()
+        .expect("the selected type registration and its dependencies are valid");
+    let descriptor = context
+        .type_by_name(std::any::type_name::<DerivedRegistration>())
+        .expect("the derived type is discoverable in the context");
 
-    assert!(
-        std::ptr::eq(registered, ManuallyReflected::type_descriptor()),
-        "the registry must retain the manually authored descriptor"
+    assert_eq!(descriptor.type_id(), TypeId::of::<DerivedRegistration>());
+    assert!(std::ptr::eq(descriptor.context(), &context));
+    assert_eq!(
+        descriptor
+            .field("id")
+            .expect("field metadata is retained")
+            .name(),
+        "id"
     );
 }

@@ -6,47 +6,27 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::error::RegistryError;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::identity::FragmentIdentity;
+//! Lookup errors retain the query and subject as structured data.
 
-fn fragment(module: &'static str, line: u32) -> FragmentIdentity {
-    FragmentIdentity::new(
-        "registry-error-test",
-        module,
-        line,
-        3,
-        "method-binding",
-        u64::from(line),
-    )
-}
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::error::{LookupError, LookupQuery, LookupSubject};
 
 #[test]
-fn ambiguous_method_binding_error_keeps_selector_count_and_location() {
-    let declaration = fragment("crate::service", 41);
-    let error = RegistryError::method_binding_ambiguous(declaration.clone(), "render", 2);
+fn missing_type_error_keeps_the_exact_query() {
+    let context = ReflectionContext::builder()
+        .build()
+        .expect("an empty context is valid");
+    let result = context.type_by_name("missing::Type");
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("an absent type must fail lookup"),
+    };
 
-    assert_eq!(error.kind(), RegistryErrorKind::MethodBindingAmbiguous);
-    assert_eq!(error.method_binding_name(), Some("render"));
-    assert_eq!(error.method_binding_matches(), Some(2));
-    assert_eq!(error.fragment_identity(), Some(&declaration));
-    assert_eq!(error.conflicting_fragments(), None);
-    assert_eq!(
-        error.to_string(),
-        "reflection registry error: MethodBindingAmbiguous for method binding `render` (2 matches) at registry-error-test::crate::service:41:3 [method-binding; fingerprint=0x29]",
-    );
-}
-
-#[test]
-fn duplicate_method_binding_error_keeps_both_declarations_and_selector() {
-    let first = fragment("crate::first", 17);
-    let second = fragment("crate::second", 29);
-    let error = RegistryError::method_binding_conflict(first.clone(), second.clone(), "render");
-
-    assert_eq!(error.kind(), RegistryErrorKind::MethodBindingConflict);
-    assert_eq!(error.method_binding_name(), Some("render"));
-    assert_eq!(error.method_binding_matches(), Some(2));
-    assert_eq!(error.fragment_identity(), None);
-    assert_eq!(error.conflicting_fragments(), Some((&first, &second)));
-    assert!(std::error::Error::source(&error).is_none());
+    assert!(matches!(
+        error,
+        LookupError::Missing {
+            subject: LookupSubject::Type,
+            query: LookupQuery::Name(name),
+        } if name.as_ref() == "missing::Type"
+    ));
 }

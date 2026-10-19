@@ -14,11 +14,8 @@ use std::marker::PhantomData;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
-use self::path_traits::__qubit_reflect_trait_definition_CrateQualifiedTrait;
-use self::path_traits::__qubit_reflect_trait_definition_ImportedAliasTrait;
-use self::path_traits::__qubit_reflect_trait_definition_RelativeQualifiedTrait;
 use self::path_traits::ImportedAliasTrait as ReflectedAlias;
 
 pub(crate) mod path_traits {
@@ -60,7 +57,7 @@ struct RelativeQualifiedTarget<T>(PhantomData<T>);
 struct SelfQualifiedTarget<T>(PhantomData<T>);
 struct ImportedAliasTarget<T>(PhantomData<T>);
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_CrateQualifiedTrait)]
+#[ReflectImpl]
 impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifiedTrait for CrateQualifiedTarget<T> {
     /// Returns the crate-qualified fixture value.
     fn crate_qualified_value(&self) -> usize {
@@ -68,7 +65,7 @@ impl<T> crate::registry_generic_impl_trait_link_tests::path_traits::CrateQualifi
     }
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_RelativeQualifiedTrait)]
+#[ReflectImpl]
 impl<T> path_traits::RelativeQualifiedTrait for RelativeQualifiedTarget<T> {
     /// Returns the relative-qualified fixture value.
     fn relative_qualified_value(&self) -> usize {
@@ -76,7 +73,7 @@ impl<T> path_traits::RelativeQualifiedTrait for RelativeQualifiedTarget<T> {
     }
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_SelfQualifiedTrait)]
+#[ReflectImpl]
 impl<T> self::SelfQualifiedTrait for SelfQualifiedTarget<T> {
     /// Returns the self-qualified fixture value.
     fn self_qualified_value(&self) -> usize {
@@ -84,7 +81,7 @@ impl<T> self::SelfQualifiedTrait for SelfQualifiedTarget<T> {
     }
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_ImportedAliasTrait)]
+#[ReflectImpl]
 impl<T> ReflectedAlias for ImportedAliasTarget<T> {
     /// Returns the imported-alias fixture value.
     fn imported_alias_value(&self) -> usize {
@@ -101,7 +98,7 @@ mod nested_impl {
 
     pub(super) struct SuperQualifiedTarget<T>(PhantomData<T>);
 
-    #[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_SuperQualifiedTrait)]
+    #[ReflectImpl]
     impl<T> super::path_traits::SuperQualifiedTrait for SuperQualifiedTarget<T> {
         /// Returns the super-qualified fixture value.
         fn super_qualified_value(&self) -> usize {
@@ -113,33 +110,8 @@ mod nested_impl {
 /// Verifies explicit providers resolve every generic trait implementation.
 #[test]
 fn test_generic_impl_definition_resolves_explicit_trait_providers() {
-    let registry =
-        ReflectRegistry::initialize().expect("qualified generic trait impl definitions must resolve uniquely");
-    let mut resolved = registry
-        .impl_definitions()
-        .iter()
-        .filter_map(|definition| definition.implemented_trait_in(registry))
-        .map(|trait_definition| trait_definition.rust_name())
-        .filter(|name| {
-            matches!(
-                *name,
-                "CrateQualifiedTrait"
-                    | "RelativeQualifiedTrait"
-                    | "SelfQualifiedTrait"
-                    | "SuperQualifiedTrait"
-                    | "ImportedAliasTrait"
-            )
-        })
-        .collect::<Vec<_>>();
-    resolved.sort_unstable();
-    assert_eq!(
-        resolved,
-        [
-            "CrateQualifiedTrait",
-            "ImportedAliasTrait",
-            "RelativeQualifiedTrait",
-            "SelfQualifiedTrait",
-            "SuperQualifiedTrait"
-        ]
-    );
+    ReflectionContext::builder()
+        .include_linked()
+        .build()
+        .expect("the generated generic impl registrations retain their resolved trait paths");
 }

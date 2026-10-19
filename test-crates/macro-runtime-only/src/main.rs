@@ -12,7 +12,6 @@ use qubit_reflect_derive::Reflect;
 use qubit_reflect_derive::ReflectImpl;
 
 #[Reflect]
-#[reflect(opaque)]
 struct RuntimeOnlyTarget;
 
 #[Reflect]

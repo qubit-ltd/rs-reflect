@@ -6,20 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public contracts for typed capability keys.
+//! Public contracts for capability type specifications.
 
-use std::any::TypeId;
+use qubit_reflect::capability::{CapabilitySpec, CloneAdapter, CloneCapability};
 
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::identity::CapabilityId;
+fn assert_clone_adapter<C: CapabilitySpec<Adapter = CloneAdapter>>() {}
 
 #[test]
-fn test_key_clone_and_debug_preserve_contract() {
-    let id = CapabilityId::new("example.test.key").expect("valid capability ID");
-    let key = CapabilityKey::<u32>::new(id);
-    let clone = Clone::clone(&key);
-
-    assert_eq!(clone.id(), key.id());
-    assert_eq!(clone.adapter_type(), TypeId::of::<u32>());
-    assert!(format!("{key:?}").contains("CapabilityKey"));
+fn built_in_capability_spec_binds_id_and_adapter_type() {
+    assert_clone_adapter::<CloneCapability>();
+    assert_eq!(CloneCapability::ID, "qubit.reflect.clone");
 }

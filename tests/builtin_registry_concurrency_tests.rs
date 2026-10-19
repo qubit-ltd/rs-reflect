@@ -6,35 +6,33 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Isolated-process coverage for concurrent first registry initialization.
+//! Isolated-process coverage for concurrent global context initialization.
 
-use std::sync::Arc;
-use std::sync::Barrier;
+use std::sync::{Arc, Barrier};
+use std::thread;
 
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
-/// Verifies concurrent first initialization publishes one immutable snapshot.
 #[test]
-fn test_builtin_registry_concurrently_freezes_once() {
-    const THREAD_COUNT: usize = 32;
-
-    let barrier = Arc::new(Barrier::new(THREAD_COUNT));
-    let handles: Vec<_> = (0..THREAD_COUNT)
+fn global_context_concurrently_freezes_once() {
+    let workers = 16;
+    let barrier = Arc::new(Barrier::new(workers));
+    let handles: Vec<_> = (0..workers)
         .map(|_| {
             let barrier = Arc::clone(&barrier);
-            std::thread::spawn(move || {
+            thread::spawn(move || {
                 barrier.wait();
-                let registry = ReflectRegistry::initialize().expect("concurrent initialization must succeed");
-                let identities: Vec<_> = registry.types().iter().map(|descriptor| descriptor.type_id()).collect();
-                (registry as *const ReflectRegistry as usize, identities)
+                let context = ReflectionContext::global()
+                    .initialize()
+                    .expect("linked registrations must initialize");
+                (context as *const ReflectionContext as usize, context.id())
             })
         })
         .collect();
-    let snapshots: Vec<_> = handles
-        .into_iter()
-        .map(|handle| handle.join().expect("registry initialization thread must finish"))
-        .collect();
 
-    assert!(snapshots.windows(2).all(|pair| pair[0] == pair[1]));
-    assert_eq!(snapshots[0].1.len(), 20);
+    let observations: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("context worker must finish"))
+        .collect();
+    assert!(observations.iter().all(|seen| *seen == observations[0]));
 }

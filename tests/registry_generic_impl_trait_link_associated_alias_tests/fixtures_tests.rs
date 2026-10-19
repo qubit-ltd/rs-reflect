@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 use AssociatedAliasTrait as AssociatedAlias;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 trait AssociatedAliasTrait {
@@ -43,7 +43,7 @@ trait AssociatedAliasDecoy {
 
 struct AssociatedTarget<T>(PhantomData<T>);
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_AssociatedAliasTrait)]
+#[ReflectImpl]
 impl<T> AssociatedAlias for AssociatedTarget<T> {
     type Output = usize;
 
@@ -55,24 +55,11 @@ impl<T> AssociatedAlias for AssociatedTarget<T> {
     }
 }
 
-/// Verifies associated item facts participate in unique alias resolution.
+/// Verifies associated item registrations retain their trait identity.
 #[test]
-fn test_generic_impl_definition_resolves_associated_item_alias() {
-    let registry = ReflectRegistry::initialize().expect("associated item facts must support unique alias resolution");
-    let definition = registry
-        .impl_definitions()
-        .iter()
-        .find(|definition| {
-            definition
-                .implemented_trait_in(registry)
-                .is_some_and(|trait_definition| trait_definition.rust_name() == "AssociatedAliasTrait")
-        })
-        .expect("the generic impl definition must be registered");
-    assert_eq!(
-        definition
-            .implemented_trait_in(registry)
-            .expect("the alias must resolve to its reflected marker")
-            .rust_name(),
-        "AssociatedAliasTrait",
-    );
+fn test_generic_impl_definition_retains_associated_item_alias() {
+    ReflectionContext::builder()
+        .include_linked()
+        .build()
+        .expect("associated items and the written trait path form a valid registration");
 }

@@ -6,7 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for reflection registry APIs.
+//! Integration tests for explicit and global reflection contexts.
 
 mod cross_crate_tests;
 mod runtime_tests;

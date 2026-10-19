@@ -6,135 +6,48 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Isolated integration coverage for root aggregation when registry startup
-//! fails.
+//! Static shape access stays independent from context discovery indexes.
 
-use std::any::TypeId;
+#![cfg(feature = "derive")]
 
-use qubit_reflect as reflect;
-use qubit_reflect::__private::codegen_v3::registration::FragmentKind;
-use qubit_reflect::__private::codegen_v3::registration::FragmentPayload;
-use qubit_reflect::__private::codegen_v3::registration::RegistrationFragment;
-use qubit_reflect::__private::codegen_v3::registration::RuntimeIdentity;
-use qubit_reflect::__private::codegen_v3::registration::StaticFragmentIdentity;
-use qubit_reflect::__private::testing::build_registry;
-use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::FieldDescriptor;
-use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeRef;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::identity::Visibility;
+use qubit_reflect::{Reflect, ReflectionContext, TypeDescriptor};
 
-struct RegistryIndependentShape {
-    value: u8,
+#[Reflect]
+struct ContextIndependentShape {
+    value: u32,
 }
 
-/// Resolves the root used by the field fixture.
-fn registry_independent_shape_descriptor() -> &'static TypeDescriptor {
-    &REGISTRY_INDEPENDENT_SHAPE
-}
-
-static VALUE_TYPE_DESCRIPTOR: OpaqueTypeDescriptor = reflect::__private::codegen_v3::descriptor::opaque_member::<u8>();
-static VALUE_TYPE: TypeRef = TypeRef::Opaque(&VALUE_TYPE_DESCRIPTOR);
-static FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descriptor::field(
-    registry_independent_shape_descriptor,
-    0,
-    Some("value"),
-    Some("value"),
-    &VALUE_TYPE,
-    Visibility::Private,
-)];
-static REGISTRY_INDEPENDENT_SHAPE: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<
-    RegistryIndependentShape,
->("RegistryIndependentShape", StructKind::Named, &FIELDS);
-
-impl Reflect for RegistryIndependentShape {
-    /// Returns a structurally valid root that does not initialize the global
-    /// registry.
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &REGISTRY_INDEPENDENT_SHAPE
-    }
-}
-
-const CONFLICTING_IDENTITY: StaticFragmentIdentity =
-    StaticFragmentIdentity::new("type-descriptor-registry-failure-fixture", "conflict", 1, 1, "type", 1);
-
-/// Returns the first conflicting fragment target.
-fn first_target_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Type(TypeId::of::<RegistryIndependentShape>())
-}
-
-/// Returns the second conflicting fragment target.
-fn second_target_identity() -> RuntimeIdentity {
-    RuntimeIdentity::Type(TypeId::of::<u8>())
-}
-
-/// Builds the first conflicting fragment payload.
-fn first_payload() -> FragmentPayload {
-    FragmentPayload::Type(TypeDescriptor::of::<RegistryIndependentShape>())
-}
-
-/// Builds the second conflicting fragment payload.
-fn second_payload() -> FragmentPayload {
-    FragmentPayload::Type(TypeDescriptor::of::<u8>())
-}
-
-reflect::__private::codegen_v3::inventory::submit! {
-    RegistrationFragment::new(
-        FragmentKind::Type,
-        CONFLICTING_IDENTITY,
-        first_target_identity,
-        first_payload,
-    )
-}
-
-reflect::__private::codegen_v3::inventory::submit! {
-    RegistrationFragment::new(
-        FragmentKind::Type,
-        CONFLICTING_IDENTITY,
-        second_target_identity,
-        second_payload,
-    )
-}
-
-/// Verifies aggregation methods propagate one cached registry error while
-/// direct shape navigation remains usable.
 #[test]
-fn test_type_descriptor_aggregation_propagates_cached_registry_error() {
-    let value = RegistryIndependentShape { value: 7 };
-    let descriptor = TypeDescriptor::of::<RegistryIndependentShape>();
-    let first = descriptor
-        .impls_global()
-        .expect_err("duplicate registration fragments must fail initialization");
-    let second = descriptor
-        .methods_global()
-        .expect_err("method aggregation must propagate the cached error");
-    let third = descriptor
-        .methods_named_global("anything")
-        .expect_err("method lookup must propagate the cached error");
+fn type_metadata_remains_available_when_the_context_does_not_index_the_type() {
+    let context = ReflectionContext::builder()
+        .build()
+        .expect("empty explicit contexts are valid");
+    let descriptor = context.type_of::<ContextIndependentShape>();
 
-    assert_eq!(value.value, 7);
-    assert_eq!(first.kind(), RegistryErrorKind::DuplicateFragment);
-    assert_eq!(second.kind(), first.kind());
-    assert_eq!(third.kind(), first.kind());
-    assert_eq!(second.conflicting_fragments(), first.conflicting_fragments());
-    assert_eq!(third.conflicting_fragments(), first.conflicting_fragments());
-    assert_eq!(descriptor.fields().len(), 1);
+    assert!(
+        context
+            .type_by_name(std::any::type_name::<ContextIndependentShape>())
+            .is_err()
+    );
+    assert_eq!(descriptor.context().id(), context.id());
     assert_eq!(
         descriptor
             .field("value")
-            .expect("shape lookup must remain independent")
-            .index(),
-        0
+            .expect("static field metadata is available")
+            .name(),
+        "value"
     );
-
-    let isolated = build_registry(&[]).expect("an empty explicit snapshot is valid");
-    assert!(descriptor.impls_in(&isolated).is_empty());
-    assert!(descriptor.methods_in(&isolated).is_empty());
-    assert!(matches!(
-        descriptor.methods_named_in(&isolated, "anything"),
-        reflect::descriptor::MethodLookup::Missing,
-    ));
+    assert_eq!(
+        TypeDescriptor::of::<ContextIndependentShape>()
+            .field("value")
+            .expect("global descriptor also exposes static shape")
+            .name(),
+        "value"
+    );
+    assert!(
+        context
+            .types()
+            .expect("empty context stays valid")
+            .is_empty()
+    );
 }

@@ -15,8 +15,7 @@ use std::marker::PhantomData;
 use FirstMatchingTrait as AmbiguousAlias;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 trait FirstMatchingTrait {
@@ -40,9 +39,11 @@ impl<T> AmbiguousAlias for AmbiguousTarget<T> {
     }
 }
 
-/// Verifies compatible declaration facts never select an arbitrary marker.
+/// Verifies Rust-resolved trait identity stays attached to the impl metadata.
 #[test]
-fn test_generic_impl_definition_rejects_ambiguous_alias_facts() {
-    let error = ReflectRegistry::initialize().expect_err("identical trait declaration facts must remain ambiguous");
-    assert_eq!(error.kind(), RegistryErrorKind::ImplTraitResolution);
+fn test_generic_impl_definition_uses_the_compiler_resolved_trait() {
+    ReflectionContext::builder()
+        .include_linked()
+        .build()
+        .expect("the impl's written alias identifies its trait declaration");
 }

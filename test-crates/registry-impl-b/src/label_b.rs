@@ -17,7 +17,7 @@ pub trait LabelB {
     fn label_b(&self) -> u8;
 }
 
-#[ReflectImpl(external_trait_id = "fixture.registry.label_b")]
+#[ReflectImpl]
 impl LabelB for RegistryUser {
     fn label_b(&self) -> u8 {
         self.id + 20

@@ -6,34 +6,43 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Public reflected-type registration conflict integration tests.
+//! Tests that ambiguous registration names remain explicit lookup failures.
 
-use qubit_reflect::__private::codegen_v3::descriptor::opaque_root;
-use qubit_reflect::descriptor::Reflect;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::error::RegistryErrorKind;
-use qubit_reflect::register_reflected_type;
-use qubit_reflect::registry::ReflectRegistry;
+#![cfg(feature = "derive")]
 
-struct DuplicateReflectedType;
+use qubit_reflect::{Reflect, ReflectionContext};
 
-static DUPLICATE_REFLECTED_TYPE_DESCRIPTOR: TypeDescriptor =
-    opaque_root::<DuplicateReflectedType>("DuplicateReflectedType");
+mod first {
+    use qubit_reflect::Reflect;
 
-impl Reflect for DuplicateReflectedType {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &DUPLICATE_REFLECTED_TYPE_DESCRIPTOR
-    }
+    #[Reflect]
+    pub struct Duplicate;
 }
 
-register_reflected_type!(DuplicateReflectedType);
-register_reflected_type!(DuplicateReflectedType);
+mod second {
+    use qubit_reflect::Reflect;
 
-/// Verifies duplicate public type registrations fail central initialization.
+    #[Reflect]
+    pub struct Duplicate;
+}
+
 #[test]
-fn test_duplicate_public_type_registration_returns_registry_error() {
-    let error =
-        ReflectRegistry::initialize().expect_err("duplicate public type registrations must invalidate the registry");
+fn short_name_conflict_does_not_pick_a_registration() {
+    let context = ReflectionContext::builder()
+        .include_type::<first::Duplicate>()
+        .include_type::<second::Duplicate>()
+        .build()
+        .expect("different Rust types may share a short name");
 
-    assert_eq!(error.kind(), RegistryErrorKind::IdentityConflict);
+    assert!(context.type_by_short_name("Duplicate").is_err());
+    assert!(
+        context
+            .type_by_name(std::any::type_name::<first::Duplicate>())
+            .is_ok()
+    );
+    assert!(
+        context
+            .type_by_name(std::any::type_name::<second::Duplicate>())
+            .is_ok()
+    );
 }
