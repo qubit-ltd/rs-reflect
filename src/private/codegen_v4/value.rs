@@ -159,6 +159,15 @@ impl<M: ValueMode> DynamicOwned<M> {
         self.inner
     }
 
+    pub(crate) fn from_runtime(
+        inner: runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime>,
+    ) -> Self {
+        Self {
+            inner,
+            mode: PhantomData,
+        }
+    }
+
     /// Returns whether the exact stored type is `T`.
     pub fn is<T: ValueFor<M>>(&self) -> bool {
         self.inner.is::<T>()
