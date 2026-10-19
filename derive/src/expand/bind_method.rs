@@ -456,6 +456,75 @@ pub(crate) fn expand_with_context(
     ))
 }
 
+/// Expands a concrete method binding into a linked method-catalog registration.
+pub(crate) fn expand_registered(input: TokenStream) -> Result<TokenStream> {
+    let context = ExpansionContext::from_attributes(&[])?;
+    expand_registered_with_context(input, &context)
+}
+
+/// Expands a linked registration using a pre-resolved runtime facade.
+pub(crate) fn expand_registered_with_context(
+    input: TokenStream,
+    context: &ExpansionContext,
+) -> Result<TokenStream> {
+    let binding_input: BindingInput = parse2(input.clone())?;
+    let target_type = binding_target_type(&binding_input.method)?;
+    let binding = expand_with_context(input.clone(), context)?;
+    let provider = registered_provider_ident(&input, binding_input.method.span());
+    let facade = context.facade().clone();
+    let codegen = quote!(#facade::__private::codegen_v4);
+    Ok(crate::expand::invocation::emit::rewrite_codegen_paths(
+        quote! {
+            fn #provider() -> &'static [#codegen::invoke::EffectiveMethod] {
+                static VALUE: ::std::sync::OnceLock<
+                    ::std::boxed::Box<[#codegen::invoke::EffectiveMethod]>,
+                > = ::std::sync::OnceLock::new();
+                VALUE.get_or_init(|| {
+                    let binding = #binding;
+                    ::std::vec![binding.effective()].into_boxed_slice()
+                })
+            }
+            #codegen::invoke::submit_method_catalog_provider!(#target_type, #provider);
+        },
+    ))
+}
+
+fn binding_target_type(method_path: &ExprPath) -> Result<Type> {
+    if let Some(qself) = &method_path.qself {
+        return Ok((*qself.ty).clone());
+    }
+    let mut prefix = method_path.path.clone();
+    prefix.segments.pop();
+    if prefix.segments.trailing_punct() {
+        prefix.segments.pop_punct();
+    }
+    if prefix.segments.is_empty() {
+        return Err(syn::Error::new_spanned(
+            method_path,
+            "method path must include a concrete target type",
+        ));
+    }
+    for segment in &mut prefix.segments {
+        if let syn::PathArguments::AngleBracketed(arguments) = &mut segment.arguments {
+            arguments.colon2_token = None;
+        }
+    }
+    Ok(Type::Path(syn::TypePath {
+        qself: None,
+        path: prefix,
+        attrs: Vec::new(),
+    }))
+}
+
+fn registered_provider_ident(input: &TokenStream, span: proc_macro2::Span) -> proc_macro2::Ident {
+    let start = span.start();
+    let source = format!("{input}:{}:{}", start.line, start.column);
+    let hash = source.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    });
+    format_ident!("__qubit_reflect_registered_method_catalog_{hash:016x}")
+}
+
 fn specialization_argument(
     argument: &syn::GenericArgument,
     facade: &TokenStream,

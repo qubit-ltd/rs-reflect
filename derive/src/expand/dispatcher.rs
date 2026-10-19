@@ -473,6 +473,28 @@ mod tests {
     }
 
     #[test]
+    fn test_registered_method_binding_emits_provider_macro() {
+        let context = ExpansionContext::for_tests();
+        let tokens = crate::expand::bind_method::expand_registered_with_context(
+            quote!(demo::Counter::convert::<u64> as fn(&Counter, String) -> u64),
+            &context,
+        )
+        .expect("a registered generic method binding should parse");
+        assert_codegen_v4(&tokens);
+        let source = tokens.to_string();
+        assert!(
+            source.contains("submit_method_catalog_provider !")
+                && source.contains("OnceLock")
+                && source.contains("MethodSpecializationSpec"),
+            "registered bindings should lazily provide typed catalog entries: {source}"
+        );
+        assert!(
+            !source.contains("inventory :: submit") && !source.contains("codegen_v3"),
+            "registered binding tokens must delegate inventory and use only v4: {source}"
+        );
+    }
+
+    #[test]
     fn test_generic_method_binding_preserves_typed_specialization_arguments() {
         let context = ExpansionContext::for_tests();
         let tokens = crate::expand::bind_method::expand_with_context(
