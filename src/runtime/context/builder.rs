@@ -10,17 +10,17 @@ use super::data::ContextData;
 use super::registration::{Registration, RegistrationFragment};
 
 #[derive(Default)]
-pub(crate) struct ReflectionContextBuilder {
+pub struct ReflectionContextBuilder {
     registrations: Vec<Registration>,
     issues: Vec<ContextIssue>,
 }
 
 impl ReflectionContextBuilder {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
-    pub(crate) fn include_linked(mut self) -> Self {
+    pub fn include_linked(mut self) -> Self {
         let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>
             .into_iter()
             .copied()
@@ -35,12 +35,12 @@ impl ReflectionContextBuilder {
         self
     }
 
-    pub(crate) fn include_type<T: Reflect>(mut self) -> Self {
+    pub fn include_type<T: Reflect>(mut self) -> Self {
         self.registrations.push(Registration::of::<T>());
         self
     }
 
-    pub(crate) fn include_linked_for<T: Reflect>(self) -> Self {
+    pub fn include_linked_for<T: Reflect>(self) -> Self {
         let ReflectionContextBuilder {
             mut registrations,
             mut issues,
@@ -124,12 +124,14 @@ impl ReflectionContextBuilder {
         }
     }
 
-    pub(crate) fn register(mut self, registration: impl Into<Registration>) -> Self {
-        self.registrations.push(registration.into());
+    pub fn register(mut self, registration: impl Into<Registration>) -> Self {
+        let mut registration = registration.into();
+        self.issues.extend(registration.take_issues());
+        self.registrations.push(registration);
         self
     }
 
-    pub(crate) fn build(self) -> Result<ReflectionContext, ContextError> {
+    pub fn build(self) -> Result<ReflectionContext, ContextError> {
         if let Some(error) = ContextError::from_issues(self.issues.clone().into_boxed_slice()) {
             return Err(error);
         }
@@ -156,11 +158,11 @@ fn type_item_identity(type_id: TypeId) -> ItemIdentity {
 }
 
 impl ReflectionContext {
-    pub(crate) fn builder() -> ReflectionContextBuilder {
+    pub fn builder() -> ReflectionContextBuilder {
         ReflectionContextBuilder::new()
     }
 
-    pub(crate) fn type_of<T: Reflect>(&self) -> TypeDescriptor<'_> {
-        TypeDescriptor::new(T::__reflect_registration().metadata(), self)
+    pub fn type_of<T: Reflect + ?Sized>(&self) -> TypeDescriptor<'_> {
+        TypeDescriptor::of_in::<T>(self)
     }
 }

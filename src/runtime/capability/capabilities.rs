@@ -12,17 +12,24 @@ pub(crate) struct CapabilityRecord {
     pub(super) target: CapabilityTargetId,
     pub(super) id: CapabilityIdentifier,
     pub(super) adapter_type: TypeId,
-    pub(super) adapter: Box<dyn std::any::Any + Send + Sync>,
+    pub(super) adapter: std::sync::Arc<dyn std::any::Any + Send + Sync>,
     pub(super) origin: CapabilityOrigin,
 }
 
 /// An immutable capability set belonging to one reflection target.
-pub(crate) struct Capabilities {
+pub struct Capabilities {
     pub(super) target: CapabilityTargetId,
     pub(super) records: Box<[CapabilityRecord]>,
 }
 
 impl Capabilities {
+    pub(crate) fn empty(target: CapabilityTargetId) -> Self {
+        Self {
+            target,
+            records: Box::new([]),
+        }
+    }
+
     pub(crate) fn try_new(
         target: CapabilityTargetId,
         registrations: impl IntoIterator<Item = CapabilityRegistration>,
@@ -41,7 +48,7 @@ impl Capabilities {
                 target: registration.target,
                 id: registration.id,
                 adapter_type,
-                adapter: registration.adapter,
+                adapter: std::sync::Arc::from(registration.adapter),
                 origin: registration.origin,
             };
             if let Some(previous) = by_id.remove(&record.id) {
@@ -74,30 +81,30 @@ impl Capabilities {
         &self.target
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.records.len()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
-    pub(crate) fn get(&self, id: &str) -> Option<CapabilityDescriptor<'_>> {
+    pub fn get(&self, id: &str) -> Option<CapabilityDescriptor<'_>> {
         self.records
             .iter()
             .find(|record| record.id.as_str() == id)
             .map(|record| CapabilityDescriptor { record })
     }
 
-    pub(crate) fn iter(&self) -> impl ExactSizeIterator<Item = CapabilityDescriptor<'_>> + '_ {
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = CapabilityDescriptor<'_>> + '_ {
         self.records
             .iter()
             .map(|record| CapabilityDescriptor { record })
     }
 
-    pub(crate) fn find<C: CapabilitySpec>(
+    pub(crate) fn find<'ctx, C: CapabilitySpec>(
         &self,
-    ) -> Result<Option<super::capability::Capability<'_, C>>, CapabilityError> {
+    ) -> Result<Option<super::capability::Capability<'ctx, C>>, CapabilityError> {
         let Some(descriptor) = self.get(C::ID) else {
             return Ok(None);
         };
@@ -120,9 +127,9 @@ impl Capabilities {
             })
     }
 
-    pub(crate) fn capability<C: CapabilitySpec>(
+    pub(crate) fn capability<'ctx, C: CapabilitySpec>(
         &self,
-    ) -> Result<super::capability::Capability<'_, C>, CapabilityError> {
+    ) -> Result<super::capability::Capability<'ctx, C>, CapabilityError> {
         self.find::<C>()?.ok_or_else(|| CapabilityError::Missing {
             target: self.target.clone(),
             capability_id: C::ID,

@@ -24,12 +24,12 @@ struct U64AdapterSpec;
 
 impl CapabilitySpec for U32AdapterSpec {
     type Adapter = u32;
-    const ID: &'static str = "example.context.adapter-conflict";
+    const ID: &'static str = "example.context.adapter_conflict";
 }
 
 impl CapabilitySpec for U64AdapterSpec {
     type Adapter = u64;
-    const ID: &'static str = "example.context.adapter-conflict";
+    const ID: &'static str = "example.context.adapter_conflict";
 }
 
 #[test]

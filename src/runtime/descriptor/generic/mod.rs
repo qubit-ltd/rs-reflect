@@ -14,7 +14,7 @@ use crate::runtime::identity::{ItemIdentity, ItemKind, LookupCandidate, StableIt
 
 /// Process-local identity of one generic source declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct TypeDefinitionId(fn() -> TypeId);
+pub struct TypeDefinitionId(fn() -> TypeId);
 
 impl TypeDefinitionId {
     /// Creates an identity from a generated marker type.
@@ -122,6 +122,12 @@ impl TypeDefinitionMetadata {
             generics,
         }
     }
+
+    /// Returns the declaration's generic parameters in source order.
+    #[doc(hidden)]
+    pub const fn parameters(&self) -> &'static [GenericParameterMetadata] {
+        self.generics.parameters
+    }
 }
 
 impl GenericDefinitionMetadata {
@@ -134,6 +140,12 @@ impl GenericDefinitionMetadata {
             parameters,
             predicates,
         }
+    }
+
+    /// Returns the declaration's generic parameters in source order.
+    #[doc(hidden)]
+    pub const fn parameters(&self) -> &'static [GenericParameterMetadata] {
+        self.parameters
     }
 }
 
@@ -182,7 +194,7 @@ impl GenericParameterMetadata {
 
 /// Context-bound view of a generic type declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct TypeDefinitionDescriptor<'ctx> {
+pub struct TypeDefinitionDescriptor<'ctx> {
     metadata: &'static TypeDefinitionMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -194,32 +206,32 @@ impl<'ctx> TypeDefinitionDescriptor<'ctx> {
     ) -> Self {
         Self { metadata, context }
     }
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) const fn id(self) -> TypeDefinitionId {
+    pub const fn id(self) -> TypeDefinitionId {
         self.metadata.id
     }
-    pub(crate) const fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         self.metadata.name
     }
-    pub(crate) const fn path(self) -> &'static str {
+    pub fn path(self) -> &'static str {
         self.metadata.path
     }
-    pub(crate) const fn kind(self) -> TypeDefinitionKind {
+    pub fn kind(self) -> TypeDefinitionKind {
         self.metadata.kind
     }
-    pub(crate) fn generics(self) -> GenericDefinitionDescriptor<'ctx> {
+    pub fn generics(self) -> GenericDefinitionDescriptor<'ctx> {
         GenericDefinitionDescriptor::new(self.metadata.generics, self.context)
     }
-    pub(crate) fn instances(self) -> Result<Box<[TypeDescriptor<'ctx>]>, ContextError> {
+    pub fn instances(self) -> Result<Box<[TypeDescriptor<'ctx>]>, ContextError> {
         self.context.type_instances(self.metadata.id)
     }
 }
 
 /// Context-bound view of a declaration's generic parameters and predicates.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericDefinitionDescriptor<'ctx> {
+pub struct GenericDefinitionDescriptor<'ctx> {
     metadata: &'static GenericDefinitionMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -231,10 +243,10 @@ impl<'ctx> GenericDefinitionDescriptor<'ctx> {
     ) -> Self {
         Self { metadata, context }
     }
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn parameters(
+    pub fn parameters(
         self,
     ) -> impl ExactSizeIterator<Item = GenericParameterDescriptor<'ctx>> + 'ctx {
         self.metadata
@@ -242,7 +254,7 @@ impl<'ctx> GenericDefinitionDescriptor<'ctx> {
             .iter()
             .map(move |parameter| GenericParameterDescriptor::new(parameter, self.context))
     }
-    pub(crate) fn parameter(
+    pub fn parameter(
         self,
         name: &str,
     ) -> Result<GenericParameterDescriptor<'ctx>, LookupError> {
@@ -273,17 +285,17 @@ impl<'ctx> GenericDefinitionDescriptor<'ctx> {
             }),
         }
     }
-    pub(crate) fn predicates(self) -> Predicates<'ctx> {
+    pub fn predicates(self) -> Predicates<'ctx> {
         Predicates::new(self.metadata.predicates, self.context)
     }
-    pub(crate) fn is_empty(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.metadata.parameters.is_empty()
     }
 }
 
 /// Context-bound view of one declared generic parameter.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericParameterDescriptor<'ctx> {
+pub struct GenericParameterDescriptor<'ctx> {
     metadata: &'static GenericParameterMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -295,16 +307,16 @@ impl<'ctx> GenericParameterDescriptor<'ctx> {
     ) -> Self {
         Self { metadata, context }
     }
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) const fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         self.metadata.name
     }
-    pub(crate) const fn index(self) -> usize {
+    pub fn index(self) -> usize {
         self.metadata.index
     }
-    pub(crate) fn kind(self) -> GenericParameterKind<'ctx> {
+    pub fn kind(self) -> GenericParameterKind<'ctx> {
         match self.metadata.kind {
             GenericParameterMetadataKind::Lifetime { bounds } => {
                 GenericParameterKind::Lifetime { bounds }
@@ -336,7 +348,7 @@ impl<'ctx> GenericParameterDescriptor<'ctx> {
 }
 
 /// Kind-specific facts for a declared generic parameter.
-pub(crate) enum GenericParameterKind<'ctx> {
+pub enum GenericParameterKind<'ctx> {
     Lifetime {
         bounds: &'static [LifetimeExpression],
     },
@@ -369,7 +381,7 @@ pub(crate) enum GenericArgumentMetadataKind {
 
 impl GenericArgumentMetadata {
     /// Creates a type argument tied to a reflected concrete Rust type.
-    pub const fn type_argument<T: crate::runtime::descriptor::Reflect>(
+    pub const fn type_argument<T: 'static>(
         parameter: &'static GenericParameterMetadata,
         expression: &'static ExpressionData,
     ) -> Self {
@@ -410,7 +422,7 @@ impl GenericArgumentMetadata {
 
 /// Context-bound collection of the type and const arguments of one application.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericArguments<'ctx> {
+pub struct GenericArguments<'ctx> {
     arguments: &'static [GenericArgumentMetadata],
     context: &'ctx ReflectionContext,
 }
@@ -422,17 +434,17 @@ impl<'ctx> GenericArguments<'ctx> {
     ) -> Self {
         Self { arguments, context }
     }
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn iter(
+    pub fn iter(
         self,
     ) -> impl ExactSizeIterator<Item = GenericArgumentDescriptor<'ctx>> + 'ctx {
         self.arguments
             .iter()
             .map(move |argument| GenericArgumentDescriptor::new(argument, self.context))
     }
-    pub(crate) fn get(self, name: &str) -> Option<GenericArgumentDescriptor<'ctx>> {
+    pub fn get(self, name: &str) -> Option<GenericArgumentDescriptor<'ctx>> {
         let mut matches = self
             .arguments
             .iter()
@@ -443,7 +455,7 @@ impl<'ctx> GenericArguments<'ctx> {
             .is_none()
             .then(|| GenericArgumentDescriptor::new(first, self.context))
     }
-    pub(crate) fn argument(
+    pub fn argument(
         self,
         name: &str,
     ) -> Result<GenericArgumentDescriptor<'ctx>, LookupError> {
@@ -471,14 +483,14 @@ impl<'ctx> GenericArguments<'ctx> {
             }),
         }
     }
-    pub(crate) fn is_empty(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.arguments.is_empty()
     }
 }
 
 /// A concrete type or const argument in one already compiled application.
 #[derive(Clone, Copy)]
-pub(crate) struct GenericArgumentDescriptor<'ctx> {
+pub struct GenericArgumentDescriptor<'ctx> {
     metadata: &'static GenericArgumentMetadata,
     context: &'ctx ReflectionContext,
 }
@@ -490,12 +502,12 @@ impl<'ctx> GenericArgumentDescriptor<'ctx> {
     ) -> Self {
         Self { metadata, context }
     }
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn type_argument(
+    pub fn type_argument(
         self,
-    ) -> Result<TypeArgumentDescriptor<'ctx>, GenericArgumentError> {
+    ) -> Result<TypeArgumentDescriptor<'ctx>, crate::runtime::error::ReflectionError> {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Type { .. } => Ok(TypeArgumentDescriptor {
                 metadata: self.metadata,
@@ -504,12 +516,13 @@ impl<'ctx> GenericArgumentDescriptor<'ctx> {
             GenericArgumentMetadataKind::Const(_) => Err(GenericArgumentError::new(
                 GenericArgumentKind::Type,
                 GenericArgumentKind::Const,
-            )),
+            )
+            .into()),
         }
     }
-    pub(crate) fn const_argument(
+    pub fn const_argument(
         self,
-    ) -> Result<ConstArgumentDescriptor<'ctx>, GenericArgumentError> {
+    ) -> Result<ConstArgumentDescriptor<'ctx>, crate::runtime::error::ReflectionError> {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Const(_) => Ok(ConstArgumentDescriptor {
                 metadata: self.metadata,
@@ -518,26 +531,27 @@ impl<'ctx> GenericArgumentDescriptor<'ctx> {
             GenericArgumentMetadataKind::Type { .. } => Err(GenericArgumentError::new(
                 GenericArgumentKind::Const,
                 GenericArgumentKind::Type,
-            )),
+            )
+            .into()),
         }
     }
 }
 
 /// A type argument, preserving syntax when no reflected descriptor exists.
 #[derive(Clone, Copy)]
-pub(crate) struct TypeArgumentDescriptor<'ctx> {
+pub struct TypeArgumentDescriptor<'ctx> {
     metadata: &'static GenericArgumentMetadata,
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TypeArgumentDescriptor<'ctx> {
-    pub(crate) const fn context(self) -> &'ctx ReflectionContext {
+    pub fn context(self) -> &'ctx ReflectionContext {
         self.context
     }
-    pub(crate) fn parameter(self) -> GenericParameterDescriptor<'ctx> {
+    pub fn parameter(self) -> GenericParameterDescriptor<'ctx> {
         GenericParameterDescriptor::new(self.metadata.parameter, self.context)
     }
-    pub(crate) fn expression(self) -> TypeExpression<'ctx> {
+    pub fn expression(self) -> TypeExpression<'ctx> {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Type { expression, .. } => {
                 TypeExpression::new(expression, self.context)
@@ -545,7 +559,7 @@ impl<'ctx> TypeArgumentDescriptor<'ctx> {
             GenericArgumentMetadataKind::Const(_) => unreachable!("type argument kind was checked"),
         }
     }
-    pub(crate) fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
+    pub fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Type { concrete, .. } => {
                 concrete.map(|metadata| TypeDescriptor::new(metadata(), self.context))
@@ -553,27 +567,30 @@ impl<'ctx> TypeArgumentDescriptor<'ctx> {
             GenericArgumentMetadataKind::Const(_) => None,
         }
     }
-    pub(crate) fn concrete_type(self) -> Result<TypeDescriptor<'ctx>, TypeExpressionError> {
+    pub fn concrete_type(
+        self,
+    ) -> Result<TypeDescriptor<'ctx>, crate::runtime::error::ReflectionError> {
         self.find_concrete_type().ok_or_else(|| {
             TypeExpressionError::ConcreteDescriptorUnavailable {
                 parameter: self.metadata.parameter.name,
             }
+            .into()
         })
     }
 }
 
 /// A const argument retained as a structural expression.
 #[derive(Clone, Copy)]
-pub(crate) struct ConstArgumentDescriptor<'ctx> {
+pub struct ConstArgumentDescriptor<'ctx> {
     metadata: &'static GenericArgumentMetadata,
     _context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ConstArgumentDescriptor<'ctx> {
-    pub(crate) fn parameter(self) -> GenericParameterDescriptor<'ctx> {
+    pub fn parameter(self) -> GenericParameterDescriptor<'ctx> {
         GenericParameterDescriptor::new(self.metadata.parameter, self._context)
     }
-    pub(crate) fn expression(self) -> ConstExpression {
+    pub fn expression(self) -> ConstExpression {
         match self.metadata.kind {
             GenericArgumentMetadataKind::Const(expression) => expression,
             GenericArgumentMetadataKind::Type { .. } => {

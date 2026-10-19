@@ -2,12 +2,11 @@ use std::any::TypeId;
 
 use super::capabilities::CapabilityRecord;
 use super::capability_error::CapabilityContractError;
-use super::capability_id::CapabilityIdentifier;
 use super::capability_origin::CapabilityOrigin;
 use super::capability_target::CapabilityTargetId;
 
 /// Binds a stable capability ID to exactly one Rust adapter contract.
-pub(crate) trait CapabilitySpec: 'static {
+pub trait CapabilitySpec: 'static {
     type Adapter: Send + Sync + 'static;
 
     const ID: &'static str;
@@ -15,30 +14,30 @@ pub(crate) trait CapabilitySpec: 'static {
 
 /// A context-independent descriptor for finding a typed adapter.
 #[derive(Clone, Copy)]
-pub(crate) struct CapabilityDescriptor<'ctx> {
+pub struct CapabilityDescriptor<'ctx> {
     pub(super) record: &'ctx CapabilityRecord,
 }
 
 impl<'ctx> CapabilityDescriptor<'ctx> {
-    pub(crate) fn id(self) -> CapabilityIdentifier {
-        self.record.id
+    pub fn id(self) -> &'ctx str {
+        self.record.id.as_str()
     }
 
-    pub(crate) fn adapter_type_id(self) -> TypeId {
+    pub fn adapter_type_id(self) -> TypeId {
         self.record.adapter_type
     }
 
-    pub(crate) fn target(self) -> &'ctx CapabilityTargetId {
+    pub fn target(self) -> &'ctx CapabilityTargetId {
         &self.record.target
     }
 
-    pub(crate) fn origin(self) -> &'ctx CapabilityOrigin {
+    pub fn origin(self) -> &'ctx CapabilityOrigin {
         &self.record.origin
     }
 
-    pub(crate) fn downcast<C: CapabilitySpec>(
+    pub fn downcast<'cap, C: CapabilitySpec>(
         self,
-    ) -> Result<Capability<'ctx, C>, CapabilityContractError> {
+    ) -> Result<Capability<'cap, C>, CapabilityContractError> {
         if self.record.id.as_str() != C::ID {
             return Err(CapabilityContractError::IdMismatch {
                 expected: C::ID,
@@ -53,45 +52,53 @@ impl<'ctx> CapabilityDescriptor<'ctx> {
                 actual: self.record.adapter_type,
             });
         }
-        let Some(adapter) = self.record.adapter.downcast_ref::<C::Adapter>() else {
+        let adapter = match self.record.adapter.clone().downcast::<C::Adapter>() {
+            Ok(adapter) => adapter,
+            Err(_) => {
             return Err(CapabilityContractError::CorruptAdapter {
                 capability_id: self.record.id,
                 expected,
             });
+            }
         };
         Ok(Capability {
-            target: &self.record.target,
+            target: self.record.target.clone(),
             adapter,
-            origin: &self.record.origin,
+            origin: self.record.origin.clone(),
+            _context: std::marker::PhantomData,
         })
     }
 }
 
 /// A capability handle whose adapter type is fixed by its specification.
-pub(crate) struct Capability<'ctx, C: CapabilitySpec> {
-    target: &'ctx CapabilityTargetId,
-    adapter: &'ctx C::Adapter,
-    origin: &'ctx CapabilityOrigin,
+pub struct Capability<'ctx, C: CapabilitySpec> {
+    target: CapabilityTargetId,
+    adapter: std::sync::Arc<C::Adapter>,
+    origin: CapabilityOrigin,
+    _context: std::marker::PhantomData<&'ctx ()>,
 }
 
 impl<'ctx, C: CapabilitySpec> Capability<'ctx, C> {
-    pub(crate) fn target(&self) -> &'ctx CapabilityTargetId {
-        self.target
+    pub fn target(&self) -> &CapabilityTargetId {
+        &self.target
     }
 
-    pub(crate) fn adapter(&self) -> &'ctx C::Adapter {
-        self.adapter
+    pub fn adapter(&self) -> &C::Adapter {
+        &self.adapter
     }
 
-    pub(crate) fn origin(&self) -> &'ctx CapabilityOrigin {
-        self.origin
+    pub fn origin(&self) -> &CapabilityOrigin {
+        &self.origin
     }
 }
 
-impl<C: CapabilitySpec> Copy for Capability<'_, C> {}
-
 impl<C: CapabilitySpec> Clone for Capability<'_, C> {
     fn clone(&self) -> Self {
-        *self
+        Self {
+            target: self.target.clone(),
+            adapter: self.adapter.clone(),
+            origin: self.origin.clone(),
+            _context: std::marker::PhantomData,
+        }
     }
 }

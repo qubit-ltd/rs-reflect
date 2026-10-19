@@ -73,6 +73,7 @@ pub struct Registration {
     impl_applications: Vec<&'static ImplApplicationMetadata>,
     construction_plans: Vec<&'static ConstructionPlan>,
     trait_objects: Vec<TraitObjectRegistration>,
+    issues: Vec<ContextIssue>,
 }
 
 /// A compiler-checked trait-object type recorded in a reflection context.
@@ -161,6 +162,7 @@ impl Registration {
             impl_applications: Vec::new(),
             construction_plans: reflect_registration.construction_plans().iter().collect(),
             trait_objects: Vec::new(),
+            issues: Vec::new(),
         }
     }
 
@@ -186,6 +188,7 @@ impl Registration {
             impl_applications: Vec::new(),
             construction_plans: Vec::new(),
             trait_objects: Vec::new(),
+            issues: Vec::new(),
         }
     }
 
@@ -242,9 +245,23 @@ impl Registration {
         &self.trait_objects
     }
 
-    pub(crate) fn with_capability(mut self, registration: CapabilityRegistration) -> Self {
-        self.capabilities.push(registration);
+    pub(crate) fn with_capability(mut self, mut registration: CapabilityRegistration) -> Self {
+        match registration.validation_error.take() {
+            Some(error) => self.issues.push(ContextIssue::InvalidMetadata {
+                item: ItemIdentity {
+                    kind: ItemKind::Capability,
+                    stable_id: StableItemId("invalid capability registration".into()),
+                    display_name: "invalid capability registration".into(),
+                },
+                reason: MetadataValidationError::new(error.to_string()),
+            }),
+            None => self.capabilities.push(registration),
+        }
         self
+    }
+
+    pub(crate) fn take_issues(&mut self) -> Vec<ContextIssue> {
+        std::mem::take(&mut self.issues)
     }
 
     pub(crate) fn take_capabilities(&mut self) -> Vec<CapabilityRegistration> {
@@ -320,6 +337,12 @@ impl Registration {
 impl<T: Reflect> From<&'static TypeRegistration<T>> for Registration {
     fn from(_registration: &'static TypeRegistration<T>) -> Self {
         Self::new::<T>()
+    }
+}
+
+impl From<CapabilityRegistration> for Registration {
+    fn from(registration: CapabilityRegistration) -> Self {
+        Self::metadata_only().with_capability(registration)
     }
 }
 

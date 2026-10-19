@@ -40,9 +40,11 @@ pub(crate) struct ContextData {
     impl_definitions: HashMap<ImplDefinitionId, &'static ImplDefinitionMetadata>,
     capabilities: HashMap<CapabilityTargetId, Arc<Capabilities>>,
     type_instances: HashMap<TypeDefinitionId, Box<[TypeId]>>,
+    all_trait_applications: Box<[&'static TraitApplicationMetadata]>,
     trait_applications: HashMap<TraitDefinitionId, Box<[&'static TraitApplicationMetadata]>>,
     trait_applications_by_path: HashMap<&'static str, Box<[&'static TraitApplicationMetadata]>>,
     impl_applications: HashMap<ImplDefinitionId, Box<[&'static ImplApplicationMetadata]>>,
+    impl_applications_by_target: HashMap<TypeId, Box<[&'static ImplApplicationMetadata]>>,
     construction_plans: HashMap<TypeId, Box<[&'static ConstructionPlan]>>,
     trait_objects: HashMap<TypeId, TraitObjectRegistration>,
 }
@@ -59,9 +61,11 @@ impl ContextData {
             impl_definitions: HashMap::new(),
             capabilities: HashMap::new(),
             type_instances: HashMap::new(),
+            all_trait_applications: Box::new([]),
             trait_applications: HashMap::new(),
             trait_applications_by_path: HashMap::new(),
             impl_applications: HashMap::new(),
+            impl_applications_by_target: HashMap::new(),
             construction_plans: HashMap::new(),
             trait_objects: HashMap::new(),
         }
@@ -246,7 +250,15 @@ impl ContextData {
             }
         }
 
+        let mut all_trait_applications =
+            Vec::<&'static TraitApplicationMetadata>::with_capacity(trait_applications_pending.len());
         for application in trait_applications_pending {
+            if all_trait_applications
+                .iter()
+                .any(|registered| std::ptr::eq::<TraitApplicationMetadata>(*registered, application))
+            {
+                continue;
+            }
             let definition = resolve_trait_application_definition(
                 application,
                 &trait_definitions,
@@ -256,6 +268,7 @@ impl ContextData {
             if let Some(path) = path {
                 trait_applications_by_path.entry(path).or_default().push(application);
             }
+            all_trait_applications.push(application);
             if let Some(definition) = definition {
                 trait_applications.entry(definition.id).or_default().push(application);
             }
@@ -275,7 +288,11 @@ impl ContextData {
         }
 
         let types = types.into_boxed_slice();
-        let indexes = ContextIndexes::build(&types);
+        let indexes = ContextIndexes::build(
+            &types,
+            type_definitions.values().copied(),
+            trait_definitions.values().copied(),
+        );
         let included_types: std::collections::HashSet<_> =
             types.iter().map(|record| record.type_id()).collect();
         for (definition, instances) in &type_instances {
@@ -502,7 +519,11 @@ impl ContextData {
                 let name = identity.display_name.as_ref();
                 let registered = type_definitions
                     .values()
-                    .any(|definition| definition.name == name || definition.path == name)
+                    .any(|definition| {
+                        definition.name == name
+                            || definition.path == name
+                            || format!("{:?}", definition.id) == identity.stable_id.0.as_ref()
+                    })
                     || trait_definitions
                         .values()
                         .any(|definition| definition.name == name || definition.path == name)
@@ -549,9 +570,20 @@ impl ContextData {
             .into_iter()
             .map(|(path, applications)| (path, applications.into_boxed_slice()))
             .collect();
-        let impl_applications = impl_applications
+        let impl_applications: HashMap<ImplDefinitionId, Box<[&'static ImplApplicationMetadata]>> = impl_applications
             .into_iter()
             .map(|(definition, applications)| (definition, applications.into_boxed_slice()))
+            .collect();
+        let mut impl_applications_by_target = HashMap::<TypeId, Vec<&'static ImplApplicationMetadata>>::new();
+        for application in impl_applications.values().flatten() {
+            impl_applications_by_target
+                .entry((application.target)().type_id())
+                .or_default()
+                .push(*application);
+        }
+        let impl_applications_by_target = impl_applications_by_target
+            .into_iter()
+            .map(|(target, applications)| (target, applications.into_boxed_slice()))
             .collect();
         let construction_plans = construction_plans
             .into_iter()
@@ -568,9 +600,11 @@ impl ContextData {
             impl_definitions,
             capabilities,
             type_instances,
+            all_trait_applications: all_trait_applications.into_boxed_slice(),
             trait_applications,
             trait_applications_by_path,
             impl_applications,
+            impl_applications_by_target,
             construction_plans,
             trait_objects,
         })
@@ -605,11 +639,27 @@ impl ContextData {
         self.type_definitions.get(&id).copied()
     }
 
+    pub(crate) fn type_definitions(&self) -> Vec<&'static TypeDefinitionMetadata> {
+        let mut definitions = self.type_definitions.values().copied().collect::<Vec<_>>();
+        definitions.sort_by(|left, right| left.path.cmp(right.path));
+        definitions
+    }
+
     pub(crate) fn trait_definition(
         &self,
         id: TraitDefinitionId,
     ) -> Option<&'static TraitDefinitionMetadata> {
         self.trait_definitions.get(&id).copied()
+    }
+
+    pub(crate) fn trait_definitions(&self) -> Vec<&'static TraitDefinitionMetadata> {
+        let mut definitions = self.trait_definitions.values().copied().collect::<Vec<_>>();
+        definitions.sort_by(|left, right| left.path.cmp(right.path));
+        definitions
+    }
+
+    pub(crate) fn trait_applications_all(&self) -> &[&'static TraitApplicationMetadata] {
+        &self.all_trait_applications
     }
 
     pub(crate) fn trait_definition_by_path(
@@ -668,6 +718,16 @@ impl ContextData {
     ) -> &[&'static ImplApplicationMetadata] {
         self.impl_applications
             .get(&definition)
+            .map(Box::as_ref)
+            .unwrap_or(&[])
+    }
+
+    pub(crate) fn impl_applications_for_target(
+        &self,
+        target: TypeId,
+    ) -> &[&'static ImplApplicationMetadata] {
+        self.impl_applications_by_target
+            .get(&target)
             .map(Box::as_ref)
             .unwrap_or(&[])
     }

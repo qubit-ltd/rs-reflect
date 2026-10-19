@@ -8,18 +8,21 @@ pub(crate) mod capability_id;
 pub(crate) mod capability_origin;
 pub(crate) mod capability_registration;
 pub(crate) mod capability_target;
+mod type_descriptor_ext;
 
-pub(crate) use builtin::{
+pub use builtin::{
     CloneAdapter, CloneCapability, DefaultAdapter, DefaultCapability, SendCapability,
-    SyncCapability,
+    SyncCapability, CapabilityValueMode,
 };
-pub(crate) use capabilities::{Capabilities, CapabilityRecord};
-pub(crate) use capability::{Capability, CapabilityDescriptor, CapabilitySpec};
-pub(crate) use capability_error::{
+pub use capabilities::Capabilities;
+pub(crate) use capabilities::CapabilityRecord;
+pub use capability::{Capability, CapabilityDescriptor, CapabilitySpec};
+pub use capability_error::{
     CapabilityContractError, CapabilityError, CapabilityInvocationError, CapabilityInvocationMode,
-    CapabilityRegistrationError,
 };
+pub(crate) use capability_error::CapabilityRegistrationError;
 pub(crate) use capability_id::CapabilityIdentifier as CapabilityId;
-pub(crate) use capability_origin::CapabilityOrigin;
-pub(crate) use capability_registration::CapabilityRegistration;
-pub(crate) use capability_target::CapabilityTargetId;
+pub use capability_origin::CapabilityOrigin;
+pub use capability_registration::CapabilityRegistration;
+pub use capability_target::CapabilityTargetId;
+pub use type_descriptor_ext::{TypeDefinitionCapabilityExt, TypeDescriptorCapabilityExt};

@@ -16,6 +16,7 @@ use crate::runtime::descriptor::trait_descriptor::{
 use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::context::handle::registration::TraitObjectRegistration;
+use crate::runtime::context::collections::{TraitDefinitions, Traits, TypeDefinitions, Types};
 use crate::runtime::error::ContextError;
 use crate::runtime::error::LookupError;
 use crate::runtime::error::LookupQuery;
@@ -44,7 +45,7 @@ use global::GlobalContext;
 static NEXT_CONTEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct ReflectionContextId(u64);
+pub struct ReflectionContextId(u64);
 
 impl ReflectionContextId {
     fn next() -> Self {
@@ -149,6 +150,17 @@ impl ReflectionContext {
             .collect())
     }
 
+    /// Returns all registered concrete trait applications in registration order.
+    pub fn trait_applications(&self) -> Result<Traits<'_>, ContextError> {
+        let data = self.data()?;
+        Ok(Traits::new(
+            data.trait_applications_all()
+                .iter()
+                .map(|metadata| TraitDescriptor::new(metadata, self))
+                .collect(),
+        ))
+    }
+
     /// Looks up a compiler-checked registered trait-object type.
     pub fn trait_object<T: ?Sized + 'static>(
         &self,
@@ -184,21 +196,21 @@ impl ReflectionContext {
         }
     }
 
-    pub(crate) fn initialize(&self) -> Result<&Self, ContextError> {
+    pub fn initialize(&self) -> Result<&Self, ContextError> {
         if let ContextState::Global(state) = &self.state {
             state.data()?;
         }
         Ok(self)
     }
 
-    pub(crate) fn is_initialized(&self) -> bool {
+    pub fn is_initialized(&self) -> bool {
         match &self.state {
             ContextState::Explicit(_) => true,
             ContextState::Global(state) => state.is_initialized(),
         }
     }
 
-    pub(crate) fn id(&self) -> ReflectionContextId {
+    pub fn id(&self) -> ReflectionContextId {
         self.id
     }
 
@@ -209,7 +221,7 @@ impl ReflectionContext {
         }
     }
 
-    pub(crate) fn find_type_by_id(
+    pub fn find_type_by_id(
         &self,
         id: TypeId,
     ) -> Result<Option<TypeDescriptor<'_>>, ContextError> {
@@ -223,7 +235,7 @@ impl ReflectionContext {
         Ok(self.data()?.contains_type_id(id))
     }
 
-    pub(crate) fn lookup_type_by_name(
+    pub fn lookup_type_by_name(
         &self,
         name: &str,
     ) -> Result<Lookup<TypeDescriptor<'_>>, ContextError> {
@@ -231,7 +243,7 @@ impl ReflectionContext {
         Ok(self.lookup_by_indexes(&data, data.indexes.types_by_name.get(name)))
     }
 
-    pub(crate) fn lookup_type_by_short_name(
+    pub fn lookup_type_by_short_name(
         &self,
         name: &str,
     ) -> Result<Lookup<TypeDescriptor<'_>>, ContextError> {
@@ -239,7 +251,7 @@ impl ReflectionContext {
         Ok(self.lookup_by_indexes(&data, data.indexes.types_by_short_name.get(name)))
     }
 
-    pub(crate) fn type_by_id(&self, id: TypeId) -> Result<TypeDescriptor<'_>, LookupError> {
+    pub fn type_by_id(&self, id: TypeId) -> Result<TypeDescriptor<'_>, LookupError> {
         self.find_type_by_id(id)
             .map_err(LookupError::Context)?
             .ok_or_else(|| LookupError::Missing {
@@ -248,25 +260,169 @@ impl ReflectionContext {
             })
     }
 
-    pub(crate) fn type_by_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
+    pub fn type_by_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
         self.lookup_type_by_name(name)
             .map_err(LookupError::Context)?
             .into_unique(LookupSubject::Type, LookupQuery::Name(name.into()))
     }
 
-    pub(crate) fn type_by_short_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
+    pub fn type_by_short_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
         self.lookup_type_by_short_name(name)
             .map_err(LookupError::Context)?
             .into_unique(LookupSubject::Type, LookupQuery::ShortName(name.into()))
     }
 
-    pub(crate) fn types(&self) -> Result<Box<[TypeDescriptor<'_>]>, ContextError> {
+    pub fn types(&self) -> Result<Types<'_>, ContextError> {
         let data = self.data()?;
-        Ok(data
-            .types
-            .iter()
-            .map(|type_record| type_record.descriptor(self))
-            .collect())
+        Ok(Types::new(
+            data.types
+                .iter()
+                .map(|type_record| type_record.descriptor(self))
+                .collect(),
+        ))
+    }
+
+    /// Returns all registered source type definitions in path order.
+    pub fn type_definitions(&self) -> Result<TypeDefinitions<'_>, ContextError> {
+        let data = self.data()?;
+        Ok(TypeDefinitions::new(
+            data.type_definitions()
+                .into_iter()
+                .map(|metadata| TypeDefinitionDescriptor::new(metadata, self))
+                .collect(),
+        ))
+    }
+
+    /// Looks up a source type definition by its full reflected path.
+    pub fn lookup_type_definition_by_name(
+        &self,
+        path: &str,
+    ) -> Result<Lookup<TypeDefinitionDescriptor<'_>>, ContextError> {
+        let data = self.data()?;
+        let candidates = data
+            .indexes
+            .type_definitions_by_path
+            .get(path)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| data.type_definition(*id))
+            .map(|metadata| TypeDefinitionDescriptor::new(metadata, self))
+            .collect::<Vec<_>>();
+        Ok(match candidates.as_slice() {
+            [] => Lookup::Missing,
+            [only] => Lookup::Unique(*only),
+            _ => Lookup::Ambiguous(candidates.into_boxed_slice()),
+        })
+    }
+
+    /// Requires exactly one source type definition with the given full path.
+    pub fn type_definition_by_name(
+        &self,
+        path: &str,
+    ) -> Result<TypeDefinitionDescriptor<'_>, LookupError> {
+        self.lookup_type_definition_by_name(path)
+            .map_err(LookupError::Context)?
+            .into_unique(LookupSubject::TypeDefinition, LookupQuery::Name(path.into()))
+    }
+
+    /// Finds a source type definition by its opaque process-local identity.
+    pub fn find_type_definition_by_id(
+        &self,
+        id: TypeDefinitionId,
+    ) -> Result<Option<TypeDefinitionDescriptor<'_>>, ContextError> {
+        self.type_definition(id)
+    }
+
+    /// Requires a source type definition with the given opaque identity.
+    pub fn type_definition_by_id(
+        &self,
+        id: TypeDefinitionId,
+    ) -> Result<TypeDefinitionDescriptor<'_>, LookupError> {
+        self.find_type_definition_by_id(id)
+            .map_err(LookupError::Context)?
+            .ok_or_else(|| LookupError::Missing {
+                subject: LookupSubject::TypeDefinition,
+                query: LookupQuery::ItemId(StableItemId(format!("{id:?}").into())),
+            })
+    }
+
+    /// Returns source type definitions whose final path segment matches `name`.
+    pub fn type_definitions_by_short_name(
+        &self,
+        name: &str,
+    ) -> Result<TypeDefinitions<'_>, ContextError> {
+        let data = self.data()?;
+        let definitions = data
+            .indexes
+            .type_definitions_by_short_name
+            .get(name)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| data.type_definition(*id))
+            .map(|metadata| TypeDefinitionDescriptor::new(metadata, self))
+            .collect();
+        Ok(TypeDefinitions::new(definitions))
+    }
+
+    /// Returns all registered source trait definitions in path order.
+    pub fn trait_definitions(&self) -> Result<TraitDefinitions<'_>, ContextError> {
+        let data = self.data()?;
+        Ok(TraitDefinitions::new(
+            data.trait_definitions()
+                .into_iter()
+                .map(|metadata| TraitDefinitionDescriptor::new(metadata, self))
+                .collect(),
+        ))
+    }
+
+    /// Looks up a source trait definition by its full reflected path.
+    pub fn lookup_trait_definition_by_name(
+        &self,
+        path: &str,
+    ) -> Result<Lookup<TraitDefinitionDescriptor<'_>>, ContextError> {
+        let data = self.data()?;
+        let candidates = data
+            .indexes
+            .trait_definitions_by_path
+            .get(path)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| data.trait_definition(*id))
+            .map(|metadata| TraitDefinitionDescriptor::new(metadata, self))
+            .collect::<Vec<_>>();
+        Ok(match candidates.as_slice() {
+            [] => Lookup::Missing,
+            [only] => Lookup::Unique(*only),
+            _ => Lookup::Ambiguous(candidates.into_boxed_slice()),
+        })
+    }
+
+    /// Requires exactly one source trait definition with the given full path.
+    pub fn trait_definition_by_name(
+        &self,
+        path: &str,
+    ) -> Result<TraitDefinitionDescriptor<'_>, LookupError> {
+        self.lookup_trait_definition_by_name(path)
+            .map_err(LookupError::Context)?
+            .into_unique(LookupSubject::TraitDefinition, LookupQuery::Name(path.into()))
+    }
+
+    /// Returns source trait definitions whose final path segment matches `name`.
+    pub fn trait_definitions_by_short_name(
+        &self,
+        name: &str,
+    ) -> Result<TraitDefinitions<'_>, ContextError> {
+        let data = self.data()?;
+        let definitions = data
+            .indexes
+            .trait_definitions_by_short_name
+            .get(name)
+            .into_iter()
+            .flatten()
+            .filter_map(|id| data.trait_definition(*id))
+            .map(|metadata| TraitDefinitionDescriptor::new(metadata, self))
+            .collect();
+        Ok(TraitDefinitions::new(definitions))
     }
 
     fn lookup_by_indexes(
@@ -373,6 +529,20 @@ impl ReflectionContext {
             })))
     }
 
+    pub(crate) fn capabilities_for_definition(
+        &self,
+        definition: TypeDefinitionId,
+    ) -> Result<Option<Arc<Capabilities>>, ContextError> {
+        let identity = ItemIdentity {
+            kind: ItemKind::TypeDefinition,
+            stable_id: StableItemId(format!("{definition:?}").into()),
+            display_name: format!("{definition:?}").into(),
+        };
+        Ok(self
+            .data()?
+            .capabilities(&CapabilityTargetId::Definition(identity)))
+    }
+
     pub(crate) fn type_instances(
         &self,
         definition: TypeDefinitionId,
@@ -386,7 +556,7 @@ impl ReflectionContext {
             .collect())
     }
 
-    pub(crate) fn trait_applications(
+    pub(crate) fn trait_applications_for_definition(
         &self,
         definition: TraitDefinitionId,
     ) -> Result<Box<[TraitDescriptor<'_>]>, ContextError> {
@@ -405,6 +575,18 @@ impl ReflectionContext {
         let data = self.data()?;
         Ok(data
             .impl_applications(definition)
+            .iter()
+            .map(|metadata| ImplDescriptor::new(metadata, self))
+            .collect())
+    }
+
+    pub(crate) fn impl_applications_for_target(
+        &self,
+        target: TypeId,
+    ) -> Result<Box<[ImplDescriptor<'_>]>, ContextError> {
+        let data = self.data()?;
+        Ok(data
+            .impl_applications_for_target(target)
             .iter()
             .map(|metadata| ImplDescriptor::new(metadata, self))
             .collect())
