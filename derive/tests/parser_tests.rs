@@ -20,10 +20,8 @@ use qubit_reflect_derive::Reflect;
 use qubit_reflect_derive::ReflectImpl;
 
 #[Reflect]
-#[reflect(capabilities(Clone, Default))]
 struct Record<T: Clone + Default> {
     id: u64,
-    #[reflect(opaque)]
     value: T,
 }
 
@@ -35,15 +33,12 @@ enum Event {
 }
 
 #[Reflect]
-#[reflect(opaque)]
 struct Opaque;
 
-#[Reflect(external_trait(Send, id = "core.marker.Send"))]
-trait Service: Send {
-    #[reflect(catch_unwind)]
+#[Reflect]
+trait Service {
     fn run<T>(&self, value: T);
 
-    #[reflect(no_invoke)]
     fn disabled(&self);
 }
 
@@ -69,21 +64,27 @@ impl<T: Clone + Default> ExternalFormat for Record<T> {
 
 #[test]
 fn test_macro_parsers_accept_supported_declarations() {
-    let _ = Record { id: 1, value: "value" };
+    let _ = Record {
+        id: 1,
+        value: "value",
+    };
     let _ = Event::Ready;
     let _ = Opaque;
 }
 
 #[test]
-fn test_macro_diagnostic_rejects_a_removed_rename_option() {
+fn test_macro_diagnostic_rejects_a_removed_helper() {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("the system clock should follow the Unix epoch")
         .as_nanos();
-    let fixture = env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
+    let fixture =
+        env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
     let source_dir = fixture.join("src");
     fs::create_dir_all(&source_dir).expect("the temporary fixture should be created");
-    let dependency_path = env!("CARGO_MANIFEST_DIR").replace('\\', "\\\\").replace('"', "\\\"");
+    let dependency_path = env!("CARGO_MANIFEST_DIR")
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
     fs::write(
         fixture.join("Cargo.toml"),
         format!(
@@ -126,9 +127,9 @@ second: u8,
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
     fs::remove_dir_all(&fixture).expect("the temporary fixture should be removed");
 
-    assert!(!output.status.success(), "the removed rename option should fail");
+    assert!(!output.status.success(), "the removed helper should fail");
     assert!(
-        stderr.contains("`rename` was removed"),
+        stderr.contains("only `skip` is accepted"),
         "unexpected compiler diagnostic:\n{stderr}"
     );
 }

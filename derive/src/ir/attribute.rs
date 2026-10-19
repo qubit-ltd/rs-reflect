@@ -216,19 +216,16 @@ struct HelperRule {
     targets: TargetSet,
 }
 
-const TYPE: u16 = HelperTarget::Type.bit();
 const FIELD: u16 = HelperTarget::Field.bit();
 const VARIANT: u16 = HelperTarget::Variant.bit();
 const METHOD: u16 = HelperTarget::Method.bit();
-const IMPL: u16 = HelperTarget::Impl.bit();
-const TRAIT: u16 = HelperTarget::Trait.bit();
 
 /// The single legality table used by both parsing diagnostics and validation.
 const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::DefinitionProviderV2,
         source_name: "definition_provider_v2",
-        targets: TargetSet::new(TYPE | IMPL),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Rename,
@@ -238,12 +235,12 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::Opaque,
         source_name: "opaque",
-        targets: TargetSet::new(TYPE | FIELD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Capabilities,
         source_name: "capabilities",
-        targets: TargetSet::new(TYPE),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Skip,
@@ -268,12 +265,12 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::NoInvoke,
         source_name: "no_invoke",
-        targets: TargetSet::new(METHOD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::CatchUnwind,
         source_name: "catch_unwind",
-        targets: TargetSet::new(METHOD),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::ThreadSafe,
@@ -288,22 +285,22 @@ const HELPER_RULES: &[HelperRule] = &[
     HelperRule {
         name: HelperName::ExternalTraitId,
         source_name: "external_trait_id",
-        targets: TargetSet::new(IMPL),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::ExternalTrait,
         source_name: "external_trait",
-        targets: TargetSet::new(TRAIT),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::Supertrait,
         source_name: "supertrait",
-        targets: TargetSet::new(TRAIT),
+        targets: TargetSet::new(0),
     },
     HelperRule {
         name: HelperName::DynCompatible,
         source_name: "dyn_compatible",
-        targets: TargetSet::new(TRAIT),
+        targets: TargetSet::new(0),
     },
 ];
 

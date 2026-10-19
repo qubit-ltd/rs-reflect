@@ -21,12 +21,18 @@ use crate::ir::ParameterPatternKindIr;
 use crate::ir::PathArgumentsIr;
 use crate::ir::ReceiverKindIr;
 use crate::ir::TypeKindIr;
+use crate::ir::VisibilityIr;
+use crate::ir::WherePredicateIr;
 use crate::parse::parse_and_validate_declaration;
 use crate::parse::parse_declaration;
 use crate::validate::validate_declaration;
 
 /// Parses and validates a declaration, failing the test with its diagnostic.
-fn parse_valid(kind: MacroKind, args: TokenStream, input: TokenStream) -> crate::ir::ValidatedDeclaration {
+fn parse_valid(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> crate::ir::ValidatedDeclaration {
     let parsed = parse_declaration(kind, args, input).expect("the declaration should parse");
     validate_declaration(parsed).expect("the declaration should validate")
 }
@@ -41,14 +47,12 @@ fn parse_invalid(kind: MacroKind, args: TokenStream, input: TokenStream) -> Stri
 }
 
 #[test]
-fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
+fn test_parse_derive_struct_and_enum_with_skip_helper() {
     let structure = parse_valid(
         MacroKind::Derive,
         TokenStream::new(),
         quote! {
-            #[reflect(capabilities(Clone, Default))]
             struct Packet<T> {
-                #[reflect(opaque)]
                 value: T,
                 #[reflect(skip)]
                 count: usize,
@@ -59,11 +63,10 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
         panic!("expected a type declaration");
     };
     assert_eq!(structure.helper_count(HelperName::Rename), 0);
-    assert_eq!(structure.helper_count(HelperName::Capabilities), 1);
     assert_eq!(structure.fields.len(), 1);
+    assert_eq!(structure.fields[0].name.as_ref().unwrap(), "value");
     assert_eq!(structure.fields[0].ty.source, "T");
     assert!(matches!(structure.fields[0].ty.kind, TypeKindIr::Path(_)));
-    assert_eq!(structure.fields[0].attributes.len(), 1);
 
     let enumeration = parse_valid(
         MacroKind::Derive,
@@ -72,7 +75,7 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
             enum Event {
                 Ready,
                 #[reflect(skip)]
-                Data(#[reflect(opaque)] Vec<u8>),
+                Data(Vec<u8>),
             }
         },
     );
@@ -84,21 +87,16 @@ fn test_parse_derive_struct_and_enum_with_all_member_helpers() {
 }
 
 #[test]
-fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
+fn test_parse_trait_and_impl_with_skip_only() {
     let reflected_trait = parse_valid(
         MacroKind::Trait,
-        quote!(external_trait(Send, id = "core.marker.Send")),
+        TokenStream::new(),
         quote! {
-            pub trait Service: Send {
+            pub trait Service {
                 type Output;
                 const LIMIT: usize = 8;
 
-                #[reflect(
-                    catch_unwind,
-                )]
                 fn run<T, const N: usize>(&self, value: T) -> Self::Output;
-
-                #[reflect(no_invoke)]
                 fn disabled(&self);
             }
         },
@@ -106,15 +104,20 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
         panic!("expected a trait declaration");
     };
-    assert_eq!(reflected_trait.external_traits.len(), 1);
+    assert!(reflected_trait.external_traits.is_empty());
     assert_eq!(reflected_trait.methods.len(), 2);
     assert_eq!(reflected_trait.associated_types.len(), 1);
     assert_eq!(reflected_trait.associated_consts.len(), 1);
-    assert!(!reflected_trait.retained_tokens.to_string().contains("reflect"));
+    assert!(
+        !reflected_trait
+            .retained_tokens
+            .to_string()
+            .contains("reflect")
+    );
 
     let reflected_impl = parse_valid(
         MacroKind::Impl,
-        quote!(external_trait_id = "example.service.Service",),
+        TokenStream::new(),
         quote! {
             impl<T, const N: usize> Service for Packet<T> {
                 #[reflect(skip)]
@@ -128,7 +131,12 @@ fn test_parse_trait_and_impl_with_external_identity_and_specializations() {
     assert_eq!(reflected_impl.methods.len(), 0);
     assert_eq!(reflected_impl.target_type.source, "Packet < T >");
     assert!(reflected_impl.trait_path.is_some());
-    assert!(!reflected_impl.retained_tokens.to_string().contains("reflect"));
+    assert!(
+        !reflected_impl
+            .retained_tokens
+            .to_string()
+            .contains("reflect")
+    );
 }
 
 #[test]
@@ -159,17 +167,17 @@ fn test_validate_rejects_wrong_targets_with_combined_diagnostics() {
         quote! {
             #[reflect(skip)]
             struct Invalid {
-                #[reflect(thread_safe)]
+                #[reflect(opaque)]
                 value: String,
             }
         },
     );
     assert!(diagnostics.contains("`skip` is not valid on a type"));
-    assert!(diagnostics.contains("`thread_safe` was removed"));
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
-fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
+fn test_parse_rejects_removed_helpers_even_when_combined_with_skip() {
     let diagnostics = parse_invalid(
         MacroKind::Impl,
         TokenStream::new(),
@@ -180,24 +188,11 @@ fn test_validate_rejects_duplicate_and_mutually_exclusive_helpers() {
             }
         },
     );
-    assert!(diagnostics.contains("`skip` cannot be combined with `no_invoke`"));
-    assert!(diagnostics.contains("`skip` cannot be combined with `catch_unwind`"));
-
-    let no_invoke = parse_invalid(
-        MacroKind::Impl,
-        TokenStream::new(),
-        quote! {
-            impl Value {
-                #[reflect(no_invoke, catch_unwind)]
-                fn disabled(&self) {}
-            }
-        },
-    );
-    assert!(no_invoke.contains("`no_invoke` cannot be combined with `catch_unwind`"));
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
-fn test_validate_rejects_catch_unwind_on_async_method() {
+fn test_parse_rejects_catch_unwind_on_async_method() {
     let diagnostics = parse_invalid(
         MacroKind::Impl,
         TokenStream::new(),
@@ -208,7 +203,7 @@ fn test_validate_rejects_catch_unwind_on_async_method() {
             }
         },
     );
-    assert!(diagnostics.contains("`catch_unwind` cannot be used on an async method"));
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
@@ -259,7 +254,7 @@ fn test_parse_rejects_bare_helpers_and_aggregates_validation_errors() {
 }
 
 #[test]
-fn test_validate_rejects_union_and_removed_rename_helpers() {
+fn test_validate_rejects_union_and_rename_helper() {
     let union_diagnostic = parse_invalid(
         MacroKind::Derive,
         TokenStream::new(),
@@ -281,83 +276,50 @@ fn test_validate_rejects_union_and_removed_rename_helpers() {
             }
         },
     );
-    assert!(names.contains("`rename` was removed"));
+    assert!(names.contains("only `skip` is accepted"));
 }
 
 #[test]
-fn test_validate_external_trait_ids_and_mapping_conflicts() {
-    let impl_diagnostics = parse_invalid(
+fn test_parse_rejects_external_trait_helper_arguments() {
+    let diagnostics = parse_invalid(
         MacroKind::Impl,
         quote!(external_trait_id = "qubit.reflect.Display"),
         quote!(impl Display for Value {}),
     );
-    assert!(impl_diagnostics.contains("reserved `qubit.reflect` namespace"));
-
-    let mapping_diagnostics = parse_invalid(
-        MacroKind::Trait,
-        quote!(
-            external_trait(Send, id = "example.Send"),
-            external_trait(Send, id = "example.Other"),
-            external_trait(Sync, id = "example.Send")
-        ),
-        quote!(
-            trait Invalid: Send + Sync {}
-        ),
-    );
-    assert!(mapping_diagnostics.contains("external trait path `Send` is mapped more than once"));
-    assert!(mapping_diagnostics.contains("external trait ID `example.Send` is mapped more than once"));
-
-    let unused_mapping = parse_invalid(
-        MacroKind::Trait,
-        quote!(external_trait(NotABound, id = "example.NotABound")),
-        quote! {
-            trait Invalid: Send {}
-        },
-    );
-    assert!(unused_mapping.contains("external trait mapping `NotABound` does not match a direct supertrait"));
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
-fn test_external_mappings_reject_non_supertrait_bounds() {
+fn test_parse_rejects_external_trait_mapping_arguments() {
     let diagnostics = parse_invalid(
         MacroKind::Trait,
-        quote!(
-            external_trait(Send, id = "core.marker.Send"),
-            external_trait(Sync, id = "core.marker.Sync"),
-            external_trait(core::fmt::Debug, id = "core.fmt.Debug")
-        ),
+        quote!(external_trait(Send, id = "core.marker.Send")),
         quote! {
-            trait Service {
-                type Item<T>: Send
-                where
-                    T: Sync;
-
-                fn run<T: core::fmt::Debug>(&self, value: T);
-            }
+            trait Service: Send {}
         },
     );
-    assert!(diagnostics.contains("external trait mapping `Send` does not match a direct supertrait"));
-    assert!(diagnostics.contains("external trait mapping `Sync` does not match a direct supertrait"));
-    assert!(diagnostics.contains("external trait mapping `core :: fmt :: Debug` does not match a direct supertrait"));
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
-fn test_removed_options_are_explicitly_rejected_and_supported_helpers_remain() {
-    for (tokens, expected) in [
-        (quote!(rename = "old"), "`rename` was removed"),
-        (quote!(readonly), "`readonly` was removed"),
-        (quote!(read_only), "`readonly` was removed"),
-        (quote!(no_construct), "`no_construct` was removed"),
-        (quote!(default), "`default` was removed"),
-        (quote!(thread_safe), "`thread_safe` was removed"),
-        (quote!(specialize(T = String)), "`specialize` was removed"),
+fn test_removed_options_are_rejected_and_skip_remains_supported() {
+    for tokens in [
+        quote!(rename = "old"),
+        quote!(read_only),
+        quote!(no_construct),
+        quote!(default),
+        quote!(thread_safe),
+        quote!(specialize(T = String)),
     ] {
         let diagnostic = parse_invalid(
             MacroKind::Derive,
             TokenStream::new(),
             quote! { struct OldApi { #[reflect(#tokens)] value: String } },
         );
-        assert!(diagnostic.contains(expected), "{tokens}: {diagnostic}");
+        assert!(
+            diagnostic.contains("only `skip` is accepted"),
+            "{tokens}: {diagnostic}"
+        );
     }
 
     let impl_diagnostic = parse_invalid(
@@ -367,21 +329,17 @@ fn test_removed_options_are_explicitly_rejected_and_supported_helpers_remain() {
             impl<T> Container<T> {}
         ),
     );
-    assert!(impl_diagnostic.contains("`specialize` was removed"));
+    assert!(impl_diagnostic.contains("only `skip` is accepted"));
 
     let supported = parse_valid(
         MacroKind::Derive,
         TokenStream::new(),
-        quote! {
-            #[reflect(capabilities(Clone), definition_provider_v2 = provider)]
-            struct NewApi<T> { #[reflect(skip)] value: T }
-        },
+        quote! { struct NewApi<T> { #[reflect(skip)] value: T } },
     );
     let DeclarationIr::Type(supported) = &supported.declaration else {
         panic!("expected a type declaration");
     };
-    assert_eq!(supported.helper_count(HelperName::Capabilities), 1);
-    assert_eq!(supported.helper_count(HelperName::DefinitionProviderV2), 1);
+    assert_eq!(supported.fields.len(), 0);
 }
 
 #[test]
@@ -395,21 +353,7 @@ fn test_helper_target_matrix_matches_the_shared_contract() {
         HelperTarget::Trait,
         HelperTarget::AssociatedItem,
     ];
-    let expectations = [
-        (HelperName::Rename, &[][..]),
-        (HelperName::Opaque, &[0, 1][..]),
-        (HelperName::Capabilities, &[0][..]),
-        (HelperName::Skip, &[1, 2, 3][..]),
-        (HelperName::ReadOnly, &[][..]),
-        (HelperName::NoConstruct, &[][..]),
-        (HelperName::Default, &[][..]),
-        (HelperName::NoInvoke, &[3][..]),
-        (HelperName::CatchUnwind, &[3][..]),
-        (HelperName::ThreadSafe, &[][..]),
-        (HelperName::Specialize, &[][..]),
-        (HelperName::ExternalTraitId, &[4][..]),
-        (HelperName::ExternalTrait, &[5][..]),
-    ];
+    let expectations = [(HelperName::Skip, &[1, 2, 3][..])];
     for (helper, valid_indexes) in expectations {
         for (index, target) in all_targets.into_iter().enumerate() {
             assert_eq!(
@@ -424,21 +368,15 @@ fn test_helper_target_matrix_matches_the_shared_contract() {
 }
 
 #[test]
-fn test_validate_accepts_repeatable_external_mappings() {
-    let reflected_trait = parse_valid(
+fn test_parse_rejects_repeated_external_trait_mapping_arguments() {
+    let diagnostics = parse_invalid(
         MacroKind::Trait,
-        quote!(
-            external_trait(Send, id = "core.marker.Send"),
-            external_trait(Sync, id = "core.marker.Sync")
-        ),
+        quote!(external_trait(Send, id = "core.marker.Send")),
         quote! {
             trait Service: Send + Sync {}
         },
     );
-    let DeclarationIr::Trait(reflected_trait) = &reflected_trait.declaration else {
-        panic!("expected a trait declaration");
-    };
-    assert_eq!(reflected_trait.external_traits.len(), 2);
+    assert!(diagnostics.contains("only `skip` is accepted"));
 }
 
 #[test]
@@ -486,10 +424,19 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
         declaration.generics.params[2].default,
         Some(GenericDefaultIr::Const(_))
     ));
-    assert!(!declaration.generics.impl_declaration.to_string().contains('='));
+    assert!(
+        !declaration
+            .generics
+            .impl_declaration
+            .to_string()
+            .contains('=')
+    );
     assert_eq!(declaration.generics.arguments.to_string(), "< 'a , T , N >");
     assert!(declaration.generics.where_clause.is_empty());
-    let TypeKindIr::Reference { lifetime, element, .. } = &declaration.fields[0].ty.kind else {
+    let TypeKindIr::Reference {
+        lifetime, element, ..
+    } = &declaration.fields[0].ty.kind
+    else {
         panic!("expected a reference type");
     };
     assert_eq!(lifetime.as_deref(), Some("'a"));
@@ -500,12 +447,11 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
         TokenStream::new(),
         quote! {
             impl Value {
-                async unsafe extern "C" fn execute<'a, T: Clone>(
-                    &'a mut self,
-                    _: T,
-                    (left, right): (u8, u8),
-                ) -> ! {
-                    loop {}
+                pub(crate) async unsafe extern "C" fn execute<'a, T: Clone + 'a>(
+                    self: &'a mut Value,
+                    value: T,
+                ) -> T where T: Send {
+                    value
                 }
             }
         },
@@ -516,15 +462,26 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
     let method = &reflected_impl.methods[0];
     assert_eq!(
         method.receiver.as_ref().map(|value| value.kind),
-        Some(ReceiverKindIr::MutableReference)
+        Some(ReceiverKindIr::Typed)
     );
+    assert!(matches!(method.visibility, VisibilityIr::Crate));
     assert!(method.qualifiers.is_async);
     assert!(method.qualifiers.is_unsafe);
     assert_eq!(method.qualifiers.abi.as_deref(), Some("C"));
-    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Wildcard);
-    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Destructure);
+    assert_eq!(method.generics.params.len(), 2);
+    assert_eq!(method.generics.where_predicates.len(), 1);
+    assert!(matches!(
+        method.generics.where_predicates[0],
+        WherePredicateIr::Type { .. }
+    ));
+    assert_eq!(method.parameters.len(), 1);
+    assert_eq!(method.parameters[0].name.as_deref(), Some("value"));
+    assert_eq!(
+        method.parameters[0].pattern.kind,
+        ParameterPatternKindIr::Identifier
+    );
     assert!(
-        matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if matches!(ty.kind, TypeKindIr::Never))
+        matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if ty.source == "T")
     );
 }
 
@@ -590,13 +547,19 @@ fn test_parse_treats_identifier_at_subpattern_as_destructure() {
     let method = &declaration.methods[0];
 
     assert_eq!(method.parameters[0].name, None);
-    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Destructure);
+    assert_eq!(
+        method.parameters[0].pattern.kind,
+        ParameterPatternKindIr::Destructure
+    );
     assert_eq!(method.parameters[1].name.as_deref(), Some("simple"));
-    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Identifier);
+    assert_eq!(
+        method.parameters[1].pattern.kind,
+        ParameterPatternKindIr::Identifier
+    );
 }
 
 #[test]
-fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
+fn test_parse_rejects_legacy_supertrait_helper_arguments() {
     let diagnostic = parse_invalid(
         MacroKind::Trait,
         TokenStream::new(),
@@ -604,14 +567,12 @@ fn test_reflect_trait_requires_each_direct_supertrait_to_be_classified() {
     );
     assert!(diagnostic.contains("direct supertrait `std :: fmt :: Debug` needs"));
 
-    parse_valid(
+    let removed = parse_invalid(
         MacroKind::Trait,
-        quote!(
-            supertrait(Parent),
-            external_trait(std::fmt::Debug, id = "std.fmt.Debug")
-        ),
-        quote! { trait Child: Parent + std::fmt::Debug {} },
+        quote!(supertrait(Parent)),
+        quote! { trait Child: Parent {} },
     );
+    assert!(removed.contains("only `skip` is accepted"));
 }
 
 #[test]
@@ -636,53 +597,55 @@ fn test_explicit_runtime_crate_helper_is_rejected() {
             trait Service {}
         ),
     );
-    assert!(trait_error.contains("unknown"), "unexpected trait error: {trait_error}");
+    assert!(
+        trait_error.contains("unknown"),
+        "unexpected trait error: {trait_error}"
+    );
 
-    let impl_error = parse_invalid(MacroKind::Impl, quote!(crate = qubit_reflect), quote!(impl Service {}));
-    assert!(impl_error.contains("unknown"), "unexpected impl error: {impl_error}");
+    let impl_error = parse_invalid(
+        MacroKind::Impl,
+        quote!(crate = qubit_reflect),
+        quote!(impl Service {}),
+    );
+    assert!(
+        impl_error.contains("unknown"),
+        "unexpected impl error: {impl_error}"
+    );
 }
 
 /// The versioned provider hook accepts only one caller-owned identifier on a
 /// generic type.
 #[test]
-fn test_definition_provider_v2_validates_target_and_identifier() {
-    parse_valid(
-        MacroKind::Derive,
-        TokenStream::new(),
-        quote! {
-            #[reflect(definition_provider_v2 = caller_provider)] struct Valid<T> { value: T }
-        },
-    );
-    for (declaration, expected) in [
-        (
-            quote! { #[reflect(definition_provider_v2 = provider)] struct Plain; },
-            "requires a generic type",
-        ),
-        (
-            quote! { #[reflect(definition_provider_v2)] struct Missing<T>(T); },
-            "requires one function identifier",
-        ),
-        (
-            quote! { #[reflect(definition_provider_v2 = module::provider)] struct Path<T>(T); },
-            "unexpected token",
-        ),
-        (
-            quote! {
-                #[reflect(definition_provider_v2 = first, definition_provider_v2 = second)]
-                struct Duplicate<T>(T);
-            },
-            "duplicate",
-        ),
-        (
-            quote! { struct Field<T> { #[reflect(definition_provider_v2 = provider)] value: T } },
-            "not valid on a field",
-        ),
+fn test_only_skip_is_accepted_as_a_reflect_helper() {
+    for helper in [
+        quote!(rename = "renamed"),
+        quote!(no_invoke),
+        quote!(catch_unwind),
+        quote!(thread_safe),
+        quote!(capabilities(Clone)),
+        quote!(dyn_compatible),
+        quote!(opaque),
     ] {
+        let diagnostics = parse_invalid(
+            MacroKind::Derive,
+            TokenStream::new(),
+            quote! { struct Example { #[reflect(#helper)] value: String } },
+        );
         assert!(
-            parse_invalid(MacroKind::Derive, TokenStream::new(), declaration).contains(expected),
-            "expected diagnostic: {expected}"
+            diagnostics.contains("only `skip` is accepted"),
+            "expected unsupported helper diagnostic for {helper}: {diagnostics}"
         );
     }
+
+    let parsed = parse_valid(
+        MacroKind::Derive,
+        TokenStream::new(),
+        quote! { struct Example { #[reflect(skip)] value: String } },
+    );
+    let DeclarationIr::Type(declaration) = parsed.declaration else {
+        panic!("expected a type declaration");
+    };
+    assert!(declaration.fields.is_empty());
 }
 
 /// Empty fields must retain their source container before any code generation.

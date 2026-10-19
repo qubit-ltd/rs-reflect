@@ -22,7 +22,6 @@ pub(crate) use attribute::HelperAttributeIr;
 pub(crate) use attribute::HelperName;
 pub(crate) use attribute::HelperTarget;
 pub(crate) use attribute::HelperValueIr;
-pub(crate) use attribute::SpecializationBindingIr;
 pub(crate) use attribute::SpecializationIr;
 pub(crate) use attribute::SpecializationValueIr;
 pub(crate) use declaration::AssociatedConstIr;
