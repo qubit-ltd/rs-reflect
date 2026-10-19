@@ -1593,6 +1593,7 @@ impl<'a> Iterator for MethodCatalogMethodIter<'a> {
 pub struct MethodCatalogRegistration {
     type_id: fn() -> TypeId,
     methods: &'static [EffectiveMethod],
+    provider: Option<fn() -> &'static [EffectiveMethod]>,
 }
 
 impl MethodCatalogRegistration {
@@ -1600,6 +1601,18 @@ impl MethodCatalogRegistration {
         Self {
             type_id: TypeId::of::<T>,
             methods,
+            provider: None,
+        }
+    }
+
+    /// Creates a registration whose method slice is initialized by a typed provider.
+    pub const fn with_provider<T: super::Reflect>(
+        provider: fn() -> &'static [EffectiveMethod],
+    ) -> Self {
+        Self {
+            type_id: TypeId::of::<T>,
+            methods: &[],
+            provider: Some(provider),
         }
     }
 
@@ -1608,7 +1621,10 @@ impl MethodCatalogRegistration {
     }
 
     pub(crate) fn methods(&self) -> &'static [EffectiveMethod] {
-        self.methods
+        match self.provider {
+            Some(provider) => provider(),
+            None => self.methods,
+        }
     }
 }
 

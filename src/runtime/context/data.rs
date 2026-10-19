@@ -881,17 +881,23 @@ fn capability_context_error(error: CapabilityError) -> ContextError {
 mod tests {
     use super::*;
 
+    use crate::runtime::context::ReflectionContext;
     use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
     use crate::runtime::descriptor::impl_descriptor::{ImplKind, ImplQualifiers};
     use crate::runtime::descriptor::metadata::TypeMetadata;
+    use crate::runtime::descriptor::method::MethodCatalog;
     use crate::runtime::descriptor::method::{
-        MethodMetadata, MethodNamespaceMetadata, MethodQualifiers, MethodVisibility, ReturnKind,
-        ReturnMetadata,
+        InvocationAdapters, MethodCatalogRegistration, MethodMetadata, MethodNamespaceMetadata,
+        MethodQualifiers, MethodVisibility, ReturnKind, ReturnMetadata,
     };
     use crate::runtime::descriptor::trait_descriptor::{
         TraitApplicationMetadata, TraitCompleteness, TraitDefinitionMetadata, Visibility,
     };
     use crate::runtime::expression::ExpressionData;
+    use crate::runtime::invoke::{
+        FunctionInvocationAdapter, Invocation, InvocationOutput, Local, ValidatedInvocation,
+    };
+    use std::sync::OnceLock;
 
     struct Target;
     struct ImplOne;
@@ -976,6 +982,30 @@ mod tests {
     static AMBIGUOUS_TRAIT_METHOD: EffectiveMethod =
         EffectiveMethod::for_type::<Target>(&AMBIGUOUS_TRAIT_METHOD_METADATA);
     static AMBIGUOUS_TRAIT_METHODS: &[EffectiveMethod] = &[AMBIGUOUS_TRAIT_METHOD];
+
+    fn provider_adapter<'call>(
+        _invocation: ValidatedInvocation<'call, Local>,
+    ) -> InvocationOutput<'call, Local> {
+        InvocationOutput::unit()
+    }
+
+    static PROVIDER_ADAPTER: FunctionInvocationAdapter<Local> =
+        FunctionInvocationAdapter::new(provider_adapter);
+    static PROVIDER_ADAPTERS: InvocationAdapters = InvocationAdapters::builder()
+        .local(&PROVIDER_ADAPTER)
+        .build();
+    static PROVIDER_METADATA: MethodMetadata =
+        MethodMetadata::inherent("provided", "fixture::Target");
+    static PROVIDER_METHOD: EffectiveMethod =
+        EffectiveMethod::for_type::<Target>(&PROVIDER_METADATA).with_adapters(PROVIDER_ADAPTERS);
+    static PROVIDED_METHODS: OnceLock<Box<[EffectiveMethod]>> = OnceLock::new();
+
+    fn provided_methods() -> &'static [EffectiveMethod] {
+        PROVIDED_METHODS.get_or_init(|| vec![PROVIDER_METHOD].into_boxed_slice())
+    }
+
+    static PROVIDER_CATALOG: MethodCatalogRegistration =
+        MethodCatalogRegistration::with_provider::<Target>(provided_methods);
 
     static IMPL_ONE_DEFINITION: ImplDefinitionMetadata = ImplDefinitionMetadata::new::<ImplOne>(
         ImplKind::Inherent,
@@ -1134,6 +1164,30 @@ mod tests {
         assert!(methods
             .iter()
             .any(|method| method.effective.metadata.name == "clear"));
+    }
+
+    #[test]
+    fn provider_catalog_is_frozen_and_its_adapter_remains_invokable() {
+        let catalogs = [&PROVIDER_CATALOG];
+        let methods = aggregate_method_catalogs(&included_types(), &HashMap::new(), &catalogs)
+            .expect("provider catalog is valid");
+        let target_methods = methods
+            .get(&TypeId::of::<Target>())
+            .expect("provider target catalog");
+        assert_eq!(target_methods.len(), 1);
+        assert!(target_methods[0].effective.adapters.is_some());
+
+        let context = ReflectionContext::from_data(ContextData::empty());
+        let descriptor =
+            crate::runtime::descriptor::TypeDescriptor::new(&TARGET_METADATA, &context);
+        let catalog =
+            MethodCatalog::from_shared(descriptor, methods[&TypeId::of::<Target>()].clone());
+        let method = catalog.method("provided").expect("provider method lookup");
+        let output = match method.invoke(Invocation::<Local>::associated()) {
+            Ok(output) => output,
+            Err(_) => panic!("provider adapter invocation"),
+        };
+        assert!(output.into_unit().is_ok());
     }
 
     #[test]

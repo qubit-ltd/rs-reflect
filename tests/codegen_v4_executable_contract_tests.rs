@@ -6,6 +6,7 @@ use qubit_reflect::__private::codegen_v4::invoke::{
 };
 use qubit_reflect::__private::codegen_v4::invoke::{ReceiverDescriptor, ReceiverKind};
 use qubit_reflect::__private::codegen_v4::value::Local;
+use std::sync::OnceLock;
 
 struct Fixture;
 
@@ -81,9 +82,24 @@ static METHOD_BINDING: qubit_reflect::__private::codegen_v4::registration::Metho
         .with_specializations(&SPECIALIZATIONS);
 static CATALOG: MethodCatalogRegistration = MethodCatalogRegistration::new::<Fixture>(&METHODS);
 
+static PROVIDED_METHODS: OnceLock<Box<[EffectiveMethod]>> = OnceLock::new();
+
+fn provide_fixture_methods() -> &'static [EffectiveMethod] {
+    PROVIDED_METHODS.get_or_init(|| METHODS.to_vec().into_boxed_slice())
+}
+
+qubit_reflect::__private::codegen_v4::registration::submit_type!(Fixture);
+qubit_reflect::__private::codegen_v4::invoke::submit_method_catalog_provider!(
+    Fixture,
+    provide_fixture_methods
+);
+
 #[test]
 fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
     assert_eq!(qubit_reflect::__private::codegen_v4::PROTOCOL_VERSION, 4);
+    let descriptor =
+        qubit_reflect::__private::codegen_v4::descriptor::TypeDescriptor::of::<Fixture>();
+    assert_eq!(descriptor.method("echo").unwrap().name(), "echo");
     let _ = (
         &TRAIT_SELF_RECEIVER,
         &UNAVAILABLE_METHOD,

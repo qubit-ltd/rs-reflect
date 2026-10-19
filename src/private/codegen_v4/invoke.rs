@@ -63,6 +63,20 @@ macro_rules! __qubit_reflect_submit_method_catalog {
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_method_catalog as submit_method_catalog;
 
+/// Submits a method catalog initialized by a typed provider function.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_submit_method_catalog_provider {
+    ($ty:ty, $provider:path) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::invoke::MethodCatalogRegistration::with_provider::<$ty>($provider)
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_submit_method_catalog_provider as submit_method_catalog_provider;
+
 /// Registers a method declaration using its concrete reflected owner type.
 #[doc(hidden)]
 pub use crate::runtime::descriptor::method::EffectiveMethod as RuntimeEffectiveMethod;
