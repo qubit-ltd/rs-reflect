@@ -8,7 +8,7 @@ use super::capability_origin::CapabilityOrigin;
 use super::capability_registration::CapabilityRegistration;
 use super::capability_target::CapabilityTargetId;
 use crate::runtime::identity::TypeIdentity;
-use crate::runtime::value::{DynamicRef, ThreadSafe};
+use crate::runtime::value::{DynamicRef, Local, ThreadSafe};
 
 struct CountAdapter(u8);
 struct CountCapability;
@@ -182,7 +182,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("registration carries a clone adapter");
     let source = Cloneable(47);
     let cloned = clone_adapter
-        .clone_local(DynamicRef::new(&source))
+        .clone_dynamic::<Local>(DynamicRef::new(&source))
         .expect("adapter accepts the registered concrete type");
     assert_eq!(
         cloned
@@ -199,7 +199,17 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             &REGISTRATION
         }
     }
-    assert!(clone_adapter.clone_local(DynamicRef::new(&Other)).is_none());
+    let mismatch = clone_adapter
+        .clone_dynamic::<Local>(DynamicRef::new(&Other))
+        .err()
+        .expect("the exact value TypeId is checked");
+    assert!(matches!(
+        mismatch,
+        super::capability_error::CapabilityInvocationError::TypeMismatch {
+            expected,
+            actual,
+        } if expected == TypeId::of::<Cloneable>() && actual == TypeId::of::<Other>()
+    ));
 
     let thread_safe_registration =
         CapabilityRegistration::clone_thread_safe::<Cloneable>(CapabilityOrigin::Intrinsic)
@@ -209,7 +219,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .downcast_ref::<super::builtin::CloneAdapter>()
         .expect("registration carries a clone adapter");
     let thread_safe_clone = thread_safe_adapter
-        .clone_thread_safe(DynamicRef::<ThreadSafe>::new(&source))
+        .clone_dynamic::<ThreadSafe>(DynamicRef::<ThreadSafe>::new(&source))
         .expect("adapter supports the thread-safe value mode");
     assert_eq!(
         thread_safe_clone
@@ -218,6 +228,17 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
             .0,
         47
     );
+    let thread_safe_mismatch = thread_safe_adapter
+        .clone_dynamic::<ThreadSafe>(DynamicRef::<ThreadSafe>::new(&Other))
+        .err()
+        .expect("thread-safe mode retains the same type mismatch category");
+    assert!(matches!(
+        thread_safe_mismatch,
+        super::capability_error::CapabilityInvocationError::TypeMismatch {
+            expected,
+            actual,
+        } if expected == TypeId::of::<Cloneable>() && actual == TypeId::of::<Other>()
+    ));
 
     let default_registration =
         CapabilityRegistration::default::<Cloneable>(CapabilityOrigin::Intrinsic)
@@ -228,12 +249,24 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("registration carries a default adapter");
     assert_eq!(
         default_adapter
-            .create_local()
+            .create_dynamic::<Local>()
+            .expect("local mode is available")
             .downcast_ref::<Cloneable>()
             .expect("default value type")
             .0,
         0,
     );
+    let unsupported_mode = default_adapter
+        .create_dynamic::<ThreadSafe>()
+        .err()
+        .expect("local-only registration rejects thread-safe creation");
+    assert!(matches!(
+        unsupported_mode,
+        super::capability_error::CapabilityInvocationError::UnsupportedMode {
+            expected_type,
+            mode: super::capability_error::CapabilityInvocationMode::ThreadSafe,
+        } if expected_type == TypeId::of::<Cloneable>()
+    ));
 
     let thread_safe_default_registration =
         CapabilityRegistration::default_thread_safe::<Cloneable>(CapabilityOrigin::Intrinsic)
@@ -244,7 +277,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
         .expect("registration carries a default adapter");
     assert_eq!(
         thread_safe_default_adapter
-            .create_thread_safe()
+            .create_dynamic::<ThreadSafe>()
             .expect("adapter supports the thread-safe value mode")
             .downcast_ref::<Cloneable>()
             .expect("default value type")

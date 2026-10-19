@@ -16,7 +16,8 @@ pub(crate) use builtin::{
 pub(crate) use capabilities::{Capabilities, CapabilityRecord};
 pub(crate) use capability::{Capability, CapabilityDescriptor, CapabilitySpec};
 pub(crate) use capability_error::{
-    CapabilityContractError, CapabilityError, CapabilityRegistrationError,
+    CapabilityContractError, CapabilityError, CapabilityInvocationError, CapabilityInvocationMode,
+    CapabilityRegistrationError,
 };
 pub(crate) use capability_id::CapabilityIdentifier as CapabilityId;
 pub(crate) use capability_origin::CapabilityOrigin;

@@ -25,6 +25,46 @@ pub(crate) enum CapabilityContractError {
     },
 }
 
+/// The execution mode used when invoking a built-in capability adapter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CapabilityInvocationMode {
+    Local,
+    ThreadSafe,
+}
+
+/// A built-in adapter could not operate on the supplied dynamic value.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum CapabilityInvocationError {
+    TypeMismatch {
+        expected: TypeId,
+        actual: TypeId,
+    },
+    UnsupportedMode {
+        expected_type: TypeId,
+        mode: CapabilityInvocationMode,
+    },
+}
+
+impl fmt::Display for CapabilityInvocationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TypeMismatch { expected, actual } => write!(
+                formatter,
+                "capability adapter expected value type {expected:?}, got {actual:?}"
+            ),
+            Self::UnsupportedMode {
+                expected_type,
+                mode,
+            } => write!(
+                formatter,
+                "capability adapter for {expected_type:?} does not support {mode:?} values"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CapabilityInvocationError {}
+
 /// A lookup or validation error for a target-bound capability.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CapabilityError {

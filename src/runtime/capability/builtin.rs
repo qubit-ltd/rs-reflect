@@ -1,12 +1,76 @@
 use std::any::TypeId;
 
 use super::capability::CapabilitySpec;
+use super::capability_error::{CapabilityInvocationError, CapabilityInvocationMode};
 use super::capability_id::CapabilityIdentifier;
-use crate::runtime::value::{DynamicOwned, DynamicRef, Local, ThreadSafe, ValueFor};
+use crate::runtime::value::{DynamicOwned, DynamicRef, Local, ThreadSafe, ValueFor, ValueMode};
 
 pub(super) trait CoreCapabilitySpec: CapabilitySpec {
     fn core_id() -> Result<CapabilityIdentifier, crate::error::IdError> {
         CapabilityIdentifier::new_core(Self::ID)
+    }
+}
+
+pub(super) trait CapabilityValueMode: ValueMode + Sized {
+    fn invocation_mode() -> CapabilityInvocationMode;
+
+    fn clone_dynamic(
+        adapter: &CloneAdapter,
+        value: DynamicRef<'_, Self>,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError>;
+
+    fn create_dynamic(
+        adapter: &DefaultAdapter,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError>;
+}
+
+impl CapabilityValueMode for Local {
+    fn invocation_mode() -> CapabilityInvocationMode {
+        CapabilityInvocationMode::Local
+    }
+
+    fn clone_dynamic(
+        adapter: &CloneAdapter,
+        value: DynamicRef<'_, Self>,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError> {
+        (adapter.clone_local)(value)
+    }
+
+    fn create_dynamic(
+        adapter: &DefaultAdapter,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError> {
+        Ok((adapter.create_local)())
+    }
+}
+
+impl CapabilityValueMode for ThreadSafe {
+    fn invocation_mode() -> CapabilityInvocationMode {
+        CapabilityInvocationMode::ThreadSafe
+    }
+
+    fn clone_dynamic(
+        adapter: &CloneAdapter,
+        value: DynamicRef<'_, Self>,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError> {
+        let Some(clone) = adapter.clone_thread_safe else {
+            return Err(CapabilityInvocationError::UnsupportedMode {
+                expected_type: adapter.type_id,
+                mode: Self::invocation_mode(),
+            });
+        };
+        clone(value)
+    }
+
+    fn create_dynamic(
+        adapter: &DefaultAdapter,
+    ) -> Result<DynamicOwned<Self>, CapabilityInvocationError> {
+        let Some(create) = adapter.create_thread_safe else {
+            return Err(CapabilityInvocationError::UnsupportedMode {
+                expected_type: adapter.type_id,
+                mode: Self::invocation_mode(),
+            });
+        };
+        Ok(create())
     }
 }
 
@@ -47,9 +111,13 @@ impl CoreCapabilitySpec for DefaultCapability {}
 #[derive(Clone, Copy)]
 pub(crate) struct CloneAdapter {
     type_id: TypeId,
-    clone_local: for<'a> fn(DynamicRef<'a, Local>) -> Option<DynamicOwned<Local>>,
-    clone_thread_safe:
-        Option<for<'a> fn(DynamicRef<'a, ThreadSafe>) -> Option<DynamicOwned<ThreadSafe>>>,
+    clone_local:
+        for<'a> fn(DynamicRef<'a, Local>) -> Result<DynamicOwned<Local>, CapabilityInvocationError>,
+    clone_thread_safe: Option<
+        for<'a> fn(
+            DynamicRef<'a, ThreadSafe>,
+        ) -> Result<DynamicOwned<ThreadSafe>, CapabilityInvocationError>,
+    >,
 }
 
 impl CloneAdapter {
@@ -73,28 +141,36 @@ impl CloneAdapter {
         self.type_id
     }
 
-    pub(crate) fn clone_local(self, value: DynamicRef<'_, Local>) -> Option<DynamicOwned<Local>> {
-        (self.clone_local)(value)
-    }
-
-    pub(crate) fn clone_thread_safe(
-        self,
-        value: DynamicRef<'_, ThreadSafe>,
-    ) -> Option<DynamicOwned<ThreadSafe>> {
-        (self.clone_thread_safe?)(value)
+    pub(crate) fn clone_dynamic<M: CapabilityValueMode>(
+        &self,
+        value: DynamicRef<'_, M>,
+    ) -> Result<DynamicOwned<M>, CapabilityInvocationError> {
+        M::clone_dynamic(self, value)
     }
 }
 
 fn clone_value<T: Clone + ValueFor<Local>>(
     value: DynamicRef<'_, Local>,
-) -> Option<DynamicOwned<Local>> {
-    value.downcast_ref::<T>().cloned().map(DynamicOwned::new)
+) -> Result<DynamicOwned<Local>, CapabilityInvocationError> {
+    if let Some(value) = value.downcast_ref::<T>() {
+        return Ok(DynamicOwned::new(value.clone()));
+    }
+    Err(CapabilityInvocationError::TypeMismatch {
+        expected: TypeId::of::<T>(),
+        actual: value.type_id(),
+    })
 }
 
 fn clone_thread_safe_value<T: Clone + ValueFor<ThreadSafe> + Send + Sync>(
     value: DynamicRef<'_, ThreadSafe>,
-) -> Option<DynamicOwned<ThreadSafe>> {
-    value.downcast_ref::<T>().cloned().map(DynamicOwned::new)
+) -> Result<DynamicOwned<ThreadSafe>, CapabilityInvocationError> {
+    if let Some(value) = value.downcast_ref::<T>() {
+        return Ok(DynamicOwned::new(value.clone()));
+    }
+    Err(CapabilityInvocationError::TypeMismatch {
+        expected: TypeId::of::<T>(),
+        actual: value.type_id(),
+    })
 }
 
 /// Default construction for values whose concrete type is proven at creation.
@@ -126,12 +202,10 @@ impl DefaultAdapter {
         self.type_id
     }
 
-    pub(crate) fn create_local(self) -> DynamicOwned<Local> {
-        (self.create_local)()
-    }
-
-    pub(crate) fn create_thread_safe(self) -> Option<DynamicOwned<ThreadSafe>> {
-        self.create_thread_safe.map(|create| create())
+    pub(crate) fn create_dynamic<M: CapabilityValueMode>(
+        &self,
+    ) -> Result<DynamicOwned<M>, CapabilityInvocationError> {
+        M::create_dynamic(self)
     }
 }
 
