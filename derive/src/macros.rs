@@ -27,6 +27,14 @@ pub fn bind_method(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Parses and expands a linked method binding registration.
+pub fn register_method_binding(input: TokenStream) -> TokenStream {
+    match crate::expand::bind_method::expand_registered(input.into()) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
 /// Derives structural reflection for a struct or enum.
 ///
 /// Public usage and helper scopes are documented on the crate-root macro.

@@ -166,6 +166,12 @@ pub use qubit_reflect_derive::ReflectImpl;
 /// Build a compile-time method-instance binding for runtime reflection.
 #[cfg(feature = "derive")]
 pub use qubit_reflect_derive::bind_method;
+/// Register one monomorphized generic method in the linked method catalog.
+#[cfg(feature = "derive")]
+pub use qubit_reflect_derive::register_method_binding;
+/// Register a built-in capability for a reflected type.
+#[cfg(feature = "derive")]
+pub use __private::codegen_v4::capability::register_capability;
 // Registry facade.
 /// The effective implementation and method view for one registered root.
 pub use registry::EffectiveTypeView;

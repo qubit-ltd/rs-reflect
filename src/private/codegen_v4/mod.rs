@@ -29,6 +29,9 @@ pub mod expression;
 pub mod impls;
 /// Typed invocation adapter contracts used by generated implementations.
 pub mod invoke;
+/// Internal derive support used to apply conditional attributes before v4 emission.
+#[cfg(feature = "derive")]
+pub mod macro_support;
 /// Compile-time handshake for derive/runtime compatibility.
 pub mod protocol;
 /// Typed trait declaration and application metadata used by generated code.

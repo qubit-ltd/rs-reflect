@@ -377,11 +377,11 @@ fn support_path() -> Result<TokenStream> {
     }
     match crate_name("qubit-reflect") {
         Ok(FoundCrate::Itself) => Ok(quote!(
-            ::qubit_reflect::__private::codegen_v3::macro_support::ConfiguredReflection
+            ::qubit_reflect::__private::codegen_v4::macro_support::ConfiguredReflection
         )),
         Ok(FoundCrate::Name(name)) => {
             let identifier = Ident::new(&name, Span::call_site());
-            Ok(quote!(::#identifier::__private::codegen_v3::macro_support::ConfiguredReflection))
+            Ok(quote!(::#identifier::__private::codegen_v4::macro_support::ConfiguredReflection))
         }
         Err(_) => Err(Error::new(
             Span::call_site(),

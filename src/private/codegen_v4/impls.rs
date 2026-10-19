@@ -234,24 +234,9 @@ macro_rules! __qubit_reflect_submit_impl_definition {
     ($marker:ty, $definition:path) => {
         const _: () = {
             fn registration() -> $crate::__private::codegen_v4::registration::Registration {
-                $crate::__private::codegen_v4::impls::register_impl_definition_from::<$marker>(
+                    $crate::__private::codegen_v4::impls::register_impl_definition_from::<$marker>(
                     $definition,
                 )
-            }
-            $crate::__private::__inventory::submit! {
-                $crate::__private::codegen_v4::impls::impl_definition_fragment(
-                    stringify!($marker),
-                    registration,
-                )
-            }
-        };
-    };
-    ($marker:ty, static $definition:expr) => {
-        const _: () = {
-            static DEFINITION: $crate::__private::codegen_v4::impls::ImplDefinitionSpec<$marker> =
-                $definition;
-            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
-                $crate::__private::codegen_v4::impls::register_impl_definition(&DEFINITION)
             }
             $crate::__private::__inventory::submit! {
                 $crate::__private::codegen_v4::impls::impl_definition_fragment(
@@ -276,21 +261,6 @@ macro_rules! __qubit_reflect_submit_impl_application {
                 $crate::__private::codegen_v4::impls::register_impl_application_from::<$target>(
                     $application,
                 )
-            }
-            $crate::__private::__inventory::submit! {
-                $crate::__private::codegen_v4::impls::impl_application_fragment::<$target>(
-                    concat!(stringify!($target), "::impl-application"),
-                    registration,
-                )
-            }
-        };
-    };
-    ($target:ty, static $application:expr) => {
-        const _: () = {
-            static APPLICATION: $crate::__private::codegen_v4::impls::ImplApplicationSpec<$target> =
-                $application;
-            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
-                $crate::__private::codegen_v4::impls::register_impl_application(&APPLICATION)
             }
             $crate::__private::__inventory::submit! {
                 $crate::__private::codegen_v4::impls::impl_application_fragment::<$target>(

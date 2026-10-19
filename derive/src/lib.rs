@@ -48,6 +48,12 @@ pub fn bind_method(input: TokenStream) -> TokenStream {
     macros::bind_method(input)
 }
 
+/// Registers one explicitly monomorphized method binding in the linked catalog.
+#[proc_macro]
+pub fn register_method_binding(input: TokenStream) -> TokenStream {
+    macros::register_method_binding(input)
+}
+
 #[proc_macro_derive(
     ConfiguredReflection,
     attributes(

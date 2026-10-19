@@ -85,6 +85,27 @@ mod tests {
     use crate::ir::TypeDeclarationKindIr;
     use crate::parse::parse_and_validate_declaration;
 
+    #[test]
+    fn test_registered_method_binding_emits_v4_provider_registration() {
+        let context = ExpansionContext::for_tests();
+        let tokens = super::super::bind_method::expand_registered_with_context(
+            quote!(Fixture::convert::<u64> as fn(&Fixture, String) -> u64),
+            &context,
+        )
+        .expect("concrete method binding should expand");
+        let source = tokens.to_string();
+
+        assert!(source.contains("codegen_v4"), "expected v4 path in {source}");
+        assert!(
+            source.contains("submit_method_catalog_provider"),
+            "expected linked method catalog provider in {source}",
+        );
+        assert!(
+            !source.contains("codegen_v3"),
+            "must not emit the legacy protocol in {source}",
+        );
+    }
+
     /// Parses and validates one type fixture through the derive pipeline.
     ///
     /// # Parameters

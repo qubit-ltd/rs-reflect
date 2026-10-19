@@ -334,21 +334,6 @@ macro_rules! __qubit_reflect_submit_trait_definition {
             }
         };
     };
-    ($marker:ty, static $definition:expr) => {
-        const _: () = {
-            static DEFINITION: $crate::__private::codegen_v4::traits::TraitDefinitionSpec<$marker> =
-                $definition;
-            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
-                $crate::__private::codegen_v4::traits::register_trait_definition(&DEFINITION)
-            }
-            $crate::__private::__inventory::submit! {
-                $crate::__private::codegen_v4::traits::trait_definition_fragment(
-                    stringify!($marker),
-                    registration,
-                )
-            }
-        };
-    };
 }
 
 #[doc(hidden)]
@@ -364,22 +349,6 @@ macro_rules! __qubit_reflect_submit_trait_application {
                 $crate::__private::codegen_v4::traits::register_trait_application_from::<$target>(
                     $application,
                 )
-            }
-            $crate::__private::__inventory::submit! {
-                $crate::__private::codegen_v4::traits::trait_application_fragment::<$target>(
-                    concat!(stringify!($target), "::trait-application"),
-                    registration,
-                )
-            }
-        };
-    };
-    ($target:ty, static $application:expr) => {
-        const _: () = {
-            static APPLICATION: $crate::__private::codegen_v4::traits::TraitApplicationSpec<
-                $target,
-            > = $application;
-            fn registration() -> $crate::__private::codegen_v4::registration::Registration {
-                $crate::__private::codegen_v4::traits::register_trait_application(&APPLICATION)
             }
             $crate::__private::__inventory::submit! {
                 $crate::__private::codegen_v4::traits::trait_application_fragment::<$target>(
