@@ -14,10 +14,10 @@ use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
 use qubit_reflect::descriptor::ImplKind;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
-struct Service<T: 'static>(#[reflect(opaque)] PhantomData<T>);
+struct Service<T: 'static>(PhantomData<T>);
 
 #[Reflect]
 // This declaration exists to test trait implementation metadata.
@@ -29,7 +29,7 @@ trait ServiceContract<T> {
     fn omitted_from_trait(&self);
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_ServiceContract)]
+#[ReflectImpl]
 impl<T: 'static> ServiceContract<T> for Service<T> {
     fn convert<U: Clone>(&self, value: U) -> U {
         value
@@ -51,18 +51,20 @@ impl<T: 'static> Service<T> {
     pub fn omitted_from_impl(&self) {}
 }
 
-fn implementation_definition_for(trait_name: Option<&str>) -> &'static ImplDefinitionDescriptor {
-    let registry = ReflectRegistry::initialize().expect("implementation fragments must validate");
-    registry
+fn implementation_definition_for(trait_name: Option<&str>) -> ImplDefinitionDescriptor<'static> {
+    let context = ReflectionContext::global();
+    context.initialize().expect("implementation fragments must validate");
+    context
         .impl_definitions()
+        .expect("implementation definitions are available")
         .iter()
         .copied()
         .find(|definition| match trait_name {
             Some(name) => {
                 definition.kind() == ImplKind::Trait
-                    && registry
-                        .impl_definition_trait(definition)
-                        .is_some_and(|trait_definition| trait_definition.rust_name() == name)
+                    && definition.implemented_trait().is_some_and(|trait_| {
+                        trait_.path().ends_with(name)
+                    })
             }
             None => {
                 definition.kind() == ImplKind::Inherent
@@ -87,9 +89,12 @@ fn test_reflect_impl_preserves_method_declarations_and_generic_parameters() {
 
 #[test]
 fn test_reflect_impl_skip_omits_method_without_changing_trait_declaration() {
-    let trait_definition = ReflectRegistry::initialize()
-        .expect("trait declaration fragments must validate")
-        .trait_definition_by_path(concat!(module_path!(), "::ServiceContract"))
+    let context = ReflectionContext::global();
+    context
+        .initialize()
+        .expect("trait declaration fragments must validate");
+    let trait_definition = context
+        .trait_definition_by_name(concat!(module_path!(), "::ServiceContract"))
         .expect("the trait declaration remains registered");
     let trait_methods: Vec<_> = trait_definition
         .methods()

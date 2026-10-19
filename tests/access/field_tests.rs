@@ -8,14 +8,12 @@
 
 use std::any::TypeId;
 use std::cell::Cell;
-use std::error::Error;
 use std::rc::Rc;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::access::FieldAccessError;
-use qubit_reflect::access::FieldAccessOperation;
-use qubit_reflect::access::FieldIdentity;
+use qubit_reflect::access::FieldSetError;
 
 struct NotReflected;
 
@@ -40,19 +38,14 @@ impl Drop for DropProbe {
 }
 
 #[test]
-fn field_identity_keeps_names_indices_and_variant_context() {
-    let named = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, Some("secret"));
-    let positional = FieldIdentity::new(TypeId::of::<Account>(), "Account", 2, None);
-    let variant = FieldIdentity::new_variant(TypeId::of::<Account>(), "Account", 1, Some("value"), 3, "Data");
+fn field_descriptor_keeps_declaring_type_and_source_identity() {
+    let descriptor = TypeDescriptor::of::<Account>();
+    let field = descriptor.fields().get("secret").expect("private field is described");
 
-    assert_eq!(named.to_string(), "Account::secret");
-    assert_eq!(positional.to_string(), "Account field #2");
-    assert_eq!(variant.to_string(), "Account::Data.value");
-    assert_eq!(variant.variant_index(), Some(3));
-    assert_eq!(variant.variant_rust_name(), Some("Data"));
-    assert_eq!(FieldAccessOperation::Get.to_string(), "get");
-    assert_eq!(FieldAccessOperation::GetMut.to_string(), "get_mut");
-    assert_eq!(FieldAccessOperation::Set.to_string(), "set");
+    assert_eq!(field.name(), "secret");
+    assert_eq!(field.index(), 1);
+    assert_eq!(field.declaring_type().type_id(), TypeId::of::<Account>());
+    assert!(field.declaring_variant().is_none());
 }
 
 #[test]
@@ -84,7 +77,7 @@ fn private_field_requires_unsafe_visibility_bypass() {
 
     assert!(matches!(
         field.get::<_, String>(&account),
-        Err(FieldAccessError::NotPublic { .. })
+        Err(FieldAccessError::NotPublic)
     ));
     // SAFETY: the test owns the account and deliberately bypasses reflection
     // visibility.
@@ -115,8 +108,8 @@ fn failures_recover_typed_replacements_before_mutation() {
     let failure = field
         .set(&mut account, String::from("wrong type"))
         .expect_err("replacement type must match the field");
-    assert!(matches!(failure.error(), FieldAccessError::ValueTypeMismatch { .. }));
-    let recovered: String = failure.into_recovery().unwrap().into_value();
+    assert!(matches!(failure.error(), FieldSetError::ValueTypeMismatch(_)));
+    let recovered: String = failure.into_parts().1;
     assert_eq!(recovered, "wrong type");
     assert_eq!(account.balance, 7);
 
@@ -124,22 +117,18 @@ fn failures_recover_typed_replacements_before_mutation() {
     let failure = field
         .set(&mut wrong_target, 11_u64)
         .expect_err("target type must match the declaring type");
-    assert!(matches!(failure.error(), FieldAccessError::TargetTypeMismatch { .. }));
-    assert_eq!(failure.into_recovery().unwrap().into_value(), 11_u64);
+    assert!(matches!(failure.error(), FieldSetError::TargetTypeMismatch(_)));
+    assert_eq!(failure.into_parts().1, 11_u64);
     assert_eq!(wrong_target, 17);
 
     let other = OtherTarget;
     let error = field
         .get::<_, u64>(&other)
         .expect_err("target type must match the declaring type");
-    let FieldAccessError::TargetTypeMismatch {
-        field: identity,
-        mismatch,
-    } = error
+    let FieldAccessError::TargetTypeMismatch(mismatch) = error
     else {
         panic!("the error must retain target mismatch context");
     };
-    assert_eq!(identity.query_name(), Some("balance"));
     assert_eq!(mismatch.expected(), TypeId::of::<Account>());
     assert_eq!(mismatch.actual(), TypeId::of::<OtherTarget>());
 
@@ -152,14 +141,10 @@ fn failures_recover_typed_replacements_before_mutation() {
     let failure = field
         .set(&mut account, 12_u32)
         .expect_err("the replacement type must match exactly");
-    let FieldAccessError::ValueTypeMismatch {
-        field: identity,
-        mismatch,
-    } = failure.error()
+    let FieldSetError::ValueTypeMismatch(mismatch) = failure.error()
     else {
         panic!("the error must classify a replacement type mismatch");
     };
-    assert_eq!(identity.query_name(), Some("balance"));
     assert_eq!(mismatch.expected(), TypeId::of::<u64>());
     assert_eq!(mismatch.actual(), TypeId::of::<u32>());
     assert_eq!(account.balance, 7);
@@ -178,9 +163,9 @@ fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
         .set(&mut account, DropProbe(Rc::clone(&drops)))
         .expect_err("the replacement type does not match the field");
 
-    assert!(matches!(failure.error(), FieldAccessError::ValueTypeMismatch { .. }));
+    assert!(matches!(failure.error(), FieldSetError::ValueTypeMismatch(_)));
     assert_eq!(drops.get(), 0, "validation must leave ownership with recovery");
-    let recovered = failure.into_recovery().unwrap().into_value();
+    let recovered = failure.into_parts().1;
     assert_eq!(drops.get(), 0, "taking recovery must not drop the value");
     drop(recovered);
     assert_eq!(drops.get(), 1, "the caller must control the single final drop");
@@ -188,7 +173,7 @@ fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
 }
 
 #[test]
-fn typed_recovery_exposes_identity_and_non_panicking_consuming_checks() {
+fn typed_failure_exposes_the_exact_replacement_value() {
     let field = TypeDescriptor::of::<Account>().field("balance").expect("field exists");
     let mut account = Account {
         balance: 7,
@@ -199,26 +184,9 @@ fn typed_recovery_exposes_identity_and_non_panicking_consuming_checks() {
         .set(&mut account, 12_u32)
         .expect_err("the exact field type is u64");
 
-    assert!(failure.as_ref() == failure.error());
-    assert!(failure.source().is_some());
-    let recovery = failure
-        .recovery()
-        .expect("preflight failures retain the original value");
-    assert_eq!(recovery.field().query_name(), Some("balance"));
-    assert_eq!(recovery.query_name(), Some("balance"));
-    assert_eq!(recovery.value(), &12_u32);
-    assert_eq!(recovery.value_by_name("balance"), Some(&12_u32));
-    assert_eq!(recovery.value_at(0), Some(&12_u32));
-    assert!(recovery.value_by_name("other").is_none());
-    assert!(recovery.value_at(1).is_none());
-
-    let recovery = failure.into_recovery().expect("preflight recovery exists");
-    let Err(recovery) = recovery.into_value_by_name("other") else {
-        panic!("a mismatched query name must retain recovery");
-    };
-    let Err(recovery) = recovery.into_value_at(1) else {
-        panic!("a mismatched index must retain recovery");
-    };
-    assert_eq!(recovery.into_value_by_name("balance").unwrap(), 12_u32);
+    assert!(matches!(failure.error(), FieldSetError::ValueTypeMismatch(_)));
+    assert_eq!(*failure.replacement(), 12_u32);
+    let (_, replacement) = failure.into_parts();
+    assert_eq!(replacement, 12_u32);
     assert_eq!(account.balance, 7);
 }

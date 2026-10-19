@@ -3,470 +3,107 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
 // =============================================================================
 
-//! Integration tests for typed reflection capabilities.
-use std::any::TypeId;
+//! Integration tests for typed vNext capabilities.
+
 use std::rc::Rc;
-use std::sync::OnceLock;
 
-use qubit_reflect as reflect;
 use qubit_reflect::Reflect;
-use qubit_reflect::capability::CapabilityAccessError;
-use qubit_reflect::capability::CapabilityConflictKind;
-use qubit_reflect::capability::CapabilityDescriptor;
-use qubit_reflect::capability::CapabilityKey;
-use qubit_reflect::capability::TypeCapabilities;
-use qubit_reflect::capability::clone_descriptor;
-use qubit_reflect::capability::clone_key;
-use qubit_reflect::capability::default_descriptor;
-use qubit_reflect::capability::default_key;
-use qubit_reflect::capability::send_key;
-use qubit_reflect::capability::sync_key;
-use qubit_reflect::descriptor::TypeDescriptor;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::register_reflected_type;
-use qubit_reflect::register_type_capabilities;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::capability::{
+    CapabilityRegistration, CapabilitySpec, CapabilityTarget, CloneCapability, DefaultCapability,
+};
+use qubit_reflect::value::{DynamicRef, Local};
+use qubit_reflect::register_capability;
+
+#[derive(Clone, Default, Reflect)]
+struct BuiltinTarget {
+    value: String,
+}
+
+#[derive(Reflect)]
+struct ExplicitTarget {
+    marker: u8,
+}
 
 #[derive(Debug, Eq, PartialEq)]
-struct TextAdapter(&'static str);
+struct LabelAdapter(&'static str);
 
-#[derive(Debug)]
-struct NumberAdapter;
+struct LabelCapability;
 
-#[derive(Debug, Eq, PartialEq)]
-struct ExtensionAdapter(&'static str);
+impl CapabilitySpec for LabelCapability {
+    type Adapter = LabelAdapter;
 
-#[derive(Clone, Default, Debug, Eq, PartialEq)]
-#[Reflect]
-struct LocalOnly {
-    values: Rc<Vec<u32>>,
+    const ID: &'static str = "example.reflect.label";
 }
 
-#[derive(Clone, Default)]
-#[Reflect]
-struct SendSync;
+register_capability!(BuiltinTarget: CloneCapability);
+register_capability!(BuiltinTarget: DefaultCapability);
 
-#[Reflect]
-struct ExtensionRegistration;
-
-struct ReflectedRoot;
-
-#[derive(Clone, Default)]
-#[Reflect]
-struct DerivedCapabilities;
-
-mod custom {
-    use qubit_reflect::capability::CapabilityDescriptor;
-    use qubit_reflect::capability::CapabilityKey;
-    use qubit_reflect::identity::CapabilityId;
-
-    // This fixture is discovered through reflected metadata by the test.
-    #[allow(dead_code, non_snake_case)]
-    pub fn Clone<T: 'static>() -> CapabilityDescriptor {
-        let _ = std::any::TypeId::of::<T>();
-        let id = CapabilityId::new("example.capability.qualified_clone").expect("test capability ID");
-        CapabilityDescriptor::without_adapter(CapabilityKey::<()>::new(id))
-    }
-}
-
-#[Reflect]
-struct QualifiedClone;
-
-#[Reflect]
-struct DerivedExtensionRegistration;
-
-/// Builds the test root's capability set once for its static descriptor.
-fn reflected_root_capabilities() -> reflect::capability::TypeCapabilitiesResult {
-    static CAPABILITIES: OnceLock<TypeCapabilities> = OnceLock::new();
-    Ok(CAPABILITIES.get_or_init(|| {
-        TypeCapabilities::try_new(vec![CapabilityDescriptor::with_adapter(
-            extension_key(),
-            ExtensionAdapter("descriptor"),
-        )])
-        .expect("the test extension capability must be valid")
-    }))
-}
-
-static REFLECTED_ROOT_DESCRIPTOR: TypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::opaque_root_with_capabilities::<ReflectedRoot>(
-        "ReflectedRoot",
-        reflected_root_capabilities,
-    );
-
-impl Reflect for ReflectedRoot {
-    /// Returns the test type's unique descriptor.
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &REFLECTED_ROOT_DESCRIPTOR
-    }
-}
-
-register_reflected_type!(ReflectedRoot);
-register_type_capabilities!(LocalOnly: Clone, Default);
-register_type_capabilities!(SendSync: Clone, Default, Send, Sync);
-register_type_capabilities!(ExtensionRegistration: [extension_key() => ExtensionAdapter("registered")]);
-register_type_capabilities!(DerivedExtensionRegistration: [extension_key() => ExtensionAdapter("derived")]);
-register_type_capabilities!(DerivedCapabilities: Clone, Default);
-register_type_capabilities!(QualifiedClone: [qualified_key() => NumberAdapter]);
-
-/// Creates a valid third-party capability ID for a test.
-fn external_id(value: &'static str) -> CapabilityId {
-    CapabilityId::new(value).expect("the test capability ID must be valid")
-}
-
-/// Returns the typed third-party extension key used by static registrations.
-fn extension_key() -> CapabilityKey<ExtensionAdapter> {
-    CapabilityKey::new(external_id("example.capability.extension"))
-}
-
-fn qualified_key() -> CapabilityKey<NumberAdapter> {
-    CapabilityKey::new(external_id("example.capability.qualified_clone"))
-}
-
-/// Confirms descriptors retain unknown contracts and iterate by stable ID
-/// order.
+/// Verifies linked registrations provide built-in Clone and Default contracts.
 #[test]
-fn test_type_capabilities_preserve_unknown_capabilities_in_stable_order() {
-    let zeta_key = CapabilityKey::<TextAdapter>::new(external_id("example.capability.zeta"));
-    let alpha_key = CapabilityKey::<TextAdapter>::new(external_id("example.capability.alpha"));
-    let descriptors = vec![
-        CapabilityDescriptor::with_adapter(zeta_key, TextAdapter("zeta")),
-        CapabilityDescriptor::without_adapter(alpha_key),
-    ];
-
-    let capabilities = TypeCapabilities::try_new(descriptors).expect("distinct capability IDs must be accepted");
-
-    let ids: Vec<_> = capabilities
-        .descriptors()
-        .iter()
-        .map(|descriptor| descriptor.id().as_str())
-        .collect();
-    assert_eq!(ids, ["example.capability.alpha", "example.capability.zeta"]);
-    assert!(!capabilities.descriptors()[0].has_adapter());
-    assert_eq!(capabilities.descriptors()[1].adapter_type(), zeta_key.adapter_type());
-    assert!(format!("{:?}", capabilities.descriptors()[1].clone()).contains("CapabilityDescriptor"));
-    assert!(format!("{zeta_key:?}").contains("CapabilityKey"));
-    assert_eq!(capabilities.get(zeta_key).unwrap(), Some(&TextAdapter("zeta")));
-    assert!(capabilities.get(alpha_key).is_err());
-}
-
-/// Confirms one stable ID cannot silently acquire a different adapter contract.
-#[test]
-fn test_type_capabilities_reject_same_id_with_different_adapter_types() {
-    let text_key = CapabilityKey::<TextAdapter>::new(external_id("example.capability.shared"));
-    let number_key = CapabilityKey::<NumberAdapter>::new(external_id("example.capability.shared"));
-
-    let error = TypeCapabilities::try_new(vec![
-        CapabilityDescriptor::without_adapter(text_key),
-        CapabilityDescriptor::with_adapter(number_key, NumberAdapter),
-    ])
-    .expect_err("one capability ID cannot identify two adapter contracts");
-
-    assert_eq!(error.kind(), CapabilityConflictKind::AdapterTypeMismatch);
-    assert_eq!(error.id().as_str(), "example.capability.shared");
-    assert_ne!(error.first_adapter_type(), error.second_adapter_type());
-}
-
-/// Confirms conflicting adapter contracts are reported in declaration order.
-#[test]
-fn test_type_capabilities_conflict_preserves_input_order() {
-    let id = external_id("example.capability.ordered_conflict");
-    let u64_fact = CapabilityDescriptor::without_adapter(CapabilityKey::<u64>::new(id));
-    let u32_fact = CapabilityDescriptor::without_adapter(CapabilityKey::<u32>::new(id));
-
-    for (inputs, first_type, second_type) in [
-        (
-            vec![u64_fact.clone(), u32_fact.clone()],
-            TypeId::of::<u64>(),
-            TypeId::of::<u32>(),
-        ),
-        (vec![u32_fact, u64_fact], TypeId::of::<u32>(), TypeId::of::<u64>()),
-    ] {
-        let error = TypeCapabilities::try_new(inputs).expect_err("duplicate ID");
-
-        assert_eq!(error.id().as_str(), "example.capability.ordered_conflict");
-        assert_eq!(error.kind(), CapabilityConflictKind::AdapterTypeMismatch);
-        assert_eq!(error.first_adapter_type(), first_type);
-        assert_eq!(error.second_adapter_type(), second_type);
-    }
-}
-
-/// Confirms duplicate descriptors are rejected even when their contracts match.
-#[test]
-fn test_type_capabilities_reject_duplicate_ids() {
-    let first_key = CapabilityKey::<TextAdapter>::new(external_id("example.capability.duplicate"));
-    let second_key = CapabilityKey::<TextAdapter>::new(external_id("example.capability.duplicate"));
-
-    let error = TypeCapabilities::try_new(vec![
-        CapabilityDescriptor::without_adapter(first_key),
-        CapabilityDescriptor::without_adapter(second_key),
-    ])
-    .expect_err("duplicate capability IDs must not be silently coalesced");
-
-    assert_eq!(error.kind(), CapabilityConflictKind::DuplicateId);
-}
-
-/// Confirms typed lookup preserves missing, fact-only, mismatch, and found
-/// outcomes through the public capability API.
-#[test]
-fn test_typed_capability_lookup_reports_all_contract_states() {
-    type BorrowedAdapter = fn(&str);
-    type StaticAdapter = fn(&'static str);
-
-    fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<CapabilityKey<Rc<()>>>();
-
-    fn borrow_adapter(_: &str) {}
-    let borrowed_adapter: BorrowedAdapter = borrow_adapter;
-
-    let found_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.found"));
-    let fact_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.fact.only"));
-    let mismatch_key = CapabilityKey::<StaticAdapter>::new(external_id("example.capability.mismatch"));
-    let declared_mismatch_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.mismatch"));
-    let missing_key = CapabilityKey::<BorrowedAdapter>::new(external_id("example.capability.missing"));
-    let capabilities = TypeCapabilities::try_new(vec![
-        CapabilityDescriptor::with_adapter(found_key, borrowed_adapter),
-        CapabilityDescriptor::without_adapter(fact_key),
-        CapabilityDescriptor::without_adapter(declared_mismatch_key),
-    ])
-    .expect("distinct capability IDs must be accepted");
-
-    assert!(
-        capabilities
-            .get(missing_key)
-            .expect("missing lookup is valid")
-            .is_none()
-    );
-    assert!(matches!(
-        capabilities.get(fact_key),
-        Err(CapabilityAccessError::FactOnly { id, .. }) if id.as_str() == "example.capability.fact.only"
-    ));
-    assert!(matches!(
-        capabilities.get(mismatch_key),
-        Err(CapabilityAccessError::AdapterTypeMismatch { id, .. }) if id.as_str() == "example.capability.mismatch"
-    ));
-    assert!(capabilities.get(found_key).expect("found lookup is valid").is_some());
-}
-
-/// Confirms built-in clone and default adapters retain exact dynamic type
-/// checks.
-#[test]
-fn test_clone_and_default_capabilities_use_safe_local_dynamic_values() {
-    let capabilities = TypeCapabilities::try_new(vec![clone_descriptor::<String>(), default_descriptor::<String>()])
-        .expect("the built-in capability IDs are distinct");
-
-    let clone_adapter = capabilities
-        .get(clone_key())
-        .unwrap()
-        .expect("the clone adapter must be present");
-    let source = String::from("clone me");
-    let cloned = clone_adapter
-        .clone_value(&source)
-        .expect("the dynamic value has the registered type");
-    assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("clone me"));
-
-    let mismatch = match clone_adapter.clone_value(&17_u32) {
-        Ok(_) => panic!("an adapter must reject a different concrete type"),
-        Err(error) => error,
+fn test_builtin_capabilities_use_typed_adapters() {
+    let descriptor = TypeDescriptor::of::<BuiltinTarget>();
+    let original = BuiltinTarget {
+        value: String::from("before"),
     };
-    assert_eq!(mismatch.expected(), TypeId::of::<String>());
-    assert_eq!(mismatch.actual(), TypeId::of::<u32>());
 
-    let defaulted = capabilities
-        .get(default_key())
-        .unwrap()
-        .expect("the default adapter must be present")
-        .create();
-    assert_eq!(defaulted.downcast_ref::<String>().map(String::as_str), Some(""));
+    let clone = descriptor.capability::<CloneCapability>().expect("Clone is registered");
+    let copied = clone
+        .adapter()
+        .clone_dynamic(DynamicRef::<Local>::new(&original))
+        .expect("the registered Clone adapter accepts the exact root type");
+    assert_eq!(copied.downcast_ref::<BuiltinTarget>().unwrap().value, "before");
+
+    let default = descriptor.capability::<DefaultCapability>().expect("Default is registered");
+    let created = default.adapter().create_dynamic::<Local>();
+    assert_eq!(created.downcast_ref::<BuiltinTarget>().unwrap().value, "");
 }
 
-/// Confirms the registry resolves intrinsic descriptor capabilities.
+/// Verifies a custom capability is attached to an explicit context and its
+/// adapter remains type checked by the specification.
 #[test]
-fn test_registry_resolves_descriptor_intrinsic_capabilities() {
-    let descriptor = TypeDescriptor::of::<ReflectedRoot>();
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+fn test_custom_capability_is_bound_to_its_explicit_context() {
+    let context = ReflectionContext::builder()
+        .include_type::<ExplicitTarget>()
+        .register(CapabilityRegistration::for_type::<ExplicitTarget, LabelCapability>(
+            LabelAdapter("explicit"),
+        ))
+        .build()
+        .expect("the explicit capability registration is valid");
+    let descriptor = context.type_of::<ExplicitTarget>();
+    let capability = descriptor.capability::<LabelCapability>().expect("custom capability exists");
 
-    assert_eq!(
-        registry
-            .capability(descriptor, extension_key())
-            .expect("valid capability declarations"),
-        Some(&ExtensionAdapter("descriptor"))
-    );
-    assert_eq!(
-        registry
-            .capabilities(descriptor)
-            .expect("valid capability declarations")
-            .descriptors()
-            .len(),
-        1
-    );
+    assert_eq!(capability.adapter(), &LabelAdapter("explicit"));
+    assert!(matches!(capability.target(), CapabilityTarget::Type(target) if target.type_id() == descriptor.type_id()));
+    assert!(std::ptr::eq(descriptor.context(), &context));
+    assert_eq!(descriptor.capabilities().unwrap().iter().len(), 1);
+    let value = ExplicitTarget { marker: 1 };
+    assert_eq!(value.marker, 1);
 }
 
-/// Confirms type-level derive helpers attach their bound-checked capability
-/// adapters to the generated root descriptor.
+/// Verifies a local-only target can still expose a statically typed custom
+/// capability contract.
 #[test]
-fn test_derive_capabilities_attach_to_the_generated_descriptor() {
-    let descriptor = DerivedCapabilities::type_descriptor();
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
+fn test_local_target_can_use_a_typed_capability_spec() {
+    #[derive(Reflect)]
+    struct LocalOnly {
+        value: Rc<()>,
+    }
 
-    assert!(
-        registry
-            .capability(descriptor, clone_key())
-            .expect("valid capability declarations")
-            .is_some()
-    );
-    assert!(
-        registry
-            .capability(descriptor, default_key())
-            .expect("valid capability declarations")
-            .is_some()
-    );
-}
-
-/// Confirms a qualified custom provider ending in `Clone` is not treated as
-/// the built-in clone operation.
-#[test]
-fn test_qualified_capability_provider_is_not_rewritten_as_builtin() {
-    let descriptor = QualifiedClone::type_descriptor();
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-
-    assert!(
-        registry
-            .capability_by_id(descriptor, "example.capability.qualified_clone")
-            .expect("valid custom capability")
-            .is_some()
-    );
-    assert!(
-        registry
-            .capability(descriptor, clone_key())
-            .expect("valid capability lookup")
-            .is_none()
-    );
-}
-
-/// Confirms explicit typed capability registrations join the registry's
-/// effective capability set without creating another descriptor root.
-#[test]
-fn test_derive_descriptor_includes_explicit_extension_registration() {
-    let descriptor = DerivedExtensionRegistration::type_descriptor();
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-
-    assert_eq!(
-        registry
-            .capabilities(descriptor)
-            .expect("valid capability declarations")
-            .get(extension_key())
-            .unwrap(),
-        Some(&ExtensionAdapter("derived"))
-    );
-}
-
-/// Confirms built-in descriptors register core facts and executable operations.
-#[test]
-fn test_builtin_primitive_and_text_descriptors_register_core_capabilities() {
-    let primitive = TypeDescriptor::of::<u32>();
-    let text = TypeDescriptor::of::<String>();
-    let registry = ReflectRegistry::initialize().expect("built-ins must register");
-
-    assert!(
-        registry
-            .capabilities(primitive)
-            .expect("valid capability declarations")
-            .contains(send_key())
-    );
-    assert!(
-        registry
-            .capabilities(primitive)
-            .expect("valid capability declarations")
-            .contains(sync_key())
-    );
-    assert!(
-        registry
-            .capability(primitive, clone_key())
-            .expect("valid capability declarations")
-            .is_some()
-    );
-    assert!(
-        registry
-            .capability(primitive, default_key())
-            .expect("valid capability declarations")
-            .is_some()
-    );
-    assert_eq!(
-        registry
-            .capability(text, clone_key())
-            .expect("valid capability declarations")
-            .expect("String must have an actual clone adapter")
-            .clone_value(&String::from("text"))
-            .expect("the registered String adapter must accept String")
-            .downcast_ref::<String>()
-            .map(String::as_str),
-        Some("text")
-    );
-}
-
-/// Confirms explicit registration is exact and does not infer thread safety.
-#[test]
-fn test_concrete_capability_registration_keeps_send_and_sync_as_facts_only() {
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry
-        .capabilities(TypeDescriptor::of::<LocalOnly>())
-        .expect("valid capability declarations");
-
-    assert!(capabilities.get(clone_key()).unwrap().is_some());
-    assert!(capabilities.get(default_key()).unwrap().is_some());
-    assert!(!capabilities.contains(send_key()));
-    assert!(!capabilities.contains(sync_key()));
-
-    let source = LocalOnly {
-        values: Rc::new(vec![1, 2, 3]),
-    };
-    let cloned = capabilities
-        .get(clone_key())
-        .unwrap()
-        .expect("the clone registration carries its operation adapter")
-        .clone_value(&source)
-        .expect("the registered local concrete type must clone dynamically");
-    assert_eq!(cloned.downcast_ref::<LocalOnly>(), Some(&source));
-}
-
-/// Confirms explicitly declared thread-safety facts have no operation adapter.
-#[test]
-fn test_concrete_registration_exposes_send_and_sync_facts_without_value_promotion() {
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry
-        .capabilities(TypeDescriptor::of::<SendSync>())
-        .expect("valid capability declarations");
-
-    assert!(capabilities.contains(send_key()));
-    assert!(capabilities.contains(sync_key()));
-    assert!(capabilities.get(send_key()).is_err());
-    assert!(capabilities.get(sync_key()).is_err());
-}
-
-/// Confirms macro registration accepts a third-party typed key and adapter.
-#[test]
-fn test_concrete_registration_accepts_third_party_typed_adapter() {
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let capabilities = registry
-        .capabilities(TypeDescriptor::of::<ExtensionRegistration>())
-        .expect("valid capability declarations");
-
-    assert_eq!(
-        capabilities.get(extension_key()).unwrap(),
-        Some(&ExtensionAdapter("registered"))
-    );
-}
-
-/// Confirms reflected-type registration returns the existing descriptor root.
-#[test]
-fn test_reflected_type_registration_preserves_descriptor_root_identity() {
-    let registry = ReflectRegistry::initialize().expect("the linked registrations must be valid");
-    let registered = registry
-        .get(TypeId::of::<ReflectedRoot>())
-        .expect("the exact concrete reflected type must be registered");
-
-    assert!(std::ptr::eq(registered, TypeDescriptor::of::<ReflectedRoot>()));
+    let context = ReflectionContext::builder()
+        .include_type::<LocalOnly>()
+        .register(CapabilityRegistration::for_type::<LocalOnly, LabelCapability>(LabelAdapter("local")))
+        .build()
+        .expect("a local-only type can have a typed registration");
+    let local = LocalOnly { value: Rc::new(()) };
+    let descriptor = context.type_of::<LocalOnly>();
+    let capability = descriptor.capability::<LabelCapability>().expect("custom capability exists");
+    assert_eq!(descriptor.type_id(), std::any::TypeId::of::<LocalOnly>());
+    assert_eq!(capability.adapter(), &LabelAdapter("local"));
+    assert_eq!(Rc::strong_count(&local.value), 1);
 }

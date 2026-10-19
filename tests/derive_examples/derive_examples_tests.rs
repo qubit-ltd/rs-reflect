@@ -28,8 +28,8 @@ fn test_reflect_type_example() {
         internal: String::from("private application state"),
     };
 
-    assert!(descriptor.field("id").is_some());
-    assert!(descriptor.field("internal").is_none());
+    assert!(descriptor.fields().get("id").is_some());
+    assert!(descriptor.fields().get("internal").is_none());
     assert_eq!(account.internal, "private application state");
 }
 
@@ -41,7 +41,7 @@ trait Named {
 #[Reflect]
 struct NamedService;
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_Named)]
+#[ReflectImpl]
 impl Named for NamedService {
     fn name(&self) -> &'static str {
         "service"
@@ -52,7 +52,7 @@ impl Named for NamedService {
 #[test]
 fn test_reflect_trait_example() {
     let implementations = TypeDescriptor::of::<NamedService>()
-        .impls_global()
+        .impls()
         .expect("valid trait registrations");
     assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
 }
@@ -70,7 +70,7 @@ impl InherentService {
 fn test_reflect_impl_example() {
     InherentService.ping();
     let implementations = TypeDescriptor::of::<InherentService>()
-        .impls_global()
+        .impls()
         .expect("valid inherent method registrations");
-    assert!(implementations.iter().any(|item| item.method("ping").is_some()));
+    assert!(implementations.iter().any(|item| item.method("ping").is_ok()));
 }

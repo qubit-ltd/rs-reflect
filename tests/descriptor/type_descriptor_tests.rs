@@ -3,107 +3,34 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
 // =============================================================================
 
-//! Integration tests for the root type descriptor and its typed views.
-use std::any::TypeId;
+//! Integration tests for context-bound root type descriptors.
 
-use qubit_reflect as reflect;
+use std::any::TypeId;
+use std::rc::Rc;
+
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::FieldDescriptor;
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::descriptor::OpaqueTypeDescriptor;
-use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::descriptor::TypeRef;
-use qubit_reflect::identity::Visibility;
+use qubit_reflect::descriptor::{StructKind, TypeKind};
+use qubit_reflect::lookup::Lookup;
 
+#[Reflect]
 struct NamedRecord {
     number: u8,
 }
 
-static NAMED_RECORD: TypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::struct_type::<NamedRecord>("record", StructKind::Named, &[]);
-
-impl Reflect for NamedRecord {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &NAMED_RECORD
-    }
+#[Reflect]
+struct OpaqueContainer {
+    member: Rc<()>,
 }
 
-static UNIT_TUPLE: TypeDescriptor = reflect::__private::codegen_v3::descriptor::tuple::<()>("unit", &[]);
-
-struct ReflectedMember;
-
-static REFLECTED_MEMBER: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<ReflectedMember>(
-    "reflected_member",
-    StructKind::Unit,
-    &[],
-);
-
-impl Reflect for ReflectedMember {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &REFLECTED_MEMBER
-    }
-}
-
-struct OpaqueContainer;
-
-fn opaque_container_descriptor() -> &'static TypeDescriptor {
-    &OPAQUE_CONTAINER
-}
-
-static OPAQUE_MEMBER: OpaqueTypeDescriptor =
-    reflect::__private::codegen_v3::descriptor::opaque_member::<ReflectedMember>();
-static OPAQUE_MEMBER_TYPE: TypeRef = TypeRef::Opaque(&OPAQUE_MEMBER);
-static OPAQUE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descriptor::field(
-    opaque_container_descriptor,
-    0,
-    Some("member"),
-    Some("member"),
-    &OPAQUE_MEMBER_TYPE,
-    Visibility::Private,
-)];
-static OPAQUE_CONTAINER: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<OpaqueContainer>(
-    "opaque_container",
-    StructKind::Named,
-    &OPAQUE_FIELDS,
-);
-
-impl Reflect for OpaqueContainer {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &OPAQUE_CONTAINER
-    }
-}
-
-struct RecursiveNode;
-
-fn recursive_node_descriptor() -> &'static TypeDescriptor {
-    &RECURSIVE_NODE
-}
-
-static RECURSIVE_NODE_TYPE: TypeRef = TypeRef::Resolved(&RECURSIVE_NODE);
-static RECURSIVE_FIELDS: [FieldDescriptor; 1] = [reflect::__private::codegen_v3::descriptor::field(
-    recursive_node_descriptor,
-    0,
-    Some("next"),
-    Some("next"),
-    &RECURSIVE_NODE_TYPE,
-    Visibility::Private,
-)];
-static RECURSIVE_NODE: TypeDescriptor = reflect::__private::codegen_v3::descriptor::struct_type::<RecursiveNode>(
-    "recursive_node",
-    StructKind::Named,
-    &RECURSIVE_FIELDS,
-);
-
-impl Reflect for RecursiveNode {
-    fn type_descriptor() -> &'static TypeDescriptor {
-        &RECURSIVE_NODE
-    }
+#[Reflect]
+struct RecursiveNode {
+    next: Option<Box<RecursiveNode>>,
 }
 
 #[Reflect]
@@ -114,7 +41,7 @@ trait AmbiguousNavigationMethod {
     fn repeated(&self) -> u8;
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_AmbiguousNavigationMethod)]
+#[ReflectImpl]
 impl AmbiguousNavigationMethod for AggregatedNavigationTarget {
     fn repeated(&self) -> u8 {
         1
@@ -132,70 +59,44 @@ impl AggregatedNavigationTarget {
     }
 }
 
-/// Verifies root identity, names, shape, and `Reflect` navigation.
+/// Verifies root identity, type names, shape, and field navigation.
 #[test]
 fn test_type_descriptor_exposes_identity_names_and_struct_shape() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     let record = NamedRecord { number: 7 };
 
     assert_eq!(record.number, 7);
-    assert!(std::ptr::eq(descriptor, NamedRecord::type_descriptor()));
     assert_eq!(descriptor.type_id(), TypeId::of::<NamedRecord>());
-    assert_eq!(descriptor.type_name(), std::any::type_name::<NamedRecord>());
-    assert_eq!(descriptor.query_name(), "record");
-    assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
-    assert_eq!(descriptor.as_struct().map(|view| view.kind()), Some(StructKind::Named));
-    assert!(descriptor.fields().is_empty());
+    assert_eq!(descriptor.rust_type_name(), std::any::type_name::<NamedRecord>());
+    assert_eq!(descriptor.name(), "NamedRecord");
+    assert!(matches!(descriptor.kind(), TypeKind::Struct(view) if view.kind() == StructKind::Named));
+    assert_eq!(descriptor.fields().len(), 1);
+    assert_eq!(descriptor.field("number").expect("field exists").name(), "number");
     assert!(descriptor.variants().is_empty());
 }
 
-/// Verifies the empty tuple is represented as a tuple of arity zero.
+/// Verifies unit retains its zero-element tuple shape.
 #[test]
 fn test_type_descriptor_represents_unit_as_zero_arity_tuple() {
-    let descriptor = &UNIT_TUPLE;
+    let descriptor = TypeDescriptor::of::<()>();
 
-    assert_eq!(descriptor.kind(), TypeKind::Tuple);
     assert_eq!(descriptor.type_id(), TypeId::of::<()>());
-    assert_eq!(descriptor.type_name(), std::any::type_name::<()>());
-    assert_eq!(descriptor.as_tuple().map(|view| view.arity()), Some(0));
-    assert!(
-        descriptor
-            .as_tuple()
-            .expect("tuple kind should expose its typed view")
-            .elements()
-            .is_empty()
-    );
+    assert!(matches!(descriptor.kind(), TypeKind::Tuple(view) if view.elements().is_empty()));
+    assert!(descriptor.fields().is_empty());
 }
 
-/// Verifies typed navigation rejects descriptors of the wrong kind.
+/// Verifies a field whose type has no `Reflect` implementation keeps its
+/// expression without claiming a concrete descriptor.
 #[test]
-fn test_type_descriptor_returns_none_for_wrong_typed_view() {
-    let descriptor = TypeDescriptor::of::<NamedRecord>();
-
-    assert!(descriptor.as_tuple().is_none());
-    assert!(descriptor.as_sequence().is_none());
-    assert!(descriptor.as_map().is_none());
-}
-
-/// Verifies a member explicitly declared opaque remains separate from its root
-/// descriptor.
-#[test]
-fn test_type_descriptor_keeps_opaque_member_separate_from_root_descriptor() {
+fn test_type_descriptor_keeps_unreflectable_field_expression() {
     let descriptor = TypeDescriptor::of::<OpaqueContainer>();
-    let field = descriptor.field("member").expect("the named field should be present");
+    let field = descriptor.field("member").expect("the named field is present");
 
-    let TypeRef::Opaque(opaque) = field.field_type() else {
-        panic!("the member must remain explicitly opaque");
-    };
-    assert_eq!(opaque.type_id(), TypeId::of::<ReflectedMember>());
-    assert_eq!(opaque.type_name(), TypeDescriptor::of::<ReflectedMember>().type_name());
-    assert_eq!(
-        TypeDescriptor::of::<ReflectedMember>().kind(),
-        TypeKind::Struct(StructKind::Unit)
-    );
+    assert!(field.find_concrete_type().is_none());
+    assert!(format!("{}", field.type_expression()).contains("Rc"));
 }
 
-/// Verifies recursive descriptor formatting is finite and still diagnostic.
+/// Verifies recursive descriptor formatting stays finite.
 #[test]
 fn test_type_descriptor_debug_is_bounded_for_recursive_fields() {
     let rendered = format!("{:?}", TypeDescriptor::of::<RecursiveNode>());
@@ -204,72 +105,26 @@ fn test_type_descriptor_debug_is_bounded_for_recursive_fields() {
     assert!(rendered.len() < 1_024, "recursive debug output was unexpectedly large");
 }
 
-/// Verifies published descriptor graphs can be queried concurrently through
-/// shared references.
+/// Verifies public descriptors remain shareable across threads.
 #[test]
-fn test_type_descriptor_graph_is_send_and_sync() {
+fn test_type_descriptor_is_send_and_sync() {
     fn assert_send_and_sync<T: Send + Sync>() {}
 
-    assert_send_and_sync::<TypeDescriptor>();
-    assert_send_and_sync::<TypeRef>();
-    assert_send_and_sync::<OpaqueTypeDescriptor>();
-    assert_send_and_sync::<FieldDescriptor>();
+    assert_send_and_sync::<TypeDescriptor<'static>>();
 }
 
-/// Verifies the root descriptor is the unified navigation entry point for all
-/// registered impl fragments and their effective method instances.
+/// Verifies the type descriptor exposes its linked impls and method lookup.
 #[test]
-fn test_type_descriptor_navigates_registered_implementations_and_methods() {
+fn test_type_descriptor_navigates_impls_and_reports_method_ambiguity() {
     let descriptor = TypeDescriptor::of::<AggregatedNavigationTarget>();
-    let implementations = descriptor
-        .impls_global()
-        .expect("the linked reflection registry should initialize");
-    let methods = descriptor
-        .methods_global()
-        .expect("effective methods should be available through the root descriptor");
+    let implementations = descriptor.impls().expect("linked impls are available");
 
     assert_eq!(implementations.len(), 2);
-    assert!(
-        implementations
-            .iter()
-            .all(|implementation| std::ptr::eq(implementation.target_type(), descriptor))
-    );
-    assert!(
-        methods
-            .iter()
-            .any(|method| method.declaration().query_name() == "inherent_only")
-    );
-    assert_eq!(
-        methods
-            .iter()
-            .filter(|method| method.declaration().query_name() == "repeated")
-            .count(),
-        2
-    );
-}
+    assert!(implementations
+        .iter()
+        .all(|implementation| implementation.target().type_id() == descriptor.type_id()));
 
-/// Verifies unqualified lookup distinguishes a unique method from a name that
-/// occurs in both the inherent and trait namespaces.
-#[test]
-fn test_type_descriptor_methods_named_reports_ambiguity() {
-    let descriptor = TypeDescriptor::of::<AggregatedNavigationTarget>();
-
-    assert!(matches!(
-        descriptor
-            .methods_named_global("missing")
-            .expect("registry initialization should succeed"),
-        MethodLookup::Missing
-    ));
-    assert!(matches!(
-        descriptor
-            .methods_named_global("inherent_only")
-            .expect("registry initialization should succeed"),
-        MethodLookup::Unique(_)
-    ));
-    assert!(matches!(
-        descriptor
-            .methods_named_global("repeated")
-            .expect("registry initialization should succeed"),
-        MethodLookup::Ambiguous
-    ));
+    assert!(matches!(descriptor.lookup_method("missing").unwrap(), Lookup::Missing));
+    assert!(matches!(descriptor.lookup_method("inherent_only").unwrap(), Lookup::Unique(_)));
+    assert!(matches!(descriptor.lookup_method("repeated").unwrap(), Lookup::Ambiguous(_)));
 }

@@ -3,19 +3,13 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
 // =============================================================================
 
-use crate::construct::NamedConstructionInput;
-use crate::construct::TupleConstructionInput;
-use crate::descriptor::DiscriminantOrigin;
-use crate::descriptor::NumericDiscriminant;
-use crate::descriptor::TypeDescriptor;
-use crate::descriptor::VariantDescriptor;
-use crate::descriptor::VariantKind;
-use crate::error::TypeMismatch;
-use crate::value::DynamicRef;
-use crate::value::Local;
+use crate::runtime::descriptor::TypeDescriptor;
+use crate::runtime::descriptor::variant::VariantShape;
+use crate::runtime::value::{DynamicRef, Local};
 
 #[cfg(feature = "derive")]
 #[crate::Reflect]
@@ -24,68 +18,34 @@ enum VariantProbe {
     Waiting,
 }
 
-fn declaring_type() -> &'static TypeDescriptor {
-    TypeDescriptor::of::<u8>()
-}
-
-fn active_test(value: DynamicRef<'_, Local>) -> Result<bool, TypeMismatch> {
-    Ok(value.downcast_ref::<u8>().is_some())
-}
-
 #[test]
-fn test_variant_descriptor_exposes_source_facts_and_unavailable_construction() {
-    let variant = VariantDescriptor::new(declaring_type, 2, "Ready", "ready", VariantKind::Unit, &[], active_test)
-        .with_discriminant(DiscriminantOrigin::Explicit, Some(NumericDiscriminant::U8(9)));
+#[cfg(feature = "derive")]
+fn test_variant_descriptor_exposes_source_facts_and_activity() {
+    let descriptor = TypeDescriptor::of::<VariantProbe>();
+    let ready = descriptor.variant("Ready").expect("Ready variant exists");
+    let waiting = descriptor.variant("Waiting").expect("Waiting variant exists");
 
-    assert!(std::ptr::eq(variant.declaring_type(), declaring_type()));
-    assert_eq!(variant.index(), 2);
-    assert_eq!(variant.rust_name(), "Ready");
-    assert_eq!(variant.query_name(), "ready");
-    assert_eq!(variant.kind(), VariantKind::Unit);
-    assert_eq!(variant.discriminant_origin(), DiscriminantOrigin::Explicit);
-    assert_eq!(variant.numeric_discriminant(), Some(NumericDiscriminant::U8(9)));
-    assert!(variant.fields().is_empty());
-    assert!(variant.field("missing").is_none());
-    assert!(variant.field_at(0).is_none());
-    assert!(variant.construction().is_none());
-
-    let named = NamedConstructionInput::<Local>::new();
-    let tuple = TupleConstructionInput::<Local>::new();
-    assert!(variant.construct_struct::<u8>(named).is_err());
-    assert!(variant.construct_tuple::<u8>(tuple).is_err());
-    assert!(variant.construct_unit::<u8>().is_err());
+    assert_eq!(ready.index(), 0);
+    assert_eq!(ready.name(), "Ready");
+    assert_eq!(ready.shape(), VariantShape::Unit);
+    assert!(ready.fields().is_empty());
+    assert!(ready.field("missing").is_err());
+    assert!(ready.is_active(&VariantProbe::Ready).unwrap());
+    assert!(!ready.is_active(&VariantProbe::Waiting).unwrap());
+    assert!(waiting.is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Waiting)).unwrap());
+    assert!(!waiting.is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Ready)).unwrap());
 }
 
 #[test]
 #[cfg(feature = "derive")]
-fn test_variant_descriptor_checks_dynamic_active_value_type() {
-    let descriptor = TypeDescriptor::of::<VariantProbe>();
-    let ready = descriptor.variant("Ready").expect("Ready variant");
-    let waiting = descriptor.variant("Waiting").expect("Waiting variant");
-
-    assert!(
-        ready
-            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Ready))
-            .unwrap()
-    );
-    assert!(
-        !ready
-            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Waiting))
-            .unwrap()
-    );
-    assert!(
-        waiting
-            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Waiting))
-            .unwrap()
-    );
-    assert!(
-        !waiting
-            .is_active_dynamic(DynamicRef::<Local>::new(&VariantProbe::Ready))
-            .unwrap()
-    );
+fn test_variant_activity_rejects_a_different_owner_type() {
+    let ready = TypeDescriptor::of::<VariantProbe>()
+        .variant("Ready")
+        .expect("Ready variant exists");
     let error = ready
-        .is_active_dynamic(DynamicRef::<Local>::new(&7_u8))
-        .expect_err("a different dynamic root type must be rejected");
-    assert_eq!(error.expected(), std::any::TypeId::of::<VariantProbe>());
-    assert_eq!(error.actual(), std::any::TypeId::of::<u8>());
+        .is_active(&7_u8)
+        .expect_err("the activity adapter must reject a different owner type");
+
+    assert_eq!(error.expected().type_id, std::any::TypeId::of::<VariantProbe>());
+    assert_eq!(error.actual().type_id, std::any::TypeId::of::<u8>());
 }

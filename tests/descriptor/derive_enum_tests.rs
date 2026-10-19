@@ -3,377 +3,73 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0.
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
 // =============================================================================
 
-//! Integration tests for `Reflect` enum derives.
-use std::cell::Cell;
-use std::rc::Rc;
+//! Integration tests for vNext `Reflect` enum metadata.
 
 use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::access::FieldAccessError;
-use qubit_reflect::descriptor::DiscriminantOrigin;
-use qubit_reflect::descriptor::EnumRepr;
-use qubit_reflect::descriptor::NumericDiscriminant;
+use qubit_reflect::access::{FieldAccessError, FieldSetError};
 use qubit_reflect::descriptor::TypeKind;
-use qubit_reflect::descriptor::VariantDescriptor;
-use qubit_reflect::descriptor::VariantKind;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::value::{DynamicRef, Local};
 
-/// Counts destruction of a replacement submitted to an inactive variant.
-pub struct VariantDropProbe(Rc<Cell<usize>>);
-
-impl Drop for VariantDropProbe {
-    /// Records when the caller-owned replacement is finally destroyed.
-    fn drop(&mut self) {
-        self.0.set(self.0.get() + 1);
-    }
-}
-
-#[Reflect]
-pub enum RecoverableEvent {
-    Probe(#[reflect(opaque)] VariantDropProbe),
-    Inactive,
-}
-
-#[Reflect]
-pub enum DerivedEvent {
+#[derive(Reflect)]
+enum Event {
     Ready,
-    Number(u8),
-    Named { value: String },
-}
-
-#[Reflect]
-#[repr(u8)]
-enum ReprEvent {
-    First = 3,
-    Second,
-}
-
-#[Reflect]
-#[repr(C)]
-enum CReprEvent {
-    First,
-    Second,
-}
-
-#[Reflect]
-#[repr(u8, C)]
-enum CombinedReprEvent {
-    Unit = 5,
-    Payload(u16),
-}
-
-#[Reflect]
-#[repr(Rust)]
-enum RustReprEvent {
-    Unit,
-    Payload(u8),
-}
-
-#[Reflect]
-#[repr(transparent)]
-enum TransparentReprEvent {
-    Payload(u32),
-}
-
-#[Reflect]
-#[repr(align(16))]
-enum AlignedReprEvent {
-    Unit,
-    Payload(u8),
-}
-
-#[Reflect]
-#[allow(clippy::duplicated_attributes)]
-#[repr(u16)]
-#[repr(C)]
-#[repr(align(8))]
-#[repr(C)]
-#[repr(align(8))]
-enum MultiAttributeReprEvent {
-    Unit,
-    Payload(u8),
-}
-
-#[Reflect]
-enum GenericEvent<T> {
-    Value(T),
-    Empty,
-}
-
-#[Reflect]
-#[allow(dead_code)]
-enum VariantPolicyEvent {
-    Visible,
+    Number(u32),
+    Named { value: u8 },
     #[reflect(skip)]
-    Hidden,
-    ConstructionDisabled,
-    Last(u8),
+    Hidden(String),
 }
 
-/// Verifies a skipped variant is entirely absent while later source positions
-/// remain stable.
+/// Verifies enum variants and their fields retain source names and positions.
 #[test]
-fn test_derive_reflect_variant_skip_is_complete_and_preserves_source_index() {
-    let descriptor = TypeDescriptor::of::<VariantPolicyEvent>();
-    let indices: Vec<_> = descriptor.variants().iter().map(VariantDescriptor::index).collect();
+fn test_derive_enum_preserves_variant_and_field_metadata() {
+    let descriptor = TypeDescriptor::of::<Event>();
 
-    assert_eq!(indices, [0, 2, 3]);
-    assert!(descriptor.variant("Hidden").is_none());
-    assert!(descriptor.variant_at(1).is_none());
-    let retained = descriptor
-        .variant_at(2)
-        .expect("the non-skipped source variant remains described");
-    assert_eq!(retained.rust_name(), "ConstructionDisabled");
-    assert!(
-        retained
-            .is_active(&VariantPolicyEvent::ConstructionDisabled)
-            .expect("the retained variant must preserve access semantics")
-    );
-    assert!(
-        descriptor
-            .variant_at(3)
-            .and_then(|variant| variant.construction())
-            .is_some()
-    );
+    assert!(matches!(descriptor.kind(), TypeKind::Enum(_)));
+    assert_eq!(descriptor.variants().len(), 3);
+    assert_eq!(descriptor.variant("Ready").unwrap().index(), 0);
+    assert_eq!(descriptor.variant("Number").unwrap().index(), 1);
+    assert_eq!(descriptor.variant("Named").unwrap().fields().get("value").unwrap().name(), "value");
+    assert!(descriptor.variants().get("Hidden").is_none());
+    assert!(descriptor.variants().get_at(3).is_none());
 }
 
+/// Verifies a variant adapter accepts only its exact active variant.
 #[test]
-fn test_derive_reflect_generic_enum_interns_concrete_instances() {
-    let _ = GenericEvent::Value(1_u8);
-    let _ = GenericEvent::<String>::Empty;
-    let u8_descriptor = TypeDescriptor::of::<GenericEvent<u8>>();
-    let text_descriptor = TypeDescriptor::of::<GenericEvent<String>>();
-    assert!(!std::ptr::eq(u8_descriptor, text_descriptor));
-    assert_eq!(
-        u8_descriptor
-            .concrete_generic()
-            .expect("generic enum instances expose substitutions")
-            .arguments()
-            .len(),
-        1
-    );
-    assert!(std::ptr::eq(u8_descriptor, TypeDescriptor::of::<GenericEvent<u8>>()));
-    assert!(std::ptr::eq(
-        u8_descriptor
-            .variant("Value")
-            .expect("value variant")
-            .field_at(0)
-            .expect("payload")
-            .field_type()
-            .as_resolved()
-            .expect("resolved payload"),
-        TypeDescriptor::of::<u8>(),
-    ));
+fn test_derive_enum_variant_activity_checks_typed_and_dynamic_values() {
+    let descriptor = TypeDescriptor::of::<Event>();
+    let ready = descriptor.variant("Ready").expect("Ready variant is described");
+    let number = descriptor.variant("Number").expect("Number variant is described");
+
+    assert!(ready.is_active(&Event::Ready).unwrap());
+    assert!(!ready.is_active(&Event::Number(9)).unwrap());
+    assert!(number
+        .is_active_dynamic(DynamicRef::<Local>::new(&Event::Number(9)))
+        .unwrap());
+    assert!(!number
+        .is_active_dynamic(DynamicRef::<Local>::new(&Event::Ready))
+        .unwrap());
 }
 
-/// Verifies unit, tuple, and named variants retain their source shapes.
+/// Verifies typed field access reports inactive variants before reaching the
+/// field adapter and preserves a rejected replacement.
 #[test]
-fn test_derive_reflect_builds_enum_variant_descriptors() {
-    let descriptor = TypeDescriptor::of::<DerivedEvent>();
-
-    assert_eq!(descriptor.kind(), TypeKind::Enum);
-    assert_eq!(
-        descriptor.variant("Ready").expect("unit variant").kind(),
-        VariantKind::Unit
-    );
-    assert_eq!(
-        descriptor.variant("Number").expect("tuple variant").kind(),
-        VariantKind::Tuple
-    );
-    assert_eq!(
-        descriptor.variant("Named").expect("named variant").kind(),
-        VariantKind::Struct
-    );
-    let named = DerivedEvent::Named {
-        value: "payload".into(),
-    };
-    let DerivedEvent::Named { value } = named else {
-        panic!("constructed variant must retain payload");
-    };
-    assert_eq!(value, "payload");
-}
-
-/// Verifies generated enum field adapters only expose the active payload.
-#[test]
-fn test_derive_reflect_enum_field_access_checks_active_variant() {
-    let number = TypeDescriptor::of::<DerivedEvent>()
+fn test_derive_enum_field_access_preserves_inactive_variant_recovery() {
+    let field = TypeDescriptor::of::<Event>()
         .variant("Number")
-        .expect("tuple variant");
-    let value = DerivedEvent::Number(7);
+        .expect("Number variant is described")
+        .field("0")
+        .expect("tuple field is described");
+    let mut value = Event::Ready;
 
-    assert!(number.is_active(&value).expect("enum target"));
-    assert_eq!(
-        number
-            .field_at(0)
-            .expect("tuple field")
-            .get::<DerivedEvent, u8>(&value)
-            .expect("active payload"),
-        &7
-    );
-    assert!(
-        number
-            .field_at(0)
-            .expect("tuple field")
-            .get::<DerivedEvent, u8>(&DerivedEvent::Ready)
-            .is_err()
-    );
-}
-
-/// Verifies inactive-variant validation returns the untouched replacement
-/// before the generated set adapter consumes it.
-#[test]
-fn test_derive_reflect_enum_field_set_recovers_inactive_variant_replacement() {
-    let field = TypeDescriptor::of::<RecoverableEvent>()
-        .variant("Probe")
-        .expect("probe variant")
-        .field_at(0)
-        .expect("probe field");
-    let mut target = RecoverableEvent::Inactive;
-    let drops = Rc::new(Cell::new(0));
-
+    assert!(matches!(field.get::<_, u32>(&value), Err(FieldAccessError::InactiveVariant { .. })));
     let failure = field
-        .set(&mut target, VariantDropProbe(Rc::clone(&drops)))
-        .expect_err("an inactive variant must reject field replacement");
-
-    assert!(matches!(failure.error(), FieldAccessError::InactiveVariant { .. }));
-    assert!(matches!(target, RecoverableEvent::Inactive));
-    assert_eq!(drops.get(), 0, "validation must not destroy the replacement");
-    let replacement = failure
-        .into_recovery()
-        .unwrap_or_else(|_| panic!("inactive-variant failure must contain recovery"))
-        .into_value();
-    assert_eq!(drops.get(), 0, "taking recovery must preserve ownership");
-    drop(replacement);
-    assert_eq!(drops.get(), 1, "the caller controls final destruction");
-}
-
-/// Verifies a concrete derived enum is discoverable through static
-/// registration.
-#[test]
-fn test_derive_reflect_registers_concrete_enum() {
-    let registry = ReflectRegistry::initialize().expect("derived enum fragments must validate");
-
-    assert!(std::ptr::eq(
-        registry
-            .get(TypeDescriptor::of::<DerivedEvent>().type_id())
-            .expect("derived enum must be registered"),
-        TypeDescriptor::of::<DerivedEvent>(),
-    ));
-}
-
-/// Verifies explicit and implicit integer-repr discriminants remain exact.
-#[test]
-fn test_derive_reflect_records_and_reverse_looks_up_integer_discriminants() {
-    let descriptor = TypeDescriptor::of::<ReprEvent>();
-    let first = descriptor.variant("First").expect("first variant");
-    let second = descriptor.variant("Second").expect("second variant");
-
-    assert_eq!(first.index(), 0);
-    assert_eq!(second.index(), 1);
-    assert!(first.field("missing").is_none());
-    assert!(format!("{first:?}").contains("VariantDescriptor"));
-    assert_eq!(first.discriminant_origin(), DiscriminantOrigin::Explicit);
-    assert_eq!(second.discriminant_origin(), DiscriminantOrigin::Implicit);
-    assert_eq!(first.numeric_discriminant(), Some(NumericDiscriminant::U8(3)));
-    assert_eq!(second.numeric_discriminant(), Some(NumericDiscriminant::U8(4)));
-    assert_eq!(
-        descriptor
-            .variant_by_discriminant(NumericDiscriminant::U8(4))
-            .expect("reverse lookup")
-            .rust_name(),
-        "Second"
-    );
-}
-
-/// Verifies enum views expose normalized, structured `repr` declarations.
-#[test]
-fn test_derive_reflect_records_normalized_enum_representations() {
-    assert_eq!(
-        TypeDescriptor::of::<ReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::U8],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<CReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::C],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<CombinedReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::C, EnumRepr::U8],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<RustReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::Rust],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<TransparentReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::Transparent],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<AlignedReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::Align(16)],
-    );
-    assert_eq!(
-        TypeDescriptor::of::<MultiAttributeReprEvent>()
-            .as_enum()
-            .expect("enum view")
-            .representations(),
-        &[EnumRepr::C, EnumRepr::U16, EnumRepr::Align(8)],
-    );
-}
-
-/// Verifies non-integer and data-carrying enums do not manufacture numeric
-/// discriminant metadata.
-#[test]
-fn test_derive_reflect_limits_numeric_discriminants_to_fieldless_integer_repr_enums() {
-    let c_descriptor = TypeDescriptor::of::<CReprEvent>();
-    assert!(
-        c_descriptor
-            .variants()
-            .iter()
-            .all(|variant| variant.numeric_discriminant().is_none())
-    );
-    assert!(
-        c_descriptor
-            .variant_by_discriminant(NumericDiscriminant::I32(0))
-            .is_none()
-    );
-
-    let combined_descriptor = TypeDescriptor::of::<CombinedReprEvent>();
-    assert!(
-        combined_descriptor
-            .variants()
-            .iter()
-            .all(|variant| variant.numeric_discriminant().is_none())
-    );
-    assert!(
-        combined_descriptor
-            .variant_by_discriminant(NumericDiscriminant::U8(5))
-            .is_none()
-    );
-
-    let CombinedReprEvent::Payload(payload) = CombinedReprEvent::Payload(13) else {
-        panic!("payload variant must remain constructible");
-    };
-    assert_eq!(payload, 13);
+        .set(&mut value, 12_u32)
+        .expect_err("setting an inactive variant field must fail");
+    assert!(matches!(failure.error(), FieldSetError::InactiveVariant { .. }));
+    assert_eq!(failure.into_parts().1, 12_u32);
 }

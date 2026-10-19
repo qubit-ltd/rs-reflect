@@ -29,8 +29,8 @@ fn skipped_member_is_absent_from_the_descriptor() {
     };
 
     assert_eq!(descriptor.fields().len(), 1);
-    assert!(descriptor.field("visible").is_some());
-    assert!(descriptor.field("ignored").is_none());
-    assert!(descriptor.field_at(1).is_none());
+    assert!(descriptor.fields().get("visible").is_some());
+    assert!(descriptor.fields().get("ignored").is_none());
+    assert!(descriptor.fields().get_at(1).is_none());
     assert_eq!(*descriptor.field("visible").unwrap().get::<_, u32>(&record).unwrap(), 5);
 }

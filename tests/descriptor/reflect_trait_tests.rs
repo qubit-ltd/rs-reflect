@@ -9,7 +9,7 @@
 //! Integration tests for reflected trait declaration metadata.
 
 use qubit_reflect::Reflect;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 // This declaration is inspected through its reflected metadata only.
@@ -25,9 +25,10 @@ trait GenericService<T> {
 
 #[test]
 fn test_reflect_trait_preserves_identity_generics_and_visible_method_metadata() {
-    let registry = ReflectRegistry::initialize().expect("trait declarations register");
-    let definition = registry
-        .trait_definition_by_path(concat!(module_path!(), "::GenericService"))
+    let context = ReflectionContext::global();
+    context.initialize().expect("trait declarations register");
+    let definition = context
+        .trait_definition_by_name(concat!(module_path!(), "::GenericService"))
         .expect("the reflected trait definition is registered");
 
     assert_eq!(definition.rust_name(), "GenericService");

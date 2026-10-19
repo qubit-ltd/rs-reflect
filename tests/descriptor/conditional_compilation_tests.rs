@@ -12,10 +12,10 @@
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::descriptor::TraitDefinitionDescriptor;
-use qubit_reflect::registry::ReflectRegistry;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
 
 #[Reflect]
-#[reflect(opaque)]
 struct ConditionalTarget;
 
 #[cfg(any())]
@@ -92,9 +92,10 @@ fn method_names(definition: &TraitDefinitionDescriptor) -> Vec<&str> {
 
 #[test]
 fn test_cfg_controls_trait_metadata_members() {
-    let registry = ReflectRegistry::initialize().expect("active trait fragments must initialize");
-    let definition = registry
-        .trait_definition_by_path(concat!(module_path!(), "::ConditionalMetadata"))
+    let context = ReflectionContext::global();
+    context.initialize().expect("active trait fragments must initialize");
+    let definition = context
+        .trait_definition_by_name(concat!(module_path!(), "::ConditionalMetadata"))
         .expect("the reflected trait definition must be registered");
 
     #[cfg(target_pointer_width = "64")]
@@ -109,8 +110,8 @@ fn test_cfg_controls_trait_metadata_members() {
                 "retained_but_unavailable",
             ]
         );
-        assert_eq!(definition.methods()[1].query_name(), "platform_64");
-        assert_eq!(definition.methods()[3].query_name(), "configured_helper");
+        assert_eq!(definition.methods().get("platform_64").unwrap().name(), "platform_64");
+        assert_eq!(definition.methods().get("configured_helper").unwrap().name(), "configured_helper");
         assert_eq!(definition.associated_types().len(), 1);
         assert_eq!(definition.associated_consts().len(), 1);
     }
@@ -125,21 +126,24 @@ fn test_cfg_controls_trait_metadata_members() {
                 "retained_but_unavailable",
             ]
         );
-        assert_eq!(definition.methods()[0].query_name(), "platform_other");
-        assert_eq!(definition.methods()[2].query_name(), "configured_helper");
+        assert_eq!(definition.methods().get("platform_other").unwrap().name(), "platform_other");
+        assert_eq!(definition.methods().get("configured_helper").unwrap().name(), "configured_helper");
     }
     assert!(
-        registry
-            .trait_definition_by_path(concat!(module_path!(), "::EntirelyDisabledTrait"))
-            .is_none(),
+        context
+            .trait_definition_by_name(concat!(module_path!(), "::EntirelyDisabledTrait"))
+            .is_err(),
         "a fully cfg-disabled trait must not be registered",
     );
 }
 
 #[test]
 fn test_inactive_impl_member_has_no_descriptor_or_adapter() {
-    let registry = ReflectRegistry::initialize().expect("active impl fragments must initialize");
-    let implementations = registry.implementations(ConditionalTarget::type_descriptor().type_id());
+    let context = ReflectionContext::global();
+    context.initialize().expect("active impl fragments must initialize");
+    let implementations = TypeDescriptor::of::<ConditionalTarget>()
+        .inherent_impls()
+        .expect("active inherent impls must be available");
     let implementation = implementations
         .iter()
         .find(|implementation| {

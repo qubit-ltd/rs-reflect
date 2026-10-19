@@ -14,7 +14,6 @@ use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::AssociatedConstImplementationSource;
 use qubit_reflect::descriptor::ImplDescriptor;
 use qubit_reflect::expression::TypeExpression;
-use qubit_reflect::registry::ReflectRegistry;
 
 #[Reflect]
 struct AssociatedItemTarget;
@@ -27,23 +26,23 @@ trait AssociatedContract {
     const OVERRIDDEN: u32 = 19;
 }
 
-#[ReflectImpl(definition_provider_v2 = __qubit_reflect_trait_definition_AssociatedContract)]
+#[ReflectImpl]
 impl AssociatedContract for AssociatedItemTarget {
     type Output = u16;
 
     const OVERRIDDEN: u32 = 23;
 }
 
-fn implementation_for<T: Reflect>(trait_name: &str) -> &'static ImplDescriptor {
-    ReflectRegistry::initialize()
+fn implementation_for<T: Reflect>(trait_name: &str) -> ImplDescriptor<'static> {
+    TypeDescriptor::of::<T>()
+        .trait_impls()
         .expect("associated-item fragments must initialize")
-        .implementations(TypeDescriptor::of::<T>().type_id())
         .iter()
         .copied()
         .find(|implementation| {
             implementation
                 .implemented_trait()
-                .is_some_and(|descriptor| descriptor.rust_name() == trait_name)
+                .is_some_and(|descriptor| descriptor.definition().rust_name() == trait_name)
         })
         .expect("the reflected trait implementation must be registered")
 }
