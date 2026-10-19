@@ -7,9 +7,6 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: examples.native=cargo-example -->
-
 `qubit-reflect` brings opt-in, macro-based reflection to Rust. Add `#[Reflect]` to a struct, enum, or trait and `#[ReflectImpl]` to an inherent or trait implementation. The macros generate structural metadata and checked runtime adapters, so application and framework code can discover types and members, access fields, construct values, and invoke supported methods without maintaining a separate handwritten description of each type. It works on stable Rust and keeps Rust's ownership and type checks at the dynamic boundary.
 
 ## Why use reflection?
@@ -135,72 +132,39 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 ```
 
+This code completes one reflection flow in order: obtain the `Customer` type
+descriptor, find a field by name, write and read the email, confirm that safe
+access rejects a private field and that a skipped field is absent from metadata,
+then find and invoke a method by name. Passing assertions and a normal exit are
+the observable result.
 
-The complete, runnable load–patch–save flow lives in
-[`examples/customer_patch.rs`](examples/customer_patch.rs). Method lookup and
-invocation are shown in [`examples/support_action.rs`](examples/support_action.rs).
-These are native examples of the runtime package. The macros resolve the
-`qubit-reflect` runtime directly, including in same-package example targets;
-no crate-path helper is required.
-Cargo resolves the optional `qubit-datatype` and `qubit-id` dependencies from
-crates.io, so a source checkout does not need adjacent repositories. Verify
-dependency resolution from the repository root:
+Reflection is responsible here for member discovery and for checking visibility
+and exact Rust types before dynamic operations. Request parsing, caller
+authorization, business validation, and persistence remain application
+responsibilities. For a load–patch–save workflow built on field access, continue
+with the runnable [`customer_patch` example](examples/customer_patch.rs) and the
+[support-console integration guide](doc/user_guide.md#integrate-a-support-console).
 
-```bash
-cargo metadata --locked --format-version 1
-```
+## Core capabilities and boundaries
 
-Successful metadata output confirms the locked dependency graph resolves. Now
-run the examples from this source checkout:
+`qubit-reflect` provides these core capabilities:
 
-```bash
-cargo run --example field_patch
-cargo run --example customer_patch
-cargo run --example support_action
-```
+- `#[Reflect]` generates structural descriptions for structs, enums, and traits; `#[ReflectImpl]` generates implementation and method descriptions for inherent and trait implementations.
+- `TypeDescriptor` and `FieldDescriptor` provide checked field reads, mutable borrows, and replacements. Construction APIs create or update objects from ordinary Rust values.
+- `ReflectRegistry` collects linked types, implementations, and methods so applications can discover members, invoke supported methods, and query typed capabilities such as `Clone` and `Default` at runtime.
+- Built-in descriptors cover primitives, text, tuples, arrays, `Option`, sequences, sets, maps, smart pointers, and function pointers. The `ecosystem-types` and `qubit-types` features add common ecosystem and Qubit types.
 
-All three targets declare `required-features = ["derive"]`; a runtime-only build
-skips them. Their source files are included in the packaged runtime crate, so the
-same commands work in an extracted package when `derive` is enabled. The version
-dependency above selects a published release; source-checkout execution does not
-prove that this checkout has been published or installed from a registry.
+Keep these boundaries in mind:
 
-The complete load–patch–save service belongs in the [support-console guide
-scenario](doc/user_guide.md#integrate-a-support-console); it explains where
-`CustomerRepository` connects to application storage and how rejected changes
-are handled. The shorter [`customer_patch` example](examples/customer_patch.rs)
-shows the runnable path.
+- Dynamic operations require exact types; the library does not parse strings, coerce numbers, or infer `Into` conversions.
+- Reflection does not replace authorization, business validation, database transactions, or synchronization. The application retains those policies.
+- `#[reflect(skip)]` only removes a member from reflection metadata; it is not a secrecy mechanism. Safe APIs reject non-public members, and `_unsafe` APIs may bypass visibility only when their documented safety requirements hold.
+- Field setting, construction, and invocation return structured errors with unconsumed inputs when rejected before execution. Once an adapter begins executing, the library does not promise to roll back application state.
+- Runtime `TypeId` values cannot create new generic monomorphizations. Dynamically invoked generic methods must be bound at a compile-time call site with `bind_method!`; unsafe functions, unsupported ABIs, variadics, and opaque `impl Trait` returns can be described but not dynamically invoked.
+- `TypeId`, descriptor addresses, and trait markers are meaningful only within the current process, not as serialization or cross-process model identifiers. Descriptors and per-type capability caches remain alive for the process lifetime.
 
-The API layer decodes request text into each field's Rust type and checks that the caller may edit the record; `apply_patch` only verifies field names, access policy, and exact types. When a change is rejected, earlier changes may already sit in the in-memory struct, but nothing has been saved because `update_customer` returns before `save`. See the [user guide](doc/user_guide.md#errors-diagnostics-and-troubleshooting) for the full error model.
-
-### Reflect methods and implementations
-
-The quick-start example above shows an inherent implementation. Use
-`#[Reflect]` on a trait declaration and `#[ReflectImpl]` on its implementation.
-[`examples/support_action.rs`](examples/support_action.rs) provides another
-runnable method-invocation scenario, while the [method invocation
-guide](doc/user_guide.md#invoke-methods) explains lookup results, invocation
-errors, and input recovery.
-
-## What it provides
-
-- `#[Reflect]` and `#[ReflectImpl]` generate immutable descriptors for structs, enums, traits, and implementations at the declaration site, on stable Rust.
-- `TypeDescriptor` and `FieldDescriptor` provide checked field reads, mutable borrows, and replacements through ordinary `&T`, `&mut T`, and owned values. Construction builders likewise accept ordinary values.
-- `#[reflect(skip)]` completely excludes a field, variant, or method from reflection. It does not remove the Rust member or provide secrecy. Other member attributes do not change visibility; safe operations reject non-public members, while the documented `_unsafe` operations can bypass visibility after their safety requirements are met.
-- Failures before generated code runs return structured errors with untouched inputs: `FieldSetFailure`, `ConstructionRecovery`, and `InvocationRecovery`. Named and tuple construction also returns its inputs in `ConstructionRecovery` when no construction adapter is available (`TargetUnavailable`).
-- `ReflectRegistry::initialize()` assembles one deterministic, immutable registry from linked declarations; `RegistrySnapshotBuilder` builds an isolated snapshot from explicit facts for libraries and tests. Both resolve methods and typed capabilities such as `Clone` and `Default`, and report whether a capability is `Missing`, `FactOnly`, `AdapterTypeMismatch`, or `Found`.
-- Generic declarations remain definitions. To call a generic method dynamically, bind a concrete method instance at a compile-time call site with `bind_method!`; runtime `TypeId` values cannot create new monomorphized code. An unbound generic method has no callable adapter.
-- Callers provide their own synchronization when sharing reflected objects between threads. Rust's `Send` and `Sync` rules still apply to values transferred across threads.
-- Built-in descriptors for primitives, text, tuples, arrays, `Option`, sequences, sets, maps, smart pointers, and function pointers; optional `ecosystem-types` and `qubit-types` features add `BigDecimal`, `chrono`, `Uuid`, and Qubit `Id`/`DataType` implementations.
-
-`Option<T>` descriptors expose their element type and a checked borrowed
-projection for built-in `Option<T>` values. The projection returns the inner
-borrow for `Some`, `None` for an absent value, and a type mismatch for an
-unrelated value. Descriptors assembled from structural facts expose the same
-shape but report projection as unavailable because they have no runtime
-adapter. See [optional values](doc/user_guide.md#optional-values).
-
-Reflection is deliberately bounded. It does not coerce numeric values, parse strings, or infer `Into`. A failed field replacement returns the untouched input in `FieldSetFailure<V>`; construction and invocation preserve inputs rejected before execution. A `Box<dyn Any>` supplied to dynamic input APIs is checked using its enclosed concrete type, while a field whose declared type is itself `Box<dyn Any>` retains exact field-type semantics. `TypeId`, descriptor addresses, and trait markers are process-local identity, not serialization or cross-process model identifiers. Reflection does not replace application authorization. Unsafe functions, unsupported ABIs, variadics, unbound generics, and opaque `impl Trait` returns are described but not callable. Tuple and function-pointer descriptors support arities 0 through 32. Descriptors and per-type capability caches stay alive for the whole process, and initialization may allocate; measure the paths your application uses if overhead matters. See the [user guide](doc/user_guide.md#boundaries-and-a-practice-checklist).
+See the [user guide](doc/user_guide.md) for construction, method invocation,
+`Option` projection, error recovery, and registry details.
 
 ## Learn more
 
@@ -211,10 +175,7 @@ Reflection is deliberately bounded. It does not coerce numeric values, parse str
 
 ## Testing
 
-These commands run from the source checkout. Cargo resolves optional
-`qubit-datatype` and `qubit-id` dependencies from crates.io; no sibling checkout
-preparation is required. Run the metadata command shown above first if you want
-to verify dependency resolution.
+Run these commands from the source checkout root:
 
 ```bash
 # Run tests with the default feature set

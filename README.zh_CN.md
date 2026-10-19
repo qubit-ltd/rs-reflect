@@ -7,9 +7,6 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: examples.native=cargo-example -->
-
 `qubit-reflect` 为 Rust 提供按需启用、基于宏的反射能力。在结构体、枚举或 trait 上使用 `#[Reflect]`，在 inherent 或 trait 实现块上使用 `#[ReflectImpl]`，宏就会生成结构元数据及经过类型检查的运行时操作入口。应用与框架可以据此发现类型和成员、访问字段、构造值，并调用受支持的方法，无须为每个类型另写一套容易过时的描述代码。该机制可在稳定版 Rust 上使用，动态操作仍遵守 Rust 的所有权和类型约束。
 
 ## 为什么需要反射
@@ -133,50 +130,36 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 ```
 
+这段代码按顺序完成了一个反射操作闭环：取得 `Customer` 的类型描述符，按名称
+找到字段，写入并读回邮箱，确认安全入口会拒绝私有字段、被 skip 的字段不会出现在
+元数据中，最后按名称找到并调用方法。所有断言通过且程序正常退出，就是示例的成功
+结果。
 
-完整的加载–补丁–保存流程见 [`examples/customer_patch.rs`](examples/customer_patch.rs)；按名称调用业务方法见 [`examples/support_action.rs`](examples/support_action.rs)。这些是运行时包的原生 example。宏会直接解析 `qubit-reflect` 运行时，同包 example 也无须额外指定 crate 路径。
+反射在这里负责发现成员，并在动态操作前检查可见性和精确 Rust 类型；请求解析、
+调用者鉴权、业务校验和持久化仍由应用负责。需要把字段修改接入加载—修改—保存流程
+时，可继续阅读可运行的 [`customer_patch` 示例](examples/customer_patch.rs)及
+[客服控制台接入指南](doc/user_guide.zh_CN.md#接入客服控制台)。
 
-可选的 `qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。在仓库根目录确认依赖解析：
+## 核心能力与使用边界
 
-```bash
-cargo metadata --locked --format-version 1
-```
+`qubit-reflect` 提供以下核心能力：
 
-`cargo metadata` 成功即表示锁定的依赖图已解析。然后从源码检出根目录运行示例：
+- `#[Reflect]` 为结构体、枚举和 trait 生成结构描述；`#[ReflectImpl]` 为 inherent impl 与 trait impl 生成实现和方法描述。
+- `TypeDescriptor` 与 `FieldDescriptor` 支持经过类型检查的字段读取、可变借用和替换；构造 API 可以从普通 Rust 值创建或更新对象。
+- `ReflectRegistry` 汇总已链接的类型、实现和方法，使应用可以按运行时信息查找成员、调用受支持的方法，并查询 `Clone`、`Default` 等类型化能力。
+- 内置基础类型、文本、元组、数组、`Option`、序列、集合、映射、智能指针和函数指针的描述符；`ecosystem-types` 与 `qubit-types` feature 可补充常用生态类型和 Qubit 类型。
 
-```bash
-cargo run --example field_patch
-cargo run --example customer_patch
-cargo run --example support_action
-```
+使用时需要明确这些边界：
 
-三个目标均声明 `required-features = ["derive"]`，仅运行时构建会跳过它们。运行时 crate 的分发包包含这些源码，启用 `derive` 后也可在解包目录运行相同命令。上面的版本依赖用于选择已发布版本；源码检出的运行结果不能证明当前检出已发布或可从 registry 安装。
+- 动态操作只接受精确类型；库不会解析字符串、转换数值或推导 `Into`。
+- 反射不替代鉴权、业务校验、数据库事务或线程同步，这些策略仍由应用控制。
+- `#[reflect(skip)]` 只把成员排除在反射元数据之外，不是保密机制；安全 API 会拒绝非公开成员，只有满足文档中的安全前提才能使用 `_unsafe` API 绕过可见性检查。
+- 字段设置、构造或调用若在执行前被拒绝，会通过结构化错误保留尚未消费的输入；适配器开始执行后，库不承诺自动回滚业务状态。
+- 运行时不能凭 `TypeId` 生成新的泛型单态化代码。动态调用泛型方法前，必须用 `bind_method!` 在编译期绑定具体实例；`unsafe` 函数、不支持的 ABI、可变参数和不透明的 `impl Trait` 返回值只能描述，不能动态调用。
+- `TypeId`、描述符地址和 trait 标记只在当前进程内有意义，不能当作序列化格式或跨进程模型标识；描述符及按类型缓存的能力会在进程生命周期内保留。
 
-完整的加载–补丁–保存服务流程放在[客服控制台用户指南](doc/user_guide.zh_CN.md#接入客服控制台)中，其中说明 `CustomerRepository` 如何连接应用存储，以及如何处理被拒绝的变更。[`customer_patch` example](examples/customer_patch.rs) 提供可运行示例。
-
-把请求解码为字段的 Rust 类型、判断调用者是否有权编辑记录，属于 API 层职责；`apply_patch` 只核对字段名、访问策略与精确类型。某条变更被拒绝时，前面的变更可能已写入内存中的结构体，但尚未调用 `save`，调用方丢弃已加载对象即可。完整错误模型见[用户手册](doc/user_guide.zh_CN.md#错误诊断与排障)。
-
-### 反射方法与实现块
-
-上面的快速开始展示了 inherent impl。描述 trait 声明时使用 `#[Reflect]`，
-其实现仍由 `#[ReflectImpl]` 标注。[`examples/support_action.rs`](examples/support_action.rs)
-提供另一份可运行的方法调用场景；[方法调用指南](doc/user_guide.zh_CN.md#按名称调用业务方法)
-进一步解释查找结果、调用错误和输入恢复。
-
-## 能力与边界
-
-- `#[Reflect]` 与 `#[ReflectImpl]` 在声明处为结构体、枚举、trait 和 impl 生成不可变描述符，可在稳定版 Rust 上使用。
-- `TypeDescriptor` 与 `FieldDescriptor` 通过普通 `&T`、`&mut T` 和拥有所有权的值提供受检字段读取、可变借用和替换；构造 builder 同样接收普通值。
-- `#[reflect(skip)]` 会将字段、分支或方法完全排除在反射元数据之外。它不会删除 Rust 成员，也不能用来保密。其他成员属性不改变可见性；安全入口拒绝非公开成员，满足安全前提时可使用文档说明的 `_unsafe` 入口绕过可见性。
-- 生成代码执行前失败会返回结构化错误，并退回调用方尚未被消费的输入：`FieldSetFailure`、`ConstructionRecovery`、`InvocationRecovery`。named 与 tuple 构造没有可用适配器时也会通过 `ConstructionRecovery` 退回输入，错误为 `TargetUnavailable`。
-- `ReflectRegistry::initialize()` 把已链接的声明汇总成一份确定性的不可变注册表；`RegistrySnapshotBuilder` 让库和测试用显式事实构建隔离快照。两者都能解析方法以及 `Clone`、`Default` 等类型化能力，并区分能力处于 `Missing`、`FactOnly`、`AdapterTypeMismatch` 还是 `Found` 状态。
-- 泛型声明保留为定义。若要动态调用泛型方法，须在编译期已知的调用点使用 `bind_method!` 绑定具体实例；运行时 `TypeId` 不能生成新的单态化代码。未绑定的泛型方法没有可调用适配器。
-- 需要在线程间共享反射对象时，由调用方自行加锁。跨线程传值仍受 Rust 的 `Send` 和 `Sync` 规则约束。
-- 内置基础类型、文本、元组、数组、`Option`、序列、集合、映射、智能指针和函数指针的描述符；可选的 `ecosystem-types` 与 `qubit-types` feature 分别补充 `BigDecimal`、`chrono`、`Uuid` 以及 Qubit `Id`/`DataType` 的实现。
-
-`Option<T>` 描述符既能返回元素类型，也能对内置 `Option<T>` 值执行经过类型检查的借用投影。`Some` 返回内部借用，`None` 返回空值，不相关的值返回类型不匹配错误。由结构事实构造的描述符保留相同的类型形状，但因没有运行时适配器而报告投影不可用。详见[可选值](doc/user_guide.zh_CN.md#可选值)。
-
-反射能力有明确边界：不转换数值、不解析字符串，也不推导 `Into`。字段替换失败时，`FieldSetFailure<V>` 保留未消费的原始输入；构造与调用在执行前失败时也会保留输入。动态输入中的 `Box<dyn Any>` 按盒内实际类型检查；若字段本身的类型就是 `Box<dyn Any>`，则仍按该字段的精确类型处理。任意 Rust 类型不会自动可反射，必须实现 `Reflect`。`TypeId`、描述符地址和 trait 标记只是进程内身份，不能用作序列化或跨进程的模型标识。反射不能替代应用鉴权。`unsafe` 函数、不支持的 ABI、可变参数、未绑定的泛型和不透明的 `impl Trait` 返回值可以被描述，但不能动态调用。元组和函数指针描述符支持 0 到 32 个元素或参数。描述符和按类型缓存的能力会在整个进程生命周期内保留，初始化可能分配内存；关心开销时请按应用实际路径测量。详情见[用户手册](doc/user_guide.zh_CN.md#边界与实践清单)。
+构造、方法调用、`Option` 投影、错误恢复和注册表的完整说明见
+[用户手册](doc/user_guide.zh_CN.md)。
 
 ## 延伸阅读
 
@@ -187,7 +170,7 @@ cargo run --example support_action
 
 ## 测试
 
-以下命令在源码检出根目录运行。Cargo 会从 crates.io 解析可选的 `qubit-datatype` 与 `qubit-id` 依赖，无需准备相邻仓库；如需先确认依赖解析，请运行上文的 metadata 命令。
+以下命令在源码检出根目录运行：
 
 ```bash
 # 使用默认 feature 集运行测试

@@ -1,18 +1,8 @@
 # Qubit Reflect user guide
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: provider.qualified=custom-provider -->
-<!-- reflect-contract: panic.async_poll=not-caught -->
-<!-- reflect-contract: panic.abort=catching-unavailable -->
-<!-- reflect-contract: dispatch.input_recovery=original-input -->
-<!-- reflect-contract: examples.native=cargo-example -->
-<!-- reflect-contract: typeref.constructor=owned-resolved -->
-<!-- reflect-contract: lazy.retry=panic-retry -->
-<!-- reflect-contract: field.lookup=linear -->
-
 [Chinese user guide](user_guide.zh_CN.md) · [README](../README.md) · [API reference](https://docs.rs/qubit-reflect)
 
-This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust application and framework developers who want to add reflection to their own types with macros and use the generated descriptors at runtime. Start with the macro and runtime model below, then run the field example. The support-console integration shows one practical use of that mechanism. Later sections cover construction, method invocation, registries, capabilities, and access boundaries; existing integrations can jump to [Migration notes](#migration-notes).
+This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust application and framework developers who want to add reflection to their own types with macros and use the generated descriptors at runtime. Start with the macro and runtime model below, then read the field example. The support-console integration shows one practical use of that mechanism. Later sections cover construction, method invocation, registries, capabilities, and access boundaries.
 
 ## Contents
 
@@ -33,7 +23,6 @@ This guide covers `qubit-reflect` 0.2.0 on Rust 1.94 or later. It is for Rust ap
   - [Choose transparent or opaque boundaries](#choose-transparent-or-opaque-boundaries)
 - [Errors, diagnostics, and troubleshooting](#errors-diagnostics-and-troubleshooting)
 - [Boundaries and a practice checklist](#boundaries-and-a-practice-checklist)
-- [Migration notes](#migration-notes)
 - [Further reading](#further-reading)
 
 ## The problem it solves
@@ -62,21 +51,31 @@ A manual `Reflect` implementation must report the same Rust `TypeId` as its type
 
 ## Where to start
 
-1. Read [How macro-based reflection works](#how-macro-based-reflection-works), then run [Use generated field reflection](#use-generated-field-reflection). This is enough to see derive, descriptor lookup, and checked field access together.
+1. Read [How macro-based reflection works](#how-macro-based-reflection-works), then continue with [Use generated field reflection](#use-generated-field-reflection). This is enough to see derive, descriptor lookup, and checked field access together.
 2. Continue through the generic patch and [Check the PATCH result](#check-the-patch-result) when building a field-driven application workflow.
 3. Read on as needed: [Construct a new value from input](#construct-a-new-value-from-input), [Invoke methods](#invoke-methods), [Discover types and extension capabilities](#discover-types-and-extension-capabilities), or [Choose features and access boundaries](#choose-features-and-access-boundaries).
 
-Registry snapshots and migration notes come after the basic path.
+Registry snapshots come after the basic path.
 
 ## Use generated field reflection
 
-The following runnable example focuses on the reflection boundary. `Customer` remains an ordinary Rust value owned by the caller; `#[Reflect]` supplies its descriptor and checked field adapters. The business workflow appears after the example.
+The following example focuses on the reflection boundary. `Customer` remains an ordinary Rust value owned by the caller; `#[Reflect]` supplies its descriptor and checked field adapters. The business workflow appears after the example.
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
+use std::error::Error;
+use std::io;
+
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectRegistry;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::access::FieldAccessError;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Customer {
@@ -88,9 +87,23 @@ struct Customer {
     internal_note: String,
 }
 
-/// Runs the example and panics if a business assertion or reflection operation
-/// fails.
-fn main() {
+#[ReflectImpl]
+impl Customer {
+    /// Raises the credit limit, returning false when the requested limit is not
+    /// greater than the current one.
+    pub fn raise_credit_limit(&mut self, credit_limit_cents: u64) -> bool {
+        if credit_limit_cents <= self.credit_limit_cents {
+            return false;
+        }
+        self.credit_limit_cents = credit_limit_cents;
+        true
+    }
+}
+
+/// Runs the example, returning reflection setup and operation failures to the
+/// caller.
+fn main() -> Result<(), Box<dyn Error>> {
+    let registry = ReflectRegistry::initialize()?;
     let descriptor = TypeDescriptor::of::<Customer>();
     let mut customer = Customer {
         id: 1001,
@@ -100,32 +113,49 @@ fn main() {
         internal_note: String::from("not reflected"),
     };
 
-    let email = descriptor.field("email").expect("derived field");
-    email
-        .set(&mut customer, String::from("ada@corp.example"))
-        .expect("exactly typed replacement");
+    let email_field = descriptor
+        .field("email")
+        .ok_or(io::Error::other("missing reflected email field"))?;
+    email_field.set(&mut customer, String::from("ada@corp.example"))?;
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current: &String = email.get(&customer).expect("shared read");
+    let current: &String = email_field.get(&customer)?;
     assert_eq!(current, "ada@corp.example");
 
-    let secret = descriptor.field("secret").expect("private field is described");
+    let secret_field = descriptor
+        .field("secret")
+        .ok_or(io::Error::other("missing reflected secret field"))?;
     assert!(matches!(
-        secret.get::<_, String>(&customer),
+        secret_field.get::<_, String>(&customer),
         Err(FieldAccessError::NotPublic { .. })
     ));
     // SAFETY: this example owns Customer and intentionally demonstrates the
     // visibility bypass.
-    assert_eq!(
-        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
-        "private"
-    );
+    assert_eq!(unsafe { secret_field.get_unsafe::<_, String>(&customer) }?, "private");
     // SAFETY: this example owns Customer and maintains the String field's type
     // invariant.
-    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    unsafe { secret_field.set_unsafe(&mut customer, String::from("updated")) }?;
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
     assert_eq!(customer.internal_note, "not reflected");
+
+    let MethodLookup::Unique(raise_credit_limit) = descriptor.methods_named_in(registry, "raise_credit_limit") else {
+        return Err(io::Error::other("expected exactly one method named raise_credit_limit").into());
+    };
+    {
+        let invocation = Invocation::receiver_mut(&mut customer).arg(75_000_u64);
+        let output = raise_credit_limit
+            .invoke(registry, invocation)
+            .map_err(|failure| io::Error::other(failure.to_string()))?;
+        let InvocationOutput::Owned(changed) = output else {
+            return Err(io::Error::other("raise_credit_limit did not return an owned value").into());
+        };
+        let changed = DynamicOwned::<Local>::downcast::<bool>(changed)
+            .map_err(|_| io::Error::other("raise_credit_limit did not return bool"))?;
+        assert!(changed);
+    }
+    assert_eq!(customer.credit_limit_cents, 75_000);
+    Ok(())
 }
 ```
 
@@ -136,31 +166,6 @@ Add the dependency:
 [dependencies]
 qubit-reflect = "0.2"
 ```
-
-The macros resolve the runtime crate directly, including in same-package
-examples. Optional `qubit-datatype`
-and `qubit-id` dependencies resolve from crates.io, so a source checkout does
-not require adjacent repositories. Verify dependency resolution from the
-repository root:
-
-```bash
-cargo metadata --locked --format-version 1
-```
-
-A successful metadata command confirms the locked dependency graph resolves.
-Now run the native examples:
-
-```bash
-cargo run --example field_patch
-cargo run --example customer_patch
-cargo run --example support_action
-```
-
-All three targets declare `required-features = ["derive"]`; a runtime-only build
-skips them. Their source files are included in the packaged runtime crate, so the
-same commands work in an extracted package when `derive` is enabled. The version
-dependency above selects a published release; source-checkout execution does not
-prove that this checkout has been published or installed from a registry.
 
 ## Integrate a support console
 
@@ -651,69 +656,6 @@ Field access returns `FieldAccessError`. Pre-execution `set` rejections preserve
 - Unsafe functions, unsupported ABIs, variadics, unbound generic methods, and opaque `impl Trait` returns may be described but are not dynamically callable. Tuple and function-pointer descriptors support arities 0 through 32.
 - Descriptors and per-type capability caches live for the whole process; initialization may allocate. Measure the paths your application uses if overhead matters.
 - Tests should cover field reads and replacements, unknown fields, pre-execution type mismatch recovery with `FieldSetFailure`, method failures before user code with `InvocationRecovery`, and registration conflicts reported by `RegistryError`.
-
-## Migration notes
-
-Each downstream crate that derives reflection must directly depend on
-`qubit-reflect`; generated code resolves that dependency automatically.
-
-### Migrating effective capability queries
-
-The existing query names now return `Result`; no error-swallowing compatibility entry remains.
-`capabilities` returns `Result<&TypeCapabilities, CapabilityConflict>`. The typed `capability`
-query returns `Result<Option<&A>, CapabilityAccessError>`, while `capability_by_id` returns
-`Result<Option<&CapabilityDescriptor>, CapabilityConflict>`. Handle errors before testing for
-absence. Typed access errors distinguish `FactOnly` and `AdapterTypeMismatch`; intrinsic
-declaration conflicts are wrapped as `CapabilityAccessError::IntrinsicConflict`.
-Conflicts retain their kind, capability ID, and both adapter TypeIds. Registration failures also expose
-the original conflict through `RegistryError::intrinsic_conflict()` and `Error::source()`.
-
-The convenience `capability` query maps `Found` to `Ok(Some(adapter))` and `Missing` to `Ok(None)`.
-Fact-only descriptors return a `FactOnly` error, and typed keys with a different adapter type return an
-`AdapterTypeMismatch` error. Use `capability_lookup` when you need to inspect all four states:
-`Missing`, `FactOnly`, `AdapterTypeMismatch`, and `Found`. Invalid intrinsic capability sets return their
-conflict error; these lookup states are distinct from an invalid set.
-`capability_origin` reports `CapabilityOrigin::Intrinsic { type_id }` or `CapabilityOrigin::Registered { source }`, while
-`capability_source` returns the contributing `FragmentIdentity` when one is registered. The corresponding
-`definition_capability_origin` and `definition_capability_source` methods apply to generic declarations.
-`type_capability_members` and `definition_capability_members` iterate only frozen registry members
-and do not execute factories. Each result carries the lookup state, origin, and source; fact-only
-and adapter-mismatch entries remain visible, while capability-only targets are audited separately
-with `capability_only_type_targets` and `capability_only_definition_targets`. Intrinsic capability
-sources use the member declaration when it exists, otherwise the earliest fragment that triggered
-inspection. Effective queries for unregistered
-concrete instances may execute an intrinsic factory, without inserting the instance into the snapshot.
-
-Providers must depend only on static type facts, never on snapshots, time, or mutable external
-configuration, and must not re-enter registry initialization. Generic intrinsic factories run outside
-the cache-map lock; successes and conflicts are cached by concrete `TypeId` and shared by concurrent
-queries. Provider panics still propagate; they do not become absence or `CapabilityConflict`.
-Generated invocation adapters preserve receiver-capability resolution failures as structured
-invocation errors and restore the receiver, values, names, and original caller ordering.
-Invocation itself does not initialize a registry.
-
-### Explicit invocation migration and troubleshooting
-
-The twelve consuming methods on `descriptor::InvocationAdapter` and
-`MethodInstanceDescriptor` now use outer `Result` instead of `Option`: migrate
-`None` to outer `Err`, recover the input explicitly, and migrate `Some(result)`
-to `Ok(result)`. This is a breaking change; the inner validation and catching
-contracts and function-pointer ABI remain unchanged. Outer `Err(InvocationUnavailable<I>)`
-preserves the original input before method execution; use `reason()` to inspect
-the cause and `into_invocation()` or `into_parts()` to recover it. Once user code
-has started, consumed inputs and side effects cannot be restored.
-
-Every `invoke_*` entry now requires a registry. If lookup succeeds but
-invocation returns `ReceiverAdapterUnavailable`, check the selected snapshot
-for the exact receiver capability and invocation mode. A static entry does not
-guarantee that capability exists. The same key may select different adapters in
-two snapshots without cross-contamination; global failure does not affect
-valid local calls. Outputs and futures do not borrow the registry, but remain
-constrained by input lifetimes.
-
-Model metadata ABI `v7` and `definition_provider_v2` remain independent.
-Debug prints structural facts without running providers; providers
-themselves must not re-enter initialization.
 
 ## Further reading
 

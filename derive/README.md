@@ -7,9 +7,6 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: provider.qualified=custom-provider -->
-
 `qubit-reflect-derive` provides the `Reflect`, `ReflectImpl`, and `bind_method!` procedural macros used to generate reflection metadata and checked operation adapters. Applications normally depend directly on `qubit-reflect` with its default `derive` feature, which exposes these macros together with the matching runtime API. Direct use of this proc-macro crate is only needed when the runtime's default features are disabled.
 
 ## Installation

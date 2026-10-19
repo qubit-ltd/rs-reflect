@@ -7,9 +7,6 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: provider.qualified=custom-provider -->
-
 `qubit-reflect-derive` 提供 `#[Reflect]`、`#[ReflectImpl]` 和 `bind_method!`，用于生成反射元数据及受检操作适配器。普通应用应直接依赖默认启用 `derive` 功能的 `qubit-reflect`，同时取得这些宏和匹配的运行时 API。只有关闭运行时默认 feature 时，才需要单独依赖这个过程宏 crate。
 
 ## 安装

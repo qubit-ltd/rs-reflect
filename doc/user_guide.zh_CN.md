@@ -1,18 +1,8 @@
 # Qubit Reflect 用户手册
 
-<!-- reflect-contract: runtime.direct=qubit_reflect -->
-<!-- reflect-contract: provider.qualified=custom-provider -->
-<!-- reflect-contract: panic.async_poll=not-caught -->
-<!-- reflect-contract: panic.abort=catching-unavailable -->
-<!-- reflect-contract: dispatch.input_recovery=original-input -->
-<!-- reflect-contract: examples.native=cargo-example -->
-<!-- reflect-contract: typeref.constructor=owned-resolved -->
-<!-- reflect-contract: lazy.retry=panic-retry -->
-<!-- reflect-contract: field.lookup=linear -->
-
 [中文 README](../README.zh_CN.md) · [English user guide](user_guide.md) · [API 文档](https://docs.rs/qubit-reflect)
 
-本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本，面向希望通过宏为自有类型添加反射能力的 Rust 应用与框架开发者。先了解宏如何生成描述符和运行时操作入口，再运行字段示例；客服控制台是这一机制的应用案例。后续章节按需讲解构造、方法调用、注册表、能力和访问边界。已有集成可按需查阅[迁移说明](#迁移说明)。
+本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本，面向希望通过宏为自有类型添加反射能力的 Rust 应用与框架开发者。先了解宏如何生成描述符和运行时操作入口，再阅读字段示例；客服控制台是这一机制的应用案例。后续章节按需讲解构造、方法调用、注册表、能力和访问边界。
 
 ## 目录
 
@@ -35,8 +25,6 @@
   - [什么时候需要同步](#什么时候需要同步)
 - [错误、诊断与排障](#错误诊断与排障)
 - [边界与实践清单](#边界与实践清单)
-- [迁移说明](#迁移说明)
-  - [迁移 effective capability 查询](#迁移-effective-capability-查询)
 - [延伸阅读](#延伸阅读)
 
 ## 它解决什么问题
@@ -65,20 +53,30 @@ Rust 不提供通用的运行时机制来枚举应用结构体的字段、枚举
 
 ## 从哪里开始
 
-1. 先看[宏如何生成反射能力](#宏如何生成反射能力)，再运行[使用宏生成的字段反射](#使用宏生成的字段反射)中的示例，了解派生宏、描述符查询和受检字段访问如何衔接。
+1. 先看[宏如何生成反射能力](#宏如何生成反射能力)，再阅读[使用宏生成的字段反射](#使用宏生成的字段反射)，了解派生宏、描述符查询和受检字段访问如何衔接。
 2. 要开发按字段驱动的业务流程，再继续阅读通用修改逻辑和[核对 PATCH 结果](#核对-patch-结果)。
 3. 需要创建对象时读[用输入构造新对象](#用输入构造新对象)；需要操作按钮触发业务方法时读[按名称调用业务方法](#按名称调用业务方法)。
-4. 编写框架时，再查[发现类型与能力](#发现类型与能力)和[构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)；升级已有集成时参阅[迁移说明](#迁移说明)。
+4. 编写框架时，再查[发现类型与能力](#发现类型与能力)和[构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)。
 
 ## 使用宏生成的字段反射
 
-下面的可运行代码只展示反射边界。`Customer` 仍是调用方持有的普通 Rust 值；`#[Reflect]` 为它生成描述符和受检字段入口。业务流程放在示例之后。
+下面的代码只展示反射边界。`Customer` 仍是调用方持有的普通 Rust 值；`#[Reflect]` 为它生成描述符和受检字段入口。业务流程放在示例之后。
 
 <!-- reflect-source: examples/field_patch.rs -->
 ```rust
+use std::error::Error;
+use std::io;
+
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationOutput;
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectRegistry;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::access::FieldAccessError;
+use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::value::DynamicOwned;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Customer {
@@ -90,9 +88,23 @@ struct Customer {
     internal_note: String,
 }
 
-/// Runs the example and panics if a business assertion or reflection operation
-/// fails.
-fn main() {
+#[ReflectImpl]
+impl Customer {
+    /// Raises the credit limit, returning false when the requested limit is not
+    /// greater than the current one.
+    pub fn raise_credit_limit(&mut self, credit_limit_cents: u64) -> bool {
+        if credit_limit_cents <= self.credit_limit_cents {
+            return false;
+        }
+        self.credit_limit_cents = credit_limit_cents;
+        true
+    }
+}
+
+/// Runs the example, returning reflection setup and operation failures to the
+/// caller.
+fn main() -> Result<(), Box<dyn Error>> {
+    let registry = ReflectRegistry::initialize()?;
     let descriptor = TypeDescriptor::of::<Customer>();
     let mut customer = Customer {
         id: 1001,
@@ -102,32 +114,49 @@ fn main() {
         internal_note: String::from("not reflected"),
     };
 
-    let email = descriptor.field("email").expect("derived field");
-    email
-        .set(&mut customer, String::from("ada@corp.example"))
-        .expect("exactly typed replacement");
+    let email_field = descriptor
+        .field("email")
+        .ok_or(io::Error::other("missing reflected email field"))?;
+    email_field.set(&mut customer, String::from("ada@corp.example"))?;
     assert_eq!(customer.email, "ada@corp.example");
 
-    let current: &String = email.get(&customer).expect("shared read");
+    let current: &String = email_field.get(&customer)?;
     assert_eq!(current, "ada@corp.example");
 
-    let secret = descriptor.field("secret").expect("private field is described");
+    let secret_field = descriptor
+        .field("secret")
+        .ok_or(io::Error::other("missing reflected secret field"))?;
     assert!(matches!(
-        secret.get::<_, String>(&customer),
+        secret_field.get::<_, String>(&customer),
         Err(FieldAccessError::NotPublic { .. })
     ));
     // SAFETY: this example owns Customer and intentionally demonstrates the
     // visibility bypass.
-    assert_eq!(
-        unsafe { secret.get_unsafe::<_, String>(&customer) }.expect("exact field type"),
-        "private"
-    );
+    assert_eq!(unsafe { secret_field.get_unsafe::<_, String>(&customer) }?, "private");
     // SAFETY: this example owns Customer and maintains the String field's type
     // invariant.
-    unsafe { secret.set_unsafe(&mut customer, String::from("updated")) }.expect("exact replacement type");
+    unsafe { secret_field.set_unsafe(&mut customer, String::from("updated")) }?;
     assert_eq!(customer.secret, "updated");
     assert!(descriptor.field("internal_note").is_none());
     assert_eq!(customer.internal_note, "not reflected");
+
+    let MethodLookup::Unique(raise_credit_limit) = descriptor.methods_named_in(registry, "raise_credit_limit") else {
+        return Err(io::Error::other("expected exactly one method named raise_credit_limit").into());
+    };
+    {
+        let invocation = Invocation::receiver_mut(&mut customer).arg(75_000_u64);
+        let output = raise_credit_limit
+            .invoke(registry, invocation)
+            .map_err(|failure| io::Error::other(failure.to_string()))?;
+        let InvocationOutput::Owned(changed) = output else {
+            return Err(io::Error::other("raise_credit_limit did not return an owned value").into());
+        };
+        let changed = DynamicOwned::<Local>::downcast::<bool>(changed)
+            .map_err(|_| io::Error::other("raise_credit_limit did not return bool"))?;
+        assert!(changed);
+    }
+    assert_eq!(customer.credit_limit_cents, 75_000);
+    Ok(())
 }
 ```
 
@@ -138,23 +167,6 @@ fn main() {
 [dependencies]
 qubit-reflect = "0.2"
 ```
-
-宏会直接解析 `qubit-reflect` 运行时，同包 example 无须指定 crate 路径。
-`qubit-datatype` 与 `qubit-id` 依赖从 crates.io 解析，因此源码检出无需准备相邻仓库。先确认锁定的依赖图可以解析：
-
-```bash
-cargo metadata --locked --format-version 1
-```
-
-metadata 命令成功表示锁文件中的依赖图可以解析。随后在源码检出根目录运行原生示例：
-
-```bash
-cargo run --example field_patch
-cargo run --example customer_patch
-cargo run --example support_action
-```
-
-三个目标均声明 `required-features = ["derive"]`，仅运行时构建会跳过它们。运行时 crate 的分发包包含这些源码，启用 `derive` 后也可在解包目录运行相同命令。上面的版本依赖用于选择已发布版本；源码检出的运行结果不能证明当前检出已发布或可从 registry 安装。
 
 ## 接入客服控制台
 
@@ -523,22 +535,6 @@ qubit-reflect = { version = "0.2", features = ["qubit-types"] }
 - 元组和可移植函数指针分别支持 0 到 32 个元素或参数；超过范围没有 `Reflect` 实现。携带数据的枚举不提供整数判别值映射。
 - 描述符和按具体类型缓存的能力会在进程中长期保留；初始化与首次解析可能分配内存。性能敏感路径应按应用负载测量。
 - 测试应覆盖字段读取与替换、未知字段、用 `FieldSetFailure` 恢复执行前的类型不匹配、用 `InvocationRecovery` 恢复方法进入用户代码前的失败，以及 `RegistryError` 报告的注册冲突。
-
-## 迁移说明
-
-每个派生反射的下游 crate 都必须直接依赖 `qubit-reflect`；生成代码会自动解析该依赖。
-
-### 迁移 effective capability 查询
-
-旧集成若把能力查询当作简单 `Option`，需要改为先处理 `Result`：`capabilities` 返回 `Result<&TypeCapabilities, CapabilityConflict>`，类型键查询 `capability` 返回 `Result<Option<&A>, CapabilityAccessError>`，文本 ID 查询 `capability_by_id` 返回 `Result<Option<&CapabilityDescriptor>, CapabilityConflict>`。没有忽略错误的兼容入口。`FactOnly` 和 `AdapterTypeMismatch` 是错误状态，不等于能力缺失；需要完整四态时使用 `capability_lookup`。
-
-类型自身能力声明冲突会包装为 `CapabilityAccessError::IntrinsicConflict`。冲突保留类别、能力 ID 和双方适配器的 `TypeId`；注册阶段可用 `RegistryError::intrinsic_conflict()` 和 `Error::source()` 追踪原始原因。`capability_origin` 区分 `Intrinsic { type_id }` 与 `Registered { source }`；泛型定义对应使用 `definition_capability_origin` 和 `definition_capability_source`。`type_capability_members` 与 `definition_capability_members` 只遍历冻结快照中的成员，不执行 provider；每项携带 lookup 状态、origin 和来源，fact-only 与适配器类型不匹配也会保留。孤儿目标应单独通过 `capability_only_type_targets` 和 `capability_only_definition_targets` 审计。内建能力有类型成员时以类型声明片段为来源，否则使用最早触发检查的片段；未注册具体实例的有效能力查询可能执行其自身工厂，但不会将该实例加入快照。
-
-`descriptor::InvocationAdapter` 与 `MethodInstanceDescriptor` 的十二个消费调用方法将外层 `Option` 改成了 `Result`：旧 `None` 分支改为处理外层 `Err` 并明确取回输入，旧 `Some(result)` 改为 `Ok(result)`。这是破坏性变更，内层校验、catching 契约及函数指针 ABI 不变。外层 `Err(InvocationUnavailable<I>)` 保留方法执行前的完整原始输入；通过 `reason()` 查看原因，再用 `into_invocation()` 或 `into_parts()` 取回输入。进入用户代码后，已消费的输入和副作用无法恢复。
-
-所有 `invoke_*` 入口必须显式传入选定注册表。方法可见但返回 `ReceiverAdapterUnavailable` 时，检查该快照是否提供类型和模式都匹配的 `ReceiverAdapter`，调用不会自动回退到全局注册表。同一能力键可在不同快照中选择不同适配器；全局初始化失败也不影响有效的本地快照。输出和 Future 不借用注册表，但仍受输入生命周期约束。
-
-能力提供器只能依赖静态类型事实，不应依赖快照、时间或外部可变配置，也不能重入注册表初始化。泛型类型自身的能力工厂在缓存锁外执行，成功或冲突按具体 `TypeId` 缓存并供并发查询共享；提供器的 panic 会传播。`Debug` 只输出结构信息，不执行提供器。
 
 ## 延伸阅读
 
