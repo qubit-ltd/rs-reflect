@@ -12,10 +12,6 @@ fn test_invocation_rejects_missing_receiver() {
         failure.error().kind(),
         InvocationErrorKind::ReceiverMissing
     ));
-    assert!(matches!(
-        failure.error().kind(),
-        InvocationErrorKind::ReceiverMissing
-    ));
 }
 
 #[test]
@@ -29,11 +25,14 @@ fn test_invocation_rejects_wrong_argument_type_before_method_body() {
         failure.error().kind(),
         InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
     ));
-    assert_eq!(worker.value, 0);
+    let retry = method("add")
+        .invoke(failure.into_invocation())
+        .expect_err("the rejected call should retain its original argument");
     assert!(matches!(
-        failure.error().kind(),
+        retry.error().kind(),
         InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
     ));
+    drop(retry);
     assert_eq!(worker.value, 0);
 }
 

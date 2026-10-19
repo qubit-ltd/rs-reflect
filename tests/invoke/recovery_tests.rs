@@ -29,8 +29,6 @@ fn test_preflight_failure_keeps_original_receiver_and_owned_argument() {
         failure.error().kind(),
         InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
     ));
-    assert_eq!(worker.value, 12, "preflight must not enter the method body");
-
     let retry = method("add")
         .invoke(failure.into_invocation())
         .expect_err("recovery must retain the caller's original typed input");
@@ -38,6 +36,7 @@ fn test_preflight_failure_keeps_original_receiver_and_owned_argument() {
         retry.error().kind(),
         InvocationErrorKind::ArgumentTypeMismatch { index: 0, .. }
     ));
+    drop(retry);
     assert_eq!(worker.value, 12);
 }
 
