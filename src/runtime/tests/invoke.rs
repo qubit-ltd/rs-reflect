@@ -457,6 +457,10 @@ impl InvocationAdapter<Local> for PanickingAdapter {
     }
 }
 static PANICKING_ADAPTER: PanickingAdapter = PanickingAdapter;
+static BUILT_PANICKING_ADAPTERS: InvocationAdapters = InvocationAdapters::builder()
+    .local(&PANICKING_ADAPTER)
+    .catching_local(&PANICKING_ADAPTER)
+    .build();
 static PANICKING_ADAPTERS: InvocationAdapters = InvocationAdapters {
     local: Some(&PANICKING_ADAPTER),
     thread_safe: None,
@@ -484,6 +488,12 @@ static PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMetho
     availability: InvocationAvailability::Callable,
     adapters: PANICKING_ADAPTERS,
 }];
+static BUILT_PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] =
+    [ResolvedMethodSpecialization {
+        arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
+        availability: InvocationAvailability::Callable,
+        adapters: BUILT_PANICKING_ADAPTERS,
+    }];
 
 fn effective() -> EffectiveMethod {
     effective_for(&METHOD)
@@ -856,6 +866,48 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         InvocationErrorKind::ValueModeUnavailable
     ));
     drop(failure.into_invocation());
+}
+
+#[test]
+fn builder_catching_slot_catches_only_explicit_invocation() {
+    let context = ReflectionContext::empty();
+    let method = EffectiveMethod {
+        target: counter_type_metadata,
+        metadata: &PANIC_METHOD,
+        source: MethodImplementationSource::Declared,
+        availability: crate::runtime::descriptor::method::MethodAvailability::Callable,
+        specializations: &BUILT_PANIC_SPECIALIZATIONS,
+        specialization_specs: &[],
+        adapters: None,
+    };
+    let methods = [method];
+    let method = MethodCatalog::new(type_descriptor(&context), &methods)
+        .method("panic_after_start")
+        .expect("method");
+
+    let mut counter = Counter(11);
+    let ordinary = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = method.invoke(Invocation::<Local>::on_mut(&mut counter).arg(Amount(1)));
+    }));
+    assert!(
+        ordinary.is_err(),
+        "ordinary invoke must keep propagating panics"
+    );
+
+    let mut counter = Counter(11);
+    let caught =
+        match method.invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(Amount(1))) {
+            Ok(_) => panic!("a panicking method is reported by invoke_catching"),
+            Err(caught) => caught,
+        };
+    match caught {
+        crate::runtime::invoke::CaughtInvocationFailure::Panicked(panic) => {
+            assert_eq!(panic.message(), Some("user method panic"));
+        }
+        crate::runtime::invoke::CaughtInvocationFailure::Rejected(_) => {
+            panic!("valid invocation reaches the catching adapter")
+        }
+    }
 }
 
 #[test]

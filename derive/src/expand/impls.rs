@@ -747,16 +747,25 @@ fn expand_concrete_impl(
                 return None;
             }
             let name = format_ident!("__QUBIT_REFLECT_INVOCATION_ADAPTER_{index}");
-            let slot = if plan.pinned_receiver_mutability().is_some() {
+            let pinned = plan.pinned_receiver_mutability().is_some();
+            let slot = if pinned {
                 if plan.modes.thread_safe {
                     quote!(.pinned_thread_safe::<#target>(&#name))
                 } else {
                     quote!(.pinned_local::<#target>(&#name))
                 }
             } else if plan.modes.thread_safe {
-                quote!(.thread_safe(&#name))
+                if plan.modes.asynchronous || method.qualifiers.is_unsafe {
+                    quote!(.thread_safe(&#name))
+                } else {
+                    quote!(.thread_safe(&#name).catching_thread_safe(&#name))
+                }
             } else {
-                quote!(.local(&#name))
+                if plan.modes.asynchronous || method.qualifiers.is_unsafe {
+                    quote!(.local(&#name))
+                } else {
+                    quote!(.local(&#name).catching_local(&#name))
+                }
             };
             Some((index, slot))
         })

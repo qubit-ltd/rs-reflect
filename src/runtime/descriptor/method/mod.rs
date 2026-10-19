@@ -1034,6 +1034,8 @@ static NO_ADAPTERS: InvocationAdapters = InvocationAdapters {
 pub struct InvocationAdaptersBuilder {
     local: Option<&'static dyn InvocationAdapter<Local>>,
     thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    catching_local: Option<&'static dyn InvocationAdapter<Local>>,
+    catching_thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
     pinned_local: Option<&'static dyn PinnedInvocationAdapter<Local>>,
     pinned_thread_safe: Option<&'static dyn PinnedInvocationAdapter<ThreadSafe>>,
 }
@@ -1051,6 +1053,21 @@ impl InvocationAdaptersBuilder {
         adapter: &'static dyn InvocationAdapter<ThreadSafe>,
     ) -> Self {
         self.thread_safe = Some(adapter);
+        self
+    }
+
+    /// Sets the local adapter used by explicit panic-catching invocation.
+    pub const fn catching_local(mut self, adapter: &'static dyn InvocationAdapter<Local>) -> Self {
+        self.catching_local = Some(adapter);
+        self
+    }
+
+    /// Sets the thread-safe adapter used by explicit panic-catching invocation.
+    pub const fn catching_thread_safe(
+        mut self,
+        adapter: &'static dyn InvocationAdapter<ThreadSafe>,
+    ) -> Self {
+        self.catching_thread_safe = Some(adapter);
         self
     }
 
@@ -1077,8 +1094,8 @@ impl InvocationAdaptersBuilder {
         InvocationAdapters {
             local: self.local,
             thread_safe: self.thread_safe,
-            catching_local: None,
-            catching_thread_safe: None,
+            catching_local: self.catching_local,
+            catching_thread_safe: self.catching_thread_safe,
             pinned_local: self.pinned_local,
             pinned_thread_safe: self.pinned_thread_safe,
         }
@@ -1536,6 +1553,8 @@ impl InvocationAdapters {
         InvocationAdaptersBuilder {
             local: None,
             thread_safe: None,
+            catching_local: None,
+            catching_thread_safe: None,
             pinned_local: None,
             pinned_thread_safe: None,
         }

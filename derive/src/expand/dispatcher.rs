@@ -156,6 +156,10 @@ mod tests {
             !source.contains("codegen_v3"),
             "found legacy v3 token path in:\n{source}"
         );
+        assert!(
+            !source.contains("catch_unwind"),
+            "generated thunks must leave panic capture to the runtime:\n{source}"
+        );
         for forbidden in [
             "MemberId",
             "FragmentIdentity",
@@ -163,7 +167,8 @@ mod tests {
             "StaticFragmentIdentity",
             "FragmentPayload",
             "ReflectRegistry",
-            "catching_",
+            "CatchingInvocationAdapter",
+            "catching_invocation_adapter",
         ] {
             assert!(
                 !source.contains(forbidden),
@@ -345,7 +350,11 @@ mod tests {
         );
         assert!(
             !tokens.to_string().contains("catch_unwind"),
-            "ordinary invocation tokens must not emit panic capture"
+            "panic capture belongs to the runtime, not generated thunks"
+        );
+        assert!(
+            tokens.to_string().contains("catching_local"),
+            "synchronous default methods should register the same typed thunk for catching calls"
         );
     }
 
@@ -368,8 +377,10 @@ mod tests {
         );
         assert!(
             !source.contains("pinned_thread_safe")
+                && !source.contains("catching_local")
+                && !source.contains("catching_thread_safe")
                 && !source.contains("InvocationUnavailableReason :: ValueModeUnavailable"),
-            "a Local-only pinned default should leave ThreadSafe availability to the missing adapter slot: {source}"
+            "pinned defaults should omit unsupported ThreadSafe and catching slots: {source}"
         );
     }
 
@@ -388,6 +399,10 @@ mod tests {
         assert!(
             source.contains("unsafe { < Counter > :: update_unchecked"),
             "unsafe methods should emit a thunk usable only through invoke_unchecked: {source}"
+        );
+        assert!(
+            !source.contains("catching_local") && !source.contains("catching_thread_safe"),
+            "unsafe methods must not expose a safe catching invocation slot: {source}"
         );
     }
 
@@ -430,6 +445,32 @@ mod tests {
         assert!(
             tokens.to_string().contains("ImplApplicationSpec"),
             "concrete impl methods should be attached to a typed application"
+        );
+        assert!(
+            tokens.to_string().contains("catching_local"),
+            "synchronous impl methods should expose the typed thunk to invoke_catching"
+        );
+    }
+
+    #[test]
+    fn test_async_impl_does_not_emit_catching_adapter_slot() {
+        let declaration = parse_impl(quote! {
+            impl Counter {
+                async fn execute(&self) -> u32 { 1 }
+            }
+        });
+        let context = ExpansionContext::for_tests();
+        let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
+            .expect("async impl tokens should be emitted");
+        assert_codegen_v4(&tokens);
+        let source = tokens.to_string();
+        assert!(
+            source.contains(" local ("),
+            "async calls retain ordinary invocation: {source}"
+        );
+        assert!(
+            !source.contains("catching_local") && !source.contains("catching_thread_safe"),
+            "async methods must reject catching mode without a catcher slot: {source}"
         );
     }
 

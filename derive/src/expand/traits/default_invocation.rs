@@ -276,8 +276,10 @@ fn emit_default_method(
     };
     let adapter_slot = if pinned_receiver_mutable.is_some() {
         quote!(.pinned_local::<__QubitReflectTarget>(adapter))
-    } else {
+    } else if method.qualifiers.is_async || method.qualifiers.is_unsafe {
         quote!(.local(adapter))
+    } else {
+        quote!(.local(adapter).catching_local(adapter))
     };
     Some(quote! {
         if !overridden.iter().any(|name| *name == #overridden_name) {

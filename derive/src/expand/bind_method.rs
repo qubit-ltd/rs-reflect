@@ -412,10 +412,14 @@ pub(crate) fn expand_with_context(
                 quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
             }
         }
-    } else if thread_safe {
+    } else if thread_safe && asynchronous {
         quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().thread_safe(&__QUBIT_BIND_METHOD_ADAPTER).build())
-    } else {
+    } else if thread_safe {
+        quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().thread_safe(&__QUBIT_BIND_METHOD_ADAPTER).catching_thread_safe(&__QUBIT_BIND_METHOD_ADAPTER).build())
+    } else if asynchronous {
         quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().local(&__QUBIT_BIND_METHOD_ADAPTER).build())
+    } else {
+        quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().local(&__QUBIT_BIND_METHOD_ADAPTER).catching_local(&__QUBIT_BIND_METHOD_ADAPTER).build())
     };
     let binding = if is_generic {
         let specialization_argument_count = specialization_arguments.len();
