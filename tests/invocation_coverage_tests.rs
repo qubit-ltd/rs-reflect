@@ -1,6 +1,7 @@
 #![cfg(feature = "derive")]
 
-use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectImpl, ThreadSafe};
+use qubit_reflect::invoke::ThreadSafe;
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectImpl};
 
 #[Reflect]
 struct CoverageTarget {

@@ -17,7 +17,7 @@ fn test_associated_and_instance_receivers_follow_method_metadata() {
         .expect_err("associated input must not satisfy a shared receiver");
     assert!(matches!(
         failure.error().kind(),
-        qubit_reflect::InvocationErrorKind::ReceiverMissing
+        qubit_reflect::invoke::InvocationErrorKind::ReceiverMissing
     ));
 }
 

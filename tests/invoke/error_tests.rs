@@ -1,5 +1,6 @@
 use super::fixtures::{Worker, method};
-use qubit_reflect::{CaughtInvocationFailure, Invocation};
+use qubit_reflect::Invocation;
+use qubit_reflect::invoke::CaughtInvocationFailure;
 
 #[test]
 fn test_catching_invocation_reports_user_panic_as_a_separate_failure() {
@@ -11,14 +12,4 @@ fn test_catching_invocation_reports_user_panic_as_a_separate_failure() {
     };
 
     assert!(panic.to_string().contains("worker panic payload"));
-}
-
-#[test]
-fn test_async_invocation_is_not_run_by_synchronous_catching_entry() {
-    let worker = Worker { value: 17 };
-    let failure = method("async_value")
-        .invoke_catching(Invocation::on_ref(&worker))
-        .expect_err("async methods cannot use synchronous panic catching");
-
-    assert!(matches!(failure, CaughtInvocationFailure::Rejected(_)));
 }

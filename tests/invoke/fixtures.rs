@@ -25,9 +25,13 @@ impl Worker {
         panic!("worker panic payload");
     }
 
-    fn private_method(&self) {}
+    fn private_method(&mut self, amount: i32) {
+        self.value += amount;
+    }
 
-    pub unsafe fn unsafe_method(&self) {}
+    pub unsafe fn unsafe_method(&mut self, amount: i32) {
+        self.value += amount;
+    }
 
     pub fn pinned_value(self: Pin<&mut Self>) -> i32 {
         self.value
@@ -35,6 +39,10 @@ impl Worker {
 
     pub async fn async_value(&self) -> i32 {
         self.value
+    }
+
+    pub async fn async_sum(&self, left: i32, right: i32) -> i32 {
+        self.value + left + right
     }
 }
 

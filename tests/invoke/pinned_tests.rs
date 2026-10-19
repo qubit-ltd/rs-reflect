@@ -1,5 +1,5 @@
 use super::fixtures::{Worker, method};
-use qubit_reflect::PinnedInvocation;
+use qubit_reflect::invoke::PinnedInvocation;
 use std::pin::Pin;
 
 #[test]

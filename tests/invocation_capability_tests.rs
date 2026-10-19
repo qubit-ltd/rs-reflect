@@ -1,6 +1,10 @@
 #![cfg(feature = "derive")]
 
-use qubit_reflect::{CaughtInvocationFailure, Invocation, InvocationOutput, Reflect, ReflectImpl};
+use qubit_reflect::invoke::CaughtInvocationFailure;
+use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectImpl};
+use std::future::Future;
+use std::pin::pin;
+use std::task::{Context, Poll, Waker};
 
 #[Reflect]
 struct Counter {
@@ -46,7 +50,15 @@ fn test_catching_capability_rejects_async_before_dispatch_and_keeps_inputs() {
         panic!("async rejection occurs before user method entry");
     };
     let retry = method("async_value")
-        .invoke_catching(rejected.into_invocation())
-        .expect_err("recovered receiver must remain available");
-    assert!(matches!(retry, CaughtInvocationFailure::Rejected(_)));
+        .invoke(rejected.into_invocation())
+        .expect("normal invocation should reuse the recovered async receiver");
+    let InvocationOutput::Future(future) = retry else {
+        panic!("async method must return a future");
+    };
+    let mut future = pin!(future);
+    let mut context = Context::from_waker(Waker::noop());
+    let Poll::Ready(output) = Future::poll(future.as_mut(), &mut context) else {
+        panic!("fixture future should complete on first poll");
+    };
+    assert_eq!(output.into_owned::<u32>().expect("u32 output"), 13);
 }

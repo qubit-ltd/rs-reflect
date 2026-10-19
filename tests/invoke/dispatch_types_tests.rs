@@ -1,5 +1,6 @@
 use super::fixtures::{Worker, method};
-use qubit_reflect::{Invocation, ThreadSafe};
+use qubit_reflect::Invocation;
+use qubit_reflect::invoke::ThreadSafe;
 
 #[test]
 fn test_invocation_mode_selects_local_or_thread_safe_adapter() {

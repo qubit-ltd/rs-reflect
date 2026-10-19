@@ -1,7 +1,11 @@
 use super::fixtures::{Worker, method};
-use qubit_reflect::{Invocation, InvocationErrorKind, Reflect};
+use qubit_reflect::invoke::{CaughtInvocationFailure, InvocationErrorKind};
+use qubit_reflect::{Invocation, InvocationOutput, Reflect};
+use std::future::Future;
+use std::pin::pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::task::{Context, Poll, Waker};
 
 #[Reflect]
 struct RecoveryPayload {
@@ -77,4 +81,33 @@ fn test_recovery_owns_the_original_value_until_recovery_is_dropped() {
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     drop(recovered);
     assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn test_rejected_async_invocation_retries_with_recovered_receiver_and_named_arguments() {
+    let worker = Worker { value: 17 };
+    let failure = method("async_sum")
+        .invoke_catching(
+            Invocation::on_ref(&worker)
+                .named_arg("right", 5_i32)
+                .named_arg("left", 3_i32),
+        )
+        .expect_err("synchronous catching must reject async methods before execution");
+    let CaughtInvocationFailure::Rejected(rejected) = failure else {
+        panic!("preflight rejection must remain distinct from a user panic");
+    };
+
+    let output = method("async_sum")
+        .invoke(rejected.into_invocation())
+        .expect("ordinary dispatch should accept the same recovered call");
+    let InvocationOutput::Future(future) = output else {
+        panic!("async methods should return a future");
+    };
+    let mut future = pin!(future);
+    let mut context = Context::from_waker(Waker::noop());
+    let Poll::Ready(output) = Future::poll(future.as_mut(), &mut context) else {
+        panic!("fixture future should complete on the first poll");
+    };
+
+    assert_eq!(output.into_owned::<i32>().expect("i32 output"), 25);
 }
