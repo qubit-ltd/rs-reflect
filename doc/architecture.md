@@ -1,45 +1,54 @@
 # Architecture
 
-This document describes the current `qubit-reflect` implementation and the boundary it exposes to the in-repository `rs-model-metadata` crate. It is based on the source linked below; hidden generated-code modules are implementation protocols, not application-facing APIs.
+This document describes the vNext reflection path and the boundary available to application code. The public API is defined by the core redesign document; generated metadata under `__private` is a versioned implementation protocol.
 
-## From declarations to a snapshot
+## From declarations to descriptors
 
-`#[Reflect]` and `#[ReflectImpl]` parse and validate declarations, then emit descriptors, adapters, and static registration fragments. `bind_method!` emits a concrete call-site `MethodBinding` for a Rust method already monomorphized by the compiler. At registry construction, fragments are materialized and validated as a set before immutable indexes and effective method views are published.
+`#[Reflect]` records structural facts from a type or trait declaration. `#[ReflectImpl]` records implementation facts and emits adapters for supported methods. `bind_method!` supplies concrete compile-time bindings for selected generic method specializations. Generated registrations are collected into a `ReflectionContext`, where conflicts are validated before aggregate indexes are published.
 
 ```mermaid
 flowchart LR
-  A[Reflect / ReflectImpl] --> B[Descriptors and adapters]
-  C[bind_method!] --> D[MethodBinding]
-  B --> E[Static registration fragments]
+  A[Reflect / ReflectImpl] --> B[Static metadata and adapters]
+  C[bind_method!] --> D[Concrete generic binding]
+  B --> E[Linked registrations]
   D --> E
-  E --> F[Global inventory snapshot<br/>or explicit snapshot builder]
-  F --> G[Type, definition, capability queries]
-  G --> H[Method lookup and invocation<br/>on the same snapshot]
-  F --> I[rs-model-metadata projection]
+  E --> F[ReflectionContext]
+  F --> G[Context-bound descriptors]
+  G --> H[Checked access, construction, and invocation]
 ```
 
-The procedural macro entry points are in [`derive/src/lib.rs`](../derive/src/lib.rs); call-site binding expansion is in [`derive/src/expand/bind_method.rs`](../derive/src/expand/bind_method.rs). The `codegen_v3` module is a versioned generated-code protocol: its own module documentation says incompatible changes must use a sibling version rather than silently widening v3 ([`src/private/codegen_v3/mod.rs`](../src/private/codegen_v3/mod.rs)). It is not a hand-written application API.
+The derive crate owns parsing, validation, and token generation. Its output uses `qubit_reflect::__private::codegen_v4`; application code should use the public descriptors and registration macros instead of depending on this protocol directly. `#[reflect(skip)]` is the only member helper attribute: skipped declarations remain in Rust but are omitted from generated reflection metadata.
 
-Static fragment identities and payloads are defined in [`src/registry/fragment.rs`](../src/registry/fragment.rs). The builder validates fragments and links method bindings to exact reflected declarations ([`src/registry/registry_builder.rs`](../src/registry/registry_builder.rs)). For a normal process-wide registry, `ReflectRegistry::initialize()` sorts and validates linked inventory and publishes one immutable result. Both success and `RegistryError` are cached in a `OnceLock` ([`src/registry/reflect_registry.rs`](../src/registry/reflect_registry.rs), [`src/registry/registry_builder.rs`](../src/registry/registry_builder.rs)).
+## Context and descriptor ownership
 
-Use `RegistrySnapshotBuilder` when a caller needs an isolated snapshot assembled from explicit facts. It does not read linker inventory unless `include_linked_fragments()` is called; `build()` validates transactionally and returns no partial snapshot on error ([`src/registry/registry_snapshot_builder.rs`](../src/registry/registry_snapshot_builder.rs)). Both global and explicit snapshots are immutable after construction.
+`ReflectionContext::global()` is a process-wide, lazily initialized context. `ReflectionContext::builder()` creates an independent context for explicit registration and isolation. The context validates registration facts as a whole; a failed build does not expose a partial context.
 
-## Membership, capabilities, and calls
+Descriptors contain static declaration metadata and a borrow of their context. A field or method reached from a descriptor therefore uses that same context. Callers do not pass a second registry to method lookup or invocation. This prevents a method resolved in one context from being invoked against another context's adapters.
 
-Concrete type membership, generic-definition membership, and capability facts are distinct registry facts. Adding a type's capabilities does not add that type to `ReflectRegistry::types()`. Queries that enumerate `type_capability_members` yield registered type members; capability-only targets are excluded. A yielded capability lookup distinguishes `Found` (a typed adapter), `FactOnly` (a declared capability without an executable adapter), and `AdapterTypeMismatch` (the same capability ID with another adapter contract). A missing target or capability is represented by absence in the relevant query ([`src/registry/registry_snapshot_builder.rs`](../src/registry/registry_snapshot_builder.rs), [`src/registry/capability_member.rs`](../src/registry/capability_member.rs), [`src/registry/reflect_registry.rs`](../src/registry/reflect_registry.rs)).
+Fields and variants are local declaration facts, so their views do not require aggregate context initialization. Methods, type-name discovery, trait and impl applications, and capabilities use context data. `field()` and `method()` require one result and return structured lookup errors; `fields().get()` is optional, while `lookup_method()` exposes Missing, Unique, or Ambiguous.
 
-Method lookup is built into the selected snapshot's effective view. `bind_method!` supplies an already monomorphized adapter; registry construction matches it to the reflected declaration and rejects unresolved or conflicting registrations. It does not synthesize a Rust specialization from a runtime `TypeId` ([`src/registry/method_binding.rs`](../src/registry/method_binding.rs), [`src/registry/registry_builder.rs`](../src/registry/registry_builder.rs)). Pass the same `ReflectRegistry` to lookup and invocation: receiver capabilities do not fall back to another registry ([`src/registry/reflect_registry.rs`](../src/registry/reflect_registry.rs)).
+## Checked operations and recovery
 
-Invocation binding and validation can fail before the target method runs. On these failures, `InvocationRecovery` retains the supplied receiver and arguments so the caller can inspect or reconstruct the invocation; this is not rollback for user code that has already executed ([`tests/invoke/recovery_tests.rs`](../tests/invoke/recovery_tests.rs), [`src/invoke/recovery.rs`](../src/invoke/recovery.rs)). Registry construction errors retain conflicting fragment provenance. A panic from an intrinsic capability provider propagates during explicit snapshot construction rather than becoming a `RegistryError` ([`src/registry/registry_snapshot_builder.rs`](../src/registry/registry_snapshot_builder.rs)).
+Typed field access makes the target and field types explicit at the call site. Dynamic values are used when a framework has erased those types; the runtime checks the exact Rust type before accessing or replacing a field. A failed dynamic downcast or replacement retains the original value for recovery.
 
-## Identity and lifetime limits
+Invocation validates specialization, receiver, argument count, argument modes, and exact types before entering generated user code. Failures at this stage preserve receiver and argument inputs. Once an adapter begins, reflection cannot roll back user side effects. Panics propagate through ordinary invocation; panic capture is an explicit call-site policy.
 
-`TypeDescriptor::of::<T>()` returns the descriptor supplied by `T::type_descriptor()` and checks that its `TypeId` matches `T` ([`src/descriptor/type_descriptor.rs`](../src/descriptor/type_descriptor.rs)). Generated and lazy descriptors use process-lifetime storage; for example, `LazyTypeRef` resolves once into a static `OnceLock` ([`src/private/lazy_type_ref.rs`](../src/private/lazy_type_ref.rs)). The global registry and its successful or failed initialization result also live for the process. `TypeId`, descriptor addresses, and diagnostic/query names are not portable identifiers for storage or exchange across processes. Use explicit identifiers such as `CapabilityId` or source identities such as `FragmentIdentity` where the API calls for them; a type-name lookup can return multiple candidates.
+The default value mode is `Local`. `ThreadSafe` adapters are emitted only where their Rust bounds can be proved. Erasing a local value does not make it safe to transfer between threads.
 
-The library provides reflection metadata, typed dynamic access, registry validation, and invocation adapters. It does not provide authorization policy, application input parsing, persistence, or rollback of arbitrary application side effects.
+## Generic methods and capabilities
 
-## Downstream model projection
+Runtime type identities cannot ask rustc to generate a new monomorphization. A generic method declaration is reflected independently from its concrete callable specializations. Applications register the specializations they support at compile time and choose one through its typed generic arguments.
 
-The repository's `rs-model-metadata` crate consumes the reflection boundary in `rs-model-metadata/src/__private.rs` and `rs-model-metadata/src/registry/model_registry.rs`. Its hidden facade re-exports `qubit_reflect::__private::codegen_v3` for generated model code. `ModelRegistry::from_reflect_registry` projects metadata capabilities by iterating the supplied snapshot's registered type and generic-definition members. It turns `FactOnly` and adapter mismatch results into model-registry errors, validates provider metadata against its descriptor, and rejects a model-metadata capability attached only to a non-member target as `UnregisteredModelTarget`. These are additional model-layer rules, not general `qubit-reflect` membership rules.
+Capability queries are also context-bound. Their contract includes the capability type and the adapter type, so a matching display name alone is not enough to call an adapter. Built-in capabilities rely on Rust trait bounds; custom providers use the typed registration API.
 
-The model registry's process-wide `try_global()` separately caches its projected result or error, while its explicit constructor borrows the supplied reflection snapshot. Model-property path caches and model-ID rules belong to `rs-model-metadata`, not to the reflection registry (repository path: `rs-model-metadata/src/registry/model_registry.rs`).
+## Identity and application responsibilities
+
+`TypeId`, descriptor addresses, context IDs, and diagnostic Rust names are process-local. They are not storage or wire-format identifiers. Applications that persist or exchange reflection references need their own stable identifiers and versioning rules.
+
+The library provides metadata, checked dynamic operations, context validation, and generated call adapters. Applications remain responsible for input parsing, authorization, business invariants, persistence, concurrency policy, and compensation after user code has run.
+
+## Further reading
+
+- [Core API redesign](2026-10-20-core-api-redesign.zh_CN.md) is the normative API specification.
+- [User guide](user_guide.md) follows a field update and method invocation from an application perspective.
+- [中文架构](architecture.zh_CN.md)

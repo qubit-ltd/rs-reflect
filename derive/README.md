@@ -1,39 +1,17 @@
-# qubit-reflect-derive
+# `qubit-reflect-derive`
 
-[![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
-[![Crates.io](https://img.shields.io/crates/v/qubit-reflect-derive.svg?color=blue)](https://crates.io/crates/qubit-reflect-derive)
-[![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
-[![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
-
-`qubit-reflect-derive` provides the `Reflect`, `ReflectImpl`, and `bind_method!` procedural macros used to generate reflection metadata and checked operation adapters. Applications normally depend directly on `qubit-reflect` with its default `derive` feature, which exposes these macros together with the matching runtime API. Direct use of this proc-macro crate is only needed when the runtime's default features are disabled.
+`qubit-reflect-derive` provides the `#[Reflect]`, `#[ReflectImpl]`, and `bind_method!` procedural macros. They generate metadata and adapters; runtime descriptors, contexts, and checked operations are provided by `qubit-reflect`.
 
 ## Installation
 
-Direct use requires the matching runtime crate because generated code calls its versioned `__private::codegen_v3` protocol. Create the example application in a directory beside the `rs-reflect` checkout and use both crates from that same checkout:
+Most applications should depend on `qubit-reflect` with its default `derive` feature:
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = false }
-qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
+qubit-reflect = "0.2"
 ```
 
-In this source-checkout recipe, the two `path` entries refer only to the
-`qubit-reflect` runtime and its matching in-repository derive crate. The
-runtime's external dependencies, including `qubit-id` and `qubit-datatype`, are
-resolved from crates.io; no sibling `rs-id` or `rs-datatype` checkout is needed.
-Verify the source checkout's locked dependency graph from the repository root:
-
-```bash
-cargo metadata --locked --format-version 1
-```
-
-This check does not establish that the current runtime or derive checkout has
-been published. For normal application code, depend on `qubit-reflect` with its
-default `derive` feature instead of adding the derive crate directly.
-
-For registry dependencies, select published versions from the same release line:
+If the runtime default features are disabled, add the matching derive crate explicitly:
 
 ```toml
 [dependencies]
@@ -41,9 +19,9 @@ qubit-reflect = { version = "0.2", default-features = false }
 qubit-reflect-derive = "0.2"
 ```
 
-## Quick Start
+Keep the runtime and derive versions aligned. Generated code calls the versioned internal `__private::codegen_v4` protocol; it is an implementation boundary, not an application API.
 
-An editor can read a field selected at runtime while the application keeps ownership of the original value. The derive macro generates the type metadata; the runtime descriptor performs the checked lookup.
+## Quick start
 
 ```rust
 use qubit_reflect::TypeDescriptor;
@@ -54,68 +32,26 @@ struct User {
     name: String,
 }
 
-fn main() {
-    let field = TypeDescriptor::of::<User>()
-        .field("name")
-        .expect("the derived field exists");
-    assert_eq!(field.query_name(), Some("name"));
+fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
+    let field = TypeDescriptor::of::<User>().field("name")?;
+    Ok(field.get(user)?)
 }
 ```
 
-`#[Reflect]` describes structs, enums, and traits; `#[ReflectImpl]` describes inherent and trait implementations. `#[reflect(skip)]` completely removes a member from reflected metadata. Generic method definitions are not dynamically callable until a concrete method instance is bound at a compile-time call site with `bind_method!`; runtime type IDs cannot generate new monomorphized code. Unsupported operations remain unavailable with structured metadata instead of bypassing Rust's type and ownership checks. The macros do not provide reflection storage or runtime operations; those belong to `qubit-reflect`.
+Use `#[ReflectImpl]` to describe inherent or trait implementations. `#[reflect(skip)]` excludes a field, variant, or method from reflection metadata. Other helper attributes are not part of the vNext macro surface.
 
-The macros resolve the direct `qubit-reflect` dependency, including in
-same-package runtime examples. Native runtime examples declare `required-features = ["derive"]`
-and are shipped in the runtime package; from the checkout root run
-`cargo run --example field_patch`, `cargo run --example customer_patch`, or
-`cargo run --example support_action`.
+Generic method declarations remain metadata until a concrete specialization is bound at compile time with `bind_method!`. The runtime cannot create Rust monomorphizations from a dynamic type ID. Unsupported method signatures remain inspectable with an availability reason.
 
-In `#[reflect(capabilities(...))]`, bare `Clone`, `Default`, `Send`, and `Sync`
-select built-in capabilities. Qualified paths always select custom providers:
-`my_crate::Clone` calls `my_crate::Clone::<Self>()`, even though
-its final segment has the same spelling as a built-in.
+## Examples and reference
 
-## Learn More
-
-- [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
-- [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.zh_CN.md)
-- [Runtime crate overview](https://github.com/qubit-ltd/rs-reflect/blob/main/README.md) · [简体中文 README](https://github.com/qubit-ltd/rs-reflect/blob/main/README.zh_CN.md)
-- [Procedural macro API documentation](https://github.com/qubit-ltd/rs-reflect/blob/main/derive/src/lib.rs)
-
-## Testing
-
-Run these commands from the `rs-reflect` repository root:
+The repository examples require the `derive` feature and can be run from the workspace root:
 
 ```bash
-# Run tests with the default feature set
-cargo test
-
-# Run tests with all declared features
-cargo test --all-features
-
-# Project CI checks
-./.infra/bin/ci-check.sh
-
-# Check code coverage
-./.infra/bin/coverage.sh
+cargo run --example field_patch
+cargo run --example customer_patch
+cargo run --example support_action
 ```
 
-## License
-
-Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
-
-Licensed under the Apache License, Version 2.0. See [LICENSE](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE) for the
-full license text.
-
-## Contributing
-
-Contributions are welcome. Please follow the Rust API guidelines, keep public
-API documentation and tests current, and from the `rs-reflect` repository root
-run `./.infra/bin/align-ci.sh` to format code and `./.infra/bin/ci-check.sh` to satisfy CI requirements
-before submitting a pull request.
-
-## Author
-
-**Haixing Hu** - *Qubit Co. Ltd.*
-
-Repository: [https://github.com/qubit-ltd/rs-reflect](https://github.com/qubit-ltd/rs-reflect)
+- [English user guide](../doc/user_guide.md) · [中文用户手册](../doc/user_guide.zh_CN.md)
+- [Runtime overview](../README.md) · [中文 README](../README.zh_CN.md)
+- [Macro API docs](../src/lib.rs)

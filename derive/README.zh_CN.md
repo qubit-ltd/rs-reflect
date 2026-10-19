@@ -1,33 +1,17 @@
-# qubit-reflect-derive
+# `qubit-reflect-derive`
 
-[![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
-[![Crates.io](https://img.shields.io/crates/v/qubit-reflect-derive.svg?color=blue)](https://crates.io/crates/qubit-reflect-derive)
-[![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)
-[![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
-
-`qubit-reflect-derive` 提供 `#[Reflect]`、`#[ReflectImpl]` 和 `bind_method!`，用于生成反射元数据及受检操作适配器。普通应用应直接依赖默认启用 `derive` 功能的 `qubit-reflect`，同时取得这些宏和匹配的运行时 API。只有关闭运行时默认 feature 时，才需要单独依赖这个过程宏 crate。
+`qubit-reflect-derive` 提供 `#[Reflect]`、`#[ReflectImpl]` 和 `bind_method!` 过程宏，用于生成元数据与适配器。运行时描述符、context 和受检操作由 `qubit-reflect` 提供。
 
 ## 安装
 
-直接使用过程宏时还需要配套的运行时 crate，因为宏展开会调用其版本化的 `__private::codegen_v3` 协议。请在 `rs-reflect` 检出目录的同级位置创建示例应用，并让两个依赖都指向同一份检出：
+大多数应用直接依赖默认启用 `derive` feature 的 `qubit-reflect` 即可：
 
 ```toml
 [dependencies]
-qubit-reflect = { version = "0.2", path = "../rs-reflect", default-features = false }
-qubit-reflect-derive = { version = "0.2", path = "../rs-reflect/derive" }
+qubit-reflect = "0.2"
 ```
 
-此源码接入示例中的两个 `path` 只指向 `qubit-reflect` runtime 与仓库内配套的 derive crate。runtime 的外部依赖（包括 `qubit-id` 和 `qubit-datatype`）从 crates.io 解析，无需检出相邻的 `rs-id` 或 `rs-datatype` 仓库。请在仓库根目录检查源码检出的锁定依赖图：
-
-```bash
-cargo metadata --locked --format-version 1
-```
-
-此检查不能证明当前 runtime 或 derive 检出已发布。普通应用依赖默认启用 `derive` feature 的 `qubit-reflect` 即可，无需单独添加 derive crate。
-
-使用 registry 依赖时，请选择同一发布线中已经发布的版本：
+如果关闭 runtime 的默认 feature，则显式添加匹配版本的 derive crate：
 
 ```toml
 [dependencies]
@@ -35,9 +19,9 @@ qubit-reflect = { version = "0.2", default-features = false }
 qubit-reflect-derive = "0.2"
 ```
 
-## 快速开始
+runtime 与 derive 版本应保持一致。生成代码会调用带版本号的内部 `__private::codegen_v4` 协议；它是实现边界，不是应用 API。
 
-配置编辑器可以按运行时收到的字段名读取对象，同时由应用继续持有对象。派生宏生成类型元数据，运行时描述符按名称查找字段并执行类型检查。
+## 快速开始
 
 ```rust
 use qubit_reflect::TypeDescriptor;
@@ -48,60 +32,26 @@ struct User {
     name: String,
 }
 
-fn main() {
-    let field = TypeDescriptor::of::<User>()
-        .field("name")
-        .expect("派生描述符包含该字段");
-    assert_eq!(field.query_name(), Some("name"));
+fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
+    let field = TypeDescriptor::of::<User>().field("name")?;
+    Ok(field.get(user)?)
 }
 ```
 
-`#[Reflect]` 可描述结构体、枚举和 trait；`#[ReflectImpl]` 可描述 inherent impl 或 trait impl。`#[reflect(skip)]` 会将成员完全排除在反射元数据之外。泛型方法定义不会自动成为可动态调用的方法；必须在编译期调用位置通过 `bind_method!` 绑定具体的方法实例，因为运行时类型 ID 无法生成新的单态化代码。无法执行的操作仍会保留为结构化元数据，不会绕过 Rust 的类型和所有权检查。过程宏本身不提供反射存储或运行时操作，这些功能由 `qubit-reflect` 提供。
+使用 `#[ReflectImpl]` 描述 inherent impl 或 trait impl。`#[reflect(skip)]` 会把字段、variant 或方法排除在反射元数据之外。vNext 宏不再接受其他 helper attribute。
 
-宏会解析当前 crate 直接声明的 `qubit-reflect` 依赖，同包 example 也无需额外指定路径。三个原生示例均要求 `derive` feature，源码也随运行时包分发；在检出根目录运行 `cargo run --example field_patch`、`cargo run --example customer_patch` 或 `cargo run --example support_action`。
+泛型方法声明会先作为元数据保留；使用 `bind_method!` 在编译期绑定具体特化后，才能动态调用。运行时无法根据动态类型 ID 生成 Rust 单态化代码。不支持执行的方法签名仍可检查，并附带不可用原因。
 
-`#[reflect(capabilities(...))]` 中，裸写 `Clone`、`Default`、`Send`、`Sync` 会选择内建能力；限定路径始终选择自定义 provider。例如 `my_crate::Clone` 会调用 `my_crate::Clone::<Self>()`，不会因末段同名而变成内建 `Clone`。
+## 示例与参考
 
-## 延伸阅读
-
-- [中文用户指南](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.zh_CN.md)
-- [English user guide](https://github.com/qubit-ltd/rs-reflect/blob/main/doc/user_guide.md)
-- [运行时 crate 概览](https://github.com/qubit-ltd/rs-reflect/blob/main/README.zh_CN.md) · [English README](https://github.com/qubit-ltd/rs-reflect/blob/main/README.md)
-- [过程宏 API 文档](https://github.com/qubit-ltd/rs-reflect/blob/main/derive/src/lib.rs)
-
-## 测试
-
-以下命令均从 `rs-reflect` 仓库根目录运行：
+仓库示例需要启用 `derive` feature，可从 workspace 根目录运行：
 
 ```bash
-# 使用默认 feature 集运行测试
-cargo test
-
-# 使用项目声明的全部 feature 运行测试
-cargo test --all-features
-
-# 运行项目 CI 检查
-./.infra/bin/ci-check.sh
-
-# 检查代码覆盖率
-./.infra/bin/coverage.sh
+cargo run --example field_patch
+cargo run --example customer_patch
+cargo run --example support_action
 ```
 
-## 许可证
-
-Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
-
-本项目基于 Apache License 2.0 授权。完整许可证文本请参阅
-[LICENSE](https://github.com/qubit-ltd/rs-reflect/blob/main/LICENSE)。
-
-## 贡献
-
-欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并从
-`rs-reflect` 仓库根目录运行 `./.infra/bin/align-ci.sh` 格式化代码、运行 `./.infra/bin/ci-check.sh`
-通过 CI 检查，再提交 Pull Request。
-
-## 作者
-
-**Haixing Hu** - *Qubit Co. Ltd.*
-
-仓库地址：[https://github.com/qubit-ltd/rs-reflect](https://github.com/qubit-ltd/rs-reflect)
+- [中文用户手册](../doc/user_guide.zh_CN.md) · [English user guide](../doc/user_guide.md)
+- [运行时概览](../README.zh_CN.md) · [English README](../README.md)
+- [宏 API 文档](../src/lib.rs)

@@ -1,543 +1,133 @@
-# Qubit Reflect 用户手册
+# 用户手册
 
-[中文 README](../README.zh_CN.md) · [English user guide](user_guide.md) · [API 文档](https://docs.rs/qubit-reflect)
+本手册面向使用 vNext API 的 Rust 应用和框架开发者。我们以客服控制台修改客户资料为例：加载客户、更新字段、调用受支持的操作，再由应用保存结果。可运行起点是 [`examples/field_patch.rs`](../examples/field_patch.rs)；README 展示了同一流程的短代码片段。
 
-本文适用于 `qubit-reflect` 0.2.0，要求 Rust 1.94 或更高版本，面向希望通过宏为自有类型添加反射能力的 Rust 应用与框架开发者。先了解宏如何生成描述符和运行时操作入口，再阅读字段示例；客服控制台是这一机制的应用案例。后续章节按需讲解构造、方法调用、注册表、能力和访问边界。
+## 在类型上启用反射
 
-## 目录
+添加默认启用 `derive` feature 的 `qubit-reflect`，然后标注需要参与反射的声明。`#[reflect(skip)]` 会把成员从反射元数据中移除，但不会改变 Rust 声明本身。
 
-- [它解决什么问题](#它解决什么问题)
-- [宏如何生成反射能力](#宏如何生成反射能力)
-- [从哪里开始](#从哪里开始)
-- [使用宏生成的字段反射](#使用宏生成的字段反射)
-- [接入客服控制台](#接入客服控制台)
-- [核对 PATCH 结果](#核对-patch-结果)
-  - [成功时能看到什么](#成功时能看到什么)
-- [用输入构造新对象](#用输入构造新对象)
-- [按名称调用业务方法](#按名称调用业务方法)
-- [发现类型与能力](#发现类型与能力)
-  - [怎样判断能力能否使用](#怎样判断能力能否使用)
-  - [构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)
-  - [泛型定义的三种能力查询状态](#泛型定义的三种能力查询状态)
-- [选择依赖功能与访问边界](#选择依赖功能与访问边界)
-  - [选择依赖功能](#选择依赖功能)
-  - [什么时候使用不透明边界](#什么时候使用不透明边界)
-  - [什么时候需要同步](#什么时候需要同步)
-- [错误、诊断与排障](#错误诊断与排障)
-- [边界与实践清单](#边界与实践清单)
-- [延伸阅读](#延伸阅读)
-
-## 它解决什么问题
-
-Rust 不提供通用的运行时机制来枚举应用结构体的字段、枚举分支、trait 或实现。框架若需要按名称发现成员或执行运行时选定的操作，通常得手写元数据和分发表，重复类型声明中已有的信息。这些副本容易随着类型修改而过时。
-
-`qubit-reflect` 从标注过的 Rust 声明生成结构描述和受支持操作的适配器。使用方通过不可变描述符和经过类型检查的动态值检查或操作类型。自定义类型和 trait 使用 `#[Reflect]`，实现块使用 `#[ReflectImpl]`；也可手动实现运行时 `Reflect` trait。注册表汇总已链接的类型与实现信息，不保存业务对象，也不在运行时加载插件。
-
-## 宏如何生成反射能力
-
-| 声明处 | 运行时得到什么 |
-| --- | --- |
-| 结构体、枚举或 trait 上的 `#[Reflect]` | 结构类型、字段、分支和 trait 元数据，以及受支持的适配器。 |
-| inherent 或 trait `impl` 上的 `#[ReflectImpl]` | 实现和方法元数据，以及受支持的方法调用适配器。 |
-| 字段、分支或方法上的 `#[reflect(skip)]` | 将该成员完全排除在反射约定之外。 |
-
-宏在编译期运行。`TypeDescriptor::of::<T>()` 返回具体类型的描述符。字段操作接受普通引用和值；方法调用使用 `Invocation` builder 和选定的 `ReflectRegistry`。运行时会检查精确 Rust 类型，并保留在操作开始前被拒绝的输入。
-
-`skip` 不会删除 Rust 成员，也不是保密机制。非公开成员可以被描述，但安全操作会返回可见性错误。文档明确标为 `_unsafe` 的操作只绕过可见性；调用方仍须满足类型和其他不变量。带 skip 字段的结构体或枚举分支仍可被描述，但不会生成动态构造适配器，因为宏不能替被隐藏的字段臆造有效初值，也不应增加隐式 trait 约束。
-
-泛型方法声明保留为定义。若需按名称动态调用，须在编译期已知的调用点使用 `bind_method!` 并提供显式函数签名绑定具体实例。运行时 `TypeId` 不能生成新的单态化代码；未绑定的泛型方法没有可调用适配器。
-
-动态构造与更新中的 `Box<dyn Any>` 按盒内具体类型检查。如果字段本身声明为 `Box<dyn Any>`，仍按该字段的精确类型处理。调用方自行加锁并负责同步；反射 API 没有独立的线程安全动态包装模式。
-
-手写 `Reflect` 实现必须为其类型报告相同的 Rust `TypeId`。`TypeRef::of::<T>()` 指向 `TypeDescriptor::of::<T>()`，但不做全局驻留。描述符初始化可能分配；`TypeDescriptor::field` 按名称扫描字段，热路径应按实际记录形状测量查找开销。
-
-## 从哪里开始
-
-1. 先看[宏如何生成反射能力](#宏如何生成反射能力)，再阅读[使用宏生成的字段反射](#使用宏生成的字段反射)，了解派生宏、描述符查询和受检字段访问如何衔接。
-2. 要开发按字段驱动的业务流程，再继续阅读通用修改逻辑和[核对 PATCH 结果](#核对-patch-结果)。
-3. 需要创建对象时读[用输入构造新对象](#用输入构造新对象)；需要操作按钮触发业务方法时读[按名称调用业务方法](#按名称调用业务方法)。
-4. 编写框架时，再查[发现类型与能力](#发现类型与能力)和[构建隔离的 registry snapshot](#构建隔离的-registry-snapshot)。
-
-## 使用宏生成的字段反射
-
-下面的代码只展示反射边界。`Customer` 仍是调用方持有的普通 Rust 值；`#[Reflect]` 为它生成描述符和受检字段入口。业务流程放在示例之后。
-
-<!-- reflect-source: examples/field_patch.rs -->
 ```rust
-use std::error::Error;
-use std::io;
-
-use qubit_reflect::Invocation;
-use qubit_reflect::InvocationOutput;
-use qubit_reflect::Reflect;
-use qubit_reflect::ReflectImpl;
-use qubit_reflect::ReflectRegistry;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::access::FieldAccessError;
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
+use qubit_reflect::{Reflect, ReflectImpl};
 
 #[Reflect]
 struct Customer {
-    pub id: u64,
     pub email: String,
     pub credit_limit_cents: u64,
-    secret: String,
     #[reflect(skip)]
     internal_note: String,
 }
 
 #[ReflectImpl]
 impl Customer {
-    /// Raises the credit limit, returning false when the requested limit is not
-    /// greater than the current one.
-    pub fn raise_credit_limit(&mut self, credit_limit_cents: u64) -> bool {
-        if credit_limit_cents <= self.credit_limit_cents {
+    pub fn raise_credit_limit(&mut self, amount: u64) -> bool {
+        if amount <= self.credit_limit_cents {
             return false;
         }
-        self.credit_limit_cents = credit_limit_cents;
+        self.credit_limit_cents = amount;
         true
     }
 }
+```
 
-/// Runs the example, returning reflection setup and operation failures to the
-/// caller.
-fn main() -> Result<(), Box<dyn Error>> {
-    let registry = ReflectRegistry::initialize()?;
-    let descriptor = TypeDescriptor::of::<Customer>();
-    let mut customer = Customer {
-        id: 1001,
-        email: String::from("ada@example.com"),
-        credit_limit_cents: 50_000,
-        secret: String::from("private"),
-        internal_note: String::from("not reflected"),
-    };
+宏在编译期生成源码元数据和操作适配器。反射采用显式启用：没有生成进元数据的成员无法通过描述符查到。`skip` 只决定元数据是否包含该成员，不承担访问控制职责。
 
-    let email_field = descriptor
-        .field("email")
-        .ok_or(io::Error::other("missing reflected email field"))?;
-    email_field.set(&mut customer, String::from("ada@corp.example"))?;
-    assert_eq!(customer.email, "ada@corp.example");
+## 读取、更新和调用
 
-    let current: &String = email_field.get(&customer)?;
-    assert_eq!(current, "ada@corp.example");
+`TypeDescriptor::of` 会把描述符绑定到进程级全局 `ReflectionContext`。操作需要聚合信息时，context 会惰性初始化。字段单数 accessor 要求找到唯一字段，否则返回结构化错误。typed 访问保留所有者和字段的 Rust 类型信息。
 
-    let secret_field = descriptor
-        .field("secret")
-        .ok_or(io::Error::other("missing reflected secret field"))?;
-    assert!(matches!(
-        secret_field.get::<_, String>(&customer),
-        Err(FieldAccessError::NotPublic { .. })
-    ));
-    // SAFETY: this example owns Customer and intentionally demonstrates the
-    // visibility bypass.
-    assert_eq!(unsafe { secret_field.get_unsafe::<_, String>(&customer) }?, "private");
-    // SAFETY: this example owns Customer and maintains the String field's type
-    // invariant.
-    unsafe { secret_field.set_unsafe(&mut customer, String::from("updated")) }?;
-    assert_eq!(customer.secret, "updated");
-    assert!(descriptor.field("internal_note").is_none());
-    assert_eq!(customer.internal_note, "not reflected");
+```rust
+use qubit_reflect::{Invocation, TypeDescriptor};
 
-    let MethodLookup::Unique(raise_credit_limit) = descriptor.methods_named_in(registry, "raise_credit_limit") else {
-        return Err(io::Error::other("expected exactly one method named raise_credit_limit").into());
-    };
-    {
-        let invocation = Invocation::receiver_mut(&mut customer).arg(75_000_u64);
-        let output = raise_credit_limit
-            .invoke(registry, invocation)
-            .map_err(|failure| io::Error::other(failure.to_string()))?;
-        let InvocationOutput::Owned(changed) = output else {
-            return Err(io::Error::other("raise_credit_limit did not return an owned value").into());
-        };
-        let changed = DynamicOwned::<Local>::downcast::<bool>(changed)
-            .map_err(|_| io::Error::other("raise_credit_limit did not return bool"))?;
-        assert!(changed);
+fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
+    let ty = TypeDescriptor::of::<Customer>();
+    let email = ty.field("email")?;
+    if let Err(failure) = email.set(customer, String::from("ada@corp.example")) {
+        let (error, _rejected_email) = failure.into_parts();
+        return Err(format!("邮箱更新失败：{error:?}").into());
     }
-    assert_eq!(customer.credit_limit_cents, 75_000);
+    assert_eq!(email.get::<_, String>(customer)?, "ada@corp.example");
+
+    let output = match ty
+        .method("raise_credit_limit")?
+        .invoke(Invocation::on_mut(customer).arg(75_000_u64))
+    {
+        Ok(output) => output,
+        Err(failure) => {
+            let (error, _recovery) = failure.into_parts();
+            return Err(format!("方法调用失败：{error:?}").into());
+        }
+    };
+    let raised = output.into_owned::<bool>()?;
+    assert!(raised);
     Ok(())
 }
 ```
 
+操作成功的信号是方法返回 `true`，且对象字段已更新。反射不会替应用保存对象。服务处理请求时，仍应由应用通过 repository 加载对象、执行反射操作和业务校验，并按自身事务策略决定是否持久化。
 
-在依赖中加入：
+## 处理缺失和歧义
+
+业务要求必须唯一找到成员时，使用严格单数 accessor：
+
+```rust
+let method = ty.method("raise_credit_limit")?;
+```
+
+字段可能不存在时，用集合的可选查询 `get`；同名方法可能有多个候选项时，用 `lookup_method` 获取完整状态：
+
+```rust
+let email = ty.fields().get("email");
+let matches = ty.lookup_method("reset")?;
+match matches {
+    qubit_reflect::Lookup::Missing => { /* 提示不支持该操作 */ }
+    qubit_reflect::Lookup::Unique(method) => { /* 使用该方法 */ }
+    qubit_reflect::Lookup::Ambiguous(methods) => { /* 要求调用方明确选择 */ }
+}
+```
+
+`method()` 会通过 `LookupError` 报告缺失或歧义；`lookup_method()` 返回完整的 `Lookup` 状态，并把 context 初始化错误保留在外层结果中。按名称发现类型时，`ReflectionContext::type_by_name` 要求唯一，`lookup_type_by_name` 返回完整状态。诊断用的 Rust 类型名和 `TypeId` 都不应作为持久化标识。
+
+## 恢复被拒绝的更新和调用
+
+typed 字段替换失败时返回 `FieldSetFailure<V>`。调用 `into_parts()` 可以同时取回诊断信息和原替换值，便于 handler 保留或报告输入。方法开始执行前，调用校验可能因为 receiver 或参数的类型、传递模式、参数绑定或方法可用性而失败。此时 `InvocationFailure` 会保留执行前被拒绝的输入。
+
+用户代码一旦开始执行，反射无法撤销它产生的副作用。如果方法先修改对象再返回业务错误，调用方应使用自身的事务或补偿策略。普通 `invoke()` 也不会捕获 panic；只有应用已经确定 panic 处理策略时，才选择显式的捕获入口。
+
+## 在框架边界使用动态值
+
+泛型应用代码仍知道 Rust 类型时，优先使用 typed 字段访问。框架收到类型擦除的对象或新值时，可使用 `DynamicOwned<Local>`、`DynamicRef<Local>` 或 `DynamicMut<Local>`。动态操作仍会在访问前检查目标和字段值的精确类型。downcast 失败会归还原值，字段替换失败也会保留替换输入。
+
+当值和适配器满足相应 `Send`、`Sync` 约束时，可以使用 `ThreadSafe` 模式。类型擦除后不能把 `Local` 值升级为 `ThreadSafe`。应在已知所有权和并发要求的边界选择模式。
+
+## 绑定泛型方法
+
+Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。
+
+```rust
+use qubit_reflect::{bind_method, ReflectionContext};
+
+let context = ReflectionContext::builder()
+    .include_linked()
+    .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
+    .build()?;
+```
+
+方法描述符仍表示源码声明。调用前使用 `MethodArguments` 选择具体特化。未绑定或不受支持的方法仍会以元数据和可用性原因呈现，不会被静默地绕过安全检查。
+
+## 依赖功能
+
+默认 feature 集包含 `derive`。仅需运行时 API 的 crate 可以关闭默认功能。`ecosystem-types` 和 `qubit-types` 为可选外部类型补充元数据；应用只需启用实际使用的集成。
 
 ```toml
 [dependencies]
-qubit-reflect = "0.2"
-```
-
-## 接入客服控制台
-
-可运行的 [`customer_patch` 示例](../examples/customer_patch.rs)展示了加载、修改和保存流程。API 层负责解析请求文本并鉴权；补丁层按字段名查找并调用 `field.set(&mut target, value)`。校验失败时，`FieldSetFailure<V>` 会保留原值供检查或重试。若前面的修改已写入内存对象，只有整个补丁成功后才应持久化。
-
-私有字段仍可被描述，但安全 getter/setter 会返回可见性错误。只有在调用方能满足文档中 `# Safety` 前提时，才使用 `_unsafe` 操作绕过可见性。skip 字段不会出现在查询中，因此不能用来实现访问控制。
-
-## 核对 PATCH 结果
-
-最小示例在修改邮箱后读回 `"ada@corp.example"`，并确认被 skip 的 `internal_note` 不在描述符中。程序不打印业务输出；断言全部通过且进程正常退出，就是这段练习的成功信号。
-
-### 成功时能看到什么
-
-`set` 会先核对目标类型、可见性和替换值的精确 `TypeId`，再调用生成的适配器。非公开字段或类型不匹配发生在执行前，`FieldSetFailure::into_parts()` 可返还尚未消费的新值。恢复对象还保留字段身份，却不保存目标对象的借用；失败调用结束后可以再次借用 `customer`。
-
-| 阶段 | 应用会看到什么 | 怎样处理 |
-| --- | --- | --- |
-| `field("email")` 找不到 | `None`；成员可能被 skip，或者名称与 Rust 声明不符。 | 检查声明以及是否标记了 `#[reflect(skip)]`；skip 成员不可查询。 |
-| 执行前校验拒绝 `set` | `FieldSetFailure::recovery()` 为 `Some`，替换值尚未被消费。 | 读取结构化错误，提示用户修正输入；需要时取回原值。 |
-| 适配器接收所有权后报错 | `recovery()` 为 `None`。 | 检查错误和业务状态，不能假定原值可直接重试。 |
-
-`get` 需要共享借用，`get_mut` 与 `set` 需要独占借用。反射不会把 `"9"` 解析为整数、把 `u64` 转为 `String`，也不会推导 `Into`。如果业务保存发生在字段替换之后，保存失败还需由应用决定如何回滚或重试；字段适配器不管理数据库事务。
-
-## 用输入构造新对象
-
-构造 builder 接收普通自有值。类型化构造返回具体 Rust 值；动态构造返回 `Box<dyn Any>`。校验会先检查形状、成员名称或索引、重复输入、可见性、缺失值和精确类型，再消费输入。
-
-```rust
-use qubit_reflect::{NamedConstructionInput, Reflect, TypeDescriptor};
-
-#[Reflect]
-struct Customer {
-    pub id: u64,
-    pub email: String,
-}
-
-fn main() {
-    let customer: Customer = TypeDescriptor::of::<Customer>()
-        .construct_struct(
-            NamedConstructionInput::new()
-                .field("id", 1001_u64)
-                .field("email", String::from("ada@example.com")),
-        )
-        .expect("公开字段都有对应输入");
-    assert_eq!(customer.email, "ada@example.com");
-}
-```
-
-结构体或枚举分支没有构造适配器时，named 与 tuple 构造会返回 `TargetUnavailable`，并按调用方顺序保留全部输入；调用 `into_any_parts()` 可取回这些值。带有 `#[reflect(skip)]` 的字段就是适配器不可用的一种情况：反射仍保留类型描述，但生成代码无法安全初始化被省略的 Rust 字段。构造适配器开始执行后，不承诺恢复已被消费的值或撤销任意副作用。结构体更新也接受基础值和普通替换值。动态 `Box<dyn Any>` 输入根据盒内类型检查；使用 `field_any`/`value_any` builder 方法显式传入动态盒。
-
-## 按名称调用业务方法
-
-用 `#[ReflectImpl]` 标注方法实现。注册表提供方法视图；`Invocation` builder 接收普通 receiver 借用、普通自有参数或借用参数。调用返回单层 `Result`；在执行前校验失败时，`InvocationFailure` 会保留接收者和未消费输入。
-
-<!-- reflect-source: examples/support_action.rs -->
-```rust
-use qubit_reflect::Invocation;
-use qubit_reflect::InvocationOutput;
-use qubit_reflect::Reflect;
-use qubit_reflect::ReflectImpl;
-use qubit_reflect::ReflectRegistry;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::MethodLookup;
-use qubit_reflect::value::DynamicOwned;
-use qubit_reflect::value::Local;
-
-#[Reflect]
-struct Customer {
-    pub id: u64,
-    pub suspended: bool,
-    pub suspension_reason: Option<String>,
-}
-
-#[ReflectImpl]
-impl Customer {
-    /// Suspends this customer with `reason`, returning false if already
-    /// suspended.
-    pub fn suspend(&mut self, reason: String) -> bool {
-        if self.suspended {
-            return false;
-        }
-        self.suspended = true;
-        self.suspension_reason = Some(reason);
-        true
-    }
-}
-
-/// Runs the example and panics if a business assertion or reflection operation
-/// fails.
-fn main() {
-    let registry = ReflectRegistry::initialize().expect("valid reflection declarations");
-
-    let MethodLookup::Unique(suspend) = TypeDescriptor::of::<Customer>().methods_named_in(registry, "suspend") else {
-        panic!("exactly one method named suspend")
-    };
-
-    let mut customer = Customer {
-        id: 1001,
-        suspended: false,
-        suspension_reason: None,
-    };
-    {
-        let invocation = Invocation::receiver_mut(&mut customer).arg(String::from("chargeback dispute"));
-        let output = suspend
-            .invoke(registry, invocation)
-            .expect("valid receiver and arguments");
-        let InvocationOutput::Owned(changed) = output else {
-            panic!("owned output")
-        };
-        assert!(DynamicOwned::<Local>::downcast::<bool>(changed).unwrap_or_else(|_| panic!("bool")));
-    }
-    assert!(customer.suspended);
-    assert_eq!(customer.suspension_reason.as_deref(), Some("chargeback dispute"));
-}
-```
-
-方法查找和调用要使用同一个注册表。安全调用会拒绝非公开方法。`unsafe` 调用入口仅绕过可见性，仍会检查接收者类型、参数类型、借用、Pin，以及适用的枚举分支；调用前应阅读其 `# Safety` 文档。自有值、借用值、Pin 和 Future 输出仍受 Rust 函数签名生命周期约束。
-
-若要动态调用泛型方法，须先为编译期已知的具体实例创建绑定。`bind_method!(方法路径 as fn(签名))` 在绑定点由 Rust 检查方法签名，并记录具体目标类型和泛型实参。未绑定的泛型定义仍可查询，但没有可调用适配器；不能根据运行时 `TypeId` 生成代码。
-
-绑定结果是普通值。调用 `build()` 前，先将它交给 snapshot builder，让注册表能把绑定与已链接的方法声明匹配起来：
-
-```rust,no_run
-use qubit_reflect::Reflect;
-use qubit_reflect::ReflectImpl;
-use qubit_reflect::bind_method;
-use qubit_reflect::identity::FragmentIdentity;
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-
-#[Reflect]
-struct GenericService<T>(T);
-
-#[ReflectImpl]
-impl<T> GenericService<T> {
-    fn read(&self) -> &T {
-        &self.0
-    }
-}
-
-fn main() {
-    let binding = bind_method!(GenericService::<u8>::read as fn(&GenericService<u8>) -> &u8);
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder.include_linked_fragments();
-    builder.add_method_binding(
-        binding,
-        FragmentIdentity::new("example", module_path!(), line!(), 1, "binding", 1),
-    );
-    let registry = builder.build().expect("binding matches the linked method");
-    let _registry = registry;
-}
-```
-
-方法查找可能返回无匹配、唯一或多个候选，应分别处理。普通方法 panic 按 Rust 的 panic 行为传播。异步调用返回 Future，由调用方选择执行器并轮询。
-
-## 发现类型与能力
-
-已知 `Customer` 时，直接调用 `TypeDescriptor::of::<Customer>()` 即可。框架若要列出已链接类型、按名称查找方法或获取某种扩展操作，就初始化 `ReflectRegistry`。调用 `initialize()` 后，注册片段通过一次校验汇总为不可变快照；冲突返回 `RegistryError`，不会留下部分结果。下面的独立程序确认 `Service` 已进入类型索引，并检查它没有声明 `qubit.reflect.clone` 能力：
-
-### 可选值
-
-可选类型描述符将结构信息与运行时访问能力分开。`element_type()` 描述 `T`；`has_ref_projection()` 表示描述符是否带有检查借用 `Option<T>` 的适配器。内置 `Option<T>` 描述符提供此适配器：
-
-```rust
-use qubit_reflect::{OptionalProjectionError, TypeDescriptor};
-
-fn main() -> Result<(), OptionalProjectionError> {
-let value = Some(12_u32);
-let optional = TypeDescriptor::of::<Option<u32>>()
-    .as_optional()
-    .expect("Option 描述符");
-let inner = optional.project_ref(&value)?;
-assert_eq!(inner, Some(&12));
-
-let absent: Option<u32> = None;
-assert!(optional.project_ref(&absent)?.is_none());
-assert!(matches!(
-    optional.project_ref(&Some(12_u8)),
-    Err(OptionalProjectionError::TypeMismatch(_)),
-));
-Ok(())
-}
-```
-
-由结构事实构造的描述符也能描述可选元素，但不持有具体 `Option<T>` 适配器。调用其 `project_ref` 会返回 `OptionalProjectionError::Unavailable`；当适配器可用性决定操作能否绑定时，应先检查 `has_ref_projection()`。投影接受普通共享引用；调用方负责多线程访问所需的同步。
-
-```rust
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::{Reflect, TypeDescriptor};
-
-#[Reflect]
-struct Service;
-
-fn main() {
-    let snapshot = ReflectRegistry::initialize().expect("所有注册片段均有效");
-    let descriptor = TypeDescriptor::of::<Service>();
-    let _methods = descriptor.methods_in(&snapshot);
-    assert!(snapshot.get(descriptor.type_id()).is_some());
-    let clone = snapshot.capability_by_id(descriptor, "qubit.reflect.clone")
-        .expect("能力声明有效");
-    assert!(clone.is_none());
-}
-```
-
-快照固定类型、名称、trait、实现、能力和有效方法索引；静态内置类型也在结果中。之后按需生成的复合类型描述符不会成为新的快照成员。`impls_global()`、`methods_global()` 和 `methods_named_global(name)` 会初始化并查询进程全局注册表；对应的 `impls_in(&snapshot)`、`methods_in(&snapshot)` 和 `methods_named_in(&snapshot, name)` 查询显式传入的快照。方法查找与调用必须使用同一注册表：全局查询应初始化一次并将该注册表用于调用，显式快照则在两处都传入同一快照。
-
-`snapshot.definitions()` 用于枚举泛型定义，即使没有任何具体实例注册；可按 `TypeDefinitionId`、Rust 路径或查询名定位。`TypeDefinitionDescriptor` 描述声明，具体实例保留解析后的类型实参。定义字段中的 `TypeExpression` 只表达类型关系，不提供值访问适配器；`TypeRef` 仅在生成代码能证明具体类型时解析，不会根据字符串猜测。
-
-### 怎样判断能力能否使用
-
-`#[reflect(capabilities(...))]` 中，裸写 `Clone`、`Default`、`Send`、`Sync` 选择内建能力；限定路径选择自定义 provider，即使末段与内建名称相同也不例外。`#[reflect(capabilities(my_crate::Clone))]` 会调用 `my_crate::Clone::<Self>()`。
-
-能力是在类型上登记的扩展事实或操作，例如类型安全的 `Clone`、`Default` 适配器。具体类型满足 Rust 约束并注册后，可用 `clone_key()`、`default_key()` 或自定义 `CapabilityKey<A>` 查询。**拥有能力事实**和**成为快照中的类型成员**是两回事；按文本 ID 查询描述符也不等于取得类型安全的适配器。
-
-| `capability_lookup` 状态 | 含义 | 应用操作 |
-| --- | --- | --- |
-| `Missing` | 没有匹配的能力事实。 | 走应用定义的替代路径。 |
-| `FactOnly` | 有事实，但没有执行适配器。 | 可读取元数据，不要尝试当作可调用操作。 |
-| `AdapterTypeMismatch` | ID 相同，适配器 Rust 类型与查询键不同。 | 检查能力注册与查询键的契约。 |
-| `Found` | 找到类型匹配的适配器。 | 按该能力契约调用。 |
-
-便捷的 `capability` 把 `Found` 映射为 `Ok(Some(&A))`、`Missing` 映射为 `Ok(None)`；`FactOnly` 和 `AdapterTypeMismatch` 是错误，不应被当作缺失。`capability_by_id` 可按文本 ID 读取描述符。要查事实来自哪里，用 `capability_origin` 或 `capability_source`，区分类型自身和注册片段。
-
-某些特殊 `self` 形式还需要所选注册表提供接收者类型、调用模式均匹配的 `ReceiverAdapter`。缺少它时，方法入口仍可能存在，调用返回 `Ok(Err(ReceiverAdapterUnavailable))` 并返还输入；静态上不支持的签名则没有入口。
-
-### 构建隔离的 registry snapshot
-
-测试或宿主应用若只想暴露选定类型，可用 `RegistrySnapshotBuilder` 从空集合构建快照。它不读取全局链接目录；添加事实时不执行能力提供器，`build()` 通过校验后才交付不可变的 `ReflectRegistry`。下面的独立程序把 `u32` 加入类型成员，同时只给 `u64` 登记能力：
-
-```rust
-use qubit_reflect::capability::{CapabilityDescriptor, CapabilityKey};
-use qubit_reflect::identity::{CapabilityId, FragmentIdentity};
-use qubit_reflect::registry::RegistrySnapshotBuilder;
-use qubit_reflect::TypeDescriptor;
-use std::any::TypeId;
-
-fn source(kind: &str, line: u32) -> FragmentIdentity {
-    FragmentIdentity::new("example", "fixture", line, 1, kind, u64::from(line))
-}
-
-fn main() -> Result<(), qubit_reflect::RegistryError> {
-    let target = TypeDescriptor::of::<u32>();
-    let key = CapabilityKey::<u32>::new(
-        CapabilityId::new("example.limit").expect("能力 ID 有效"),
-    );
-    let mut builder = RegistrySnapshotBuilder::new();
-    builder.add_type_with_capabilities(
-        target,
-        vec![CapabilityDescriptor::with_adapter(key, 7_u32)],
-        source("type", 10),
-        source("capability", 11),
-    );
-    builder.add_type_capabilities(
-        TypeDescriptor::of::<u64>(),
-        vec![CapabilityDescriptor::with_adapter(key, 8_u32)],
-        source("capability", 12),
-    );
-    let snapshot = builder.build()?;
-
-    assert_eq!(snapshot.capability(target, key).expect("能力有效"), Some(&7));
-    assert_eq!(snapshot.types().len(), 1);
-    assert_eq!(
-        snapshot.capability_only_type_targets("example.limit")[0].0,
-        TypeId::of::<u64>(),
-    );
-    Ok(())
-}
-```
-
-`u32` 可从 `types()` 中找到；`u64` 虽可查询 `example.limit`，却不是类型成员。`add_type_with_capabilities` 同时添加成员和能力，`add_type_capabilities` 只添加能力。空构建器的 `types()` 为空；仅添加能力也不会让目标出现在 `types()` 中。`capability_only_type_targets(id)` 按稳定能力 ID 枚举这些目标，即使适配器类型不一致也会返回，并按来源片段排序；审计模型元数据时可查 `"qubit.model.metadata.v1"`。
-
-需要能力查询同时要求快照成员资格时，使用 `member_capabilities(type_id)`：上例中的 `u32` 返回 `Some(...)`，仅登记能力的 `u64` 返回 `None`。没有有效能力事实的成员会返回 `Some(empty)`。该入口仅读取快照中已冻结的能力集，不会执行 provider；原有 `capabilities(descriptor)` 和 `capability(...)` 仍可查询 capability-only 目标。
-
-反射本身不要求执行此审计，但模型投影有更严格的约束：若模型元数据能力指向的类型不是 snapshot 成员，`ModelRegistry::from_reflect_registry` 会返回 `UnregisteredModelTarget`。启用泛型模型元数据时，定义目标也遵循相同规则。应检查对应的 `capability_only_*_targets` 结果及其来源片段，再将预期的模型类型或定义加入 snapshot，或从该视图中移除相应元数据注册。能力可查询并不代表它已成为模型成员。
-
-其他入口包括 `add_type`、`add_definition`、`add_trait`、`add_impl_definition`、`add_impl`、`add_definition_capabilities`。模型层的 `ModelRegistry::from_reflect_registry` 只投影快照的类型成员；若只想纳入 `MyModel`，在直接依赖 `qubit-reflect` 和 `qubit-model-metadata` 的 crate 中按以下集成步骤构建快照：
-
-```text
-let mut builder = RegistrySnapshotBuilder::new();
-builder.add_type(
-    TypeDescriptor::of::<MyModel>(),
-    FragmentIdentity::new("example", "models", 1, 1, "type", 1),
-);
-let snapshot = builder.build()?;
-let models = qubit_model_metadata::registry::ModelRegistry::from_reflect_registry(&snapshot)?;
-```
-
-这段是集成片段，`MyModel` 和错误返回上下文由应用提供；显式快照不会自动包含其他已链接注册。`build()` 会一起校验标识、引用关系和能力冲突。为片段设置稳定的 `FragmentIdentity`；失败时查看 `RegistryError::conflicting_fragments()`、`capability_details()`、`capability_target()`、`capability_id()`，类型自身的冲突还可从 `intrinsic_conflict()` 与 `Error::source()` 追踪。
-
-### 泛型定义的三种能力查询状态
-
-`definition_capabilities(id)` 查询泛型定义的能力事实，不能单靠它判断定义是否已成为快照成员：
-
-| 返回值 | 说明 | 应用下一步 |
-| --- | --- | --- |
-| `None` | 既没有该定义成员，也没有相关能力事实。 | 核对定义 ID 和注册来源。 |
-| `Some(empty)` | 定义是成员，但没有能力事实。 | 如需扩展操作，添加定义级能力。 |
-| `Some(nonempty)` | 有能力事实，定义可能是成员，也可能只是能力目标。 | 用 `definition(id).is_some()` 判断成员资格。 |
-
-例如只调用 `add_definition_capabilities` 而不调用 `add_definition`，就可能得到 `Some(nonempty)`，但 `definition(id)` 仍为 `None`。类型化的 `definition_capability` 与文本 ID 查询 `definition_capability_by_id` 也能从能力专用目标返回匹配的适配器或描述符；目标没有对应事实或能力时才返回 `None`。需要判断快照成员资格时，另行查询 `definition(id)`。存在能力事实但没有可执行适配器时，类型化查询返回 `CapabilityAccessError::FactOnly`；适配器类型与类型键不匹配时返回 `AdapterTypeMismatch`。
-
-`member_definition_capabilities(id)` 将定义成员资格与能力集查询合并：仅作为能力目标的定义返回 `None`，无能力的定义成员返回 `Some(empty)`，有能力的定义成员返回其能力集。该入口只读取快照中冻结的数据，不会执行 provider。
-
-## 选择依赖功能与访问边界
-
-### 选择依赖功能
-
-| Feature | 适用情形 |
-| --- | --- |
-| `derive`（默认） | 需要 `Reflect`、`ReflectImpl`、`bind_method!` 宏。 |
-| `ecosystem-types` | 需要 `BigDecimal`、`DateTime<Utc>`、`NaiveDate`、`NaiveTime`、`Uuid` 的反射实现。 |
-| `qubit-types` | 需要 `qubit_id::Id`、`qubit_datatype::DataType` 的反射实现；同时禁用 `qubit-id` 默认的生成器 feature。 |
-
-以下是互相替代的依赖配置。只把符合需求的一项放进 `[dependencies]`；`path` 仍相对于你的 `Cargo.toml`：
-
-```toml
-# 只使用运行时描述符、动态值和手写注册 API。
 qubit-reflect = { version = "0.2", default-features = false }
+qubit-reflect-derive = "0.2"
 ```
 
-```toml
-# 使用宏，并为 BigDecimal、chrono、UUID 类型提供反射实现。
-qubit-reflect = { version = "0.2", features = ["ecosystem-types"] }
-```
-
-```toml
-# 使用宏，并为 Qubit DataType、Id 类型提供反射实现。
-qubit-reflect = { version = "0.2", features = ["qubit-types"] }
-```
-
-两个外部类型 feature 相互独立，均不在默认配置中。生成这些外部类型描述符的 crate，须在自己直接声明的 `qubit-reflect` 依赖上开启对应 feature。`qubit-types` 只为 `qubit_id::Id` 提供反射。如果应用还使用 ID 生成器，请直接依赖 `qubit-id` 并启用所需 feature，不要依赖本 crate 间接启用的 feature。
-
-### 什么时候使用不透明边界
-
-普通字段可通过已解析的 `TypeRef` 继续导航内部类型，要求字段类型实现 `Reflect`。如果下游只需整体读取、替换、传参或用外层对象构造，而不应遍历内部结构，可把字段标为 `#[reflect(opaque)]`；仍会核对精确 `TypeId`。将整个类型标为不透明时，只暴露根描述符与显式登记的能力，不公开字段、分支或成员级构造入口。
-
-业务模型的校验、持久化、编解码、关系和脱敏规则由下游负责。下游可用自定义能力与提供器将这些元数据关联到 `FieldDescriptor`，而 `qubit-reflect` 不解释领域含义；模型 crate 保持单向依赖它。
-
-### 什么时候需要同步
-
-反射 API 不提供单独的跨线程动态值模式。若多线程共享反射对象，由调用方持有 mutex 等锁，并在持锁期间调用 `get`、`set` 或 `invoke`。值在线程间移动或共享仍受 Rust 的 `Send` 与 `Sync` 静态约束。
-
-## 错误、诊断与排障
-
-按结构化错误分类处理，不要解析 `Display` 文本。字段读取返回 `FieldAccessError`；字段替换的 `FieldSetFailure` 要先检查恢复对象；构造失败会携带 `ConstructionRecovery`；用户代码执行前的调用失败会携带 `InvocationRecovery`。构造和调用的恢复对象保留调用方输入顺序。当前未激活的枚举分支字段也会返回结构化访问错误。
-
-| 现象 | 检查顺序 |
-| --- | --- |
-| Cargo 无法解析 `qubit-datatype` 或 `qubit-id` | 检查 registry 网络访问，并运行 `cargo metadata --locked --format-version 1` 查看锁定的依赖图；不需要检出相邻仓库。 |
-| `field("...")` 返回 `None` | 检查 Rust 字段名以及该字段是否标记为 `#[reflect(skip)]`；skip 成员完全不进入反射。 |
-| 字段读取或替换失败 | 检查目标类型、公开可见性及值的精确类型；从 `FieldSetFailure` 取回原始替换值。 |
-| 构造返回 `TargetUnavailable` | 检查该类型或分支是否有构造适配器；named 与 tuple 输入仍保存在 `ConstructionRecovery` 中，可用 `into_any_parts()` 取回。 |
-| 构造校验失败 | 检查形状、重复或缺失的字段、名称或位置，以及每个值的类型；从 `ConstructionRecovery` 取回输入。 |
-| 方法可见但无法调用 | 检查是否有受支持的适配器；泛型方法还须有编译期 `bind_method!` 具体实例绑定。查看调用失败中的恢复输入。 |
-| 注册表初始化或快照构建失败 | 查看 `RegistryError` 的冲突来源；全局初始化错误在当前进程缓存，修复声明后启动新进程。 |
-| 外部类型没有 `Reflect` 实现 | 在使用该反射边界的 crate 上启用 `ecosystem-types` 或 `qubit-types`。 |
-| 跨线程操作不适用 | 在调用方使用同步机制，并满足值跨线程所需的 Rust `Send`/`Sync` 约束。 |
-| 派生宏找不到运行时 | 在当前 crate 直接声明 `qubit-reflect` 依赖，并启用默认的 `derive` feature。 |
-
-不要假设反射会捕获方法 panic；调用遵循方法本身的 Rust panic 行为。异步调用返回 Future，不替应用选择执行器。恢复输入不代表业务操作一定可以重试；应用还要判断用户代码或外围持久化步骤是否产生了副作用。
-
-## 边界与实践清单
-
-- 将反射属性写在拥有该契约的类型或成员声明处。生成代码可能访问私有字段，反射策略不能替代应用鉴权；`skip` 也不是访问控制。
-- `TypeId`、描述符地址、查询名和 trait 标记只适合作为进程内身份，不能作为序列化或跨进程模型 ID。
-- `unsafe` 方法、不支持的 ABI、可变参数、不透明的 `impl Trait` 输出、未绑定具体实例的泛型方法以及不能安全擦除的动态大小类型，可以保留结构信息，但不保证有动态调用入口。
-- 元组和可移植函数指针分别支持 0 到 32 个元素或参数；超过范围没有 `Reflect` 实现。携带数据的枚举不提供整数判别值映射。
-- 描述符和按具体类型缓存的能力会在进程中长期保留；初始化与首次解析可能分配内存。性能敏感路径应按应用负载测量。
-- 测试应覆盖字段读取与替换、未知字段、用 `FieldSetFailure` 恢复执行前的类型不匹配、用 `InvocationRecovery` 恢复方法进入用户代码前的失败，以及 `RegistryError` 报告的注册冲突。
+直接使用 derive crate 时，要让它和匹配版本的 runtime 配套。大多数应用直接使用默认启用 `derive` 的 `qubit-reflect` 即可。
 
 ## 延伸阅读
 
-- [架构说明](architecture.zh_CN.md) · [English architecture](architecture.md)
-- [README](../README.zh_CN.md) · [API 文档](https://docs.rs/qubit-reflect)
-- [English user guide](user_guide.md) · [English README](../README.md)
+- [架构说明](architecture.zh_CN.md)介绍 context 构建和生成元数据的边界。
+- [API 文档](https://docs.rs/qubit-reflect)列出公开类型和方法。
+- [English user guide](user_guide.md)按相同的客服工作流说明操作步骤。
