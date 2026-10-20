@@ -36,5 +36,11 @@ impl<T: Element, const N: usize> Buffer<T, N> {
 }
 
 fn main() {
-    assert_eq!(TypeDescriptor::of::<Buffer<Bytes, 4>>().name(), "Buffer");
+    assert_eq!(
+        TypeDescriptor::of::<Buffer<Bytes, 4>>()
+            .definition()
+            .expect("Buffer retains its source declaration")
+            .name(),
+        "Buffer"
+    );
 }

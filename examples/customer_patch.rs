@@ -1,7 +1,16 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use qubit_reflect::{Reflect, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::TypeDescriptor;
 
 #[derive(Clone)]
 #[Reflect]
@@ -35,10 +44,7 @@ impl CustomerRepository {
     }
 }
 
-fn apply_email_patch(
-    customer: &mut Customer,
-    email: String,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn apply_email_patch(customer: &mut Customer, email: String) -> Result<(), Box<dyn std::error::Error>> {
     let field = TypeDescriptor::of::<Customer>().field("email")?;
     if let Err(failure) = field.set(customer, email) {
         let (error, _rejected_email) = failure.into_parts();

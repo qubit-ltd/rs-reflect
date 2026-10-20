@@ -17,7 +17,7 @@ trait DefaultStr {
     }
 }
 
-#[qubit_reflect::ReflectImpl]
+#[qubit_reflect::ReflectImpl(reflected_trait = DefaultStr)]
 impl DefaultStr for DefaultStrSample {}
 
 fn main() {}

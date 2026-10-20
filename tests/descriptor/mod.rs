@@ -12,9 +12,13 @@
 mod associated_item_impl_tests;
 mod builtin_tests;
 #[cfg(feature = "derive")]
+mod capability_conflict_tests;
+#[cfg(feature = "derive")]
 mod capability_tests;
 #[cfg(feature = "derive")]
 mod conditional_compilation_tests;
+#[cfg(feature = "derive")]
+mod coverage_boundary_tests;
 #[cfg(feature = "derive")]
 mod default_trait_invocation_tests;
 #[cfg(feature = "derive")]
@@ -28,6 +32,8 @@ mod optional_projection_tests;
 mod reflect_impl_tests;
 #[cfg(feature = "derive")]
 mod reflect_trait_tests;
+#[cfg(feature = "derive")]
+mod supertrait_binding_tests;
 mod trait_tests;
 #[cfg(feature = "derive")]
 mod type_descriptor_tests;

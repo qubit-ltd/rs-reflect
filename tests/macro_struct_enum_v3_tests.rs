@@ -9,8 +9,11 @@
 #![cfg(feature = "derive")]
 
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::construct::NamedConstructionInput;
-use qubit_reflect::construct::TupleConstructionInput;
+use qubit_reflect::construct::ConstructionAvailability;
+use qubit_reflect::construct::NamedFields;
+use qubit_reflect::construct::PositionalFields;
+use qubit_reflect::construct::UnitFields;
+use qubit_reflect::value::Local;
 
 pub struct NotReflect;
 
@@ -76,16 +79,19 @@ enum SkippedTuplePayload {
 fn structs_exclude_skipped_fields_without_reflect_or_default_bounds() {
     let descriptor = TypeDescriptor::of::<GenericRecord<u32>>();
     assert_eq!(descriptor.fields().len(), 1);
-    assert!(descriptor.field("value").is_some());
-    assert!(descriptor.field("hidden").is_none());
-    assert!(descriptor.struct_construction().is_none());
+    assert!(descriptor.field("value").is_ok());
+    assert!(descriptor.field("hidden").is_err());
+    assert!(matches!(
+        descriptor.construction().availability(),
+        ConstructionAvailability::Unavailable { .. }
+    ));
 }
 
 #[test]
 fn named_tuple_and_unit_structs_construct_from_ordinary_values() {
     let named = TypeDescriptor::of::<Named>()
-        .construct_struct::<Named>(
-            NamedConstructionInput::new()
+        .construct::<Named, _>(
+            NamedFields::<Local>::new()
                 .field("id", 7_u64)
                 .field("label", String::from("Ada")),
         )
@@ -94,13 +100,13 @@ fn named_tuple_and_unit_structs_construct_from_ordinary_values() {
     assert_eq!(named.label, "Ada");
 
     let pair = TypeDescriptor::of::<Pair>()
-        .construct_tuple::<Pair>(TupleConstructionInput::new().value(9_u8).value(String::from("nine")))
+        .construct::<Pair, _>(PositionalFields::<Local>::new().value(9_u8).value(String::from("nine")))
         .expect("tuple fields construct");
     assert_eq!(pair.0, 9);
     assert_eq!(pair.1, "nine");
 
     let unit = TypeDescriptor::of::<Unit>()
-        .construct_unit::<Unit>()
+        .construct::<Unit, _>(UnitFields)
         .expect("unit struct constructs");
     let _ = unit;
 }
@@ -109,31 +115,33 @@ fn named_tuple_and_unit_structs_construct_from_ordinary_values() {
 fn enum_variants_are_queryable_active_and_constructible() {
     let descriptor = TypeDescriptor::of::<Event>();
     assert_eq!(descriptor.variants().len(), 3);
-    assert!(descriptor.variant("Absent").is_none());
-    assert!(descriptor.variant("Hidden").is_none());
+    assert!(descriptor.variant("Absent").is_err());
+    assert!(descriptor.variant("Hidden").is_err());
 
-    let named = descriptor
-        .variant("Named")
-        .expect("named variant exists")
-        .construct_struct::<Event>(NamedConstructionInput::new().field("pub_value", String::from("ok")))
-        .expect("named variant constructs");
+    let named_variant = descriptor.variant("Named").expect("named variant exists");
+    assert_eq!(
+        named_variant.construction().availability(),
+        ConstructionAvailability::Available
+    );
+    let named: Event = named_variant
+        .construct(NamedFields::<Local>::new().field("pub_value", String::from("ok")))
+        .expect("public named variant construction");
     assert!(descriptor.variant("Named").unwrap().is_active(&named).unwrap());
 
-    let tuple = descriptor
-        .variant("Tuple")
-        .expect("tuple variant exists")
-        .construct_tuple::<Event>(
-            TupleConstructionInput::new()
+    let tuple_variant = descriptor.variant("Tuple").expect("tuple variant exists");
+    let tuple: Event = tuple_variant
+        .construct(
+            PositionalFields::<Local>::new()
                 .value(16_u16)
                 .value(String::from("sixteen")),
         )
-        .expect("tuple variant constructs");
+        .expect("public tuple variant construction");
     assert!(descriptor.variant("Tuple").unwrap().is_active(&tuple).unwrap());
 
     let empty = descriptor
         .variant("Empty")
         .expect("unit variant exists")
-        .construct_unit::<Event>()
+        .construct::<Event, _>(UnitFields)
         .expect("unit variant constructs");
     assert!(descriptor.variant("Empty").unwrap().is_active(&empty).unwrap());
 }
@@ -142,9 +150,9 @@ fn enum_variants_are_queryable_active_and_constructible() {
 fn cfg_and_cfg_attr_fields_follow_the_compiled_rust_shape() {
     let descriptor = TypeDescriptor::of::<ConditionalFields>();
     assert_eq!(descriptor.fields().len(), 1);
-    assert!(descriptor.field("retained").is_some());
-    assert!(descriptor.field("absent_by_cfg").is_none());
-    assert!(descriptor.field("absent_by_cfg_attr").is_none());
+    assert!(descriptor.field("retained").is_ok());
+    assert!(descriptor.field("absent_by_cfg").is_err());
+    assert!(descriptor.field("absent_by_cfg_attr").is_err());
 }
 
 #[test]
@@ -153,15 +161,20 @@ fn skipped_variant_payload_field_keeps_type_reflection_but_disables_construction
         .variant("Visible")
         .expect("variant remains reflected");
     assert_eq!(variant.fields().len(), 1);
-    assert!(variant.field("internal").is_none());
-    assert!(variant.construction().is_none());
+    assert!(variant.field("internal").is_err());
+    assert!(matches!(
+        variant.construction().availability(),
+        ConstructionAvailability::Unavailable { .. }
+    ));
 
     let tuple = TypeDescriptor::of::<SkippedTuplePayload>()
         .variant("Values")
         .expect("tuple variant remains reflected");
     assert_eq!(tuple.fields().len(), 2);
-    assert_eq!(tuple.fields()[0].index(), 0);
-    assert_eq!(tuple.fields()[1].index(), 2);
-    assert!(tuple.field_at(1).is_none());
-    assert!(tuple.construction().is_none());
+    assert_eq!(tuple.fields().get_at(0).unwrap().index(), 0);
+    assert_eq!(tuple.fields().get_at(1).unwrap().index(), 2);
+    assert!(matches!(
+        tuple.construction().availability(),
+        ConstructionAvailability::Unavailable { .. }
+    ));
 }

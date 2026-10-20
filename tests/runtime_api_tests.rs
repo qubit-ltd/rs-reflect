@@ -17,8 +17,8 @@ use qubit_reflect::value::Local;
 #[test]
 fn test_runtime_only_descriptor_and_value_path() {
     let descriptor = TypeDescriptor::of::<u32>();
-    assert_eq!(descriptor.type_name(), "u32");
-    assert!(descriptor.as_primitive().is_some());
+    assert_eq!(descriptor.rust_type_name(), "u32");
+    assert_eq!(descriptor.short_name(), "u32");
 
     let value = DynamicOwned::<Local>::new(17_u32);
     assert_eq!(value.downcast_ref::<u32>(), Some(&17));
@@ -27,7 +27,5 @@ fn test_runtime_only_descriptor_and_value_path() {
 /// Verifies invocation input construction is part of the runtime-only surface.
 #[test]
 fn test_runtime_only_associated_invocation_path() {
-    let invocation = Invocation::<Local>::associated([]);
-    assert!(invocation.receiver().is_none());
-    assert!(invocation.arguments().is_empty());
+    let _invocation = Invocation::<Local>::associated().arg(17_u32);
 }

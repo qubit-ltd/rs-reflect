@@ -1,0 +1,8 @@
+error[E0191]: the value of the associated type `Item` in `Parent` must be specified
+  --> tests/ui/fail/trait_object_missing_associated_type_tests.rs:13:43
+   |
+10 |     type Item;
+   |     --------- `Item` defined here
+...
+13 | qubit_reflect::register_trait_object!(dyn Parent);
+   |                                           ^^^^^^ help: specify the associated type: `Parent::<Item = Type>`

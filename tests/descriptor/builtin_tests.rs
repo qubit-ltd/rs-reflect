@@ -3,14 +3,18 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for built-in vNext type shapes.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::hash::{BuildHasherDefault, DefaultHasher};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::hash::BuildHasherDefault;
+use std::hash::DefaultHasher;
 use std::sync::Arc;
 
 use qubit_reflect::TypeDescriptor;
@@ -19,26 +23,11 @@ use qubit_reflect::descriptor::TypeKind;
 /// Verifies built-in scalar and text types retain their structural families.
 #[test]
 fn test_builtin_scalar_and_text_type_kinds() {
-    assert!(matches!(
-        TypeDescriptor::of::<bool>().kind(),
-        TypeKind::Primitive(_)
-    ));
-    assert!(matches!(
-        TypeDescriptor::of::<char>().kind(),
-        TypeKind::Primitive(_)
-    ));
-    assert!(matches!(
-        TypeDescriptor::of::<u64>().kind(),
-        TypeKind::Primitive(_)
-    ));
-    assert!(matches!(
-        TypeDescriptor::of::<String>().kind(),
-        TypeKind::Text(_)
-    ));
-    assert!(matches!(
-        TypeDescriptor::of::<str>().kind(),
-        TypeKind::Text(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<bool>().kind(), TypeKind::Primitive(_)));
+    assert!(matches!(TypeDescriptor::of::<char>().kind(), TypeKind::Primitive(_)));
+    assert!(matches!(TypeDescriptor::of::<u64>().kind(), TypeKind::Primitive(_)));
+    assert!(matches!(TypeDescriptor::of::<String>().kind(), TypeKind::Text(_)));
+    assert!(matches!(TypeDescriptor::of::<str>().kind(), TypeKind::Text(_)));
 }
 
 /// Verifies built-in collections preserve their source-level shape families.
@@ -52,41 +41,26 @@ fn test_builtin_container_type_kinds() {
         TypeDescriptor::of::<Vec<String>>().kind(),
         TypeKind::Sequence(_)
     ));
-    assert!(matches!(
-        TypeDescriptor::of::<HashSet<u16>>().kind(),
-        TypeKind::Set(_)
-    ));
-    assert!(matches!(
-        TypeDescriptor::of::<BTreeSet<u16>>().kind(),
-        TypeKind::Set(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<HashSet<u16>>().kind(), TypeKind::Set(_)));
+    assert!(matches!(TypeDescriptor::of::<BTreeSet<u16>>().kind(), TypeKind::Set(_)));
     assert!(matches!(
         TypeDescriptor::of::<BTreeMap<u8, String>>().kind(),
         TypeKind::Map(_)
     ));
 
     type CustomHashMap = HashMap<u8, String, BuildHasherDefault<DefaultHasher>>;
-    assert!(matches!(
-        TypeDescriptor::of::<CustomHashMap>().kind(),
-        TypeKind::Map(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<CustomHashMap>().kind(), TypeKind::Map(_)));
 }
 
 /// Verifies built-in composite and pointer types retain their shape families.
 #[test]
 fn test_builtin_composite_and_pointer_type_kinds() {
-    assert!(matches!(
-        TypeDescriptor::of::<()>().kind(),
-        TypeKind::Tuple(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<()>().kind(), TypeKind::Tuple(_)));
     assert!(matches!(
         TypeDescriptor::of::<(u8, String)>().kind(),
         TypeKind::Tuple(_)
     ));
-    assert!(matches!(
-        TypeDescriptor::of::<[u8; 3]>().kind(),
-        TypeKind::Array(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<[u8; 3]>().kind(), TypeKind::Array(_)));
     assert!(matches!(
         TypeDescriptor::of::<Arc<u32>>().kind(),
         TypeKind::SmartPointer(_)
@@ -99,10 +73,7 @@ fn test_builtin_composite_and_pointer_type_kinds() {
         TypeDescriptor::of::<*const u32>().kind(),
         TypeKind::RawPointer(_)
     ));
-    assert!(matches!(
-        TypeDescriptor::of::<[u32]>().kind(),
-        TypeKind::Slice(_)
-    ));
+    assert!(matches!(TypeDescriptor::of::<[u32]>().kind(), TypeKind::Slice(_)));
     assert!(matches!(
         TypeDescriptor::of::<fn(u8) -> String>().kind(),
         TypeKind::Function(_)

@@ -55,12 +55,13 @@ fn observations(context: &ReflectionContext) -> [bool; 4] {
 ///
 /// # Parameters
 ///
-/// - `unbounded`: Arbitrary input bytes, limited internally to 4 KiB and 32 type registrations.
+/// - `unbounded`: Arbitrary input bytes, limited internally to 4 KiB and 32
+///   type registrations.
 ///
 /// # Panics
 ///
-/// Panics if context validity or indexed types depend on registration order, or if one explicit
-/// context changes another context's frozen type set.
+/// Panics if context validity or indexed types depend on registration order, or
+/// if one explicit context changes another context's frozen type set.
 pub fn check(unbounded: &[u8]) {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
     let first = build(data.iter());

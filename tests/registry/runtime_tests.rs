@@ -10,9 +10,11 @@
 
 #![cfg(feature = "derive")]
 
-use std::any::{TypeId, type_name};
+use std::any::TypeId;
+use std::any::type_name;
 
-use qubit_reflect::{Reflect, ReflectionContext};
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
 
 mod duplicate_a {
     use qubit_reflect::Reflect;
@@ -47,11 +49,7 @@ fn explicit_context_indexes_only_included_types() {
             .type_id(),
         TypeId::of::<ExplicitOnly>()
     );
-    assert!(
-        context
-            .type_by_name(type_name::<duplicate_a::Shared>())
-            .is_err()
-    );
+    assert!(context.type_by_name(type_name::<duplicate_a::Shared>()).is_err());
     assert_eq!(context.types().expect("context remains readable").len(), 1);
 }
 
@@ -66,10 +64,7 @@ fn descriptor_created_in_context_keeps_that_context() {
     assert_eq!(descriptor.context().id(), context.id());
     assert_eq!(descriptor.type_id(), TypeId::of::<ExplicitOnly>());
     assert_eq!(
-        descriptor
-            .field("value")
-            .expect("field metadata is present")
-            .name(),
+        descriptor.field("value").expect("field metadata is present").name(),
         "value"
     );
 }

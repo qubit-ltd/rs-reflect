@@ -6,7 +6,9 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::{ReflectionContext, reflect_external_trait, register_trait_object};
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::reflect_external_trait;
+use qubit_reflect::register_trait_object;
 
 reflect_external_trait! {
     pub ExternalDebug = std::fmt::Debug;

@@ -1,13 +1,25 @@
-use std::any::TypeId;
-use std::hash::{Hash, Hasher};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
-use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
+use std::any::TypeId;
+use std::hash::Hash;
+use std::hash::Hasher;
+
+use crate::runtime::descriptor::generic::GenericArgumentMetadata;
+use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
 use crate::runtime::descriptor::method::MethodMetadata;
-use crate::runtime::expression::{ExpressionData, PredicateData, TraitExpressionData};
+use crate::runtime::expression::ExpressionData;
+use crate::runtime::expression::PredicateData;
+use crate::runtime::expression::TraitExpressionData;
 
 /// Process-local identity of a reflected trait declaration.
 #[derive(Clone, Copy)]
-pub(crate) struct TraitDefinitionId(fn() -> TypeId);
+pub struct TraitDefinitionId(fn() -> TypeId);
 
 impl TraitDefinitionId {
     /// Creates an identity from a generated marker type.
@@ -43,23 +55,31 @@ impl Hash for TraitDefinitionId {
 /// Whether complete source metadata is known for a trait.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TraitCompleteness {
+    /// The trait declaration and its reflected items are fully described.
     Complete,
+    /// Only an external trait path or incomplete declaration facts are known.
     ExternalIncomplete,
 }
 
 /// Completeness of a resolved trait's transitive supertrait closure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SupertraitCompleteness {
+    /// All reachable supertrait applications are retained.
     Complete,
+    /// Some supertrait applications could not be resolved or retained.
     Incomplete,
 }
 
 /// Visibility retained from a Rust declaration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Visibility {
+    /// The item is public.
     Public,
+    /// The item is restricted to the named module path.
     Restricted(&'static str),
+    /// The source visibility could not be resolved precisely.
     RestrictedUnknown,
+    /// The item is private to its defining module.
     Private,
 }
 
@@ -121,7 +141,31 @@ impl TraitApplicationMetadata {
         }
     }
 
-    /// Creates an application whose trait definition is resolved by source path in its context.
+    /// Creates a linked application while retaining the path written at its
+    /// source.
+    pub const fn linked(
+        definition: &'static TraitDefinitionMetadata,
+        expression: &'static TraitExpressionData,
+        arguments: &'static [GenericArgumentMetadata],
+        identity: &'static [TraitArgumentIdentity],
+        direct_supertraits: &'static [&'static TraitApplicationMetadata],
+        all_supertraits: &'static [&'static TraitApplicationMetadata],
+        supertrait_completeness: SupertraitCompleteness,
+    ) -> Self {
+        Self {
+            definition: Some(definition),
+            expression: Some(expression),
+            arguments,
+            identity,
+            direct_supertraits,
+            all_supertraits,
+            supertrait_completeness,
+        }
+    }
+
+    /// Creates an application that retains source syntax without associating a
+    /// trait definition. A matching path in a context does not establish trait
+    /// identity; use [`Self::linked`] when the definition is known.
     pub const fn unresolved(
         expression: &'static TraitExpressionData,
         arguments: &'static [GenericArgumentMetadata],
@@ -142,9 +186,13 @@ impl TraitApplicationMetadata {
 /// Const-safe key used to distinguish compiled generic applications.
 #[derive(Clone, Copy)]
 pub enum TraitArgumentIdentity {
+    /// A concrete type argument identified by its `TypeId`.
     Type(fn() -> TypeId),
+    /// A structural const argument.
     Const(crate::runtime::expression::ConstExpression),
+    /// A retained lifetime argument.
     Lifetime(&'static str),
+    /// A source expression used when the argument cannot be typed concretely.
     Expression(&'static str),
 }
 
@@ -153,15 +201,19 @@ impl PartialEq for TraitArgumentIdentity {
         match (self, other) {
             (Self::Type(left), Self::Type(right)) => left() == right(),
             (Self::Const(left), Self::Const(right)) => left == right,
-            (Self::Lifetime(left), Self::Lifetime(right))
-            | (Self::Expression(left), Self::Expression(right)) => left == right,
+            // Lifetime spellings are source metadata, not runtime type
+            // identity. Rust does not expose a stable runtime token for a
+            // lifetime argument, so every lifetime slot is a wildcard key.
+            (Self::Lifetime(_), Self::Lifetime(_)) => true,
+            (Self::Expression(left), Self::Expression(right)) => left == right,
             _ => false,
         }
     }
 }
 impl Eq for TraitArgumentIdentity {}
 
-/// Static source facts for a trait declaration and applications visible to a context.
+/// Static source facts for a trait declaration and applications visible to a
+/// context.
 pub struct TraitDefinitionMetadata {
     pub(crate) id: TraitDefinitionId,
     pub(crate) name: &'static str,
@@ -205,7 +257,8 @@ impl TraitDefinitionMetadata {
 }
 
 impl TraitExpressionMetadata {
-    /// Retains a trait expression when its declaration is external or unresolved.
+    /// Retains a trait expression when its declaration is external or
+    /// unresolved.
     pub const fn unresolved(expression: &'static TraitExpressionData) -> Self {
         Self {
             expression,
@@ -227,7 +280,7 @@ impl TraitExpressionMetadata {
 
 impl TraitArgumentIdentity {
     /// Binds an application argument identity to concrete Rust type `T`.
-    pub const fn type_argument<T: 'static>() -> Self {
+    pub const fn type_argument<T: ?Sized + 'static>() -> Self {
         Self::Type(TypeId::of::<T>)
     }
 

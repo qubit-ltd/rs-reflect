@@ -7,7 +7,8 @@
 // =============================================================================
 
 use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::descriptor::TypeDescriptor;
 
 struct NotReflected;
 
@@ -22,7 +23,7 @@ pub struct Record {
 
 #[test]
 fn skipped_member_is_absent_from_the_descriptor() {
-    let descriptor = TypeDescriptor::of::<Record>();
+    let descriptor = TypeDescriptor::of_in::<Record>(ReflectionContext::global());
     let record = Record {
         visible: 5,
         ignored: NotReflected,

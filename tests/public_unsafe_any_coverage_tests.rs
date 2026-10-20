@@ -8,17 +8,16 @@
 
 #![cfg(feature = "derive")]
 
-use std::any::Any;
-
-use qubit_reflect::NamedConstructionInput;
 use qubit_reflect::Reflect;
-use qubit_reflect::StructUpdateInput;
-use qubit_reflect::TupleConstructionInput;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::access::FieldAccessError;
 use qubit_reflect::construct::ConstructionError;
-use qubit_reflect::construct::RecoveredAnyValue;
-use qubit_reflect::value::DynamicMut;
+use qubit_reflect::construct::NamedFields;
+use qubit_reflect::construct::PositionalFields;
+use qubit_reflect::construct::RecoveredConstructionInput;
+use qubit_reflect::construct::UnitFields;
+use qubit_reflect::construct::UpdateInput;
+use qubit_reflect::descriptor::FieldAccessError;
+use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
 #[Reflect]
@@ -43,160 +42,166 @@ struct PublicRecord {
 }
 
 #[test]
-fn unsafe_dynamic_construction_checks_types_and_returns_exact_values() {
-    let named = TypeDescriptor::of::<NamedRecord>();
-    // SAFETY: both supplied values have the declared field types.
+fn unchecked_named_construction_bypasses_visibility_but_checks_types() {
+    let descriptor = TypeDescriptor::of::<NamedRecord>();
+    assert!(matches!(
+        descriptor.construction().availability(),
+        qubit_reflect::construct::ConstructionAvailability::Unavailable { .. }
+    ));
+
+    // SAFETY: both values have the declared field types; the private String
+    // field is initialized with a valid String.
     let value = unsafe {
-        named.construct_struct_any_unsafe(
-            NamedConstructionInput::new()
+        descriptor.construct_unchecked::<NamedRecord, _>(
+            NamedFields::<Local>::new()
                 .field("count", 4_u32)
                 .field("secret", String::from("private")),
         )
     }
-    .expect("unsafe dynamic named construction succeeds");
-    let value = value.downcast::<NamedRecord>().expect("exact named root type");
+    .expect("unchecked named construction succeeds");
     assert_eq!(
-        *value,
+        value,
         NamedRecord {
             count: 4,
             secret: String::from("private"),
         }
     );
 
-    // SAFETY: visibility is bypassed, but the intentionally wrong value type
-    // must still be rejected before the generated adapter runs.
-    let recovery = unsafe {
-        named.construct_struct_any_unsafe(
-            NamedConstructionInput::new()
+    // SAFETY: visibility is bypassed, while the intentionally wrong value
+    // type is still rejected before the generated adapter runs.
+    let failure = unsafe {
+        descriptor.construct_unchecked::<NamedRecord, _>(
+            NamedFields::<Local>::new()
                 .field("count", String::from("wrong"))
                 .field("secret", String::from("retained")),
         )
     }
-    .expect_err("unsafe construction still validates exact field types");
-    let (error, values) = recovery.into_any_parts();
-    assert!(matches!(error, ConstructionError::ValueTypeMismatch { .. }));
-    let values = values.into_vec();
-    let [
-        RecoveredAnyValue::Named { name, value },
-        RecoveredAnyValue::Named {
-            name: secret,
-            value: secret_value,
-        },
-    ] = values.as_slice()
-    else {
-        panic!("recovery preserves each named input in caller order");
-    };
-    assert_eq!(name.as_ref(), "count");
-    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("wrong"));
-    assert_eq!(secret.as_ref(), "secret");
-    assert_eq!(
-        secret_value.downcast_ref::<String>().map(String::as_str),
-        Some("retained")
-    );
+    .expect_err("unchecked construction still checks exact field types");
+    assert!(matches!(
+        failure.error(),
+        ConstructionError::ValueTypeMismatch { field: "count", .. }
+    ));
+    assert!(matches!(failure.into_input(), RecoveredConstructionInput::Named(_)));
 }
 
 #[test]
-fn unsafe_tuple_and_unit_construction_support_typed_and_erased_results() {
-    let tuple = TypeDescriptor::of::<TupleRecord>();
-    // SAFETY: the supplied values have the declared positional field types.
-    let typed: TupleRecord = unsafe {
-        tuple.construct_tuple_unsafe(TupleConstructionInput::new().value(7_u32).value(String::from("seven")))
+fn dynamic_unchecked_construction_and_typed_root_checks() {
+    let descriptor = TypeDescriptor::of::<NamedRecord>();
+    // SAFETY: both values match the declared types and preserve the private
+    // field invariant.
+    let erased = unsafe {
+        descriptor.construct_dynamic_unchecked::<_>(
+            NamedFields::<Local>::new()
+                .field("count", 8_u32)
+                .field("secret", String::from("dynamic")),
+        )
     }
-    .expect("typed unsafe tuple construction succeeds");
+    .expect("dynamic unchecked construction succeeds");
+    assert_eq!(
+        erased.downcast::<NamedRecord>().expect("exact root type"),
+        NamedRecord {
+            count: 8,
+            secret: String::from("dynamic"),
+        }
+    );
+
+    // SAFETY: values match the private type's field types; the requested root
+    // type intentionally does not match the descriptor.
+    let failure = unsafe {
+        descriptor.construct_unchecked::<TupleRecord, _>(
+            NamedFields::<Local>::new()
+                .field("count", 9_u32)
+                .field("secret", String::from("wrong root")),
+        )
+    }
+    .expect_err("unchecked construction does not bypass root type identity");
+    assert!(matches!(failure.error(), ConstructionError::TargetTypeMismatch(_)));
+}
+
+#[test]
+fn unchecked_positional_and_unit_construction_support_dynamic_results() {
+    let tuple = TypeDescriptor::of::<TupleRecord>();
+    // SAFETY: the supplied values match the positional field types.
+    let typed: TupleRecord = unsafe {
+        tuple.construct_unchecked(
+            PositionalFields::<Local>::new()
+                .value(7_u32)
+                .value(String::from("seven")),
+        )
+    }
+    .expect("typed unchecked tuple construction succeeds");
     assert_eq!(typed, TupleRecord(7, String::from("seven")));
 
-    // SAFETY: the supplied values have the declared positional field types.
+    // SAFETY: the supplied values match the positional field types.
     let erased = unsafe {
-        tuple.construct_tuple_any_unsafe(TupleConstructionInput::new().value(8_u32).value(String::from("eight")))
+        tuple.construct_dynamic_unchecked(
+            PositionalFields::<Local>::new()
+                .value(8_u32)
+                .value(String::from("eight")),
+        )
     }
-    .expect("erased unsafe tuple construction succeeds");
+    .expect("dynamic unchecked tuple construction succeeds");
     assert_eq!(
-        *erased.downcast::<TupleRecord>().expect("exact tuple root"),
-        TupleRecord(8, "eight".into())
+        erased.downcast::<TupleRecord>().expect("exact tuple root"),
+        TupleRecord(8, String::from("eight"))
     );
 
     let unit = TypeDescriptor::of::<UnitRecord>();
-    // SAFETY: a unit struct has no private fields whose invariants could be
-    // violated, and this call deliberately covers the public unsafe wrapper.
-    let typed: UnitRecord = unsafe { unit.construct_unit_unsafe() }.expect("typed unsafe unit construction");
+    // SAFETY: a unit struct has no field invariants to violate.
+    let typed: UnitRecord =
+        unsafe { unit.construct_unchecked(UnitFields::new()) }.expect("typed unchecked unit construction");
     assert_eq!(typed, UnitRecord);
 
     // SAFETY: same empty unit construction contract as above.
-    let erased = unsafe { unit.construct_unit_any_unsafe() }.expect("erased unsafe unit construction");
-    assert_eq!(*erased.downcast::<UnitRecord>().expect("exact unit root"), UnitRecord);
-
-    // SAFETY: the method still rejects a typed result that differs from the
-    // descriptor's exact root.
-    let failure = unsafe { unit.construct_unit_unsafe::<TupleRecord>() }
-        .expect_err("unsafe visibility bypass does not bypass target type identity");
-    assert!(matches!(failure.error(), ConstructionError::TargetTypeMismatch { .. }));
+    let erased =
+        unsafe { unit.construct_dynamic_unchecked(UnitFields::new()) }.expect("dynamic unchecked unit construction");
+    assert_eq!(erased.downcast::<UnitRecord>().expect("exact unit root"), UnitRecord);
 }
 
 #[test]
-fn dynamic_update_returns_values_and_preserves_failed_inputs() {
-    let public = TypeDescriptor::of::<PublicRecord>();
-    let updated = public
-        .update_struct_any(StructUpdateInput::new(
-            PublicRecord { count: 1 },
-            NamedConstructionInput::new().field("count", 2_u32),
-        ))
-        .expect("public dynamic update succeeds")
-        .downcast::<PublicRecord>()
-        .expect("exact updated root");
-    assert_eq!(*updated, PublicRecord { count: 2 });
-
-    let failure = public
-        .update_struct_any(StructUpdateInput::new(
-            PublicRecord { count: 3 },
-            NamedConstructionInput::new().field("count", String::from("wrong")),
-        ))
-        .expect_err("dynamic update rejects the wrong replacement type");
-    let (error, values) = failure.into_any_parts();
-    assert!(matches!(error, ConstructionError::ValueTypeMismatch { .. }));
-    let values = values.into_vec();
-    let [RecoveredAnyValue::Base(base), RecoveredAnyValue::Named { name, value }] = values.as_slice() else {
-        panic!("recovery retains the base followed by the rejected override");
+fn unchecked_update_bypasses_visibility_and_preserves_type_checks() {
+    let descriptor = TypeDescriptor::of::<NamedRecord>();
+    let base = NamedRecord {
+        count: 5,
+        secret: String::from("before"),
     };
-    assert_eq!(base.downcast_ref::<PublicRecord>().map(|base| base.count), Some(3));
-    assert_eq!(name.as_ref(), "count");
-    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("wrong"));
 
-    let private = TypeDescriptor::of::<NamedRecord>();
-    let safe_failure = private
-        .update_struct_any(StructUpdateInput::new(
-            NamedRecord {
-                count: 4,
-                secret: String::from("before"),
-            },
-            NamedConstructionInput::new().field("secret", String::from("after")),
-        ))
-        .expect_err("safe dynamic update rejects a private field");
-    assert!(matches!(
-        safe_failure.error(),
-        ConstructionError::VisibilityDenied { .. }
-    ));
-    let (_, values) = safe_failure.into_any_parts();
-    assert!(matches!(values.first(), Some(RecoveredAnyValue::Base(_))));
-
-    // SAFETY: this test intentionally replaces the private String with another
-    // String and therefore preserves the type's private-field invariant.
-    let updated = unsafe {
-        private.update_struct_any_unsafe(StructUpdateInput::new(
-            NamedRecord {
-                count: 5,
-                secret: String::from("before"),
-            },
-            NamedConstructionInput::new().field("secret", String::from("after")),
-        ))
-    }
-    .expect("unsafe dynamic update permits the private field replacement")
-    .downcast::<NamedRecord>()
-    .expect("exact updated private root");
+    // SAFETY: the replacement is a String and preserves the private field's
+    // invariant.
+    let updated: NamedRecord =
+        unsafe { descriptor.update_unchecked(UpdateInput::<Local>::new(base).field("secret", String::from("after"))) }
+            .expect("unchecked update permits a private field replacement");
     assert_eq!(updated.secret, "after");
+
+    // SAFETY: this intentionally supplies the wrong field value type to check
+    // that bypassing visibility does not bypass exact type validation.
+    let failure = unsafe {
+        descriptor.update_unchecked::<NamedRecord, Local>(
+            UpdateInput::<Local>::new(NamedRecord {
+                count: 6,
+                secret: String::from("before"),
+            })
+            .field("secret", 17_u32),
+        )
+    }
+    .expect_err("unchecked update still checks exact replacement types");
+    assert!(matches!(
+        failure.error(),
+        qubit_reflect::construct::UpdateError::ValueTypeMismatch { field: "secret", .. }
+    ));
+    assert_eq!(
+        failure
+            .recovery()
+            .base()
+            .downcast_ref::<NamedRecord>()
+            .expect("the recovered update base keeps its original type")
+            .count,
+        6
+    );
 }
 
 #[test]
-fn unsafe_dynamic_mutation_preserves_visibility_and_target_checks() {
+fn unsafe_field_access_bypasses_visibility_but_checks_target_type() {
     let field = TypeDescriptor::of::<NamedRecord>()
         .field("secret")
         .expect("private field remains described");
@@ -206,40 +211,52 @@ fn unsafe_dynamic_mutation_preserves_visibility_and_target_checks() {
     };
 
     // SAFETY: the test owns the record and intentionally bypasses the field's
-    // source visibility to mutate its String value.
-    let mut secret = unsafe { field.get_mut_dynamic_unsafe(DynamicMut::<Local>::new(&mut record)) }
-        .expect("unsafe dynamic mutable access bypasses visibility");
-    *secret.downcast_mut::<String>().expect("exact field type") = String::from("new");
+    // source visibility to mutate the String value.
+    *unsafe { field.get_mut_unsafe::<NamedRecord, String>(&mut record) }
+        .expect("unsafe mutable access bypasses visibility") = String::from("new");
     assert_eq!(record.secret, "new");
 
-    let mut wrong_target = 9_u32;
-    // SAFETY: visibility bypass does not relax the target root type check.
-    let error = match unsafe { field.get_mut_dynamic_unsafe(DynamicMut::<Local>::new(&mut wrong_target)) } {
-        Ok(_) => panic!("wrong dynamic root is rejected"),
-        Err(error) => error,
-    };
-    assert!(matches!(error, FieldAccessError::TargetTypeMismatch { .. }));
+    let wrong_target = 9_u32;
+    // SAFETY: this deliberately supplies the wrong root to verify target
+    // identity remains checked even when visibility is bypassed.
+    let error = unsafe { field.get_unsafe::<u32, String>(&wrong_target) }.expect_err("wrong dynamic root is rejected");
+    assert!(matches!(error, FieldAccessError::TargetTypeMismatch(_)));
 }
 
 #[test]
-fn tuple_value_any_checks_the_boxed_value_type_and_recovers_it_unchanged() {
-    let descriptor = TypeDescriptor::of::<TupleRecord>();
-    let input = TupleConstructionInput::new()
-        .value_any(Box::new(11_u32) as Box<dyn Any>)
-        .value_any(Box::new(String::from("eleven")) as Box<dyn Any>);
-    let value: TupleRecord = descriptor
-        .construct_tuple(input)
-        .expect("boxed inputs use their inner exact types");
-    assert_eq!(value, TupleRecord(11, String::from("eleven")));
+fn dynamic_owned_inputs_keep_runtime_type_validation_and_recovery() {
+    let public = TypeDescriptor::of::<PublicRecord>();
+    let updated = public
+        .update_dynamic(UpdateInput::<Local>::new(PublicRecord { count: 1 }).field("count", 2_u32))
+        .expect("public dynamic update succeeds");
+    assert_eq!(
+        updated.downcast::<PublicRecord>().expect("exact updated root"),
+        PublicRecord { count: 2 }
+    );
 
-    let failure = descriptor
-        .construct_tuple::<TupleRecord>(TupleConstructionInput::new().value_any(Box::new(String::from("wrong"))))
-        .expect_err("boxed Any input is checked against the first tuple field");
-    let (error, values) = failure.into_any_parts();
-    assert!(matches!(error, ConstructionError::ValueTypeMismatch { .. }));
-    let values = values.into_vec();
-    let [RecoveredAnyValue::Positional { index: 0, value }] = values.as_slice() else {
-        panic!("the rejected boxed value keeps its original position");
+    let update_failure = match public
+        .update_dynamic(UpdateInput::<Local>::new(PublicRecord { count: 3 }).field("count", String::from("wrong")))
+    {
+        Ok(_) => panic!("dynamic update rejects the wrong replacement type"),
+        Err(failure) => failure,
     };
-    assert_eq!(value.downcast_ref::<String>().map(String::as_str), Some("wrong"));
+    assert!(matches!(
+        update_failure.error(),
+        qubit_reflect::construct::UpdateError::ValueTypeMismatch { field: "count", .. }
+    ));
+
+    let descriptor = TypeDescriptor::of::<TupleRecord>();
+    let failure = descriptor
+        .construct::<TupleRecord, _>(
+            PositionalFields::<Local>::new().value_dynamic(DynamicOwned::new(String::from("wrong"))),
+        )
+        .expect_err("dynamic input is checked against the positional field type");
+    assert!(matches!(
+        failure.error(),
+        ConstructionError::ValueTypeMismatch { field: "0", .. }
+    ));
+    assert!(matches!(
+        failure.into_input(),
+        RecoveredConstructionInput::Positional(_)
+    ));
 }

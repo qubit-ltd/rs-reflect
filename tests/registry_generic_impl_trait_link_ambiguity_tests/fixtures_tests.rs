@@ -31,7 +31,7 @@ trait SecondMatchingTrait {
 
 struct AmbiguousTarget<T>(PhantomData<T>);
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = FirstMatchingTrait)]
 impl<T> AmbiguousAlias for AmbiguousTarget<T> {
     /// Returns the shared fixture value.
     fn shared_value(&self) -> usize {

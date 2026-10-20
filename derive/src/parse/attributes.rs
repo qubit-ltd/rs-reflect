@@ -24,6 +24,26 @@ use crate::ir::HelperName;
 use crate::ir::HelperTarget;
 use crate::ir::HelperValueIr;
 
+/// Previously supported helper spellings that remain recognized for a useful
+/// migration diagnostic without entering the current helper IR.
+const REMOVED_HELPERS: &[&str] = &[
+    "rename",
+    "opaque",
+    "capabilities",
+    "read_only",
+    "no_construct",
+    "default",
+    "no_invoke",
+    "catch_unwind",
+    "thread_safe",
+    "specialize",
+    "external_trait_id",
+    "external_trait",
+    "supertrait",
+    "dyn_compatible",
+    "definition_provider_v2",
+];
+
 /// Parses helper attributes from a source attribute slice.
 ///
 /// # Parameters
@@ -109,38 +129,25 @@ pub(super) fn parse_helper_tokens(
 ///
 /// Returns the converted helper when its key and value are valid.
 #[must_use]
-fn convert_meta(
-    meta: Meta,
-    target: HelperTarget,
-    errors: &mut ErrorCollector,
-) -> Option<HelperAttributeIr> {
+fn convert_meta(meta: Meta, target: HelperTarget, errors: &mut ErrorCollector) -> Option<HelperAttributeIr> {
     let span = meta.span();
     let path_text = meta.path().to_token_stream().to_string();
     let Some(source_name) = meta.path().get_ident().map(ToString::to_string) else {
-        errors.push(Error::new(
-            span,
-            format!("unknown reflection helper `{path_text}`"),
-        ));
+        errors.push(Error::new(span, format!("unknown reflection helper `{path_text}`")));
         return None;
     };
     let Some(name) = HelperName::from_str(&source_name) else {
-        errors.push(Error::new(
-            span,
-            format!("unknown reflection helper `{source_name}`"),
-        ));
+        let message = if REMOVED_HELPERS.contains(&source_name.as_str()) {
+            format!("reflection helper `{source_name}` is unsupported; only `skip` is accepted")
+        } else {
+            format!("unknown reflection helper `{source_name}`")
+        };
+        errors.push(Error::new(span, message));
         return None;
     };
-    if name != HelperName::Skip {
-        errors.push(Error::new(
-            span,
-            format!("reflection helper `{source_name}` is unsupported; only `skip` is accepted"),
-        ));
-        return None;
-    }
-    let value = match (&name, &meta) {
-        (HelperName::Skip, Meta::Path(_)) => Ok(HelperValueIr::Flag),
-        (HelperName::Skip, _) => Err(Error::new(span, "`skip` does not accept a value")),
-        _ => unreachable!("all non-skip helpers are rejected before value parsing"),
+    let value = match &meta {
+        Meta::Path(_) => Ok(HelperValueIr::Flag),
+        _ => Err(Error::new(span, "`skip` does not accept a value")),
     };
     match value {
         Ok(value) => {

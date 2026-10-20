@@ -1,18 +1,30 @@
-use std::any::TypeId;
-use std::hash::{Hash, Hasher};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
-use crate::runtime::descriptor::generic::{GenericArgumentMetadata, GenericDefinitionMetadata};
+use std::any::TypeId;
+use std::hash::Hash;
+use std::hash::Hasher;
+
+use crate::runtime::descriptor::generic::GenericArgumentMetadata;
+use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
 use crate::runtime::descriptor::metadata::TypeMetadata;
-use crate::runtime::descriptor::method::{EffectiveMethod, MethodMetadata};
-use crate::runtime::descriptor::trait_descriptor::{
-    TraitApplicationMetadata, TraitExpressionMetadata,
-};
+use crate::runtime::descriptor::method::EffectiveMethod;
+use crate::runtime::descriptor::method::MethodMetadata;
+use crate::runtime::descriptor::trait_descriptor::TraitApplicationMetadata;
+use crate::runtime::descriptor::trait_descriptor::TraitExpressionMetadata;
 use crate::runtime::expression::ExpressionData;
-use crate::runtime::value::{DynamicOwned, Local, ThreadSafe};
+use crate::runtime::value::DynamicOwned;
+use crate::runtime::value::Local;
+use crate::runtime::value::ThreadSafe;
 
 /// Process-local identity of one source `impl` block.
 #[derive(Clone, Copy)]
-pub(crate) struct ImplDefinitionId(fn() -> TypeId);
+pub struct ImplDefinitionId(fn() -> TypeId);
 
 impl ImplDefinitionId {
     /// Creates an identity from a generated marker type.
@@ -44,7 +56,9 @@ impl Hash for ImplDefinitionId {
 /// Whether an implementation block is inherent or implements a trait.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImplKind {
+    /// An inherent implementation with no trait path.
     Inherent,
+    /// An implementation associated with a trait.
     Trait,
 }
 
@@ -57,17 +71,20 @@ pub struct ImplQualifiers {
 /// Origin of one final associated item binding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AssociatedItemSource {
+    /// The implementation explicitly defines the associated item.
     Declared,
+    /// The implementation uses the trait item's default.
     Defaulted,
+    /// The implementation replaces the trait item's default.
     Overridden,
+    /// The required item has no usable binding in this application.
     RequiredButUnavailable,
 }
 
 /// Static metadata for a concrete associated type binding.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeBindingMetadata {
-    pub(crate) definition:
-        &'static crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata,
+    pub(crate) definition: &'static crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata,
     pub(crate) expression: &'static ExpressionData,
     pub(crate) concrete: Option<fn() -> &'static TypeMetadata>,
     pub(crate) source: AssociatedItemSource,
@@ -76,8 +93,7 @@ pub struct AssociatedTypeBindingMetadata {
 /// Static metadata for a concrete associated constant binding.
 #[derive(Clone, Copy)]
 pub struct AssociatedConstBindingMetadata {
-    pub(crate) definition:
-        &'static crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata,
+    pub(crate) definition: &'static crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata,
     pub(crate) expression: crate::runtime::expression::ConstExpression,
     pub(crate) source: AssociatedItemSource,
     pub(crate) value: Option<&'static AssociatedConstValueAdapter>,
@@ -89,7 +105,8 @@ pub(crate) struct AssociatedConstValueAdapter {
     pub(crate) thread_safe: Option<fn() -> DynamicOwned<ThreadSafe>>,
 }
 
-/// Static source facts for an `impl` declaration and context-visible applications.
+/// Static source facts for an `impl` declaration and context-visible
+/// applications.
 pub struct ImplDefinitionMetadata {
     pub(crate) id: ImplDefinitionId,
     pub(crate) kind: ImplKind,
@@ -98,8 +115,10 @@ pub struct ImplDefinitionMetadata {
     pub(crate) generics: &'static GenericDefinitionMetadata,
     pub(crate) qualifiers: ImplQualifiers,
     pub(crate) methods: &'static [MethodMetadata],
-    pub(crate) associated_types: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata],
-    pub(crate) associated_consts: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata],
+    pub(crate) associated_types:
+        &'static [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata],
+    pub(crate) associated_consts:
+        &'static [crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata],
 }
 
 /// Static metadata for one compiled implementation application.
@@ -108,8 +127,7 @@ pub struct ImplApplicationMetadata {
     pub(crate) target: fn() -> &'static TypeMetadata,
     pub(crate) implemented_trait: Option<&'static TraitApplicationMetadata>,
     pub(crate) arguments: &'static [GenericArgumentMetadata],
-    pub(crate) identity:
-        &'static [crate::runtime::descriptor::trait_descriptor::TraitArgumentIdentity],
+    pub(crate) identity: &'static [crate::runtime::descriptor::trait_descriptor::TraitArgumentIdentity],
     pub(crate) methods: &'static [EffectiveMethod],
     pub(crate) associated_types: &'static [AssociatedTypeBindingMetadata],
     pub(crate) associated_consts: &'static [AssociatedConstBindingMetadata],
@@ -192,7 +210,8 @@ impl AssociatedTypeBindingMetadata {
 }
 
 impl AssociatedConstBindingMetadata {
-    /// Creates a typed associated constant binding without a dynamic value adapter.
+    /// Creates a typed associated constant binding without a dynamic value
+    /// adapter.
     pub const fn new(
         definition: &'static crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata,
         expression: crate::runtime::expression::ConstExpression,

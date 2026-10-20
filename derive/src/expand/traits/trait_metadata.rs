@@ -19,8 +19,4 @@ pub(super) struct TraitMetadata {
     pub(super) associated_types: Vec<TokenStream>,
     /// Associated constant descriptor expressions.
     pub(super) associated_consts: Vec<TokenStream>,
-    /// Generic parameter descriptor expressions.
-    pub(super) parameters: Vec<TokenStream>,
-    /// Generic where-predicate descriptor expressions.
-    pub(super) where_predicates: Vec<TokenStream>,
 }

@@ -9,7 +9,7 @@
 //! Shared reflected root used by the cross-crate registry fixture.
 
 mod generic_bound_service;
-mod registry_dyn_parent;
+pub mod registry_dyn_parent;
 mod registry_user;
 
 pub use generic_bound_service::BoundedConstService;

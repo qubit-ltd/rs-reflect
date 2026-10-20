@@ -12,7 +12,8 @@
 
 use std::any::TypeId;
 
-use qubit_reflect::{Reflect, ReflectionContext};
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 struct DerivedRegistration {
@@ -31,11 +32,5 @@ fn derived_registration_is_discovered_by_an_explicit_context() {
 
     assert_eq!(descriptor.type_id(), TypeId::of::<DerivedRegistration>());
     assert!(std::ptr::eq(descriptor.context(), &context));
-    assert_eq!(
-        descriptor
-            .field("id")
-            .expect("field metadata is retained")
-            .name(),
-        "id"
-    );
+    assert_eq!(descriptor.field("id").expect("field metadata is retained").name(), "id");
 }

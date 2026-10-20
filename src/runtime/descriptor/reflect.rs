@@ -1,21 +1,35 @@
-use std::any::{Any, TypeId};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
+use std::any::Any;
+use std::any::TypeId;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use super::metadata::TypeMetadata;
 use crate::runtime::construct::ConstructionPlan;
+use crate::runtime::construct::ConstructionTargetKind;
 use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 use crate::runtime::descriptor::type_kind::TypeKindMetadata;
 use crate::runtime::descriptor::variant::VariantMetadata;
 
+/// Supplies the static registration used to reflect a Rust type.
 pub trait Reflect: 'static {
-    fn __reflect_registration() -> &'static TypeRegistration<Self>
-    where
-        Self: Sized;
+    /// Returns the shared registration for this concrete type.
+    fn __reflect_registration() -> &'static TypeRegistration<Self> {
+        TypeRegistration::get_or_init_with(TypeRegistration::new)
+    }
 }
 
-pub struct TypeRegistration<T: 'static> {
+/// Static type metadata retained by the reflection runtime.
+pub struct TypeRegistration<T: ?Sized + 'static> {
     metadata: TypeMetadata,
     shape: Option<&'static TypeKindMetadata>,
     type_definition: Option<&'static TypeDefinitionMetadata>,
@@ -23,7 +37,8 @@ pub struct TypeRegistration<T: 'static> {
     _type: PhantomData<fn() -> T>,
 }
 
-impl<T: 'static> TypeRegistration<T> {
+impl<T: ?Sized + 'static> TypeRegistration<T> {
+    /// Creates a registration containing only the concrete type identity.
     pub const fn new() -> Self {
         Self {
             metadata: TypeMetadata::new::<T>(),
@@ -40,8 +55,12 @@ impl<T: 'static> TypeRegistration<T> {
         type_definition: Option<&'static TypeDefinitionMetadata>,
         construction_plans: &'static [ConstructionPlan],
     ) -> Self {
+        let construction_shape = construction_plans
+            .iter()
+            .find(|plan| plan.target.kind == ConstructionTargetKind::Struct)
+            .map(|plan| plan.shape);
         Self {
-            metadata: TypeMetadata::new::<T>(),
+            metadata: TypeMetadata::with_shape::<T>(shape, construction_shape, type_definition),
             shape: Some(shape),
             type_definition,
             construction_plans,
@@ -49,7 +68,8 @@ impl<T: 'static> TypeRegistration<T> {
         }
     }
 
-    /// Returns the stable registration for this concrete type, initializing it once.
+    /// Returns the stable registration for this concrete type, initializing it
+    /// once.
     pub fn get_or_init_with(initialize: impl FnOnce() -> Self) -> &'static Self {
         let type_id = TypeId::of::<T>();
         let cell = {
@@ -67,6 +87,16 @@ impl<T: 'static> TypeRegistration<T> {
 
     pub(crate) fn metadata(&'static self) -> &'static TypeMetadata {
         &self.metadata
+    }
+
+    /// Adds concrete arguments retained for this compiled type application.
+    #[doc(hidden)]
+    pub fn with_generic_arguments(
+        mut self,
+        arguments: &'static [crate::runtime::descriptor::generic::GenericArgumentMetadata],
+    ) -> Self {
+        self.metadata = self.metadata.with_generic_arguments(arguments);
+        self
     }
 
     pub(crate) fn shape(&'static self) -> Option<&'static TypeKindMetadata> {
@@ -87,6 +117,12 @@ impl<T: 'static> TypeRegistration<T> {
             TypeKindMetadata::Enum(variants) => variants.get(index),
             _ => None,
         }
+    }
+}
+
+impl<T: ?Sized + 'static> Default for TypeRegistration<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

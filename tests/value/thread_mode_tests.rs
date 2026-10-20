@@ -7,240 +7,77 @@
 // =============================================================================
 
 //! Integration tests for thread-safe dynamic value mode.
+
 use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::ThreadSafe;
 
-/// Verifies that a wrapper retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
 
-/// Confirms a thread-safe shared borrow crosses the mode boundary safely.
 #[test]
-fn test_thread_safe_ref_can_be_downgraded_without_losing_the_borrow() {
+fn thread_safe_borrows_are_send_sync_and_preserve_mutation() {
     let number = 42_u32;
-    assert_send_and_sync(&DynamicRef::<ThreadSafe>::new(&number));
+    let shared = DynamicRef::<ThreadSafe>::new(&number);
+    assert_send_and_sync(&shared);
+    assert_eq!(shared.downcast_ref::<u32>(), Some(&42));
 
-    let value = DynamicRef::<ThreadSafe>::new(&number).into_local();
-    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
-}
-
-/// Confirms the thread-safe shared `Any` boundary supports direct type
-/// inspection before its independent downgrade path.
-#[test]
-fn test_thread_safe_ref_any_and_downcast_are_available_before_downgrade() {
-    let number = 42_u32;
-    let value = DynamicRef::<ThreadSafe>::new(&number);
-
-    assert!(value.as_any().is_some());
-    assert!(value.is::<u32>());
-    assert_eq!(value.as_str(), None);
-    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
-    assert_eq!(value.downcast_ref::<String>(), None);
-
-    let value = value.into_local();
-    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
-}
-
-/// Confirms a thread-safe mutable borrow crosses the mode boundary safely.
-#[test]
-fn test_thread_safe_mut_can_be_downgraded_without_losing_the_borrow() {
     let mut number = 42_u32;
-    assert_send_and_sync(&DynamicMut::<ThreadSafe>::new(&mut number));
-
     {
-        let mut value = DynamicMut::<ThreadSafe>::new(&mut number).into_local();
-        *value
+        let mut mutable = DynamicMut::<ThreadSafe>::new(&mut number);
+        assert_send_and_sync(&mutable);
+        *mutable
             .downcast_mut::<u32>()
-            .expect("the mutable borrow survives the mode downgrade") = 43;
+            .expect("the thread-safe borrow retains its exact type") = 43;
     }
-
     assert_eq!(number, 43);
 }
 
-/// Confirms the thread-safe mutable `Any` boundary supports direct mutation
-/// before its independent downgrade path.
 #[test]
-fn test_thread_safe_mut_any_and_downcast_are_available_before_downgrade() {
-    let mut number = 42_u32;
-    let mut value = DynamicMut::<ThreadSafe>::new(&mut number);
-
-    assert!(value.as_any().is_some());
-    assert!(value.is::<u32>());
-    assert_eq!(value.as_str(), None);
-    assert_eq!(value.as_str_mut(), None);
-    *value
-        .as_any_mut()
-        .and_then(|value| value.downcast_mut::<u32>())
-        .expect("the thread-safe Any boundary retains the stored u32") = 43;
-    assert_eq!(value.downcast_ref::<u32>(), Some(&43));
-
-    let value = value.into_local();
-    assert_eq!(value.downcast_ref::<u32>(), Some(&43));
-}
-
-/// Confirms the thread-safe owned `Any` boundary supports type recovery
-/// without first downgrading to local mode.
-#[test]
-fn test_thread_safe_owned_any_and_downcast_preserve_the_original_wrapper() {
+fn thread_safe_owned_values_are_send_sync_and_keep_typed_access() {
     let mut value = DynamicOwned::<ThreadSafe>::new(41_u32);
-
-    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
+    assert_send_and_sync(&value);
+    assert!(value.is::<u32>());
+    assert!(!value.is::<String>());
+    assert_eq!(value.downcast_ref::<u32>(), Some(&41));
     *value
-        .as_any_mut()
-        .and_then(|value| value.downcast_mut::<u32>())
-        .expect("the thread-safe Any boundary retains the stored u32") = 42;
-
-    let value = match value.downcast::<String>() {
-        Ok(_) => panic!("a mismatched thread-safe owned downcast must fail"),
-        Err(value) => value,
-    };
-    let number = match value.downcast::<u32>() {
-        Ok(number) => number,
-        Err(_) => panic!("a matching thread-safe owned downcast must recover the value"),
-    };
-    assert_eq!(number, 42);
+        .downcast_mut::<u32>()
+        .expect("the thread-safe owned value should downcast mutably") = 42;
+    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
 }
 
 #[test]
-fn test_thread_safe_owned_borrow_bridges_preserve_thread_safe_mode() {
+fn thread_safe_owned_borrow_bridges_preserve_the_mode_and_value() {
     let mut value = DynamicOwned::<ThreadSafe>::new(61_u32);
-    let shared: DynamicRef<'_, ThreadSafe> = value.as_reflected_ref();
+    let shared: DynamicRef<'_, ThreadSafe> = value.as_ref();
+    assert_send_and_sync(&shared);
     assert_eq!(shared.downcast_ref::<u32>(), Some(&61));
-    let mut mutable: DynamicMut<'_, ThreadSafe> = value.as_reflected_mut();
+    drop(shared);
+
+    let mut mutable: DynamicMut<'_, ThreadSafe> = value.as_mut();
+    assert_send_and_sync(&mutable);
     *mutable
         .downcast_mut::<u32>()
-        .expect("the owned thread-safe value must expose a mutable bridge") = 67;
+        .expect("the owned value must expose a typed mutable borrow") = 67;
+    drop(mutable);
     assert_eq!(value.downcast_ref::<u32>(), Some(&67));
 }
 
-/// Confirms thread-safe `str` variants retain their dedicated accessors after
-/// downgrade.
 #[test]
-fn test_thread_safe_str_variants_can_be_downgraded() {
-    let value = DynamicRef::<ThreadSafe>::new_str("hello");
-    assert_send_and_sync(&value);
-    assert!(value.as_any().is_none());
-    assert_eq!(value.into_local().as_str(), Some("hello"));
+fn thread_safe_str_borrows_support_typed_access_and_mutation() {
+    let text = String::from("hello");
+    let shared = DynamicRef::<ThreadSafe>::new(text.as_str());
+    assert_send_and_sync(&shared);
+    assert_eq!(shared.downcast_ref::<str>(), Some("hello"));
 
     let mut text = String::from("hello");
-    assert_send_and_sync(&DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str()));
     {
-        let value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
-        assert!(value.as_any().is_none());
-        let mut value = value.into_local();
-        value
-            .as_str_mut()
-            .expect("the dedicated mutable str borrow survives the downgrade")
+        let mut mutable = DynamicMut::<ThreadSafe>::new(text.as_mut_str());
+        assert_send_and_sync(&mutable);
+        mutable
+            .downcast_mut::<str>()
+            .expect("thread-safe str remains available through typed access")
             .make_ascii_uppercase();
     }
-
     assert_eq!(text, "HELLO");
-
-    let mut text = String::from("hello");
-    let mut value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
-    assert!(value.as_any_mut().is_none());
-}
-
-/// Confirms consuming thread-safe shared downcasts preserve both the original
-/// borrow lifetime and wrapper recovery after an exact-type mismatch.
-#[test]
-fn test_thread_safe_ref_consuming_downcast_recovers_mismatch() {
-    let number = 42_u32;
-    let value = DynamicRef::<ThreadSafe>::new(&number);
-    let value = match value.downcast::<String>() {
-        Ok(_) => panic!("a mismatched consuming downcast must fail"),
-        Err(value) => value,
-    };
-
-    let number_ref = value
-        .downcast::<u32>()
-        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the thread-safe borrow"));
-    assert_eq!(number_ref, &42);
-}
-
-/// Confirms consuming thread-safe mutable downcasts preserve the exclusive
-/// borrow and recover the wrapper after a mismatch.
-#[test]
-fn test_thread_safe_mut_consuming_downcast_recovers_mismatch() {
-    let mut number = 42_u32;
-    let value = DynamicMut::<ThreadSafe>::new(&mut number);
-    let value = match value.downcast::<String>() {
-        Ok(_) => panic!("a mismatched consuming downcast must fail"),
-        Err(value) => value,
-    };
-    *value
-        .downcast::<u32>()
-        .unwrap_or_else(|_| panic!("an exact consuming downcast should return the thread-safe mutable borrow")) = 43;
-
-    assert_eq!(number, 43);
-}
-
-/// Confirms consuming typed extraction keeps dedicated thread-safe `str`
-/// variants intact when they cannot participate in `Any` downcasts.
-#[test]
-fn test_thread_safe_str_consuming_downcast_returns_original_wrapper() {
-    let value = DynamicRef::<ThreadSafe>::new_str("hello");
-    let value = match value.downcast::<String>() {
-        Ok(_) => {
-            panic!("a dedicated str variant must not downcast through Any")
-        }
-        Err(value) => value,
-    };
-    assert_eq!(value.as_str(), Some("hello"));
-
-    let mut text = String::from("hello");
-    let value = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
-    let mut value = match value.downcast::<String>() {
-        Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
-        Err(value) => value,
-    };
-    value
-        .as_str_mut()
-        .expect("the original mutable str wrapper should be returned")
-        .make_ascii_uppercase();
-    assert_eq!(text, "HELLO");
-}
-
-/// Confirms consuming thread-safe `str` extraction returns the original shared
-/// borrow and preserves a non-`str` wrapper on failure.
-#[test]
-fn test_thread_safe_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
-    let text = String::from("hello");
-    let extracted = match DynamicRef::<ThreadSafe>::new_str(text.as_str()).into_str() {
-        Ok(extracted) => extracted,
-        Err(_) => panic!("a dedicated thread-safe str wrapper must extract successfully"),
-    };
-    assert_eq!(extracted, "hello");
-
-    let number = 42_u32;
-    let value = match DynamicRef::<ThreadSafe>::new(&number).into_str() {
-        Ok(_) => panic!("a thread-safe Any wrapper must not extract as str"),
-        Err(value) => value,
-    };
-    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
-}
-
-/// Confirms consuming thread-safe mutable `str` extraction returns the
-/// original exclusive borrow and preserves a non-`str` wrapper on failure.
-#[test]
-fn test_thread_safe_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
-    let mut text = String::from("hello");
-    match DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str()).into_str_mut() {
-        Ok(extracted) => extracted.make_ascii_uppercase(),
-        Err(_) => panic!("a dedicated thread-safe mutable str wrapper must extract successfully"),
-    }
-    assert_eq!(text, "HELLO");
-
-    let mut number = 42_u32;
-    let mut value = match DynamicMut::<ThreadSafe>::new(&mut number).into_str_mut() {
-        Ok(_) => {
-            panic!("a thread-safe Any wrapper must not extract as mutable str")
-        }
-        Err(value) => value,
-    };
-    *value
-        .downcast_mut::<u32>()
-        .expect("failed str extraction must return the original wrapper") = 43;
-    assert_eq!(number, 43);
 }

@@ -1,15 +1,15 @@
 warning: unused import: `qubit_reflect::capability::CloneCapability`
-  --> tests/ui/fail/capability_key_variance_tests.rs:10:5
+  --> tests/ui/fail/capability_key_variance_tests.rs:11:5
    |
-10 | use qubit_reflect::capability::CloneCapability;
+11 | use qubit_reflect::capability::CloneCapability;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 error[E0277]: the trait bound `NotClone: Clone` is not satisfied
-  --> tests/ui/fail/capability_key_variance_tests.rs:15:22
+  --> tests/ui/fail/capability_key_variance_tests.rs:16:22
    |
-15 | register_capability!(NotClone: CloneCapability);
+16 | register_capability!(NotClone: CloneCapability);
    |                      ^^^^^^^^ the trait `Clone` is not implemented for `NotClone`
    |
 note: required by a bound in `register_clone`
@@ -19,6 +19,6 @@ note: required by a bound in `register_clone`
    |                                                                ^^^^^^^^^^^^^^^^^ required by this bound in `register_clone`
 help: consider annotating `NotClone` with `#[derive(Clone)]`
    |
-13 + #[derive(Clone)]
-14 | struct NotClone;
+14 + #[derive(Clone)]
+15 | struct NotClone;
    |

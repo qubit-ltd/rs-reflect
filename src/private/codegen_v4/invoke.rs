@@ -8,13 +8,13 @@
 
 //! Typed method invocation adapter contracts emitted by derive.
 //!
-//! Derive needs safe constructors for method metadata and its `InvocationAdapters`
-//! table, including local, thread-safe, catching, and pinned dispatch. Runtime
-//! counterparts include `MethodMetadata`, `MethodDescriptor`,
-//! `InvocationAdapter`, `PinnedInvocationAdapter`, `ModeAdapter`, and
-//! `Invocation`; these are currently crate-private. Adapter factories must
-//! preserve receiver, argument, output, and value-mode types in their
-//! signatures.
+//! Derive needs safe constructors for method metadata and its
+//! `InvocationAdapters` table, including local, thread-safe, catching, and
+//! pinned dispatch. Runtime counterparts include `MethodMetadata`,
+//! `MethodDescriptor`, `InvocationAdapter`, `PinnedInvocationAdapter`,
+//! `ModeAdapter`, and `Invocation`; these are currently crate-private. Adapter
+//! factories must preserve receiver, argument, output, and value-mode types in
+//! their signatures.
 
 pub use crate::runtime::descriptor::method::EffectiveMethod;
 pub use crate::runtime::descriptor::method::FunctionAbi;
@@ -76,7 +76,6 @@ macro_rules! __qubit_reflect_submit_method_catalog_provider {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_method_catalog_provider as submit_method_catalog_provider;
-
 /// Registers a method declaration using its concrete reflected owner type.
 #[doc(hidden)]
 pub use crate::runtime::descriptor::method::EffectiveMethod as RuntimeEffectiveMethod;

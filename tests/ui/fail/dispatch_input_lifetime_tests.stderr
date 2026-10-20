@@ -1,31 +1,7 @@
-error[E0432]: unresolved import `qubit_reflect::InvocationFailure`
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:10:5
+error[E0515]: cannot return value referencing local variable `argument`
+  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:19:25
    |
-10 | use qubit_reflect::InvocationFailure;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `InvocationFailure` in the root
-   |
-help: consider importing this struct instead
-   |
-10 | use qubit_reflect::invoke::InvocationFailure;
-   |                    ++++++++
-
-error[E0432]: unresolved import `qubit_reflect::ReflectRegistry`
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:11:5
-   |
-11 | use qubit_reflect::ReflectRegistry;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in the root
-
-error[E0432]: unresolved import `qubit_reflect::descriptor::MethodInstanceDescriptor`
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:12:5
-   |
-12 | use qubit_reflect::descriptor::MethodInstanceDescriptor;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^------------------------
-   |     |                          |
-   |     |                          help: a similar name exists in the module: `MethodDescriptor`
-   |     no `MethodInstanceDescriptor` in `descriptor`
-
-error[E0599]: no function or associated item named `associated_function` found for struct `qubit_reflect::Invocation<'call, M>` in the current scope
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:20:47
-   |
-20 |     match method.invoke(registry, Invocation::associated_function().arg_ref(&argument)) {
-   |                                               ^^^^^^^^^^^^^^^^^^^ function or associated item not found in `qubit_reflect::Invocation<'_, _>`
+18 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
+   |                                                                   --------- `argument` is borrowed here
+19 |         Err(failure) => failure,
+   |                         ^^^^^^^ returns a value referencing data owned by the current function

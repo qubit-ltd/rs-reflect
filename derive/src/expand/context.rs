@@ -94,7 +94,7 @@ impl ExpansionContext {
     /// # Errors
     ///
     /// Returns a diagnostic when no runtime dependency was found.
-    fn from_found_crate(found: Option<FoundCrate>) -> SynResult<Self> {
+    pub(super) fn from_found_crate(found: Option<FoundCrate>) -> SynResult<Self> {
         let facade = match found {
             Some(FoundCrate::Itself) => quote!(::qubit_reflect),
             Some(FoundCrate::Name(name)) => {

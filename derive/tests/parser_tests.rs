@@ -55,7 +55,7 @@ trait ExternalFormat {
     fn format(&self) -> String;
 }
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = ExternalFormat)]
 impl<T: Clone + Default> ExternalFormat for Record<T> {
     fn format(&self) -> String {
         String::new()
@@ -64,10 +64,7 @@ impl<T: Clone + Default> ExternalFormat for Record<T> {
 
 #[test]
 fn test_macro_parsers_accept_supported_declarations() {
-    let _ = Record {
-        id: 1,
-        value: "value",
-    };
+    let _ = Record { id: 1, value: "value" };
     let _ = Event::Ready;
     let _ = Opaque;
 }
@@ -78,13 +75,10 @@ fn test_macro_diagnostic_rejects_a_removed_helper() {
         .duration_since(UNIX_EPOCH)
         .expect("the system clock should follow the Unix epoch")
         .as_nanos();
-    let fixture =
-        env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
+    let fixture = env::temp_dir().join(format!("qubit-reflect-span-{}-{nonce}", std::process::id()));
     let source_dir = fixture.join("src");
     fs::create_dir_all(&source_dir).expect("the temporary fixture should be created");
-    let dependency_path = env!("CARGO_MANIFEST_DIR")
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"");
+    let dependency_path = env!("CARGO_MANIFEST_DIR").replace('\\', "\\\\").replace('"', "\\\"");
     fs::write(
         fixture.join("Cargo.toml"),
         format!(

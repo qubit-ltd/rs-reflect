@@ -1,5 +1,5 @@
 error[E0432]: unresolved import `qubit_reflect::ReflectRegistry`
- --> tests/ui/fail/removed_registry_helper_tests.rs:1:5
+ --> tests/ui/fail/removed_registry_helper_tests.rs:9:5
   |
-1 | use qubit_reflect::ReflectRegistry;
+9 | use qubit_reflect::ReflectRegistry;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in the root

@@ -10,7 +10,9 @@
 
 #![cfg(feature = "derive")]
 
-use qubit_reflect::{Reflect, ReflectionContext, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
 
 #[Reflect]
 struct GenericContextRecord<T> {
@@ -24,18 +26,13 @@ fn generic_definition_is_available_from_the_concrete_type_descriptor() {
         .build()
         .expect("a concrete generic type registration is valid");
     let concrete = context.type_of::<GenericContextRecord<u32>>();
-    let definition = concrete
-        .definition()
-        .expect("generic type has a definition");
+    let definition = concrete.definition().expect("generic type has a definition");
 
     assert_eq!(definition.name(), "GenericContextRecord");
     assert!(definition.path().ends_with("GenericContextRecord"));
     assert_eq!(concrete.generic_arguments().len(), 1);
     assert_eq!(
-        concrete
-            .field("value")
-            .expect("field metadata is retained")
-            .name(),
+        concrete.field("value").expect("field metadata is retained").name(),
         "value"
     );
 

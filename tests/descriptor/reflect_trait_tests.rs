@@ -50,10 +50,5 @@ fn test_reflect_trait_preserves_identity_generics_and_visible_method_metadata() 
             .len(),
         1
     );
-    assert!(
-        definition
-            .methods()
-            .iter()
-            .all(|method| method.name() != "omitted")
-    );
+    assert!(definition.methods().iter().all(|method| method.name() != "omitted"));
 }

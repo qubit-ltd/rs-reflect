@@ -1,0 +1,28 @@
+error: cannot find macro `__QubitReflectTraitDef_UnreflectedTrait_DEFAULT_METHODS_CALLSITE` in this scope
+  --> tests/ui/fail/reflected_trait_requires_provider.rs:16:48
+   |
+16 | #[qubit_reflect::ReflectImpl(reflected_trait = UnreflectedTrait)]
+   |                                                ^^^^^^^^^^^^^^^^
+
+error[E0576]: cannot find method or associated constant `__qbr_trait_application_metadata` in trait `UnreflectedTrait`
+  --> tests/ui/fail/reflected_trait_requires_provider.rs:16:1
+   |
+13 |     fn value(&self) -> u8;
+   |     ---------------------- associated function `value` defined here
+...
+16 | #[qubit_reflect::ReflectImpl(reflected_trait = UnreflectedTrait)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in `UnreflectedTrait`
+   |
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find type `__QubitReflectTraitDef_UnreflectedTrait` in this scope
+  --> tests/ui/fail/reflected_trait_requires_provider.rs:16:48
+   |
+16 | #[qubit_reflect::ReflectImpl(reflected_trait = UnreflectedTrait)]
+   |                                                ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `__QubitReflectTraitDef_UnreflectedTrait_SPEC` in this scope
+  --> tests/ui/fail/reflected_trait_requires_provider.rs:16:48
+   |
+16 | #[qubit_reflect::ReflectImpl(reflected_trait = UnreflectedTrait)]
+   |                                                ^^^^^^^^^^^^^^^^ not found in this scope

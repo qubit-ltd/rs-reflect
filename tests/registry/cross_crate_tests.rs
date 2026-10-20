@@ -6,4 +6,5 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! The `registry-app` workspace package verifies cross-crate context aggregation.
+//! The `registry-app` workspace package verifies cross-crate context
+//! aggregation.

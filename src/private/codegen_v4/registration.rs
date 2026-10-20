@@ -15,18 +15,15 @@
 //! expose caller-constructed fragment identities, raw payload variants, or the
 //! inventory macro as part of this protocol.
 
+pub use crate::runtime::context::handle::TraitObjectDescriptor;
 pub use crate::runtime::context::handle::registration::Registration;
 pub use crate::runtime::context::handle::registration::RegistrationFragment;
-pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 pub use crate::runtime::context::handle::registration::TraitObjectRegistration;
-pub use crate::runtime::context::handle::TraitObjectDescriptor;
+pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 
 /// Creates a global registration fragment for a compiler-checked trait object.
 #[doc(hidden)]
-pub const fn trait_object_fragment(
-    label: &'static str,
-    registration: fn() -> Registration,
-) -> RegistrationFragment {
+pub const fn trait_object_fragment(label: &'static str, registration: fn() -> Registration) -> RegistrationFragment {
     RegistrationFragment::for_global_registration(label, registration)
 }
 
@@ -61,14 +58,22 @@ impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
     }
 }
 
+impl<T: crate::runtime::descriptor::Reflect> From<MethodBinding<T>>
+    for crate::runtime::context::handle::registration::Registration
+{
+    fn from(binding: MethodBinding<T>) -> Self {
+        crate::runtime::context::handle::registration::Registration::metadata_only()
+            .with_method_binding::<T>(binding.effective)
+    }
+}
+
 /// Binds method metadata and generated adapters to their concrete target type.
 pub const fn bind_method<T: crate::runtime::descriptor::Reflect>(
     metadata: &'static crate::runtime::descriptor::method::MethodMetadata,
     adapters: crate::runtime::descriptor::method::InvocationAdapters,
 ) -> MethodBinding<T> {
     MethodBinding {
-        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata)
-            .with_adapters(adapters),
+        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata).with_adapters(adapters),
         _target: std::marker::PhantomData,
     }
 }
@@ -86,6 +91,23 @@ macro_rules! __qubit_reflect_submit_type {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_type as submit_type;
+
+/// Submits a generic type definition independently of any concrete instance.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_submit_type_definition {
+    ($label:expr, $registration:path) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::registration::RegistrationFragment::for_type_definition(
+                $label,
+                $registration,
+            )
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_submit_type_definition as submit_type_definition;
 
 /// Creates a statically typed method binding for the exact target type.
 #[doc(hidden)]

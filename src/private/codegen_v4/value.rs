@@ -13,47 +13,34 @@ use std::marker::PhantomData;
 
 use crate::runtime::descriptor::Reflect;
 use crate::runtime::value as runtime_value;
-
-pub use crate::runtime::value::{Local, ThreadSafe};
+pub use crate::runtime::value::Local;
+pub use crate::runtime::value::ThreadSafe;
 
 mod sealed {
-    use super::{Reflect, runtime_value};
+    use super::Reflect;
+    use super::runtime_value;
 
-    pub(crate) trait Mode: 'static {
+    // These traits are public within a private module so the public marker
+    // traits below can use them as sealed bounds without triggering
+    // `private_bounds`. Downstream crates cannot name this module, so the
+    // value-mode and conversion traits remain sealed.
+    pub trait Mode: 'static {
         type Runtime: runtime_value::RuntimeValueMode;
     }
 
-    pub(crate) trait OwnedValue<M: Mode>:
-        Reflect + Sized + 'static + runtime_value::RuntimeValueFor<M::Runtime>
-    {
-    }
+    pub trait OwnedValue<M: Mode>: Reflect + Sized + 'static + runtime_value::RuntimeValueFor<M::Runtime> {}
 
-    pub(crate) trait SharedValue<M: Mode>:
-        Reflect + runtime_value::RuntimeValueForRef<M::Runtime>
-    {
-    }
+    pub trait SharedValue<M: Mode>: Reflect + runtime_value::RuntimeValueForRef<M::Runtime> {}
 
-    pub(crate) trait MutableValue<M: Mode>:
-        Reflect + runtime_value::RuntimeValueForMut<M::Runtime>
-    {
-    }
+    pub trait MutableValue<M: Mode>: Reflect + runtime_value::RuntimeValueForMut<M::Runtime> {}
 
-    pub(crate) trait Sealed {}
+    pub trait Sealed {}
 
-    impl<T: Reflect + Sized + 'static, M: Mode> OwnedValue<M> for T where
-        T: runtime_value::RuntimeValueFor<M::Runtime>
-    {
-    }
+    impl<T: Reflect + Sized + 'static, M: Mode> OwnedValue<M> for T where T: runtime_value::RuntimeValueFor<M::Runtime> {}
 
-    impl<T: Reflect + ?Sized, M: Mode> SharedValue<M> for T where
-        T: runtime_value::RuntimeValueForRef<M::Runtime>
-    {
-    }
+    impl<T: Reflect + ?Sized, M: Mode> SharedValue<M> for T where T: runtime_value::RuntimeValueForRef<M::Runtime> {}
 
-    impl<T: Reflect + ?Sized, M: Mode> MutableValue<M> for T where
-        T: runtime_value::RuntimeValueForMut<M::Runtime>
-    {
-    }
+    impl<T: Reflect + ?Sized, M: Mode> MutableValue<M> for T where T: runtime_value::RuntimeValueForMut<M::Runtime> {}
 }
 
 /// A sealed mode controlling which values can cross a thread boundary.
@@ -73,36 +60,29 @@ impl ValueMode for ThreadSafe {}
 /// A sealed marker for sized values that can be stored in a dynamic owner.
 pub trait ValueFor<M: ValueMode>: Reflect + Sized + 'static + sealed::OwnedValue<M> {}
 
-impl<T: Reflect + Sized + 'static> ValueFor<Local> for T where
-    T: runtime_value::RuntimeValueFor<runtime_value::Local>
-{
-}
+impl<T: Reflect + Sized + 'static> ValueFor<Local> for T where T: runtime_value::RuntimeValueFor<runtime_value::Local> {}
 
 impl<T: Reflect + Send + Sync + Sized + 'static> ValueFor<ThreadSafe> for T where
     T: runtime_value::RuntimeValueFor<runtime_value::ThreadSafe>
 {
 }
 
-/// A sealed marker for values that can be represented by a shared dynamic borrow.
+/// A sealed marker for values that can be represented by a shared dynamic
+/// borrow.
 pub trait ValueForRef<M: ValueMode>: Reflect + sealed::SharedValue<M> {}
 
-impl<T: Reflect + ?Sized> ValueForRef<Local> for T where
-    T: runtime_value::RuntimeValueForRef<runtime_value::Local>
-{
-}
+impl<T: Reflect + ?Sized> ValueForRef<Local> for T where T: runtime_value::RuntimeValueForRef<runtime_value::Local> {}
 
 impl<T: Reflect + Sync + ?Sized> ValueForRef<ThreadSafe> for T where
     T: runtime_value::RuntimeValueForRef<runtime_value::ThreadSafe>
 {
 }
 
-/// A sealed marker for values that can be represented by a mutable dynamic borrow.
+/// A sealed marker for values that can be represented by a mutable dynamic
+/// borrow.
 pub trait ValueForMut<M: ValueMode>: Reflect + sealed::MutableValue<M> {}
 
-impl<T: Reflect + ?Sized> ValueForMut<Local> for T where
-    T: runtime_value::RuntimeValueForMut<runtime_value::Local>
-{
-}
+impl<T: Reflect + ?Sized> ValueForMut<Local> for T where T: runtime_value::RuntimeValueForMut<runtime_value::Local> {}
 
 impl<T: Reflect + Send + Sync + ?Sized> ValueForMut<ThreadSafe> for T where
     T: runtime_value::RuntimeValueForMut<runtime_value::ThreadSafe>
@@ -159,9 +139,7 @@ impl<M: ValueMode> DynamicOwned<M> {
         self.inner
     }
 
-    pub(crate) fn from_runtime(
-        inner: runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime>,
-    ) -> Self {
+    pub(crate) fn from_runtime(inner: runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime>) -> Self {
         Self {
             inner,
             mode: PhantomData,
@@ -349,5 +327,128 @@ impl<'a, M: ValueMode> DynamicMut<'a, M> {
             inner: self.inner.reborrow(),
             mode: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    use super::DynamicMut;
+    use super::DynamicOwned;
+    use super::DynamicRef;
+    use super::Local;
+    use super::Reflect;
+    use super::ThreadSafe;
+
+    struct LocalOnly(Rc<Cell<u32>>);
+
+    impl Reflect for LocalOnly {}
+
+    struct SharedCounter(u32);
+
+    impl Reflect for SharedCounter {}
+
+    #[test]
+    fn local_owned_adapter_preserves_typed_and_dynamic_values() {
+        let mut value = DynamicOwned::<Local>::new(LocalOnly(Rc::new(Cell::new(7))));
+        assert!(value.is::<LocalOnly>());
+        assert_eq!(value.downcast_ref::<LocalOnly>().map(|value| value.0.get()), Some(7));
+        value.downcast_mut::<LocalOnly>().expect("stored type").0.set(8);
+
+        let runtime = value.into_runtime();
+        let value = DynamicOwned::<Local>::from_runtime(runtime);
+        assert_eq!(value.downcast::<LocalOnly>().expect("matching type").0.get(), 8);
+
+        let failed = DynamicOwned::<Local>::new(LocalOnly(Rc::new(Cell::new(9))))
+            .downcast::<u32>()
+            .expect_err("wrong requested type must retain the dynamic owner");
+        assert_eq!(
+            failed.value().downcast_ref::<LocalOnly>().map(|value| value.0.get()),
+            Some(9)
+        );
+        assert_eq!(
+            failed
+                .into_value()
+                .downcast::<LocalOnly>()
+                .expect("retained value")
+                .0
+                .get(),
+            9
+        );
+    }
+
+    #[test]
+    fn thread_safe_owned_adapter_preserves_typed_and_dynamic_values() {
+        let mut value = DynamicOwned::<ThreadSafe>::new(SharedCounter(12));
+        assert!(value.is::<SharedCounter>());
+        assert_eq!(value.downcast_ref::<SharedCounter>().map(|value| value.0), Some(12));
+        value.downcast_mut::<SharedCounter>().expect("stored type").0 += 1;
+
+        let runtime = value.into_runtime();
+        let value = DynamicOwned::<ThreadSafe>::from_runtime(runtime);
+        assert_eq!(value.downcast::<SharedCounter>().expect("matching type").0, 13);
+
+        let failed = DynamicOwned::<ThreadSafe>::new(SharedCounter(14))
+            .downcast::<u32>()
+            .expect_err("wrong requested type must retain the dynamic owner");
+        assert_eq!(
+            failed.value().downcast_ref::<SharedCounter>().map(|value| value.0),
+            Some(14)
+        );
+    }
+
+    #[test]
+    fn local_borrowed_adapters_recover_and_retain_mismatches() {
+        let local = LocalOnly(Rc::new(Cell::new(21)));
+        let shared = DynamicRef::<Local>::new(&local);
+        assert!(shared.is::<LocalOnly>());
+        assert_eq!(shared.downcast_ref::<LocalOnly>().map(|value| value.0.get()), Some(21));
+        assert!(shared.clone().downcast::<u32>().is_err());
+        assert_eq!(
+            shared.downcast::<LocalOnly>().expect("matching shared borrow").0.get(),
+            21
+        );
+
+        let mut local = LocalOnly(Rc::new(Cell::new(30)));
+        let mut exclusive = DynamicMut::<Local>::new(&mut local);
+        assert_eq!(
+            exclusive.downcast_ref::<LocalOnly>().map(|value| value.0.get()),
+            Some(30)
+        );
+        exclusive.downcast_mut::<LocalOnly>().expect("stored type").0.set(31);
+        let retained = exclusive.downcast::<u32>().expect_err("mismatch keeps mutable borrow");
+        retained
+            .into_value()
+            .downcast::<LocalOnly>()
+            .expect("retained mutable borrow")
+            .0
+            .set(32);
+        assert_eq!(local.0.get(), 32);
+    }
+
+    #[test]
+    fn thread_safe_borrowed_adapters_support_sized_and_slice_values() {
+        let value = SharedCounter(40);
+        let shared = DynamicRef::<ThreadSafe>::new(&value);
+        assert_eq!(shared.downcast_ref::<SharedCounter>().map(|value| value.0), Some(40));
+        assert!(shared.clone().downcast::<u32>().is_err());
+        assert_eq!(
+            shared.downcast::<SharedCounter>().expect("matching shared borrow").0,
+            40
+        );
+
+        let text = String::from("hello");
+        let shared_text = DynamicRef::<ThreadSafe>::new_str(text.as_str());
+        assert!(shared_text.is::<str>());
+        assert_eq!(shared_text.downcast_ref::<str>(), Some("hello"));
+        assert_eq!(shared_text.into_str().expect("matching DST borrow"), "hello");
+
+        let mut text = String::from("world");
+        let mut text_slice = DynamicMut::<ThreadSafe>::new_str_mut(text.as_mut_str());
+        assert_eq!(text_slice.downcast_ref::<str>(), Some("world"));
+        text_slice.downcast_mut::<str>().expect("matching mutable DST")[0..1].make_ascii_uppercase();
+        assert_eq!(text_slice.into_str_mut().expect("matching mutable DST"), "World");
     }
 }

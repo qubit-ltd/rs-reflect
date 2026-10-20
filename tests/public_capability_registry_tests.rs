@@ -14,7 +14,8 @@ use qubit_reflect::Reflect;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CloneCapability;
 use qubit_reflect::register_capability;
-use qubit_reflect::value::{DynamicRef, Local};
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -34,7 +35,7 @@ fn linked_capability_macro_registers_a_typed_adapter() {
         .clone_dynamic(DynamicRef::<Local>::new(&source))
         .expect("the registered adapter clones the exact Rust type");
     let cloned = cloned
-        .into_owned::<LinkedCloneValue>()
+        .downcast::<LinkedCloneValue>()
         .expect("the dynamic clone keeps its registered concrete type");
 
     assert_eq!(cloned, source);

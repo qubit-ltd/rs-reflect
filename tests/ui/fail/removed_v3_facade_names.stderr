@@ -1,0 +1,44 @@
+error[E0432]: unresolved import `qubit_reflect::capability::CapabilityKey`
+ --> tests/ui/fail/removed_v3_facade_names.rs:9:5
+  |
+9 | use qubit_reflect::capability::CapabilityKey;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^-------------
+  |     |                          |
+  |     |                          help: a similar name exists in the module: `Capabilities`
+  |     no `CapabilityKey` in `capability`
+
+error[E0432]: unresolved import `qubit_reflect::context::ReflectRegistry`
+  --> tests/ui/fail/removed_v3_facade_names.rs:10:5
+   |
+10 | use qubit_reflect::context::ReflectRegistry;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in `context`
+
+error[E0432]: unresolved import `qubit_reflect::descriptor::ReflectedType`
+  --> tests/ui/fail/removed_v3_facade_names.rs:11:5
+   |
+11 | use qubit_reflect::descriptor::ReflectedType;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectedType` in `descriptor`
+
+error[E0599]: no method named `require_type_by_name` found for reference `&ReflectionContext` in the current scope
+  --> tests/ui/fail/removed_v3_facade_names.rs:19:21
+   |
+19 |     let _ = context.require_type_by_name("fixture::Type");
+   |                     ^^^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `type_by_name` with a similar name
+   |
+19 -     let _ = context.require_type_by_name("fixture::Type");
+19 +     let _ = context.type_by_name("fixture::Type");
+   |
+
+error[E0599]: no method named `require_field` found for struct `TypeDescriptor<'ctx>` in the current scope
+  --> tests/ui/fail/removed_v3_facade_names.rs:20:24
+   |
+20 |     let _ = descriptor.require_field("field");
+   |                        ^^^^^^^^^^^^^ method not found in `TypeDescriptor<'static>`
+
+error[E0599]: no method named `require_method` found for struct `TypeDescriptor<'ctx>` in the current scope
+  --> tests/ui/fail/removed_v3_facade_names.rs:21:24
+   |
+21 |     let _ = descriptor.require_method("method");
+   |                        ^^^^^^^^^^^^^^ method not found in `TypeDescriptor<'static>`

@@ -43,7 +43,7 @@ trait AssociatedAliasDecoy {
 
 struct AssociatedTarget<T>(PhantomData<T>);
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = AssociatedAliasTrait)]
 impl<T> AssociatedAlias for AssociatedTarget<T> {
     type Output = usize;
 

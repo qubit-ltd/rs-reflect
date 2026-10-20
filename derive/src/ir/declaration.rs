@@ -12,7 +12,6 @@ use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 
-use crate::ir::ExternalTraitIr;
 use crate::ir::HelperAttributeIr;
 use crate::ir::HelperName;
 use crate::ir::PathIr;
@@ -46,6 +45,9 @@ pub(crate) struct ValidatedDeclaration {
 
 /// One of the declarations supported by the reflection macros.
 #[derive(Clone, Debug)]
+// This short-lived macro IR keeps each declaration directly accessible; boxing
+// the large impl variant would add an allocation to every impl expansion.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum DeclarationIr {
     /// Struct, enum, or union declaration.
     Type(TypeDeclarationIr),
@@ -160,12 +162,10 @@ pub(crate) struct TraitDeclarationIr {
     pub(crate) generics: GenericsIr,
     /// Direct supertrait bounds in source order.
     pub(crate) supertraits: Vec<GenericBoundIr>,
+    /// Explicit typed provider bindings for direct supertrait source indexes.
+    pub(crate) supertrait_bindings: Vec<TraitSupertraitBindingIr>,
     /// Helpers supplied to the outer trait macro.
     pub(crate) attributes: Vec<HelperAttributeIr>,
-    /// Explicit mappings for external trait bounds.
-    pub(crate) external_traits: Vec<ExternalTraitIr>,
-    /// Explicitly declared reflected direct supertrait paths.
-    pub(crate) reflected_supertraits: Vec<PathIr>,
     /// Trait methods in source order.
     pub(crate) methods: Vec<MethodIr>,
     /// Associated type declarations in source order.
@@ -178,6 +178,15 @@ pub(crate) struct TraitDeclarationIr {
     pub(crate) span: Span,
 }
 
+/// Associates one source supertrait with a reflected trait provider path.
+#[derive(Clone, Debug)]
+pub(crate) struct TraitSupertraitBindingIr {
+    /// Zero-based index in the source supertrait list.
+    pub(crate) index: usize,
+    /// Path whose generated provider supplies this supertrait's identity.
+    pub(crate) provider: PathIr,
+}
+
 /// A reflected inherent or trait impl declaration.
 #[derive(Clone, Debug)]
 pub(crate) struct ImplDeclarationIr {
@@ -187,12 +196,20 @@ pub(crate) struct ImplDeclarationIr {
     pub(crate) target_type: TypeIr,
     /// The implemented trait path, or `None` for an inherent impl.
     pub(crate) trait_path: Option<PathIr>,
+    /// Explicit path to a reflected trait definition when the impl path uses an
+    /// alias.
+    pub(crate) reflected_trait: Option<PathIr>,
+    /// Typed external-trait identity handle for an otherwise unresolved impl
+    /// path.
+    pub(crate) external_trait: Option<PathIr>,
     /// Helpers supplied to the outer impl macro.
     pub(crate) attributes: Vec<HelperAttributeIr>,
     /// Concrete impl specializations in source order.
     pub(crate) specializations: Vec<SpecializationIr>,
     /// Impl methods in source order.
     pub(crate) methods: Vec<MethodIr>,
+    /// Impl methods excluded from reflection but retained as override facts.
+    pub(crate) skipped_methods: Vec<MethodIr>,
     /// Associated type bindings in source order.
     pub(crate) associated_types: Vec<AssociatedTypeIr>,
     /// Associated const bindings in source order.

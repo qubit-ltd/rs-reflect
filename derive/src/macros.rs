@@ -14,11 +14,11 @@ use quote::quote;
 use syn::Item;
 use syn::ItemEnum;
 use syn::ItemStruct;
-use syn::parse2;
-use syn::spanned::Spanned;
+use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
-use syn::Token;
+use syn::parse2;
+use syn::spanned::Spanned;
 
 use crate::configure;
 use crate::entry;
@@ -56,17 +56,37 @@ impl Parse for ExternalTraitInput {
         if !input.is_empty() {
             return Err(input.error("unexpected tokens after external trait declaration"));
         }
-        Ok(Self { visibility, marker, path })
+        Ok(Self {
+            visibility,
+            marker,
+            path,
+        })
     }
 }
 
-/// Expands a typed marker and linked identity registration for an external trait.
+/// Expands a typed marker and linked identity registration for an external
+/// trait.
 pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
-    let result: syn::Result<TokenStream2> = (|| {
-        let input: ExternalTraitInput = parse2(input.into())?;
-        let context = crate::expand::ExpansionContext::from_attributes(&[])?;
+    let result = crate::expand::ExpansionContext::from_attributes(&[])
+        .and_then(|context| expand_reflect_external_trait(input.into(), &context));
+    match result {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
+    }
+}
+
+fn expand_reflect_external_trait(
+    input: TokenStream2,
+    context: &crate::expand::ExpansionContext,
+) -> syn::Result<TokenStream2> {
+    (|| {
+        let input: ExternalTraitInput = parse2(input)?;
         let facade = context.facade();
-        let ExternalTraitInput { visibility, marker, path } = input;
+        let ExternalTraitInput {
+            visibility,
+            marker,
+            path,
+        } = input;
         let source_path = path
             .segments
             .iter()
@@ -78,11 +98,18 @@ pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
         } else {
             source_path
         };
+        let trait_name = path
+            .segments
+            .last()
+            .map(|segment| segment.ident.to_string())
+            .ok_or_else(|| syn::Error::new(path.span(), "expected an external trait path"))?;
+        let trait_name = syn::LitStr::new(&trait_name, path.span());
         let source = syn::LitStr::new(&source_path, path.span());
         let fingerprint = context.fingerprint(&source_path);
-        let marker_provider =
-            format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
+        let marker_provider = format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
         Ok(quote! {
+            const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
+
             #[doc(hidden)]
             #visibility struct #marker;
 
@@ -104,7 +131,7 @@ pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
                 > = ::std::sync::OnceLock::new();
                 VALUE.get_or_init(||
                     #facade::__private::codegen_v4::traits::external_trait_definition::<#marker>(
-                        stringify!(#marker), #source,
+                        #trait_name, #source,
                     )
                 )
             }
@@ -122,23 +149,35 @@ pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
                 }
             };
         })
-    })();
+    })()
+}
+
+/// Expands a compiler-checked trait-object registration fragment.
+pub fn register_trait_object(input: TokenStream) -> TokenStream {
+    let result = crate::expand::ExpansionContext::from_attributes(&[])
+        .and_then(|context| expand_register_trait_object(input.into(), &context));
     match result {
         Ok(tokens) => tokens.into(),
         Err(error) => error.into_compile_error().into(),
     }
 }
 
-/// Expands a compiler-checked trait-object registration fragment.
-pub fn register_trait_object(input: TokenStream) -> TokenStream {
-    let result: syn::Result<TokenStream2> = (|| {
-        let object: syn::Type = parse2(input.into())?;
+fn expand_register_trait_object(
+    input: TokenStream2,
+    context: &crate::expand::ExpansionContext,
+) -> syn::Result<TokenStream2> {
+    (|| {
+        let object: syn::Type = parse2(input)?;
         if !matches!(object, syn::Type::TraitObject(_)) {
-            return Err(syn::Error::new_spanned(object, "expected a trait object such as `dyn Trait`"));
+            return Err(syn::Error::new_spanned(
+                object,
+                "expected a trait object such as `dyn Trait`",
+            ));
         }
-        let facade = crate::expand::ExpansionContext::from_attributes(&[])?;
-        let facade = facade.facade();
+        let facade = context.facade();
         Ok(quote! {
+            const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
+
             const _: () = {
                 fn registration() -> #facade::__private::codegen_v4::registration::Registration {
                     #facade::__private::codegen_v4::registration::Registration::metadata_only()
@@ -155,11 +194,7 @@ pub fn register_trait_object(input: TokenStream) -> TokenStream {
                 }
             };
         })
-    })();
-    match result {
-        Ok(tokens) => tokens.into(),
-        Err(error) => error.into_compile_error().into(),
-    }
+    })()
 }
 
 /// Derives structural reflection for a struct or enum.
@@ -268,4 +303,62 @@ fn expand_type(item: impl ToTokens, reflected_item: TokenStream2) -> TokenStream
 
 fn strip_attributes(attributes: &mut Vec<syn::Attribute>) {
     attributes.retain(|attribute| !attribute.path().is_ident("reflect"));
+}
+
+#[cfg(test)]
+mod tests {
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    use super::expand_reflect_external_trait;
+    use super::expand_register_trait_object;
+    use crate::expand::ExpansionContext;
+
+    fn assert_v4_protocol_handshake(tokens: TokenStream) {
+        let source = tokens.to_string();
+        assert!(
+            source.contains("codegen_v4 :: protocol :: assert_protocol_version (4)"),
+            "expected the generated output to assert codegen v4, got: {source}",
+        );
+    }
+
+    #[test]
+    fn test_bind_method_emits_v4_protocol_handshake() {
+        let context = ExpansionContext::for_tests();
+        let tokens =
+            crate::expand::bind_method::expand_with_context(quote!(Fixture::method as fn(&Fixture) -> u32), &context)
+                .expect("method binding should expand");
+
+        assert_v4_protocol_handshake(tokens);
+    }
+
+    #[test]
+    fn test_register_method_binding_emits_v4_protocol_handshake() {
+        let context = ExpansionContext::for_tests();
+        let tokens = crate::expand::bind_method::expand_registered_with_context(
+            quote!(Fixture::method as fn(&Fixture) -> u32),
+            &context,
+        )
+        .expect("registered method binding should expand");
+
+        assert_v4_protocol_handshake(tokens);
+    }
+
+    #[test]
+    fn test_reflect_external_trait_emits_v4_protocol_handshake() {
+        let context = ExpansionContext::for_tests();
+        let tokens = expand_reflect_external_trait(quote!(pub ExternalDebug = ::std::fmt::Debug;), &context)
+            .expect("external trait marker should expand");
+
+        assert_v4_protocol_handshake(tokens);
+    }
+
+    #[test]
+    fn test_register_trait_object_emits_v4_protocol_handshake() {
+        let context = ExpansionContext::for_tests();
+        let tokens = expand_register_trait_object(quote!(dyn ::std::fmt::Debug), &context)
+            .expect("trait object registration should expand");
+
+        assert_v4_protocol_handshake(tokens);
+    }
 }

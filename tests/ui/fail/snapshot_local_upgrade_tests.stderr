@@ -1,14 +1,15 @@
-error[E0432]: unresolved import `qubit_reflect::ReflectRegistry`
-  --> tests/ui/fail/snapshot_local_upgrade_tests.rs:10:5
+error[E0308]: mismatched types
+  --> tests/ui/fail/snapshot_local_upgrade_tests.rs:19:34
    |
-10 | use qubit_reflect::ReflectRegistry;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in the root
-
-error[E0432]: unresolved import `qubit_reflect::descriptor::MethodInstanceDescriptor`
-  --> tests/ui/fail/snapshot_local_upgrade_tests.rs:11:5
+19 |     dispatch_thread_safe(method, input);
+   |     --------------------         ^^^^^ expected `Invocation<'_, ThreadSafe>`, found `Invocation<'_>`
+   |     |
+   |     arguments to this function are incorrect
    |
-11 | use qubit_reflect::descriptor::MethodInstanceDescriptor;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^------------------------
-   |     |                          |
-   |     |                          help: a similar name exists in the module: `MethodDescriptor`
-   |     no `MethodInstanceDescriptor` in `descriptor`
+   = note: expected struct `qubit_reflect::Invocation<'_, ThreadSafe>`
+              found struct `qubit_reflect::Invocation<'_, Local>`
+note: function defined here
+  --> tests/ui/fail/snapshot_local_upgrade_tests.rs:14:4
+   |
+14 | fn dispatch_thread_safe(method: &MethodDescriptor<'_>, input: Invocation<'_, ThreadSafe>) {
+   |    ^^^^^^^^^^^^^^^^^^^^                                ---------------------------------

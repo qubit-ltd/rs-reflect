@@ -1,0 +1,16 @@
+error[E0277]: the trait bound `__QubitReflectTarget: Unrelated` is not satisfied
+  --> tests/ui/fail/supertrait_binding_mismatch.rs:17:1
+   |
+17 | #[Reflect(supertrait_binding(0 => Unrelated))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Unrelated` is not implemented for `__QubitReflectTarget`
+   |
+note: required by a bound in `require_provider`
+  --> tests/ui/fail/supertrait_binding_mismatch.rs:17:1
+   |
+17 | #[Reflect(supertrait_binding(0 => Unrelated))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `require_provider`
+   = note: this error originates in the derive macro `::qubit_reflect_derive::ConfiguredReflection` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider further restricting type parameter `__QubitReflectTarget` with trait `Unrelated`
+   |
+18 | trait Child<T> + Unrelated: Required {}
+   |                +++++++++++

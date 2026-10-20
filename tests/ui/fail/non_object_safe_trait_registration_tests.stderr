@@ -1,0 +1,15 @@
+error[E0038]: the trait `External` is not dyn compatible
+  --> tests/ui/fail/non_object_safe_trait_registration_tests.rs:13:43
+   |
+13 | qubit_reflect::register_trait_object!(dyn External);
+   |                                           ^^^^^^^^ `External` is not dyn compatible
+   |
+note: for a trait to be dyn compatible it needs to allow building a vtable
+      for more information, visit <https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility>
+  --> tests/ui/fail/non_object_safe_trait_registration_tests.rs:10:8
+   |
+ 9 | trait External {
+   |       -------- this trait is not dyn compatible...
+10 |     fn generic<T>(&self, value: T);
+   |        ^^^^^^^ ...because method `generic` has generic type parameters
+   = help: consider moving `generic` to another trait

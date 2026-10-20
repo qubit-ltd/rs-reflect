@@ -15,7 +15,10 @@ use qubit_reflect::value::ThreadSafe;
 #[test]
 fn test_downcast_owned_failure_returns_the_original_wrapper() {
     let value = DynamicOwned::<Local>::new(String::from("owned value"));
-    let value = value.downcast::<u32>().expect_err("a String must not downcast to u32");
+    let failure = value.downcast::<u32>().expect_err("a String must not downcast to u32");
+    assert_eq!(failure.expected(), std::any::TypeId::of::<u32>());
+    assert_eq!(failure.actual(), std::any::TypeId::of::<String>());
+    let value = failure.into_value();
 
     assert!(value.is::<String>());
     let text = match value.downcast::<String>() {
@@ -25,9 +28,9 @@ fn test_downcast_owned_failure_returns_the_original_wrapper() {
     assert_eq!(text, "owned value");
 }
 
-/// Confirms local owned values expose safe `Any` interoperability.
+/// Confirms local owned values expose exact typed access and recovery.
 #[test]
-fn test_owned_any_interoperation_preserves_type_identity() {
+fn test_owned_typed_access_preserves_type_identity() {
     let mut value = DynamicOwned::<Local>::new(41_u32);
 
     assert_eq!(value.downcast_ref::<u32>(), Some(&41));
@@ -37,28 +40,15 @@ fn test_owned_any_interoperation_preserves_type_identity() {
             .expect("the local owned value should downcast mutably"),
         41,
     );
-    assert_eq!(value.as_any().and_then(|value| value.downcast_ref::<u32>()), Some(&41));
-    *value
-        .as_any_mut()
-        .and_then(|value| value.downcast_mut::<u32>())
-        .expect("the stored value is a u32") = 42;
-    let value = match value.into_any() {
-        Ok(value) => value,
-        Err(_) => panic!("owned values are Any-compatible"),
-    };
-    let value = match value.downcast::<u32>() {
-        Ok(value) => value,
-        Err(_) => panic!("the stored value remains a u32"),
-    };
-    assert_eq!(*value, 42);
+    *value.downcast_mut::<u32>().expect("the stored value is a u32") = 42;
+    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
 }
 
 /// Confirms a thread-safe owned value can be irreversibly downgraded.
 #[test]
-fn test_thread_safe_owned_can_be_downgraded_to_local() {
+fn test_thread_safe_owned_retains_typed_value() {
     let value = DynamicOwned::<ThreadSafe>::new(String::from("thread-safe"));
     assert_send_and_sync(&value);
-    let value = value.into_local();
 
     let text = match value.downcast::<String>() {
         Ok(text) => text,
@@ -68,7 +58,7 @@ fn test_thread_safe_owned_can_be_downgraded_to_local() {
 }
 
 /// Confirms thread-safe owned values expose all typed and `Any` inspection
-/// paths before downgrade.
+/// paths.
 #[test]
 fn test_thread_safe_owned_typed_and_any_access_preserve_value() {
     let mut value = DynamicOwned::<ThreadSafe>::new(51_u32);
@@ -80,15 +70,7 @@ fn test_thread_safe_owned_typed_and_any_access_preserve_value() {
         .expect("thread-safe owned value should downcast mutably") = 52;
     assert_eq!(value.downcast_ref::<u32>(), Some(&52));
 
-    let value = value
-        .into_any()
-        .unwrap_or_else(|_| panic!("owned value should expose Any"));
-    assert_eq!(
-        value
-            .downcast::<u32>()
-            .unwrap_or_else(|_| panic!("Any payload should retain exact type")),
-        Box::new(52),
-    );
+    assert_eq!(value.downcast_ref::<u32>(), Some(&52));
 }
 
 /// Verifies that a value retains both thread-safety auto traits.

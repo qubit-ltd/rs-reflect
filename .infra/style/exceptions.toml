@@ -72,22 +72,7 @@ reason = "This file intentionally uses a legacy import shape required by its mod
 
 [[exceptions]]
 rule = "explicit-imports"
-path = "tests/descriptor/expression_tests.rs"
-reason = "This file intentionally uses a legacy import shape required by its module boundary."
-
-[[exceptions]]
-rule = "explicit-imports"
 path = "tests/descriptor/generic_tests.rs"
-reason = "This file intentionally uses a legacy import shape required by its module boundary."
-
-[[exceptions]]
-rule = "explicit-imports"
-path = "tests/descriptor/identity_tests.rs"
-reason = "This file intentionally uses a legacy import shape required by its module boundary."
-
-[[exceptions]]
-rule = "explicit-imports"
-path = "tests/descriptor/method_descriptor_tests.rs"
 reason = "This file intentionally uses a legacy import shape required by its module boundary."
 
 [[exceptions]]
@@ -196,86 +181,206 @@ path = "derive/src/parse/attributes.rs"
 reason = "Helper parser syntax nodes share one grammar and are consumed together."
 
 [[exceptions]]
-rule = "public-type-layout"
-path = "src/access/field_set_recovery.rs"
-reason = "Field-set failure metadata and retained recovery values form one ownership-preserving failure result."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/capability/set.rs"
-reason = "Set construction, typed lookup, conflict details, and the lazy result alias form one immutable capability-set contract."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/construct/error.rs"
-reason = "Construction error kinds and field identifiers are the structured context carried by ConstructionError."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/construct/input.rs"
-reason = "Field policies and named, tuple, and update inputs make up one input model consumed by construction validation."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/construct/recovery.rs"
-reason = "The recovered value and aggregate recovery object jointly preserve ownership across failed construction."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/construct/validated.rs"
-reason = "Validated construction, override, and update tokens define the shared preflight boundary before extraction."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/expression/generic_argument.rs"
-reason = "Generic arguments and const-expression nodes form one recursive grammar used to represent generic instantiations."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/invoke/future.rs"
-reason = "InvocationMode selects the execution contract represented by ReflectedFuture."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/invoke/output.rs"
-reason = "BorrowOrigin and InvocationOutput jointly retain the source lifetime contract of a returned value."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/invoke/pinned.rs"
-reason = "Pinned invocation, validation, recovery, and adapter contracts share one lifetime-sensitive protocol."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/invoke/receiver.rs"
-reason = "Receiver expectations and adapters jointly validate and adapt the receiver before invoking a method."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/private/descriptor.rs"
-reason = "Generated-code probes and descriptor factories form one hidden macro protocol."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/registry/fragment.rs"
-reason = "Identity, target, payload, and kind types form the closed registration-fragment protocol consumed by aggregation."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/value/mode.rs"
-reason = "The sealed mode trait and its two marker implementations jointly define the associated storage and auto-trait contract."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/value/storage.rs"
-reason = "Owned, shared, and mutable storage for local and thread-safe modes form one six-cell representation matrix."
-
-[[exceptions]]
-rule = "public-type-layout"
-path = "src/registry/method_binding.rs"
-reason = "Binding selectors, duplicate-detection identity, and resolved bindings form one registration protocol consumed together by the registry builder."
-
-[[exceptions]]
 rule = "aggregation-files"
 path = "src/lib.rs"
 reason = "Test builds require `extern crate self as qubit_reflect` so procedural macro expansions can resolve the crate's absolute path."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/construct_vnext.rs"
+reason = "Construction request, plan, and failure types are the cohesive public surface of the vNext construction module."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/private/codegen_v4/impls.rs"
+reason = "Implementation metadata and emitted binding records form one internal code-generation protocol."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/private/codegen_v4/traits.rs"
+reason = "Trait declaration and application metadata are consumed together by the trait code-generation pipeline."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/private/codegen_v4/value.rs"
+reason = "Generated value and mode records share one private code-generation representation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/capability/builtin.rs"
+reason = "Built-in capability markers and their registrations form one closed built-in capability catalog."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/capability/capability.rs"
+reason = "Capability descriptors and their metadata are the single runtime capability model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/capability/capability_error.rs"
+reason = "Capability registration errors and their structured failure details form one diagnostic API."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/construct/schema.rs"
+reason = "Construction schema, target, and policy types form one validated construction plan model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/context/handle.rs"
+reason = "Context handle types share the same lifetime-bound access contract and are used as one API family."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/context/registration.rs"
+reason = "Registration input and result types form one context registration protocol."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/collections.rs"
+reason = "Descriptor collection views share one context-bound lookup and iteration contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/field.rs"
+reason = "Field descriptors and field policy metadata form one field reflection contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/impl_descriptor/descriptor.rs"
+reason = "Implementation descriptor views and lookup results share one source-to-application projection."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/impl_descriptor/metadata.rs"
+reason = "Implementation definition and application metadata form one static registration schema."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/reflect.rs"
+reason = "Reflection marker traits and their associated contracts define one sealed runtime boundary."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/trait_descriptor/descriptor.rs"
+reason = "Trait definition and application descriptor views share one identity-aware lookup model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/trait_descriptor/metadata.rs"
+reason = "Trait definition, application, and method metadata form one static trait registration schema."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/type_kind.rs"
+reason = "Type shape variants and their field/variant metadata are one closed descriptor representation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/variant.rs"
+reason = "Variant descriptors and their shape metadata form one enum-variant reflection contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/error.rs"
+reason = "Context, lookup, and validation errors share one runtime diagnostic vocabulary."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/expression/data.rs"
+reason = "Expression data variants form one recursive source-expression representation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/expression/error.rs"
+reason = "Expression parsing and validation failures share one structured error model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/expression/predicate.rs"
+reason = "Predicate and bound records form one static generic-constraint representation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/expression/type_expression.rs"
+reason = "Type-expression values and their lookup outcomes form one expression evaluation API."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/identity.rs"
+reason = "Item identities and lookup candidates form one stable identity and ambiguity model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/value/borrowed.rs"
+reason = "Borrowed dynamic value views share one lifetime and access-mode contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/value/failure.rs"
+reason = "Value conversion failure records share one structured mismatch and recovery model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/value/dynamic.rs"
+reason = "DynamicValue and DynamicValueKind form one tagged-value contract and are intentionally co-located."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/value/mode.rs"
+reason = "Value mode markers and their sealed mode contract are one closed type family."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/value/owned.rs"
+reason = "Owned dynamic value wrappers share one storage and mode contract."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/access/field_adapter.rs"
+reason = "Typed and dynamic field adapters share one callback contract and mode-specific dispatch implementation."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/construct.rs"
+reason = "Construction runtime descriptors, requests, and failures form one construction execution API."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/generic.rs"
+reason = "Generic definition metadata, descriptors, and arguments form one generic reflection model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/descriptor/method.rs"
+reason = "Method declarations, effective descriptors, and specializations form one callable method model."
+
+[[exceptions]]
+rule = "public-type-layout"
+path = "src/runtime/invoke.rs"
+reason = "Invocation inputs, adapters, outputs, and failures form one checked invocation contract."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/private/codegen_v4/construct.rs"
+reason = "ConstructProvider is intentionally kept beside the construction emission functions that create and consume it."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/private/codegen_v4/registration.rs"
+reason = "MethodBinding is intentionally kept with registration emission because it is an internal registration record."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/runtime/access/field_adapter.rs"
+reason = "TypedFieldAdapter remains beside the field adapter constructors and shared dispatch helpers."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/runtime/capability/capability_target.rs"
+reason = "CapabilityTargetId remains with the target identity conversion and matching logic."
+
+[[exceptions]]
+rule = "type-file-name"
+path = "src/runtime/context/builder.rs"
+reason = "ReflectionContextBuilder remains with the context construction helpers and validation flow."

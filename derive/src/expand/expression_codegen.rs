@@ -26,7 +26,6 @@ use crate::ir::GenericKindIr;
 use crate::ir::GenericsIr;
 use crate::ir::PathArgumentIr;
 use crate::ir::PathArgumentsIr;
-use crate::ir::TraitDeclarationIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 use crate::ir::WherePredicateIr;
@@ -78,11 +77,7 @@ fn function_pointer_abi(abi: Option<&str>, span: Span) -> TokenStream {
 ///
 /// Returns tokens constructing the runtime generic definition descriptor.
 #[must_use]
-pub(crate) fn generic_definition(
-    generics: &GenericsIr,
-    span: Span,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &TokenStream) -> TokenStream {
     let environment = GenericEnvironment::from_generics(generics);
     let parameters = generics.params.iter().enumerate().map(|(index, parameter)| {
         let name = LitStr::new(&parameter.name, parameter.span);
@@ -118,9 +113,11 @@ pub(crate) fn generic_definition(
                     .as_ref()
                     .map(|ty| type_expression(ty, &environment, facade))
                     .unwrap_or_else(|| {
-                        leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
-                            path: "_", definition: None, arguments: &[],
-                        }))
+                        leaked_expression(
+                            quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
+                                path: "_", definition: None, arguments: &[],
+                            }),
+                        )
                     });
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Const(value)) => const_expression(value, &environment, facade),
@@ -136,9 +133,13 @@ pub(crate) fn generic_definition(
         WherePredicateIr::Lifetime { lifetime, bounds, .. } => {
             let lifetime = lifetime_expression(lifetime, span, facade);
             let bounds = bounds.iter().map(|bound| lifetime_expression(bound, span, facade));
-            bounds.map(|bound| quote!(#facade::__private::codegen_v4::expression::PredicateData::LifetimeOutlives {
-                lifetime: #lifetime, outlives: #bound,
-            })).collect::<Vec<_>>()
+            bounds
+                .map(|bound| {
+                    quote!(#facade::__private::codegen_v4::expression::PredicateData::LifetimeOutlives {
+                        lifetime: #lifetime, outlives: #bound,
+                    })
+                })
+                .collect::<Vec<_>>()
         }
         WherePredicateIr::Type {
             bounded_type,
@@ -149,18 +150,27 @@ pub(crate) fn generic_definition(
             let subject = type_expression(bounded_type, &environment, facade);
             let mut predicates = Vec::new();
             for bound in bounds {
-                if let GenericBoundIr::Trait { path, modifier, lifetimes } = bound {
+                if let GenericBoundIr::Trait {
+                    path,
+                    modifier,
+                    lifetimes,
+                } = bound
+                {
                     let trait_ = trait_expression_data(path, lifetimes, &environment, facade, span);
                     let modifier = trait_bound_modifier(*modifier, facade);
-                    predicates.push(quote!(#facade::__private::codegen_v4::expression::PredicateData::TraitBound {
-                        ty: #subject, trait_: #trait_, modifier: #modifier,
-                    }));
+                    predicates.push(
+                        quote!(#facade::__private::codegen_v4::expression::PredicateData::TraitBound {
+                            ty: #subject, trait_: #trait_, modifier: #modifier,
+                        }),
+                    );
                 }
                 if let GenericBoundIr::Lifetime(lifetime) = bound {
                     let lifetime = lifetime_expression(lifetime, span, facade);
-                    predicates.push(quote!(#facade::__private::codegen_v4::expression::PredicateData::TypeOutlives {
-                        ty: #subject, lifetime: #lifetime,
-                    }));
+                    predicates.push(
+                        quote!(#facade::__private::codegen_v4::expression::PredicateData::TypeOutlives {
+                            ty: #subject, lifetime: #lifetime,
+                        }),
+                    );
                 }
             }
             let outlives = lifetimes.iter().map(|lifetime| {
@@ -180,6 +190,37 @@ pub(crate) fn generic_definition(
         #parameters,
         #predicates,
     ))
+}
+
+/// Emits the concrete type and const arguments for one reflected type
+/// application.
+#[must_use]
+pub(crate) fn generic_arguments(generics: &GenericsIr, definition: &Ident, facade: &TokenStream) -> TokenStream {
+    let arguments = generics.params.iter().enumerate().filter_map(|(index, parameter)| {
+        let name = Ident::new(&parameter.name, parameter.span);
+        match parameter.kind {
+            GenericKindIr::Lifetime => None,
+            GenericKindIr::Type => Some(quote!(
+                #facade::__private::codegen_v4::expression::GenericArgumentMetadata::type_argument::<#name>(
+                    &#definition.parameters()[#index],
+                    ::std::boxed::Box::leak(::std::boxed::Box::new(
+                        #facade::__private::codegen_v4::expression::ExpressionData::Named {
+                            path: ::std::any::type_name::<#name>(),
+                            definition: None,
+                            arguments: &[],
+                        }
+                    )),
+                )
+            )),
+            GenericKindIr::Const => Some(quote!(
+                #facade::__private::codegen_v4::expression::GenericArgumentMetadata::const_argument(
+                    &#definition.parameters()[#index],
+                    #facade::__private::codegen_v4::expression::ConstExpression::from_const(#name),
+                )
+            )),
+        }
+    });
+    quote!(::std::boxed::Box::leak(::std::vec![#(#arguments),*].into_boxed_slice()))
 }
 
 /// Converts generic bounds into structural predicates over one type parameter.
@@ -206,20 +247,32 @@ fn generic_bounds(
     bounds
         .iter()
         .filter_map(|bound| match bound {
-            GenericBoundIr::Trait { path, modifier, lifetimes } => {
-                let subject = leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::ParameterName(#subject)));
+            GenericBoundIr::Trait {
+                path,
+                modifier,
+                lifetimes,
+            } => {
+                let subject = leaked_expression(
+                    quote!(#facade::__private::codegen_v4::expression::ExpressionData::ParameterName(#subject)),
+                );
                 let trait_ = trait_expression_data(path, lifetimes, environment, facade, span);
                 let modifier = trait_bound_modifier(*modifier, facade);
-                Some(quote!(#facade::__private::codegen_v4::expression::PredicateData::TraitBound {
-                    ty: #subject, trait_: #trait_, modifier: #modifier,
-                }))
+                Some(
+                    quote!(#facade::__private::codegen_v4::expression::PredicateData::TraitBound {
+                        ty: #subject, trait_: #trait_, modifier: #modifier,
+                    }),
+                )
             }
             GenericBoundIr::Lifetime(lifetime) => {
-                let subject = leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::ParameterName(#subject)));
+                let subject = leaked_expression(
+                    quote!(#facade::__private::codegen_v4::expression::ExpressionData::ParameterName(#subject)),
+                );
                 let lifetime = lifetime_expression(lifetime, span, facade);
-                Some(quote!(#facade::__private::codegen_v4::expression::PredicateData::TypeOutlives {
-                    ty: #subject, lifetime: #lifetime,
-                }))
+                Some(
+                    quote!(#facade::__private::codegen_v4::expression::PredicateData::TypeOutlives {
+                        ty: #subject, lifetime: #lifetime,
+                    }),
+                )
             }
             GenericBoundIr::Other(_) => None,
         })
@@ -228,13 +281,16 @@ fn generic_bounds(
 
 fn leak_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
     let values = values.into_iter().collect::<Vec<_>>();
-    quote!(::std::boxed::Box::leak(
-        ::std::vec![#(#values),*].into_boxed_slice()
-    ))
+    quote!(::std::boxed::Box::leak(::std::vec![#(#values),*].into_boxed_slice()))
 }
 
-fn leak_expression_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
-    let values = values.into_iter().map(|value| quote!(&*#value));
+fn leak_expression_slice(values: impl IntoIterator<Item = TokenStream>, facade: &TokenStream) -> TokenStream {
+    let values = values.into_iter().map(|value| {
+        quote!({
+            let value: &'static #facade::__private::codegen_v4::expression::ExpressionData = #value;
+            value
+        })
+    });
     leak_slice(values)
 }
 
@@ -242,10 +298,7 @@ fn leaked_expression(expression: TokenStream) -> TokenStream {
     quote!(::std::boxed::Box::leak(::std::boxed::Box::new(#expression)))
 }
 
-fn trait_bound_modifier(
-    modifier: crate::ir::TraitBoundModifierIr,
-    facade: &TokenStream,
-) -> TokenStream {
+fn trait_bound_modifier(modifier: crate::ir::TraitBoundModifierIr, facade: &TokenStream) -> TokenStream {
     match modifier {
         crate::ir::TraitBoundModifierIr::None => {
             quote!(#facade::__private::codegen_v4::expression::TraitBoundModifier::None)
@@ -313,15 +366,11 @@ pub(super) fn lifetime_expression(lifetime: &str, span: Span, facade: &TokenStre
 ///
 /// Returns tokens representing the type expression in runtime metadata.
 #[must_use]
-pub(crate) fn type_expression(
-    ty: &TypeIr,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     match &ty.kind {
-        TypeKindIr::Never => leaked_expression(
-            quote!(#facade::__private::codegen_v4::expression::ExpressionData::Never),
-        ),
+        TypeKindIr::Never => {
+            leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Never))
+        }
         TypeKindIr::Path(path) => path_expression(path, ty, environment, facade),
         TypeKindIr::Reference {
             lifetime,
@@ -351,16 +400,12 @@ pub(crate) fn type_expression(
             let elements = elements
                 .iter()
                 .map(|element| type_expression(element, environment, facade));
-            let elements = leak_expression_slice(elements);
-            leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::ExpressionData::Tuple(#elements)),
-            )
+            let elements = leak_expression_slice(elements, facade);
+            leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Tuple(#elements)))
         }
         TypeKindIr::Slice(element) => {
             let element = type_expression(element, environment, facade);
-            leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::ExpressionData::Slice(#element)),
-            )
+            leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Slice(#element)))
         }
         TypeKindIr::Array { element, length } => {
             let element = type_expression(element, environment, facade);
@@ -387,10 +432,8 @@ pub(crate) fn type_expression(
             abi,
             is_variadic,
         } => {
-            let parameters = inputs
-                .iter()
-                .map(|value| type_expression(value, environment, facade));
-            let parameters = leak_expression_slice(parameters);
+            let parameters = inputs.iter().map(|value| type_expression(value, environment, facade));
+            let parameters = leak_expression_slice(parameters, facade);
             let higher_ranked_lifetimes = lifetimes
                 .iter()
                 .map(|value| lifetime_expression(value, ty.span, facade));
@@ -411,11 +454,8 @@ pub(crate) fn type_expression(
         }
         TypeKindIr::TraitObject { bounds, .. } => {
             let traits = bounds.iter().filter_map(|bound| match bound {
-                GenericBoundIr::Trait {
-                    path, lifetimes, ..
-                } => {
-                    let trait_data =
-                        trait_expression_data(path, lifetimes, environment, facade, ty.span);
+                GenericBoundIr::Trait { path, lifetimes, .. } => {
+                    let trait_data = trait_expression_data(path, lifetimes, environment, facade, ty.span);
                     Some(quote!(*#trait_data))
                 }
                 _ => None,
@@ -424,31 +464,22 @@ pub(crate) fn type_expression(
             let lifetime = bounds
                 .iter()
                 .find_map(|bound| match bound {
-                    GenericBoundIr::Lifetime(value) => {
-                        Some(lifetime_expression(value, ty.span, facade))
-                    }
+                    GenericBoundIr::Lifetime(value) => Some(lifetime_expression(value, ty.span, facade)),
                     _ => None,
                 })
                 .map(|value| quote!(Some(#value)))
                 .unwrap_or_else(|| quote!(None));
-            let data = leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::TraitObjectData::new(
-                    #traits, #lifetime,
-                )),
-            );
-            leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::ExpressionData::TraitObject(#data)),
-            )
+            let data = leaked_expression(quote!(#facade::__private::codegen_v4::expression::TraitObjectData::new(
+                #traits, #lifetime,
+            )));
+            leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::TraitObject(#data)))
         }
         TypeKindIr::ImplTrait { bounds } => {
             let bounds = bound_predicates(bounds, environment, facade, ty.span);
             let bounds = leak_slice(bounds);
-            let data = leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::OpaqueTypeData::new(#bounds)),
-            );
-            leaked_expression(
-                quote!(#facade::__private::codegen_v4::expression::ExpressionData::Opaque(#data)),
-            )
+            let data =
+                leaked_expression(quote!(#facade::__private::codegen_v4::expression::OpaqueTypeData::new(#bounds)));
+            leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Opaque(#data)))
         }
         _ => {
             let source = LitStr::new(&ty.source, ty.span);
@@ -485,11 +516,8 @@ fn path_expression(
     environment: &GenericEnvironment,
     facade: &TokenStream,
 ) -> TokenStream {
-    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self"
-    {
-        return leaked_expression(
-            quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType),
-        );
+    if path.qualified_self.is_none() && path.segments.len() == 1 && path.segments[0].name == "Self" {
+        return leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType));
     }
     if path.qualified_self.is_none()
         && path.segments.len() == 1
@@ -505,9 +533,7 @@ fn path_expression(
         let owner = &path.segments[0].name;
         if owner == "Self" || environment.is_type_parameter(owner) {
             let self_type = if owner == "Self" {
-                leaked_expression(
-                    quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType),
-                )
+                leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType))
             } else {
                 let owner = LitStr::new(owner, ty.span);
                 leaked_expression(
@@ -545,9 +571,7 @@ fn path_expression(
                 .segments
                 .iter()
                 .take(qualified.position)
-                .flat_map(|segment| {
-                    path_arguments(&segment.arguments, environment, facade, ty.span)
-                });
+                .flat_map(|segment| path_arguments(&segment.arguments, environment, facade, ty.span));
             let arguments = leak_slice(arguments);
             quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #facade::__private::codegen_v4::expression::TraitExpressionData::new(#trait_name, #arguments, &[])
@@ -574,33 +598,6 @@ fn path_expression(
     )
 }
 
-/// Converts a parsed trait path using the same structural path encoder as a
-/// type expression.
-///
-/// # Parameters
-///
-/// - `path`: Structured trait path and generic arguments.
-/// - `environment`: Generic names visible at the trait metadata site.
-/// - `facade`: Runtime facade path used in generated expressions.
-///
-/// # Returns
-///
-/// Returns the trait path as a runtime type expression.
-#[must_use]
-pub(crate) fn path_type_expression(
-    path: &crate::ir::PathIr,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
-    let ty = TypeIr {
-        source: path.source.clone(),
-        tokens: path.tokens.clone(),
-        kind: TypeKindIr::Path(path.clone()),
-        span: path.span,
-    };
-    path_expression(path, &ty, environment, facade)
-}
-
 /// Converts parsed path arguments into runtime generic-argument expressions.
 ///
 /// # Parameters
@@ -624,7 +621,7 @@ pub(crate) fn path_arguments(
         PathArgumentsIr::None => Vec::new(),
         PathArgumentsIr::Parenthesized { inputs, output } => {
             let inputs = inputs.iter().map(|value| type_expression(value, environment, facade));
-            let inputs = leak_slice(inputs);
+            let inputs = leak_expression_slice(inputs, facade);
             let output = output.as_deref().map(|value| type_expression(value, environment, facade));
             let output = output.map(|value| quote!(Some(#value))).unwrap_or_else(|| quote!(None));
             let abi = quote!(None);
@@ -684,73 +681,6 @@ pub(crate) fn path_arguments(
     }
 }
 
-/// Materializes direct external-supertrait arguments at the trait hook's
-/// concrete instance.
-///
-/// # Parameters
-///
-/// - `arguments`: Parsed arguments from the direct supertrait path.
-/// - `declaration`: Trait declaration whose generic scope supplies concrete
-///   types.
-/// - `facade`: Runtime facade path used in generated expressions.
-///
-/// # Returns
-///
-/// Returns runtime generic arguments with direct trait parameters materialized.
-#[must_use]
-pub(super) fn external_supertrait_arguments(
-    arguments: &PathArgumentsIr,
-    declaration: &TraitDeclarationIr,
-    facade: &TokenStream,
-) -> Vec<TokenStream> {
-    let environment = GenericEnvironment::from_generics(&declaration.generics);
-    let PathArgumentsIr::AngleBracketed(values) = arguments else {
-        return path_arguments(arguments, &environment, facade, declaration.span);
-    };
-    values
-        .iter()
-        .filter_map(|value| match value {
-            PathArgumentIr::Type(
-                value @ TypeIr {
-                    kind: TypeKindIr::Path(path),
-                    ..
-                },
-            ) if path.segments.len() == 1 => {
-                let name = &path.segments[0].name;
-                if let Some(parameter) = declaration
-                    .generics
-                    .params
-                    .iter()
-                    .find(|parameter| parameter.kind == GenericKindIr::Type && parameter.name == *name)
-                {
-                    let identifier = Ident::new(&parameter.name, parameter.span);
-                    let expression = leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
-                        path: std::any::type_name::<#identifier>(), definition: None, arguments: &[],
-                    }));
-                    Some(quote!(#facade::__private::codegen_v4::expression::GenericExpressionArgument::Type(#expression)))
-                } else {
-                    path_arguments(
-                        &PathArgumentsIr::AngleBracketed(vec![PathArgumentIr::Type(value.clone())]),
-                        &environment,
-                        facade,
-                        declaration.span,
-                    )
-                    .into_iter()
-                    .next()
-                }
-            }
-            value => path_arguments(
-                &PathArgumentsIr::AngleBracketed(vec![value.clone()]),
-                &environment,
-                facade,
-                declaration.span,
-            )
-            .into_iter()
-            .next(),
-        })
-        .collect()
-}
-
 /// Converts trait-object or opaque-type bounds into runtime predicates.
 ///
 /// # Parameters
@@ -779,9 +709,8 @@ fn bound_predicates(
             } => {
                 let path = trait_expression_data(path, lifetimes, environment, facade, span);
                 let modifier = trait_bound_modifier(*modifier, facade);
-                let self_type = leaked_expression(
-                    quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType),
-                );
+                let self_type =
+                    leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType));
                 Some(
                     quote!(#facade::__private::codegen_v4::expression::PredicateData::TraitBound {
                         ty: #self_type,
@@ -791,9 +720,8 @@ fn bound_predicates(
             }
             GenericBoundIr::Lifetime(value) => {
                 let value = lifetime_expression(value, span, facade);
-                let self_type = leaked_expression(
-                    quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType),
-                );
+                let self_type =
+                    leaked_expression(quote!(#facade::__private::codegen_v4::expression::ExpressionData::SelfType));
                 Some(
                     quote!(#facade::__private::codegen_v4::expression::PredicateData::TypeOutlives {
                         ty: #self_type,
@@ -819,11 +747,7 @@ fn bound_predicates(
 /// Returns structural tokens for supported expressions or a compile error for
 /// unsupported syntax.
 #[must_use]
-fn const_expression_value(
-    value: &TokenStream,
-    environment: &GenericEnvironment,
-    facade: &TokenStream,
-) -> TokenStream {
+fn const_expression_value(value: &TokenStream, environment: &GenericEnvironment, facade: &TokenStream) -> TokenStream {
     let source = value.to_string();
     if let Ok(identifier) = parse2::<Ident>(value.clone()) {
         let name = LitStr::new(&identifier.to_string(), identifier.span());
@@ -866,10 +790,7 @@ fn const_expression_value(
             .iter()
             .map(|segment| LitStr::new(&segment.ident.to_string(), segment.ident.span()));
         let path = LitStr::new(
-            &segments
-                .map(|segment| segment.value())
-                .collect::<Vec<_>>()
-                .join("::"),
+            &segments.map(|segment| segment.value()).collect::<Vec<_>>().join("::"),
             Span::call_site(),
         );
         return quote!(#facade::__private::codegen_v4::expression::ConstExpression::Path(#path));
@@ -918,16 +839,14 @@ pub(super) fn const_expression(
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
             _ => unsupported_const_default(value),
         },
-        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => {
-            match expression.expr.as_ref() {
-                Expr::Lit(expression) => match &expression.lit {
-                    Lit::Int(value) => integer_const_expression(value, true, facade)
-                        .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
-                    _ => unsupported_const_default(value),
-                },
+        Expr::Unary(expression) if matches!(expression.op, UnOp::Neg(_)) => match expression.expr.as_ref() {
+            Expr::Lit(expression) => match &expression.lit {
+                Lit::Int(value) => integer_const_expression(value, true, facade)
+                    .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
                 _ => unsupported_const_default(value),
-            }
-        }
+            },
+            _ => unsupported_const_default(value),
+        },
         Expr::Path(path) if path.path.segments.len() == 1 => {
             let identifier = path.path.segments[0].ident.to_string();
             let name = LitStr::new(&identifier, path.path.segments[0].ident.span());
@@ -944,10 +863,7 @@ pub(super) fn const_expression(
                 .iter()
                 .map(|segment| LitStr::new(&segment.ident.to_string(), segment.ident.span()));
             let path = LitStr::new(
-                &segments
-                    .map(|segment| segment.value())
-                    .collect::<Vec<_>>()
-                    .join("::"),
+                &segments.map(|segment| segment.value()).collect::<Vec<_>>().join("::"),
                 Span::call_site(),
             );
             quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Path(#path)))
@@ -970,28 +886,16 @@ pub(super) fn const_expression(
 /// Returns signed or unsigned structural tokens when the value fits, or `None`
 /// when parsing overflows.
 #[must_use]
-fn integer_const_expression(
-    value: &LitInt,
-    negative: bool,
-    facade: &TokenStream,
-) -> Option<TokenStream> {
+fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream) -> Option<TokenStream> {
     let suffix = value.suffix();
     let signed = negative || matches!(suffix, "i8" | "i16" | "i32" | "i64" | "i128" | "isize");
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
-        let value = if negative {
-            magnitude.checked_neg()?
-        } else {
-            magnitude
-        };
-        Some(
-            quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#value))),
-        )
+        let value = if negative { magnitude.checked_neg()? } else { magnitude };
+        Some(quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#value))))
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(
-            quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#value))),
-        )
+        Some(quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#value))))
     }
 }
 
@@ -1059,15 +963,14 @@ mod tests {
     fn test_type_expression_emits_codegen_v4_for_unreflected_type() {
         let ty = parse_str::<Type>("Unreflected<'a, T, 3>").expect("test type must parse");
         let environment = GenericEnvironment::new().with_type_parameter("T");
-        let generated =
-            type_expression(&convert_type(&ty), &environment, &quote!(qubit_reflect)).to_string();
+        let generated = type_expression(&convert_type(&ty), &environment, &quote!(qubit_reflect)).to_string();
 
         assert!(
             generated.contains("codegen_v4"),
             "type expressions must use the v4 protocol"
         );
         assert!(
-            !generated.contains("codegen_v3"),
+            !generated.contains(concat!("codegen", "_v3")),
             "type expressions must not use the v3 protocol"
         );
         assert!(
@@ -1076,14 +979,24 @@ mod tests {
         );
     }
 
-    /// Verifies generic arguments remain attached to every path segment.
     #[test]
     fn test_type_expression_leaks_immutable_function_argument_slice() {
         let generated = render_type("for<'a> fn(&'a u8)", &GenericEnvironment::new());
 
         assert!(
-            generated.contains("& *"),
+            generated.contains("let value : & 'static"),
             "function argument slices must coerce leaked expressions to shared references"
+        );
+    }
+
+    /// Verifies generic arguments remain attached to every path segment.
+    #[test]
+    fn test_parenthesized_trait_arguments_use_immutable_expression_slice() {
+        let generated = render_type("Box<dyn Fn(&u8)>", &GenericEnvironment::new());
+
+        assert!(
+            generated.contains("let value : & 'static"),
+            "parenthesized trait arguments must coerce leaked expressions to shared references"
         );
     }
 
@@ -1095,14 +1008,8 @@ mod tests {
             rendered.contains("ExpressionData :: Named"),
             "paths should emit a named expression node"
         );
-        assert!(
-            rendered.contains("u8"),
-            "generated expression should contain u8"
-        );
-        assert!(
-            rendered.contains("u16"),
-            "generated expression should contain u16"
-        );
+        assert!(rendered.contains("u8"), "generated expression should contain u8");
+        assert!(rendered.contains("u16"), "generated expression should contain u16");
     }
 
     /// Verifies const parameters passed as type-shaped path arguments retain
@@ -1140,10 +1047,7 @@ mod tests {
             projection.contains("Trait"),
             "generated expression should contain Trait"
         );
-        assert!(
-            projection.contains("u8"),
-            "generated expression should contain u8"
-        );
+        assert!(projection.contains("u8"), "generated expression should contain u8");
         assert!(
             constraint.contains("AssociatedTypeBound"),
             "generated expression should contain AssociatedTypeBound"
@@ -1165,18 +1069,11 @@ mod tests {
     #[test]
     fn test_const_expression_uses_explicit_generic_environment() {
         let environment = GenericEnvironment::new().with_const_parameter("limit");
-        let parameter =
-            const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
-        let item = const_expression_value(
-            &quote!(limits::DEFAULT),
-            &environment,
-            &quote!(qubit_reflect),
-        );
+        let parameter = const_expression_value(&quote!(limit), &environment, &quote!(qubit_reflect));
+        let item = const_expression_value(&quote!(limits::DEFAULT), &environment, &quote!(qubit_reflect));
 
         assert!(
-            parameter
-                .to_string()
-                .contains("ConstExpression :: Parameter"),
+            parameter.to_string().contains("ConstExpression :: Parameter"),
             "generated expression should contain const parameter"
         );
         assert!(
@@ -1219,18 +1116,14 @@ mod tests {
             escaped.contains("Character"),
             "generated expression should contain Character"
         );
-        assert!(
-            escaped.contains("'\\n'"),
-            "generated expression should contain '\\n'"
-        );
+        assert!(escaped.contains("'\\n'"), "generated expression should contain '\\n'");
     }
 
     /// Verifies that symbolic defaults retain const-item path identity.
     #[test]
     fn test_const_default_preserves_const_item_path() {
         let value: TokenStream = quote!(DEFAULT_LIMIT);
-        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect))
-            .to_string();
+        let rendered = const_expression(&value, &GenericEnvironment::new(), &quote!(qubit_reflect)).to_string();
 
         assert!(
             rendered.contains("ConstExpression :: Path"),

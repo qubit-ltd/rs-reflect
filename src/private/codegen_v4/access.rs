@@ -10,9 +10,9 @@
 //!
 //! The runtime counterparts are `FieldMetadata`, `TypeShapeRegistration`,
 //! `FieldAdapter`, `DynamicFieldAdapter`, `VariantMetadata`, and
-//! `VariantAdapter` in `runtime::descriptor` and `runtime::access`. Derive needs
-//! safe typed constructors that keep each adapter tied to the owner and value
-//! types. These internal traits and metadata are currently crate-private.
+//! `VariantAdapter` in `runtime::descriptor` and `runtime::access`. Derive
+//! needs safe typed constructors that keep each adapter tied to the owner and
+//! value types. These internal traits and metadata are currently crate-private.
 
 pub use crate::runtime::descriptor::collections::TypeShapeRegistration;
 pub use crate::runtime::descriptor::field::FieldAccess;
@@ -28,10 +28,12 @@ pub use crate::runtime::descriptor::variant::NumericDiscriminant;
 pub use crate::runtime::descriptor::variant::TypedVariantAdapter;
 pub use crate::runtime::descriptor::variant::VariantAdapter;
 pub use crate::runtime::descriptor::variant::VariantDiscriminant;
+pub use crate::runtime::descriptor::variant::VariantIdentity;
 pub use crate::runtime::descriptor::variant::VariantMetadata;
 pub use crate::runtime::descriptor::variant::VariantShape;
 
-/// Submits a type's structural shape, with the target type fixed at compile time.
+/// Submits a type's structural shape, with the target type fixed at compile
+/// time.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __qubit_reflect_submit_type_shape {
@@ -44,5 +46,4 @@ macro_rules! __qubit_reflect_submit_type_shape {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_type_shape as submit_type_shape;
-
 pub use crate::runtime::access::TypedFieldAdapter;

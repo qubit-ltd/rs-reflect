@@ -34,8 +34,6 @@ use syn::parse2;
 use super::SynPathArguments;
 use super::SynWherePredicate;
 use super::replace_declared_lifetimes_with_static;
-use crate::ir::HelperName;
-use crate::ir::HelperValueIr;
 use crate::ir::TraitDeclarationIr;
 
 /// Returns inherited associated types explicitly proven for a dyn root.
@@ -51,14 +49,8 @@ use crate::ir::TraitDeclarationIr;
 pub(super) fn dyn_inherited_associated_types(
     declaration: &TraitDeclarationIr,
 ) -> impl Iterator<Item = &crate::ir::PathIr> {
-    declaration
-        .attributes
-        .iter()
-        .filter_map(|attribute| match &attribute.value {
-            HelperValueIr::DynCompatible(paths) => Some(paths.iter()),
-            _ => None,
-        })
-        .flatten()
+    let _ = declaration;
+    std::iter::empty()
 }
 
 /// Adds explicit inherited bindings to one reflected dyn supertrait path.
@@ -203,13 +195,6 @@ pub(super) fn is_provably_dyn_compatible(
     item: &ItemTrait,
     declaration: &TraitDeclarationIr,
 ) -> bool {
-    if declaration
-        .attributes
-        .iter()
-        .any(|attribute| attribute.name == HelperName::DynCompatible)
-    {
-        return true;
-    }
     if where_clause_requires_sized_self(item.generics.where_clause.as_ref())
         || item
             .generics

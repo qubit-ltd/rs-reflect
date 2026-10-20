@@ -6,102 +6,60 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Integration tests for `str` dynamic values.
+//! Integration tests for reflected `str` borrows.
+
 use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::Local;
 
-/// Confirms shared `str` values use their dedicated non-`Any` variant.
 #[test]
-fn test_shared_str_uses_its_dedicated_accessors() {
-    let text = "hello";
-    let value = DynamicRef::<Local>::new_str(text);
-
-    assert_eq!(value.as_str(), Some("hello"));
-    assert!(value.as_any().is_none());
-}
-
-/// Confirms mutable `str` values use their dedicated non-`Any` variant.
-#[test]
-fn test_mutable_str_uses_its_dedicated_accessors() {
-    let mut text = String::from("hello");
-    let mut value = DynamicMut::<Local>::new_str_mut(text.as_mut_str());
-
-    value
-        .as_str_mut()
-        .expect("a mutable str value exposes its dedicated accessor")
-        .make_ascii_uppercase();
-    assert_eq!(value.as_str(), Some("HELLO"));
-    assert!(value.as_any().is_none());
-}
-
-/// Confirms consuming local typed extraction returns dedicated `str` wrappers
-/// unchanged because they do not participate in `Any` downcasts.
-#[test]
-fn test_local_str_consuming_downcast_returns_original_wrapper() {
-    let value = DynamicRef::<Local>::new_str("hello");
-    let value = match value.downcast::<String>() {
-        Ok(_) => {
-            panic!("a dedicated str variant must not downcast through Any")
-        }
-        Err(value) => value,
-    };
-    assert_eq!(value.as_str(), Some("hello"));
-
-    let mut text = String::from("hello");
-    let value = DynamicMut::<Local>::new_str_mut(text.as_mut_str());
-    let mut value = match value.downcast::<String>() {
-        Ok(_) => panic!("a dedicated mutable str variant must not downcast through Any"),
-        Err(value) => value,
-    };
-    value
-        .as_str_mut()
-        .expect("the original mutable str wrapper should be returned")
-        .make_ascii_uppercase();
-    assert_eq!(text, "HELLO");
-}
-
-/// Confirms consuming local `str` extraction returns the original shared
-/// borrow and preserves a non-`str` wrapper on failure.
-#[test]
-fn test_local_shared_str_consuming_extraction_preserves_borrow_and_wrapper() {
+fn shared_str_can_be_inspected_and_extracted_by_type() {
     let text = String::from("hello");
-    let extracted = match DynamicRef::<Local>::new_str(text.as_str()).into_str() {
-        Ok(extracted) => extracted,
-        Err(_) => panic!("a dedicated str wrapper must extract successfully"),
-    };
-    assert_eq!(extracted, "hello");
+    let value = DynamicRef::<Local>::new(text.as_str());
 
-    let number = 42_u32;
-    let value = match DynamicRef::<Local>::new(&number).into_str() {
-        Ok(_) => panic!("an Any-compatible wrapper must not extract as str"),
-        Err(value) => value,
-    };
-    assert_eq!(value.downcast_ref::<u32>(), Some(&42));
+    assert_eq!(value.downcast_ref::<str>(), Some("hello"));
+    assert_eq!(value.clone().downcast::<str>().unwrap(), "hello");
 }
 
-/// Confirms consuming local mutable `str` extraction returns the original
-/// exclusive borrow and preserves a non-`str` wrapper on failure.
 #[test]
-fn test_local_mutable_str_consuming_extraction_preserves_borrow_and_wrapper() {
+fn mutable_str_can_be_inspected_mutated_and_extracted_by_type() {
     let mut text = String::from("hello");
-    match DynamicMut::<Local>::new_str_mut(text.as_mut_str()).into_str_mut() {
-        Ok(extracted) => extracted.make_ascii_uppercase(),
-        Err(_) => {
-            panic!("a dedicated mutable str wrapper must extract successfully")
-        }
+    {
+        let mut value = DynamicMut::<Local>::new(text.as_mut_str());
+        value
+            .downcast_mut::<str>()
+            .expect("a mutable str borrow has the exact reflected type")
+            .make_ascii_uppercase();
     }
     assert_eq!(text, "HELLO");
 
+    let mut text = String::from("hello");
+    match DynamicMut::<Local>::new(text.as_mut_str()).downcast::<str>() {
+        Ok(extracted) => extracted.make_ascii_uppercase(),
+        Err(_) => panic!("a mutable str borrow must be extractable by its exact type"),
+    }
+    assert_eq!(text, "HELLO");
+}
+
+#[test]
+fn failed_str_extraction_returns_the_original_borrow() {
+    let number = 42_u32;
+    let failure = DynamicRef::<Local>::new(&number)
+        .downcast::<str>()
+        .expect_err("a u32 borrow cannot be extracted as str");
+    assert_eq!(failure.expected(), std::any::TypeId::of::<str>());
+    assert_eq!(failure.actual(), std::any::TypeId::of::<u32>());
+    assert_eq!(failure.into_value().downcast_ref::<u32>(), Some(&42));
+
     let mut number = 42_u32;
-    let mut value = match DynamicMut::<Local>::new(&mut number).into_str_mut() {
-        Ok(_) => {
-            panic!("an Any-compatible wrapper must not extract as mutable str")
-        }
-        Err(value) => value,
-    };
-    *value
+    let failure = DynamicMut::<Local>::new(&mut number)
+        .downcast::<str>()
+        .expect_err("a mutable u32 borrow cannot be extracted as str");
+    assert_eq!(failure.expected(), std::any::TypeId::of::<str>());
+    assert_eq!(failure.actual(), std::any::TypeId::of::<u32>());
+    *failure
+        .into_value()
         .downcast_mut::<u32>()
-        .expect("failed str extraction must return the original wrapper") = 43;
+        .expect("the failed extraction must retain the mutable borrow") = 43;
     assert_eq!(number, 43);
 }

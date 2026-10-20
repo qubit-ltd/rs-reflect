@@ -1,7 +1,19 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 #![cfg(feature = "derive")]
 
-use qubit_reflect::invoke::ThreadSafe;
-use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectImpl};
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationOutput;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::value::Local;
+use qubit_reflect::value::ThreadSafe;
 
 #[Reflect]
 struct CoverageTarget {
@@ -42,11 +54,16 @@ fn test_invocation_borrowed_output_keeps_receiver_lifetime() {
         delta: 0,
     };
     let output = method("label")
-        .invoke(Invocation::on_ref(&target))
-        .expect("shared receiver return should be callable");
+        .invoke(Invocation::<Local>::on_ref(&target))
+        .unwrap_or_else(|failure| {
+            panic!(
+                "shared receiver return should be callable: {:?}",
+                failure.error().kind()
+            )
+        });
 
     assert_eq!(
-        output.into_ref::<str>().expect("label returns str"),
+        output.into_ref::<str>().unwrap_or_else(|_| panic!("label returns str")),
         "borrowed label"
     );
 }
@@ -59,11 +76,18 @@ fn test_invocation_borrowed_argument_preserves_call_lifetime() {
     };
     let text = String::from("borrowed input");
     let output = method("borrowed_len")
-        .invoke(Invocation::on_ref(&target).arg_ref(text.as_str()))
-        .expect("shared str argument should match the declared borrow mode");
+        .invoke(Invocation::<Local>::on_ref(&target).arg_ref(text.as_str()))
+        .unwrap_or_else(|failure| {
+            panic!(
+                "shared str argument should match the declared borrow mode: {:?}",
+                failure.error().kind()
+            )
+        });
 
     assert_eq!(
-        output.into_owned::<usize>().expect("length is usize"),
+        output
+            .into_owned::<usize>()
+            .unwrap_or_else(|_| panic!("length is usize")),
         text.len()
     );
 }
@@ -76,10 +100,16 @@ fn test_invocation_mutable_argument_changes_caller_value() {
     };
     let mut value = 11_i32;
     let output = method("adjust")
-        .invoke(Invocation::on_mut(&mut target).arg_mut(&mut value))
-        .expect("mutable receiver and argument should dispatch together");
+        .invoke(Invocation::<Local>::on_mut(&mut target).arg_mut(&mut value))
+        .unwrap_or_else(|failure| {
+            panic!(
+                "mutable receiver and argument should dispatch together: {:?}",
+                failure.error().kind()
+            )
+        });
 
-    assert!(matches!(output, InvocationOutput::Unit));
+    assert!(matches!(&output, InvocationOutput::Unit));
+    drop(output);
     assert_eq!(value, 17);
 }
 
@@ -90,18 +120,29 @@ fn test_invocation_mode_controls_thread_safe_adapter_selection() {
         delta: 4,
     };
     let local = method("combine")
-        .invoke(Invocation::on_ref(&target).arg(3_i32).arg(5_i32))
-        .expect("local invocation should be available");
+        .invoke(Invocation::<Local>::on_ref(&target).arg(3_i32).arg(5_i32))
+        .unwrap_or_else(|failure| panic!("local invocation should be available: {:?}", failure.error().kind()));
     let thread_safe = method("combine")
-        .invoke(
-            Invocation::<ThreadSafe>::on_ref(&target)
-                .arg(3_i32)
-                .arg(5_i32),
-        )
-        .expect("String and integer fields are Send + Sync");
+        .invoke(Invocation::<ThreadSafe>::on_ref(&target).arg(3_i32).arg(5_i32))
+        .unwrap_or_else(|failure| {
+            panic!(
+                "String and integer fields are Send + Sync: {:?}",
+                failure.error().kind()
+            )
+        });
 
-    assert_eq!(local.into_owned::<i32>().expect("i32 output"), 12);
-    assert_eq!(thread_safe.into_owned::<i32>().expect("i32 output"), 12);
+    assert_eq!(
+        local
+            .into_owned::<i32>()
+            .unwrap_or_else(|_| panic!("local output is i32")),
+        12
+    );
+    assert_eq!(
+        thread_safe
+            .into_owned::<i32>()
+            .unwrap_or_else(|_| panic!("thread-safe output is i32")),
+        12
+    );
 }
 
 #[test]
@@ -112,11 +153,19 @@ fn test_named_bindings_keep_parameter_identity_after_reordering() {
     };
     let output = method("combine")
         .invoke(
-            Invocation::on_ref(&target)
+            Invocation::<Local>::on_ref(&target)
                 .named_arg("right", 9_i32)
                 .named_arg("left", 1_i32),
         )
-        .expect("parameter names should select the matching declaration slots");
+        .unwrap_or_else(|failure| {
+            panic!(
+                "parameter names should select the matching declaration slots: {:?}",
+                failure.error().kind()
+            )
+        });
 
-    assert_eq!(output.into_owned::<i32>().expect("i32 output"), 12);
+    assert_eq!(
+        output.into_owned::<i32>().unwrap_or_else(|_| panic!("output is i32")),
+        12
+    );
 }

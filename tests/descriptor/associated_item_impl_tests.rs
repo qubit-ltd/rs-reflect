@@ -18,23 +18,36 @@ use qubit_reflect::descriptor::ImplDescriptor;
 struct AssociatedItemTarget;
 
 #[Reflect]
+struct GenericAssociatedItemTarget;
+
+#[Reflect]
+#[allow(dead_code)] // The impl macro consumes this contract for reflection metadata.
 trait AssociatedContract {
     type Output: qubit_reflect::descriptor::Reflect;
 
+    const REQUIRED: u32;
     const DEFAULTED: u32 = 17;
     const OVERRIDDEN: u32 = 19;
 }
 
-#[ReflectImpl]
+#[Reflect]
+#[allow(dead_code)] // The impl macro consumes this contract for reflection metadata.
+trait ConstGenericAssociatedContract<const VALUE: usize> {
+    const DEFAULTED: usize = VALUE;
+}
+
+#[ReflectImpl(reflected_trait = AssociatedContract)]
 impl AssociatedContract for AssociatedItemTarget {
     type Output = u16;
 
+    const REQUIRED: u32 = 11;
     const OVERRIDDEN: u32 = 23;
 }
 
-fn implementation_for<T: qubit_reflect::descriptor::Reflect>(
-    trait_name: &str,
-) -> ImplDescriptor<'static> {
+#[ReflectImpl(reflected_trait = ConstGenericAssociatedContract::<29>)]
+impl ConstGenericAssociatedContract<29> for GenericAssociatedItemTarget {}
+
+fn implementation_for<T: qubit_reflect::descriptor::Reflect>(trait_name: &str) -> ImplDescriptor<'static> {
     TypeDescriptor::of::<T>()
         .trait_impls()
         .expect("associated-item fragments must initialize")
@@ -63,6 +76,7 @@ fn test_reflect_impl_records_associated_type_and_constant_bindings() {
             .type_id(),
         TypeDescriptor::of::<u16>().type_id(),
     );
+    assert_eq!(output.source(), AssociatedItemSource::Declared);
 
     let defaulted = implementation
         .associated_const("DEFAULTED")
@@ -74,4 +88,25 @@ fn test_reflect_impl_records_associated_type_and_constant_bindings() {
     assert_eq!(overridden.definition().name(), "OVERRIDDEN");
     assert_eq!(defaulted.source(), AssociatedItemSource::Defaulted);
     assert_eq!(overridden.source(), AssociatedItemSource::Overridden);
+    assert_eq!(
+        implementation
+            .associated_const("REQUIRED")
+            .expect("the required constant must be described")
+            .source(),
+        AssociatedItemSource::Declared,
+    );
+}
+
+#[test]
+fn test_generic_trait_default_constant_uses_concrete_application_argument() {
+    let implementation = implementation_for::<GenericAssociatedItemTarget>("ConstGenericAssociatedContract");
+    let value = implementation
+        .associated_const("DEFAULTED")
+        .expect("the generic default constant must be described");
+
+    assert_eq!(
+        value.expression(),
+        qubit_reflect::descriptor::ConstExpression::UnsignedInteger(29)
+    );
+    assert_eq!(value.source(), AssociatedItemSource::Defaulted);
 }

@@ -24,7 +24,7 @@ trait EmptyTrait {
 
 struct EmptyTarget<T>(PhantomData<T>);
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = EmptyTrait)]
 impl<T> EmptyAlias for EmptyTarget<T> {}
 
 /// Verifies an empty trait alias still retains its compiler-resolved identity.

@@ -3,8 +3,8 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for vNext generic definitions and concrete arguments.
@@ -71,22 +71,19 @@ fn test_generic_descriptor_exposes_concrete_type_and_const_arguments() {
 #[test]
 fn test_generic_definition_retains_lifetime_parameters() {
     let descriptor = TypeDescriptor::of::<Envelope<'static, User, 4>>();
-    let definition = descriptor
-        .definition()
-        .expect("Envelope has a type definition");
+    let definition = descriptor.definition().expect("Envelope has a type definition");
     let parameters = definition.generics();
 
-    assert!(matches!(
-        parameters.parameter("a").unwrap().kind(),
-        GenericParameterKind::Lifetime { .. }
-    ));
+    let lifetime = parameters.parameters().next().expect("lifetime parameter exists");
+    assert_eq!(lifetime.name(), "scope");
+    assert!(matches!(lifetime.kind(), GenericParameterKind::Lifetime { .. }));
     assert_eq!(descriptor.generic_arguments().iter().len(), 2);
 }
 
-/// Verifies an unreflected generic type argument is retained as metadata
-/// without imposing an unnecessary `Reflect` bound.
+/// Verifies a concrete reflected generic type argument remains navigable from
+/// the context-bound descriptor.
 #[test]
-fn test_unreflectable_generic_argument_remains_non_navigable() {
+fn test_reflected_generic_argument_has_a_concrete_descriptor() {
     let descriptor = TypeDescriptor::of::<GenericHolder<Rc<()>>>();
     let item = descriptor
         .generic_arguments()
@@ -95,7 +92,10 @@ fn test_unreflectable_generic_argument_remains_non_navigable() {
         .type_argument()
         .expect("T is a type argument");
 
-    assert!(item.find_concrete_type().is_none());
+    assert_eq!(
+        item.find_concrete_type().expect("Rc is reflectable").type_id(),
+        std::any::TypeId::of::<Rc<()>>()
+    );
     assert!(descriptor.field("item").is_ok());
     let value = GenericHolder { item: Rc::new(()) };
     let _ = value.item;

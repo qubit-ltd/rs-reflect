@@ -7,12 +7,16 @@
 // =============================================================================
 
 use qubit_reflect::Invocation;
-use qubit_reflect::ReflectRegistry;
-use qubit_reflect::descriptor::MethodInstanceDescriptor;
+use qubit_reflect::MethodDescriptor;
 use qubit_reflect::value::Local;
+use qubit_reflect::value::ThreadSafe;
 
-fn upgrade(method: &MethodInstanceDescriptor, registry: &ReflectRegistry, input: Invocation<'_, Local>) {
-    let _ = method.invoke_thread_safe(registry, input);
+fn dispatch_thread_safe(method: &MethodDescriptor<'_>, input: Invocation<'_, ThreadSafe>) {
+    let _ = method.invoke(input);
+}
+
+fn upgrade(method: &MethodDescriptor<'_>, input: Invocation<'_, Local>) {
+    dispatch_thread_safe(method, input);
 }
 
 fn main() {}

@@ -8,7 +8,8 @@
 
 //! Isolated-process coverage for concurrent global context initialization.
 
-use std::sync::{Arc, Barrier};
+use std::sync::Arc;
+use std::sync::Barrier;
 use std::thread;
 
 use qubit_reflect::ReflectionContext;

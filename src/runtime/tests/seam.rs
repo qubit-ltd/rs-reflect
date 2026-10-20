@@ -1,7 +1,18 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use crate::runtime::context::ReflectionContext;
-use crate::runtime::descriptor::{Reflect, TypeDescriptor, TypeRegistration};
+use crate::runtime::descriptor::Reflect;
+use crate::runtime::descriptor::TypeDescriptor;
+use crate::runtime::descriptor::TypeRegistration;
 
 static REGISTRATION_CALLS: AtomicUsize = AtomicUsize::new(0);
 
@@ -31,13 +42,7 @@ fn of_uses_the_global_context_without_building_aggregate_state() {
     let descriptor = TypeDescriptor::of::<Fixture>();
 
     assert_eq!(descriptor.type_id(), std::any::TypeId::of::<Fixture>());
-    assert!(std::ptr::eq(
-        descriptor.context(),
-        ReflectionContext::global()
-    ));
-    assert_eq!(
-        before,
-        ReflectionContext::global() as *const ReflectionContext
-    );
+    assert!(std::ptr::eq(descriptor.context(), ReflectionContext::global()));
+    assert_eq!(before, ReflectionContext::global() as *const ReflectionContext);
     assert_eq!(REGISTRATION_CALLS.load(Ordering::SeqCst), 1);
 }

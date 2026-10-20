@@ -15,6 +15,7 @@ use syn::Attribute;
 use syn::Data;
 use syn::DeriveInput;
 use syn::Error;
+use syn::Expr;
 use syn::Fields;
 use syn::FnArg;
 use syn::GenericParam;
@@ -24,15 +25,21 @@ use syn::Item;
 use syn::ItemImpl;
 use syn::ItemTrait;
 use syn::LitStr;
+use syn::Meta;
 use syn::Pat;
 use syn::Result as SynResult;
 use syn::ReturnType;
 use syn::Signature;
+use syn::Token;
 use syn::TraitItem;
 use syn::Type;
 use syn::Visibility;
 use syn::WherePredicate as SynWherePredicate;
+use syn::parse::Parse;
+use syn::parse::ParseStream;
+use syn::parse::Parser;
 use syn::parse2;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 
 use super::parsed_pipeline::ParsedPipeline;
@@ -62,6 +69,7 @@ use crate::ir::ReceiverIr;
 use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TraitDeclarationIr;
+use crate::ir::TraitSupertraitBindingIr;
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 use crate::ir::ValidatedDeclaration;
@@ -214,7 +222,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             visibility,
             generics,
             attributes,
-            fields: convert_fields(&data.fields, &mut errors),
+            fields: convert_fields(&data.fields, &mut errors, None),
             variants: Vec::new(),
             retained_tokens,
             span: input.ident.span(),
@@ -223,7 +231,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Enum,
             field_shape: FieldShapeIr::Unit,
-            visibility,
+            visibility: visibility.clone(),
             generics,
             attributes,
             fields: Vec::new(),
@@ -245,7 +253,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                         name: variant.ident.clone(),
                         index,
                         kind,
-                        fields: convert_fields(&variant.fields, &mut errors),
+                        fields: convert_fields(&variant.fields, &mut errors, Some(&visibility)),
                         attributes,
                         discriminant: variant
                             .discriminant
@@ -265,7 +273,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             visibility,
             generics,
             attributes,
-            fields: convert_fields(&Fields::Named(data.fields.clone()), &mut errors),
+            fields: convert_fields(&Fields::Named(data.fields.clone()), &mut errors, None),
             variants: Vec::new(),
             retained_tokens,
             span: input.ident.span(),
@@ -300,23 +308,8 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
         return Err(Error::new(item.span(), "`#[reflect]` can only be applied to a trait"));
     };
     let mut errors = ErrorCollector::default();
-    let attributes = parse_helper_tokens(args, HelperTarget::Trait, &mut errors);
-    let external_traits = attributes
-        .iter()
-        .filter_map(|attribute| match &attribute.value {
-            crate::ir::HelperValueIr::ExternalTrait(value) => Some(value.clone()),
-            _ => None,
-        })
-        .collect();
-    let reflected_supertraits = attributes
-        .iter()
-        .filter(|attribute| attribute.name == crate::ir::HelperName::Supertrait)
-        .filter_map(|attribute| match &attribute.value {
-            crate::ir::HelperValueIr::Paths(paths) => Some(paths.iter().cloned()),
-            _ => None,
-        })
-        .flatten()
-        .collect();
+    let (helper_tokens, supertrait_bindings) = parse_trait_arguments(args)?;
+    let attributes = parse_helper_tokens(helper_tokens, HelperTarget::Trait, &mut errors);
     let (methods, associated_types, associated_consts) = convert_trait_items(&item, &mut errors);
     strip_trait_helpers(&mut item);
     Ok(ParsedPipeline {
@@ -326,9 +319,8 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
                 visibility: convert_visibility(&item.vis),
                 generics: convert_generics(&item.generics),
                 supertraits: item.supertraits.iter().map(convert_bound).collect(),
+                supertrait_bindings,
                 attributes,
-                external_traits,
-                reflected_supertraits,
                 methods,
                 associated_types,
                 associated_consts,
@@ -338,6 +330,59 @@ fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipelin
         },
         error: errors.into_error(),
     })
+}
+
+struct TraitMacroArguments {
+    helpers: TokenStream,
+    bindings: Vec<TraitSupertraitBindingIr>,
+}
+
+impl Parse for TraitMacroArguments {
+    fn parse(input: ParseStream<'_>) -> SynResult<Self> {
+        let mut helpers = TokenStream::new();
+        let mut bindings = Vec::new();
+        while !input.is_empty() {
+            let lookahead = input.fork();
+            let is_binding = lookahead
+                .parse::<syn::Ident>()
+                .is_ok_and(|name| name == "supertrait_binding");
+            if is_binding {
+                let name = input.parse::<syn::Ident>()?;
+                let content;
+                syn::parenthesized!(content in input);
+                let index = content.parse::<syn::LitInt>()?.base10_parse::<usize>()?;
+                content.parse::<Token![=>]>()?;
+                let provider = content.parse::<syn::Path>()?;
+                if !content.is_empty() {
+                    return Err(content.error("expected `supertrait_binding(index => path)`"));
+                }
+                bindings.push(TraitSupertraitBindingIr {
+                    index,
+                    provider: crate::parse::type_ir::convert_path(&provider),
+                });
+                let _ = name;
+            } else {
+                let helper = input.parse::<Meta>()?;
+                helpers.extend(quote!(#helper));
+            }
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+            if !helpers.is_empty() {
+                helpers.extend(quote!(,));
+            }
+        }
+        Ok(Self { helpers, bindings })
+    }
+}
+
+fn parse_trait_arguments(tokens: TokenStream) -> SynResult<(TokenStream, Vec<TraitSupertraitBindingIr>)> {
+    if tokens.is_empty() {
+        return Ok((TokenStream::new(), Vec::new()));
+    }
+    let arguments: TraitMacroArguments = parse2(tokens)?;
+    Ok((arguments.helpers, arguments.bindings))
 }
 
 /// Parses a `#[reflect_impl]` impl input and removes nested helpers from
@@ -364,13 +409,10 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
         ));
     };
     let mut errors = ErrorCollector::default();
-    let attributes = parse_helper_tokens(args, HelperTarget::Impl, &mut errors);
-    let specializations = attributes
-        .iter()
-        .filter_map(HelperAttributeIr::specialization)
-        .cloned()
-        .collect();
-    let (methods, associated_types, associated_consts) = convert_impl_items(&item, &mut errors);
+    let (reflected_trait, external_trait) = parse_trait_identity_arguments(args.clone(), &mut errors);
+    let helper_args = parse_impl_helper_arguments(args, &mut errors);
+    let attributes = parse_helper_tokens(helper_args, HelperTarget::Impl, &mut errors);
+    let (methods, skipped_methods, associated_types, associated_consts) = convert_impl_items(&item, &mut errors);
     let trait_path = item.trait_.as_ref().map(|(path, _)| convert_path(path));
     let target_type = convert_type(&item.self_ty);
     strip_impl_helpers(&mut item);
@@ -380,9 +422,12 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
                 generics: convert_generics(&item.generics),
                 target_type,
                 trait_path,
+                reflected_trait,
+                external_trait,
                 attributes,
-                specializations,
+                specializations: Vec::new(),
                 methods,
+                skipped_methods,
                 associated_types,
                 associated_consts,
                 retained_tokens: quote!(#item),
@@ -391,6 +436,71 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
         },
         error: errors.into_error(),
     })
+}
+
+/// Extracts the explicit reflected trait path from `ReflectImpl` macro
+/// arguments.
+fn parse_trait_identity_arguments(
+    args: TokenStream,
+    errors: &mut ErrorCollector,
+) -> (Option<crate::ir::PathIr>, Option<crate::ir::PathIr>) {
+    let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
+    let metas = match parser.parse2(args) {
+        Ok(metas) => metas,
+        Err(error) => {
+            errors.push(error);
+            return (None, None);
+        }
+    };
+    let mut reflected_trait = None;
+    let mut external_trait = None;
+    for meta in metas {
+        let slot = if meta.path().is_ident("reflected_trait") {
+            &mut reflected_trait
+        } else if meta.path().is_ident("external_trait") {
+            &mut external_trait
+        } else {
+            continue;
+        };
+        let name = meta.path().get_ident().expect("matched identity argument").to_string();
+        if slot.is_some() {
+            errors.push(Error::new_spanned(meta, format!("`{name}` may only be specified once")));
+            continue;
+        }
+        let Meta::NameValue(value) = meta else {
+            errors.push(Error::new_spanned(meta, format!("`{name}` must be set to a path")));
+            continue;
+        };
+        let Expr::Path(path) = value.value else {
+            errors.push(Error::new_spanned(value, format!("`{name}` must be set to a path")));
+            continue;
+        };
+        *slot = Some(crate::parse::type_ir::convert_path(&path.path));
+    }
+    if reflected_trait.is_some() && external_trait.is_some() {
+        errors.push(Error::new(
+            proc_macro2::Span::call_site(),
+            "`reflected_trait` and `external_trait` cannot be specified together",
+        ));
+    }
+    (reflected_trait, external_trait)
+}
+
+/// Removes trait identity arguments before helper parsing.
+fn parse_impl_helper_arguments(args: TokenStream, errors: &mut ErrorCollector) -> TokenStream {
+    let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
+    let metas = match parser.parse2(args) {
+        Ok(metas) => metas,
+        Err(error) => {
+            errors.push(error);
+            return TokenStream::new();
+        }
+    };
+    let helpers = metas
+        .into_iter()
+        .filter(|meta| !meta.path().is_ident("reflected_trait") && !meta.path().is_ident("external_trait"))
+        .collect::<Vec<_>>();
+    quote!(#(#helpers),*)
 }
 
 /// Reports conflicting helpers and returns whether the member must be omitted.
@@ -416,20 +526,6 @@ fn is_skipped(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) -> 
             ));
         }
     }
-    let conflicts: &[HelperName] = match skip.target {
-        HelperTarget::Field => &[HelperName::ReadOnly, HelperName::NoConstruct],
-        HelperTarget::Variant => &[HelperName::NoConstruct],
-        HelperTarget::Method => &[HelperName::NoInvoke, HelperName::CatchUnwind, HelperName::ThreadSafe],
-        _ => &[],
-    };
-    for conflict in conflicts {
-        if let Some(attribute) = attributes.iter().find(|attribute| attribute.name == *conflict) {
-            errors.push(Error::new(
-                attribute.span,
-                format!("`skip` cannot be combined with `{}`", conflict.as_str()),
-            ));
-        }
-    }
     true
 }
 
@@ -444,7 +540,11 @@ fn is_skipped(attributes: &[HelperAttributeIr], errors: &mut ErrorCollector) -> 
 ///
 /// Returns converted field IR in source order.
 #[must_use]
-fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> {
+fn convert_fields(
+    fields: &Fields,
+    errors: &mut ErrorCollector,
+    inherited_visibility: Option<&VisibilityIr>,
+) -> Vec<FieldIr> {
     fields
         .iter()
         .enumerate()
@@ -456,7 +556,11 @@ fn convert_fields(fields: &Fields, errors: &mut ErrorCollector) -> Vec<FieldIr> 
             Some(FieldIr {
                 name: field.ident.clone(),
                 index,
-                visibility: convert_visibility(&field.vis),
+                visibility: if matches!(field.vis, Visibility::Inherited) {
+                    inherited_visibility.cloned().unwrap_or(VisibilityIr::Inherited)
+                } else {
+                    convert_visibility(&field.vis)
+                },
                 ty: convert_type(&field.ty),
                 attributes,
                 span: field.span(),
@@ -650,20 +754,29 @@ fn convert_trait_items(
 ///
 /// # Returns
 ///
-/// Returns methods, associated types, and associated constants in source order.
+/// Returns visible and skipped methods, associated types, and associated
+/// constants in source order.
 #[must_use]
 fn convert_impl_items(
     item: &ItemImpl,
     errors: &mut ErrorCollector,
-) -> (Vec<MethodIr>, Vec<AssociatedTypeIr>, Vec<AssociatedConstIr>) {
+) -> (
+    Vec<MethodIr>,
+    Vec<MethodIr>,
+    Vec<AssociatedTypeIr>,
+    Vec<AssociatedConstIr>,
+) {
     let mut methods = Vec::new();
+    let mut skipped_methods = Vec::new();
     let mut associated_types = Vec::new();
     let mut associated_consts = Vec::new();
     for impl_item in &item.items {
         match impl_item {
             ImplItem::Fn(function) => {
                 let method = convert_method(&function.sig, &function.vis, &function.attrs, true, errors);
-                if !is_skipped(&method.attributes, errors) {
+                if is_skipped(&method.attributes, errors) {
+                    skipped_methods.push(method);
+                } else {
                     methods.push(method);
                 }
             }
@@ -687,7 +800,7 @@ fn convert_impl_items(
             _ => {}
         }
     }
-    (methods, associated_types, associated_consts)
+    (methods, skipped_methods, associated_types, associated_consts)
 }
 
 /// Converts a method signature and all method helpers.
@@ -712,11 +825,6 @@ fn convert_method(
     errors: &mut ErrorCollector,
 ) -> MethodIr {
     let helper_attributes = parse_attributes(attributes, HelperTarget::Method, errors);
-    let specializations = helper_attributes
-        .iter()
-        .filter_map(HelperAttributeIr::specialization)
-        .cloned()
-        .collect();
     let mut receiver = None;
     let mut parameters = Vec::new();
     for argument in &signature.inputs {
@@ -799,7 +907,7 @@ fn convert_method(
         qualifiers,
         has_default,
         attributes: helper_attributes,
-        specializations,
+        specializations: Vec::new(),
         span: signature.ident.span(),
     }
 }

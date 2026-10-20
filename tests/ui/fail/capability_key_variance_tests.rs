@@ -6,7 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::{Reflect, register_capability};
+use qubit_reflect::Reflect;
+use qubit_reflect::register_capability;
 use qubit_reflect::capability::CloneCapability;
 
 #[Reflect]

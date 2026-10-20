@@ -138,6 +138,8 @@ pub(crate) enum OutputPlan {
     Owned,
     /// Method returns a shared borrow.
     SharedBorrow,
+    /// Optional shared borrow retained in the call lifetime.
+    OptionalSharedBorrow,
     /// Method returns an exclusive mutable borrow.
     MutableBorrow,
     /// Method returns an opaque `impl Trait` value.

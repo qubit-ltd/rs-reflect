@@ -9,13 +9,13 @@
 //! Lookup errors retain the query and subject as structured data.
 
 use qubit_reflect::ReflectionContext;
-use qubit_reflect::error::{LookupError, LookupQuery, LookupSubject};
+use qubit_reflect::error::LookupError;
+use qubit_reflect::error::LookupQuery;
+use qubit_reflect::error::LookupSubject;
 
 #[test]
 fn missing_type_error_keeps_the_exact_query() {
-    let context = ReflectionContext::builder()
-        .build()
-        .expect("an empty context is valid");
+    let context = ReflectionContext::builder().build().expect("an empty context is valid");
     let result = context.type_by_name("missing::Type");
     let error = match result {
         Err(error) => error,

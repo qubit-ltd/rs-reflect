@@ -1,0 +1,9 @@
+[package]
+name = "default-trait-thread-safe-consumer"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+qubit-reflect = { path = "../.." }
+default-trait-thread-safe-producer = { path = "../default-trait-thread-safe-producer" }

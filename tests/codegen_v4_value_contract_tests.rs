@@ -1,7 +1,19 @@
-use qubit_reflect::__private::codegen_v4::descriptor::{Reflect, TypeRegistration};
-use qubit_reflect::__private::codegen_v4::value::{
-    DynamicMut, DynamicOwned, DynamicRef, Local, ThreadSafe, ValueFor,
-};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
+use qubit_reflect::__private::codegen_v4::descriptor::Reflect;
+use qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration;
+use qubit_reflect::__private::codegen_v4::value::DynamicMut;
+use qubit_reflect::__private::codegen_v4::value::DynamicOwned;
+use qubit_reflect::__private::codegen_v4::value::DynamicRef;
+use qubit_reflect::__private::codegen_v4::value::Local;
+use qubit_reflect::__private::codegen_v4::value::ThreadSafe;
+use qubit_reflect::__private::codegen_v4::value::ValueFor;
 
 struct ContractValue(String);
 #[derive(Debug)]
@@ -31,15 +43,8 @@ fn external_codegen_value_facade_preserves_owned_and_borrowed_values() {
         .downcast::<OtherValue>()
         .expect_err("an unrelated type must not consume the dynamic value");
     let mut owned = failure.into_value();
-    owned
-        .downcast_mut::<ContractValue>()
-        .unwrap()
-        .0
-        .push_str(" retained");
-    assert_eq!(
-        owned.downcast::<ContractValue>().unwrap().0,
-        "value retained"
-    );
+    owned.downcast_mut::<ContractValue>().unwrap().0.push_str(" retained");
+    assert_eq!(owned.downcast::<ContractValue>().unwrap().0, "value retained");
 
     let value = ContractValue(String::from("borrowed"));
     let shared = DynamicRef::<Local>::new(&value);
@@ -47,16 +52,9 @@ fn external_codegen_value_facade_preserves_owned_and_borrowed_values() {
 
     let mut value = ContractValue(String::from("mutable"));
     let mut dynamic = DynamicMut::<Local>::new(&mut value);
-    dynamic
-        .downcast_mut::<ContractValue>()
-        .unwrap()
-        .0
-        .push_str(" borrow");
+    dynamic.downcast_mut::<ContractValue>().unwrap().0.push_str(" borrow");
     let view = dynamic.as_ref();
-    assert_eq!(
-        view.downcast_ref::<ContractValue>().unwrap().0,
-        "mutable borrow"
-    );
+    assert_eq!(view.downcast_ref::<ContractValue>().unwrap().0, "mutable borrow");
     drop(view);
     dynamic
         .reborrow()

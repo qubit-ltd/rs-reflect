@@ -6,19 +6,21 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Empty field lists retain their original construction syntax.
+//! Empty field lists retain their source shape and construct through vNext.
 #![cfg(feature = "derive")]
 
-use qubit_reflect::NamedConstructionInput;
 use qubit_reflect::Reflect;
-use qubit_reflect::StructUpdateInput;
-use qubit_reflect::TupleConstructionInput;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::construct::ConstructionError;
 use qubit_reflect::construct::ConstructionShape;
+use qubit_reflect::construct::NamedFields;
+use qubit_reflect::construct::PositionalFields;
+use qubit_reflect::construct::UnitFields;
+use qubit_reflect::construct::UpdateInput;
+use qubit_reflect::descriptor::ConstExpression;
 use qubit_reflect::descriptor::StructKind;
-use qubit_reflect::descriptor::TypeDefinitionData;
-use qubit_reflect::descriptor::TypeKind;
+use qubit_reflect::descriptor::TypeDefinitionKind;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct EmptyUnit;
@@ -29,16 +31,6 @@ struct EmptyNamed {
 #[Reflect]
 struct EmptyTuple();
 
-#[test]
-fn test_empty_named_constructs_as_named() {
-    let descriptor = TypeDescriptor::of::<EmptyNamed>();
-    assert_eq!(descriptor.kind(), TypeKind::Struct(StructKind::Named));
-    let output = descriptor
-        .construct_struct::<EmptyNamed>(NamedConstructionInput::new())
-        .expect("empty named struct construction should succeed");
-    let _ = output;
-}
-
 #[Reflect]
 struct GenericEmpty<const N: usize> {}
 #[Reflect]
@@ -46,94 +38,118 @@ struct GenericTuple<const N: usize>();
 #[Reflect]
 struct GenericUnit<const N: usize>;
 
+#[test]
+fn test_empty_named_constructs_as_named() {
+    let descriptor = TypeDescriptor::of::<EmptyNamed>();
+    assert!(matches!(
+        descriptor.definition().expect("source definition exists").kind(),
+        TypeDefinitionKind::Struct(StructKind::Named)
+    ));
+    assert_eq!(descriptor.construction().shape(), ConstructionShape::Named);
+    assert!(descriptor.construction().fields().is_empty());
+    let output: EmptyNamed = descriptor
+        .construct(NamedFields::<Local>::new())
+        .expect("empty named struct construction should succeed");
+    let _ = output;
+}
+
 /// Checks construction and rejection across shapes without erasing type
 /// identity.
-fn assert_empty_shape<T: Reflect>(kind: StructKind) {
+fn assert_empty_shape<T: qubit_reflect::__private::codegen_v4::descriptor::Reflect>(
+    kind: StructKind,
+    expected: ConstructionShape,
+) {
     let descriptor = TypeDescriptor::of::<T>();
-    assert_eq!(descriptor.kind(), TypeKind::Struct(kind));
+    assert_eq!(
+        descriptor.definition().expect("source definition exists").kind(),
+        TypeDefinitionKind::Struct(kind)
+    );
+    let construction = descriptor.construction();
+    assert_eq!(construction.shape(), expected);
+    assert!(construction.fields().is_empty());
+
     let local = [
-        descriptor.construct_unit::<T>(),
-        descriptor.construct_struct::<T>(NamedConstructionInput::new()),
-        descriptor.construct_tuple::<T>(TupleConstructionInput::new()),
+        descriptor.construct::<T, _>(UnitFields::new()).map(|_| ()),
+        descriptor.construct::<T, _>(NamedFields::<Local>::new()).map(|_| ()),
+        descriptor
+            .construct::<T, _>(PositionalFields::<Local>::new())
+            .map(|_| ()),
     ];
     let shapes = [
         ConstructionShape::Unit,
         ConstructionShape::Named,
-        ConstructionShape::Tuple,
+        ConstructionShape::Positional,
     ];
-    let expected = match kind {
-        StructKind::Unit => ConstructionShape::Unit,
-        StructKind::Named => ConstructionShape::Named,
-        StructKind::Tuple => ConstructionShape::Tuple,
-        StructKind::Newtype => panic!("empty structs cannot be newtypes"),
-    };
     for (actual, result) in shapes.into_iter().zip(local) {
         if actual == expected {
-            let updated = descriptor
-                .update_struct::<T>(StructUpdateInput::new(
-                    result.expect("matching local construction shape should succeed"),
-                    NamedConstructionInput::new(),
-                ))
-                .expect("updating an empty struct with no fields should succeed");
-            let _ = updated;
+            result.expect("matching empty input shape should construct");
         } else {
-            let Err(failure) = result else {
-                panic!("wrong shape must fail")
-            };
-            assert!(
-                matches!(failure.error(), ConstructionError::WrongShape { expected: e, actual: a }
-                if *e == expected && *a == actual)
-            );
+            let failure = result.expect_err("mismatched input shape must fail");
+            assert!(matches!(
+                failure.error(),
+                ConstructionError::ShapeMismatch { expected: e, actual: a }
+                    if *e == expected && *a == actual
+            ));
         }
     }
+
+    let base = match expected {
+        ConstructionShape::Unit => descriptor.construct::<T, _>(UnitFields::new()),
+        ConstructionShape::Named => descriptor.construct::<T, _>(NamedFields::<Local>::new()),
+        ConstructionShape::Positional => descriptor.construct::<T, _>(PositionalFields::<Local>::new()),
+    }
+    .expect("matching input creates the value used for the empty update");
+    descriptor
+        .update::<T, Local>(UpdateInput::<Local>::new(base))
+        .expect("updating an empty struct with no changed fields should succeed");
 }
 
 #[test]
 fn test_all_empty_shapes_construct_and_reject_wrong_shapes() {
-    assert_empty_shape::<EmptyUnit>(StructKind::Unit);
-    assert_empty_shape::<EmptyNamed>(StructKind::Named);
-    assert_empty_shape::<EmptyTuple>(StructKind::Tuple);
+    assert_empty_shape::<EmptyUnit>(StructKind::Unit, ConstructionShape::Unit);
+    assert_empty_shape::<EmptyNamed>(StructKind::Named, ConstructionShape::Named);
+    assert_empty_shape::<EmptyTuple>(StructKind::Tuple, ConstructionShape::Positional);
 }
 
-/// Checks that the source definition and both concrete const instances agree.
-fn assert_generic_shape<T: Reflect, U: Reflect>(kind: StructKind) {
-    assert_empty_shape::<T>(kind);
-    assert_empty_shape::<U>(kind);
+/// Checks source definitions and concrete const instances through vNext
+/// descriptors.
+fn assert_generic_shape<
+    T: qubit_reflect::__private::codegen_v4::descriptor::Reflect,
+    U: qubit_reflect::__private::codegen_v4::descriptor::Reflect,
+>(
+    kind: StructKind,
+) {
     let first = TypeDescriptor::of::<T>();
     let second = TypeDescriptor::of::<U>();
+    assert_eq!(
+        first.definition().expect("generic source definition exists").kind(),
+        TypeDefinitionKind::Struct(kind)
+    );
     assert_ne!(first.type_id(), second.type_id());
     assert_eq!(
         first
             .generic_arguments()
-            .expect("generic type should expose its const argument")
-            .const_argument_value(0)
-            .expect("first generic argument should be the const parameter")
-            .downcast_ref::<usize>(),
-        Some(&1)
+            .argument("N")
+            .expect("const argument is retained")
+            .const_argument()
+            .expect("N is a const parameter")
+            .expression(),
+        ConstExpression::UnsignedInteger(1)
     );
     assert_eq!(
         second
             .generic_arguments()
-            .expect("generic type should expose its const argument")
-            .const_argument_value(0)
-            .expect("first generic argument should be the const parameter")
-            .downcast_ref::<usize>(),
-        Some(&2)
+            .argument("N")
+            .expect("const argument is retained")
+            .const_argument()
+            .expect("N is a const parameter")
+            .expression(),
+        ConstExpression::UnsignedInteger(2)
     );
-    let definition = first
-        .type_definition()
-        .expect("generic struct should have a shared type definition");
-    assert!(std::ptr::eq(
-        definition,
-        second
-            .type_definition()
-            .expect("second const instance should share the type definition")
-    ));
-    let TypeDefinitionData::Struct { kind: actual, fields } = definition.data() else {
-        panic!("struct definition")
-    };
-    assert_eq!(*actual, kind);
-    assert!(fields.is_empty());
+    assert_eq!(
+        first.definition().expect("definition exists").id(),
+        second.definition().expect("definition exists").id()
+    );
 }
 
 #[test]

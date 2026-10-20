@@ -12,7 +12,16 @@
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectionContext;
-use qubit_reflect::capability::{CapabilityRegistration, CloneAdapter, CloneCapability};
+use qubit_reflect::capability::CapabilityRegistration;
+use qubit_reflect::capability::CapabilitySpec;
+
+struct ExplicitMarkerCapability;
+
+impl CapabilitySpec for ExplicitMarkerCapability {
+    type Adapter = u32;
+
+    const ID: &'static str = "example.public.snapshot_marker";
+}
 
 #[Reflect]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -27,12 +36,7 @@ fn empty_context_does_not_import_linked_registrations() {
         .build()
         .expect("an empty explicit context is valid");
 
-    assert!(
-        context
-            .types()
-            .expect("empty context can be queried")
-            .is_empty()
-    );
+    assert!(context.types().expect("empty context can be queried").is_empty());
     assert!(
         context
             .type_by_name(std::any::type_name::<ExplicitCloneTarget>())
@@ -42,9 +46,7 @@ fn empty_context_does_not_import_linked_registrations() {
 
 #[test]
 fn explicit_capabilities_are_isolated_from_the_global_context() {
-    let registration = CapabilityRegistration::for_type::<ExplicitCloneTarget, CloneCapability>(
-        CloneAdapter::for_type::<ExplicitCloneTarget>(),
-    );
+    let registration = CapabilityRegistration::for_type::<ExplicitCloneTarget, ExplicitMarkerCapability>(17);
     let context = ReflectionContext::builder()
         .include_type::<ExplicitCloneTarget>()
         .register(registration)
@@ -54,7 +56,7 @@ fn explicit_capabilities_are_isolated_from_the_global_context() {
     assert!(
         context
             .type_of::<ExplicitCloneTarget>()
-            .capability::<CloneCapability>()
+            .capability::<ExplicitMarkerCapability>()
             .is_ok()
     );
     assert!(
@@ -63,7 +65,7 @@ fn explicit_capabilities_are_isolated_from_the_global_context() {
             .build()
             .expect("a context without extension registrations is valid")
             .type_of::<ExplicitCloneTarget>()
-            .find_capability::<CloneCapability>()
+            .find_capability::<ExplicitMarkerCapability>()
             .expect("the absence is a valid query")
             .is_none()
     );
@@ -76,36 +78,23 @@ fn explicit_type_members_do_not_implicitly_register_other_types() {
         .build()
         .expect("the selected type can be registered by itself");
 
-    assert_eq!(
-        context.types().expect("context types are available").len(),
-        1
-    );
+    assert_eq!(context.types().expect("context types are available").len(), 1);
     assert!(
         context
             .type_by_name(std::any::type_name::<UnregisteredTarget>())
             .is_err()
     );
-    assert_eq!(
-        context.type_of::<ExplicitCloneTarget>().context().id(),
-        context.id()
-    );
+    assert_eq!(context.type_of::<ExplicitCloneTarget>().context().id(), context.id());
 }
 
 #[test]
 fn conflicting_capability_registrations_fail_context_construction() {
-    let registration = || {
-        CapabilityRegistration::for_type::<ExplicitCloneTarget, CloneCapability>(
-            CloneAdapter::for_type::<ExplicitCloneTarget>(),
-        )
-    };
+    let registration = || CapabilityRegistration::for_type::<ExplicitCloneTarget, ExplicitMarkerCapability>(17);
     let result = ReflectionContext::builder()
         .include_type::<ExplicitCloneTarget>()
         .register(registration())
         .register(registration())
         .build();
 
-    assert!(
-        result.is_err(),
-        "duplicate typed providers must be rejected"
-    );
+    assert!(result.is_err(), "duplicate typed providers must be rejected");
 }

@@ -1,6 +1,18 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::error::Error;
 
-use qubit_reflect::{Invocation, Reflect, ReflectImpl, TypeDescriptor};
+use qubit_reflect::Invocation;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Customer {
@@ -43,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let output = match descriptor
         .method("raise_credit_limit")?
-        .invoke(Invocation::on_mut(&mut customer).arg(75_000_u64))
+        .invoke(Invocation::<Local>::on_mut(&mut customer).arg(75_000_u64))
     {
         Ok(output) => output,
         Err(failure) => {
@@ -51,7 +63,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             return Err(format!("method invocation failed: {error:?}").into());
         }
     };
-    let changed = output.into_owned::<bool>()?;
+    let changed = output
+        .into_owned::<bool>()
+        .map_err(|_| std::io::Error::other("method returned a non-boolean output"))?;
     assert!(changed);
     assert_eq!(customer.credit_limit_cents, 75_000);
     Ok(())

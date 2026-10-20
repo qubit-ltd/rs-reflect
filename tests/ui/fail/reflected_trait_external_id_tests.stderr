@@ -3,11 +3,3 @@ error: reflection helper `external_trait_id` is unsupported; only `skip` is acce
    |
 18 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid.reflected.service")]
    |                              ^^^^^^^^^^^^^^^^^
-
-warning: type `__QubitReflectTraitDef_ReflectedService` should have an upper camel case name
-  --> tests/ui/fail/reflected_trait_external_id_tests.rs:14:7
-   |
-14 | trait ReflectedService {
-   |       ^^^^^^^^^^^^^^^^ help: convert the identifier to upper camel case: `QubitReflectTraitDefReflectedService`
-   |
-   = note: `#[warn(non_camel_case_types)]` (part of `#[warn(nonstandard_style)]`) on by default

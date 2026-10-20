@@ -1,0 +1,8 @@
+error[E0515]: cannot return value referencing local variable `context`
+  --> tests/ui/fail/capability_context_escape.rs:32:5
+   |
+32 |     context.type_of::<Target>().capability::<Marker>().unwrap()
+   |     -------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |     |
+   |     returns a value referencing data owned by the current function
+   |     `context` is borrowed here

@@ -1,52 +1,123 @@
-use qubit_reflect::__private::codegen_v4 as codegen;
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
-struct V4Fixture {
-    name: u32,
+#![cfg(feature = "derive")]
+
+use std::any::TypeId;
+
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
+use qubit_reflect::bind_method;
+use qubit_reflect::context::MethodBinding;
+use qubit_reflect::context::RegisteredTraitDescriptor;
+use qubit_reflect::error::ItemIdentity;
+use qubit_reflect::error::ItemKind;
+use qubit_reflect::error::LookupCandidate;
+use qubit_reflect::error::LookupQuery;
+use qubit_reflect::error::LookupSubject;
+use qubit_reflect::error::StableItemId;
+use qubit_reflect::lookup::Lookup;
+
+#[Reflect]
+struct PublicFacadeFixture {
+    value: u32,
 }
 
-impl codegen::descriptor::Reflect for V4Fixture {
-    fn __reflect_registration() -> &'static codegen::descriptor::TypeRegistration<Self> {
-        static REGISTRATION: codegen::descriptor::TypeRegistration<V4Fixture> =
-            codegen::descriptor::TypeRegistration::new();
-        &REGISTRATION
+#[ReflectImpl]
+impl PublicFacadeFixture {
+    pub fn run(&self) -> u32 {
+        self.value
     }
 }
 
-fn name_ref(value: &V4Fixture) -> &u32 {
-    &value.name
+#[Reflect]
+struct PublicBindingFixture;
+
+impl PublicBindingFixture {
+    fn run(&self) -> u32 {
+        7
+    }
 }
-
-fn name_mut(value: &mut V4Fixture) -> &mut u32 {
-    &mut value.name
-}
-
-static NAME_ADAPTER: codegen::access::TypedFieldAdapter<V4Fixture, u32> =
-    codegen::access::TypedFieldAdapter::new(name_ref, name_mut);
-static NAME_FIELDS: [codegen::access::FieldMetadata; 1] =
-    [codegen::access::FieldMetadata::typed(0, "name", &NAME_ADAPTER)];
-static SHAPE: codegen::access::TypeKindMetadata =
-    codegen::access::TypeKindMetadata::Struct(&NAME_FIELDS);
-static METHOD_METADATA: codegen::invoke::MethodMetadata =
-    codegen::invoke::MethodMetadata::inherent("run", "V4Fixture");
-static METHODS: [codegen::invoke::EffectiveMethod; 1] =
-    [codegen::invoke::EffectiveMethod::for_type::<V4Fixture>(&METHOD_METADATA)];
-
-codegen::registration::submit_type!(V4Fixture);
-codegen::access::submit_type_shape!(V4Fixture, &SHAPE);
-codegen::invoke::submit_method_catalog!(V4Fixture, &METHODS);
 
 #[test]
-fn v4_contract_exposes_typed_descriptor_context_and_lookup() {
-    assert_eq!(codegen::PROTOCOL_VERSION, 4);
+fn public_facade_supports_named_type_and_member_queries() {
+    let context = ReflectionContext::global();
+    let type_name = std::any::type_name::<PublicFacadeFixture>();
 
-    let context = codegen::descriptor::ReflectionContext::global();
-    let descriptor = codegen::descriptor::TypeDescriptor::of::<V4Fixture>();
-    assert!(std::ptr::eq(context, descriptor.context()));
+    let descriptor = context
+        .type_by_name(type_name)
+        .expect("the unique fully qualified type name should resolve");
+    assert_eq!(descriptor.type_id(), TypeId::of::<PublicFacadeFixture>());
+    assert!(std::ptr::eq(descriptor.context(), context));
+    assert_eq!(descriptor.field("value").expect("field exists").name(), "value");
+    assert_eq!(descriptor.method("run").expect("method exists").name(), "run");
 
-    assert_eq!(descriptor.field("name").unwrap().name(), "name");
-    assert_eq!(descriptor.method("run").unwrap().name(), "run");
+    let lookup = context
+        .lookup_type_by_name(type_name)
+        .expect("the lookup should complete");
+    assert_eq!(lookup.len(), 1);
+    let lookup_descriptor = lookup.only().expect("the type name is unique");
+    assert_eq!(lookup_descriptor.type_id(), TypeId::of::<PublicFacadeFixture>());
+    assert!(std::ptr::eq(lookup_descriptor.context(), context));
+
+    let method_lookup = descriptor
+        .lookup_method("run")
+        .expect("the method lookup should complete");
+    assert_eq!(method_lookup.only().expect("the method is unique").name(), "run");
+}
+
+#[test]
+fn public_type_descriptor_is_the_context_bound_type_handle() {
+    let context = ReflectionContext::global();
+    let descriptor = TypeDescriptor::of_in::<PublicFacadeFixture>(context);
+
+    assert_eq!(descriptor.type_id(), TypeId::of::<PublicFacadeFixture>());
+    assert!(std::ptr::eq(descriptor.context(), context));
+}
+
+#[test]
+fn public_context_facade_names_typed_bindings_and_trait_descriptors() {
+    let binding: MethodBinding<PublicBindingFixture> =
+        bind_method!(PublicBindingFixture::run as fn(&PublicBindingFixture) -> u32);
+    let context = ReflectionContext::builder()
+        .bind(binding)
+        .build()
+        .expect("typed binding builds an explicit context");
     assert_eq!(
-        descriptor.lookup_method("run").unwrap().only().unwrap().name(),
+        context
+            .type_of::<PublicBindingFixture>()
+            .method("run")
+            .expect("the bound method is public")
+            .name(),
         "run"
     );
+
+    let trait_lookup: Result<Option<RegisteredTraitDescriptor<'_>>, _> =
+        context.external_trait_definition("missing::Trait");
+    assert!(trait_lookup.expect("trait descriptor lookup completes").is_none());
+}
+
+#[test]
+fn public_lookup_errors_expose_constructible_candidate_identities() {
+    let candidate = LookupCandidate {
+        identity: ItemIdentity {
+            kind: ItemKind::Type,
+            stable_id: StableItemId("public-fixture".into()),
+            display_name: "PublicFacadeFixture".into(),
+        },
+        display_name: "PublicFacadeFixture".into(),
+        origin: None,
+    };
+    let lookup = Lookup::Ambiguous(vec![candidate].into_boxed_slice());
+    let error = lookup
+        .into_unique(LookupSubject::Type, LookupQuery::Name("PublicFacadeFixture".into()))
+        .expect_err("an ambiguous lookup reports its public candidate identities");
+    assert!(matches!(error, qubit_reflect::error::LookupError::Ambiguous { .. }));
 }

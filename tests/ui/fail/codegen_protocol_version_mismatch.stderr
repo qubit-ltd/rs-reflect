@@ -1,0 +1,19 @@
+error[E0080]: evaluation panicked: generated code and runtime protocol versions do not match
+ --> tests/ui/fail/codegen_protocol_version_mismatch.rs:9:15
+  |
+9 | const _: () = qubit_reflect::__private::codegen_v4::protocol::assert_protocol_version(3);
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed inside this call
+  |
+note: inside `assert_protocol_version`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/private/codegen_v4/protocol.rs
+  |
+  | /     assert!(
+  | |         expected == PROTOCOL_VERSION,
+  | |         "generated code and runtime protocol versions do not match",
+  | |     );
+  | |_____- in this macro invocation

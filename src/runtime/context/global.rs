@@ -1,12 +1,19 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
 
-use crate::runtime::error::ContextError;
-
 use super::ReflectionContext;
 use super::builder::ReflectionContextBuilder;
 use super::data::ContextData;
+use crate::runtime::error::ContextError;
 
 #[derive(Default)]
 struct InitializationState {
@@ -31,11 +38,7 @@ impl GlobalContext {
     }
 
     pub(crate) fn data(&self) -> Result<Arc<ContextData>, ContextError> {
-        self.get_or_initialize(|| {
-            ReflectionContextBuilder::new()
-                .include_linked()
-                .build_data()
-        })
+        self.get_or_initialize(|| ReflectionContextBuilder::new().include_linked().build_data())
     }
 
     pub(crate) fn get_or_initialize(
@@ -43,10 +46,7 @@ impl GlobalContext {
         initialize: impl FnOnce() -> Result<ContextData, ContextError>,
     ) -> Result<Arc<ContextData>, ContextError> {
         let mut initialize = Some(initialize);
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         loop {
             if let Some(result) = &state.result {
                 return result.clone();
@@ -59,10 +59,7 @@ impl GlobalContext {
                     initialize.take().expect("initializer is consumed once")().map(Arc::new)
                 }));
 
-                let mut state = self
-                    .state
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 state.building = false;
                 self.changed.notify_all();
                 match result {

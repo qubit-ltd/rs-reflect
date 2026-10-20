@@ -17,7 +17,6 @@ mod attribute;
 mod declaration;
 mod type_ir;
 
-pub(crate) use attribute::ExternalTraitIr;
 pub(crate) use attribute::HelperAttributeIr;
 pub(crate) use attribute::HelperName;
 pub(crate) use attribute::HelperTarget;
@@ -47,6 +46,7 @@ pub(crate) use declaration::ReceiverKindIr;
 pub(crate) use declaration::ReturnTypeIr;
 pub(crate) use declaration::TraitBoundModifierIr;
 pub(crate) use declaration::TraitDeclarationIr;
+pub(crate) use declaration::TraitSupertraitBindingIr;
 pub(crate) use declaration::TypeDeclarationIr;
 pub(crate) use declaration::TypeDeclarationKindIr;
 pub(crate) use declaration::ValidatedDeclaration;

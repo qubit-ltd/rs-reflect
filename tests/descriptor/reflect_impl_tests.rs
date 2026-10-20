@@ -13,9 +13,10 @@ use std::marker::PhantomData;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::ReflectionContext;
-use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::ImplDefinitionDescriptor;
+use qubit_reflect::descriptor::ImplDefinitionId;
 use qubit_reflect::descriptor::ImplKind;
+use qubit_reflect::descriptor::TraitDefinitionId;
 
 #[Reflect]
 struct Service<T: 'static>(PhantomData<T>);
@@ -26,16 +27,16 @@ struct Service<T: 'static>(PhantomData<T>);
 trait ServiceContract<T> {
     fn convert<U: Clone>(&self, value: U) -> U;
 
-    #[reflect(skip)]
     fn omitted_from_trait(&self);
 }
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = ServiceContract::<T>)]
 impl<T: 'static> ServiceContract<T> for Service<T> {
     fn convert<U: Clone>(&self, value: U) -> U {
         value
     }
 
+    #[reflect(skip)]
     fn omitted_from_trait(&self) {}
 }
 
@@ -53,24 +54,21 @@ impl<T: 'static> Service<T> {
 }
 
 fn implementation_definition_for(trait_name: Option<&str>) -> ImplDefinitionDescriptor<'static> {
-    TypeDescriptor::of::<Service<u8>>()
-        .impls()
-        .expect("implementation applications are available")
+    ReflectionContext::global()
+        .impl_definitions()
+        .expect("source implementation definitions are available")
         .iter()
-        .map(|implementation| implementation.definition())
         .find(|definition| match trait_name {
             Some(name) => {
                 definition.kind() == ImplKind::Trait
                     && definition
                         .implemented_trait()
-                        .is_some_and(|trait_| trait_.path().ends_with(name))
+                        .is_some_and(|trait_| trait_.path().contains(name))
+                    && definition.methods().iter().any(|method| method.name() == "convert")
             }
             None => {
                 definition.kind() == ImplKind::Inherent
-                    && definition
-                        .methods()
-                        .iter()
-                        .any(|method| method.name() == "inherent")
+                    && definition.methods().iter().any(|method| method.name() == "inherent")
             }
         })
         .expect("the requested implementation definition must be registered")
@@ -90,26 +88,58 @@ fn test_reflect_impl_preserves_method_declarations_and_generic_parameters() {
 }
 
 #[test]
-fn test_reflect_impl_skip_omits_method_without_changing_trait_declaration() {
+fn test_reflect_impl_skip_omits_implementation_method_without_changing_trait_declaration() {
     let context = ReflectionContext::global();
-    context
-        .initialize()
-        .expect("trait declaration fragments must validate");
+    context.initialize().expect("trait declaration fragments must validate");
     let trait_definition = context
         .trait_definition_by_name(concat!(module_path!(), "::ServiceContract"))
         .expect("the trait declaration remains registered");
-    let trait_methods: Vec<_> = trait_definition
-        .methods()
-        .iter()
-        .map(|method| method.name())
-        .collect();
-    assert_eq!(trait_methods, ["convert"]);
+    let trait_methods: Vec<_> = trait_definition.methods().iter().map(|method| method.name()).collect();
+    assert_eq!(trait_methods, ["convert", "omitted_from_trait"]);
 
     let implementation = implementation_definition_for(Some("ServiceContract"));
-    let method_names: Vec<_> = implementation
-        .methods()
-        .iter()
-        .map(|method| method.name())
-        .collect();
+    let method_names: Vec<_> = implementation.methods().iter().map(|method| method.name()).collect();
     assert_eq!(method_names, ["convert"]);
+}
+
+#[test]
+fn test_context_lists_source_impl_definitions() {
+    let context = ReflectionContext::global();
+    context.initialize().expect("implementation metadata must validate");
+    let definitions = context
+        .impl_definitions()
+        .expect("registered source implementation declarations are queryable");
+
+    assert!(definitions.iter().any(|definition| {
+        definition.kind() == ImplKind::Inherent && definition.methods().iter().any(|method| method.name() == "inherent")
+    }));
+    assert!(definitions.iter().any(|definition| {
+        definition.kind() == ImplKind::Trait && definition.methods().iter().any(|method| method.name() == "convert")
+    }));
+}
+
+#[test]
+fn test_definition_ids_are_public_and_comparable() {
+    let context = ReflectionContext::global();
+    context.initialize().expect("definition metadata must initialize");
+
+    let trait_definition = context
+        .trait_definition_by_name(concat!(module_path!(), "::ServiceContract"))
+        .expect("the reflected trait definition is registered");
+    let trait_id: TraitDefinitionId = trait_definition.id();
+    assert_eq!(trait_id, trait_definition.id());
+
+    let impl_definition = context
+        .impl_definitions()
+        .expect("implementation definitions are available")
+        .iter()
+        .find(|definition| {
+            definition.kind() == ImplKind::Trait
+                && definition
+                    .implemented_trait()
+                    .is_some_and(|trait_| trait_.path().ends_with("ServiceContract"))
+        })
+        .expect("the trait implementation definition is registered");
+    let impl_id: ImplDefinitionId = impl_definition.id();
+    assert_eq!(impl_id, impl_definition.id());
 }

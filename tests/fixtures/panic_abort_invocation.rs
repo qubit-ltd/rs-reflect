@@ -1,7 +1,26 @@
-use qubit_reflect::invoke::{CaughtInvocationFailure, InvocationErrorKind};
-use qubit_reflect::{Invocation, Reflect, ReflectImpl};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Compile fixture for invocation behavior in `panic = "abort"` builds.
+
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
+#[cfg(panic = "abort")]
+use qubit_reflect::Invocation;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+#[cfg(panic = "abort")]
+use qubit_reflect::invoke::CaughtInvocationFailure;
+#[cfg(panic = "abort")]
+use qubit_reflect::invoke::InvocationErrorKind;
+#[cfg(panic = "abort")]
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct AbortPayload {
@@ -42,11 +61,15 @@ fn main() {
         .type_of::<Worker>()
         .method("set")
         .expect("the panic method must be registered");
-    let failure = method
-        .invoke_catching(Invocation::on_mut(&mut worker).arg(payload))
-        .expect_err("panic=abort cannot support catching dispatch");
-    let CaughtInvocationFailure::Rejected(rejected) = failure else {
-        panic!("abort mode must reject before entering the user method");
+    let failure = match method.invoke_catching(Invocation::<Local>::on_mut(&mut worker).arg(payload)) {
+        Err(failure) => failure,
+        Ok(_) => panic!("panic=abort cannot support catching dispatch"),
+    };
+    let rejected = match failure {
+        CaughtInvocationFailure::Rejected(rejected) => rejected,
+        CaughtInvocationFailure::Panicked(_) => {
+            panic!("abort mode must reject before entering the user method");
+        }
     };
     assert!(matches!(
         rejected.error().kind(),
@@ -55,9 +78,10 @@ fn main() {
     assert_eq!(drops.load(Ordering::SeqCst), 0);
     let recovered = rejected.into_invocation();
     assert_eq!(drops.load(Ordering::SeqCst), 0);
-    let output = method
-        .invoke(recovered)
-        .expect("normal invocation should reuse the recovered input");
+    let output = match method.invoke(recovered) {
+        Ok(output) => output,
+        Err(_) => panic!("normal invocation should reuse the recovered input"),
+    };
     assert!(matches!(output, qubit_reflect::InvocationOutput::Unit));
     assert_eq!(worker.value, "recovered value".len());
     assert_eq!(drops.load(Ordering::SeqCst), 1);

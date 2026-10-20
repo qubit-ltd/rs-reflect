@@ -8,6 +8,10 @@
 
 //! Compile fixture for direct derive macros with a runtime-only dependency.
 
+// The derives generate fixture-only public helper items whose documentation is
+// not part of this compile-test crate's API.
+#![allow(missing_docs)]
+
 use qubit_reflect_derive::Reflect;
 use qubit_reflect_derive::ReflectImpl;
 

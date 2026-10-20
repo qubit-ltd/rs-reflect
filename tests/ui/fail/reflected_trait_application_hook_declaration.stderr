@@ -1,0 +1,9 @@
+error: `__qbr_trait_application_metadata` is reserved by `#[Reflect]`
+  --> tests/ui/fail/reflected_trait_application_hook_declaration.rs:11:5
+   |
+11 | /     fn __qbr_trait_application_metadata()
+12 | |     where
+13 | |         Self: Sized,
+14 | |     {
+15 | |     }
+   | |_____^

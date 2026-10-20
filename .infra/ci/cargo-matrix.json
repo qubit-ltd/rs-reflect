@@ -71,7 +71,8 @@
         "registry-types",
         "registry-impl-a",
         "registry-impl-b",
-        "registry-app"
+        "registry-app",
+        "default-trait-thread-safe-consumer"
       ]
     }
   ]

@@ -3,8 +3,8 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for concrete generic type identity and field navigation.
@@ -22,5 +22,8 @@ fn test_concrete_generic_descriptor_resolves_reflected_field_type() {
     let descriptor = TypeDescriptor::of::<GenericBox<u32>>();
     let field = descriptor.field("value").expect("generic field exists");
 
-    assert_eq!(field.find_concrete_type().unwrap().type_id(), std::any::TypeId::of::<u32>());
+    assert_eq!(
+        field.find_concrete_type().unwrap().type_id(),
+        std::any::TypeId::of::<u32>()
+    );
 }

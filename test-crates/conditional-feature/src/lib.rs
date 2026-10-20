@@ -7,10 +7,14 @@
 // =============================================================================
 //! Fixture proving that reflected members follow a Cargo feature.
 
+// The derives emit fixture-only helper macros whose docs are not user-facing.
+#![allow(missing_docs)]
+
 use qubit_reflect::Reflect;
 
 /// A signature type available only when the fixture feature is enabled.
 #[cfg(feature = "conditional-extra")]
+#[Reflect]
 pub struct FeatureOnlyType;
 
 /// A trait whose members and helper validation follow the selected feature.

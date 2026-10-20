@@ -12,15 +12,12 @@ use std::fmt;
 
 use crate::error::IdError;
 
-/// A stable, namespaced identifier for a reflection capability.
+/// An internal stable, namespaced identifier for a reflection capability.
 ///
-/// # Examples
-///
-/// ```
-/// use qubit_reflect::identity::CapabilityId;
-/// let id = CapabilityId::new("example.cache").expect("valid capability ID");
-/// assert_eq!(id.as_str(), "example.cache");
-/// ```
+/// Downstream code declares capability IDs through
+/// [`crate::capability::CapabilitySpec`] and registers adapters through
+/// [`crate::capability::CapabilityRegistration`]. This implementation type is
+/// not exposed as a public module API.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CapabilityId(&'static str);
 
@@ -198,4 +195,18 @@ fn validate_segments(value: &str) -> Result<(), IdError> {
         return Err(IdError::InvalidFormat { value: value.into() });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CapabilityId;
+
+    #[test]
+    fn display_and_as_ref_return_the_stable_identifier() {
+        let id = CapabilityId::new("example.capability").expect("valid capability ID");
+
+        assert_eq!(id.to_string(), "example.capability");
+        let as_ref: &str = id.as_ref();
+        assert_eq!(as_ref, "example.capability");
+    }
 }

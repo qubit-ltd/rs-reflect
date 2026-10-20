@@ -12,7 +12,9 @@
 
 use std::any::TypeId;
 
-use qubit_reflect::{Reflect, ReflectionContext, TypeDescriptor};
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
 
 #[Reflect]
 struct IdentityFixture;
@@ -31,8 +33,5 @@ fn context_identity_matches_the_registered_rust_type() {
     assert_eq!(registered.type_id(), TypeId::of::<IdentityFixture>());
     assert_eq!(static_descriptor.type_id(), TypeId::of::<IdentityFixture>());
     assert!(std::ptr::eq(registered.context(), &context));
-    assert!(!std::ptr::eq(
-        registered.context(),
-        static_descriptor.context()
-    ));
+    assert!(!std::ptr::eq(registered.context(), static_descriptor.context()));
 }

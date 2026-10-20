@@ -1,0 +1,5 @@
+error: `__qbr_trait_application_metadata` is reserved by `#[Reflect]` traits
+  --> tests/ui/fail/reflected_trait_application_hook_override.rs:16:8
+   |
+16 |     fn __qbr_trait_application_metadata()
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

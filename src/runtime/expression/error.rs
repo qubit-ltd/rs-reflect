@@ -1,15 +1,25 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::fmt;
 
 /// The semantic kind of a concrete generic argument.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum GenericArgumentKind {
+pub enum GenericArgumentKind {
+    /// A type parameter argument.
     Type,
+    /// A const parameter argument.
     Const,
 }
 
 /// A request to view a generic argument through the wrong kind-specific API.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct GenericArgumentError {
+pub struct GenericArgumentError {
     expected: GenericArgumentKind,
     actual: GenericArgumentKind,
 }
@@ -19,11 +29,13 @@ impl GenericArgumentError {
         Self { expected, actual }
     }
 
-    pub(crate) const fn expected(self) -> GenericArgumentKind {
+    /// Returns the argument kind required by the attempted operation.
+    pub const fn expected(self) -> GenericArgumentKind {
         self.expected
     }
 
-    pub(crate) const fn actual(self) -> GenericArgumentKind {
+    /// Returns the actual kind of the supplied generic argument.
+    pub const fn actual(self) -> GenericArgumentKind {
         self.actual
     }
 }
@@ -42,8 +54,13 @@ impl std::error::Error for GenericArgumentError {}
 
 /// A type expression that cannot provide a requested concrete descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TypeExpressionError {
-    ConcreteDescriptorUnavailable { parameter: &'static str },
+pub enum TypeExpressionError {
+    /// No concrete reflected type descriptor is available for this parameter.
+    ConcreteDescriptorUnavailable {
+        /// The name of the generic type parameter without an available
+        /// descriptor.
+        parameter: &'static str,
+    },
 }
 
 impl fmt::Display for TypeExpressionError {

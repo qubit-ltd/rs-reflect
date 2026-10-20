@@ -17,13 +17,13 @@
 pub use crate::runtime::context::handle::ReflectionContext;
 pub use crate::runtime::context::handle::RegisteredTraitDescriptor;
 pub use crate::runtime::descriptor::field::FieldDescriptor;
+pub use crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor;
+pub use crate::runtime::descriptor::impl_descriptor::ImplDescriptor;
 pub use crate::runtime::descriptor::method::MethodDescriptor;
-pub use crate::runtime::descriptor::impl_descriptor::{ImplDefinitionDescriptor, ImplDescriptor};
 pub use crate::runtime::descriptor::reflect::Reflect;
 pub use crate::runtime::descriptor::reflect::TypeRegistration;
-pub use crate::runtime::descriptor::trait_descriptor::{
-    TraitDescriptor, TraitExpressionDescriptor,
-};
+pub use crate::runtime::descriptor::trait_descriptor::TraitDescriptor;
+pub use crate::runtime::descriptor::trait_descriptor::TraitExpressionDescriptor;
 pub use crate::runtime::descriptor::type_descriptor::TypeDescriptor;
 pub use crate::runtime::error::ContextError;
 pub use crate::runtime::error::LookupError;

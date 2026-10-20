@@ -22,7 +22,7 @@ trait ShadowBoundContract {
     type Item: crate::Reflect + 'static;
 }
 
-#[qubit_reflect::ReflectImpl]
+#[qubit_reflect::ReflectImpl(reflected_trait = ShadowBoundContract)]
 impl ShadowBoundContract for Target {
     type Item = ShadowValue;
 }

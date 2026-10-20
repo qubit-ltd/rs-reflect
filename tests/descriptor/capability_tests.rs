@@ -3,8 +3,8 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for typed vNext capabilities.
@@ -13,19 +13,23 @@ use std::rc::Rc;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectionContext;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::capability::{
-    CapabilityRegistration, CapabilitySpec, CapabilityTarget, CloneCapability, DefaultCapability,
-};
-use qubit_reflect::value::{DynamicRef, Local};
+use qubit_reflect::capability::CapabilityOrigin;
+use qubit_reflect::capability::CapabilityRegistration;
+use qubit_reflect::capability::CapabilitySpec;
+use qubit_reflect::capability::CapabilityTarget;
+use qubit_reflect::capability::CloneCapability;
+use qubit_reflect::capability::DefaultCapability;
 use qubit_reflect::register_capability;
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
-#[derive(Clone, Default, Reflect)]
+#[derive(Clone, Default)]
+#[Reflect]
 struct BuiltinTarget {
     value: String,
 }
 
-#[derive(Reflect)]
+#[Reflect]
 struct ExplicitTarget {
     marker: u8,
 }
@@ -47,20 +51,34 @@ register_capability!(BuiltinTarget: DefaultCapability);
 /// Verifies linked registrations provide built-in Clone and Default contracts.
 #[test]
 fn test_builtin_capabilities_use_typed_adapters() {
-    let descriptor = TypeDescriptor::of::<BuiltinTarget>();
+    let context = ReflectionContext::builder()
+        .include_linked_for::<BuiltinTarget>()
+        .build()
+        .expect("the linked Clone and Default registrations are valid");
+    let descriptor = context.type_of::<BuiltinTarget>();
     let original = BuiltinTarget {
         value: String::from("before"),
     };
 
     let clone = descriptor.capability::<CloneCapability>().expect("Clone is registered");
+    assert!(descriptor.has_capability::<CloneCapability>().unwrap());
+    assert!(matches!(clone.target(), CapabilityTarget::Type(target)
+        if target.type_id() == descriptor.type_id() && std::ptr::eq(target.context(), &context)));
+    assert!(matches!(clone.origin(), CapabilityOrigin::Linked { registration }
+        if std::ptr::eq(registration.context(), &context)));
     let copied = clone
         .adapter()
         .clone_dynamic(DynamicRef::<Local>::new(&original))
         .expect("the registered Clone adapter accepts the exact root type");
     assert_eq!(copied.downcast_ref::<BuiltinTarget>().unwrap().value, "before");
 
-    let default = descriptor.capability::<DefaultCapability>().expect("Default is registered");
-    let created = default.adapter().create_dynamic::<Local>();
+    let default = descriptor
+        .capability::<DefaultCapability>()
+        .expect("Default is registered");
+    let created = default
+        .adapter()
+        .create_dynamic::<Local>()
+        .expect("the registered Default adapter creates the exact root type");
     assert_eq!(created.downcast_ref::<BuiltinTarget>().unwrap().value, "");
 }
 
@@ -76,10 +94,18 @@ fn test_custom_capability_is_bound_to_its_explicit_context() {
         .build()
         .expect("the explicit capability registration is valid");
     let descriptor = context.type_of::<ExplicitTarget>();
-    let capability = descriptor.capability::<LabelCapability>().expect("custom capability exists");
+    let capability = descriptor
+        .capability::<LabelCapability>()
+        .expect("custom capability exists");
+    assert!(descriptor.has_capability::<LabelCapability>().unwrap());
 
     assert_eq!(capability.adapter(), &LabelAdapter("explicit"));
-    assert!(matches!(capability.target(), CapabilityTarget::Type(target) if target.type_id() == descriptor.type_id()));
+    assert!(matches!(capability.target(), CapabilityTarget::Type(target)
+        if target.type_id() == descriptor.type_id() && std::ptr::eq(target.context(), &context)));
+    assert!(
+        matches!(capability.origin(), CapabilityOrigin::Explicit { registration }
+        if std::ptr::eq(registration.context(), &context))
+    );
     assert!(std::ptr::eq(descriptor.context(), &context));
     assert_eq!(descriptor.capabilities().unwrap().iter().len(), 1);
     let value = ExplicitTarget { marker: 1 };
@@ -90,20 +116,28 @@ fn test_custom_capability_is_bound_to_its_explicit_context() {
 /// capability contract.
 #[test]
 fn test_local_target_can_use_a_typed_capability_spec() {
-    #[derive(Reflect)]
+    #[Reflect]
     struct LocalOnly {
         value: Rc<()>,
     }
 
     let context = ReflectionContext::builder()
         .include_type::<LocalOnly>()
-        .register(CapabilityRegistration::for_type::<LocalOnly, LabelCapability>(LabelAdapter("local")))
+        .register(CapabilityRegistration::for_type::<LocalOnly, LabelCapability>(
+            LabelAdapter("local"),
+        ))
         .build()
         .expect("a local-only type can have a typed registration");
     let local = LocalOnly { value: Rc::new(()) };
     let descriptor = context.type_of::<LocalOnly>();
-    let capability = descriptor.capability::<LabelCapability>().expect("custom capability exists");
+    let capability = descriptor
+        .capability::<LabelCapability>()
+        .expect("custom capability exists");
     assert_eq!(descriptor.type_id(), std::any::TypeId::of::<LocalOnly>());
     assert_eq!(capability.adapter(), &LabelAdapter("local"));
+    assert!(
+        matches!(descriptor.capabilities().unwrap().target(), CapabilityTarget::Type(target)
+        if std::ptr::eq(target.context(), &context))
+    );
     assert_eq!(Rc::strong_count(&local.value), 1);
 }

@@ -10,10 +10,11 @@
 
 #![cfg(feature = "derive")]
 
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
 use qubit_reflect::capability::CapabilitySpec;
 use qubit_reflect::error::ContextIssue;
 use qubit_reflect::registration::CapabilityRegistration;
-use qubit_reflect::{Reflect, ReflectionContext};
 
 #[Reflect]
 #[derive(Clone)]
@@ -36,12 +37,8 @@ impl CapabilitySpec for U64AdapterSpec {
 fn duplicate_typed_providers_report_a_structured_context_conflict() {
     let result = ReflectionContext::builder()
         .include_type::<ConflictingCloneTarget>()
-        .register(CapabilityRegistration::for_type::<ConflictingCloneTarget, U32AdapterSpec>(
-            3_u32,
-        ))
-        .register(CapabilityRegistration::for_type::<ConflictingCloneTarget, U64AdapterSpec>(
-            7_u64,
-        ))
+        .register(CapabilityRegistration::for_type::<ConflictingCloneTarget, U32AdapterSpec>(3_u32))
+        .register(CapabilityRegistration::for_type::<ConflictingCloneTarget, U64AdapterSpec>(7_u64))
         .build();
     let error = match result {
         Err(error) => error,

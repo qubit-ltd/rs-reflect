@@ -11,6 +11,7 @@
 use std::env;
 
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::Result;
 
 use super::ExpansionContext;
@@ -52,22 +53,21 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
 }
 
 /// Expands a declaration after resolving its runtime path.
-fn dispatch_with_context(
-    declaration: DeclarationIr,
-    context: &ExpansionContext,
-) -> Result<TokenStream> {
-    match declaration {
+fn dispatch_with_context(declaration: DeclarationIr, context: &ExpansionContext) -> Result<TokenStream> {
+    let expanded = match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {
             TypeDeclarationKindIr::Struct => super::structs::expand(declaration, context),
             TypeDeclarationKindIr::Enum => super::enums::expand(declaration, context),
-            TypeDeclarationKindIr::Union => Err(syn::Error::new(
-                declaration.span,
-                "cannot expand Reflect for union",
-            )),
+            TypeDeclarationKindIr::Union => Err(syn::Error::new(declaration.span, "cannot expand Reflect for union")),
         },
         DeclarationIr::Trait(declaration) => Ok(super::traits::expand(declaration, context)),
         DeclarationIr::Impl(declaration) => Ok(super::impls::expand_impl(declaration, context)),
-    }
+    }?;
+    let facade = context.facade();
+    Ok(quote! {
+        const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
+        #expanded
+    })
 }
 
 #[cfg(test)]
@@ -101,9 +101,48 @@ mod tests {
             "expected linked method catalog provider in {source}",
         );
         assert!(
-            !source.contains("codegen_v3"),
+            !source.contains(concat!("codegen", "_v3")),
             "must not emit the legacy protocol in {source}",
         );
+    }
+
+    #[test]
+    fn test_reflection_emits_protocol_assertion_through_resolved_facade() {
+        use proc_macro_crate::FoundCrate;
+
+        use crate::ir::MacroKind;
+
+        let context = ExpansionContext::from_found_crate(Some(FoundCrate::Name("renamed_reflect".to_owned())))
+            .expect("renamed runtime dependency should resolve");
+        let declarations = [
+            (
+                MacroKind::Derive,
+                quote!(
+                    struct Fixture;
+                ),
+            ),
+            (
+                MacroKind::Trait,
+                quote!(
+                    trait Fixture {}
+                ),
+            ),
+            (MacroKind::Impl, quote!(impl Fixture {})),
+        ];
+
+        for (kind, item) in declarations {
+            let parsed = parse_and_validate_declaration(kind, TokenStream::new(), item)
+                .expect("fixture declaration should parse and validate");
+            let expanded =
+                dispatch_with_context(parsed.declaration, &context).expect("fixture declaration should expand");
+            let source = expanded.to_string();
+
+            assert!(
+                source
+                    .contains("renamed_reflect :: __private :: codegen_v4 :: protocol :: assert_protocol_version (4)"),
+                "protocol assertion should use the resolved runtime facade: {source}",
+            );
+        }
     }
 
     /// Parses and validates one type fixture through the derive pipeline.
@@ -148,12 +187,9 @@ mod tests {
     /// Asserts emitted executable tokens use only the v4 protocol.
     fn assert_codegen_v4(tokens: &TokenStream) {
         let source = tokens.to_string();
+        assert!(source.contains("codegen_v4"), "expected v4 token path in:\n{source}");
         assert!(
-            source.contains("codegen_v4"),
-            "expected v4 token path in:\n{source}"
-        );
-        assert!(
-            !source.contains("codegen_v3"),
+            !source.contains(concat!("codegen", "_v3")),
             "found legacy v3 token path in:\n{source}"
         );
         assert!(
@@ -166,7 +202,7 @@ mod tests {
             "RuntimeIdentity",
             "StaticFragmentIdentity",
             "FragmentPayload",
-            "ReflectRegistry",
+            concat!("Reflect", "Registry"),
             "CatchingInvocationAdapter",
             "catching_invocation_adapter",
         ] {
@@ -205,10 +241,7 @@ mod tests {
             "diagnostic should include the expected detail: {error}",
         );
         assert!(
-            error
-                .into_compile_error()
-                .to_string()
-                .contains("compile_error"),
+            error.into_compile_error().to_string().contains("compile_error"),
             "diagnostic should convert to a compile_error token",
         );
     }
@@ -222,11 +255,7 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(
-            declaration,
-            "cannot expand Reflect for struct",
-            "invalid generics",
-        );
+        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid generics");
     }
 
     #[test]
@@ -238,11 +267,7 @@ mod tests {
         ));
         declaration.generics.declaration = quote!(not_a_generic_list);
 
-        assert_diagnostic(
-            declaration,
-            "cannot expand Reflect for enum",
-            "invalid generics",
-        );
+        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid generics");
     }
 
     #[test]
@@ -257,11 +282,7 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(
-            declaration,
-            "cannot expand Reflect for struct",
-            "invalid where clause",
-        );
+        assert_diagnostic(declaration, "cannot expand Reflect for struct", "invalid where clause");
     }
 
     #[test]
@@ -276,11 +297,7 @@ mod tests {
         ));
         declaration.generics.where_clause = quote!(where ());
 
-        assert_diagnostic(
-            declaration,
-            "cannot expand Reflect for enum",
-            "invalid where clause",
-        );
+        assert_diagnostic(declaration, "cannot expand Reflect for enum", "invalid where clause");
     }
 
     #[test]
@@ -291,19 +308,14 @@ mod tests {
         declaration.kind = TypeDeclarationKindIr::Union;
 
         let context = ExpansionContext::for_tests();
-        let error = dispatch_with_context(DeclarationIr::Type(declaration), &context)
-            .expect_err("union must be rejected");
+        let error =
+            dispatch_with_context(DeclarationIr::Type(declaration), &context).expect_err("union must be rejected");
         assert!(
-            error
-                .to_string()
-                .contains("cannot expand Reflect for union"),
+            error.to_string().contains("cannot expand Reflect for union"),
             "union declarations should report the unsupported type",
         );
         assert!(
-            error
-                .into_compile_error()
-                .to_string()
-                .contains("compile_error"),
+            error.into_compile_error().to_string().contains("compile_error"),
             "diagnostic should convert to a compile_error token",
         );
     }
@@ -318,8 +330,8 @@ mod tests {
             }
         });
         let context = ExpansionContext::for_tests();
-        let tokens = dispatch_with_context(DeclarationIr::Trait(declaration), &context)
-            .expect("trait tokens should be emitted");
+        let tokens =
+            dispatch_with_context(DeclarationIr::Trait(declaration), &context).expect("trait tokens should be emitted");
         assert_codegen_v4(&tokens);
         assert!(
             tokens.to_string().contains("MethodMetadataSpec"),
@@ -327,9 +339,7 @@ mod tests {
         );
         assert!(
             tokens.to_string().contains("DEFAULT_METHODS")
-                && tokens
-                    .to_string()
-                    .contains("MethodImplementationSource :: Defaulted"),
+                && tokens.to_string().contains("MethodImplementationSource :: Defaulted"),
             "default methods should expose a typed target-bound invocation provider"
         );
         assert!(
@@ -338,15 +348,13 @@ mod tests {
         );
         assert!(
             tokens.to_string().contains("method_at (2usize)"),
-            "generic default methods should remain in the typed default-method catalog: {}",
-            tokens.to_string()
+            "generic default methods should remain in the typed default-method catalog: {tokens}"
         );
         assert!(
             tokens
                 .to_string()
                 .contains("InvocationUnavailableReason :: UnspecializedGeneric"),
-            "generic default methods without a binding need structured specialization state: {}",
-            tokens.to_string()
+            "generic default methods without a binding need structured specialization state: {tokens}"
         );
         assert!(
             !tokens.to_string().contains("catch_unwind"),
@@ -359,6 +367,29 @@ mod tests {
     }
 
     #[test]
+    fn test_reflect_structural_emitter_uses_codegen_v4_only() {
+        let parsed = parse_and_validate_declaration(
+            MacroKind::Derive,
+            TokenStream::new(),
+            quote! {
+                struct StructuralFixture {
+                    value: u32,
+                }
+            },
+        )
+        .expect("the Reflect derive input should parse and validate");
+        let context = ExpansionContext::for_tests();
+        let tokens =
+            dispatch_with_context(parsed.declaration, &context).expect("the Reflect structural emitter should expand");
+
+        assert_codegen_v4(&tokens);
+        assert!(
+            tokens.to_string().contains("TypeRegistration"),
+            "Reflect should emit the structural type registration: {tokens}"
+        );
+    }
+
+    #[test]
     fn test_pinned_default_trait_method_emits_typed_adapter() {
         let declaration = parse_trait(quote! {
             trait PinnedService {
@@ -366,8 +397,8 @@ mod tests {
             }
         });
         let context = ExpansionContext::for_tests();
-        let tokens = dispatch_with_context(DeclarationIr::Trait(declaration), &context)
-            .expect("trait tokens should be emitted");
+        let tokens =
+            dispatch_with_context(DeclarationIr::Trait(declaration), &context).expect("trait tokens should be emitted");
         assert_codegen_v4(&tokens);
         let source = tokens.to_string();
         assert!(
@@ -392,8 +423,8 @@ mod tests {
             }
         });
         let context = ExpansionContext::for_tests();
-        let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
-            .expect("impl tokens should be emitted");
+        let tokens =
+            dispatch_with_context(DeclarationIr::Impl(declaration), &context).expect("impl tokens should be emitted");
         assert_codegen_v4(&tokens);
         let source = tokens.to_string();
         assert!(
@@ -415,8 +446,8 @@ mod tests {
             }
         });
         let context = ExpansionContext::for_tests();
-        let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
-            .expect("impl tokens should be emitted");
+        let tokens =
+            dispatch_with_context(DeclarationIr::Impl(declaration), &context).expect("impl tokens should be emitted");
         assert_codegen_v4(&tokens);
         let source = tokens.to_string();
         assert!(
@@ -453,6 +484,50 @@ mod tests {
     }
 
     #[test]
+    fn test_concrete_pin_receiver_emits_matching_adapter_and_slot() {
+        let context = ExpansionContext::for_tests();
+        let declaration = parse_impl(quote! {
+            impl Worker {
+                fn first(&self) {}
+                fn second(&self) {}
+                fn third(&self) {}
+                fn fourth(&self) {}
+                fn fifth(&self) {}
+                fn sixth(&self) {}
+                fn pinned_value(self: ::std::pin::Pin<&mut Worker>) -> u32 {
+                    1
+                }
+            }
+        });
+        let receiver = declaration.methods[6]
+            .receiver
+            .as_ref()
+            .expect("the explicit self receiver should be retained by parsing");
+        assert_eq!(
+            crate::expand::invocation::analysis::typed_pinned_receiver_mutable(receiver),
+            Some(true),
+            "Pin<&mut ConcreteSelf> should be classified as pinned: {receiver:#?}"
+        );
+
+        let tokens =
+            dispatch_with_context(DeclarationIr::Impl(declaration), &context).expect("the concrete impl should expand");
+        let source = tokens.to_string();
+        assert!(
+            source.contains("__QUBIT_REFLECT_INVOCATION_ADAPTER_6"),
+            "the pinned adapter definition and slot should use index 6: {source}"
+        );
+        assert!(
+            source.contains("PinnedFunctionInvocationAdapter") && source.contains("pinned_local"),
+            "a concrete pinned receiver should emit the typed pinned adapter slot: {source}"
+        );
+        assert!(
+            source.contains("ReceiverDescriptor :: for_type :: < Worker >")
+                && !source.contains("for_type :: < :: std :: pin"),
+            "receiver dispatch should bind to the reflected target, not Pin<&mut Worker>: {source}"
+        );
+    }
+
+    #[test]
     fn test_async_impl_does_not_emit_catching_adapter_slot() {
         let declaration = parse_impl(quote! {
             impl Counter {
@@ -476,11 +551,19 @@ mod tests {
 
     #[test]
     fn test_trait_impl_tokens_use_typed_trait_application() {
-        let declaration = parse_impl(quote! {
-            impl Service<u32> for Counter {
-                fn execute(&self, value: u32) -> usize { value as usize }
-            }
-        });
+        let parsed = parse_and_validate_declaration(
+            MacroKind::Impl,
+            quote!(reflected_trait = crate::Service),
+            quote! {
+                impl Service<u32> for Counter {
+                    fn execute(&self, value: u32) -> usize { value as usize }
+                }
+            },
+        )
+        .expect("the reflected trait impl input should parse and validate");
+        let DeclarationIr::Impl(declaration) = parsed.declaration else {
+            panic!("the ReflectImpl parser must produce an impl declaration");
+        };
         let context = ExpansionContext::for_tests();
         let tokens = dispatch_with_context(DeclarationIr::Impl(declaration), &context)
             .expect("concrete trait impl tokens should be emitted");
@@ -491,13 +574,12 @@ mod tests {
             "trait impls should emit a typed trait application: {source}"
         );
         assert!(
-            source.contains("GenericArgumentMetadata") && source.contains("ArgumentIdentity"),
-            "trait generic arguments should retain their typed values and identity: {source}"
+            source.contains("__qbr_trait_application_metadata") && source.contains("as Service < u32 >"),
+            "local reflected trait applications should query resolved generic metadata through the source trait path: {source}"
         );
         assert!(
-            source.contains("DEFAULT_METHODS")
-                && source.contains("MethodImplementationSource :: Overridden"),
-            "trait applications should merge defaulted and overridden effective methods: {source}"
+            source.contains("effective_methods") && source.contains("MethodImplementationSource :: Overridden"),
+            "trait applications should retain overridden effective method metadata: {source}"
         );
     }
 
@@ -551,7 +633,7 @@ mod tests {
             "registered bindings should lazily provide typed catalog entries: {source}"
         );
         assert!(
-            !source.contains("inventory :: submit") && !source.contains("codegen_v3"),
+            !source.contains("inventory :: submit") && !source.contains(concat!("codegen", "_v3")),
             "registered binding tokens must delegate inventory and use only v4: {source}"
         );
     }

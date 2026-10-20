@@ -15,13 +15,15 @@ use qubit_reflect::value::Local;
 #[test]
 fn test_local_dynamic_values_can_be_reborrowed_and_cloned() {
     let mut owned = DynamicOwned::<Local>::new(String::from("value"));
-    let borrowed = owned.as_reflected_ref();
+    let borrowed = owned.as_ref();
     let cloned: DynamicRef<'_, Local> = borrowed.clone();
 
     assert_eq!(borrowed.downcast_ref::<String>().map(String::as_str), Some("value"));
     assert_eq!(cloned.downcast_ref::<String>().map(String::as_str), Some("value"));
+    drop(cloned);
+    drop(borrowed);
     owned
-        .as_reflected_mut()
+        .as_mut()
         .downcast_mut::<String>()
         .expect("the owned value must expose an exact mutable borrow")
         .push_str("-updated");

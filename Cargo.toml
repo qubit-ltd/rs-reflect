@@ -31,10 +31,17 @@ members = [
     "test-crates/registry-impl-a",
     "test-crates/registry-impl-b",
     "test-crates/registry-app",
+    "test-crates/multi-version-types-v1",
+    "test-crates/multi-version-types-v2",
     "test-crates/macro-runtime-only",
     "test-crates/conditional-feature",
+    "test-crates/default-trait-thread-safe-producer",
+    "test-crates/default-trait-thread-safe-consumer",
 ]
-exclude = ["fuzz", "test-crates/readme-examples"]
+exclude = [
+    "fuzz",
+    "test-crates/readme-examples",
+]
 resolver = "3"
 
 [features]
@@ -95,11 +102,6 @@ name = "panic_abort_invocation_tests"
 path = "tests/panic_abort_invocation_tests.rs"
 required-features = ["derive"]
 
-[[test]]
-name = "public_derived_capability_conflict_tests"
-path = "tests/public_derived_capability_conflict_tests.rs"
-required-features = ["derive"]
-
 [[bin]]
 name = "panic_abort_invocation_fixture"
 path = "tests/fixtures/panic_abort_invocation.rs"
@@ -129,7 +131,7 @@ required-features = ["derive"]
 [[bench]]
 name = "registry_init"
 harness = false
-required-features = ["bench-internals"]
+required-features = ["bench-internals", "derive"]
 
 [[bench]]
 name = "dynamic_operations"
@@ -139,7 +141,23 @@ required-features = ["derive"]
 [[bench]]
 name = "trait_cache_lookup"
 harness = false
+required-features = ["derive"]
 
 [[test]]
 name = "vnext_api_contract_tests"
 path = "tests/vnext_api_contract_tests.rs"
+
+[[test]]
+name = "codegen_v4_trait_registration_tests"
+path = "tests/codegen_v4_trait_registration_tests.rs"
+required-features = ["derive"]
+
+[[test]]
+name = "registered_method_binding_macro_contract_tests"
+path = "tests/registered_method_binding_macro_contract_tests.rs"
+required-features = ["derive"]
+
+[[test]]
+name = "type_descriptor_generic_arguments_tests"
+path = "tests/type_descriptor_generic_arguments_tests.rs"
+required-features = ["derive"]

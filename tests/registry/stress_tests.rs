@@ -14,7 +14,8 @@ use std::any::TypeId;
 use std::sync::Arc;
 use std::thread;
 
-use qubit_reflect::{Reflect, ReflectionContext};
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
 
 #[Reflect]
 struct ConcurrentRoot {

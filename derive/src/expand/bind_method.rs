@@ -24,21 +24,23 @@ struct BindingInput {
     signature: TypeFnPtr,
     asynchronous: bool,
     thread_safe: bool,
+    trait_binding: Option<TraitBindingHint>,
+}
+
+enum TraitBindingHint {
+    Reflected(syn::Path),
+    External(syn::Path),
 }
 
 impl Parse for BindingInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let method = input.parse()?;
         input.parse::<Token![as]>()?;
-        let thread_safe = input.peek(syn::Ident)
-            && input.fork().parse::<syn::Ident>()?.to_string() == "thread_safe";
+        let thread_safe = input.peek(syn::Ident) && input.fork().parse::<syn::Ident>()? == "thread_safe";
         if thread_safe {
             let mode = input.parse::<syn::Ident>()?;
             if mode != "thread_safe" {
-                return Err(syn::Error::new_spanned(
-                    mode,
-                    "expected `thread_safe` adapter mode",
-                ));
+                return Err(syn::Error::new_spanned(mode, "expected `thread_safe` adapter mode"));
             }
         }
         let asynchronous = input.peek(Token![async]);
@@ -52,6 +54,24 @@ impl Parse for BindingInput {
                 "expected a function pointer signature such as `fn(&T) -> U`",
             ));
         };
+        let trait_binding = if input.peek(Token![,]) {
+            input.parse::<Token![,]>()?;
+            let name = input.parse::<syn::Ident>()?;
+            input.parse::<Token![=]>()?;
+            let path = input.parse::<syn::Path>()?;
+            match name.to_string().as_str() {
+                "reflected_trait" => Some(TraitBindingHint::Reflected(path)),
+                "external_trait" => Some(TraitBindingHint::External(path)),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        name,
+                        "expected `reflected_trait = TraitPath` or `external_trait = Handle`",
+                    ));
+                }
+            }
+        } else {
+            None
+        };
         if !input.is_empty() {
             return Err(input.error("unexpected tokens after the method signature"));
         }
@@ -60,6 +80,7 @@ impl Parse for BindingInput {
             signature,
             asynchronous,
             thread_safe,
+            trait_binding,
         })
     }
 }
@@ -71,20 +92,20 @@ pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
 }
 
 /// Expands a binding using a pre-resolved runtime facade.
-pub(crate) fn expand_with_context(
-    input: TokenStream,
-    context: &ExpansionContext,
-) -> Result<TokenStream> {
+pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext) -> Result<TokenStream> {
     let input: BindingInput = parse2(input)?;
     let asynchronous = input.asynchronous;
     let thread_safe = input.thread_safe;
-    if input.signature.unsafety.is_some()
-        || input.signature.abi.is_some()
-        || input.signature.variadic.is_some()
-    {
+    if input.signature.unsafety.is_some() || input.signature.abi.is_some() || input.signature.variadic.is_some() {
         return Err(syn::Error::new_spanned(
             input.signature,
             "bind_method! requires a safe, Rust ABI, non-variadic function signature",
+        ));
+    }
+    if input.trait_binding.is_some() && input.method.qself.is_none() {
+        return Err(syn::Error::new_spanned(
+            &input.method,
+            "trait identity hints require a fully qualified trait method path such as `<Target as Trait>::method`",
         ));
     }
     let facade = context.facade().clone();
@@ -171,17 +192,18 @@ pub(crate) fn expand_with_context(
     });
     let receiver_metadata = receiver_kind.map_or_else(
         || quote!(None),
-        |kind| quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#target>(
-            #facade::__private::codegen_v4::invoke::ReceiverKind::#kind,
-        ))),
+        |kind| {
+            quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#target>(
+                #facade::__private::codegen_v4::invoke::ReceiverKind::#kind,
+            )))
+        },
     );
     let parameters: Vec<_> = input_types
         .iter()
         .enumerate()
         .map(|(index, ty)| {
             let ty_ir = crate::parse::convert_type(ty);
-            let expression =
-                super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
+            let expression = super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
             let passing = if is_mut_reference(ty) {
                 quote!(Mutable)
             } else if is_reference(ty) {
@@ -189,12 +211,17 @@ pub(crate) fn expand_with_context(
             } else {
                 quote!(Owned)
             };
+            let concrete_type = if let Type::Reference(reference) = ty {
+                &reference.elem
+            } else {
+                ty
+            };
             quote!(#facade::__private::codegen_v4::invoke::ParameterMetadata::new(
                 #index,
                 #facade::__private::codegen_v4::invoke::ParameterPattern::Identifier(""),
                 #facade::__private::codegen_v4::invoke::PassingMode::#passing,
                 #expression,
-            ))
+            ).with_concrete_type::<#concrete_type>())
         })
         .collect();
     let (return_metadata, return_kind) = match &signature.output {
@@ -202,16 +229,13 @@ pub(crate) fn expand_with_context(
             quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
             "Unit",
         ),
-        syn::ReturnType::Type(_, ty) if matches!(**ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) => {
-            (
-                quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
-                "Unit",
-            )
-        }
+        syn::ReturnType::Type(_, ty) if matches!(**ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) => (
+            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
+            "Unit",
+        ),
         syn::ReturnType::Type(_, ty) => {
             let ty_ir = crate::parse::convert_type(ty);
-            let expression =
-                super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
+            let expression = super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
             let (kind, kind_name) = if asynchronous {
                 (quote!(Future), "Future")
             } else if is_mut_reference(ty) {
@@ -223,44 +247,105 @@ pub(crate) fn expand_with_context(
             } else {
                 (quote!(Owned), "Owned")
             };
-            (
-                quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
-                    #facade::__private::codegen_v4::invoke::ReturnKind::#kind,
-                    #expression,
-                )),
-                kind_name,
-            )
+            let metadata = quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
+                #facade::__private::codegen_v4::invoke::ReturnKind::#kind,
+                #expression,
+            ));
+            let metadata = if !asynchronous
+                && !is_mut_reference(ty)
+                && !is_reference(ty)
+                && !matches!(**ty, Type::Never(_))
+                && !matches!(**ty, Type::ImplTrait(_) | Type::Infer(_))
+                && !is_str_type(ty)
+            {
+                quote!(#metadata.with_concrete_type::<#ty>())
+            } else {
+                metadata
+            };
+            (metadata, kind_name)
         }
     };
-    let generic_definition = quote!(#facade::__private::codegen_v4::expression::GenericDefinitionMetadata::new(&[], &[]));
+    let generic_definition =
+        quote!(#facade::__private::codegen_v4::expression::GenericDefinitionMetadata::new(&[], &[]));
     let method_name = syn::LitStr::new(&method_ident.to_string(), method_ident.span());
-    let implementation = syn::LitStr::new(
-        &target_type.to_token_stream().to_string(),
-        method_path.span(),
-    );
+    let implementation = syn::LitStr::new(&target_type.to_token_stream().to_string(), method_path.span());
     let namespace = if let Some(qself) = &method_path.qself {
-        let trait_path = syn::Path {
-            leading_colon: None,
-            segments: method_path
-                .path
-                .segments
-                .iter()
-                .take(qself.position)
-                .cloned()
-                .collect(),
+        let mut trait_path = syn::Path {
+            leading_colon: method_path.path.leading_colon,
+            segments: method_path.path.segments.iter().take(qself.position).cloned().collect(),
         };
-        let trait_name =
-            syn::LitStr::new(&trait_path.to_token_stream().to_string(), trait_path.span());
-        quote!(#facade::__private::codegen_v4::invoke::MethodNamespaceMetadata::Trait {
-            trait_: #trait_name,
+        let trait_name = syn::LitStr::new(&source_trait_path(&trait_path), trait_path.span());
+        let identity_arguments = trait_path.segments.last().and_then(|segment| match &segment.arguments {
+            syn::PathArguments::AngleBracketed(arguments) => Some(&arguments.args),
+            _ => None,
+        });
+        let mut identity = Vec::new();
+        for argument in identity_arguments.into_iter().flatten() {
+            if let Some(argument_identity) = trait_argument_identity(argument, &facade)? {
+                identity.push(argument_identity);
+            }
+        }
+        let identity_len = identity.len();
+        let (definition, identity_setup) = match input.trait_binding.as_ref() {
+            Some(TraitBindingHint::Reflected(canonical_path)) => {
+                let definition_provider = trait_definition_provider_path(canonical_path);
+                let source_path = trait_path.clone();
+                (
+                    quote!(Some(#definition_provider().metadata())),
+                    quote! {
+                        let (_, __qubit_trait_identity, _, _) =
+                            <#target as #source_path>::__qbr_trait_application_metadata();
+                        let __qubit_trait_identity =
+                            ::std::boxed::Box::leak(__qubit_trait_identity);
+                    },
+                )
+            }
+            Some(TraitBindingHint::External(handle)) => (
+                quote!(Some(#handle::__qubit_reflect_trait_definition().metadata())),
+                quote! {
+                    let __qubit_trait_identity = ::std::boxed::Box::leak(
+                        ::std::vec![#(#identity),*].into_boxed_slice(),
+                    );
+                },
+            ),
+            None => {
+                let definition_provider = trait_definition_provider_path(&trait_path);
+                (
+                    quote!(Some(#definition_provider().metadata())),
+                    quote! {
+                        static __QUBIT_BIND_METHOD_TRAIT_APPLICATION_IDENTITY:
+                            [#facade::__private::codegen_v4::traits::ArgumentIdentity; #identity_len] =
+                            [#(#identity),*];
+                        let __qubit_trait_identity =
+                            &__QUBIT_BIND_METHOD_TRAIT_APPLICATION_IDENTITY[..];
+                    },
+                )
+            }
+        };
+        let namespace_trait = match input.trait_binding.as_ref() {
+            Some(TraitBindingHint::External(handle)) => {
+                quote!(#handle::__qubit_reflect_trait_definition().path())
+            }
+            _ => quote!(#trait_name),
+        };
+        for segment in &mut trait_path.segments {
+            segment.arguments = syn::PathArguments::None;
+        }
+        quote!({
+            #identity_setup
+            #facade::__private::codegen_v4::invoke::MethodNamespaceMetadata::TraitApplication {
+            trait_: #namespace_trait,
             implementation: #implementation,
-        })
+            identity: __qubit_trait_identity,
+            definition: #definition,
+        }})
     } else {
         quote!(#facade::__private::codegen_v4::invoke::MethodNamespaceMetadata::Inherent {
             implementation: #implementation,
         })
     };
-    let qualifiers = quote!(#facade::__private::codegen_v4::invoke::MethodQualifiers::new(false, #asynchronous, false, false));
+    let qualifiers =
+        quote!(#facade::__private::codegen_v4::invoke::MethodQualifiers::new(false, #asynchronous, false, false));
     let metadata = quote! {
         fn __qubit_bind_method_metadata() -> &'static #facade::__private::codegen_v4::invoke::MethodMetadata {
             static VALUE: ::std::sync::OnceLock<#facade::__private::codegen_v4::invoke::MethodMetadata> = ::std::sync::OnceLock::new();
@@ -399,18 +484,10 @@ pub(crate) fn expand_with_context(
         quote!(__validated: #facade::__private::codegen_v4::invoke::ValidatedInvocation<'call, #mode>)
     };
     let adapters = if pinned {
-        if receiver_ty.as_ref().is_some_and(is_pin_mut_type) {
-            if thread_safe {
-                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_thread_safe::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
-            } else {
-                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
-            }
+        if thread_safe {
+            quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_thread_safe::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
         } else {
-            if thread_safe {
-                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_thread_safe::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
-            } else {
-                quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
-            }
+            quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().pinned_local::<#target>(&__QUBIT_BIND_METHOD_ADAPTER).build())
         }
     } else if thread_safe && asynchronous {
         quote!(#facade::__private::codegen_v4::invoke::InvocationAdapters::builder().thread_safe(&__QUBIT_BIND_METHOD_ADAPTER).build())
@@ -455,9 +532,62 @@ pub(crate) fn expand_with_context(
         }
         #adapter
     };
-    Ok(crate::expand::invocation::emit::rewrite_codegen_paths(
-        quote! {{ #shim #binding }},
-    ))
+    Ok(quote! {{
+        const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
+        #shim
+        #binding
+    }})
+}
+
+fn source_trait_path(path: &syn::Path) -> String {
+    let mut source = path
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::");
+    if path.leading_colon.is_some() {
+        source.insert_str(0, "::");
+    }
+    source
+}
+
+fn trait_definition_provider_path(path: &syn::Path) -> syn::Path {
+    let mut provider: syn::Path = path.clone();
+    let last = provider
+        .segments
+        .last_mut()
+        .expect("a qualified method trait path has a final segment");
+    last.ident = format_ident!("__QubitReflectTraitDef_{}_SPEC", last.ident);
+    last.arguments = syn::PathArguments::None;
+    provider
+}
+
+fn trait_argument_identity(argument: &syn::GenericArgument, facade: &TokenStream) -> Result<Option<TokenStream>> {
+    let identity = quote!(#facade::__private::codegen_v4::traits::ArgumentIdentity);
+    let token = match argument {
+        syn::GenericArgument::Type(ty) => quote!(#identity::type_argument::<#ty>()),
+        // Runtime trait application identity intentionally omits lifetimes,
+        // which do not distinguish Rust trait implementations at runtime.
+        syn::GenericArgument::Lifetime(_) => return Ok(None),
+        syn::GenericArgument::Const(expression) => {
+            let expression = expression.to_token_stream();
+            let value = super::expression_codegen::const_expression(&expression, &GenericEnvironment::new(), facade);
+            quote!(#identity::const_argument(
+                #value.expect("supported const trait arguments are available")
+            ))
+        }
+        syn::GenericArgument::AssocType(_)
+        | syn::GenericArgument::AssocConst(_)
+        | syn::GenericArgument::Constraint(_) => return Ok(None),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                argument,
+                "trait application identity supports only type, lifetime, and const arguments",
+            ));
+        }
+    };
+    Ok(Some(token))
 }
 
 /// Expands a concrete method binding into a linked method-catalog registration.
@@ -467,30 +597,27 @@ pub(crate) fn expand_registered(input: TokenStream) -> Result<TokenStream> {
 }
 
 /// Expands a linked registration using a pre-resolved runtime facade.
-pub(crate) fn expand_registered_with_context(
-    input: TokenStream,
-    context: &ExpansionContext,
-) -> Result<TokenStream> {
+pub(crate) fn expand_registered_with_context(input: TokenStream, context: &ExpansionContext) -> Result<TokenStream> {
     let binding_input: BindingInput = parse2(input.clone())?;
     let target_type = binding_target_type(&binding_input.method)?;
     let binding = expand_with_context(input.clone(), context)?;
     let provider = registered_provider_ident(&input, binding_input.method.span());
     let facade = context.facade().clone();
     let codegen = quote!(#facade::__private::codegen_v4);
-    Ok(crate::expand::invocation::emit::rewrite_codegen_paths(
-        quote! {
-            fn #provider() -> &'static [#codegen::invoke::EffectiveMethod] {
-                static VALUE: ::std::sync::OnceLock<
-                    ::std::boxed::Box<[#codegen::invoke::EffectiveMethod]>,
-                > = ::std::sync::OnceLock::new();
-                VALUE.get_or_init(|| {
-                    let binding = #binding;
-                    ::std::vec![binding.effective()].into_boxed_slice()
-                })
-            }
-            #codegen::invoke::submit_method_catalog_provider!(#target_type, #provider);
-        },
-    ))
+    Ok(quote! {
+        const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
+
+        fn #provider() -> &'static [#codegen::invoke::EffectiveMethod] {
+            static VALUE: ::std::sync::OnceLock<
+                ::std::boxed::Box<[#codegen::invoke::EffectiveMethod]>,
+            > = ::std::sync::OnceLock::new();
+            VALUE.get_or_init(|| {
+                let binding = #binding;
+                ::std::vec![binding.effective()].into_boxed_slice()
+            })
+        }
+        #codegen::invoke::submit_method_catalog_provider!(#target_type, #provider);
+    })
 }
 
 fn binding_target_type(method_path: &ExprPath) -> Result<Type> {
@@ -529,21 +656,15 @@ fn registered_provider_ident(input: &TokenStream, span: proc_macro2::Span) -> pr
     format_ident!("__qubit_reflect_registered_method_catalog_{hash:016x}")
 }
 
-fn specialization_argument(
-    argument: &syn::GenericArgument,
-    facade: &TokenStream,
-) -> Result<TokenStream> {
+fn specialization_argument(argument: &syn::GenericArgument, facade: &TokenStream) -> Result<TokenStream> {
     let path = quote!(#facade::__private::codegen_v4::invoke::MethodSpecializationArgument);
     let token = match argument {
         syn::GenericArgument::Type(ty) => quote!(#path::type_argument::<#ty>()),
         syn::GenericArgument::Lifetime(lifetime) => {
-            let lifetime =
-                syn::LitStr::new(&lifetime.to_token_stream().to_string(), lifetime.span());
+            let lifetime = syn::LitStr::new(&lifetime.to_token_stream().to_string(), lifetime.span());
             quote!(#path::lifetime(#lifetime))
         }
-        syn::GenericArgument::Const(expression) => {
-            const_specialization_argument(expression, &path)?
-        }
+        syn::GenericArgument::Const(expression) => const_specialization_argument(expression, &path)?,
         other => {
             return Err(syn::Error::new_spanned(
                 other,
@@ -576,10 +697,7 @@ fn const_specialization_argument(expression: &Expr, path: &TokenStream) -> Resul
     let token = match literal {
         Lit::Bool(value) => {
             if negative {
-                return Err(syn::Error::new_spanned(
-                    expression,
-                    "boolean const cannot be negative",
-                ));
+                return Err(syn::Error::new_spanned(expression, "boolean const cannot be negative"));
             }
             let value = value.value;
             quote!(#path::const_bool(#value))
@@ -604,9 +722,7 @@ fn const_specialization_argument(expression: &Expr, path: &TokenStream) -> Resul
                 let magnitude = magnitude_digits.parse::<u128>().map_err(|error| {
                     syn::Error::new_spanned(
                         expression,
-                        format!(
-                            "integer const specialization `{raw_digits}` is out of range: {error}"
-                        ),
+                        format!("integer const specialization `{raw_digits}` is out of range: {error}"),
                     )
                 })?;
                 quote!(#path::const_integer_literal(#negative, #magnitude))
@@ -647,16 +763,8 @@ fn const_specialization_argument(expression: &Expr, path: &TokenStream) -> Resul
 fn receiver_target(ty: &Type) -> Option<&Type> {
     match ty {
         Type::Reference(reference) => Some(&reference.elem),
-        Type::Path(path)
-            if path
-                .path
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "Pin") =>
-        {
-            let syn::PathArguments::AngleBracketed(arguments) =
-                &path.path.segments.last()?.arguments
-            else {
+        Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "Pin") => {
+            let syn::PathArguments::AngleBracketed(arguments) = &path.path.segments.last()?.arguments else {
                 return None;
             };
             match arguments.args.first()? {
@@ -692,6 +800,10 @@ fn is_mut_reference(ty: &Type) -> bool {
 
 fn is_reference(ty: &Type) -> bool {
     matches!(ty, Type::Reference(_))
+}
+
+fn is_str_type(ty: &Type) -> bool {
+    matches!(ty, Type::Path(path) if path.path.is_ident("str"))
 }
 
 fn binding(ty: &Type, index: usize, _facade: &TokenStream) -> TokenStream {

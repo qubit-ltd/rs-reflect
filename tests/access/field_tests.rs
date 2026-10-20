@@ -11,9 +11,11 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use qubit_reflect::Reflect;
-use qubit_reflect::TypeDescriptor;
-use qubit_reflect::access::FieldAccessError;
-use qubit_reflect::access::FieldSetError;
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::descriptor::FieldAccessError;
+use qubit_reflect::descriptor::FieldSetError;
+use qubit_reflect::descriptor::TypeDescriptor;
+use qubit_reflect::error::RecoverableFailure;
 
 struct NotReflected;
 
@@ -39,7 +41,7 @@ impl Drop for DropProbe {
 
 #[test]
 fn field_descriptor_keeps_declaring_type_and_source_identity() {
-    let descriptor = TypeDescriptor::of::<Account>();
+    let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.fields().get("secret").expect("private field is described");
 
     assert_eq!(field.name(), "secret");
@@ -50,7 +52,7 @@ fn field_descriptor_keeps_declaring_type_and_source_identity() {
 
 #[test]
 fn public_field_uses_typed_borrows_and_owned_values() {
-    let descriptor = TypeDescriptor::of::<Account>();
+    let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.field("balance").expect("public field is described");
     let mut account = Account {
         balance: 7,
@@ -67,7 +69,7 @@ fn public_field_uses_typed_borrows_and_owned_values() {
 
 #[test]
 fn private_field_requires_unsafe_visibility_bypass() {
-    let descriptor = TypeDescriptor::of::<Account>();
+    let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.field("secret").expect("private field is described");
     let mut account = Account {
         balance: 7,
@@ -93,12 +95,18 @@ fn private_field_requires_unsafe_visibility_bypass() {
     // not bypass field-type validation.
     let error = unsafe { field.get_unsafe::<_, u32>(&account) }
         .expect_err("the requested type must match the field's declared type");
-    assert!(matches!(error, FieldAccessError::FieldTypeMismatch { .. }));
+    let FieldAccessError::ValueTypeMismatch(mismatch) = error else {
+        panic!("the error must classify a requested field value type mismatch");
+    };
+    assert_eq!(mismatch.expected(), TypeId::of::<String>());
+    assert_eq!(mismatch.actual(), TypeId::of::<u32>());
 }
 
 #[test]
 fn failures_recover_typed_replacements_before_mutation() {
-    let field = TypeDescriptor::of::<Account>().field("balance").expect("field exists");
+    let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
+        .field("balance")
+        .expect("field exists");
     let mut account = Account {
         balance: 7,
         secret: String::new(),
@@ -125,14 +133,15 @@ fn failures_recover_typed_replacements_before_mutation() {
     let error = field
         .get::<_, u64>(&other)
         .expect_err("target type must match the declaring type");
-    let FieldAccessError::TargetTypeMismatch(mismatch) = error
-    else {
+    let FieldAccessError::TargetTypeMismatch(mismatch) = error else {
         panic!("the error must retain target mismatch context");
     };
     assert_eq!(mismatch.expected(), TypeId::of::<Account>());
     assert_eq!(mismatch.actual(), TypeId::of::<OtherTarget>());
 
-    let field = TypeDescriptor::of::<Account>().field("balance").expect("field exists");
+    let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
+        .field("balance")
+        .expect("field exists");
     let mut account = Account {
         balance: 7,
         secret: String::new(),
@@ -141,8 +150,7 @@ fn failures_recover_typed_replacements_before_mutation() {
     let failure = field
         .set(&mut account, 12_u32)
         .expect_err("the replacement type must match exactly");
-    let FieldSetError::ValueTypeMismatch(mismatch) = failure.error()
-    else {
+    let FieldSetError::ValueTypeMismatch(mismatch) = failure.error() else {
         panic!("the error must classify a replacement type mismatch");
     };
     assert_eq!(mismatch.expected(), TypeId::of::<u64>());
@@ -152,7 +160,9 @@ fn failures_recover_typed_replacements_before_mutation() {
 
 #[test]
 fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
-    let field = TypeDescriptor::of::<Account>().field("balance").expect("field exists");
+    let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
+        .field("balance")
+        .expect("field exists");
     let mut account = Account {
         balance: 7,
         secret: String::new(),
@@ -174,7 +184,9 @@ fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
 
 #[test]
 fn typed_failure_exposes_the_exact_replacement_value() {
-    let field = TypeDescriptor::of::<Account>().field("balance").expect("field exists");
+    let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
+        .field("balance")
+        .expect("field exists");
     let mut account = Account {
         balance: 7,
         secret: String::new(),
@@ -185,8 +197,13 @@ fn typed_failure_exposes_the_exact_replacement_value() {
         .expect_err("the exact field type is u64");
 
     assert!(matches!(failure.error(), FieldSetError::ValueTypeMismatch(_)));
+    assert!(matches!(
+        RecoverableFailure::error(&failure),
+        FieldSetError::ValueTypeMismatch(_)
+    ));
+    assert_eq!(*RecoverableFailure::recovery(&failure), 12_u32);
     assert_eq!(*failure.replacement(), 12_u32);
-    let (_, replacement) = failure.into_parts();
+    let (_, replacement) = RecoverableFailure::into_parts(failure);
     assert_eq!(replacement, 12_u32);
     assert_eq!(account.balance, 7);
 }

@@ -41,7 +41,7 @@ trait Named {
 #[Reflect]
 struct NamedService;
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = Named)]
 impl Named for NamedService {
     fn name(&self) -> &'static str {
         "service"
@@ -52,9 +52,11 @@ impl Named for NamedService {
 #[test]
 fn test_reflect_trait_example() {
     let implementations = TypeDescriptor::of::<NamedService>()
-        .impls()
+        .trait_impls()
         .expect("valid trait registrations");
-    assert!(implementations.iter().any(|item| item.implemented_trait().is_some()));
+    assert!(implementations.iter().any(|item| {
+        item.implemented_trait().is_some_and(|trait_| trait_.name() == "Named") && item.method("name").is_ok()
+    }));
 }
 
 #[Reflect]
@@ -70,7 +72,7 @@ impl InherentService {
 fn test_reflect_impl_example() {
     InherentService.ping();
     let implementations = TypeDescriptor::of::<InherentService>()
-        .impls()
+        .inherent_impls()
         .expect("valid inherent method registrations");
     assert!(implementations.iter().any(|item| item.method("ping").is_ok()));
 }

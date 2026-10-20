@@ -1,26 +1,15 @@
-error[E0432]: unresolved import `qubit_reflect::ReflectRegistry`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:11:5
+error[E0515]: cannot return value referencing local variable `receiver`
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:19:23
    |
-11 | use qubit_reflect::ReflectRegistry;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ReflectRegistry` in the root
+18 |     match method.invoke(Invocation::<Local>::on_ref(&receiver)) {
+   |                                                     --------- `receiver` is borrowed here
+19 |         Ok(output) => output,
+   |                       ^^^^^^ returns a value referencing data owned by the current function
 
-error[E0432]: unresolved import `qubit_reflect::descriptor::MethodInstanceDescriptor`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:12:5
+error[E0515]: cannot return value referencing local variable `argument`
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:29:23
    |
-12 | use qubit_reflect::descriptor::MethodInstanceDescriptor;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^------------------------
-   |     |                          |
-   |     |                          help: a similar name exists in the module: `MethodDescriptor`
-   |     no `MethodInstanceDescriptor` in `descriptor`
-
-error[E0599]: no function or associated item named `receiver_ref` found for struct `qubit_reflect::Invocation<'call, M>` in the current scope
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:20:47
-   |
-20 |     match method.invoke(registry, Invocation::receiver_ref(&receiver)) {
-   |                                               ^^^^^^^^^^^^ function or associated item not found in `qubit_reflect::Invocation<'_, _>`
-
-error[E0599]: no function or associated item named `associated_function` found for struct `qubit_reflect::Invocation<'call, M>` in the current scope
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:31:47
-   |
-31 |     match method.invoke(registry, Invocation::associated_function().arg_ref(&argument)) {
-   |                                               ^^^^^^^^^^^^^^^^^^^ function or associated item not found in `qubit_reflect::Invocation<'_, _>`
+28 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
+   |                                                                   --------- `argument` is borrowed here
+29 |         Ok(output) => output,
+   |                       ^^^^^^ returns a value referencing data owned by the current function

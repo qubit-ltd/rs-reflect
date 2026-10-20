@@ -1,20 +1,47 @@
-use qubit_reflect::__private::codegen_v4::{access, construct, expression};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
-use access::{
-    FieldAccess, FieldMetadata, TypeKindMetadata, TypedFieldAdapter, TypedVariantAdapter,
-    VariantDiscriminant, VariantMetadata, VariantShape, Visibility,
-};
-use construct::{
-    ConstructField, ConstructProvider, ConstructionAvailability, ConstructionFieldPolicy,
-    ConstructionPlan, ConstructionProviders, ConstructionShape, UpdateFieldPolicy,
-};
-use expression::{
-    ConstExpression, ExpressionData, GenericArgumentMetadata, GenericDefinitionMetadata,
-    GenericParameterMetadata, LifetimeExpression, PredicateData, StructKind, TypeDefinitionKind,
-    TypeDefinitionMetadata,
-};
-use qubit_reflect::__private::codegen_v4::descriptor::{Reflect, TypeRegistration};
-use qubit_reflect::__private::codegen_v4::value::{DynamicOwned, Local, ThreadSafe};
+use access::FieldAccess;
+use access::FieldMetadata;
+use access::TypeKindMetadata;
+use access::TypedFieldAdapter;
+use access::TypedVariantAdapter;
+use access::VariantDiscriminant;
+use access::VariantIdentity;
+use access::VariantMetadata;
+use access::VariantShape;
+use access::Visibility;
+use construct::ConstructField;
+use construct::ConstructProvider;
+use construct::ConstructionAvailability;
+use construct::ConstructionFieldPolicy;
+use construct::ConstructionPlan;
+use construct::ConstructionProviders;
+use construct::ConstructionShape;
+use construct::UpdateFieldPolicy;
+use expression::ConstExpression;
+use expression::ExpressionData;
+use expression::GenericArgumentMetadata;
+use expression::GenericDefinitionMetadata;
+use expression::GenericParameterMetadata;
+use expression::LifetimeExpression;
+use expression::PredicateData;
+use expression::StructKind;
+use expression::TypeDefinitionKind;
+use expression::TypeDefinitionMetadata;
+use qubit_reflect::__private::codegen_v4::access;
+use qubit_reflect::__private::codegen_v4::construct;
+use qubit_reflect::__private::codegen_v4::descriptor::Reflect;
+use qubit_reflect::__private::codegen_v4::descriptor::TypeRegistration;
+use qubit_reflect::__private::codegen_v4::expression;
+use qubit_reflect::__private::codegen_v4::value::DynamicOwned;
+use qubit_reflect::__private::codegen_v4::value::Local;
+use qubit_reflect::__private::codegen_v4::value::ThreadSafe;
 
 struct Record {
     value: u8,
@@ -60,14 +87,19 @@ fn number_mut(choice: &mut Choice) -> &mut u8 {
     }
 }
 
-fn active_choice_variant(choice: &Choice) -> &'static VariantMetadata {
-    let index = match choice {
-        Choice::Number(_) => 0,
-        Choice::Empty => 1,
-    };
-    <Choice as Reflect>::__reflect_registration()
-        .variant(index)
-        .expect("each Choice variant has static metadata")
+fn active_choice_variant(choice: &Choice) -> VariantIdentity {
+    match choice {
+        Choice::Number(_) => VariantIdentity {
+            owner: std::any::TypeId::of::<Choice>(),
+            index: 0,
+            name: "Number",
+        },
+        Choice::Empty => VariantIdentity {
+            owner: std::any::TypeId::of::<Choice>(),
+            index: 1,
+            name: "Empty",
+        },
+    }
 }
 
 fn number_variant() -> &'static VariantMetadata {
@@ -123,11 +155,7 @@ fn construct_choice_number(fields: Vec<Option<DynamicOwned<Local>>>) -> Choice {
     let [Some(value)] = fields.as_slice() else {
         panic!("the validated construction input has one field");
     };
-    Choice::Number(
-        *value
-            .downcast_ref::<u8>()
-            .expect("field type was validated"),
-    )
+    Choice::Number(*value.downcast_ref::<u8>().expect("field type was validated"))
 }
 
 fn update_choice_number(_base: Choice, replacements: Vec<Option<DynamicOwned<Local>>>) -> Choice {
@@ -186,10 +214,7 @@ fn construct_record_thread_safe(fields: Vec<Option<DynamicOwned<ThreadSafe>>>) -
     }
 }
 
-fn update_record_thread_safe(
-    mut record: Record,
-    replacements: Vec<Option<DynamicOwned<ThreadSafe>>>,
-) -> Record {
+fn update_record_thread_safe(mut record: Record, replacements: Vec<Option<DynamicOwned<ThreadSafe>>>) -> Record {
     let [Some(value)] = replacements.as_slice() else {
         return record;
     };
@@ -201,13 +226,13 @@ fn update_record_thread_safe(
 
 #[test]
 fn test_codegen_v4_exposes_typed_structural_metadata_constructors() {
+    let _empty = Choice::Empty;
     static VALUE_EXPRESSION: ExpressionData = ExpressionData::Named {
         path: "u8",
         definition: None,
         arguments: &[],
     };
-    static FIELD_ADAPTER: TypedFieldAdapter<Record, u8> =
-        TypedFieldAdapter::new(value_ref, value_mut);
+    static FIELD_ADAPTER: TypedFieldAdapter<Record, u8> = TypedFieldAdapter::new(value_ref, value_mut);
     static FIELDS: [FieldMetadata; 1] = [FieldMetadata::typed::<Record, u8>(
         0,
         "value",
@@ -218,12 +243,10 @@ fn test_codegen_v4_exposes_typed_structural_metadata_constructors() {
     )];
     static SHAPE: TypeKindMetadata = TypeKindMetadata::Struct(&FIELDS);
 
-    let first = TypeRegistration::<Record>::get_or_init_with(|| {
-        TypeRegistration::<Record>::with_shape(&SHAPE, None, &[])
-    });
-    let second = TypeRegistration::<Record>::get_or_init_with(|| {
-        panic!("a concrete type registration is initialized once")
-    });
+    let first =
+        TypeRegistration::<Record>::get_or_init_with(|| TypeRegistration::<Record>::with_shape(&SHAPE, None, &[]));
+    let second =
+        TypeRegistration::<Record>::get_or_init_with(|| panic!("a concrete type registration is initialized once"));
     assert!(std::ptr::eq(first, second));
 }
 
@@ -234,16 +257,11 @@ fn test_codegen_v4_exposes_typed_generic_definition_metadata() {
         GenericParameterMetadata::lifetime("'a", 0, &[LifetimeExpression::Static]);
     static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(
         &[PARAMETER],
-        &[PredicateData::ConstEvaluatable(ConstExpression::Boolean(
-            true,
-        ))],
+        &[PredicateData::ConstEvaluatable(ConstExpression::Boolean(true))],
     );
-    static TYPE_PARAMETER: GenericParameterMetadata =
-        GenericParameterMetadata::type_parameter("T", 0, &[], None);
-    static TYPE_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata::type_expression(
-        &TYPE_PARAMETER,
-        &ExpressionData::ParameterName("T"),
-    );
+    static TYPE_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::type_parameter("T", 0, &[], None);
+    static TYPE_ARGUMENT: GenericArgumentMetadata =
+        GenericArgumentMetadata::type_expression(&TYPE_PARAMETER, &ExpressionData::ParameterName("T"));
     static CONST_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::const_parameter(
         "N",
         1,
@@ -254,10 +272,8 @@ fn test_codegen_v4_exposes_typed_generic_definition_metadata() {
         },
         None,
     );
-    static CONST_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata::const_argument(
-        &CONST_PARAMETER,
-        ConstExpression::UnsignedInteger(4),
-    );
+    static CONST_ARGUMENT: GenericArgumentMetadata =
+        GenericArgumentMetadata::const_argument(&CONST_PARAMETER, ConstExpression::UnsignedInteger(4));
     static DEFINITION: TypeDefinitionMetadata = TypeDefinitionMetadata::new::<DefinitionMarker>(
         "Record",
         "example::Record",
@@ -270,8 +286,7 @@ fn test_codegen_v4_exposes_typed_generic_definition_metadata() {
 
 #[test]
 fn test_codegen_v4_exposes_typed_construction_provider_and_plan() {
-    static PROVIDER: ConstructProvider<Record, Local> =
-        ConstructProvider::new(construct_record, update_record);
+    static PROVIDER: ConstructProvider<Record, Local> = ConstructProvider::new(construct_record, update_record);
     static PROVIDERS: ConstructionProviders = ConstructionProviders::new::<Record>(Some(&PROVIDER));
     static FIELDS: [ConstructField; 1] = [ConstructField::typed::<u8>(
         "value",

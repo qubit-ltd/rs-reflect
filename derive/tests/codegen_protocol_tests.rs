@@ -18,8 +18,8 @@ fn test_configured_reflection_uses_codegen_v4_support() {
     let pipeline = fs::read_to_string(derive_root.join("src/configure/pipeline.rs"))
         .expect("derive pipeline source should be readable");
     let runtime_root = derive_root.join("../src/private/codegen_v4");
-    let support = fs::read_to_string(runtime_root.join("macro_support.rs"))
-        .expect("v4 macro support source should be readable");
+    let support =
+        fs::read_to_string(runtime_root.join("macro_support.rs")).expect("v4 macro support source should be readable");
 
     assert!(
         pipeline.contains("__private::codegen_v4::macro_support::ConfiguredReflection"),

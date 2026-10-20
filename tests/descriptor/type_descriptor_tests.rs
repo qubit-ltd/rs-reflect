@@ -3,19 +3,20 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for context-bound root type descriptors.
 
 use std::any::TypeId;
-use std::rc::Rc;
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::{StructKind, TypeDefinitionKind, TypeKind};
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeDefinitionKind;
+use qubit_reflect::descriptor::TypeKind;
 use qubit_reflect::lookup::Lookup;
 
 #[Reflect]
@@ -25,8 +26,10 @@ struct NamedRecord {
 
 #[Reflect]
 struct OpaqueContainer {
-    member: Rc<()>,
+    member: OpaqueMember,
 }
+
+struct OpaqueMember;
 
 #[Reflect]
 struct RecursiveNode {
@@ -41,7 +44,7 @@ trait AmbiguousNavigationMethod {
     fn repeated(&self) -> u8;
 }
 
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = AmbiguousNavigationMethod)]
 impl AmbiguousNavigationMethod for AggregatedNavigationTarget {
     fn repeated(&self) -> u8 {
         1
@@ -67,20 +70,14 @@ fn test_type_descriptor_exposes_identity_names_and_struct_shape() {
 
     assert_eq!(record.number, 7);
     assert_eq!(descriptor.type_id(), TypeId::of::<NamedRecord>());
-    assert_eq!(
-        descriptor.rust_type_name(),
-        std::any::type_name::<NamedRecord>()
-    );
+    assert_eq!(descriptor.rust_type_name(), std::any::type_name::<NamedRecord>());
     assert_eq!(descriptor.name(), "NamedRecord");
     assert!(matches!(
         descriptor.definition().unwrap().kind(),
         TypeDefinitionKind::Struct(StructKind::Named)
     ));
     assert_eq!(descriptor.fields().len(), 1);
-    assert_eq!(
-        descriptor.field("number").expect("field exists").name(),
-        "number"
-    );
+    assert_eq!(descriptor.field("number").expect("field exists").name(), "number");
     assert!(descriptor.variants().is_empty());
 }
 
@@ -99,12 +96,10 @@ fn test_type_descriptor_represents_unit_as_zero_arity_tuple() {
 #[test]
 fn test_type_descriptor_keeps_unreflectable_field_expression() {
     let descriptor = TypeDescriptor::of::<OpaqueContainer>();
-    let field = descriptor
-        .field("member")
-        .expect("the named field is present");
+    let field = descriptor.field("member").expect("the named field is present");
 
     assert!(field.find_concrete_type().is_none());
-    assert!(field.type_expression().display().to_string().contains("Rc"));
+    assert!(field.type_expression().display().to_string().contains("OpaqueMember"));
 }
 
 /// Verifies recursive descriptor formatting stays finite.
@@ -118,10 +113,7 @@ fn test_type_descriptor_debug_is_bounded_for_recursive_fields() {
         .to_string();
 
     assert!(rendered.contains("RecursiveNode"));
-    assert!(
-        rendered.len() < 1_024,
-        "recursive debug output was unexpectedly large"
-    );
+    assert!(rendered.len() < 1_024, "recursive debug output was unexpectedly large");
 }
 
 /// Verifies public descriptors remain shareable across threads.
@@ -145,10 +137,7 @@ fn test_type_descriptor_navigates_impls_and_reports_method_ambiguity() {
             .all(|implementation| implementation.target().type_id() == descriptor.type_id())
     );
 
-    assert!(matches!(
-        descriptor.lookup_method("missing").unwrap(),
-        Lookup::Missing
-    ));
+    assert!(matches!(descriptor.lookup_method("missing").unwrap(), Lookup::Missing));
     assert!(matches!(
         descriptor.lookup_method("inherent_only").unwrap(),
         Lookup::Unique(_)

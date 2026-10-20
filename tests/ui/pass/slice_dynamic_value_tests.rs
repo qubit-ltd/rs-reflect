@@ -6,7 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::value::{DynamicRef, Local};
+use qubit_reflect::value::DynamicRef;
+use qubit_reflect::value::Local;
 
 fn wrap(value: &[u8]) {
     let _ = DynamicRef::<Local>::new(value);

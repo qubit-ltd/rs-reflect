@@ -9,3 +9,5 @@ renamed-reflect = { package = "qubit-reflect", path = "../.." }
 registry-impl-a = { path = "../registry-impl-a" }
 registry-impl-b = { path = "../registry-impl-b" }
 registry-types = { path = "../registry-types" }
+version-v1 = { package = "multi-version-types-v1", path = "../multi-version-types-v1" }
+version-v2 = { package = "multi-version-types-v2", path = "../multi-version-types-v2" }

@@ -12,10 +12,7 @@
 //! receiver, and registration shells. Their owners retain those shells while
 //! this module emits the semantic fragments that must remain identical.
 
-use proc_macro2::Group;
-use proc_macro2::Ident;
 use proc_macro2::TokenStream;
-use proc_macro2::TokenTree;
 use quote::format_ident;
 use quote::quote;
 use quote::quote_spanned;
@@ -31,40 +28,6 @@ use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TypeKindIr;
 
-/// Rewrites generated protocol paths to the v4 derive/runtime boundary.
-///
-/// Structural expression helpers are shared with T13 and still build their
-/// tokens against v3. Executable emitters pass their final token stream here
-/// so their output consistently targets the v4 protocol without changing the
-/// structural emitter's independent write set.
-///
-/// # Parameters
-///
-/// - `tokens`: Generated tokens that may contain protocol paths.
-///
-/// # Returns
-///
-/// Returns the token stream with each `codegen_v3` path segment rewritten to
-/// `codegen_v4`, preserving source spans and group delimiters.
-#[must_use]
-pub(crate) fn rewrite_codegen_paths(tokens: TokenStream) -> TokenStream {
-    tokens
-        .into_iter()
-        .map(|token| match token {
-            TokenTree::Ident(identifier) if identifier == "codegen_v3" => {
-                TokenTree::Ident(Ident::new("codegen_v4", identifier.span()))
-            }
-            TokenTree::Group(group) => {
-                let mut rewritten =
-                    Group::new(group.delimiter(), rewrite_codegen_paths(group.stream()));
-                rewritten.set_span(group.span());
-                TokenTree::Group(rewritten)
-            }
-            other => other,
-        })
-        .collect()
-}
-
 /// Emits the canonical runtime unavailability slice for one adapter plan.
 ///
 /// # Parameters
@@ -77,14 +40,8 @@ pub(crate) fn rewrite_codegen_paths(tokens: TokenStream) -> TokenStream {
 /// Returns generated tokens for the ordered reasons, or an empty slice for
 /// executable plans.
 #[must_use]
-pub(crate) fn emit_unavailable_reasons(
-    plan: &InvocationPlan,
-    context: &ExpansionContext,
-) -> TokenStream {
-    debug_assert!(
-        !plan.is_executable()
-            || !matches!(plan.output, OutputPlan::Opaque | OutputPlan::Unsupported)
-    );
+pub(crate) fn emit_unavailable_reasons(plan: &InvocationPlan, context: &ExpansionContext) -> TokenStream {
+    debug_assert!(!plan.is_executable() || !matches!(plan.output, OutputPlan::Opaque | OutputPlan::Unsupported));
     let facade = context.facade();
     let reasons = match &plan.availability {
         AvailabilityPlan::Executable => return quote!(&[]),
@@ -170,9 +127,7 @@ pub(crate) fn thread_safe_assertions(
         let span = parameter.span;
         match &parameter.ty.kind {
             TypeKindIr::Reference {
-                mutable: true,
-                element,
-                ..
+                mutable: true, element, ..
             } => {
                 let ty = &element.tokens;
                 quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#ty>();)
@@ -188,9 +143,7 @@ pub(crate) fn thread_safe_assertions(
         }
     });
     let output = match &method.return_type {
-        ReturnTypeIr::Type(ty)
-            if !matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) =>
-        {
+        ReturnTypeIr::Type(ty) if !matches!(ty.kind, TypeKindIr::Reference { .. } | TypeKindIr::Never) => {
             let tokens = &ty.tokens;
             let span = ty.span;
             quote_spanned!(span=> __qubit_reflect_assert_send_sync::<#tokens>();)
@@ -225,17 +178,11 @@ pub(crate) fn thread_safe_assertions(
 /// The generated code is unreachable if validation did not verify count, type
 /// and mode.
 #[must_use]
-pub(crate) fn argument_binding(
-    parameter: &ParameterIr,
-    _facade: &TokenStream,
-    _mode: &TokenStream,
-) -> TokenStream {
+pub(crate) fn argument_binding(parameter: &ParameterIr, _facade: &TokenStream, _mode: &TokenStream) -> TokenStream {
     let argument = format_ident!("__qubit_reflect_argument_{}", parameter.index);
     match &parameter.ty.kind {
         TypeKindIr::Reference {
-            mutable: true,
-            element,
-            ..
+            mutable: true, element, ..
         } => {
             let element = &element.tokens;
             quote! {

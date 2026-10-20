@@ -1,0 +1,11 @@
+[package]
+name = "multi-version-types-v1"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "multi_version_types_v1"
+
+[dependencies]
+qubit-reflect = { path = "../.." }

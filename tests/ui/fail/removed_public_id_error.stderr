@@ -1,0 +1,15 @@
+error[E0603]: enum `IdError` is private
+ --> tests/ui/fail/removed_public_id_error.rs:9:27
+  |
+9 | use qubit_reflect::error::IdError;
+  |                           ^^^^^^^ private enum
+  |
+note: the enum `IdError` is defined here
+ --> src/lib.rs
+  |
+  |     pub(crate) use crate::old_id_error::IdError;
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: import `IdError` directly
+  |
+9 | use qubit_reflect::old_id_error::IdError;
+  |                    +++++++

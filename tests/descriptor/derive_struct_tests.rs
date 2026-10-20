@@ -3,8 +3,8 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // =============================================================================
 
 //! Integration tests for vNext `Reflect` struct metadata.
@@ -12,8 +12,10 @@
 use std::rc::Rc;
 
 use qubit_reflect::Reflect;
+use qubit_reflect::ReflectionContext;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::descriptor::{StructKind, TypeDefinitionKind};
+use qubit_reflect::descriptor::StructKind;
+use qubit_reflect::descriptor::TypeDefinitionKind;
 
 #[Reflect]
 struct NamedRecord {
@@ -48,6 +50,13 @@ struct GenericRecord<T> {
 fn test_derive_struct_preserves_named_fields_and_source_positions() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     let fields = descriptor.fields();
+    let source_value = NamedRecord {
+        visible: 1,
+        ignored: String::from("retained"),
+        retained: true,
+    };
+
+    assert_eq!(source_value.ignored, "retained");
 
     assert!(matches!(
         descriptor.definition().unwrap().kind(),
@@ -58,7 +67,8 @@ fn test_derive_struct_preserves_named_fields_and_source_positions() {
     assert_eq!(fields.get("visible").unwrap().name(), "visible");
     assert_eq!(fields.get("retained").unwrap().index(), 2);
     assert!(fields.get("ignored").is_none());
-    assert!(fields.get_at(1).is_none());
+    assert_eq!(fields.get_at(1).unwrap().index(), 2);
+    assert!(fields.get_at(2).is_none());
 }
 
 /// Verifies tuple, newtype, and unit structs retain source shape and fields.
@@ -91,9 +101,7 @@ fn test_derive_struct_preserves_tuple_newtype_and_unit_shapes() {
 #[test]
 fn test_derive_struct_preserves_recursive_field_expression() {
     let descriptor = TypeDescriptor::of::<RecursiveRecord>();
-    let field = descriptor
-        .field("next")
-        .expect("recursive field is described");
+    let field = descriptor.field("next").expect("recursive field is described");
 
     assert_eq!(field.index(), 0);
     assert!(
@@ -105,17 +113,26 @@ fn test_derive_struct_preserves_recursive_field_expression() {
     );
 }
 
-/// Verifies generic field expressions do not impose a `Reflect` bound on the
-/// field type and expose a concrete type only when available.
+/// Verifies a reflected generic field resolves through the concrete type
+/// argument while retaining its source-level parameter expression.
 #[test]
-fn test_derive_struct_preserves_unreflectable_generic_field() {
-    let descriptor = TypeDescriptor::of::<GenericRecord<Rc<()>>>();
-    let field = descriptor
-        .field("item")
-        .expect("generic field is described");
+fn test_derive_struct_resolves_reflected_generic_field_type() {
+    let context = ReflectionContext::builder()
+        .include_type::<GenericRecord<Rc<()>>>()
+        .include_type::<Rc<()>>()
+        .build()
+        .expect("context includes the owner and reflected field type");
+    let descriptor = TypeDescriptor::of_in::<GenericRecord<Rc<()>>>(&context);
+    let field = descriptor.field("item").expect("generic field is described");
 
-    assert!(field.find_concrete_type().is_none());
-    assert!(field.type_expression().display().to_string().contains("Rc"));
+    assert_eq!(
+        field
+            .find_concrete_type()
+            .expect("the concrete generic argument has a descriptor")
+            .type_id(),
+        std::any::TypeId::of::<Rc<()>>()
+    );
+    assert_eq!(field.type_expression().display().to_string(), "T");
 }
 
 /// Verifies concurrent lookup preserves the concrete type identity.

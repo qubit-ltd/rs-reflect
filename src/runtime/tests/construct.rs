@@ -1,19 +1,48 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 #![allow(unsafe_code)]
 
 use std::any::TypeId;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
-use crate::runtime::construct::{
-    ConstructField, ConstructProvider, ConstructVisibility, ConstructionAvailability,
-    ConstructionDescriptor, ConstructionError, ConstructionFieldPolicy, ConstructionPlan,
-    ConstructionProviders, ConstructionShape, NamedFields, PositionalFields,
-    RecoveredConstructionInput, UnitFields, UpdateError, UpdateFieldPolicy, UpdateInput,
-    UpdateUnavailableReason, resolve_plan, resolve_variant_plan,
-};
-use crate::runtime::descriptor::{Reflect, TypeRegistration};
+use crate::runtime::construct::ConstructField;
+use crate::runtime::construct::ConstructProvider;
+use crate::runtime::construct::ConstructVisibility;
+use crate::runtime::construct::ConstructionAvailability;
+use crate::runtime::construct::ConstructionDescriptor;
+use crate::runtime::construct::ConstructionError;
+use crate::runtime::construct::ConstructionFieldPolicy;
+use crate::runtime::construct::ConstructionPlan;
+use crate::runtime::construct::ConstructionProviders;
+use crate::runtime::construct::ConstructionShape;
+use crate::runtime::construct::ConstructionTarget;
+use crate::runtime::construct::ConstructionTargetKind;
+use crate::runtime::construct::NamedFields;
+use crate::runtime::construct::PositionalFields;
+use crate::runtime::construct::RecoveredConstructionInput;
+use crate::runtime::construct::UnitFields;
+use crate::runtime::construct::UpdateError;
+use crate::runtime::construct::UpdateFieldPolicy;
+use crate::runtime::construct::UpdateInput;
+use crate::runtime::construct::UpdateUnavailableReason;
+use crate::runtime::construct::resolve_plan;
+use crate::runtime::construct::resolve_variant_plan;
+use crate::runtime::descriptor::Reflect;
+use crate::runtime::descriptor::TypeRegistration;
+use crate::runtime::error::RecoverableFailure;
 use crate::runtime::identity::TypeIdentity;
-use crate::runtime::value::{DynamicOwned, Local, ThreadSafe, ValueFor};
+use crate::runtime::value::DynamicOwned;
+use crate::runtime::value::Local;
+use crate::runtime::value::ThreadSafe;
+use crate::runtime::value::ValueFor;
 
 #[derive(Debug, PartialEq)]
 struct Record {
@@ -24,6 +53,8 @@ struct Record {
 
 #[derive(Debug, PartialEq)]
 enum Choice {
+    // Construction plans below address variant index 1, so keep index 0 in the fixture.
+    #[allow(dead_code)]
     Empty,
     Coordinates(i32, i32),
 }
@@ -45,11 +76,7 @@ impl ConstructProvider<Local> for FreezeProbeProvider {
             secret: false,
         })
     }
-    fn update(
-        &self,
-        base: DynamicOwned<Local>,
-        _: Vec<Option<DynamicOwned<Local>>>,
-    ) -> DynamicOwned<Local> {
+    fn update(&self, base: DynamicOwned<Local>, _: Vec<Option<DynamicOwned<Local>>>) -> DynamicOwned<Local> {
         FREEZE_PROVIDER_CALLS.fetch_add(1, Ordering::SeqCst);
         base
     }
@@ -92,19 +119,11 @@ impl ConstructProvider<Local> for RecordProvider {
         DynamicOwned::new(Record {
             count: value(fields.next().unwrap()),
             title: value(fields.next().unwrap()),
-            secret: fields
-                .next()
-                .unwrap()
-                .map(|field| value(Some(field)))
-                .unwrap_or(false),
+            secret: fields.next().unwrap().map(|field| value(Some(field))).unwrap_or(false),
         })
     }
 
-    fn update(
-        &self,
-        base: DynamicOwned<Local>,
-        replacements: Vec<Option<DynamicOwned<Local>>>,
-    ) -> DynamicOwned<Local> {
+    fn update(&self, base: DynamicOwned<Local>, replacements: Vec<Option<DynamicOwned<Local>>>) -> DynamicOwned<Local> {
         let mut record = base.downcast::<Record>().ok().unwrap();
         let mut replacements = replacements.into_iter();
         if let Some(value) = replacements.next().unwrap() {
@@ -126,11 +145,7 @@ impl ConstructProvider<ThreadSafe> for RecordProvider {
         DynamicOwned::new(Record {
             count: value(fields.next().unwrap()),
             title: value(fields.next().unwrap()),
-            secret: fields
-                .next()
-                .unwrap()
-                .map(|field| value(Some(field)))
-                .unwrap_or(false),
+            secret: fields.next().unwrap().map(|field| value(Some(field))).unwrap_or(false),
         })
     }
 
@@ -165,11 +180,7 @@ impl ConstructProvider<Local> for PairProvider {
         ))
     }
 
-    fn update(
-        &self,
-        base: DynamicOwned<Local>,
-        _: Vec<Option<DynamicOwned<Local>>>,
-    ) -> DynamicOwned<Local> {
+    fn update(&self, base: DynamicOwned<Local>, _: Vec<Option<DynamicOwned<Local>>>) -> DynamicOwned<Local> {
         base
     }
 }
@@ -181,11 +192,7 @@ impl ConstructProvider<Local> for MarkerProvider {
         DynamicOwned::new(Marker)
     }
 
-    fn update(
-        &self,
-        base: DynamicOwned<Local>,
-        _: Vec<Option<DynamicOwned<Local>>>,
-    ) -> DynamicOwned<Local> {
+    fn update(&self, base: DynamicOwned<Local>, _: Vec<Option<DynamicOwned<Local>>>) -> DynamicOwned<Local> {
         base
     }
 }
@@ -355,16 +362,9 @@ fn construct_accepts_named_positional_and_unit_shapes() {
 fn named_input_rejects_duplicates_and_recovers_every_entry() {
     let plan = record_plan();
     let failure = ConstructionDescriptor::new(&plan)
-        .construct::<Record, Local, _>(
-            NamedFields::new()
-                .field("count", 4_u32)
-                .field("count", 5_u32),
-        )
+        .construct::<Record, Local, _>(NamedFields::new().field("count", 4_u32).field("count", 5_u32))
         .unwrap_err();
-    assert_eq!(
-        failure.error(),
-        &ConstructionError::DuplicateField { field: "count" }
-    );
+    assert_eq!(failure.error(), &ConstructionError::DuplicateField { field: "count" });
     let RecoveredConstructionInput::Named(input) = failure.into_input() else {
         panic!("named input shape was not retained");
     };
@@ -379,10 +379,7 @@ fn construction_rejects_a_typed_target_mismatch_before_provider_execution() {
     let failure = ConstructionDescriptor::new(&plan)
         .construct::<Wrong, Local, _>(NamedFields::new().field("count", 3_u32))
         .unwrap_err();
-    assert!(matches!(
-        failure.error(),
-        ConstructionError::TargetTypeMismatch(_)
-    ));
+    assert!(matches!(failure.error(), ConstructionError::TargetTypeMismatch(_)));
     let RecoveredConstructionInput::Named(input) = failure.into_input() else {
         panic!("named input shape was not retained");
     };
@@ -404,6 +401,59 @@ fn shape_mismatch_keeps_the_original_input_shape_and_values() {
         }
     );
     assert_eq!(failure.recovery().input().shape(), ConstructionShape::Named);
+}
+
+#[test]
+fn recoverable_failure_protocol_borrows_and_splits_construction_and_update_failures() {
+    let plan = choice_variant_plan();
+    let failure = ConstructionDescriptor::new(&plan)
+        .construct::<Choice, Local, _>(NamedFields::new().field("0", 11_i32))
+        .unwrap_err();
+    assert!(matches!(
+        RecoverableFailure::error(&failure),
+        ConstructionError::ShapeMismatch { .. }
+    ));
+    assert_eq!(
+        RecoverableFailure::recovery(&failure).input().shape(),
+        ConstructionShape::Named
+    );
+    let (error, recovery) = RecoverableFailure::into_parts(failure);
+    assert!(matches!(error, ConstructionError::ShapeMismatch { .. }));
+    let RecoveredConstructionInput::Named(input) = recovery.into_input() else {
+        panic!("construction recovery must retain its named input shape");
+    };
+    assert_eq!(input.entries[0].1.downcast_ref::<i32>(), Some(&11));
+
+    let plan = record_plan_with_unavailable_update();
+    let failure = match ConstructionDescriptor::new(&plan).update_dynamic::<Local>(
+        UpdateInput::new(Record {
+            count: 1,
+            title: "old".into(),
+            secret: false,
+        })
+        .field("title", String::from("new")),
+    ) {
+        Err(failure) => failure,
+        Ok(_) => panic!("unavailable update policy must reject before consuming inputs"),
+    };
+    assert!(matches!(
+        RecoverableFailure::error(&failure),
+        UpdateError::UpdateUnavailable(UpdateUnavailableReason::NoProvider)
+    ));
+    assert_eq!(
+        RecoverableFailure::recovery(&failure)
+            .base()
+            .downcast_ref::<Record>()
+            .map(|record| record.count),
+        Some(1)
+    );
+    let (error, recovery) = RecoverableFailure::into_parts(failure);
+    assert!(matches!(
+        error,
+        UpdateError::UpdateUnavailable(UpdateUnavailableReason::NoProvider)
+    ));
+    let input = recovery.into_input();
+    assert_eq!(input.replacements.entries.len(), 1);
 }
 
 #[test]
@@ -433,10 +483,7 @@ fn safe_visibility_and_unchecked_type_validation_are_separate() {
     .unwrap_err();
     assert!(matches!(
         type_failure.error(),
-        ConstructionError::ValueTypeMismatch {
-            field: "secret",
-            ..
-        }
+        ConstructionError::ValueTypeMismatch { field: "secret", .. }
     ));
     let RecoveredConstructionInput::Named(input) = type_failure.into_input() else {
         panic!("named input shape was not retained");
@@ -457,10 +504,7 @@ fn safe_visibility_and_unchecked_type_validation_are_separate() {
 
 #[test]
 fn private_required_fields_make_only_safe_construction_unavailable() {
-    let plan = record_plan_with_policy(
-        ConstructVisibility::Private,
-        ConstructionFieldPolicy::Required,
-    );
+    let plan = record_plan_with_policy(ConstructVisibility::Private, ConstructionFieldPolicy::Required);
     assert!(matches!(
         ConstructionDescriptor::new(&plan).availability(),
         ConstructionAvailability::Unavailable { reasons }
@@ -497,15 +541,10 @@ fn update_unchecked_only_skips_visibility_and_still_checks_update_policy() {
         secret: false,
     })
     .field("secret", true);
-    let failure =
-        unsafe { ConstructionDescriptor::new(&plan).update_unchecked::<Record, Local>(input) }
-            .unwrap_err();
-    assert_eq!(
-        failure.error(),
-        &UpdateError::FieldPreserved { field: "secret" }
-    );
+    let failure = unsafe { ConstructionDescriptor::new(&plan).update_unchecked::<Record, Local>(input) }.unwrap_err();
+    assert_eq!(failure.error(), &UpdateError::FieldPreserved { field: "secret" });
     let input = failure.into_input();
-    assert_eq!(input.base.downcast_ref::<Record>().unwrap().secret, false);
+    assert!(!input.base.downcast_ref::<Record>().unwrap().secret);
     assert_eq!(input.replacements.entries.len(), 1);
 }
 
@@ -609,9 +648,7 @@ fn provider_lookup_reports_missing_and_ambiguous_metadata() {
         resolve_plan(type_identity::<Choice>(), std::slice::from_ref(&pair)),
         Err(ConstructionError::MissingProvider)
     ));
-    assert!(
-        resolve_variant_plan(type_identity::<Choice>(), 1, std::slice::from_ref(&pair)).is_ok()
-    );
+    assert!(resolve_variant_plan(type_identity::<Choice>(), 1, std::slice::from_ref(&pair)).is_ok());
     assert!(matches!(
         resolve_variant_plan(type_identity::<Choice>(), 0, std::slice::from_ref(&pair)),
         Err(ConstructionError::MissingProvider)
@@ -621,6 +658,36 @@ fn provider_lookup_reports_missing_and_ambiguous_metadata() {
         resolve_variant_plan(type_identity::<Choice>(), 1, &[pair, duplicate_variant]),
         Err(ConstructionError::AmbiguousProvider { count: 2, .. })
     ));
+}
+
+#[test]
+fn missing_provider_descriptor_reports_reason_and_recovers_input() {
+    let target = ConstructionTarget::for_runtime(
+        TypeIdentity {
+            type_id: TypeId::of::<Record>(),
+            rust_name: std::any::type_name::<Record>(),
+        },
+        ConstructionTargetKind::Struct,
+        None,
+    );
+    let descriptor = ConstructionDescriptor::unavailable(
+        target,
+        ConstructionShape::Named,
+        &[],
+        crate::runtime::construct::ConstructionUnavailableReason::NoProvider,
+    );
+
+    assert!(matches!(
+        descriptor.availability(),
+        ConstructionAvailability::Unavailable { reasons }
+            if reasons.as_ref() == [crate::runtime::construct::ConstructionUnavailableReason::NoProvider]
+    ));
+
+    let failure = descriptor
+        .construct::<Record, Local, _>(NamedFields::new().field("count", 7_u32))
+        .expect_err("a missing provider is reported before input is consumed");
+    assert!(matches!(failure.error(), ConstructionError::Unavailable(_)));
+    assert!(matches!(failure.into_input(), RecoveredConstructionInput::Named(_)));
 }
 
 #[test]

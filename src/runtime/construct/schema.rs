@@ -1,12 +1,29 @@
-use crate::runtime::descriptor::{Reflect, field::Visibility};
-use crate::runtime::identity::TypeIdentity;
-use crate::runtime::value::{DynamicOwned, Local, ThreadSafe, ValueMode};
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::fmt;
 
+use crate::runtime::descriptor::Reflect;
+use crate::runtime::descriptor::field::Visibility;
+use crate::runtime::identity::TypeIdentity;
+use crate::runtime::value::DynamicOwned;
+use crate::runtime::value::Local;
+use crate::runtime::value::ThreadSafe;
+use crate::runtime::value::ValueMode;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Input layout used to construct or update a target.
 pub enum ConstructionShape {
+    /// Fields are supplied by their reflected names.
     Named,
+    /// Fields are supplied in declaration order.
     Positional,
+    /// The target has no input fields.
     Unit,
 }
 
@@ -25,6 +42,7 @@ impl ConstructVisibility {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Describes how a construction provider handles one field.
 pub enum ConstructionFieldPolicy {
     /// The caller must supply this field.
     Required,
@@ -38,14 +56,20 @@ pub enum ConstructionFieldPolicy {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+/// Reason a target or field cannot be safely constructed.
 pub enum ConstructionUnavailableReason {
+    /// No generated provider is available for the target.
     NoProvider,
+    /// The field's type or metadata cannot be reflected for construction.
     FieldNotReflectable,
+    /// The target has a shape that the construction provider does not support.
     UnsupportedShape,
+    /// A required field is not public to the caller.
     PrivateRequiredField,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Describes whether an existing field may be changed by an update.
 pub enum UpdateFieldPolicy {
     /// The caller may replace this field.
     Replaceable,
@@ -57,11 +81,15 @@ pub enum UpdateFieldPolicy {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+/// Reason an update operation or field update is unavailable.
 pub enum UpdateUnavailableReason {
+    /// No generated update provider is available for the target.
     NoProvider,
+    /// The field is not supported by the update provider.
     FieldNotReplaceable,
 }
 
+/// Type and access policy metadata for one field in a construction plan.
 pub struct ConstructField {
     pub(crate) name: &'static str,
     pub(crate) value: fn() -> TypeIdentity,
@@ -95,22 +123,35 @@ impl ConstructField {
     pub(crate) fn value_identity(&self) -> TypeIdentity {
         (self.value)()
     }
+
+    /// Returns the field's reflected name.
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Returns how construction handles omitted values for this field.
+    pub fn policy(&self) -> ConstructionFieldPolicy {
+        self.policy
+    }
+
+    /// Returns whether updates can replace or preserve this field.
+    pub fn update_policy(&self) -> UpdateFieldPolicy {
+        self.update_policy
+    }
 }
 
 /// Type checked providers invoked only after all input validation succeeds.
 ///
-/// Implementations receive fields in declaration order. They must return a dynamic
-/// value with the exact target identity declared by the associated construction plan.
+/// Implementations receive fields in declaration order. They must return a
+/// dynamic value with the exact target identity declared by the associated
+/// construction plan.
 pub(crate) trait ConstructProvider<M: ValueMode>: Sync {
     fn construct(&self, fields: Vec<Option<DynamicOwned<M>>>) -> DynamicOwned<M>;
-    fn update(
-        &self,
-        base: DynamicOwned<M>,
-        replacements: Vec<Option<DynamicOwned<M>>>,
-    ) -> DynamicOwned<M>;
+    fn update(&self, base: DynamicOwned<M>, replacements: Vec<Option<DynamicOwned<M>>>) -> DynamicOwned<M>;
 }
 
 #[derive(Clone, Copy)]
+/// Runtime providers generated for local and thread-safe value modes.
 pub struct ConstructionProviders {
     local: Option<&'static dyn ConstructProvider<Local>>,
     thread_safe: Option<&'static dyn ConstructProvider<ThreadSafe>>,
@@ -143,9 +184,7 @@ pub(crate) trait ConstructionMode: ValueMode {
 
 impl ConstructionMode for Local {
     fn provider(providers: &ConstructionProviders) -> Option<&dyn ConstructProvider<Self>> {
-        providers
-            .local
-            .map(|provider| provider as &dyn ConstructProvider<Self>)
+        providers.local.map(|provider| provider as &dyn ConstructProvider<Self>)
     }
 }
 
@@ -158,23 +197,49 @@ impl ConstructionMode for ThreadSafe {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Whether a construction plan can safely construct its target.
 pub enum ConstructionAvailability {
+    /// All fields required for construction are available.
     Available,
+    /// Construction is unavailable for the listed reasons.
     Unavailable {
+        /// Reasons that prevent construction.
         reasons: Box<[ConstructionUnavailableReason]>,
     },
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct ConstructionTarget {
-    identity: fn() -> TypeIdentity,
+    identity: ConstructionIdentity,
     pub(crate) kind: ConstructionTargetKind,
     pub(crate) variant_index: Option<usize>,
 }
 
 impl ConstructionTarget {
     pub(crate) fn identity(&self) -> TypeIdentity {
-        (self.identity)()
+        match self.identity {
+            ConstructionIdentity::Static(resolve) => resolve(),
+            ConstructionIdentity::Runtime(identity) => identity,
+        }
     }
+
+    pub(crate) const fn for_runtime(
+        identity: TypeIdentity,
+        kind: ConstructionTargetKind,
+        variant_index: Option<usize>,
+    ) -> Self {
+        Self {
+            identity: ConstructionIdentity::Runtime(identity),
+            kind,
+            variant_index,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ConstructionIdentity {
+    Static(fn() -> TypeIdentity),
+    Runtime(TypeIdentity),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,6 +249,8 @@ pub(crate) enum ConstructionTargetKind {
     Unsupported,
 }
 
+/// Static metadata and generated providers for constructing one reflected
+/// target.
 pub struct ConstructionPlan {
     pub(crate) target: ConstructionTarget,
     pub(crate) shape: ConstructionShape,
@@ -202,7 +269,7 @@ impl ConstructionPlan {
     ) -> Self {
         Self::new(
             ConstructionTarget {
-                identity: type_identity::<T>,
+                identity: ConstructionIdentity::Static(type_identity::<T>),
                 kind: ConstructionTargetKind::Struct,
                 variant_index: None,
             },
@@ -223,7 +290,7 @@ impl ConstructionPlan {
     ) -> Self {
         Self::new(
             ConstructionTarget {
-                identity: type_identity::<T>,
+                identity: ConstructionIdentity::Static(type_identity::<T>),
                 kind: ConstructionTargetKind::Variant,
                 variant_index: Some(variant_index),
             },
@@ -256,10 +323,10 @@ impl ConstructionPlan {
             ConstructionAvailability::Unavailable { reasons } => reasons.to_vec(),
         };
         for field in self.fields {
-            if let ConstructionFieldPolicy::Unavailable(reason) = field.policy {
-                if !reasons.contains(&reason) {
-                    reasons.push(reason);
-                }
+            if let ConstructionFieldPolicy::Unavailable(reason) = field.policy
+                && !reasons.contains(&reason)
+            {
+                reasons.push(reason);
             }
             if !unchecked_visibility
                 && !field.visibility.is_public()
@@ -279,12 +346,10 @@ impl ConstructionPlan {
     }
 
     pub(crate) fn update_unavailable_reason(&self) -> Option<UpdateUnavailableReason> {
-        self.fields
-            .iter()
-            .find_map(|field| match field.update_policy {
-                UpdateFieldPolicy::Unavailable(reason) => Some(reason),
-                UpdateFieldPolicy::Replaceable | UpdateFieldPolicy::Preserved => None,
-            })
+        self.fields.iter().find_map(|field| match field.update_policy {
+            UpdateFieldPolicy::Unavailable(reason) => Some(reason),
+            UpdateFieldPolicy::Replaceable | UpdateFieldPolicy::Preserved => None,
+        })
     }
 }
 
@@ -297,16 +362,20 @@ fn type_identity<T: 'static>() -> TypeIdentity {
 
 #[derive(Clone, Copy)]
 pub(crate) struct ConstructionDescriptor<'ctx> {
-    pub(crate) plan: &'ctx ConstructionPlan,
+    pub(crate) plan: Option<&'ctx ConstructionPlan>,
+    target: ConstructionTarget,
+    shape: ConstructionShape,
+    fields: &'static [ConstructField],
+    unavailable_reason: Option<ConstructionUnavailableReason>,
 }
 
-pub(crate) fn resolve_plan<'a>(
+#[cfg(test)]
+pub(crate) fn resolve_plan(
     target: TypeIdentity,
-    plans: &'a [ConstructionPlan],
-) -> Result<&'a ConstructionPlan, ConstructionError> {
+    plans: &[ConstructionPlan],
+) -> Result<&ConstructionPlan, ConstructionError> {
     let mut matching = plans.iter().filter(|plan| {
-        plan.target.kind == ConstructionTargetKind::Struct
-            && plan.target.identity().type_id == target.type_id
+        plan.target.kind == ConstructionTargetKind::Struct && plan.target.identity().type_id == target.type_id
     });
     let Some(plan) = matching.next() else {
         return Err(ConstructionError::MissingProvider);
@@ -315,8 +384,7 @@ pub(crate) fn resolve_plan<'a>(
         let count = plans
             .iter()
             .filter(|plan| {
-                plan.target.kind == ConstructionTargetKind::Struct
-                    && plan.target.identity().type_id == target.type_id
+                plan.target.kind == ConstructionTargetKind::Struct && plan.target.identity().type_id == target.type_id
             })
             .count();
         return Err(ConstructionError::AmbiguousProvider { target, count });
@@ -324,11 +392,12 @@ pub(crate) fn resolve_plan<'a>(
     Ok(plan)
 }
 
-pub(crate) fn resolve_variant_plan<'a>(
+#[cfg(test)]
+pub(crate) fn resolve_variant_plan(
     owner: TypeIdentity,
     variant_index: usize,
-    plans: &'a [ConstructionPlan],
-) -> Result<&'a ConstructionPlan, ConstructionError> {
+    plans: &[ConstructionPlan],
+) -> Result<&ConstructionPlan, ConstructionError> {
     let mut matching = plans.iter().filter(|plan| {
         plan.target.kind == ConstructionTargetKind::Variant
             && plan.target.identity().type_id == owner.type_id
@@ -346,39 +415,64 @@ pub(crate) fn resolve_variant_plan<'a>(
                     && plan.target.variant_index == Some(variant_index)
             })
             .count();
-        return Err(ConstructionError::AmbiguousProvider {
-            target: owner,
-            count,
-        });
+        return Err(ConstructionError::AmbiguousProvider { target: owner, count });
     }
     Ok(plan)
 }
 
 impl<'ctx> ConstructionDescriptor<'ctx> {
     pub(crate) const fn new(plan: &'ctx ConstructionPlan) -> Self {
-        Self { plan }
+        Self {
+            plan: Some(plan),
+            target: plan.target,
+            shape: plan.shape,
+            fields: plan.fields,
+            unavailable_reason: None,
+        }
+    }
+
+    pub(crate) const fn unavailable(
+        target: ConstructionTarget,
+        shape: ConstructionShape,
+        fields: &'static [ConstructField],
+        reason: ConstructionUnavailableReason,
+    ) -> Self {
+        Self {
+            plan: None,
+            target,
+            shape,
+            fields,
+            unavailable_reason: Some(reason),
+        }
     }
 
     pub(crate) fn target(&self) -> &ConstructionTarget {
-        &self.plan.target
+        &self.target
     }
 
     pub(crate) fn shape(&self) -> ConstructionShape {
-        self.plan.shape
+        self.shape
     }
 
     pub(crate) fn availability(&self) -> ConstructionAvailability {
-        self.plan.availability(false)
+        if let Some(plan) = self.plan {
+            return plan.availability(false);
+        }
+        ConstructionAvailability::Unavailable {
+            reasons: Box::new([self
+                .unavailable_reason
+                .unwrap_or(ConstructionUnavailableReason::NoProvider)]),
+        }
     }
 
     pub(crate) fn fields(&self) -> &[ConstructField] {
-        self.plan.fields
+        self.fields
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ConstructionError {
+pub enum ConstructionError {
     MissingProvider,
     AmbiguousProvider {
         target: TypeIdentity,
@@ -430,7 +524,7 @@ impl std::error::Error for ConstructionError {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum UpdateError {
+pub enum UpdateError {
     BaseTypeMismatch(crate::runtime::value::TypeMismatch),
     TargetTypeMismatch(crate::runtime::value::TypeMismatch),
     WrongTargetKind,
@@ -493,33 +587,19 @@ impl From<ConstructionError> for UpdateError {
     fn from(error: ConstructionError) -> Self {
         match error {
             ConstructionError::MissingProvider => Self::MissingProvider,
-            ConstructionError::AmbiguousProvider { target, count } => {
-                Self::AmbiguousProvider { target, count }
-            }
+            ConstructionError::AmbiguousProvider { target, count } => Self::AmbiguousProvider { target, count },
             ConstructionError::WrongTargetKind => Self::WrongTargetKind,
             ConstructionError::Unavailable(reason) => Self::Unavailable(reason),
             ConstructionError::TargetTypeMismatch(mismatch) => Self::TargetTypeMismatch(mismatch),
-            ConstructionError::ShapeMismatch { expected, actual } => {
-                Self::ShapeMismatch { expected, actual }
-            }
+            ConstructionError::ShapeMismatch { expected, actual } => Self::ShapeMismatch { expected, actual },
             ConstructionError::MissingField { field } => Self::MissingField { field },
             ConstructionError::DuplicateField { field } => Self::DuplicateField { field },
             ConstructionError::UnknownField { field } => Self::UnknownField { field },
             ConstructionError::ProviderOnlyField { field } => Self::ProviderOnlyField { field },
-            ConstructionError::FieldUnavailable { field, reason } => {
-                Self::FieldUnavailable { field, reason }
-            }
+            ConstructionError::FieldUnavailable { field, reason } => Self::FieldUnavailable { field, reason },
             ConstructionError::FieldNotPublic { field } => Self::FieldNotPublic { field },
-            ConstructionError::ValueTypeMismatch { field, mismatch } => {
-                Self::ValueTypeMismatch { field, mismatch }
-            }
-            ConstructionError::TooManyValues {
-                expected_max,
-                actual,
-            } => Self::TooManyValues {
-                expected_max,
-                actual,
-            },
+            ConstructionError::ValueTypeMismatch { field, mismatch } => Self::ValueTypeMismatch { field, mismatch },
+            ConstructionError::TooManyValues { expected_max, actual } => Self::TooManyValues { expected_max, actual },
         }
     }
 }

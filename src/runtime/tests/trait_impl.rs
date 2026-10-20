@@ -1,31 +1,59 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use std::any::TypeId;
 
 use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::TypeDescriptor;
-use crate::runtime::descriptor::generic::{
-    GenericArgumentMetadata, GenericArgumentMetadataKind, GenericDefinitionMetadata,
-    GenericParameterMetadata, GenericParameterMetadataKind,
-};
-use crate::runtime::descriptor::impl_descriptor::{
-    AssociatedConstBindingMetadata, AssociatedConstValueAdapter, AssociatedItemSource,
-    AssociatedTypeBindingMetadata, ImplApplicationMetadata, ImplDefinitionId,
-    ImplDefinitionMetadata, ImplKind, ImplQualifiers, Impls,
-};
+use crate::runtime::descriptor::generic::GenericArgumentMetadata;
+use crate::runtime::descriptor::generic::GenericArgumentMetadataKind;
+use crate::runtime::descriptor::generic::GenericDefinitionMetadata;
+use crate::runtime::descriptor::generic::GenericParameterMetadata;
+use crate::runtime::descriptor::generic::GenericParameterMetadataKind;
+use crate::runtime::descriptor::impl_descriptor::AssociatedConstBindingMetadata;
+use crate::runtime::descriptor::impl_descriptor::AssociatedItemSource;
+use crate::runtime::descriptor::impl_descriptor::AssociatedTypeBindingMetadata;
+use crate::runtime::descriptor::impl_descriptor::ImplApplicationMetadata;
+use crate::runtime::descriptor::impl_descriptor::ImplDefinitionId;
+use crate::runtime::descriptor::impl_descriptor::ImplDefinitionMetadata;
+use crate::runtime::descriptor::impl_descriptor::ImplKind;
+use crate::runtime::descriptor::impl_descriptor::ImplQualifiers;
+use crate::runtime::descriptor::impl_descriptor::Impls;
+use crate::runtime::descriptor::impl_descriptor::metadata::AssociatedConstValueAdapter;
 use crate::runtime::descriptor::metadata::TypeMetadata;
-use crate::runtime::descriptor::method::{
-    EffectiveMethod, FunctionAbi, MethodAvailability, MethodImplementationSource, MethodMetadata,
-    MethodNamespaceMetadata, MethodQualifiers, MethodVisibility, ReturnKind, ReturnMetadata,
-};
-use crate::runtime::descriptor::trait_descriptor::{
-    AssociatedConstDefinitionMetadata, AssociatedTypeDefinitionMetadata, TraitApplicationMetadata,
-    TraitArgumentIdentity, TraitCompleteness, TraitDefinitionDescriptor, TraitDefinitionId,
-    TraitDefinitionMetadata, TraitExpressionMetadata, Visibility,
-};
-use crate::runtime::expression::{
-    ConstExpression, ExpressionData, PredicateData, TraitExpressionData,
-};
+use crate::runtime::descriptor::method::EffectiveMethod;
+use crate::runtime::descriptor::method::FunctionAbi;
+use crate::runtime::descriptor::method::MethodAvailability;
+use crate::runtime::descriptor::method::MethodImplementationSource;
+use crate::runtime::descriptor::method::MethodMetadata;
+use crate::runtime::descriptor::method::MethodNamespaceMetadata;
+use crate::runtime::descriptor::method::MethodQualifiers;
+use crate::runtime::descriptor::method::MethodVisibility;
+use crate::runtime::descriptor::method::ReturnKind;
+use crate::runtime::descriptor::method::ReturnMetadata;
+use crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata;
+use crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata;
+use crate::runtime::descriptor::trait_descriptor::TraitApplicationMetadata;
+use crate::runtime::descriptor::trait_descriptor::TraitArgumentIdentity;
+use crate::runtime::descriptor::trait_descriptor::TraitCompleteness;
+use crate::runtime::descriptor::trait_descriptor::TraitDefinitionDescriptor;
+use crate::runtime::descriptor::trait_descriptor::TraitDefinitionId;
+use crate::runtime::descriptor::trait_descriptor::TraitDefinitionMetadata;
+use crate::runtime::descriptor::trait_descriptor::TraitExpressionMetadata;
+use crate::runtime::descriptor::trait_descriptor::Visibility;
+use crate::runtime::expression::ConstExpression;
+use crate::runtime::expression::ExpressionData;
+use crate::runtime::expression::PredicateData;
+use crate::runtime::expression::TraitExpressionData;
 use crate::runtime::lookup::Lookup;
-use crate::runtime::value::{DynamicOwned, Local, ThreadSafe};
+use crate::runtime::value::DynamicOwned;
+use crate::runtime::value::Local;
+use crate::runtime::value::ThreadSafe;
 
 struct CustomerId;
 struct ErrorValue;
@@ -103,14 +131,14 @@ static TARGET_EXPR: ExpressionData = ExpressionData::Named {
     arguments: &[],
 };
 static STRING_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata {
-    parameter: &TRAIT_PARAMETER,
+    parameter: Some(&TRAIT_PARAMETER),
     kind: GenericArgumentMetadataKind::Type {
         expression: &STRING_EXPR,
         concrete: Some(string_type_metadata),
     },
 };
 static U64_ARGUMENT: GenericArgumentMetadata = GenericArgumentMetadata {
-    parameter: &TRAIT_PARAMETER,
+    parameter: Some(&TRAIT_PARAMETER),
     kind: GenericArgumentMetadataKind::Type {
         expression: &U64_EXPR,
         concrete: Some(u64_type_metadata),
@@ -133,13 +161,12 @@ static ASSOCIATED_TYPE_ERROR: AssociatedTypeDefinitionMetadata = AssociatedTypeD
     bounds: EMPTY_PREDICATES,
     default: Some(&ERROR_EXPR),
 };
-static ASSOCIATED_CONST_COUNT: AssociatedConstDefinitionMetadata =
-    AssociatedConstDefinitionMetadata {
-        name: "COUNT",
-        visibility: Visibility::Public,
-        ty: &U64_EXPR,
-        default: Some(ConstExpression::UnsignedInteger(1)),
-    };
+static ASSOCIATED_CONST_COUNT: AssociatedConstDefinitionMetadata = AssociatedConstDefinitionMetadata {
+    name: "COUNT",
+    visibility: Visibility::Public,
+    ty: &U64_EXPR,
+    default: Some(ConstExpression::UnsignedInteger(1)),
+};
 static ASSOCIATED_TYPES: &[AssociatedTypeDefinitionMetadata] = &[ASSOCIATED_TYPE_ERROR];
 static ASSOCIATED_CONSTS: &[AssociatedConstDefinitionMetadata] = &[ASSOCIATED_CONST_COUNT];
 static NO_ASSOCIATED_TYPES: &[AssociatedTypeDefinitionMetadata] = &[];
@@ -154,9 +181,7 @@ static STRING_TRAIT_EXPRESSION_DATA: TraitExpressionData = TraitExpressionData {
 };
 static U64_TRAIT_EXPRESSION_DATA: TraitExpressionData = TraitExpressionData {
     path: "fixture::Convert",
-    arguments: &[crate::runtime::expression::GenericExpressionArgument::Type(
-        &U64_EXPR,
-    )],
+    arguments: &[crate::runtime::expression::GenericExpressionArgument::Type(&U64_EXPR)],
     lifetimes: &[],
 };
 static STRING_TRAIT_EXPRESSION: TraitExpressionMetadata = TraitExpressionMetadata {
@@ -238,8 +263,7 @@ static STRING_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
     identity: STRING_IDENTITY,
     direct_supertraits: &[],
     all_supertraits: &[],
-    supertrait_completeness:
-        crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
+    supertrait_completeness: crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
 };
 static U64_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
     definition: Some(&TRAIT_DEFINITION),
@@ -248,8 +272,7 @@ static U64_TRAIT: TraitApplicationMetadata = TraitApplicationMetadata {
     identity: U64_IDENTITY,
     direct_supertraits: &[],
     all_supertraits: &[],
-    supertrait_completeness:
-        crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
+    supertrait_completeness: crate::runtime::descriptor::trait_descriptor::SupertraitCompleteness::Complete,
 };
 fn dynamic_answer_local() -> DynamicOwned<Local> {
     DynamicOwned::new(Answer(42))
@@ -377,12 +400,12 @@ fn trait_applications_keep_distinct_generic_arguments() {
     assert!(!first.same_application(second));
     assert!(first.same_application(first));
     let other_context = make_context();
-    assert!(!first.same_application(
-        crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(
+    assert!(
+        !first.same_application(crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(
             &STRING_TRAIT,
             &other_context,
-        ),
-    ));
+        ),)
+    );
 }
 
 #[test]
@@ -390,30 +413,23 @@ fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
     let context = make_context();
     let applications = Impls::new(
         vec![
-            crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(
-                &STRING_IMPL,
-                &context,
-            ),
+            crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&STRING_IMPL, &context),
             crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&U64_IMPL, &context),
         ]
         .into_boxed_slice(),
         &context,
     );
-    let string_trait =
-        crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(&STRING_TRAIT, &context);
-    let u64_trait =
-        crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(&U64_TRAIT, &context);
+    let string_trait = crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(&STRING_TRAIT, &context);
+    let u64_trait = crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(&U64_TRAIT, &context);
     assert!(
         applications
             .find_trait_application(string_trait)
             .expect("valid context")
             .expect("String impl")
-            .same_application(
-                crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(
-                    &STRING_IMPL,
-                    &context
-                )
-            )
+            .same_application(crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(
+                &STRING_IMPL,
+                &context
+            ))
     );
     assert!(
         applications
@@ -431,28 +447,19 @@ fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
             .id(),
         context.id()
     );
+    assert_eq!(applications.get(0).expect("impl").definition().kind(), ImplKind::Trait);
     assert_eq!(
-        applications.get(0).expect("impl").definition().kind(),
-        ImplKind::Trait
-    );
-    assert_eq!(
-        crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor::new(
-            &STRING_IMPL_DEF,
-            &context
-        )
-        .instances()
-        .expect("definition instances")
-        .len(),
+        crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor::new(&STRING_IMPL_DEF, &context)
+            .instances()
+            .expect("definition instances")
+            .len(),
         1
     );
     assert_eq!(
-        crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor::new(
-            &U64_IMPL_DEF,
-            &context
-        )
-        .implemented_trait()
-        .expect("source trait expression")
-        .path(),
+        crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor::new(&U64_IMPL_DEF, &context)
+            .implemented_trait()
+            .expect("source trait expression")
+            .path(),
         "fixture::Convert"
     );
     assert!(matches!(
@@ -467,20 +474,15 @@ fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
     let other_context = make_context();
     assert!(
         applications
-            .lookup_trait_definition(TraitDefinitionDescriptor::new(
-                &TRAIT_DEFINITION,
-                &other_context
-            ))
+            .lookup_trait_definition(TraitDefinitionDescriptor::new(&TRAIT_DEFINITION, &other_context))
             .is_err()
     );
     assert!(
         applications
-            .find_trait_application(
-                crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(
-                    &STRING_TRAIT,
-                    &other_context
-                )
-            )
+            .find_trait_application(crate::runtime::descriptor::trait_descriptor::TraitDescriptor::new(
+                &STRING_TRAIT,
+                &other_context
+            ))
             .is_err()
     );
     assert!(matches!(
@@ -495,10 +497,8 @@ fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
 #[test]
 fn effective_methods_and_associated_item_sources_preserve_overrides() {
     let context = make_context();
-    let overridden =
-        crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&STRING_IMPL, &context);
-    let defaulted =
-        crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&U64_IMPL, &context);
+    let overridden = crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&STRING_IMPL, &context);
+    let defaulted = crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&U64_IMPL, &context);
     assert_eq!(
         overridden
             .method("normalize")
@@ -507,17 +507,11 @@ fn effective_methods_and_associated_item_sources_preserve_overrides() {
         MethodImplementationSource::Overridden
     );
     assert_eq!(
-        defaulted
-            .method("normalize")
-            .expect("default")
-            .implementation_source(),
+        defaulted.method("normalize").expect("default").implementation_source(),
         MethodImplementationSource::Defaulted
     );
     assert_eq!(
-        overridden
-            .associated_type("Error")
-            .expect("associated type")
-            .source(),
+        overridden.associated_type("Error").expect("associated type").source(),
         AssociatedItemSource::Declared
     );
     assert_eq!(
@@ -528,10 +522,7 @@ fn effective_methods_and_associated_item_sources_preserve_overrides() {
         AssociatedItemSource::Defaulted
     );
     assert_eq!(
-        overridden
-            .associated_const("COUNT")
-            .expect("associated const")
-            .source(),
+        overridden.associated_const("COUNT").expect("associated const").source(),
         AssociatedItemSource::Overridden
     );
     assert_eq!(
@@ -558,23 +549,14 @@ fn effective_methods_and_associated_item_sources_preserve_overrides() {
         .value::<Local>()
         .expect("local value")
         .expect("adapter value");
-    assert_eq!(
-        value.downcast_ref::<Answer>().expect("dynamic answer").0,
-        42
-    );
+    assert_eq!(value.downcast_ref::<Answer>().expect("dynamic answer").0, 42);
     let thread_safe = overridden
         .associated_const("COUNT")
         .expect("value binding")
         .value::<ThreadSafe>()
         .expect("thread-safe value")
         .expect("adapter value");
-    assert_eq!(
-        thread_safe
-            .downcast_ref::<Answer>()
-            .expect("dynamic answer")
-            .0,
-        42
-    );
+    assert_eq!(thread_safe.downcast_ref::<Answer>().expect("dynamic answer").0, 42);
 }
 
 #[test]
@@ -582,24 +564,13 @@ fn definition_descriptors_retain_visibility_and_missing_queries() {
     let context = make_context();
     let definition = TraitDefinitionDescriptor::new(&TRAIT_DEFINITION, &context);
     assert_eq!(definition.visibility(), Visibility::Public);
-    assert_eq!(
-        definition.method("normalize").expect("method").name(),
-        "normalize"
-    );
-    assert!(
-        definition
-            .method("normalize")
-            .expect("method")
-            .has_default_body()
-    );
+    assert_eq!(definition.method("normalize").expect("method").name(), "normalize");
+    assert!(definition.method("normalize").expect("method").has_default_body());
     assert!(definition.method("missing").is_err());
     assert!(definition.associated_type("missing").is_err());
     assert!(definition.associated_const("missing").is_err());
     assert_eq!(
-        definition
-            .associated_type("Error")
-            .expect("type definition")
-            .name(),
+        definition.associated_type("Error").expect("type definition").name(),
         "Error"
     );
     assert_eq!(
@@ -612,15 +583,16 @@ fn definition_descriptors_retain_visibility_and_missing_queries() {
     assert!(definition.supertraits().iter().next().is_none());
     assert_eq!(definition.completeness(), TraitCompleteness::Complete);
     assert_eq!(
-        definition
-            .applications()
-            .expect("applications")
-            .context()
-            .id(),
+        definition.applications().expect("applications").context().id(),
         context.id()
     );
     assert_eq!(
         TypeDescriptor::new(&TARGET_METADATA, &context).type_id(),
         TypeId::of::<CustomerId>()
     );
+}
+
+#[test]
+fn lifetime_trait_argument_identity_does_not_use_source_names() {
+    assert!(TraitArgumentIdentity::lifetime("'a") == TraitArgumentIdentity::lifetime("'b"));
 }

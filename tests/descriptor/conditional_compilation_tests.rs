@@ -11,9 +11,9 @@
 
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
-use qubit_reflect::descriptor::TraitDefinitionDescriptor;
 use qubit_reflect::ReflectionContext;
 use qubit_reflect::TypeDescriptor;
+use qubit_reflect::descriptor::TraitDefinitionDescriptor;
 
 #[Reflect]
 struct ConditionalTarget;
@@ -111,7 +111,10 @@ fn test_cfg_controls_trait_metadata_members() {
             ]
         );
         assert_eq!(definition.methods().get("platform_64").unwrap().name(), "platform_64");
-        assert_eq!(definition.methods().get("configured_helper").unwrap().name(), "configured_helper");
+        assert_eq!(
+            definition.methods().get("configured_helper").unwrap().name(),
+            "configured_helper"
+        );
         assert_eq!(definition.associated_types().len(), 1);
         assert_eq!(definition.associated_consts().len(), 1);
     }
@@ -126,8 +129,14 @@ fn test_cfg_controls_trait_metadata_members() {
                 "retained_but_unavailable",
             ]
         );
-        assert_eq!(definition.methods().get("platform_other").unwrap().name(), "platform_other");
-        assert_eq!(definition.methods().get("configured_helper").unwrap().name(), "configured_helper");
+        assert_eq!(
+            definition.methods().get("platform_other").unwrap().name(),
+            "platform_other"
+        );
+        assert_eq!(
+            definition.methods().get("configured_helper").unwrap().name(),
+            "configured_helper"
+        );
     }
     assert!(
         context
@@ -146,12 +155,7 @@ fn test_inactive_impl_member_has_no_descriptor_or_adapter() {
         .expect("active inherent impls must be available");
     let implementation = implementations
         .iter()
-        .find(|implementation| {
-            implementation
-                .methods()
-                .iter()
-                .any(|method| method.name() == "enabled")
-        })
+        .find(|implementation| implementation.methods().iter().any(|method| method.name() == "enabled"))
         .expect("the active method's implementation must be registered");
 
     assert_eq!(

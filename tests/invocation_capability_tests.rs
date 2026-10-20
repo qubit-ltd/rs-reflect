@@ -1,10 +1,25 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 #![cfg(feature = "derive")]
 
-use qubit_reflect::invoke::CaughtInvocationFailure;
-use qubit_reflect::{Invocation, InvocationOutput, Reflect, ReflectImpl};
 use std::future::Future;
 use std::pin::pin;
-use std::task::{Context, Poll, Waker};
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+
+use qubit_reflect::Invocation;
+use qubit_reflect::InvocationOutput;
+use qubit_reflect::Reflect;
+use qubit_reflect::ReflectImpl;
+use qubit_reflect::invoke::CaughtInvocationFailure;
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Counter {
@@ -33,25 +48,26 @@ fn method(name: &str) -> qubit_reflect::MethodDescriptor<'static> {
 fn test_catching_capability_runs_generated_method_adapter() {
     let mut counter = Counter { value: 5 };
     let output = method("increment")
-        .invoke_catching(Invocation::on_mut(&mut counter).arg(3_u32))
-        .expect("synchronous catching adapter should be present");
+        .invoke_catching(Invocation::<Local>::on_mut(&mut counter).arg(3_u32))
+        .unwrap_or_else(|_| panic!("synchronous catching adapter should be present"));
 
-    assert!(matches!(output, InvocationOutput::Unit));
+    assert!(matches!(&output, InvocationOutput::Unit));
+    drop(output);
     assert_eq!(counter.value, 8);
 }
 
 #[test]
 fn test_catching_capability_rejects_async_before_dispatch_and_keeps_inputs() {
     let counter = Counter { value: 13 };
-    let failure = method("async_value")
-        .invoke_catching(Invocation::on_ref(&counter))
-        .expect_err("synchronous catching cannot dispatch async methods");
+    let Err(failure) = method("async_value").invoke_catching(Invocation::<Local>::on_ref(&counter)) else {
+        panic!("synchronous catching cannot dispatch async methods");
+    };
     let CaughtInvocationFailure::Rejected(rejected) = failure else {
         panic!("async rejection occurs before user method entry");
     };
     let retry = method("async_value")
         .invoke(rejected.into_invocation())
-        .expect("normal invocation should reuse the recovered async receiver");
+        .unwrap_or_else(|_| panic!("normal invocation should reuse the recovered async receiver"));
     let InvocationOutput::Future(future) = retry else {
         panic!("async method must return a future");
     };
@@ -60,5 +76,10 @@ fn test_catching_capability_rejects_async_before_dispatch_and_keeps_inputs() {
     let Poll::Ready(output) = Future::poll(future.as_mut(), &mut context) else {
         panic!("fixture future should complete on first poll");
     };
-    assert_eq!(output.into_owned::<u32>().expect("u32 output"), 13);
+    assert_eq!(
+        output
+            .into_owned::<u32>()
+            .unwrap_or_else(|_| panic!("async method should return a u32")),
+        13
+    );
 }
