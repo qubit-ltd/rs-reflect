@@ -46,7 +46,7 @@ struct PartialTarget;
 #[Reflect]
 struct AliasTarget;
 #[Reflect]
-struct GenericTarget<T: 'static>(PhantomData<T>);
+struct GenericTarget<T: 'static>(#[reflect(skip)] PhantomData<T>);
 #[Reflect]
 struct ExternalTarget;
 

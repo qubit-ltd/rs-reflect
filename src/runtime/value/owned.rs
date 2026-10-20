@@ -179,6 +179,11 @@ impl<M: ValueMode> DynamicOwned<M> {
         self.identity.type_id
     }
 
+    /// Returns the stored concrete value as `Any` for read-only downcasting.
+    pub fn as_any(&self) -> &dyn Any {
+        M::owned_as_any(&self.value)
+    }
+
     /// Describes the stored concrete type in the global reflection context.
     pub fn ty(&self) -> TypeDescriptor<'static> {
         self.ty_in(ReflectionContext::global())
@@ -240,6 +245,7 @@ impl<M: ValueMode> DynamicOwned<M> {
     pub fn as_ref(&self) -> DynamicRef<'_, M> {
         DynamicRef::from_erased(
             M::shared_from_owned(&self.value),
+            None,
             self.identity,
             self.descriptor_factory,
         )

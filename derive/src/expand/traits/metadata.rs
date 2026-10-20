@@ -346,6 +346,7 @@ fn associated_type_bound(
             )),
             trait_: None,
             name: #name,
+            arguments: &[],
         },
     )));
     match bound {

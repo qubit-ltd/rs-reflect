@@ -55,7 +55,7 @@ trait SelfQualifiedTrait {
 }
 
 #[Reflect]
-struct CrateQualifiedTarget<T: 'static>(PhantomData<T>);
+struct CrateQualifiedTarget<T: 'static>(#[reflect(skip)] PhantomData<T>);
 struct RelativeQualifiedTarget<T>(PhantomData<T>);
 struct SelfQualifiedTarget<T>(PhantomData<T>);
 struct ImportedAliasTarget<T>(PhantomData<T>);

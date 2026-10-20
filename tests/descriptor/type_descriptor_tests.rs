@@ -29,6 +29,7 @@ struct OpaqueContainer {
     member: OpaqueMember,
 }
 
+#[Reflect]
 struct OpaqueMember;
 
 #[Reflect]
@@ -91,15 +92,25 @@ fn test_type_descriptor_represents_unit_as_zero_arity_tuple() {
     assert!(descriptor.fields().is_empty());
 }
 
-/// Verifies a field whose type has no `Reflect` implementation keeps its
-/// expression without claiming a concrete descriptor.
+/// Verifies field views and concrete type descriptors retain their owner
+/// context.
 #[test]
-fn test_type_descriptor_keeps_unreflectable_field_expression() {
-    let descriptor = TypeDescriptor::of::<OpaqueContainer>();
+fn test_type_descriptor_field_views_retain_context() {
+    let context = qubit_reflect::ReflectionContext::builder()
+        .include_type::<OpaqueContainer>()
+        .build()
+        .expect("context contains the owner but not its field type");
+    let descriptor = TypeDescriptor::of_in::<OpaqueContainer>(&context);
     let field = descriptor.field("member").expect("the named field is present");
 
-    assert!(field.find_concrete_type().is_none());
-    assert!(field.type_expression().display().to_string().contains("OpaqueMember"));
+    let expression = field.type_expression();
+    let concrete = field
+        .find_concrete_type()
+        .expect("the reflected field type has a concrete descriptor");
+
+    assert!(std::ptr::eq(expression.context(), &context));
+    assert!(std::ptr::eq(concrete.context(), &context));
+    assert!(expression.display().to_string().contains("OpaqueMember"));
 }
 
 /// Verifies recursive descriptor formatting stays finite.

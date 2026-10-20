@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 #[qubit_reflect::Reflect]
 struct LocalOnly {
+    #[reflect(skip)]
     value: Rc<u8>,
 }
 

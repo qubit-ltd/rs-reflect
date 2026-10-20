@@ -467,6 +467,7 @@ fn test_unsupported_default_method_does_not_disable_thread_safe_siblings() {
 
 #[Reflect]
 struct LocalDefaultService {
+    #[reflect(skip)]
     marker: Rc<()>,
 }
 

@@ -342,10 +342,12 @@ fn substitute_type_expression(
             self_type,
             trait_,
             name,
+            arguments: values,
         } => ExpressionData::AssociatedType {
             self_type: substitute(self_type),
-            trait_: *trait_,
+            trait_: trait_.map(|trait_| &*Box::leak(Box::new(substitute_trait_expression(trait_, arguments)))),
             name,
+            arguments: substitute_arguments(values),
         },
         ExpressionData::Reference {
             lifetime,
@@ -643,16 +645,19 @@ mod tests {
         definition: None,
         arguments: &[],
     };
+    static U_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::type_parameter("U", 1, &[], None);
+    static U_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::Parameter(&U_PARAMETER);
     static USIZE: ExpressionData = ExpressionData::Named {
         path: "usize",
         definition: None,
         arguments: &[],
     };
     static TYPE_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::type_parameter("T", 0, &[], None);
-    static CONST_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::const_parameter("N", 1, &USIZE, None);
+    static CONST_PARAMETER: GenericParameterMetadata = GenericParameterMetadata::const_parameter("N", 2, &USIZE, None);
     static TYPE_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::Parameter(&TYPE_PARAMETER);
-    static TYPE_ARGUMENTS: [GenericArgumentMetadata; 2] = [
+    static TYPE_ARGUMENTS: [GenericArgumentMetadata; 3] = [
         GenericArgumentMetadata::type_argument::<u8>(&TYPE_PARAMETER, &U8),
+        GenericArgumentMetadata::type_argument::<u16>(&U_PARAMETER, &U16),
         GenericArgumentMetadata::const_argument(&CONST_PARAMETER, ConstExpression::UnsignedInteger(7)),
     ];
 
@@ -815,10 +820,17 @@ mod tests {
 
     #[test]
     fn substitution_covers_pointer_projection_slice_function_trait_object_and_opaque_nodes() {
+        static PROJECTION_ARGUMENTS: [GenericExpressionArgument; 1] =
+            [GenericExpressionArgument::Type(&U_PARAMETER_EXPRESSION)];
+        static PROJECTION_TRAIT_ARGUMENTS: [GenericExpressionArgument; 1] =
+            [GenericExpressionArgument::Type(&TYPE_PARAMETER_EXPRESSION)];
+        static PROJECTION_TRAIT: TraitExpressionData =
+            TraitExpressionData::new("Trait", &PROJECTION_TRAIT_ARGUMENTS, &[]);
         static PROJECTION: ExpressionData = ExpressionData::AssociatedType {
             self_type: &TYPE_PARAMETER_EXPRESSION,
-            trait_: None,
+            trait_: Some(&PROJECTION_TRAIT),
             name: "Item",
+            arguments: &PROJECTION_ARGUMENTS,
         };
         static RAW: ExpressionData = ExpressionData::RawPointer {
             mutable: false,
@@ -858,6 +870,17 @@ mod tests {
                 target: ExpressionData::AssociatedType {
                     self_type: ExpressionData::Named { path: "u8", .. },
                     name: "Item",
+                    trait_: Some(TraitExpressionData {
+                        arguments: [GenericExpressionArgument::Type(ExpressionData::Named {
+                            path: "u8",
+                            ..
+                        })],
+                        ..
+                    }),
+                    arguments: [GenericExpressionArgument::Type(ExpressionData::Named {
+                        path: "u16",
+                        ..
+                    })],
                     ..
                 }
             }

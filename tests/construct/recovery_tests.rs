@@ -31,7 +31,7 @@ pub struct User {
 pub struct Pair(pub u64, pub String);
 
 #[Reflect]
-struct DropProbe(Rc<Cell<usize>>);
+struct DropProbe(#[reflect(skip)] Rc<Cell<usize>>);
 
 impl Drop for DropProbe {
     fn drop(&mut self) {

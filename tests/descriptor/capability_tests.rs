@@ -118,6 +118,7 @@ fn test_custom_capability_is_bound_to_its_explicit_context() {
 fn test_local_target_can_use_a_typed_capability_spec() {
     #[Reflect]
     struct LocalOnly {
+        #[reflect(skip)]
         value: Rc<()>,
     }
 

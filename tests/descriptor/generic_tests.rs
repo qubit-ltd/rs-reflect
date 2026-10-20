@@ -22,6 +22,7 @@ struct User {
 
 #[Reflect]
 struct Envelope<'scope, T, const N: usize> {
+    #[reflect(skip)]
     marker: std::marker::PhantomData<&'scope ()>,
     item: T,
     bytes: [u8; N],

@@ -54,6 +54,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let module = format_ident!("__qubit_reflect_v4_struct_{fingerprint:016x}");
     let marker = format_ident!("TypeDefinitionMarker");
+    let owner_name = declaration.name.to_string();
     let mut generics = super::generics::parse_type_generics(&declaration)?;
     let visible_fields: Vec<_> = declaration
         .fields
@@ -68,7 +69,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
     let environment = GenericEnvironment::from_generics(&declaration.generics);
     let constructible = visible_fields
         .iter()
-        .all(|field| supports_construction(&field.ty, &environment))
+        .all(|field| supports_construction(&field.ty, &owner_name))
         && !has_skipped_source_field(&declaration)
         && declaration
             .fields
@@ -96,7 +97,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field in visible_fields.iter().filter(|field| {
-            supports_construction(&field.ty, &environment)
+            supports_reflection(&field.ty, &owner_name)
                 && super::generics::field_cfg_attributes(&declaration, None, field.index).is_empty()
         }) {
             let ty = &field.ty.tokens;
@@ -143,7 +144,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         let adapter = quote!(::std::boxed::Box::leak(::std::boxed::Box::new(
             #facade::__private::codegen_v4::access::TypedFieldAdapter::<Self, #ty>::new(Self::#get, Self::#get_mut)
         )));
-        let local_dynamic = if supports_construction(&field.ty, &environment) && cfg.is_empty() {
+        let local_dynamic = if supports_construction(&field.ty, &owner_name) && cfg.is_empty() {
             quote!(.with_local_dynamic(#adapter))
         } else {
             TokenStream::new()
@@ -153,12 +154,17 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         } else {
             TokenStream::new()
         };
+        let concrete_type = if supports_reflection(&field.ty, &owner_name) && cfg.is_empty() {
+            quote!(.with_concrete_type::<#ty>())
+        } else {
+            TokenStream::new()
+        };
         field_metadata.push(quote! {
             #(#cfg)*
             #facade::__private::codegen_v4::access::FieldMetadata::typed::<Self, #ty>(
                 #index, #source_name, #visibility, #expression,
                 #adapter, #access,
-            ) #local_dynamic #thread_safe_dynamic
+            ) #concrete_type #local_dynamic #thread_safe_dynamic
         });
         let field_policy = if constructible {
             quote!(#facade::__private::codegen_v4::construct::ConstructionFieldPolicy::Required)
@@ -249,14 +255,16 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         quote!(#facade::__private::codegen_v4::registration::submit_type!(#name);)
     } else {
         let registration_fn = format_ident!("{}_registration", module);
+        let definition_fn = format_ident!("{}_definition_registration", module);
+        let capability_fn = format_ident!("__qubit_reflect_v4_definition_capability_{}", name);
         let rust_name = name.to_string();
         quote! {
             #[doc(hidden)]
-            fn #registration_fn() -> #facade::__private::codegen_v4::registration::Registration {
+            fn #definition_fn() -> &'static #facade::__private::codegen_v4::registration::TypeDefinitionRegistration<#module::#marker> {
                 static VALUE: ::std::sync::OnceLock<
                     ::std::boxed::Box<#facade::__private::codegen_v4::registration::TypeDefinitionRegistration<#module::#marker>>,
                 > = ::std::sync::OnceLock::new();
-                let registration = VALUE.get_or_init(|| {
+                VALUE.get_or_init(|| {
                     let generics = ::std::boxed::Box::leak(::std::boxed::Box::new(#generic_definition));
                     ::std::boxed::Box::new(
                         #facade::__private::codegen_v4::registration::TypeDefinitionRegistration::new(
@@ -266,8 +274,16 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                             generics,
                         ),
                     )
-                });
-                #facade::__private::codegen_v4::registration::Registration::type_definition(registration)
+                })
+            }
+            #[doc(hidden)]
+            fn #registration_fn() -> #facade::__private::codegen_v4::registration::Registration {
+                #facade::__private::codegen_v4::registration::Registration::type_definition(#definition_fn())
+            }
+            #[doc(hidden)]
+            #[allow(non_snake_case)]
+            pub fn #capability_fn<C: #facade::capability::CapabilitySpec>(adapter: C::Adapter) -> #facade::capability::CapabilityRegistration {
+                #facade::capability::CapabilityRegistration::for_type_definition::<#module::#marker, C>(adapter)
             }
             #facade::__private::codegen_v4::registration::submit_type_definition!(#rust_name, #registration_fn);
         }
@@ -292,35 +308,80 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
     })
 }
 
-pub(super) fn supports_construction(ty: &crate::ir::TypeIr, environment: &GenericEnvironment) -> bool {
+pub(super) fn supports_construction(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
     use crate::ir::TypeKindIr;
+    if contains_recursive_owner_type(ty, owner_name) {
+        return false;
+    }
     match &ty.kind {
-        TypeKindIr::Path(path) if path.qualified_self.is_none() && path.segments.len() == 1 => {
-            let name = path.segments[0].name.as_str();
-            environment.is_type_parameter(name)
-                || matches!(
-                    name,
-                    "bool"
-                        | "char"
-                        | "str"
-                        | "String"
-                        | "i8"
-                        | "i16"
-                        | "i32"
-                        | "i64"
-                        | "i128"
-                        | "isize"
-                        | "u8"
-                        | "u16"
-                        | "u32"
-                        | "u64"
-                        | "u128"
-                        | "usize"
-                        | "f32"
-                        | "f64"
-                )
+        TypeKindIr::Path(path) if path.qualified_self.is_none() => !path.segments.is_empty(),
+        TypeKindIr::Tuple(values) => values.iter().all(|value| supports_construction(value, owner_name)),
+        TypeKindIr::Array { element, .. } => supports_construction(element, owner_name),
+        _ => false,
+    }
+}
+
+pub(super) fn supports_reflection(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
+    use crate::ir::TypeKindIr;
+
+    if contains_recursive_owner_type(ty, owner_name) {
+        return false;
+    }
+    match &ty.kind {
+        TypeKindIr::Path(path) if path.qualified_self.is_none() => !path.segments.is_empty(),
+        TypeKindIr::Tuple(values) => values.iter().all(|value| supports_reflection(value, owner_name)),
+        TypeKindIr::Array { element, .. } => supports_reflection(element, owner_name),
+        _ => false,
+    }
+}
+
+fn contains_recursive_owner_type(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
+    use crate::ir::PathArgumentIr;
+    use crate::ir::PathArgumentsIr;
+    use crate::ir::TypeKindIr;
+
+    match &ty.kind {
+        TypeKindIr::Path(path) => {
+            path.qualified_self
+                .as_ref()
+                .is_some_and(|qualified| contains_recursive_owner_type(&qualified.ty, owner_name))
+                || path
+                    .segments
+                    .last()
+                    .is_some_and(|segment| segment.name == owner_name || segment.name == "Self")
+                || path.segments.iter().any(|segment| match &segment.arguments {
+                    PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Type(nested) | PathArgumentIr::AssociatedType { ty: nested, .. } => {
+                            contains_recursive_owner_type(nested, owner_name)
+                        }
+                        _ => false,
+                    }),
+                    PathArgumentsIr::Parenthesized { inputs, output } => {
+                        inputs
+                            .iter()
+                            .any(|input| contains_recursive_owner_type(input, owner_name))
+                            || output
+                                .as_ref()
+                                .is_some_and(|output| contains_recursive_owner_type(output, owner_name))
+                    }
+                    PathArgumentsIr::None => false,
+                })
         }
-        TypeKindIr::Tuple(values) => values.iter().all(|value| supports_construction(value, environment)),
+        TypeKindIr::Reference { element, .. }
+        | TypeKindIr::Slice(element)
+        | TypeKindIr::Array { element, .. }
+        | TypeKindIr::Pointer { element, .. } => contains_recursive_owner_type(element, owner_name),
+        TypeKindIr::Tuple(elements) => elements
+            .iter()
+            .any(|element| contains_recursive_owner_type(element, owner_name)),
+        TypeKindIr::BareFunction { inputs, output, .. } => {
+            inputs
+                .iter()
+                .any(|input| contains_recursive_owner_type(input, owner_name))
+                || output
+                    .as_ref()
+                    .is_some_and(|output| contains_recursive_owner_type(output, owner_name))
+        }
         _ => false,
     }
 }

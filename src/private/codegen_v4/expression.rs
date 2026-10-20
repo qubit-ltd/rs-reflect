@@ -15,6 +15,7 @@
 //! and their fields are crate-private, so the façade must expose validated
 //! typed constructors rather than raw text or forgeable identities.
 
+use crate::runtime::context::ReflectionContext;
 pub use crate::runtime::descriptor::GenericArgumentMetadata;
 pub use crate::runtime::descriptor::GenericDefinitionMetadata;
 pub use crate::runtime::descriptor::GenericParameterMetadata;
@@ -32,6 +33,20 @@ pub use crate::runtime::expression::PredicateData;
 pub use crate::runtime::expression::TraitBoundModifier;
 pub use crate::runtime::expression::TraitExpressionData;
 pub use crate::runtime::expression::TraitObjectData;
+use crate::runtime::expression::TypeExpression;
 
 /// Static source-level expression data emitted by the derive crate.
 pub type TypeExpressionData = ExpressionData;
+
+/// Binds generated static type-expression data to a reflection context.
+///
+/// Every nested expression view produced from the returned value uses the
+/// supplied context. This is intended for generated metadata and downstream
+/// derive integrations that retain source expressions independently of a
+/// context.
+pub fn type_expression_in<'ctx>(
+    data: &'static TypeExpressionData,
+    context: &'ctx ReflectionContext,
+) -> TypeExpression<'ctx> {
+    TypeExpression::new(data, context)
+}

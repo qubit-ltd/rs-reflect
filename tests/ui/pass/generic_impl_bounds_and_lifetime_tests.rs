@@ -11,13 +11,13 @@ use std::marker::PhantomData;
 use qubit_reflect::TypeDescriptor;
 
 #[qubit_reflect::Reflect]
-struct Constrained<T>(PhantomData<T>);
+struct Constrained<T>(#[reflect(skip)] PhantomData<T>);
 
 #[qubit_reflect::ReflectImpl]
 impl<T: Clone + Send> Constrained<T> where T: Sync {}
 
 #[qubit_reflect::Reflect]
-struct Borrowed<'scope, T>(PhantomData<&'scope T>);
+struct Borrowed<'scope, T>(#[reflect(skip)] PhantomData<&'scope T>);
 
 #[qubit_reflect::ReflectImpl]
 impl<'scope, T: 'scope> Borrowed<'scope, T> {}

@@ -22,7 +22,7 @@ impl Element for Bytes {
 }
 
 #[qubit_reflect::Reflect]
-struct Buffer<T, const N: usize>(PhantomData<[T; N]>);
+struct Buffer<T, const N: usize>(#[reflect(skip)] PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl]
 impl<T: Element, const N: usize> Buffer<T, N> {

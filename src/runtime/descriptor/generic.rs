@@ -444,6 +444,10 @@ pub(crate) enum GenericArgumentMetadataKind {
     Const(ConstExpression),
 }
 
+fn reflected_type_metadata<T: super::Reflect + ?Sized>() -> &'static TypeMetadata {
+    T::__reflect_registration().metadata()
+}
+
 impl GenericArgumentMetadata {
     /// Creates a type argument tied to a reflected concrete Rust type.
     pub const fn type_argument<T: ?Sized + 'static>(
@@ -502,6 +506,18 @@ impl GenericArgumentMetadata {
             kind: GenericArgumentMetadataKind::Type {
                 expression,
                 concrete: Some(TypeMetadata::of::<T>),
+            },
+        }
+    }
+
+    pub(crate) const fn reflected_type_argument<T: super::Reflect + ?Sized>(
+        expression: &'static ExpressionData,
+    ) -> Self {
+        Self {
+            parameter: None,
+            kind: GenericArgumentMetadataKind::Type {
+                expression,
+                concrete: Some(reflected_type_metadata::<T>),
             },
         }
     }

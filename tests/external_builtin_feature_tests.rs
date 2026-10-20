@@ -18,6 +18,8 @@ use chrono::DateTime;
 #[cfg(feature = "ecosystem-types")]
 use chrono::NaiveDate;
 #[cfg(feature = "ecosystem-types")]
+use chrono::NaiveDateTime;
+#[cfg(feature = "ecosystem-types")]
 use chrono::NaiveTime;
 #[cfg(feature = "ecosystem-types")]
 use chrono::Utc;
@@ -38,6 +40,7 @@ fn test_ecosystem_types_expose_opaque_reflection_roots() {
     assert_opaque::<BigDecimal>();
     assert_opaque::<DateTime<Utc>>();
     assert_opaque::<NaiveDate>();
+    assert_opaque::<NaiveDateTime>();
     assert_opaque::<NaiveTime>();
     assert_opaque::<Uuid>();
 }

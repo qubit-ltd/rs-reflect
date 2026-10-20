@@ -18,6 +18,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  public-consumer:
+    name: Public external consumer contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.94.0
+      - name: Compile and run the external consumer contract
+        run: cargo test --test public_consumer_vnext_contract_tests --all-features --locked
+
   rust-ci:
     permissions:
       contents: read

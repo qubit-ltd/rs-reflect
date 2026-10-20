@@ -21,6 +21,29 @@ pub use crate::runtime::context::handle::registration::RegistrationFragment;
 pub use crate::runtime::context::handle::registration::TraitObjectRegistration;
 pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 
+/// Combines generic definition metadata with a capability targeting its marker.
+///
+/// This keeps the definition identity and capability target tied to the same
+/// generated marker, so downstream code does not need to construct or expose a
+/// `TypeDefinitionId`.
+pub fn type_definition_with_capability<TMarker: 'static, C: crate::runtime::capability::CapabilitySpec>(
+    definition: &'static TypeDefinitionRegistration<TMarker>,
+    adapter: C::Adapter,
+) -> Registration {
+    Registration::metadata_only()
+        .with_type_definition(definition)
+        .with_capability(crate::runtime::capability::CapabilityRegistration::for_type_definition::<TMarker, C>(adapter))
+}
+
+/// Creates a linked capability-only fragment for a generic definition.
+#[doc(hidden)]
+pub const fn linked_definition_capability_fragment(
+    label: &'static str,
+    registration: fn() -> Registration,
+) -> RegistrationFragment {
+    RegistrationFragment::for_linked_capability(label, registration)
+}
+
 /// Creates a global registration fragment for a compiler-checked trait object.
 #[doc(hidden)]
 pub const fn trait_object_fragment(label: &'static str, registration: fn() -> Registration) -> RegistrationFragment {
@@ -108,6 +131,23 @@ macro_rules! __qubit_reflect_submit_type_definition {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_submit_type_definition as submit_type_definition;
+
+/// Submits a capability for a definition already registered by its derive.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __qubit_reflect_submit_linked_definition_capability {
+    ($label:expr, $registration:path) => {
+        $crate::__private::__inventory::submit! {
+            $crate::__private::codegen_v4::registration::linked_definition_capability_fragment(
+                $label,
+                $registration,
+            )
+        }
+    };
+}
+
+#[doc(hidden)]
+pub use crate::__qubit_reflect_submit_linked_definition_capability as submit_linked_definition_capability;
 
 /// Creates a statically typed method binding for the exact target type.
 #[doc(hidden)]

@@ -61,6 +61,15 @@ fn downcast_failure_returns_the_same_owned_value() {
 }
 
 #[test]
+fn dynamic_owned_exposes_the_actual_value_as_any() {
+    let value = DynamicOwned::<Local>::new(String::from("owned"));
+    assert_eq!(
+        value.as_any().downcast_ref::<String>().map(String::as_str),
+        Some("owned")
+    );
+}
+
+#[test]
 fn owned_value_is_dropped_exactly_once_after_failed_downcast_recovery() {
     DROPS.store(0, Ordering::SeqCst);
     let value = DynamicOwned::<Local>::new(Dropped);
@@ -128,6 +137,27 @@ fn dynamic_shared_references_preserve_dst_metadata() {
         dynamic.downcast::<[u64]>().expect("slice adapter preserves its length"),
         &[2, 3, 5]
     );
+}
+
+#[test]
+fn dynamic_ref_exposes_any_only_when_constructed_with_a_sized_any_view() {
+    use std::any::Any;
+
+    let text = String::from("borrowed");
+    let dynamic = DynamicRef::<Local>::new_any(&text);
+    let any = dynamic.as_any().expect("new_any retains the actual value view");
+    assert_eq!(any.downcast_ref::<String>().map(String::as_str), Some("borrowed"));
+    let reborrowed = dynamic.reborrow();
+    let reborrowed_text = reborrowed
+        .as_any()
+        .and_then(|value| value.downcast_ref::<String>())
+        .expect("reborrowing retains the Any view");
+    assert!(std::ptr::eq(reborrowed_text, &text));
+
+    assert!(DynamicRef::<Local>::new(&text).as_any().is_none());
+
+    let erased: &dyn Any = &text;
+    assert!(DynamicRef::<Local>::new(erased).as_any().is_none());
 }
 
 #[test]

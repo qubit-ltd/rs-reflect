@@ -10,13 +10,13 @@ use std::marker::PhantomData;
 
 
 #[qubit_reflect::Reflect]
-struct Missing<T, const N: usize>(PhantomData<[T; N]>);
+struct Missing<T, const N: usize>(#[reflect(skip)] PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl(specialize(T = u8))]
 impl<T, const N: usize> Missing<T, N> {}
 
 #[qubit_reflect::Reflect]
-struct Duplicate<T, const N: usize>(PhantomData<[T; N]>);
+struct Duplicate<T, const N: usize>(#[reflect(skip)] PhantomData<[T; N]>);
 
 #[qubit_reflect::ReflectImpl(specialize(T = u8, T = u16, N = 4))]
 impl<T, const N: usize> Duplicate<T, N> {}

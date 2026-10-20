@@ -44,6 +44,11 @@ struct GenericRecord<T> {
     item: T,
 }
 
+#[Reflect]
+struct ArrayRecord {
+    items: [u8; 4],
+}
+
 /// Verifies a derived named struct exposes source ordered fields and preserves
 /// source indexes when a field is skipped.
 #[test]
@@ -133,6 +138,25 @@ fn test_derive_struct_resolves_reflected_generic_field_type() {
         std::any::TypeId::of::<Rc<()>>()
     );
     assert_eq!(field.type_expression().display().to_string(), "T");
+}
+
+#[test]
+fn test_derive_struct_resolves_array_field_type_in_context() {
+    let context = ReflectionContext::builder()
+        .include_type::<ArrayRecord>()
+        .include_type::<[u8; 4]>()
+        .include_type::<u8>()
+        .build()
+        .expect("context contains the owner and array field type");
+    let descriptor = TypeDescriptor::of_in::<ArrayRecord>(&context);
+    let field = descriptor.field("items").expect("array field is described");
+    let concrete = field
+        .find_concrete_type()
+        .expect("the array field has a concrete descriptor");
+
+    assert_eq!(concrete.type_id(), std::any::TypeId::of::<[u8; 4]>());
+    assert!(std::ptr::eq(field.type_expression().context(), &context));
+    assert!(std::ptr::eq(concrete.context(), &context));
 }
 
 /// Verifies concurrent lookup preserves the concrete type identity.

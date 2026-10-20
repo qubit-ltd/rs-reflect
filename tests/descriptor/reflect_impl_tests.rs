@@ -19,7 +19,7 @@ use qubit_reflect::descriptor::ImplKind;
 use qubit_reflect::descriptor::TraitDefinitionId;
 
 #[Reflect]
-struct Service<T: 'static>(PhantomData<T>);
+struct Service<T: 'static>(#[reflect(skip)] PhantomData<T>);
 
 #[Reflect]
 // This declaration exists to test trait implementation metadata.

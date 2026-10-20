@@ -96,18 +96,9 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-操作成功的信号是方法返回 `true`，且对象字段已更新。反射不会替应用保存对象。服务处理请求时，仍应由应用通过 repository 加载对象、执行反射操作和业务校验，并按自身事务策略决定是否持久化。
+操作成功的信号是方法返回 `true`，且内存中的对象字段已更新。反射不会替应用保存对象。服务 handler 应先通过 repository 按客户 ID 加载对象，再执行反射操作和应用校验；只有校验成功后，才在应用自己的事务中保存。更新被拒绝时应保留或报告返回的输入，并由 handler 决定后续处理。若用户代码已经执行后才失败，应使用 repository 事务或显式补偿策略。
 
-### 接入客服请求处理流程
-
-`field_patch` 只是内存练习：它创建一个 `Customer`，修改并检查结果后退出，不会读取或写入数据库。实际服务应把这些操作放进应用自己的请求处理流程：
-
-1. 先解析请求并完成操作员鉴权，再读取客户数据。
-2. 通过应用 repository 加载 `Customer`，在内存对象上执行字段更新和反射方法。
-3. 方法返回 `true` 且字段值符合预期，才表示反射操作成功；返回 `false` 表示额度没有提高，应按应用的拒绝流程响应。随后执行应用自己的业务校验。
-4. 校验通过后，才按 repository 的事务策略保存。校验或保存失败时，由应用丢弃内存对象或执行回滚/补偿。反射库本身不负责保存，也不会回滚。
-
-可运行示例覆盖的是上述第 2 步中的反射操作和结果检查。请求解析、鉴权、repository 类型、业务校验规则和事务行为都属于宿主应用，不是本库 API。
+可运行示例有意停在存储之前。应用可以按以下顺序装配：按客户 ID 加载；调用 `update`；校验客户对象；成功后在事务中保存；失败时返回错误且不保存。Repository trait、数据库事务和鉴权规则都由应用定义。
 
 ## 处理缺失和歧义
 
@@ -147,7 +138,7 @@ derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定�
 
 ## 绑定泛型方法
 
-Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。下面是局部片段，不是可独立编译的完整文件：它假设已声明 `Converter` 及其泛型 `convert` 方法，并用 `#[Reflect]` / `#[ReflectImpl]` 启用反射，同时已导入 `bind_method!` 和 `ReflectionContext`。这个 builder 会注册链接进来的声明以及此处选定的特化。
+Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。
 
 ```rust
 use qubit_reflect::{bind_method, ReflectionContext};
@@ -158,7 +149,7 @@ let context = ReflectionContext::builder()
     .build()?;
 ```
 
-trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflected_trait` 指向 trait 定义；binder 会从 impl 的 trait 路径调用隐藏 hook，因此 rustc 能解析导入 alias 并补齐默认类型和 const 实参。下面同样是局部片段，接在上一个 builder 链上，并非单独可编译的代码。它依赖已声明的 `Service`、已反射的 `api::ServiceContract`、该 trait 对 `Service` 的实现，以及 `ImportedService` 导入别名。
+trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflected_trait` 指向 trait 定义；binder 会从 impl 的 trait 路径调用隐藏 hook，因此 rustc 能解析导入 alias 并补齐默认类型和 const 实参：
 
 ```rust
 .bind(bind_method!(
@@ -186,6 +177,6 @@ qubit-reflect-derive = "0.2"
 ## 延伸阅读
 
 - [架构说明](architecture.zh_CN.md)介绍 context 构建和生成元数据的边界。
-- [英文核心 API 契约摘要](core_api_contract.md) · [中文核心 API 设计规范](2026-10-20-core-api-redesign.zh_CN.md)
+- [英文核心 API 契约摘要](core_api_contract.md)概述 context、查找、错误恢复和 capability 保证。
 - [API 文档](https://docs.rs/qubit-reflect)列出公开类型和方法。
 - [English user guide](user_guide.md)按相同的客服工作流说明操作步骤。

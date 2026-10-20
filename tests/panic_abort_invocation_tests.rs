@@ -23,6 +23,7 @@ use qubit_reflect::value::Local;
 #[Reflect]
 struct AbortPayload {
     value: String,
+    #[reflect(skip)]
     drops: Arc<AtomicUsize>,
 }
 

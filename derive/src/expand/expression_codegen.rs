@@ -542,9 +542,11 @@ fn path_expression(
             };
             let item_segment = &path.segments[1];
             let item = LitStr::new(&item_segment.name, ty.span);
+            let arguments = path_arguments(&item_segment.arguments, environment, facade, ty.span);
+            let arguments = leak_slice(arguments);
             return leaked_expression(
                 quote!(#facade::__private::codegen_v4::expression::ExpressionData::AssociatedType {
-                    self_type: #self_type, trait_: None, name: #item,
+                    self_type: #self_type, trait_: None, name: #item, arguments: #arguments,
                 }),
             );
         }
@@ -556,6 +558,12 @@ fn path_expression(
             .last()
             .map(|segment| LitStr::new(&segment.name, ty.span))
             .expect("qualified path has an item");
+        let item_arguments = path
+            .segments
+            .last()
+            .map(|segment| path_arguments(&segment.arguments, environment, facade, ty.span))
+            .unwrap_or_default();
+        let item_arguments = leak_slice(item_arguments);
         let trait_ = if qualified.has_as {
             let trait_name = LitStr::new(
                 &path
@@ -581,7 +589,7 @@ fn path_expression(
         };
         return leaked_expression(
             quote!(#facade::__private::codegen_v4::expression::ExpressionData::AssociatedType {
-                self_type: #self_type, trait_: #trait_, name: #item,
+                self_type: #self_type, trait_: #trait_, name: #item, arguments: #item_arguments,
             }),
         );
     }

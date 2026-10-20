@@ -6,6 +6,7 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::any::Any;
 use std::any::TypeId;
 
 use crate::runtime::descriptor::Reflect;
@@ -180,6 +181,22 @@ pub struct TypedFieldAdapter<Owner: 'static, Value: 'static> {
     active_variant_metadata: Option<for<'a> fn(&'a Owner) -> &'static VariantMetadata>,
 }
 
+trait TypedDynamicRef<M: ValueMode> {
+    fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, M>;
+}
+
+impl<T: ValueForRef<Local> + Any> TypedDynamicRef<Local> for T {
+    fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, Local> {
+        DynamicRef::<Local>::new_any(value)
+    }
+}
+
+impl<T: ValueForRef<ThreadSafe> + Any + Sync> TypedDynamicRef<ThreadSafe> for T {
+    fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, ThreadSafe> {
+        DynamicRef::<ThreadSafe>::new_any(value)
+    }
+}
+
 /// A dynamic only adapter for an unsized owner or field value.
 #[cfg(test)]
 pub(crate) struct DynamicOnlyFieldAdapter<Owner: ?Sized + 'static, Value: ?Sized + 'static> {
@@ -351,10 +368,11 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
     }
 }
 
+#[allow(private_bounds)]
 impl<Owner, Value, M> DynamicFieldAdapter<M> for TypedFieldAdapter<Owner, Value>
 where
     Owner: Reflect + ValueForRef<M> + ValueForMut<M> + 'static,
-    Value: Reflect + ValueForRef<M> + ValueForMut<M> + ValueFor<M> + 'static,
+    Value: Reflect + ValueForRef<M> + ValueForMut<M> + ValueFor<M> + TypedDynamicRef<M> + 'static,
     M: ValueMode,
 {
     fn get<'a>(
@@ -375,7 +393,7 @@ where
                 return Err(FieldAccessError::InactiveVariant { expected, actual });
             }
         }
-        Ok(DynamicRef::new((self.get_ref)(owner)))
+        Ok(<Value as TypedDynamicRef<M>>::new_any((self.get_ref)(owner)))
     }
 
     fn get_mut<'a>(
@@ -452,7 +470,7 @@ where
 impl<Owner, Value> TypedFieldAdapter<Owner, Value>
 where
     Owner: Reflect + ValueForRef<ThreadSafe> + ValueForMut<ThreadSafe> + 'static,
-    Value: Reflect + ValueForRef<ThreadSafe> + ValueForMut<ThreadSafe> + ValueFor<ThreadSafe> + 'static,
+    Value: Reflect + ValueForRef<ThreadSafe> + ValueForMut<ThreadSafe> + ValueFor<ThreadSafe> + Sync + 'static,
 {
     pub(crate) const fn thread_safe_dynamic(&'static self) -> &'static dyn DynamicFieldAdapter<ThreadSafe> {
         self

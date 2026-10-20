@@ -60,6 +60,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
     }
     let facade = context.facade().clone();
     let name = declaration.name.clone();
+    let owner_name = name.to_string();
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let module = format_ident!("__qubit_reflect_v4_enum_{fingerprint:016x}");
     let marker = format_ident!("TypeDefinitionMarker");
@@ -79,7 +80,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                         .attributes
                         .iter()
                         .any(|attribute| attribute.name == HelperName::Skip)
-                        || super::structs::supports_construction(&field.ty, &environment)
+                        || super::structs::supports_construction(&field.ty, &owner_name)
                 })
                 && variant.fields.iter().all(|field| {
                     super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
@@ -106,7 +107,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                         .attributes
                         .iter()
                         .any(|attribute| attribute.name == HelperName::Skip)
-                        && super::structs::supports_construction(&field.ty, &environment)
+                        && super::structs::supports_construction(&field.ty, &owner_name)
                         && super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index)
                             .is_empty()
                 })
@@ -151,7 +152,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                     .attributes
                     .iter()
                     .any(|attribute| attribute.name == HelperName::Skip)
-                    || !super::structs::supports_construction(&field.ty, &environment)
+                    || !super::structs::supports_reflection(&field.ty, &owner_name)
                     || !super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
                 {
                     continue;
@@ -272,14 +273,19 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                     Self::#get, Self::#get_mut, Self::#active_variant_identity,
                 )
             )));
-            let local_dynamic =
-                if super::structs::supports_construction(&field.ty, &environment) && cfg_field.is_empty() {
-                    quote!(.with_local_dynamic(#adapter))
-                } else {
-                    TokenStream::new()
-                };
+            let local_dynamic = if super::structs::supports_construction(&field.ty, &owner_name) && cfg_field.is_empty()
+            {
+                quote!(.with_local_dynamic(#adapter))
+            } else {
+                TokenStream::new()
+            };
             let thread_safe_dynamic = if thread_safe_construction {
                 quote!(.with_thread_safe_dynamic(#adapter))
+            } else {
+                TokenStream::new()
+            };
+            let concrete_type = if super::structs::supports_reflection(&field.ty, &owner_name) && cfg_field.is_empty() {
+                quote!(.with_concrete_type::<#ty>())
             } else {
                 TokenStream::new()
             };
@@ -289,7 +295,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 #facade::__private::codegen_v4::access::FieldMetadata::typed_variant::<Self, #ty>(
                     #field_index, #source_name, #visibility, #expression, #adapter,
                     Self::#static_variant_metadata_fn, #access,
-                ) #local_dynamic #thread_safe_dynamic
+                ) #concrete_type #local_dynamic #thread_safe_dynamic
             });
             let constructible = constructible_variants.contains(&index);
             let field_policy = if constructible {
@@ -397,14 +403,16 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         quote!(#facade::__private::codegen_v4::registration::submit_type!(#name);)
     } else {
         let registration_fn = format_ident!("{}_registration", module);
+        let definition_fn = format_ident!("{}_definition_registration", module);
+        let capability_fn = format_ident!("__qubit_reflect_v4_definition_capability_{}", name);
         let rust_name = name.to_string();
         quote! {
             #[doc(hidden)]
-            fn #registration_fn() -> #facade::__private::codegen_v4::registration::Registration {
+            fn #definition_fn() -> &'static #facade::__private::codegen_v4::registration::TypeDefinitionRegistration<#module::#marker> {
                 static VALUE: ::std::sync::OnceLock<
                     ::std::boxed::Box<#facade::__private::codegen_v4::registration::TypeDefinitionRegistration<#module::#marker>>,
                 > = ::std::sync::OnceLock::new();
-                let registration = VALUE.get_or_init(|| {
+                VALUE.get_or_init(|| {
                     let generics = ::std::boxed::Box::leak(::std::boxed::Box::new(#generic_definition));
                     ::std::boxed::Box::new(
                         #facade::__private::codegen_v4::registration::TypeDefinitionRegistration::new(
@@ -414,8 +422,16 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                             generics,
                         ),
                     )
-                });
-                #facade::__private::codegen_v4::registration::Registration::type_definition(registration)
+                })
+            }
+            #[doc(hidden)]
+            fn #registration_fn() -> #facade::__private::codegen_v4::registration::Registration {
+                #facade::__private::codegen_v4::registration::Registration::type_definition(#definition_fn())
+            }
+            #[doc(hidden)]
+            #[allow(non_snake_case)]
+            pub fn #capability_fn<C: #facade::capability::CapabilitySpec>(adapter: C::Adapter) -> #facade::capability::CapabilityRegistration {
+                #facade::capability::CapabilityRegistration::for_type_definition::<#module::#marker, C>(adapter)
             }
             #facade::__private::codegen_v4::registration::submit_type_definition!(#rust_name, #registration_fn);
         }

@@ -18,6 +18,7 @@ use super::mode::ErasedRef;
 use super::mode::Local;
 use super::mode::ThreadSafe;
 use super::mode::ValueMode;
+use super::mode::ValueModeInternal;
 use super::mode::thread_safe_ref_into_local;
 use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::Reflect;
@@ -421,6 +422,7 @@ fn type_identity<T: Reflect + ?Sized>() -> TypeIdentity {
 /// shared view of the same value.
 pub struct DynamicRef<'a, M: ValueMode = Local> {
     value: M::Shared<'a>,
+    any_value: Option<&'a M::AnyObject>,
     identity: TypeIdentity,
     descriptor_factory: DescriptorFactory,
     _mode: PhantomData<M>,
@@ -429,12 +431,23 @@ pub struct DynamicRef<'a, M: ValueMode = Local> {
 impl<'a, M: ValueMode> DynamicRef<'a, M> {
     /// Erases a shared borrow while preserving its concrete type identity.
     pub fn new<T: ValueForRef<M> + ?Sized>(value: &'a T) -> Self {
+        Self::new_with_any(value, None)
+    }
+    fn new_with_any<T: ValueForRef<M> + ?Sized>(value: &'a T, any_value: Option<&'a M::AnyObject>) -> Self {
         Self {
             value: T::erase_ref(value),
+            any_value,
             identity: T::identity(),
             descriptor_factory: descriptor_for::<T>,
             _mode: PhantomData,
         }
+    }
+    /// Returns the actual borrowed value as `Any` when this view retained one.
+    ///
+    /// Views created by [`Self::new`] return `None`. The returned reference is
+    /// tied to this view and never points to the internal erasure holder.
+    pub fn as_any(&self) -> Option<&dyn std::any::Any> {
+        self.any_value.map(M::any_object_as_any)
     }
     /// Returns the concrete Rust `TypeId` represented by this view.
     pub fn type_id(self) -> TypeId {
@@ -463,7 +476,12 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
     where
         'a: 'b,
     {
-        DynamicRef::from_erased(M::shared_reborrow(&self.value), self.identity, self.descriptor_factory)
+        DynamicRef::from_erased(
+            M::shared_reborrow(&self.value),
+            self.any_value,
+            self.identity,
+            self.descriptor_factory,
+        )
     }
     /// Recovers the original borrow as `T`.
     ///
@@ -481,6 +499,7 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
                 self.identity,
                 Self {
                     value,
+                    any_value: self.any_value,
                     identity: self.identity,
                     descriptor_factory: self.descriptor_factory,
                     _mode: PhantomData,
@@ -490,11 +509,13 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
     }
     pub(super) fn from_erased(
         value: M::Shared<'a>,
+        any_value: Option<&'a M::AnyObject>,
         identity: TypeIdentity,
         descriptor_factory: DescriptorFactory,
     ) -> Self {
         Self {
             value,
+            any_value,
             identity,
             descriptor_factory,
             _mode: PhantomData,
@@ -509,6 +530,7 @@ where
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
+            any_value: self.any_value,
             identity: self.identity,
             descriptor_factory: self.descriptor_factory,
             _mode: PhantomData,
@@ -517,10 +539,16 @@ where
 }
 
 impl<'a> DynamicRef<'a, ThreadSafe> {
+    /// Erases a shared borrow and retains a thread-safe `Any` view.
+    pub fn new_any<T: ValueForRef<ThreadSafe> + std::any::Any + Sync>(value: &'a T) -> Self {
+        Self::new_with_any(value, Some(value))
+    }
+
     pub(crate) fn into_local(self) -> DynamicRef<'a, Local> {
         let value = thread_safe_ref_into_local(self.value);
         DynamicRef {
             value,
+            any_value: self.any_value.map(ThreadSafe::any_object_as_any),
             identity: self.identity,
             descriptor_factory: self.descriptor_factory,
             _mode: PhantomData,
@@ -528,6 +556,12 @@ impl<'a> DynamicRef<'a, ThreadSafe> {
     }
 }
 impl<'a> DynamicRef<'a, Local> {
+    /// Erases a shared borrow and retains a local `Any` view of its actual
+    /// value.
+    pub fn new_any<T: ValueForRef<Local> + std::any::Any>(value: &'a T) -> Self {
+        Self::new_with_any(value, Some(value))
+    }
+
     pub(crate) fn into_local(self) -> Self {
         self
     }
@@ -607,7 +641,12 @@ impl<'a, M: ValueMode> DynamicMut<'a, M> {
     /// Creates a shared view of this borrow, tied to the current borrow of
     /// `self`.
     pub fn as_ref(&self) -> DynamicRef<'_, M> {
-        DynamicRef::from_erased(M::shared_from_mut(&self.value), self.identity, self.descriptor_factory)
+        DynamicRef::from_erased(
+            M::shared_from_mut(&self.value),
+            None,
+            self.identity,
+            self.descriptor_factory,
+        )
     }
     /// Creates a shorter-lived exclusive view of the same value.
     pub fn reborrow(&mut self) -> DynamicMut<'_, M> {

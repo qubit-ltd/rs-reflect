@@ -19,6 +19,7 @@ use qubit_reflect::TypeDescriptor;
 
 #[qubit_reflect::Reflect]
 struct Borrowed<'scope> {
+    #[reflect(skip)]
     marker: PhantomData<&'scope ()>,
 }
 

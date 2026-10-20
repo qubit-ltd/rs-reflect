@@ -34,6 +34,7 @@ impl_opaque_reflect!(
     bigdecimal::BigDecimal,
     chrono::DateTime<chrono::Utc>,
     chrono::NaiveDate,
+    chrono::NaiveDateTime,
     chrono::NaiveTime,
     uuid::Uuid,
 );

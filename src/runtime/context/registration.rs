@@ -438,6 +438,18 @@ impl RegistrationFragment {
         }
     }
 
+    /// Creates a capability-only fragment included by linked contexts.
+    pub const fn for_linked_capability(label: &'static str, registration: fn() -> Registration) -> Self {
+        Self {
+            sort_key: ("generated", None, "generated", Some(label), None, None, label),
+            target_type_id: None,
+            dependencies: no_dependencies,
+            includes_type: false,
+            include_in_linked_context: true,
+            registration,
+        }
+    }
+
     pub(crate) const fn for_target<T: 'static>(
         sort_key: RegistrationSortKey,
         dependencies: fn() -> &'static [TypeId],

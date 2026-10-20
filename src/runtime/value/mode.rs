@@ -60,10 +60,14 @@ pub trait ValueMode: sealed::Sealed + ValueModeInternal + crate::runtime::invoke
 pub(crate) trait ValueModeInternal {
     type Owned: 'static;
     type Marker;
+    type AnyObject: ?Sized;
     type Shared<'a>: Clone;
     type Mutable<'a>;
 
+    fn any_object_as_any(value: &Self::AnyObject) -> &dyn Any;
+
     fn owned_type_id(value: &Self::Owned) -> TypeId;
+    fn owned_as_any(value: &Self::Owned) -> &dyn Any;
     fn shared_type_id(value: &Self::Shared<'_>) -> TypeId;
     fn mutable_type_id(value: &Self::Mutable<'_>) -> TypeId;
     fn owned_into_any(value: Self::Owned) -> Box<dyn Any>;
@@ -93,11 +97,19 @@ impl ValueMode for Local {}
 impl ValueModeInternal for Local {
     type Owned = LocalOwned;
     type Marker = Rc<()>;
+    type AnyObject = dyn Any;
     type Shared<'a> = Rc<dyn ErasedRef + 'a>;
     type Mutable<'a> = Box<dyn ErasedMut + 'a>;
 
+    fn any_object_as_any(value: &Self::AnyObject) -> &dyn Any {
+        value
+    }
+
     fn owned_type_id(value: &Self::Owned) -> TypeId {
         ErasedOwned::type_id(value.0.as_ref())
+    }
+    fn owned_as_any(value: &Self::Owned) -> &dyn Any {
+        value.0.as_any()
     }
     fn shared_type_id(value: &Self::Shared<'_>) -> TypeId {
         ErasedRef::type_id(value.as_ref())
@@ -133,11 +145,19 @@ impl ValueMode for ThreadSafe {}
 impl ValueModeInternal for ThreadSafe {
     type Owned = ThreadSafeOwned;
     type Marker = ();
+    type AnyObject = dyn Any + Sync;
     type Shared<'a> = Arc<dyn ErasedRef + Send + Sync + 'a>;
     type Mutable<'a> = Box<dyn ErasedMutThreadSafe + 'a>;
 
+    fn any_object_as_any(value: &Self::AnyObject) -> &dyn Any {
+        value
+    }
+
     fn owned_type_id(value: &Self::Owned) -> TypeId {
         ErasedOwned::type_id(value.0.as_ref())
+    }
+    fn owned_as_any(value: &Self::Owned) -> &dyn Any {
+        value.0.as_any()
     }
     fn shared_type_id(value: &Self::Shared<'_>) -> TypeId {
         ErasedRef::type_id(value.as_ref())
@@ -255,6 +275,41 @@ mod tests {
 
         let erased = Local::owned_into_any(owned);
         assert_eq!(*erased.downcast::<i32>().expect("owned type is preserved"), 41);
+    }
+
+    #[test]
+    fn modes_expose_erased_any_views() {
+        let local = String::from("local");
+        let local_any: &<Local as ValueModeInternal>::AnyObject = &local;
+        assert_eq!(
+            <Local as ValueModeInternal>::any_object_as_any(local_any)
+                .downcast_ref::<String>()
+                .map(String::as_str),
+            Some("local")
+        );
+        let local_owned = <String as ValueForInternal<Local>>::erase(String::from("owned-local"));
+        assert_eq!(
+            <Local as ValueModeInternal>::owned_as_any(&local_owned)
+                .downcast_ref::<String>()
+                .map(String::as_str),
+            Some("owned-local")
+        );
+
+        let thread_safe = String::from("thread-safe");
+        let thread_safe_any: &<ThreadSafe as ValueModeInternal>::AnyObject = &thread_safe;
+        assert_eq!(
+            <ThreadSafe as ValueModeInternal>::any_object_as_any(thread_safe_any)
+                .downcast_ref::<String>()
+                .map(String::as_str),
+            Some("thread-safe")
+        );
+        let thread_safe_owned = <String as ValueForInternal<ThreadSafe>>::erase(String::from("owned-thread-safe"));
+        assert_eq!(
+            <ThreadSafe as ValueModeInternal>::owned_as_any(&thread_safe_owned)
+                .downcast_ref::<String>()
+                .map(String::as_str),
+            Some("owned-thread-safe")
+        );
     }
 
     #[test]

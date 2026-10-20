@@ -203,6 +203,7 @@ static ASSOCIATED_EXPRESSION: ExpressionData = ExpressionData::AssociatedType {
     self_type: &T_EXPRESSION,
     trait_: Some(&ITERATOR_TRAIT),
     name: "Item",
+    arguments: &[],
 };
 static TRAIT_OBJECT_DATA: super::super::expression::TraitObjectData = super::super::expression::TraitObjectData {
     traits: &[DISPLAY_TRAIT],
@@ -222,6 +223,7 @@ static UNQUALIFIED_ASSOCIATED_EXPRESSION: ExpressionData = ExpressionData::Assoc
     self_type: &T_EXPRESSION,
     trait_: None,
     name: "Output",
+    arguments: &[],
 };
 static ARGUMENT_EXPRESSION: ExpressionData = ExpressionData::Named {
     path: "fixture::Container",

@@ -14,17 +14,18 @@ use qubit_reflect::Reflect;
 use qubit_reflect::ReflectionContext;
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect::descriptor::FieldAccessError;
-use qubit_reflect::descriptor::FieldAccessUnavailableReason;
 use qubit_reflect::descriptor::FieldSetError;
 use qubit_reflect::descriptor::Visibility;
-use qubit_reflect::error::ReflectionError;
 use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::Local;
 use qubit_reflect::value::ThreadSafe;
 
+#[Reflect]
 struct OpaqueValue(&'static str);
+
+struct UnreflectedValue(&'static str);
 
 #[Reflect]
 struct FieldOwner {
@@ -40,6 +41,38 @@ struct ThreadSafeOwner {
 
 #[Reflect]
 struct WrongOwner;
+
+#[Reflect]
+struct OptionalOwner {
+    pub value: Option<u32>,
+}
+
+#[Reflect]
+struct AccessMiddle {
+    pub count: u32,
+}
+
+#[Reflect]
+struct OptionalCustomOwner {
+    pub value: Option<AccessMiddle>,
+}
+
+#[Reflect]
+struct NestedCustomOwner {
+    pub middle: AccessMiddle,
+}
+
+#[Reflect]
+struct ArrayOwner {
+    items: [String; 2],
+}
+
+#[Reflect]
+struct SkipOwner {
+    #[reflect(skip)]
+    pub omitted: UnreflectedValue,
+    pub count: u32,
+}
 
 fn owner() -> FieldOwner {
     FieldOwner {
@@ -65,8 +98,11 @@ fn field_descriptor_exposes_context_type_expression_and_concrete_lookup() {
     assert_eq!(count.type_expression().display().to_string(), "u32");
     assert_eq!(count.find_concrete_type().unwrap().type_id(), TypeId::of::<u32>());
     assert_eq!(count.concrete_type().unwrap().type_id(), TypeId::of::<u32>());
-    assert!(opaque.find_concrete_type().is_none());
-    assert!(matches!(opaque.concrete_type(), Err(ReflectionError::Lookup(_))));
+    let opaque_type = opaque
+        .find_concrete_type()
+        .expect("the reflected custom field type has a concrete descriptor");
+    assert!(std::ptr::eq(opaque.type_expression().context(), &context));
+    assert!(std::ptr::eq(opaque_type.context(), &context));
     assert!(opaque.type_expression().display().to_string().contains("OpaqueValue"));
 }
 
@@ -84,17 +120,147 @@ fn field_visibility_and_dynamic_access_capabilities_match_metadata() {
     assert!(public.access().mutable);
     assert!(public.access().replaceable);
     assert!(public.access().constructible);
-    assert!(!opaque.access().readable);
-    assert!(!opaque.access().mutable);
-    assert!(!opaque.access().replaceable);
-    assert!(!opaque.access().constructible);
+    assert!(opaque.access().readable);
+    assert!(opaque.access().mutable);
+    assert!(opaque.access().replaceable);
+    assert!(opaque.access().constructible);
 
     let target = owner();
     assert_eq!(target.opaque.0, "opaque");
+    assert_eq!(
+        opaque
+            .get_dynamic(DynamicRef::<Local>::new(&target))
+            .expect("a reflected custom field supports dynamic reads")
+            .downcast_ref::<OpaqueValue>()
+            .map(|value| value.0),
+        Some("opaque")
+    );
     assert!(matches!(
         private.get_dynamic(DynamicRef::<Local>::new(&target)),
         Err(FieldAccessError::NotPublic)
     ));
+}
+
+#[test]
+fn dynamic_unsafe_field_read_bypasses_visibility_but_keeps_adapter_checks() {
+    let context = ReflectionContext::builder()
+        .include_type::<FieldOwner>()
+        .build()
+        .expect("the owner is registered in this context");
+    let descriptor = TypeDescriptor::of_in::<FieldOwner>(&context);
+    let private = descriptor.field("private_label").expect("private field exists");
+    let public = descriptor.field("count").expect("public field exists");
+    let target = owner();
+
+    assert!(matches!(
+        private.get_dynamic(DynamicRef::<Local>::new(&target)),
+        Err(FieldAccessError::NotPublic)
+    ));
+    let private_value = unsafe { private.get_dynamic_unsafe::<Local>(DynamicRef::<Local>::new(&target)) }
+        .expect("the caller authorizes reading this private field");
+    assert_eq!(private_value.downcast_ref::<String>(), Some(&target.private_label));
+
+    let public_value = public
+        .get_dynamic(DynamicRef::<Local>::new(&target))
+        .expect("public fields remain available through the safe API");
+    assert_eq!(public_value.downcast_ref::<u32>(), Some(&target.count));
+}
+
+#[test]
+fn derived_array_field_supports_dynamic_reads_with_visibility_checks() {
+    let context = ReflectionContext::builder()
+        .include_type::<ArrayOwner>()
+        .include_type::<[String; 2]>()
+        .include_type::<String>()
+        .build()
+        .expect("context contains the owner and reflected array field type");
+    let descriptor = TypeDescriptor::of_in::<ArrayOwner>(&context);
+    let field = descriptor.field("items").expect("array field exists");
+    let target = ArrayOwner {
+        items: [String::from("first"), String::from("second")],
+    };
+
+    assert!(matches!(
+        field.get_dynamic(DynamicRef::<Local>::new(&target)),
+        Err(FieldAccessError::NotPublic)
+    ));
+    let value = unsafe { field.get_dynamic_unsafe::<Local>(DynamicRef::<Local>::new(&target)) }
+        .expect("the array field has a local dynamic adapter");
+
+    assert_eq!(value.downcast_ref::<[String; 2]>(), Some(&target.items));
+    assert!(std::ptr::eq(field.context(), &context));
+}
+
+#[test]
+fn derived_option_field_supports_dynamic_reads_for_some_and_none() {
+    let field = TypeDescriptor::of::<OptionalOwner>()
+        .field("value")
+        .expect("optional field exists");
+    let some_owner = OptionalOwner { value: Some(27) };
+    let some = field
+        .get_dynamic(DynamicRef::<Local>::new(&some_owner))
+        .expect("Option<u32> gets a dynamic field adapter");
+    assert_eq!(some.downcast_ref::<Option<u32>>(), Some(&Some(27)));
+    assert_eq!(
+        some.as_any().and_then(|value| value.downcast_ref::<Option<u32>>()),
+        Some(&Some(27))
+    );
+
+    let none_owner = OptionalOwner { value: None };
+    let none = field
+        .get_dynamic(DynamicRef::<Local>::new(&none_owner))
+        .expect("the same adapter reads an absent optional value");
+    assert_eq!(none.downcast_ref::<Option<u32>>(), Some(&None));
+}
+
+#[test]
+fn derived_option_field_with_custom_reflect_inner_supports_dynamic_reads() {
+    let field = TypeDescriptor::of::<OptionalCustomOwner>()
+        .field("value")
+        .expect("optional custom field exists");
+    let some_owner = OptionalCustomOwner {
+        value: Some(AccessMiddle { count: 43 }),
+    };
+    let some = field
+        .get_dynamic(DynamicRef::<Local>::new(&some_owner))
+        .expect("Option<AccessMiddle> gets a dynamic field adapter");
+    assert_eq!(
+        some.downcast_ref::<Option<AccessMiddle>>()
+            .and_then(Option::as_ref)
+            .map(|value| value.count),
+        Some(43)
+    );
+
+    let none_owner = OptionalCustomOwner { value: None };
+    let none = field
+        .get_dynamic(DynamicRef::<Local>::new(&none_owner))
+        .expect("the same adapter reads None");
+    assert!(matches!(none.downcast_ref::<Option<AccessMiddle>>(), Some(None)));
+}
+
+#[test]
+fn dynamic_custom_field_supports_dynamic_read_and_write() {
+    let field = TypeDescriptor::of::<NestedCustomOwner>()
+        .field("middle")
+        .expect("nested custom field exists");
+    let mut owner = NestedCustomOwner {
+        middle: AccessMiddle { count: 17 },
+    };
+
+    {
+        let value = field
+            .get_dynamic(DynamicRef::<Local>::new(&owner))
+            .expect("a reflected custom field gets a dynamic adapter");
+        assert_eq!(value.downcast_ref::<AccessMiddle>().map(|value| value.count), Some(17));
+    }
+
+    field
+        .set_dynamic(
+            DynamicMut::<Local>::new(&mut owner),
+            DynamicOwned::<Local>::new(AccessMiddle { count: 29 }),
+        )
+        .expect("a reflected custom field can be replaced dynamically");
+    assert_eq!(owner.middle.count, 29);
 }
 
 #[test]
@@ -159,37 +325,15 @@ fn thread_safe_dynamic_field_supports_mutation_and_replacement() {
 }
 
 #[test]
-fn missing_dynamic_adapter_reports_reason_and_returns_replacement() {
-    let field = TypeDescriptor::of::<FieldOwner>()
-        .field("opaque")
-        .expect("opaque field exists");
-    let mut target = owner();
-
-    assert!(matches!(
-        field.get_dynamic(DynamicRef::<Local>::new(&target)),
-        Err(FieldAccessError::Unavailable(
-            FieldAccessUnavailableReason::AdapterUnavailable
-        ))
-    ));
-    assert!(matches!(
-        field.get_dynamic_mut(DynamicMut::<Local>::new(&mut target)),
-        Err(FieldAccessError::Unavailable(
-            FieldAccessUnavailableReason::AdapterUnavailable
-        ))
-    ));
-    let failure = field
-        .set_dynamic(
-            DynamicMut::<Local>::new(&mut target),
-            DynamicOwned::<Local>::new(String::from("recovered")),
-        )
-        .expect_err("an opaque field has no dynamic adapter");
-    assert!(matches!(
-        failure.error(),
-        FieldSetError::Unavailable(FieldAccessUnavailableReason::AdapterUnavailable)
-    ));
-    let (_, recovered) = failure.into_parts();
-    assert_eq!(recovered.downcast::<String>().unwrap(), "recovered");
-    assert_eq!(target.opaque.0, "opaque");
+fn reflect_skip_explicitly_excludes_an_unreflected_field() {
+    let descriptor = TypeDescriptor::of::<SkipOwner>();
+    assert!(descriptor.field("omitted").is_err());
+    assert!(descriptor.field("count").is_ok());
+    let owner = SkipOwner {
+        omitted: UnreflectedValue("excluded"),
+        count: 5,
+    };
+    assert_eq!(owner.omitted.0, "excluded");
 }
 
 #[test]

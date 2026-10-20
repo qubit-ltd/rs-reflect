@@ -54,6 +54,16 @@ impl CapabilityRegistration {
         )
     }
 
+    /// Creates a typed capability registration for a reflected generic
+    /// definition identified by its generated marker type.
+    pub fn for_type_definition<TMarker: 'static, C: CapabilitySpec>(adapter: C::Adapter) -> Self {
+        Self::typed::<C>(
+            CapabilityTargetId::Definition(crate::runtime::descriptor::generic::TypeDefinitionId::of::<TMarker>()),
+            adapter,
+            explicit_origin(std::any::type_name::<TMarker>()),
+        )
+    }
+
     fn typed<C: CapabilitySpec>(
         target: CapabilityTargetId,
         adapter: C::Adapter,

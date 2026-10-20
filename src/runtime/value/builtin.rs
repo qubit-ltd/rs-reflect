@@ -8,7 +8,9 @@
 
 use crate::runtime::descriptor::Reflect;
 use crate::runtime::descriptor::TypeRegistration;
+use crate::runtime::descriptor::generic::GenericArgumentMetadata;
 use crate::runtime::descriptor::type_kind::TypeKindMetadata;
+use crate::runtime::expression::ExpressionData;
 
 static ARRAY_KIND: TypeKindMetadata = TypeKindMetadata::Array;
 static OPTIONAL_KIND: TypeKindMetadata = TypeKindMetadata::Optional;
@@ -24,9 +26,37 @@ static SLICE_KIND: TypeKindMetadata = TypeKindMetadata::Slice;
 static RAW_POINTER_KIND: TypeKindMetadata = TypeKindMetadata::RawPointer;
 static FUNCTION_KIND: TypeKindMetadata = TypeKindMetadata::Function;
 static TRAIT_OBJECT_KIND: TypeKindMetadata = TypeKindMetadata::TraitObject;
+static TYPE_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName("T");
+static KEY_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName("K");
+static VALUE_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName("V");
 
 fn shaped_registration<T: ?Sized + 'static>(kind: &'static TypeKindMetadata) -> &'static TypeRegistration<T> {
     TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(kind, None, &[]))
+}
+
+fn map_registration<T: ?Sized + 'static, K: Reflect, V: Reflect>() -> &'static TypeRegistration<T> {
+    TypeRegistration::get_or_init_with(|| {
+        let arguments = Box::leak(
+            vec![
+                GenericArgumentMetadata::reflected_type_argument::<K>(&KEY_PARAMETER_EXPRESSION),
+                GenericArgumentMetadata::reflected_type_argument::<V>(&VALUE_PARAMETER_EXPRESSION),
+            ]
+            .into_boxed_slice(),
+        );
+        TypeRegistration::with_shape(&MAP_KIND, None, &[]).with_generic_arguments(arguments)
+    })
+}
+
+fn set_registration<Collection: ?Sized + 'static, T: Reflect>() -> &'static TypeRegistration<Collection> {
+    TypeRegistration::get_or_init_with(|| {
+        let arguments = Box::leak(
+            vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                &TYPE_PARAMETER_EXPRESSION,
+            )]
+            .into_boxed_slice(),
+        );
+        TypeRegistration::with_shape(&SET_KIND, None, &[]).with_generic_arguments(arguments)
+    })
 }
 
 macro_rules! impl_builtin_reflect {
@@ -65,43 +95,67 @@ crate::__private::codegen_v4::registration::submit_type!(());
 
 impl<T: Reflect> Reflect for Vec<T> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(&SEQUENCE_KIND, None, &[]))
+        TypeRegistration::get_or_init_with(|| {
+            let arguments = Box::leak(
+                vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                    &TYPE_PARAMETER_EXPRESSION,
+                )]
+                .into_boxed_slice(),
+            );
+            TypeRegistration::with_shape(&SEQUENCE_KIND, None, &[]).with_generic_arguments(arguments)
+        })
     }
 }
 
 impl<T: Reflect> Reflect for Option<T> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(&OPTIONAL_KIND, None, &[]))
+        TypeRegistration::get_or_init_with(|| {
+            let arguments = Box::leak(
+                vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                    &TYPE_PARAMETER_EXPRESSION,
+                )]
+                .into_boxed_slice(),
+            );
+            TypeRegistration::with_shape(&OPTIONAL_KIND, None, &[]).with_generic_arguments(arguments)
+        })
     }
 }
 
 impl<T: Reflect, const N: usize> Reflect for [T; N] {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(&ARRAY_KIND, None, &[]))
+        TypeRegistration::get_or_init_with(|| {
+            let arguments = Box::leak(
+                vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                    &TYPE_PARAMETER_EXPRESSION,
+                )]
+                .into_boxed_slice(),
+            );
+            TypeRegistration::with_shape(&ARRAY_KIND, None, &[]).with_generic_arguments(arguments)
+        })
     }
 }
 
 impl<T: Reflect, S: 'static> Reflect for std::collections::HashSet<T, S> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        shaped_registration(&SET_KIND)
+        set_registration::<Self, T>()
     }
 }
 
 impl<T: Reflect> Reflect for std::collections::BTreeSet<T> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        shaped_registration(&SET_KIND)
+        set_registration::<Self, T>()
     }
 }
 
 impl<K: Reflect, V: Reflect> Reflect for std::collections::BTreeMap<K, V> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        shaped_registration(&MAP_KIND)
+        map_registration::<Self, K, V>()
     }
 }
 
 impl<K: Reflect, V: Reflect, S: 'static> Reflect for std::collections::HashMap<K, V, S> {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        shaped_registration(&MAP_KIND)
+        map_registration::<Self, K, V>()
     }
 }
 
@@ -115,7 +169,20 @@ macro_rules! impl_smart_pointer_reflect {
     };
 }
 
-impl_smart_pointer_reflect!(boxed, Box);
+impl<T: Reflect + ?Sized> Reflect for Box<T> {
+    fn __reflect_registration() -> &'static TypeRegistration<Self> {
+        TypeRegistration::get_or_init_with(|| {
+            let arguments = Box::leak(
+                vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                    &TYPE_PARAMETER_EXPRESSION,
+                )]
+                .into_boxed_slice(),
+            );
+            TypeRegistration::with_shape(&SMART_POINTER_KIND, None, &[]).with_generic_arguments(arguments)
+        })
+    }
+}
+
 impl_smart_pointer_reflect!(rc, Rc);
 impl_smart_pointer_reflect!(sync, Arc);
 
@@ -133,7 +200,15 @@ impl<T: Reflect + ?Sized> Reflect for &'static mut T {
 
 impl<T: Reflect> Reflect for [T] {
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
-        shaped_registration(&SLICE_KIND)
+        TypeRegistration::get_or_init_with(|| {
+            let arguments = Box::leak(
+                vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                    &TYPE_PARAMETER_EXPRESSION,
+                )]
+                .into_boxed_slice(),
+            );
+            TypeRegistration::with_shape(&SLICE_KIND, None, &[]).with_generic_arguments(arguments)
+        })
     }
 }
 
@@ -280,7 +355,16 @@ macro_rules! impl_tuple_reflect {
         impl<$($type: Reflect),+> Reflect for ($($type,)+) {
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
                 TypeRegistration::get_or_init_with(|| {
+                    let arguments = Box::leak(
+                        vec![
+                            $(GenericArgumentMetadata::reflected_type_argument::<$type>(
+                                Box::leak(Box::new(ExpressionData::ParameterName(stringify!($type)))),
+                            ),)+
+                        ]
+                        .into_boxed_slice(),
+                    );
                     TypeRegistration::with_shape(&TUPLE_KIND, None, &[])
+                        .with_generic_arguments(arguments)
                 })
             }
         }

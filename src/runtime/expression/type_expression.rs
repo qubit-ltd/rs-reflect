@@ -61,6 +61,7 @@ impl<'ctx> TypeExpression<'ctx> {
                 self_type,
                 trait_,
                 name,
+                arguments,
             } => TypeExpressionKind::AssociatedType(AssociatedTypeExpression {
                 self_type: Self::new(self_type, self.context),
                 trait_: trait_.map(|data| TraitExpression {
@@ -68,6 +69,7 @@ impl<'ctx> TypeExpression<'ctx> {
                     context: self.context,
                 }),
                 name,
+                arguments,
             }),
             ExpressionData::Reference {
                 lifetime,
@@ -202,6 +204,7 @@ pub struct AssociatedTypeExpression<'ctx> {
     self_type: TypeExpression<'ctx>,
     trait_: Option<TraitExpression<'ctx>>,
     name: &'static str,
+    arguments: &'static [GenericExpressionArgument],
 }
 
 impl<'ctx> AssociatedTypeExpression<'ctx> {
@@ -221,6 +224,11 @@ impl<'ctx> AssociatedTypeExpression<'ctx> {
     /// Returns the projected associated-type name.
     pub const fn name(self) -> &'static str {
         self.name
+    }
+
+    /// Returns generic arguments written on the projected associated type.
+    pub fn arguments(self) -> GenericExpressionArguments<'ctx> {
+        GenericExpressionArguments::new(self.arguments, self.context())
     }
 }
 
@@ -557,33 +565,7 @@ impl fmt::Display for ExpressionDisplay<'_> {
         match self.expression.data {
             ExpressionData::Named { path, arguments, .. } => {
                 formatter.write_str(path)?;
-                if !arguments.is_empty() {
-                    formatter.write_str("<")?;
-                    for (index, argument) in arguments.iter().enumerate() {
-                        if index > 0 {
-                            formatter.write_str(", ")?;
-                        }
-                        match argument {
-                            GenericExpressionArgument::Type(ty) => write!(
-                                formatter,
-                                "{}",
-                                TypeExpression::new(ty, self.expression.context).display()
-                            )?,
-                            GenericExpressionArgument::Lifetime(lifetime) => write_lifetime(formatter, *lifetime)?,
-                            GenericExpressionArgument::Const(value) => write_const(formatter, *value)?,
-                            GenericExpressionArgument::AssociatedType { name, value } => write!(
-                                formatter,
-                                "{name} = {}",
-                                TypeExpression::new(value, self.expression.context).display()
-                            )?,
-                            GenericExpressionArgument::AssociatedTypeBound { name, .. } => {
-                                write!(formatter, "{name}: …")?
-                            }
-                        }
-                    }
-                    formatter.write_str(">")?;
-                }
-                Ok(())
+                write_generic_arguments(formatter, arguments, self.expression.context)
             }
             ExpressionData::Parameter(parameter) => formatter.write_str(parameter.name),
             ExpressionData::ParameterName(name) => formatter.write_str(name),
@@ -592,21 +574,26 @@ impl fmt::Display for ExpressionDisplay<'_> {
                 self_type,
                 trait_,
                 name,
+                arguments,
             } => {
                 if let Some(trait_) = trait_ {
                     write!(
                         formatter,
-                        "<{} as {}>::{name}",
-                        TypeExpression::new(self_type, self.expression.context).display(),
-                        trait_.path
-                    )
+                        "<{} as ",
+                        TypeExpression::new(self_type, self.expression.context).display()
+                    )?;
+                    formatter.write_str(trait_.path)?;
+                    write_generic_arguments(formatter, trait_.arguments, self.expression.context)?;
+                    formatter.write_str(">::")?;
+                    formatter.write_str(name)?;
                 } else {
                     write!(
                         formatter,
                         "{}::{name}",
                         TypeExpression::new(self_type, self.expression.context).display()
-                    )
+                    )?;
                 }
+                write_generic_arguments(formatter, arguments, self.expression.context)
             }
             ExpressionData::Reference {
                 lifetime,
@@ -672,6 +659,32 @@ impl fmt::Display for ExpressionDisplay<'_> {
             ExpressionData::Never => formatter.write_str("!"),
         }
     }
+}
+
+fn write_generic_arguments(
+    formatter: &mut fmt::Formatter<'_>,
+    arguments: &[GenericExpressionArgument],
+    context: &ReflectionContext,
+) -> fmt::Result {
+    if arguments.is_empty() {
+        return Ok(());
+    }
+    formatter.write_str("<")?;
+    for (index, argument) in arguments.iter().enumerate() {
+        if index > 0 {
+            formatter.write_str(", ")?;
+        }
+        match argument {
+            GenericExpressionArgument::Type(ty) => write!(formatter, "{}", TypeExpression::new(ty, context).display())?,
+            GenericExpressionArgument::Lifetime(lifetime) => write_lifetime(formatter, *lifetime)?,
+            GenericExpressionArgument::Const(value) => write_const(formatter, *value)?,
+            GenericExpressionArgument::AssociatedType { name, value } => {
+                write!(formatter, "{name} = {}", TypeExpression::new(value, context).display())?
+            }
+            GenericExpressionArgument::AssociatedTypeBound { name, .. } => write!(formatter, "{name}: …")?,
+        }
+    }
+    formatter.write_str(">")
 }
 
 fn write_lifetime(formatter: &mut fmt::Formatter<'_>, lifetime: LifetimeExpression) -> fmt::Result {

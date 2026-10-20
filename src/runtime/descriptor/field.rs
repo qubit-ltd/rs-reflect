@@ -205,12 +205,19 @@ fn identity<T: 'static>() -> TypeIdentity {
     }
 }
 
+fn concrete_type_of<'ctx, Value: crate::runtime::descriptor::Reflect>(
+    context: &'ctx ReflectionContext,
+) -> TypeDescriptor<'ctx> {
+    TypeDescriptor::of_in::<Value>(context)
+}
+
 /// Static source facts for a field, consumed when binding a descriptor.
 pub struct FieldMetadata {
     pub(crate) index: usize,
     pub(crate) name: &'static str,
     pub(crate) visibility: Visibility,
     pub(crate) type_expression: &'static crate::runtime::expression::ExpressionData,
+    pub(crate) concrete_type: Option<for<'ctx> fn(&'ctx ReflectionContext) -> TypeDescriptor<'ctx>>,
     pub(crate) adapter: &'static dyn FieldAdapter,
     pub(crate) variant: Option<&'static VariantMetadata>,
     pub(crate) variant_source: Option<fn() -> &'static VariantMetadata>,
@@ -236,6 +243,7 @@ impl FieldMetadata {
             name,
             visibility,
             type_expression,
+            concrete_type: None,
             adapter,
             variant: None,
             variant_source: None,
@@ -262,6 +270,7 @@ impl FieldMetadata {
             name,
             visibility,
             type_expression,
+            concrete_type: None,
             adapter,
             variant: None,
             variant_source: Some(variant),
@@ -271,6 +280,14 @@ impl FieldMetadata {
             dynamic_unavailable: FieldAccessUnavailableReason::AdapterUnavailable,
             access,
         }
+    }
+
+    /// Associates a context-bound descriptor factory for a concrete reflected
+    /// field type.
+    #[doc(hidden)]
+    pub const fn with_concrete_type<Value: crate::runtime::descriptor::Reflect>(mut self) -> Self {
+        self.concrete_type = Some(concrete_type_of::<Value>);
+        self
     }
 
     /// Enables local dynamic access when both field types support reflection.
@@ -305,6 +322,7 @@ impl FieldMetadata {
             + crate::runtime::value::ValueForRef<crate::runtime::value::ThreadSafe>
             + crate::runtime::value::ValueForMut<crate::runtime::value::ThreadSafe>
             + crate::runtime::value::ValueFor<crate::runtime::value::ThreadSafe>
+            + Sync
             + 'static,
     {
         self.dynamic_thread_safe = Some(adapter.thread_safe_dynamic());
@@ -328,6 +346,7 @@ impl FieldMetadata {
             name,
             visibility,
             type_expression,
+            concrete_type: None,
             adapter,
             variant,
             variant_source: None,
@@ -414,14 +433,22 @@ impl<'ctx> FieldDescriptor<'ctx> {
 
     /// Looks up the concrete field type when it is registered in this context.
     pub fn find_concrete_type(self) -> Option<TypeDescriptor<'ctx>> {
-        self.context()
-            .find_type_by_id(self.metadata.adapter.value().type_id)
-            .ok()
-            .flatten()
+        self.metadata
+            .concrete_type
+            .map(|factory| factory(self.context()))
+            .or_else(|| {
+                self.context()
+                    .find_type_by_id(self.metadata.adapter.value().type_id)
+                    .ok()
+                    .flatten()
+            })
     }
 
     /// Resolves the concrete field type or returns the context/lookup failure.
     pub fn concrete_type(self) -> Result<TypeDescriptor<'ctx>, crate::runtime::error::ReflectionError> {
+        if let Some(factory) = self.metadata.concrete_type {
+            return Ok(factory(self.context()));
+        }
         self.context()
             .find_type_by_id(self.metadata.adapter.value().type_id)
             .map_err(crate::runtime::error::ReflectionError::Context)?
@@ -499,6 +526,25 @@ impl<'ctx> FieldDescriptor<'ctx> {
         M::get(self.metadata, target)
     }
 
+    /// Reads a field through a dynamically typed value while bypassing source
+    /// visibility restrictions.
+    ///
+    /// Owner type, active variant, field type, and adapter availability are
+    /// still checked by the generated dynamic adapter.
+    ///
+    /// # Safety
+    /// The caller must ensure that reading this field is authorized even when
+    /// its source visibility is private or restricted.
+    pub unsafe fn get_dynamic_unsafe<'a, M: DynamicFieldMode>(
+        self,
+        target: DynamicRef<'a, M>,
+    ) -> Result<DynamicRef<'a, M>, FieldAccessError> {
+        if !self.metadata.access.readable {
+            return Err(FieldAccessError::NotReadable);
+        }
+        M::get(self.metadata, target)
+    }
+
     /// Mutably borrows a public field through a dynamically typed value.
     pub fn get_dynamic_mut<'a, M: DynamicFieldMode>(
         self,
@@ -507,6 +553,25 @@ impl<'ctx> FieldDescriptor<'ctx> {
         if self.metadata.visibility != Visibility::Public {
             return Err(FieldAccessError::NotPublic);
         }
+        if !self.metadata.access.mutable {
+            return Err(FieldAccessError::NotMutable);
+        }
+        M::get_mut(self.metadata, target)
+    }
+
+    /// Mutably borrows a field through a dynamically typed value while
+    /// bypassing its source visibility restriction.
+    ///
+    /// Owner type, active variant, field type, and adapter availability are
+    /// still checked by the generated dynamic adapter.
+    ///
+    /// # Safety
+    /// The caller must ensure that mutating this field is authorized even when
+    /// its source visibility is private or restricted.
+    pub unsafe fn get_dynamic_mut_unsafe<'a, M: DynamicFieldMode>(
+        self,
+        target: DynamicMut<'a, M>,
+    ) -> Result<DynamicMut<'a, M>, FieldAccessError> {
         if !self.metadata.access.mutable {
             return Err(FieldAccessError::NotMutable);
         }
@@ -523,6 +588,26 @@ impl<'ctx> FieldDescriptor<'ctx> {
         if self.metadata.visibility != Visibility::Public {
             return Err(FieldSetFailure::new(FieldSetError::NotPublic, value));
         }
+        if !self.metadata.access.replaceable {
+            return Err(FieldSetFailure::new(FieldSetError::NotReplaceable, value));
+        }
+        M::set(self.metadata, target, value)
+    }
+
+    /// Replaces a field dynamically while bypassing its source visibility
+    /// restriction, retaining the replacement on failure.
+    ///
+    /// Owner type, active variant, field type, and adapter availability are
+    /// still checked by the generated dynamic adapter.
+    ///
+    /// # Safety
+    /// The caller must ensure that replacing this field is authorized even
+    /// when its source visibility is private or restricted.
+    pub unsafe fn set_dynamic_unsafe<M: DynamicFieldMode>(
+        self,
+        target: DynamicMut<'_, M>,
+        value: DynamicOwned<M>,
+    ) -> Result<(), FieldSetFailure<DynamicOwned<M>>> {
         if !self.metadata.access.replaceable {
             return Err(FieldSetFailure::new(FieldSetError::NotReplaceable, value));
         }
@@ -749,9 +834,17 @@ mod tests {
     use crate::runtime::descriptor::TypeDescriptor;
     use crate::runtime::expression::ExpressionData;
     use crate::runtime::identity::TypeIdentity;
+    use crate::runtime::value::DynamicMut;
+    use crate::runtime::value::DynamicOwned;
+    use crate::runtime::value::ThreadSafe;
 
     #[crate::Reflect]
     struct Owner {
+        value: u32,
+    }
+
+    #[crate::Reflect]
+    struct PrivateOwner {
         value: u32,
     }
 
@@ -854,5 +947,32 @@ mod tests {
         ));
         assert_eq!(value, 13);
         assert_eq!(owner.value, 7);
+    }
+
+    #[test]
+    fn unsafe_dynamic_access_can_mutate_a_private_field() {
+        let descriptor = TypeDescriptor::of::<PrivateOwner>();
+        let field = descriptor.field("value").expect("private reflected field");
+        let mut owner = PrivateOwner { value: 7 };
+
+        // SAFETY: this unit test owns the value and explicitly verifies the
+        // caller's responsibility for accessing a private field.
+        let mut value = unsafe { field.get_dynamic_mut_unsafe(DynamicMut::<ThreadSafe>::new(&mut owner)) }
+            .expect("mutable dynamic adapter is available");
+        *value.downcast_mut::<u32>().expect("field value is u32") = 11;
+        drop(value);
+        assert_eq!(owner.value, 11);
+
+        // SAFETY: this unit test owns the value and explicitly verifies the
+        // caller's responsibility for replacing a private field.
+        unsafe {
+            field
+                .set_dynamic_unsafe(
+                    DynamicMut::<ThreadSafe>::new(&mut owner),
+                    DynamicOwned::<ThreadSafe>::new(13_u32),
+                )
+                .expect("dynamic replacement adapter is available");
+        }
+        assert_eq!(owner.value, 13);
     }
 }

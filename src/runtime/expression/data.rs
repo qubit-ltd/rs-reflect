@@ -218,6 +218,8 @@ pub enum ExpressionData {
         trait_: Option<&'static TraitExpressionData>,
         /// Associated-type name.
         name: &'static str,
+        /// Generic arguments written on the associated type.
+        arguments: &'static [GenericExpressionArgument],
     },
     /// A reference type.
     Reference {

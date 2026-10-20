@@ -27,6 +27,7 @@ use super::fixtures::method;
 
 #[Reflect]
 struct RecoveryPayload {
+    #[reflect(skip)]
     drops: Arc<AtomicUsize>,
 }
 

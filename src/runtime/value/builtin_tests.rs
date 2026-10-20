@@ -61,6 +61,49 @@ fn built_in_collections_register_their_type_kinds() {
 }
 
 #[test]
+fn built_in_arrays_retain_nested_element_type_arguments_in_context() {
+    type InnerArray = [u8; 4];
+    type OuterArray = [InnerArray; 2];
+
+    let context = ReflectionContext::builder()
+        .include_type::<OuterArray>()
+        .include_type::<InnerArray>()
+        .include_type::<u8>()
+        .build()
+        .expect("nested arrays and their element type are valid registrations");
+    let outer = context.type_of::<OuterArray>();
+    let outer_arguments = outer.generic_arguments();
+    assert_eq!(outer_arguments.len(), 1);
+
+    let inner_argument = outer_arguments
+        .get_at(0)
+        .expect("outer array element argument exists")
+        .type_argument()
+        .expect("outer array element is a type argument");
+    let inner = inner_argument
+        .find_concrete_type()
+        .expect("inner array type is registered in the context");
+    assert_eq!(inner.type_id(), std::any::TypeId::of::<InnerArray>());
+    assert_eq!(inner_argument.context().id(), context.id());
+    assert_eq!(inner.context().id(), context.id());
+
+    let inner_argument = inner
+        .generic_arguments()
+        .get_at(0)
+        .expect("inner array element argument exists")
+        .type_argument()
+        .expect("inner array element is a type argument");
+    assert_eq!(
+        inner_argument
+            .find_concrete_type()
+            .expect("u8 type is registered in the context")
+            .type_id(),
+        std::any::TypeId::of::<u8>()
+    );
+    assert_eq!(inner_argument.context().id(), context.id());
+}
+
+#[test]
 fn built_in_tuples_register_tuple_kind_including_unit() {
     let tuple_context = context_for::<(u8, String)>();
     assert!(matches!(
@@ -81,6 +124,66 @@ fn built_in_sets_and_maps_register_container_kinds() {
 
     type CustomHashMap = HashMap<u8, String, BuildHasherDefault<DefaultHasher>>;
     assert_kind!(CustomHashMap, TypeKind::Map(_));
+}
+
+#[test]
+fn built_in_maps_retain_key_and_value_type_arguments() {
+    fn assert_map_arguments<T: Reflect>(context: &ReflectionContext) {
+        let arguments = context.type_of::<T>().generic_arguments();
+        assert_eq!(arguments.len(), 2);
+
+        let key = arguments
+            .get_at(0)
+            .expect("map key argument exists")
+            .type_argument()
+            .expect("map key is a type argument");
+        let value = arguments
+            .get_at(1)
+            .expect("map value argument exists")
+            .type_argument()
+            .expect("map value is a type argument");
+
+        assert_eq!(
+            key.find_concrete_type()
+                .expect("key type is registered in the context")
+                .type_id(),
+            std::any::TypeId::of::<u8>()
+        );
+        assert_eq!(
+            value
+                .find_concrete_type()
+                .expect("value type is registered in the context")
+                .type_id(),
+            std::any::TypeId::of::<String>()
+        );
+        assert_eq!(key.context().id(), context.id());
+        assert_eq!(value.context().id(), context.id());
+    }
+
+    let hash_context = ReflectionContext::builder()
+        .include_type::<HashMap<u8, String>>()
+        .include_type::<u8>()
+        .include_type::<String>()
+        .build()
+        .expect("HashMap and its key/value types are valid registrations");
+    assert_map_arguments::<HashMap<u8, String>>(&hash_context);
+
+    let tree_context = ReflectionContext::builder()
+        .include_type::<BTreeMap<u8, String>>()
+        .include_type::<u8>()
+        .include_type::<String>()
+        .build()
+        .expect("BTreeMap and its key/value types are valid registrations");
+    assert_map_arguments::<BTreeMap<u8, String>>(&tree_context);
+
+    type CustomHashMap = HashMap<u8, String, BuildHasherDefault<DefaultHasher>>;
+    let custom_hash_context = ReflectionContext::builder()
+        .include_type::<CustomHashMap>()
+        .include_type::<u8>()
+        .include_type::<String>()
+        .build()
+        .expect("custom-hasher HashMap and its key/value types are valid registrations");
+    assert_map_arguments::<CustomHashMap>(&custom_hash_context);
 }
 
 #[test]

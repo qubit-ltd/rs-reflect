@@ -18,7 +18,7 @@ use qubit_reflect::TypeDescriptor;
 use std::marker::PhantomData;
 
 #[qubit_reflect::Reflect]
-struct Page<T>(PhantomData<T>);
+struct Page<T>(#[reflect(skip)] PhantomData<T>);
 
 #[qubit_reflect::ReflectImpl]
 impl<T> Page<T> {

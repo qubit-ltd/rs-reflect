@@ -158,7 +158,7 @@ fn enum_construction_descriptor_tracks_variant_shape() {
 }
 
 #[test]
-fn required_fields_are_not_defaulted_and_unreflectable_options_are_unavailable() {
+fn required_fields_are_not_defaulted_and_option_fields_are_reflectable() {
     let failure = TypeDescriptor::of::<RequiredValue>()
         .construct::<RequiredValue, _>(NamedFields::<Local>::new())
         .expect_err("required fields are not implicitly defaulted");
@@ -174,21 +174,16 @@ fn required_fields_are_not_defaulted_and_unreflectable_options_are_unavailable()
     let optional = TypeDescriptor::of::<OptionalValue>();
     assert!(matches!(
         optional.construction().availability(),
-        ConstructionAvailability::Unavailable { reasons }
-            if reasons.contains(&ConstructionUnavailableReason::FieldNotReflectable)
+        ConstructionAvailability::Available
     ));
-    let failure = optional
-        .construct::<OptionalValue, _>(NamedFields::<Local>::new())
-        .expect_err("an unreflectable field makes construction unavailable");
-    assert!(matches!(
-        failure.error(),
-        ConstructionError::Unavailable(ConstructionAvailability::Unavailable { reasons })
-            if reasons.contains(&ConstructionUnavailableReason::FieldNotReflectable)
-    ));
-    assert!(matches!(
-        failure.into_input(),
-        qubit_reflect::construct::RecoveredConstructionInput::Named(_)
-    ));
+    let some = optional
+        .construct::<OptionalValue, _>(NamedFields::<Local>::new().field("value", Some(19_u32)))
+        .expect("Option fields can be constructed from an optional value");
+    assert_eq!(some.value, Some(19));
+    let none = optional
+        .construct::<OptionalValue, _>(NamedFields::<Local>::new().field("value", None::<u32>))
+        .expect("Option fields can be constructed with None");
+    assert_eq!(none.value, None);
 }
 
 #[test]

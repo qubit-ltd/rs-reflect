@@ -17,6 +17,7 @@ impl default_trait_thread_safe_producer::DefaultService for SharedTarget {}
 #[Reflect]
 /// A local-only target whose `Rc` marker makes it non-thread-safe.
 pub struct LocalTarget {
+    #[reflect(skip)]
     marker: Rc<()>,
 }
 
