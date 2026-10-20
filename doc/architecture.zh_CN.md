@@ -1,6 +1,6 @@
 # 架构说明
 
-本文介绍 vNext 反射流程，以及它向应用代码提供的边界。核心 API 设计文档是公开接口的正式依据；`__private` 下生成的元数据属于带版本号的实现协议。
+本文介绍 vNext 反射流程，以及它向应用代码提供的边界。中文核心 API 设计文档是公开接口的正式依据，另有[英文契约摘要](core_api_contract.md)便于快速查阅；`__private` 下生成的元数据属于带版本号的实现协议。
 
 ## 从声明到描述符
 
@@ -51,4 +51,4 @@ Capability 查询也绑定到 context。其契约由 capability 类型和适配�
 
 - [核心 API 设计](2026-10-20-core-api-redesign.zh_CN.md)是公开接口的正式规格。
 - [用户手册](user_guide.zh_CN.md)从应用视角串起字段更新与方法调用。
-- [English architecture](architecture.md)
+- [English architecture](architecture.md) · [English core API contract](core_api_contract.md) · [English user guide](user_guide.md)

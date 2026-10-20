@@ -70,6 +70,8 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 `field()` and `method()` require one matching member and return structured errors when lookup fails. Dynamic operations check the exact Rust types. Generic methods need a concrete compile-time binding through `bind_method!`; a runtime `TypeId` cannot create a new Rust monomorphization.
 
+Run the complete executable example from the repository root with `cargo run --example field_patch`.
+
 ## Core boundaries
 
 - `ReflectionContext::global()` provides the process-wide view. Explicit contexts are available for isolation and custom registrations.
@@ -82,6 +84,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 - [English user guide](doc/user_guide.md) · [中文用户手册](doc/user_guide.zh_CN.md)
 - [Architecture](doc/architecture.md) · [中文架构](doc/architecture.zh_CN.md)
+- [Core API contract (English summary)](doc/core_api_contract.md) · [中文核心 API 设计规范](doc/2026-10-20-core-api-redesign.zh_CN.md)
 - [API reference](https://docs.rs/qubit-reflect)
 - [中文 README](README.zh_CN.md)
 

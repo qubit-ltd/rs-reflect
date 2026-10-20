@@ -70,6 +70,8 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 `field()` 和 `method()` 要求恰好找到一个成员；查找失败时会返回结构化错误。动态操作会检查精确 Rust 类型。泛型方法需要通过 `bind_method!` 在编译期绑定具体实例，运行时的 `TypeId` 不能生成新的 Rust 单态化代码。
 
+在仓库根目录运行 `cargo run --example field_patch`，可以执行完整的字段更新与方法调用示例。
+
 ## 使用边界
 
 - `ReflectionContext::global()` 提供进程级视图；需要隔离或自定义注册时，可以使用显式 context。
@@ -83,6 +85,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 - [中文用户手册](doc/user_guide.zh_CN.md) · [English user guide](doc/user_guide.md)
 - [中文架构](doc/architecture.zh_CN.md) · [Architecture](doc/architecture.md)
 - [API 文档](https://docs.rs/qubit-reflect)
+- [英文核心 API 契约摘要](doc/core_api_contract.md) · [中文核心 API 设计规范](doc/2026-10-20-core-api-redesign.zh_CN.md)
 - [English README](README.md)
 
 ## 开发检查

@@ -98,6 +98,17 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 The success signal is the returned `true` and the updated fields on the object. Reflection does not save the object. In a service, the handler should load through its repository, apply reflection operations, run application validation, and persist only according to its own transaction policy.
 
+### Assemble the support-console flow in an application
+
+`field_patch` is an in-memory exercise: it constructs a `Customer`, changes it, checks the result, and exits. It does not load a record or write a database. In an application, keep those responsibilities in the request handler and its repository boundary:
+
+1. Parse the request and authorize the operator before touching the object.
+2. Load `Customer` through the application repository; run the field update and reflected action on that in-memory value.
+3. Run application business validation after the action. A `true` action result and the expected field values are the success signals; a `false` result means the requested limit was not raised and should follow the application's rejection response.
+4. Save only after validation succeeds, using the repository's transaction policy. If validation or persistence fails, discard the in-memory value or use the application's rollback/compensation path. Reflection itself does not persist or roll back.
+
+The runnable example covers steps 2's reflection operations and their checks. Parsing, authorization, repository types, validation rules, and transaction behavior belong to the host application and are intentionally not represented as library APIs here.
+
 ## Handle missing and ambiguous results
 
 Use a strict singular accessor when the application requires exactly one member:
@@ -136,7 +147,7 @@ Derive-generated invocation adapters for `async fn` currently support only `Loca
 
 ## Bind a generic method
 
-Rust creates a generic method's concrete code at compile time. Register each supported specialization with `bind_method!` when building an explicit context; runtime reflection does not synthesize a new monomorphization from a `TypeId`.
+Rust creates a generic method's concrete code at compile time. Register each supported specialization with `bind_method!` when building an explicit context; runtime reflection does not synthesize a new monomorphization from a `TypeId`. The following is a local fragment, not a standalone file: it assumes `Converter` and its generic `convert` method are declared and reflected with `#[Reflect]` / `#[ReflectImpl]`, and that `bind_method!` and `ReflectionContext` are imported. The builder registers linked declarations plus this selected specialization.
 
 ```rust
 let context = ReflectionContext::builder()
@@ -145,7 +156,7 @@ let context = ReflectionContext::builder()
     .build()?;
 ```
 
-Trait method bindings should carry an explicit identity hint. For a local reflected trait, `reflected_trait` names its definition; the binder calls the hidden application hook through the impl's trait path, so rustc resolves imports and fills omitted type and const defaults:
+Trait method bindings should carry an explicit identity hint. For a local reflected trait, `reflected_trait` names its definition; the binder calls the hidden application hook through the impl's trait path, so rustc resolves imports and fills omitted type and const defaults. This is another local fragment appended to the preceding builder chain; it assumes `Service`, the reflected trait definition `api::ServiceContract`, its implementation for `Service`, and the `ImportedService` import alias are already declared. It is not independently compilable as shown.
 
 ```rust
 .bind(bind_method!(
@@ -173,5 +184,6 @@ When using the derive crate directly, keep it paired with the matching runtime v
 ## Further reading
 
 - [Architecture](architecture.md) explains context construction and generated metadata boundaries.
+- [Core API contract (English summary)](core_api_contract.md) · [中文核心 API 设计规范](2026-10-20-core-api-redesign.zh_CN.md)
 - [API reference](https://docs.rs/qubit-reflect) lists the public types and methods.
 - [中文用户手册](user_guide.zh_CN.md) follows the same support-console workflow in Chinese.

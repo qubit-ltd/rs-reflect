@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the vNext reflection path and the boundary available to application code. The public API is defined by the core redesign document; generated metadata under `__private` is a versioned implementation protocol.
+This document describes the vNext reflection path and the boundary available to application code. The public API is defined by the normative [core redesign document in Chinese](2026-10-20-core-api-redesign.zh_CN.md) and summarized in the [English core API contract](core_api_contract.md); generated metadata under `__private` is a versioned implementation protocol.
 
 ## From declarations to descriptors
 
@@ -50,5 +50,6 @@ The library provides metadata, checked dynamic operations, context validation, a
 ## Further reading
 
 - [Core API redesign](2026-10-20-core-api-redesign.zh_CN.md) is the normative API specification.
+- [Core API contract (English summary)](core_api_contract.md)
 - [User guide](user_guide.md) follows a field update and method invocation from an application perspective.
-- [中文架构](architecture.zh_CN.md)
+- [中文架构](architecture.zh_CN.md) · [中文用户手册](user_guide.zh_CN.md)
