@@ -19,6 +19,7 @@ use std::time::Instant;
 use criterion::Criterion;
 use criterion::criterion_group;
 use qubit_reflect::TypeDescriptor;
+use qubit_reflect::context::ReflectionContext;
 
 macro_rules! define_lookup_record {
     ($name:ident; $($field:ident),+ $(,)?) => {
@@ -66,18 +67,13 @@ define_lookup_record!(FieldLookupFiftyOne;
     f48, f49, f50,
 );
 
-fn benchmark_field_cases(
-    criterion: &mut Criterion,
-    descriptor: &'static TypeDescriptor,
-    width: usize,
-    legacy_labels: bool,
-) {
+fn benchmark_field_cases(criterion: &mut Criterion, descriptor: TypeDescriptor<'_>, width: usize, legacy_labels: bool) {
     let first = "f00";
     let last = Box::leak(format!("f{:02}", width - 1).into_boxed_str());
     let missing = "absent";
-    assert!(descriptor.field(first).is_some());
-    assert!(descriptor.field(last).is_some());
-    assert!(descriptor.field(missing).is_none());
+    assert!(descriptor.fields().get(first).is_some());
+    assert!(descriptor.fields().get(last).is_some());
+    assert!(descriptor.fields().get(missing).is_none());
 
     for (label, name) in [("first", first), ("last", last), ("missing", missing)] {
         let id = if legacy_labels {
@@ -86,15 +82,17 @@ fn benchmark_field_cases(
             format!("field_lookup/{width}_fields/{label}")
         };
         criterion.bench_function(&id, |bench| {
-            bench.iter(|| black_box(descriptor.field(black_box(name))));
+            bench.iter(|| black_box(descriptor.fields().get(black_box(name))));
         });
     }
 }
 
 /// Registers cold-shape and hot-interner descriptor cases.
 fn descriptor_lookup(criterion: &mut Criterion) {
-    let fields = TypeDescriptor::of::<FieldLookupRecord>();
-    let field_descriptor_bytes = std::mem::size_of_val(fields.field("f00").expect("first field"));
+    let context = ReflectionContext::global();
+    let fields = TypeDescriptor::of_in::<FieldLookupRecord>(context);
+    let field = fields.field("f00").expect("first field");
+    let field_descriptor_bytes = std::mem::size_of_val(&field);
     for width in [1_usize, 2, 9, 16, 17, 51] {
         let descriptor_bytes = width * field_descriptor_bytes;
         // Approximate a HashMap<&str, usize> table: fat key + index per bucket,
@@ -109,19 +107,29 @@ fn descriptor_lookup(criterion: &mut Criterion) {
         );
     }
     benchmark_field_cases(criterion, fields, 16, true);
-    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupOne>(), 1, false);
-    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupTwo>(), 2, false);
-    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupNine>(), 9, false);
-    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupSeventeen>(), 17, false);
-    benchmark_field_cases(criterion, TypeDescriptor::of::<FieldLookupFiftyOne>(), 51, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of_in::<FieldLookupOne>(context), 1, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of_in::<FieldLookupTwo>(context), 2, false);
+    benchmark_field_cases(criterion, TypeDescriptor::of_in::<FieldLookupNine>(context), 9, false);
+    benchmark_field_cases(
+        criterion,
+        TypeDescriptor::of_in::<FieldLookupSeventeen>(context),
+        17,
+        false,
+    );
+    benchmark_field_cases(
+        criterion,
+        TypeDescriptor::of_in::<FieldLookupFiftyOne>(context),
+        51,
+        false,
+    );
 
     criterion.bench_function("descriptor/hot_nested_shape", |bench| {
-        bench.iter(|| black_box(TypeDescriptor::of::<Vec<Option<String>>>()));
+        bench.iter(|| black_box(TypeDescriptor::of_in::<Vec<Option<String>>>(context)));
     });
     criterion.bench_function("descriptor/hot_builtin_pair", |bench| {
         bench.iter(|| {
-            black_box(TypeDescriptor::of::<u64>());
-            black_box(TypeDescriptor::of::<Vec<String>>());
+            black_box(TypeDescriptor::of_in::<u64>(context));
+            black_box(TypeDescriptor::of_in::<Vec<String>>(context));
         });
     });
     for workers in [1_usize, 4, 8] {
@@ -134,11 +142,11 @@ fn descriptor_lookup(criterion: &mut Criterion) {
                             scope.spawn(|| {
                                 // Warm each thread before starting the
                                 // timed batch.
-                                black_box(TypeDescriptor::of::<Vec<Option<String>>>());
+                                black_box(TypeDescriptor::of_in::<Vec<Option<String>>>(context));
                                 barrier.wait();
                                 let start = Instant::now();
                                 for _ in 0..iterations {
-                                    black_box(TypeDescriptor::of::<Vec<Option<String>>>());
+                                    black_box(TypeDescriptor::of_in::<Vec<Option<String>>>(context));
                                 }
                                 start.elapsed()
                             })
@@ -160,7 +168,7 @@ criterion_group!(benches, descriptor_lookup);
 fn main() {
     if std::env::var_os("QUBIT_REFLECT_COLD_SAMPLE").is_some() {
         let start = Instant::now();
-        let descriptor = TypeDescriptor::of::<Vec<Option<String>>>();
+        let descriptor = TypeDescriptor::of_in::<Vec<Option<String>>>(ReflectionContext::global());
         black_box(descriptor);
         println!("{}", start.elapsed().as_nanos());
         return;
