@@ -14,13 +14,10 @@ use std::sync::atomic::Ordering;
 use libfuzzer_sys::fuzz_target;
 use qubit_reflect::Reflect;
 use qubit_reflect::ReflectImpl;
+use qubit_reflect::ReflectionContext;
 use qubit_reflect::TypeDescriptor;
-use qubit_reflect::construct::NamedConstructionInput;
-use qubit_reflect::descriptor::MethodLookup;
+use qubit_reflect::construct::NamedFields;
 use qubit_reflect::invoke::Invocation;
-use qubit_reflect::invoke::InvocationArg;
-use qubit_reflect::registry::ReflectRegistry;
-use qubit_reflect::value::DynamicMut;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 
@@ -58,17 +55,20 @@ fn assert_one_recovered_drop(operation: impl FnOnce(DropProbe)) {
 
 fuzz_target!(|unbounded: &[u8]| {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
-    let registry =
-        ReflectRegistry::initialize().expect("the fuzz target's linked fragments must form a valid snapshot");
-    let descriptor = TypeDescriptor::of::<DynamicRecord>();
-    let registry_type_count = registry.types().len();
-    let registered_descriptor = registry
-        .get(descriptor.type_id())
-        .expect("the derived fuzz target must be registered");
+    let context = ReflectionContext::global();
+    context
+        .initialize()
+        .expect("the fuzz target's linked fragments must form a valid context");
+    let descriptor = TypeDescriptor::of_in::<DynamicRecord>(context);
+    let registry_type_count = context.types().expect("a frozen context must enumerate types").len();
+    assert!(
+        descriptor
+            .is_registered()
+            .expect("a frozen context must check registration"),
+        "the derived fuzz target must be registered"
+    );
     let field = descriptor.field("value").expect("derived field");
-    let MethodLookup::Unique(method) = descriptor.methods_named_in(registry, "add") else {
-        panic!("derived method must resolve uniquely");
-    };
+    let method = descriptor.method("add").expect("derived method must resolve uniquely");
 
     let mut record = DynamicRecord { value: 0 };
     for command in data {
@@ -83,46 +83,41 @@ fuzz_target!(|unbounded: &[u8]| {
             2 => assert_one_recovered_drop(|replacement| {
                 let failure = field.set(&mut record, replacement).expect_err("wrong replacement type");
                 assert_eq!(DROPS.load(Ordering::SeqCst), 0);
-                drop(
-                    failure
-                        .into_recovery()
-                        .expect("pre-execution field failure")
-                        .into_value(),
-                );
+                let (_error, replacement) = failure.into_parts();
+                drop(replacement);
             }),
             3 => assert_one_recovered_drop(|argument| {
-                let result = method
-                    .invoke_local(
-                        registry,
-                        Invocation::borrowed_mut(
-                            DynamicMut::<Local>::new(&mut record),
-                            [InvocationArg::Owned(DynamicOwned::<Local>::new(argument))],
-                        ),
-                    )
-                    .expect("generated adapter");
-                let Err(failure) = result else {
-                    panic!("wrong invocation argument type");
-                };
+                let failure =
+                    match method.invoke(
+                        Invocation::<Local>::on_mut(&mut record).arg_dynamic(DynamicOwned::<Local>::new(argument)),
+                    ) {
+                        Ok(_) => panic!("wrong invocation argument type"),
+                        Err(failure) => failure,
+                    };
                 assert_eq!(DROPS.load(Ordering::SeqCst), 0);
-                drop(failure.into_recovery());
+                drop(failure.into_invocation());
             }),
             _ => assert_one_recovered_drop(|value| {
-                let result =
-                    descriptor.construct_struct::<DynamicRecord>(NamedConstructionInput::new().field("value", value));
-                let Err(recovery) = result else {
-                    panic!("wrong construction field type");
+                let failure = match descriptor
+                    .construction()
+                    .construct::<DynamicRecord, _>(NamedFields::<Local>::new().field("value", value))
+                {
+                    Ok(_) => panic!("wrong construction field type"),
+                    Err(failure) => failure,
                 };
                 assert_eq!(DROPS.load(Ordering::SeqCst), 0);
-                drop(recovery);
+                drop(failure.into_input());
             }),
         }
 
-        assert_eq!(registry.types().len(), registry_type_count);
-        assert!(std::ptr::eq(
-            registry
-                .get(descriptor.type_id())
-                .expect("registry identity remains indexed"),
-            registered_descriptor,
-        ));
+        assert_eq!(
+            context.types().expect("a frozen context must enumerate types").len(),
+            registry_type_count,
+        );
+        assert!(
+            descriptor
+                .is_registered()
+                .expect("a frozen context must check registration")
+        );
     }
 });

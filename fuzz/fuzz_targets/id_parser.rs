@@ -9,20 +9,25 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use qubit_reflect::identity::CapabilityId;
-use qubit_reflect::identity::ExternalTraitId;
+use qubit_reflect::ReflectionContext;
 
 const MAX_INPUT_BYTES: usize = 4_096;
 
-// Exercises bounded public identifier parsing with arbitrary lossy UTF-8 input.
+// The vNext facade no longer exposes standalone identity parsers. Exercise its
+// public name-lookup boundary with arbitrary lossy UTF-8 input instead.
 fuzz_target!(|unbounded: &[u8]| {
     let data = &unbounded[..unbounded.len().min(MAX_INPUT_BYTES)];
-    let data = String::from_utf8_lossy(data);
-    let capability_id = CapabilityId::validate(&data);
-    let repeated_capability_id = CapabilityId::validate(&data);
-    assert_eq!(capability_id, repeated_capability_id);
+    let query = String::from_utf8_lossy(data);
+    let context = ReflectionContext::global();
+    context
+        .initialize()
+        .expect("the linked reflection context must initialize");
 
-    let external_trait_id = ExternalTraitId::new(&data);
-    let repeated_external_trait_id = ExternalTraitId::new(&data);
-    assert_eq!(external_trait_id, repeated_external_trait_id);
+    let lookup = context
+        .lookup_type_by_short_name(&query)
+        .expect("a frozen context must answer short-name lookups");
+    assert_eq!(lookup.is_unique(), lookup.len() == 1);
+    for descriptor in lookup.candidates() {
+        assert_eq!(descriptor.short_name(), query.as_ref());
+    }
 });
