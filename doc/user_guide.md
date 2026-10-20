@@ -31,6 +31,39 @@ impl Customer {
 
 The macros generate source metadata and adapters at compile time. Reflection is opt-in: a member that is not generated into metadata cannot be found through a descriptor. `skip` is a metadata choice, not an access control feature.
 
+## Reflect a trait implementation
+
+Mark a local trait with `#[Reflect]`, then name its definition explicitly on each implementation that should use its reflected definition and default-method adapters:
+
+```rust
+use qubit_reflect::{Reflect, ReflectImpl};
+
+#[Reflect]
+trait HealthCheck {
+    fn check(&self) -> bool;
+
+    fn label(&self) -> &'static str {
+        "ready"
+    }
+}
+
+#[Reflect]
+struct Worker;
+
+use crate::HealthCheck as Check;
+
+#[ReflectImpl(reflected_trait = crate::HealthCheck)]
+impl Check for Worker {
+    fn check(&self) -> bool {
+        true
+    }
+}
+```
+
+`reflected_trait` points to the reflected trait definition. The trait path written after `impl` may use an import alias; Rust resolves that path as usual. A bare `#[ReflectImpl]` on any trait impl, including one for a local `#[Reflect]` trait, preserves the source path and records an unlinked application as `ExternalIncomplete`. It does not associate a reflected definition or provide default methods. Only `reflected_trait = ...` links a local reflected trait provider.
+
+`reflected_trait` and `external_trait` are caller assertions about the trait identity of the impl. Stable procedural macros cannot resolve import aliases to prove path equivalence. Ensure the selected provider or handle belongs to the trait the impl actually implements; otherwise reflection metadata will be associated with the wrong trait.
+
 ## Read, update, and invoke
 
 `TypeDescriptor::of` binds a descriptor to the process-global `ReflectionContext`. The context initializes lazily when an operation needs aggregate data. A field accessor is strict: it returns the one named field or a structured error. Typed access keeps the owner's and field's Rust types visible to the compiler.
@@ -99,6 +132,8 @@ Use typed field access when generic application code still knows its Rust types.
 
 `ThreadSafe` mode is available for values and adapters that satisfy the relevant `Send` and `Sync` bounds. Local values cannot be promoted to `ThreadSafe` by erasure. Choose the mode at the boundary where ownership and concurrency requirements are known.
 
+Derive-generated invocation adapters for `async fn` currently support only `Local`. A stable procedural macro cannot infer a `ThreadSafe` adapter for an opaque future, so it does not automatically generate one even when a particular implementation's future would satisfy `Send`. To request a `ThreadSafe` adapter, explicitly bind the concrete method with `bind_method!(... as thread_safe async fn(...))`; the compiler checks that the generated future satisfies `Send`, without requiring you to name its opaque type.
+
 ## Bind a generic method
 
 Rust creates a generic method's concrete code at compile time. Register each supported specialization with `bind_method!` when building an explicit context; runtime reflection does not synthesize a new monomorphization from a `TypeId`.
@@ -109,6 +144,17 @@ let context = ReflectionContext::builder()
     .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
     .build()?;
 ```
+
+Trait method bindings should carry an explicit identity hint. For a local reflected trait, `reflected_trait` names its definition; the binder calls the hidden application hook through the impl's trait path, so rustc resolves imports and fills omitted type and const defaults:
+
+```rust
+.bind(bind_method!(
+    <Service as ImportedService>::refresh as fn(&Service) -> String,
+    reflected_trait = api::ServiceContract,
+))
+```
+
+For an external trait, create an identity handle with `reflect_external_trait!` and bind the explicit method with `external_trait = Handle`. The handle provides no external method declarations or default-argument information. Application identity contains only type and const arguments written in the impl path; the binding is an explicitly supplied method fact.
 
 The method descriptor keeps the source declaration. Select a concrete specialization with `MethodArguments` before invoking it. Unbound or unsupported methods remain visible as metadata with an availability reason; they are not silently called through an unsafe fallback.
 

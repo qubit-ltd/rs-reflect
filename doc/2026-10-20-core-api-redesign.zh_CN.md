@@ -570,7 +570,7 @@ impl<'ctx> FieldDescriptor<'ctx> {
         self,
     ) -> Result<TypeDescriptor<'ctx>, ReflectionError>;
 
-    pub fn visibility(self) -> Visibility;
+    pub fn visibility(self) -> TraitVisibility;
     pub fn access(self) -> FieldAccess;
 
     pub fn get<'a, T: 'static, V: 'static>(
@@ -911,6 +911,10 @@ impl<'ctx> MethodDescriptor<'ctx> {
 }
 ```
 
+方法可见性使用 `TraitVisibility`，与定义级方法 descriptor 保持一致。反射方法元数据保留
+`pub`、`private` 或“受限但路径未知”；crate 可见性和 `pub(super)` 等受限路径不会被推断，
+统一表示为 `RestrictedUnknown`。字段和变体继续使用独立的 `Visibility` 类型。
+
 `MethodDescriptor::invoke()` 是普通非泛型方法的主路径：
 
 ```rust
@@ -982,7 +986,7 @@ pub enum MethodImplementationSource {
 }
 ```
 
-`MethodDescriptor` 始终代表最终有效行为。普通调用方不需要自行合并 trait 默认方法和 impl 覆盖；诊断工具可以读取声明位置、有效实现位置和 `implementation_source()`。
+对于通过 `#[ReflectImpl(reflected_trait = ...)]` 显式链接的反射 trait，`MethodDescriptor` 代表最终有效行为。普通调用方不需要自行合并 trait 默认方法和 impl 覆盖；诊断工具可以读取声明位置、有效实现位置和 `implementation_source()`。未链接的外部 trait 是不完整信息，不会仅凭源码路径推断其默认方法。
 
 ### 14.4 参数与返回值
 
@@ -1116,6 +1120,8 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
 }
 ```
 
+`MethodArguments::type_of()` 按其公开签名要求类型实参实现 `Reflect`；该约束限定可显式选择的类型 specialization。类型选择按具体 Rust 类型身份匹配，而不按类型名匹配。整数、布尔和字符 const 按具体类型和值匹配。对不能规范编码的其他 const 值，API 保留诊断表示，但不会据此选中特化，避免用类型名或 `Debug` 文本冒充精确身份。
+
 特化规则：
 
 - 非泛型方法始终有且仅有一个空参数 specialization，即使调用不可用；
@@ -1176,6 +1182,8 @@ pub enum ThreadSafe {}
 ```
 
 `Local` 是默认模式；`ThreadSafe` 要求 owned value 满足 `Send + Sync`，异步 future 满足 `Send`。
+
+稳定过程宏无法为 `async fn` 的 opaque future 生成可按具体 future 类型选择的 adapter。因此当前 derive 生成的异步方法（包括 inherent 和 trait 默认方法）只提供 `Local` 异步 adapter；即使某个具体实现的 future 实际满足 `Send`，也不会推断出 `ThreadSafe` adapter。使用专用 typed binding 显式选择具体异步方法后，由编译器验证其 future 满足 `Send`，才能支持对应的 `ThreadSafe` 异步调用；调用者无需、也无法命名该 opaque future 的具体类型。不能把未生成 adapter 的方法视为 ThreadSafe 可调用。
 
 ```rust
 pub struct Invocation<'call, M: ValueMode = Local> {
@@ -1923,10 +1931,11 @@ impl CapabilitySpec for ValidateCapability {
 
 该模型保证 capability ID 和 adapter 类型不会被调用方错误配对，并让 built-in 与自定义 capability 使用同一查询方式。
 
+`CapabilitySpec::ID` 使用稳定的点分 ASCII 标识。构造 capability registration 时会校验格式并保留库的 `qubit.reflect` 命名空间；格式错误或使用保留命名空间时，context 构建会通过 `ContextError` 的 `InvalidMetadata` issue 报告校验原因，底层校验错误为 `IdError`。
+
 ### 17.2 context-bound capability handle
 
 ```rust
-#[derive(Clone, Copy)]
 pub struct Capability<'ctx, C: CapabilitySpec> {
     target: CapabilityTarget<'ctx>,
     adapter: &'ctx C::Adapter,
@@ -1940,7 +1949,7 @@ pub enum CapabilityTarget<'ctx> {
 
 impl<'ctx, C: CapabilitySpec> Capability<'ctx, C> {
     pub fn target(self) -> CapabilityTarget<'ctx>;
-    pub fn adapter(self) -> &'ctx C::Adapter;
+    pub fn adapter(&self) -> &C::Adapter;
     pub fn origin(self) -> CapabilityOrigin<'ctx>;
 }
 ```
@@ -2032,16 +2041,16 @@ impl<'ctx> Capabilities<'ctx> {
     ) -> impl ExactSizeIterator<Item = CapabilityDescriptor<'ctx>> + '_;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct CapabilityDescriptor<'ctx> {
     // erased metadata
 }
 
 impl<'ctx> CapabilityDescriptor<'ctx> {
-    pub fn id(self) -> &'static str;
-    pub fn adapter_type_id(self) -> TypeId;
-    pub fn target(self) -> CapabilityTarget<'ctx>;
-    pub fn origin(self) -> CapabilityOrigin<'ctx>;
+    pub fn id(&self) -> &'static str;
+    pub fn adapter_type_id(&self) -> TypeId;
+    pub fn target(&self) -> CapabilityTarget<'ctx>;
+    pub fn origin(&self) -> CapabilityOrigin<'ctx>;
 
     pub fn downcast<C: CapabilitySpec>(
         self,
@@ -2055,11 +2064,6 @@ impl<'ctx> CapabilityDescriptor<'ctx> {
 
 ```rust
 pub enum CapabilityOrigin<'ctx> {
-    /// 由类型自己的 Reflect metadata 提供。
-    Intrinsic {
-        target: TypeDescriptor<'ctx>,
-    },
-
     /// 来自链接目录中的外部注册。
     Linked {
         registration: RegistrationOrigin<'ctx>,
@@ -2074,14 +2078,13 @@ pub enum CapabilityOrigin<'ctx> {
 
 解析规则：
 
-- intrinsic capability 属于类型自身；
-- linked 和 explicit capability 属于当前 context；
+- vNext 仅通过 linked 或 explicit typed registration 提供 capability；
+- capability 属于包含其 registration 的当前 context，不写入类型 definition 或 `Reflect` metadata；
 - 显式 context 不回退查询全局 context；
 - 同一 target 上一个 capability ID 只能有一个有效提供者；
-- 不定义隐式优先级，不允许 external registration 静默覆盖 intrinsic capability；
 - 重复或冲突注册在 context 构建时失败；
-- 未进入发现索引但通过 `type_of::<T>()` 获得的类型，其 intrinsic capability 仍可用；
-- 该类型只能观察当前 context 中明确包含的 external capability。
+- type capability registration 要求目标类型已包含在当前 context 中；此后可由同一 context 中通过 `type_of::<T>()` 取得的 descriptor 查询；
+- descriptor 只能观察当前 context 中明确包含的 linked 或 explicit capability registration。
 
 ### 17.6 built-in capability
 
@@ -2479,6 +2482,12 @@ impl<'ctx> GenericArguments<'ctx> {
         Item = GenericArgumentDescriptor<'ctx>,
     > + 'ctx;
 
+    /// 按 type/const 参数在 application 中的顺序读取；lifetime 参数不计入位置。
+    pub fn get_at(
+        self,
+        index: usize,
+    ) -> Option<GenericArgumentDescriptor<'ctx>>;
+
     pub fn get(
         self,
         name: &str,
@@ -2512,7 +2521,8 @@ impl<'ctx> GenericArgumentDescriptor<'ctx> {
 
 ```rust
 impl<'ctx> TypeArgumentDescriptor<'ctx> {
-    pub fn parameter(self) -> GenericParameterDescriptor<'ctx>;
+    /// 外部不完整 trait 没有已知参数声明时返回 `None`。
+    pub fn parameter(self) -> Option<GenericParameterDescriptor<'ctx>>;
 
     pub fn expression(self) -> TypeExpression<'ctx>;
 
@@ -2531,7 +2541,8 @@ const 参数：
 
 ```rust
 impl<'ctx> ConstArgumentDescriptor<'ctx> {
-    pub fn parameter(self) -> GenericParameterDescriptor<'ctx>;
+    /// 外部不完整 trait 没有已知参数声明时返回 `None`。
+    pub fn parameter(self) -> Option<GenericParameterDescriptor<'ctx>>;
 
     pub fn expression(self) -> ConstExpression<'ctx>;
 
@@ -2926,7 +2937,10 @@ MethodDefinitionDescriptor
 impl<'ctx> TraitDescriptor<'ctx> {
     pub fn context(self) -> &'ctx ReflectionContext;
 
-    pub fn definition(self) -> TraitDefinitionDescriptor<'ctx>;
+    /// 返回关联的反射 trait 定义；外部不完整 application 没有定义时返回 `None`。
+    pub fn definition(self) -> Option<TraitDefinitionDescriptor<'ctx>>;
+    /// 仅查找关联的反射定义；等同于 `definition()`，显式表达查询语义。
+    pub fn find_definition(self) -> Option<TraitDefinitionDescriptor<'ctx>>;
     pub fn arguments(self) -> GenericArguments<'ctx>;
 
     pub fn name(self) -> &'static str;
@@ -2935,7 +2949,7 @@ impl<'ctx> TraitDescriptor<'ctx> {
     /// 已经代入具体泛型参数的直接 supertrait。
     pub fn direct_supertraits(self) -> Traits<'ctx>;
 
-    /// 去重后的完整传递闭包；对于不完整外部 trait 可能不完整。
+    /// 已知的去重传递闭包；只有 `Complete` 时才保证完整。
     pub fn all_supertraits(self) -> Traits<'ctx>;
 
     pub fn supertrait_completeness(
@@ -2945,6 +2959,18 @@ impl<'ctx> TraitDescriptor<'ctx> {
 ```
 
 `TraitDescriptor` 表示 `Repository<Customer>`、`From<String>` 或 `Iterator`。它不绑定目标类型。`From<String>` 和 `From<u8>` 是不同的具体 application，但共享一个 `TraitDefinitionDescriptor`。
+
+稳定过程宏无法解析 trait 别名并据此确认 supertrait 的反射身份。trait 定义可按源码 supertrait 序号显式绑定 provider：
+
+```rust
+#[Reflect]
+trait Root {}
+
+#[Reflect(supertrait_binding(0 => crate::traits::Root))]
+trait Child: Root {}
+```
+
+该路径指向生成的 typed provider。绑定是调用者对指定源码直接边身份的断言；稳定过程宏不能证明 provider 与该索引的源码 trait 名义相同。对不含 higher-ranked bound、且该 supertrait path 没有泛型参数的边，生成代码会让 rustc 检查 Child 的泛型参数满足 provider bound，作为存在性与蕴含关系的 sanity check；这不能验证源码序号与 provider 精确对应。调用者必须选择正确的直接源码边。即使 Child 自身有泛型参数，只要此边不引用这些参数、生命周期或投影，typed direct edge 与递归 closure 仍可完整生成。所有边均有 typed provider 且不涉及泛型代入时，`all_supertraits()` 返回递归闭包并按 trait definition identity 去重。未绑定的边、带泛型实参的 supertrait application（包括固定的具体实参）、higher-ranked lifetime 或关联类型投影均标为 `Incomplete`。显式绑定仍可保留泛型定义 identity 和已知实参，但不能据此声称该定义已针对 application 安全单态化或闭包完整；此时只暴露已知子集。不得把源码路径相似视为身份。
 
 关联类型不作为 trait application 的泛型身份：
 
@@ -3092,7 +3118,7 @@ impl<'ctx> ImplDescriptor<'ctx> {
     /// impl 自身泛型参数在本次具体应用中的绑定。
     pub fn arguments(self) -> GenericArguments<'ctx>;
 
-    /// 包含 trait 默认方法在内的最终有效方法。
+    /// 包含已链接反射 trait 默认方法在内的最终有效方法。
     pub fn methods(self) -> Methods<'ctx>;
 
     pub fn method(
@@ -3120,12 +3146,14 @@ impl<'ctx> ImplDescriptor<'ctx> {
 }
 ```
 
-`ImplDescriptor::methods()` 返回最终有效方法，包括：
+`ImplDescriptor::methods()` 返回已知的有效方法，包括：
 
 - inherent impl 中声明的方法；
 - trait impl 显式实现的方法；
-- trait 提供且没有被覆盖的默认方法；
+- 已显式链接的反射 trait 提供且没有被覆盖的默认方法；
 - 必需但没有可调用实现的方法仍可作为不可调用 descriptor 出现，以供诊断。
+
+未链接的外部 trait 为 `ExternalIncomplete`；此时 impl descriptor 保留已知的 impl 方法，但不推断外部 trait 的必需项或默认方法。
 
 ### 19.10 关联项最终绑定
 
@@ -3227,6 +3255,8 @@ impl From<u64> for CustomerId {
 ```
 
 因此 `lookup_trait_impl_by_definition(from_definition)` 可能歧义，而 `trait_impl(from_string)` 使用精确 application 并要求结果存在。
+
+对显式 `reflected_trait` 链接的本地 `#[Reflect]` trait，隐藏的 application hook 通过 impl 源 trait 路径调用；rustc 负责解析导入别名并补齐省略的类型与 const 默认参数，生成的 typed identity 可用于精确 application 查询。生命周期仍保留在 application 源表达式中，不转换为运行时类型身份。外部 `external_trait` handle 只提供显式 trait 身份，不携带 trait 泛型声明；对应 application 保持 `ExternalIncomplete`，只记录源码中实际写出的参数，不推断被省略的外部默认参数。hook 名称由 `#[Reflect]` 保留；trait 声明或带 `reflected_trait` 的 impl 若占用该名称会得到编译错误。
 
 ### 19.12 方法查找与 impl 的关系
 
@@ -4161,7 +4191,7 @@ pub enum ContextIssue {
     },
 
     ConflictingCapability {
-        target: TypeIdentity,
+        target: CapabilityTargetId,
         capability: CapabilityId,
         registrations: Box<[RegistrationOrigin]>,
     },
@@ -4616,10 +4646,16 @@ trait Repository<T> {
 }
 ```
 
+需要把 supertrait 纳入 typed closure 时，使用 `supertrait_binding(index => path)` 指向该 trait 的反射 provider。`index` 是源码 supertrait 列表的零基序号，也是调用者对 direct-edge identity 的断言；rustc 的 entailment sanity check 不会证明 provider 与该索引的边精确匹配。Child 自身的泛型参数若未出现在 supertrait path 中，不妨碍生成 typed edge 与完整递归闭包。未绑定项仍保留源码表达式并使闭包状态为 `Incomplete`；带泛型实参（包括固定的具体实参）、higher-ranked lifetime 或关联类型投影的 supertrait application 也保持 `Incomplete`。显式 binding 可以链接泛型 trait definition 并保留实参，但这不表示该 definition 已针对 application 安全单态化，也不保证递归 closure 完整。
+
 ### 22.5 `#[ReflectImpl]`
 
+`#[ReflectImpl]` 默认只根据 impl 源码登记 impl 定义和 application。对于外部 trait，裸标注保留 impl 中书写的路径，并将 trait 记录为 `ExternalIncomplete`；宏不得仅凭路径文本推断反射定义或默认方法。
+
+本地 `#[Reflect]` trait 的 impl 需要显式关联 trait 定义，宏才能在编译期确认存在 provider，并为具体 target 生成默认方法 adapter：
+
 ```rust
-#[ReflectImpl]
+#[ReflectImpl(reflected_trait = crate::Repository)]
 impl Repository<Customer> for Store {
     type Error = StoreError;
 
@@ -4631,6 +4667,12 @@ impl Repository<Customer> for Store {
     }
 }
 ```
+
+`reflected_trait` 必须指向 trait 定义的规范路径，以便宏定位生成的 provider；impl 自身的 trait 路径仍保留源码拼写，并由 Rust 编译器解析，包括导入 alias。trait 定义路径与 impl 中的展示路径分开记录，前者用于 typed definition link，后者用于展示及源码级候选信息。
+
+`reflected_trait` 与 `external_trait` 是调用者对 impl trait 身份的显式断言。stable proc macro 无法解析 import alias 或证明两个 Rust 路径指向同一 trait，因此不会校验该断言与 impl trait 的语义等价性；调用者必须确保所选 provider/handle 对应 impl 实际实现的 trait，否则反射 metadata 会被错误关联。
+
+未提供 `reflected_trait` 或外部 trait handle 时，宏不推断本地/外部 trait 身份，也不合成默认方法 adapter。`reflected_trait` 指向未反射 trait 时应由 Rust 编译器报告缺少 provider。
 
 宏自动生成：
 
@@ -4762,7 +4804,7 @@ DynamicOwned::<ThreadSafe>::new(value)
 
 ### 22.11 capability 是独立扩展
 
-`Clone`、`Default`、`Send` 和 `Sync` 不能由 proc macro 仅从类型声明可靠判断，因为 impl 可能来自 derive、其他模块、cfg、auto trait 或具体泛型参数。
+`Clone`、`Default`、`Send` 和 `Sync` 不能由 proc macro 仅从类型声明可靠判断，因为 impl 可能来自 derive、其他模块、cfg、auto trait 或具体泛型参数。vNext 不推断 intrinsic capability，也不通过 `Reflect` helper attribute 声明它们；需要 capability 时必须显式建立类型化 registration。
 
 需要 capability 时使用独立 registration：
 
@@ -4784,7 +4826,7 @@ ReflectionContext::builder()
     .build()?;
 ```
 
-registration 构造器通过 Rust trait bound 验证能力，不根据字符串作出声明。`Send` 和 `Sync` 主要由 `ValueMode` 使用；只有确实需要枚举时才注册为 capability。
+registration 构造器通过 Rust trait bound 验证能力，不根据字符串作出声明。链接注册只对包含该 registration 的 context 生效；显式注册只对创建它的 context 生效。类型是否进入发现索引与 capability registration 是独立的，但没有对应 registration 时，`type_of::<T>()` 不会自动推断 capability。`Send` 和 `Sync` 主要由 `ValueMode` 使用；只有确实需要枚举时才注册为 capability。
 
 ### 22.12 dyn compatibility
 
@@ -4843,6 +4885,26 @@ register_method_binding!(
 );
 ```
 
+trait 方法绑定应明确给出 trait 身份。对本地 `#[Reflect]` trait，`reflected_trait` 指向定义 provider；binder 通过方法路径中的 impl trait path 调用隐藏 application hook，让 rustc 补齐省略的类型和 const 默认实参：
+
+```rust
+bind_method!(
+    <Target as ImportedService>::run as fn(&Target) -> String,
+    reflected_trait = service_api::Service,
+);
+```
+
+对外部 trait，`external_trait` 指向 `reflect_external_trait!` 创建的 handle。外部定义没有方法声明或泛型参数声明；显式绑定会登记该方法事实，并且 application identity 只包含 impl 源路径中写出的类型和 const 实参，不推断外部默认参数：
+
+```rust
+bind_method!(
+    <Target as ImportedExternal>::run as fn(&Target) -> String,
+    external_trait = ExternalService,
+);
+```
+
+`register_method_binding!` 接受同样的身份参数。省略身份提示的旧式绑定仍适用于 inherent method 和实参完整、规范路径可定位的本地 trait method；trait alias 或含省略默认实参的本地 trait application 应使用显式提示。
+
 ### 22.14 外部类型
 
 由于 Rust orphan rule，下游 crate 不能为“外部 trait + 外部类型”实现 `Reflect`。正式支持路径是：
@@ -4857,7 +4919,7 @@ register_method_binding!(
 
 ### 22.15 外部 trait 身份限制
 
-`#[ReflectImpl]` 可以从源码自动采集外部 trait 的书写路径：
+裸 `#[ReflectImpl]` 可以从源码自动采集外部 trait 的书写路径：
 
 ```rust
 #[ReflectImpl]
@@ -4866,7 +4928,24 @@ impl serde::Serialize for Customer {
 }
 ```
 
-但稳定版 proc macro 无法向 rustc 查询依赖 alias、package 版本、路径重命名或 trait 的编译器级唯一身份，Rust 也没有 `TypeId::of::<Trait>()`。默认情况下将其记录为 `ExternalIncomplete`，并保留源码中写出的路径。
+但稳定版 proc macro 无法向 rustc 查询依赖 alias、package 版本、路径重命名或 trait 的编译器级唯一身份，Rust 也没有 `TypeId::of::<Trait>()`。因此裸标注将其记录为 `ExternalIncomplete`，并保留源码中写出的路径；它不会要求外部 trait 提供反射 hook，也不会生成默认方法 adapter。
+
+如果外部 trait 有显式类型化 handle，可以在 impl 上引用它：
+
+```rust
+reflect_external_trait! {
+    pub SerdeSerialize = serde::Serialize;
+}
+
+#[ReflectImpl(external_trait = SerdeSerialize)]
+impl serde::Serialize for Customer {
+    // ...
+}
+```
+
+`external_trait` 只提供精确身份，不意味着外部 trait 有本地反射定义或可生成默认方法 adapter。
+外部 trait 的具体方法可以通过 `bind_method!` 或 `register_method_binding!` 显式登记；该方法签名由调用者提供，handle 只链接 trait identity。binder 依据 impl 源路径记录明确写出的 type/const 实参，不推断外部泛型参数声明或默认值；impl 路径使用 alias 时，`trait_` 元数据采用 handle 的 canonical definition path 进行身份关联，同时 impl descriptor 继续呈现原始 source path。
+若 impl 源路径包含 type/const 参数，具体 application 仍按位置保留这些实参；由于 handle 不提供外部 trait 的参数声明，`GenericArguments::get_at()` 可读取它们，而按参数名查询不会匹配这些位置参数，实参的 `parameter()` 返回 `None`。框架不会伪造外部参数名、种类约束或默认值。
 
 要求跨 crate、跨 alias 精确合并时，使用独立的类型化身份 handle：
 
@@ -4880,20 +4959,22 @@ reflect_external_trait! {
 
 ### 22.16 公开 registration API
 
-普通用户主要使用宏。高级用户使用类型化 registration，不直接构造底层 fragment：
+普通用户主要使用宏。高级用户通过稳定的 `context`、`descriptor`、`registration` facade 使用类型化 registration，不直接构造底层 fragment。当前 `Registration` 是字段私有的聚合 builder，不是按类型区分的 enum：
 
 ```rust
-pub enum Registration {
-    Type(TypeRegistrationHandle),
-    Trait(TraitRegistration),
-    Impl(ImplRegistration),
-    MethodBinding(MethodBinding),
-    Capability(CapabilityRegistration),
-    TraitObject(TraitObjectRegistration),
-}
+let registration = Registration::of::<Customer>();
+let context = ReflectionContext::builder()
+    .register(registration)
+    .register(capability_registration)
+    .bind(method_binding)
+    .build()?;
 ```
 
-具体字段保持私有，通过类型安全构造器建立：
+`Registration::of::<T>()` 从 `Reflect` 类型建立类型 registration；`Registration::type_definition` 和 `with_type_definition` 使用 marker-bound `TypeDefinitionRegistration<T>`；`metadata_only` 可承载 trait/impl metadata、应用关系和 trait-object registration。`CapabilityRegistration` 可直接传给 builder 的 `register`，`MethodBinding` 使用 `bind`。这些值只影响显式构建的 context，不修改全局 context。
+
+`TypeRegistration<T>`、`TypeDefinitionRegistration<T>`、`TraitObjectRegistration`、`CapabilityRegistration` 和 `MethodBinding` 可从相应稳定 facade 导入。低层 `TraitDefinitionMetadata`、`ImplDefinitionMetadata` 等源码 metadata 主要供 derive/codegen 生成；即使某些类型提供公共构造器，也不代表所有复杂 metadata 都有完整、安全的手写构造流程。该 API 不承诺 `TraitRegistration` 或 `ImplRegistration` enum variant，也不要求应用直接构造 generated fragment。
+
+`ReflectionContextBuilder` 提供以下组合入口：
 
 ```rust
 impl ReflectionContextBuilder {

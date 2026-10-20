@@ -31,6 +31,39 @@ impl Customer {
 
 宏在编译期生成源码元数据和操作适配器。反射采用显式启用：没有生成进元数据的成员无法通过描述符查到。`skip` 只决定元数据是否包含该成员，不承担访问控制职责。
 
+## 反射 trait 实现
+
+用 `#[Reflect]` 标记本地 trait。需要关联其反射定义并生成默认方法 adapter 的 impl，须在属性中显式给出 trait 定义路径：
+
+```rust
+use qubit_reflect::{Reflect, ReflectImpl};
+
+#[Reflect]
+trait HealthCheck {
+    fn check(&self) -> bool;
+
+    fn label(&self) -> &'static str {
+        "ready"
+    }
+}
+
+#[Reflect]
+struct Worker;
+
+use crate::HealthCheck as Check;
+
+#[ReflectImpl(reflected_trait = crate::HealthCheck)]
+impl Check for Worker {
+    fn check(&self) -> bool {
+        true
+    }
+}
+```
+
+`reflected_trait` 指向已反射的 trait 定义。`impl` 后的 trait 路径可以使用导入别名，仍由 Rust 按常规规则解析。任何裸 `#[ReflectImpl]` trait impl（包括实现本地 `#[Reflect]` trait 的 impl）都会保留源码路径，并将未关联的 application 记为 `ExternalIncomplete`；它不会关联反射定义或提供默认方法。只有 `reflected_trait = ...` 才会链接本地反射 trait provider。
+
+`reflected_trait` 和 `external_trait` 是调用者对 impl trait 身份的断言。稳定过程宏不能解析导入别名来证明路径等价；请确保参数指向 impl 实际实现的 trait，否则反射信息会关联到错误的 trait。
+
 ## 读取、更新和调用
 
 `TypeDescriptor::of` 会把描述符绑定到进程级全局 `ReflectionContext`。操作需要聚合信息时，context 会惰性初始化。字段单数 accessor 要求找到唯一字段，否则返回结构化错误。typed 访问保留所有者和字段的 Rust 类型信息。
@@ -99,6 +132,8 @@ typed 字段替换失败时返回 `FieldSetFailure<V>`。调用 `into_parts()` �
 
 当值和适配器满足相应 `Send`、`Sync` 约束时，可以使用 `ThreadSafe` 模式。类型擦除后不能把 `Local` 值升级为 `ThreadSafe`。应在已知所有权和并发要求的边界选择模式。
 
+derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定过程宏无法推断 opaque future 的 `ThreadSafe` adapter，因此即使某个实现的 future 满足 `Send`，也不会自动生成该 adapter。若要使用 `ThreadSafe` adapter，可用 `bind_method!(... as thread_safe async fn(...))` 显式绑定具体方法；编译器会检查生成的 future 是否满足 `Send`，无需命名 opaque future 类型。
+
 ## 绑定泛型方法
 
 Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。
@@ -111,6 +146,17 @@ let context = ReflectionContext::builder()
     .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
     .build()?;
 ```
+
+trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflected_trait` 指向 trait 定义；binder 会从 impl 的 trait 路径调用隐藏 hook，因此 rustc 能解析导入 alias 并补齐默认类型和 const 实参：
+
+```rust
+.bind(bind_method!(
+    <Service as ImportedService>::refresh as fn(&Service) -> String,
+    reflected_trait = api::ServiceContract,
+))
+```
+
+对外部 trait，先用 `reflect_external_trait!` 创建 identity handle，再以 `external_trait = Handle` 绑定显式方法。handle 不提供外部方法声明或默认参数信息；application identity 仅包含 impl 路径中明确写出的类型和 const 实参。此绑定是调用者登记的方法事实。
 
 方法描述符仍表示源码声明。调用前使用 `MethodArguments` 选择具体特化。未绑定或不受支持的方法仍会以元数据和可用性原因呈现，不会被静默地绕过安全检查。
 
