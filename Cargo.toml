@@ -55,7 +55,7 @@ qubit-types = ["dep:qubit-datatype", "dep:qubit-id"]
 bigdecimal = { version = "^0.4", optional = true }
 chrono = { version = "^0.4", default-features = false, features = ["std"], optional = true }
 inventory = "^0.3"
-qubit-datatype = { version = "0.15.0", optional = true }
+qubit-datatype = { version = "0.15.0", path = "../rs-datatype", optional = true }
 qubit-id = { version = "^0.7.0", default-features = false, optional = true }
 thiserror = "^2.0"
 uuid = { version = "^1.26", optional = true }
