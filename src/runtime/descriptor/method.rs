@@ -1284,6 +1284,7 @@ fn selector_slices_match(left: &[GenericArgumentSelector], right: &[GenericArgum
     left.len() == right.len() && left.iter().zip(right).all(|(left, right)| left.matches(right))
 }
 
+#[derive(Clone)]
 pub(crate) struct ContextEffectiveMethod {
     pub(crate) effective: EffectiveMethod,
     pub(crate) specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
@@ -1393,18 +1394,6 @@ impl<'ctx> MethodDescriptor<'ctx> {
             effective,
             specializations: std::sync::Arc::from(effective.specializations),
             implementation: None,
-            context,
-        }
-    }
-    pub(crate) fn with_implementation(
-        effective: EffectiveMethod,
-        implementation: &'static crate::runtime::descriptor::impl_descriptor::metadata::ImplApplicationMetadata,
-        context: &'ctx ReflectionContext,
-    ) -> Self {
-        Self {
-            effective,
-            specializations: std::sync::Arc::from(effective.specializations),
-            implementation: Some(implementation),
             context,
         }
     }
@@ -2292,6 +2281,20 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
             Err(InvocationAttempt::Rejected(failure)) => Err(failure),
             Err(InvocationAttempt::Panicked(_)) => unreachable!("ordinary invoke does not catch"),
         }
+    }
+
+    /// Invokes this specialization with a pinned receiver.
+    ///
+    /// Returns [`PinnedInvocationFailure`] with the original pinned receiver
+    /// and arguments when the adapter is unavailable or receiver and argument
+    /// validation rejects the call. Panics raised by the method propagate.
+    pub fn invoke_pinned<'call, T: ?Sized + 'static, M: ValueMode>(
+        &self,
+        invocation: PinnedInvocation<'call, M, T>,
+    ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
+        let selected = self.resolved();
+        self.method
+            .invoke_pinned_with(selected.availability, &selected.adapters, invocation)
     }
 }
 

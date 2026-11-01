@@ -18,7 +18,9 @@ use crate::runtime::context::ReflectionContext;
 use crate::runtime::descriptor::TypeDescriptor;
 use crate::runtime::descriptor::generic::GenericArguments;
 use crate::runtime::descriptor::generic::GenericDefinitionDescriptor;
+use crate::runtime::descriptor::method::ContextEffectiveMethod;
 use crate::runtime::descriptor::method::MethodDescriptor;
+use crate::runtime::descriptor::method::MethodNamespaceMetadata;
 use crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionDescriptor;
 use crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionDescriptor;
 use crate::runtime::descriptor::trait_descriptor::MethodDefinitionDescriptor;
@@ -172,7 +174,17 @@ impl<'ctx> ImplDescriptor<'ctx> {
     }
     /// Returns methods available through this concrete implementation.
     pub fn methods(self) -> Methods<'ctx> {
-        Methods::new(self.metadata.methods, self.metadata, self.context)
+        let context_methods = self
+            .context
+            .methods_for((self.metadata.target)().type_id())
+            .expect("an implementation descriptor belongs to an initialized context");
+        let values = context_methods
+            .iter()
+            .filter(|candidate| context_method_belongs_to_application(candidate, self.metadata))
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        Methods::new(values, self.metadata, self.context)
     }
     /// Finds a method by its source name.
     pub fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
@@ -212,16 +224,49 @@ impl<'ctx> ImplDescriptor<'ctx> {
     }
 }
 
+fn context_method_belongs_to_application(
+    method: &ContextEffectiveMethod,
+    application: &'static ImplApplicationMetadata,
+) -> bool {
+    if method
+        .implementation
+        .is_some_and(|candidate| std::ptr::eq(candidate, application))
+    {
+        return true;
+    }
+    let Some(trait_application) = application.implemented_trait else {
+        return false;
+    };
+    let Some(definition) = trait_application.definition else {
+        return false;
+    };
+    let MethodNamespaceMetadata::TraitApplication {
+        trait_: _,
+        identity,
+        definition: method_definition,
+        ..
+    } = method.effective.metadata.namespace
+    else {
+        return false;
+    };
+    identity == trait_application.identity
+        && method_definition.is_some_and(|candidate| candidate.id == definition.id)
+        && definition
+            .methods
+            .iter()
+            .any(|declaration| declaration.name == method.effective.metadata.name)
+}
+
 /// Ordered methods available on one concrete implementation.
 pub struct Methods<'ctx> {
-    values: &'static [crate::runtime::descriptor::method::EffectiveMethod],
+    values: Box<[ContextEffectiveMethod]>,
     implementation: &'static ImplApplicationMetadata,
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> Methods<'ctx> {
-    const fn new(
-        values: &'static [crate::runtime::descriptor::method::EffectiveMethod],
+    fn new(
+        values: Box<[ContextEffectiveMethod]>,
         implementation: &'static ImplApplicationMetadata,
         context: &'ctx ReflectionContext,
     ) -> Self {
@@ -237,9 +282,14 @@ impl<'ctx> Methods<'ctx> {
     }
     /// Iterates over methods in declaration and effective-availability order.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = MethodDescriptor<'ctx>> + '_ {
-        self.values
-            .iter()
-            .map(|method| MethodDescriptor::with_implementation(*method, self.implementation, self.context))
+        self.values.iter().map(|method| {
+            MethodDescriptor::with_resolved_specializations(
+                method.effective,
+                method.specializations.clone(),
+                Some(self.implementation),
+                self.context,
+            )
+        })
     }
     /// Returns the number of methods in this implementation.
     pub fn len(&self) -> usize {
@@ -253,8 +303,15 @@ impl<'ctx> Methods<'ctx> {
     pub fn get(&self, name: &str) -> Option<MethodDescriptor<'ctx>> {
         self.values
             .iter()
-            .find(|method| method.metadata.name == name)
-            .map(|method| MethodDescriptor::with_implementation(*method, self.implementation, self.context))
+            .find(|method| method.effective.metadata.name == name)
+            .map(|method| {
+                MethodDescriptor::with_resolved_specializations(
+                    method.effective,
+                    method.specializations.clone(),
+                    Some(self.implementation),
+                    self.context,
+                )
+            })
     }
 }
 
@@ -892,11 +949,7 @@ mod tests {
         assert!(application.arguments().is_empty());
         assert_eq!(application.target().type_id(), std::any::TypeId::of::<String>());
         assert!(application.implemented_trait().is_none());
-        let method = application.method("run").expect("method is available");
-        assert!(matches!(
-            method.namespace(),
-            crate::runtime::descriptor::method::MethodNamespace::Inherent { .. }
-        ));
+        assert!(application.method("run").is_err());
     }
 
     #[test]
@@ -1022,10 +1075,10 @@ mod tests {
         let implementation = ImplDescriptor::new(&APPLICATION, &context);
         let methods = implementation.methods();
         assert_eq!(methods.context().id(), context.id());
-        assert_eq!(methods.len(), 1);
-        assert!(!methods.is_empty());
-        assert_eq!(methods.iter().count(), 1);
-        assert_eq!(methods.get("run").expect("method exists").name(), "run");
+        assert_eq!(methods.len(), 0);
+        assert!(methods.is_empty());
+        assert_eq!(methods.iter().count(), 0);
+        assert!(methods.get("run").is_none());
         assert!(methods.get("missing").is_none());
 
         let empty_implementation = ImplDescriptor::new(&EMPTY_METHODS_APPLICATION, &context);

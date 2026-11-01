@@ -125,10 +125,8 @@ impl BuilderBindingFixture {
         value
     }
 
-    pub fn mixed<T: qubit_reflect::__private::codegen_v4::descriptor::Reflect, const N: usize>(
-        &self,
-        _value: T,
-    ) -> usize {
+    pub fn mixed<T: qubit_reflect::__private::codegen_v4::descriptor::Reflect, const N: usize>(&self) -> usize {
+        let _argument_type = std::any::TypeId::of::<T>();
         N
     }
 
@@ -148,8 +146,77 @@ fn same_named_type_binding() -> MethodBinding<BuilderBindingFixture> {
     )
 }
 
+#[Reflect]
+trait ApplicationLabel<T> {
+    fn label(&self) -> u32;
+}
+
+#[Reflect]
+struct ApplicationLabelTarget;
+
+#[ReflectImpl(reflected_trait = ApplicationLabel::<u8>)]
+impl ApplicationLabel<u8> for ApplicationLabelTarget {
+    #[reflect(skip)]
+    fn label(&self) -> u32 {
+        8
+    }
+}
+
+#[ReflectImpl(reflected_trait = ApplicationLabel::<u64>)]
+impl ApplicationLabel<u64> for ApplicationLabelTarget {
+    #[reflect(skip)]
+    fn label(&self) -> u32 {
+        64
+    }
+}
+
+fn application_label_u8_binding() -> MethodBinding<ApplicationLabelTarget> {
+    bind_method!(<ApplicationLabelTarget as ApplicationLabel<u8>>::label as fn(&ApplicationLabelTarget) -> u32)
+}
+
+fn application_label_u64_binding() -> MethodBinding<ApplicationLabelTarget> {
+    bind_method!(<ApplicationLabelTarget as ApplicationLabel<u64>>::label as fn(&ApplicationLabelTarget) -> u32)
+}
+
+fn application_label_impl<'ctx>(
+    context: &'ctx ReflectionContext,
+    argument_type: std::any::TypeId,
+) -> qubit_reflect::descriptor::ImplDescriptor<'ctx> {
+    context
+        .type_of::<ApplicationLabelTarget>()
+        .trait_impls()
+        .expect("trait applications are available")
+        .iter()
+        .find(|implementation| {
+            implementation
+                .implemented_trait()
+                .and_then(|trait_| trait_.arguments().get_at(0))
+                .and_then(|argument| argument.type_argument().ok())
+                .and_then(|argument| argument.concrete_type().ok())
+                .is_some_and(|argument| argument.type_id() == argument_type)
+        })
+        .expect("the requested trait application is registered")
+}
+
+fn invoke_application_label(
+    context: &ReflectionContext,
+    argument_type: std::any::TypeId,
+    target: &ApplicationLabelTarget,
+) -> u32 {
+    let method = application_label_impl(context, argument_type)
+        .method("label")
+        .expect("the trait application's method is navigable");
+    let output = match method.invoke(qubit_reflect::Invocation::<qubit_reflect::value::Local>::on_ref(target)) {
+        Ok(output) => output,
+        Err(_) => panic!("the selected application method is callable"),
+    };
+    output
+        .into_owned::<u32>()
+        .unwrap_or_else(|_| panic!("the selected application method returns u32"))
+}
+
 fn builder_mixed_binding() -> MethodBinding<BuilderBindingFixture> {
-    bind_method!(BuilderBindingFixture::mixed::<u32, 3usize> as fn(&BuilderBindingFixture, u32) -> usize)
+    bind_method!(BuilderBindingFixture::mixed::<u32, 3usize> as fn(&BuilderBindingFixture) -> usize)
 }
 
 #[test]
@@ -242,6 +309,62 @@ fn specialization_api_exposes_typed_generic_arguments() {
 }
 
 #[test]
+fn impl_method_navigation_uses_context_specializations() {
+    let context = ReflectionContext::builder()
+        .include_linked()
+        .bind(builder_mixed_binding())
+        .build()
+        .expect("the explicit mixed specialization is registered");
+    let target = context.type_of::<BuilderBindingFixture>();
+    let by_type = target.method("mixed").expect("type navigation finds mixed");
+    let implementation = target
+        .inherent_impls()
+        .expect("inherent impl applications are available")
+        .iter()
+        .next()
+        .expect("the fixture has an inherent impl");
+    let by_impl = implementation.method("mixed").expect("impl navigation finds mixed");
+
+    assert_eq!(by_type.specializations().len(), 1);
+    assert_eq!(by_impl.specializations().len(), 1);
+    let arguments = qubit_reflect::descriptor::MethodArguments::new()
+        .type_of::<u32>()
+        .constant(3usize);
+    let type_specialization = by_type.specialization(&arguments).expect("type path resolves binding");
+    let impl_specialization = by_impl.specialization(&arguments).expect("impl path resolves binding");
+    assert_eq!(
+        type_specialization.arguments().len(),
+        impl_specialization.arguments().len()
+    );
+
+    let target_value = BuilderBindingFixture;
+    let type_output = match type_specialization.invoke(
+        qubit_reflect::Invocation::<qubit_reflect::value::Local>::on_ref(&target_value),
+    ) {
+        Ok(output) => output,
+        Err(failure) => panic!("type navigation failed: {:?}", failure.error().kind()),
+    };
+    let impl_output = match impl_specialization.invoke(
+        qubit_reflect::Invocation::<qubit_reflect::value::Local>::on_ref(&target_value),
+    ) {
+        Ok(output) => output,
+        Err(failure) => panic!("impl navigation failed: {:?}", failure.error().kind()),
+    };
+    assert_eq!(
+        type_output
+            .into_owned::<usize>()
+            .unwrap_or_else(|_| panic!("type result is usize")),
+        3
+    );
+    assert_eq!(
+        impl_output
+            .into_owned::<usize>()
+            .unwrap_or_else(|_| panic!("impl result is usize")),
+        3
+    );
+}
+
+#[test]
 fn specialization_selection_uses_exact_type_identity() {
     let context = ReflectionContext::builder()
         .include_linked()
@@ -289,6 +412,100 @@ fn specialization_selection_distinguishes_same_named_types() {
         ),
         Err(qubit_reflect::error::LookupError::Missing { .. })
     ));
+}
+
+#[test]
+fn method_specializations_do_not_leak_between_contexts() {
+    let first_context = ReflectionContext::builder()
+        .include_linked()
+        .bind(builder_type_binding())
+        .build()
+        .expect("the first context owns its u32 binding");
+    let second_context = ReflectionContext::builder()
+        .include_linked()
+        .bind(same_named_type_binding())
+        .build()
+        .expect("the second context owns its Value binding");
+
+    let first_method = first_context
+        .type_of::<BuilderBindingFixture>()
+        .inherent_impls()
+        .expect("first context impls are available")
+        .iter()
+        .next()
+        .expect("first context has an inherent impl")
+        .method("map")
+        .expect("first context method is available");
+    let second_method = second_context
+        .type_of::<BuilderBindingFixture>()
+        .inherent_impls()
+        .expect("second context impls are available")
+        .iter()
+        .next()
+        .expect("second context has an inherent impl")
+        .method("map")
+        .expect("second context method is available");
+
+    assert!(
+        first_method
+            .specialization(&qubit_reflect::descriptor::MethodArguments::new().type_of::<u32>())
+            .is_ok()
+    );
+    assert!(matches!(
+        first_method.specialization(
+            &qubit_reflect::descriptor::MethodArguments::new().type_of::<same_named_types::first::Value>()
+        ),
+        Err(qubit_reflect::error::LookupError::Missing { .. })
+    ));
+    assert!(matches!(
+        second_method.specialization(&qubit_reflect::descriptor::MethodArguments::new().type_of::<u32>()),
+        Err(qubit_reflect::error::LookupError::Missing { .. })
+    ));
+    assert!(
+        second_method
+            .specialization(
+                &qubit_reflect::descriptor::MethodArguments::new().type_of::<same_named_types::first::Value>()
+            )
+            .is_ok()
+    );
+}
+
+#[test]
+fn same_named_trait_application_methods_stay_with_their_context_application() {
+    let u8_context = ReflectionContext::builder()
+        .include_linked()
+        .bind(application_label_u8_binding())
+        .build()
+        .expect("the first trait application is bound in its context");
+    let u64_context = ReflectionContext::builder()
+        .include_linked()
+        .bind(application_label_u64_binding())
+        .build()
+        .expect("the second trait application is bound in its context");
+    let target = ApplicationLabelTarget;
+    assert_eq!(
+        invoke_application_label(&u8_context, std::any::TypeId::of::<u8>(), &target),
+        8
+    );
+    assert_eq!(
+        invoke_application_label(&u64_context, std::any::TypeId::of::<u64>(), &target),
+        64
+    );
+
+    let shared_context = ReflectionContext::builder()
+        .include_linked()
+        .bind(application_label_u8_binding())
+        .bind(application_label_u64_binding())
+        .build()
+        .expect("both same-named trait applications are bound in one context");
+    assert_eq!(
+        invoke_application_label(&shared_context, std::any::TypeId::of::<u8>(), &target),
+        8
+    );
+    assert_eq!(
+        invoke_application_label(&shared_context, std::any::TypeId::of::<u64>(), &target),
+        64
+    );
 }
 
 #[test]

@@ -523,7 +523,7 @@ fn bind_replacements<M: ValueMode>(
     unchecked_visibility: bool,
 ) -> Result<Binding, UpdateError> {
     let entries = input.entries();
-    let binding = bind_entries(plan, &entries, unchecked_visibility, false).map_err(UpdateError::from)?;
+    let binding = bind_named_entries(plan, &entries, unchecked_visibility, false).map_err(UpdateError::from)?;
     for (index, value) in binding.input_indices.iter().enumerate() {
         if value.is_some() {
             match plan.fields[index].update_policy {
@@ -551,12 +551,10 @@ fn bind_entries<M: ValueMode>(
     unchecked_visibility: bool,
     check_required: bool,
 ) -> Result<Binding, ConstructionError> {
-    let mut binding = Binding {
-        input_indices: vec![None; plan.fields.len()],
-    };
-    let mut seen = vec![false; plan.fields.len()];
-
     if plan.shape == ConstructionShape::Positional {
+        let mut binding = Binding {
+            input_indices: vec![None; plan.fields.len()],
+        };
         let mut position = 0;
         for (field_index, field) in plan.fields.iter().enumerate() {
             if matches!(field.policy, ConstructionFieldPolicy::ProviderOnly) {
@@ -588,37 +586,53 @@ fn bind_entries<M: ValueMode>(
                 actual: entries.len(),
             });
         }
+        Ok(binding)
     } else {
-        for (input_index, entry) in entries.iter().enumerate() {
-            let InputEntryRef::Named { name, value } = entry else {
-                continue;
-            };
-            let Some((field_index, field)) = plan.fields.iter().enumerate().find(|(_, field)| field.name == *name)
-            else {
-                return Err(ConstructionError::UnknownField { field: (*name).into() });
-            };
-            if seen[field_index] {
-                return Err(ConstructionError::DuplicateField { field: field.name });
-            }
-            seen[field_index] = true;
-            if matches!(field.policy, ConstructionFieldPolicy::ProviderOnly) {
-                return Err(ConstructionError::ProviderOnlyField { field: field.name });
-            }
-            if let ConstructionFieldPolicy::Unavailable(reason) = field.policy {
-                return Err(ConstructionError::FieldUnavailable {
-                    field: field.name,
-                    reason,
-                });
-            }
-            validate_visibility(field, unchecked_visibility)?;
-            validate_value(field, value)?;
-            binding.input_indices[field_index] = Some(input_index);
+        bind_named_entries(plan, entries, unchecked_visibility, check_required)
+    }
+}
+
+fn bind_named_entries<M: ValueMode>(
+    plan: &ConstructionPlan,
+    entries: &[InputEntryRef<'_, M>],
+    unchecked_visibility: bool,
+    check_required: bool,
+) -> Result<Binding, ConstructionError> {
+    let mut binding = Binding {
+        input_indices: vec![None; plan.fields.len()],
+    };
+    let mut seen = vec![false; plan.fields.len()];
+    for (input_index, entry) in entries.iter().enumerate() {
+        let InputEntryRef::Named { name, value } = entry else {
+            return Err(ConstructionError::ShapeMismatch {
+                expected: ConstructionShape::Named,
+                actual: ConstructionShape::Positional,
+            });
+        };
+        let Some((field_index, field)) = plan.fields.iter().enumerate().find(|(_, field)| field.name == *name) else {
+            return Err(ConstructionError::UnknownField { field: (*name).into() });
+        };
+        if seen[field_index] {
+            return Err(ConstructionError::DuplicateField { field: field.name });
         }
-        if check_required {
-            for (index, field) in plan.fields.iter().enumerate() {
-                if !seen[index] && matches!(field.policy, ConstructionFieldPolicy::Required) {
-                    return Err(ConstructionError::MissingField { field: field.name });
-                }
+        seen[field_index] = true;
+        if matches!(field.policy, ConstructionFieldPolicy::ProviderOnly) {
+            return Err(ConstructionError::ProviderOnlyField { field: field.name });
+        }
+        if let ConstructionFieldPolicy::Unavailable(reason) = field.policy {
+            return Err(ConstructionError::FieldUnavailable {
+                field: field.name,
+                reason,
+            });
+        }
+        validate_visibility(field, unchecked_visibility)?;
+        validate_value(field, value)?;
+        binding.input_indices[field_index] = Some(input_index);
+    }
+    if check_required {
+        for (index, field) in plan.fields.iter().enumerate() {
+            if !seen[index] && matches!(field.policy, ConstructionFieldPolicy::Required) {
+                return Err(ConstructionError::MissingField { field: field.name });
             }
         }
     }
