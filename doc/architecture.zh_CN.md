@@ -33,7 +33,7 @@ typed 字段访问在调用点保留目标和字段类型。框架已经擦除�
 
 Invocation 会在进入生成的用户代码前检查特化、receiver、参数数量、传递模式和精确类型。这个阶段的失败会保留 receiver 与参数。适配器开始执行后，反射无法回滚用户副作用。普通调用会让 panic 继续传播；只有调用点显式选择捕获策略时才会捕获。
 
-动态值默认使用 `Local` 模式。只有能够证明 Rust bounds 的地方才会生成 `ThreadSafe` 适配器。擦除类型不会让本地值自动具备跨线程安全性。
+动态值默认使用 `Local` 模式。对于反射 struct 和 enum，字段不满足 `Send + Sync` 时可显式使用 `#[Reflect(local_only)]`，生成仅供本地使用的字段与构造适配器；裸 `#[Reflect]` 的默认行为不变。Local 值仍不能跨线程传递，该类型选项也不改变 `#[ReflectImpl]` 方法注册。只有 Rust bounds 能建立相应保证的生成路径才会提供 `ThreadSafe` 适配器。
 
 ## 泛型方法与能力
 
@@ -46,6 +46,14 @@ Capability 查询也绑定到 context。其契约由 capability 类型和适配�
 `TypeId`、描述符地址、context ID 和诊断用 Rust 名称都只在当前进程内有效，不能作为存储或网络协议标识。需要持久化或交换反射引用时，应用应定义自己的稳定标识和版本规则。
 
 本库提供元数据、经过检查的动态操作、context 校验和生成的调用适配器。输入解析、鉴权、业务不变量、持久化、并发策略，以及用户代码执行后的补偿仍由应用负责。
+
+## 迁移说明
+
+- 显式 context 现在只包含选中的类型和显式选择的绑定目标。若应用依赖无关 linked registration 意外进入 catalog，应通过 context builder 选择所需目标。
+- 非法 linked capability 会在构建 context 时报告。应用应处理 `ContextError`，不要依赖后续查询隐藏无效注册。
+- 含非 `Send + Sync` 字段的反射类型可使用 `#[Reflect(local_only)]` 保留本地字段访问和构造能力；这不会让值变为线程安全。若应完全排除成员，仍可使用 `#[reflect(skip)]`。
+- Rc 和 Arc 描述符现在会公开其 pointee 泛型实参；下游生产代码无需为这项元数据增量迁移。
+- 调用 pinned 泛型方法时，先通过 `specialization(&MethodArguments)` 选择精确特化，再调用 `MethodSpecializationDescriptor::invoke_pinned`。校验拒绝时会保留 pinned receiver 和参数。`echo<T>(Pin<&mut Self>, T) -> T` 形式的绑定可以被发现，但泛型参数 metadata 尚不能识别具体实参类型，因此该调用仍不可执行。
 
 ## 延伸阅读
 

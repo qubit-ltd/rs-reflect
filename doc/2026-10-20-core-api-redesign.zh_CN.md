@@ -4249,20 +4249,18 @@ pub struct RegistrationOrigin {
 
 ### 21.9 `TypeMismatch`
 
-所有动态边界共用一种类型不匹配结构：
+**2026-11-01 修订：** 以当前公开实现为准。`TypeMismatch` 保留 expected/actual 的 `TypeId` 和诊断名称访问器，不公开内部 `TypeIdentity`：
 
 ```rust
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TypeMismatch {
-    expected: TypeIdentity,
-    actual: TypeIdentity,
-}
-
 impl TypeMismatch {
-    pub fn expected(&self) -> &TypeIdentity;
-    pub fn actual(&self) -> &TypeIdentity;
+    pub fn expected(&self) -> std::any::TypeId;
+    pub fn actual(&self) -> std::any::TypeId;
+    pub fn expected_name(&self) -> &'static str;
+    pub fn actual_name(&self) -> &'static str;
 }
 ```
+
+所有动态边界共用这一类型不匹配结构。调用方可用 `TypeId` 判断精确 Rust 类型，并用名称访问器构造诊断；名称仅用于展示，不是稳定身份。
 
 具体错误通过 variant 说明发生位置：
 

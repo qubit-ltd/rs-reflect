@@ -23,13 +23,15 @@ Keep the runtime and derive versions aligned. Generated code calls the versioned
 
 ## Quick start
 
+### Read a reflected field
+
 ```rust
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
 #[Reflect]
 struct User {
-    name: String,
+    pub name: String,
 }
 
 fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
@@ -37,6 +39,8 @@ fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
     Ok(field.get(user)?)
 }
 ```
+
+## Trait and impl registration
 
 Use `#[ReflectImpl]` to describe inherent or trait implementations. For a reflected trait implementation, pass its definition path explicitly so the macro can link the exact trait even when the impl uses an import alias:
 

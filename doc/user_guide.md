@@ -29,6 +29,26 @@ impl Customer {
 }
 ```
 
+For a reflected struct or enum with non-`Send + Sync` fields, use
+`#[Reflect(local_only)]` to retain local field access and construction. Bare
+`#[Reflect]` keeps its existing behavior, this option does not make values
+thread-safe, and it does not change `#[ReflectImpl]` registrations. Use
+`#[reflect(skip)]` only when the member should be omitted from reflection.
+
+Explicit contexts select their target types and binding targets. Select a
+target explicitly if code previously relied on unrelated linked registrations
+appearing in a context. Context construction also reports invalid linked
+capabilities, so handle the returned `ContextError`. Rc and Arc descriptors
+now include their pointee type argument; this metadata addition requires no
+downstream production change.
+
+For a generic method with a pinned receiver, select the exact specialization
+with `method.specialization(&MethodArguments)` and invoke it through
+`MethodSpecializationDescriptor::invoke_pinned`. A rejected call returns the
+pinned receiver and arguments for recovery. A binding whose runtime argument
+is the method's generic `T` is discoverable, but still cannot be invoked until
+reflection can identify that concrete argument type.
+
 The macros generate source metadata and adapters at compile time. Reflection is opt-in: a member that is not generated into metadata cannot be found through a descriptor. `skip` is a metadata choice, not an access control feature.
 
 ## Reflect a trait implementation
@@ -70,6 +90,7 @@ impl Check for Worker {
 
 ```rust
 use qubit_reflect::{Invocation, TypeDescriptor};
+use qubit_reflect::value::Local;
 
 fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
     let ty = TypeDescriptor::of::<Customer>();
@@ -82,7 +103,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
     let output = match ty
         .method("raise_credit_limit")?
-        .invoke(Invocation::on_mut(customer).arg(75_000_u64))
+        .invoke(Invocation::<Local>::on_mut(customer).arg(75_000_u64))
     {
         Ok(output) => output,
         Err(failure) => {
@@ -90,7 +111,9 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("method invocation failed: {error:?}").into());
         }
     };
-    let raised = output.into_owned::<bool>()?;
+    let raised = output
+        .into_owned::<bool>()
+        .map_err(|_| std::io::Error::other("method returned a non-boolean output"))?;
     assert!(raised);
     Ok(())
 }

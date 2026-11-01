@@ -29,6 +29,7 @@ qubit-reflect = "0.2"
 
 ```rust
 use qubit_reflect::{Invocation, Reflect, ReflectImpl, TypeDescriptor};
+use qubit_reflect::value::Local;
 
 #[Reflect]
 struct Customer {
@@ -56,7 +57,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
     }
     let output = match ty
         .method("raise_credit_limit")?
-        .invoke(Invocation::on_mut(customer).arg(75_000_u64))
+        .invoke(Invocation::<Local>::on_mut(customer).arg(75_000_u64))
     {
         Ok(output) => output,
         Err(failure) => {
@@ -64,7 +65,9 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("方法调用失败：{error:?}").into());
         }
     };
-    let raised = output.into_owned::<bool>()?;
+    let raised = output
+        .into_owned::<bool>()
+        .map_err(|_| std::io::Error::other("方法返回了非布尔值"))?;
     assert!(raised);
     Ok(())
 }

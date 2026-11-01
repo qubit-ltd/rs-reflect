@@ -23,13 +23,15 @@ runtime 与 derive 版本应保持一致。生成代码会调用带版本号的�
 
 ## 快速开始
 
+### 读取反射字段
+
 ```rust
 use qubit_reflect::TypeDescriptor;
 use qubit_reflect_derive::Reflect;
 
 #[Reflect]
 struct User {
-    name: String,
+    pub name: String,
 }
 
 fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
@@ -37,6 +39,8 @@ fn read_name(user: &User) -> Result<&String, Box<dyn std::error::Error>> {
     Ok(field.get(user)?)
 }
 ```
+
+## Trait 与 impl 注册
 
 使用 `#[ReflectImpl]` 描述 inherent impl 或 trait impl。反射 trait impl 需要显式提供定义路径，这样即使 impl 使用导入别名，宏也能关联到准确的 trait：
 

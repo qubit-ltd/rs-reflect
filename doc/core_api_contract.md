@@ -18,6 +18,10 @@ A field's `type_expression()` preserves the source-level type shape, including g
 
 Typed access keeps owner and value types visible to Rust. Dynamic access checks exact runtime types. Failed updates return the rejected input with the error. Invocation failures before adapter execution retain receivers and arguments; once user code begins, reflection cannot roll back side effects. Panic handling is an explicit caller policy.
 
+`TypeMismatch::expected()` and `actual()` return `std::any::TypeId`; `expected_name()` and `actual_name()` return diagnostic type names. The names are for display and are not stable identities.
+
+The 2026-11-01 contract revision records the current `TypeMismatch` accessors and context selection behavior: explicit contexts aggregate selected types and selected binding targets, while malformed linked capabilities fail context construction.
+
 ## Capabilities
 
 Capability queries specify both a capability type and its adapter contract through `CapabilitySpec`. Registrations target concrete types or generic definitions with typed adapters. A name or diagnostic string does not establish compatibility. Capability descriptors expose registration origin and remain scoped to the querying context.

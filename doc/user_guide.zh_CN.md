@@ -29,6 +29,22 @@ impl Customer {
 }
 ```
 
+反射的 struct 或 enum 含有不满足 `Send + Sync` 的字段时，可使用
+`#[Reflect(local_only)]` 保留本地字段访问与构造能力。裸 `#[Reflect]` 的
+行为保持不变；该选项不会让值变为线程安全，也不改变 `#[ReflectImpl]` 注册。
+只有需要从反射中完全排除成员时才使用 `#[reflect(skip)]`。
+
+显式 context 会选择自己的目标类型和绑定目标。若代码此前依赖无关 linked
+registration 意外出现在 context 中，现在应显式选择目标。context 构建也会报告
+非法 linked capability，因此应处理返回的 `ContextError`。Rc 和 Arc 描述符
+现在包含 pointee 类型实参；这项元数据增量不要求下游生产代码修改。
+
+调用带 pinned receiver 的泛型方法时，先使用
+`method.specialization(&MethodArguments)` 选择精确特化，再通过
+`MethodSpecializationDescriptor::invoke_pinned` 调用。调用被拒绝时会返回
+pinned receiver 和参数以供恢复。若运行时实参类型仍是方法泛型 `T`，绑定虽然可被
+发现，但在反射能够识别其具体实参类型前仍不可调用。
+
 宏在编译期生成源码元数据和操作适配器。反射采用显式启用：没有生成进元数据的成员无法通过描述符查到。`skip` 只决定元数据是否包含该成员，不承担访问控制职责。
 
 ## 反射 trait 实现
@@ -70,6 +86,7 @@ impl Check for Worker {
 
 ```rust
 use qubit_reflect::{Invocation, TypeDescriptor};
+use qubit_reflect::value::Local;
 
 fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
     let ty = TypeDescriptor::of::<Customer>();
@@ -82,7 +99,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
     let output = match ty
         .method("raise_credit_limit")?
-        .invoke(Invocation::on_mut(customer).arg(75_000_u64))
+        .invoke(Invocation::<Local>::on_mut(customer).arg(75_000_u64))
     {
         Ok(output) => output,
         Err(failure) => {
@@ -90,7 +107,9 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("方法调用失败：{error:?}").into());
         }
     };
-    let raised = output.into_owned::<bool>()?;
+    let raised = output
+        .into_owned::<bool>()
+        .map_err(|_| std::io::Error::other("方法返回了非布尔值"))?;
     assert!(raised);
     Ok(())
 }

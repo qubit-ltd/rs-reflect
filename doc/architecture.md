@@ -33,7 +33,7 @@ Typed field access makes the target and field types explicit at the call site. D
 
 Invocation validates specialization, receiver, argument count, argument modes, and exact types before entering generated user code. Failures at this stage preserve receiver and argument inputs. Once an adapter begins, reflection cannot roll back user side effects. Panics propagate through ordinary invocation; panic capture is an explicit call-site policy.
 
-The default value mode is `Local`. `ThreadSafe` adapters are emitted only where their Rust bounds can be proved. Erasing a local value does not make it safe to transfer between threads.
+The default value mode is `Local`. For reflected structs and enums, `#[Reflect(local_only)]` explicitly keeps generated field and construction adapters local when fields are not `Send + Sync`; the option does not change the default behavior of bare `#[Reflect]`. Local values remain non-transferable across threads, and `#[ReflectImpl]` method registration is independent of this type option. ThreadSafe adapters are generated only by paths whose Rust bounds establish that contract.
 
 ## Generic methods and capabilities
 
@@ -46,6 +46,14 @@ Capability queries are also context-bound. Their contract includes the capabilit
 `TypeId`, descriptor addresses, context IDs, and diagnostic Rust names are process-local. They are not storage or wire-format identifiers. Applications that persist or exchange reflection references need their own stable identifiers and versioning rules.
 
 The library provides metadata, checked dynamic operations, context validation, and generated call adapters. Applications remain responsible for input parsing, authorization, business invariants, persistence, concurrency policy, and compensation after user code has run.
+
+## Migration notes
+
+- Explicit contexts now include only selected types and explicitly selected binding targets. If an application relied on unrelated linked registrations appearing through catalog leakage, select the required target with the context builder.
+- Invalid linked capability registrations are reported while the context is built. Handle that `ContextError` instead of relying on a later lookup to hide the invalid registration.
+- A reflected type with non-`Send + Sync` fields can use `#[Reflect(local_only)]` to retain local field access and construction. This does not make the value thread-safe; `#[reflect(skip)]` remains available when a member should be omitted entirely.
+- Rc and Arc descriptors now expose their pointee generic argument; downstream production code does not need a migration for this metadata addition.
+- For pinned generic methods, select the exact specialization with `specialization(&MethodArguments)` and call `MethodSpecializationDescriptor::invoke_pinned`. Rejected calls retain the pinned receiver and arguments. Bindings such as `echo<T>(Pin<&mut Self>, T) -> T` are discoverable, but invoking one remains unavailable while generic parameter metadata cannot identify the concrete argument type.
 
 ## Further reading
 
