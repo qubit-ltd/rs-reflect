@@ -175,7 +175,11 @@ pub(crate) fn parse_and_validate_declaration(
 /// # Errors
 ///
 /// Returns a syntax error when the top-level item cannot be parsed.
-fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
+fn parse_pipeline(
+    kind: MacroKind,
+    args: TokenStream,
+    input: TokenStream,
+) -> SynResult<ParsedPipeline> {
     match kind {
         MacroKind::Derive => parse_derive(args, input),
         MacroKind::Trait => parse_trait(args, input),
@@ -198,12 +202,16 @@ fn parse_pipeline(kind: MacroKind, args: TokenStream, input: TokenStream) -> Syn
 ///
 /// Returns a syntax error when the derive input cannot be parsed.
 fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
-    if !args.is_empty() {
-        return Err(Error::new_spanned(
-            args,
-            "`Reflect` derive does not accept macro arguments",
-        ));
-    }
+    let local_only = if args.is_empty() {
+        false
+    } else {
+        let arguments =
+            Punctuated::<syn::Ident, Token![,]>::parse_terminated.parse2(args.clone())?;
+        if arguments.len() != 1 || arguments[0] != "local_only" {
+            return Err(Error::new_spanned(args, "expected `local_only`"));
+        }
+        true
+    };
     let input: DeriveInput = parse2(input)?;
     let mut errors = ErrorCollector::default();
     let attributes = parse_attributes(&input.attrs, HelperTarget::Type, &mut errors);
@@ -212,6 +220,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
     let retained_tokens = input.to_token_stream();
     let declaration = match &input.data {
         Data::Struct(data) => TypeDeclarationIr {
+            local_only,
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Struct,
             field_shape: match data.fields {
@@ -228,6 +237,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             span: input.ident.span(),
         },
         Data::Enum(data) => TypeDeclarationIr {
+            local_only,
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Enum,
             field_shape: FieldShapeIr::Unit,
@@ -240,7 +250,8 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
                 .iter()
                 .enumerate()
                 .filter_map(|(index, variant)| {
-                    let attributes = parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
+                    let attributes =
+                        parse_attributes(&variant.attrs, HelperTarget::Variant, &mut errors);
                     if is_skipped(&attributes, &mut errors) {
                         return None;
                     }
@@ -267,6 +278,7 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
             span: input.ident.span(),
         },
         Data::Union(data) => TypeDeclarationIr {
+            local_only,
             name: input.ident.clone(),
             kind: TypeDeclarationKindIr::Union,
             field_shape: FieldShapeIr::Named,
@@ -305,7 +317,10 @@ fn parse_derive(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeli
 fn parse_trait(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline> {
     let item: Item = parse2(input)?;
     let Item::Trait(mut item) = item else {
-        return Err(Error::new(item.span(), "`#[reflect]` can only be applied to a trait"));
+        return Err(Error::new(
+            item.span(),
+            "`#[reflect]` can only be applied to a trait",
+        ));
     };
     let mut errors = ErrorCollector::default();
     let (helper_tokens, supertrait_bindings) = parse_trait_arguments(args)?;
@@ -377,7 +392,9 @@ impl Parse for TraitMacroArguments {
     }
 }
 
-fn parse_trait_arguments(tokens: TokenStream) -> SynResult<(TokenStream, Vec<TraitSupertraitBindingIr>)> {
+fn parse_trait_arguments(
+    tokens: TokenStream,
+) -> SynResult<(TokenStream, Vec<TraitSupertraitBindingIr>)> {
     if tokens.is_empty() {
         return Ok((TokenStream::new(), Vec::new()));
     }
@@ -409,10 +426,12 @@ fn parse_impl(args: TokenStream, input: TokenStream) -> SynResult<ParsedPipeline
         ));
     };
     let mut errors = ErrorCollector::default();
-    let (reflected_trait, external_trait) = parse_trait_identity_arguments(args.clone(), &mut errors);
+    let (reflected_trait, external_trait) =
+        parse_trait_identity_arguments(args.clone(), &mut errors);
     let helper_args = parse_impl_helper_arguments(args, &mut errors);
     let attributes = parse_helper_tokens(helper_args, HelperTarget::Impl, &mut errors);
-    let (methods, skipped_methods, associated_types, associated_consts) = convert_impl_items(&item, &mut errors);
+    let (methods, skipped_methods, associated_types, associated_consts) =
+        convert_impl_items(&item, &mut errors);
     let trait_path = item.trait_.as_ref().map(|(path, _)| convert_path(path));
     let target_type = convert_type(&item.self_ty);
     strip_impl_helpers(&mut item);
@@ -462,17 +481,30 @@ fn parse_trait_identity_arguments(
         } else {
             continue;
         };
-        let name = meta.path().get_ident().expect("matched identity argument").to_string();
+        let name = meta
+            .path()
+            .get_ident()
+            .expect("matched identity argument")
+            .to_string();
         if slot.is_some() {
-            errors.push(Error::new_spanned(meta, format!("`{name}` may only be specified once")));
+            errors.push(Error::new_spanned(
+                meta,
+                format!("`{name}` may only be specified once"),
+            ));
             continue;
         }
         let Meta::NameValue(value) = meta else {
-            errors.push(Error::new_spanned(meta, format!("`{name}` must be set to a path")));
+            errors.push(Error::new_spanned(
+                meta,
+                format!("`{name}` must be set to a path"),
+            ));
             continue;
         };
         let Expr::Path(path) = value.value else {
-            errors.push(Error::new_spanned(value, format!("`{name}` must be set to a path")));
+            errors.push(Error::new_spanned(
+                value,
+                format!("`{name}` must be set to a path"),
+            ));
             continue;
         };
         *slot = Some(crate::parse::type_ir::convert_path(&path.path));
@@ -498,7 +530,9 @@ fn parse_impl_helper_arguments(args: TokenStream, errors: &mut ErrorCollector) -
     };
     let helpers = metas
         .into_iter()
-        .filter(|meta| !meta.path().is_ident("reflected_trait") && !meta.path().is_ident("external_trait"))
+        .filter(|meta| {
+            !meta.path().is_ident("reflected_trait") && !meta.path().is_ident("external_trait")
+        })
         .collect::<Vec<_>>();
     quote!(#(#helpers),*)
 }
@@ -557,7 +591,9 @@ fn convert_fields(
                 name: field.ident.clone(),
                 index,
                 visibility: if matches!(field.vis, Visibility::Inherited) {
-                    inherited_visibility.cloned().unwrap_or(VisibilityIr::Inherited)
+                    inherited_visibility
+                        .cloned()
+                        .unwrap_or(VisibilityIr::Inherited)
                 } else {
                     convert_visibility(&field.vis)
                 },
@@ -649,7 +685,9 @@ fn convert_generics(generics: &Generics) -> GenericsIr {
                         .iter()
                         .flat_map(|lifetimes| lifetimes.lifetimes.iter())
                         .filter_map(|parameter| match parameter {
-                            GenericParam::Lifetime(lifetime) => Some(lifetime.lifetime.to_token_stream().to_string()),
+                            GenericParam::Lifetime(lifetime) => {
+                                Some(lifetime.lifetime.to_token_stream().to_string())
+                            }
                             _ => None,
                         })
                         .collect(),
@@ -680,10 +718,18 @@ fn convert_visibility(visibility: &Visibility) -> VisibilityIr {
     match visibility {
         Visibility::Public(_) => VisibilityIr::Public,
         Visibility::Inherited => VisibilityIr::Inherited,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => VisibilityIr::Crate,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => VisibilityIr::Super,
-        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => VisibilityIr::SelfValue,
-        Visibility::Restricted(restricted) => VisibilityIr::Restricted(convert_path(&restricted.path)),
+        Visibility::Restricted(restricted) if restricted.path.is_ident("crate") => {
+            VisibilityIr::Crate
+        }
+        Visibility::Restricted(restricted) if restricted.path.is_ident("super") => {
+            VisibilityIr::Super
+        }
+        Visibility::Restricted(restricted) if restricted.path.is_ident("self") => {
+            VisibilityIr::SelfValue
+        }
+        Visibility::Restricted(restricted) => {
+            VisibilityIr::Restricted(convert_path(&restricted.path))
+        }
     }
 }
 
@@ -773,7 +819,8 @@ fn convert_impl_items(
     for impl_item in &item.items {
         match impl_item {
             ImplItem::Fn(function) => {
-                let method = convert_method(&function.sig, &function.vis, &function.attrs, true, errors);
+                let method =
+                    convert_method(&function.sig, &function.vis, &function.attrs, true, errors);
                 if is_skipped(&method.attributes, errors) {
                     skipped_methods.push(method);
                 } else {
@@ -800,7 +847,12 @@ fn convert_impl_items(
             _ => {}
         }
     }
-    (methods, skipped_methods, associated_types, associated_consts)
+    (
+        methods,
+        skipped_methods,
+        associated_types,
+        associated_consts,
+    )
 }
 
 /// Converts a method signature and all method helpers.
@@ -859,9 +911,10 @@ fn convert_method(
             FnArg::Typed(value) => {
                 let pattern_tokens = value.pat.to_token_stream();
                 let (name, kind) = match value.pat.as_ref() {
-                    Pat::Ident(identifier) if identifier.subpat.is_none() => {
-                        (Some(identifier.ident.to_string()), ParameterPatternKindIr::Identifier)
-                    }
+                    Pat::Ident(identifier) if identifier.subpat.is_none() => (
+                        Some(identifier.ident.to_string()),
+                        ParameterPatternKindIr::Identifier,
+                    ),
                     Pat::Ident(_) => (None, ParameterPatternKindIr::Destructure),
                     Pat::Wild(_) => (None, ParameterPatternKindIr::Wildcard),
                     _ => (None, ParameterPatternKindIr::Destructure),
@@ -891,10 +944,11 @@ fn convert_method(
         is_const: signature.constness.is_some(),
         is_async: signature.asyncness.is_some(),
         is_unsafe: matches!(signature.safety, syn::Safety::Unsafe(_)),
-        abi: signature
-            .abi
-            .as_ref()
-            .map(|abi| abi.name.as_ref().map_or_else(|| "C".to_owned(), LitStr::value)),
+        abi: signature.abi.as_ref().map(|abi| {
+            abi.name
+                .as_ref()
+                .map_or_else(|| "C".to_owned(), LitStr::value)
+        }),
         is_variadic: signature.variadic.is_some(),
     };
     MethodIr {

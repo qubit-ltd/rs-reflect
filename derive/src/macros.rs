@@ -106,7 +106,8 @@ fn expand_reflect_external_trait(
         let trait_name = syn::LitStr::new(&trait_name, path.span());
         let source = syn::LitStr::new(&source_path, path.span());
         let fingerprint = context.fingerprint(&source_path);
-        let marker_provider = format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
+        let marker_provider =
+            format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
         Ok(quote! {
             const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
 
@@ -257,31 +258,17 @@ pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn reflect_type(attribute: TokenStream, mut item: ItemStruct) -> TokenStream {
-    if !attribute.is_empty() {
-        return syn::Error::new_spanned(
-            TokenStream2::from(attribute),
-            "`#[Reflect]` does not accept arguments on structs",
-        )
-        .into_compile_error()
-        .into();
-    }
+    let args = TokenStream2::from(attribute);
     let reflected_item = item.to_token_stream();
     strip_attributes(&mut item.attrs);
     for field in &mut item.fields {
         strip_attributes(&mut field.attrs);
     }
-    expand_type(item, reflected_item)
+    expand_type(item, reflected_item, args)
 }
 
 fn reflect_enum(attribute: TokenStream, mut item: ItemEnum) -> TokenStream {
-    if !attribute.is_empty() {
-        return syn::Error::new_spanned(
-            TokenStream2::from(attribute),
-            "`#[Reflect]` does not accept arguments on enums",
-        )
-        .into_compile_error()
-        .into();
-    }
+    let args = TokenStream2::from(attribute);
     let reflected_item = item.to_token_stream();
     strip_attributes(&mut item.attrs);
     for variant in &mut item.variants {
@@ -290,12 +277,16 @@ fn reflect_enum(attribute: TokenStream, mut item: ItemEnum) -> TokenStream {
             strip_attributes(&mut field.attrs);
         }
     }
-    expand_type(item, reflected_item)
+    expand_type(item, reflected_item, args)
 }
 
-fn expand_type(item: impl ToTokens, reflected_item: TokenStream2) -> TokenStream {
+fn expand_type(
+    item: impl ToTokens,
+    reflected_item: TokenStream2,
+    args: TokenStream2,
+) -> TokenStream {
     let item = item.to_token_stream();
-    let generated = entry::process_macro(MacroKind::Derive, TokenStream::new(), reflected_item.into());
+    let generated = entry::process_macro(MacroKind::Derive, args.into(), reflected_item.into());
     let item: TokenStream2 = item;
     let generated: TokenStream2 = generated.into();
     quote!(#item #generated).into()
@@ -325,9 +316,11 @@ mod tests {
     #[test]
     fn test_bind_method_emits_v4_protocol_handshake() {
         let context = ExpansionContext::for_tests();
-        let tokens =
-            crate::expand::bind_method::expand_with_context(quote!(Fixture::method as fn(&Fixture) -> u32), &context)
-                .expect("method binding should expand");
+        let tokens = crate::expand::bind_method::expand_with_context(
+            quote!(Fixture::method as fn(&Fixture) -> u32),
+            &context,
+        )
+        .expect("method binding should expand");
 
         assert_v4_protocol_handshake(tokens);
     }
@@ -347,8 +340,9 @@ mod tests {
     #[test]
     fn test_reflect_external_trait_emits_v4_protocol_handshake() {
         let context = ExpansionContext::for_tests();
-        let tokens = expand_reflect_external_trait(quote!(pub ExternalDebug = ::std::fmt::Debug;), &context)
-            .expect("external trait marker should expand");
+        let tokens =
+            expand_reflect_external_trait(quote!(pub ExternalDebug = ::std::fmt::Debug;), &context)
+                .expect("external trait marker should expand");
 
         assert_v4_protocol_handshake(tokens);
     }

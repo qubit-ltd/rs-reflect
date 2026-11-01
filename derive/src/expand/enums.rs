@@ -17,7 +17,6 @@ use syn::Lifetime;
 use syn::LitInt;
 use syn::Meta;
 use syn::Token;
-use syn::parse::Parser;
 use syn::parse_quote;
 use syn::parse2;
 use syn::punctuated::Punctuated;
@@ -47,11 +46,17 @@ use crate::ir::VariantKindIr;
 ///
 /// Returns a syntax diagnostic when the declaration is not an enum or retained
 /// generic syntax cannot be parsed.
-pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
+pub(crate) fn expand(
+    declaration: TypeDeclarationIr,
+    context: &ExpansionContext,
+) -> syn::Result<TokenStream> {
     expand_v4(declaration, context)
 }
 
-fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
+fn expand_v4(
+    declaration: TypeDeclarationIr,
+    context: &ExpansionContext,
+) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return Err(syn::Error::new(
             declaration.span,
@@ -64,7 +69,8 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let module = format_ident!("__qubit_reflect_v4_enum_{fingerprint:016x}");
     let marker = format_ident!("TypeDefinitionMarker");
-    let environment = super::generic_environment::GenericEnvironment::from_generics(&declaration.generics);
+    let environment =
+        super::generic_environment::GenericEnvironment::from_generics(&declaration.generics);
     let constructible_variants: Vec<_> = declaration
         .variants
         .iter()
@@ -83,7 +89,12 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                         || super::structs::supports_construction(&field.ty, &owner_name)
                 })
                 && variant.fields.iter().all(|field| {
-                    super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
+                    super::generics::field_cfg_attributes(
+                        &declaration,
+                        Some(variant.index),
+                        field.index,
+                    )
+                    .is_empty()
                 })
                 && variant.fields.iter().all(|field| {
                     !field
@@ -94,7 +105,8 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         })
         .map(|variant| variant.index)
         .collect();
-    let thread_safe_construction = declaration.generics.params.is_empty()
+    let thread_safe_construction = !declaration.local_only
+        && declaration.generics.params.is_empty()
         && declaration.variants.iter().all(|variant| {
             !variant
                 .attributes
@@ -108,8 +120,12 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                         .iter()
                         .any(|attribute| attribute.name == HelperName::Skip)
                         && super::structs::supports_construction(&field.ty, &owner_name)
-                        && super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index)
-                            .is_empty()
+                        && super::generics::field_cfg_attributes(
+                            &declaration,
+                            Some(variant.index),
+                            field.index,
+                        )
+                        .is_empty()
                 })
         });
     let integer_repr = declaration
@@ -135,7 +151,9 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause.predicates.push(parse_quote!(#lifetime: 'static));
+            where_clause
+                .predicates
+                .push(parse_quote!(#lifetime: 'static));
         }
         for parameter in declaration
             .generics
@@ -144,7 +162,9 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             .filter(|parameter| parameter.kind == GenericKindIr::Type)
         {
             let parameter = Ident::new(&parameter.name, parameter.span);
-            where_clause.predicates.push(parse_quote!(#parameter: 'static));
+            where_clause
+                .predicates
+                .push(parse_quote!(#parameter: 'static));
         }
         for variant in &declaration.variants {
             for field in &variant.fields {
@@ -153,7 +173,12 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                     .iter()
                     .any(|attribute| attribute.name == HelperName::Skip)
                     || !super::structs::supports_reflection(&field.ty, &owner_name)
-                    || !super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
+                    || !super::generics::field_cfg_attributes(
+                        &declaration,
+                        Some(variant.index),
+                        field.index,
+                    )
+                    .is_empty()
                 {
                     continue;
                 }
@@ -177,10 +202,9 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             syn::Fields::Unnamed(_) => quote!(Self::#name(..)),
             syn::Fields::Named(_) => quote!(Self::#name { .. }),
         };
-        let cfg = variant
-            .attrs
-            .iter()
-            .filter(|attribute| attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr"));
+        let cfg = variant.attrs.iter().filter(|attribute| {
+            attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr")
+        });
         let name = name.to_string();
         quote! {
             #(#cfg)*
@@ -246,18 +270,34 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 )
             } else {
                 (
-                    tuple_field_patterns(&declaration, variant.index, field_index, variant_name, &binding),
-                    tuple_field_patterns(&declaration, variant.index, field_index, variant_name, &binding),
+                    tuple_field_patterns(
+                        &declaration,
+                        variant.index,
+                        field_index,
+                        variant_name,
+                        &binding,
+                    ),
+                    tuple_field_patterns(
+                        &declaration,
+                        variant.index,
+                        field_index,
+                        variant_name,
+                        &binding,
+                    ),
                 )
             };
-            let cfg_field = super::generics::field_cfg_attributes(&declaration, Some(variant.index), field_index);
+            let cfg_field = super::generics::field_cfg_attributes(
+                &declaration,
+                Some(variant.index),
+                field_index,
+            );
             methods.push(quote! {
                 #(#cfg_field)*
-                fn #get<'a>(value: &'a Self) -> &'a #ty {
+                fn #get(value: &Self) -> & #ty {
                     match value { #pattern }
                 }
                 #(#cfg_field)*
-                fn #get_mut<'a>(value: &'a mut Self) -> &'a mut #ty {
+                fn #get_mut(value: &mut Self) -> &mut #ty {
                     match value { #mutable_pattern }
                 }
             });
@@ -267,13 +307,15 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 .map(ToString::to_string)
                 .unwrap_or_else(|| field_index.to_string());
             let visibility = super::structs::v4_visibility(&field.visibility, &facade, field.span);
-            let expression = super::expression_codegen::type_expression(&field.ty, &environment, &facade);
+            let expression =
+                super::expression_codegen::type_expression(&field.ty, &environment, &facade);
             let adapter = quote!(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #facade::__private::codegen_v4::access::TypedFieldAdapter::<Self, #ty>::for_variant(
                     Self::#get, Self::#get_mut, Self::#active_variant_identity,
                 )
             )));
-            let local_dynamic = if super::structs::supports_construction(&field.ty, &owner_name) && cfg_field.is_empty()
+            let local_dynamic = if super::structs::supports_construction(&field.ty, &owner_name)
+                && cfg_field.is_empty()
             {
                 quote!(.with_local_dynamic(#adapter))
             } else {
@@ -284,7 +326,9 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             } else {
                 TokenStream::new()
             };
-            let concrete_type = if super::structs::supports_reflection(&field.ty, &owner_name) && cfg_field.is_empty() {
+            let concrete_type = if super::structs::supports_reflection(&field.ty, &owner_name)
+                && cfg_field.is_empty()
+            {
                 quote!(.with_concrete_type::<#ty>())
             } else {
                 TokenStream::new()
@@ -330,7 +374,8 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 quote!(#facade::__private::codegen_v4::access::VariantShape::Struct)
             }
         };
-        let variant_visibility = super::structs::v4_visibility(&declaration.visibility, &facade, declaration.span);
+        let variant_visibility =
+            super::structs::v4_visibility(&declaration.visibility, &facade, declaration.span);
         let variant_name_text = variant_name.to_string();
         let origin = if variant.discriminant.is_some() {
             quote!(#facade::__private::codegen_v4::access::DiscriminantOrigin::Explicit)
@@ -338,8 +383,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             quote!(#facade::__private::codegen_v4::access::DiscriminantOrigin::Implicit)
         };
         let numeric = numeric_discriminant_v4(&name, variant_name, integer_repr, &facade);
-        let variant_discriminant =
-            quote!(#facade::__private::codegen_v4::access::VariantDiscriminant::new(#origin, #numeric));
+        let variant_discriminant = quote!(#facade::__private::codegen_v4::access::VariantDiscriminant::new(#origin, #numeric));
         variant_metadata.push(quote! {
             #(#cfg)*
             #facade::__private::codegen_v4::access::VariantMetadata::new(
@@ -379,11 +423,18 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
         });
     }
     let type_definition_ident = format_ident!("__qubit_reflect_type_definition");
-    let generic_definition =
-        super::expression_codegen::generic_definition(&declaration.generics, declaration.span, &facade);
-    let generic_arguments =
-        super::expression_codegen::generic_arguments(&declaration.generics, &type_definition_ident, &facade);
-    let type_definition_and_arguments = {
+    let definition_fn = format_ident!("{}_definition_registration", module);
+    let generic_definition = super::expression_codegen::generic_definition(
+        &declaration.generics,
+        declaration.span,
+        &facade,
+    );
+    let generic_arguments = super::expression_codegen::generic_arguments(
+        &declaration.generics,
+        &type_definition_ident,
+        &facade,
+    );
+    let type_definition_and_arguments = if declaration.generics.params.is_empty() {
         let rust_name = name.to_string();
         quote!({
             let generic_definition = ::std::boxed::Box::leak(::std::boxed::Box::new(#generic_definition));
@@ -398,12 +449,17 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
             (Some(#type_definition_ident), generic_arguments)
         })
+    } else {
+        quote!({
+            let #type_definition_ident = #facade::__private::codegen_v4::registration::type_definition_metadata(#definition_fn());
+            let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
+            (Some(#type_definition_ident), generic_arguments)
+        })
     };
     let type_submission = if declaration.generics.params.is_empty() {
         quote!(#facade::__private::codegen_v4::registration::submit_type!(#name);)
     } else {
         let registration_fn = format_ident!("{}_registration", module);
-        let definition_fn = format_ident!("{}_definition_registration", module);
         let capability_fn = format_ident!("__qubit_reflect_v4_definition_capability_{}", name);
         let rust_name = name.to_string();
         quote! {
@@ -503,8 +559,8 @@ fn source_variant_fields(declaration: &TypeDeclarationIr, variant_index: usize) 
 }
 
 fn source_enum(declaration: &TypeDeclarationIr) -> Vec<syn::Variant> {
-    let input: DeriveInput =
-        parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid enum declaration");
+    let input: DeriveInput = parse2(declaration.retained_tokens.clone())
+        .expect("the parser retains a valid enum declaration");
     let syn::Data::Enum(data) = input.data else {
         unreachable!("enum expansion receives an enum declaration");
     };
@@ -524,11 +580,12 @@ fn tuple_field_patterns(
     let mut conditional_prefix = Vec::new();
     let mut fixed_prefix = Vec::new();
     for source_index in 0..field_index {
-        let cfg = super::generics::field_cfg_attributes(declaration, Some(variant_index), source_index);
+        let cfg =
+            super::generics::field_cfg_attributes(declaration, Some(variant_index), source_index);
         if cfg.is_empty() {
             fixed_prefix.push(source_index);
         } else {
-            conditional_prefix.push((source_index, field_presence_predicate(&cfg)));
+            conditional_prefix.push((source_index, super::generics::field_presence_predicate(&cfg)));
         }
     }
 
@@ -567,77 +624,17 @@ fn tuple_field_patterns(
     quote!(#(#arms)* _ => unreachable!("field is only active for its variant"))
 }
 
-/// Converts field cfg/cfg_attr attributes to a cfg predicate describing when
-/// the field exists in the compiled enum shape.
-fn field_presence_predicate(attributes: &[syn::Attribute]) -> TokenStream {
-    let constraints = attributes
-        .iter()
-        .filter_map(attribute_presence_predicate)
-        .collect::<Vec<_>>();
-    quote!(all(#(#constraints),*))
-}
-
-fn attribute_presence_predicate(attribute: &syn::Attribute) -> Option<TokenStream> {
-    if attribute.path().is_ident("cfg") {
-        let predicate = attribute.parse_args::<Meta>().ok()?;
-        return Some(quote!(#predicate));
-    }
-    if !attribute.path().is_ident("cfg_attr") {
-        return None;
-    }
-    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse2(attribute.meta.require_list().ok()?.tokens.clone())
-        .ok()?;
-    let mut arguments = arguments.into_iter();
-    let gate = arguments.next()?;
-    let nested = arguments
-        .filter_map(|meta| meta_presence_predicate(&meta))
-        .collect::<Vec<_>>();
-    if nested.is_empty() {
-        return None;
-    }
-    let nested = quote!(all(#(#nested),*));
-    Some(quote!(any(not(#gate), #nested)))
-}
-
-fn meta_presence_predicate(meta: &Meta) -> Option<TokenStream> {
-    if meta.path().is_ident("cfg") {
-        let Meta::List(list) = meta else {
-            return None;
-        };
-        let predicate = syn::parse2::<Meta>(list.tokens.clone()).ok()?;
-        return Some(quote!(#predicate));
-    }
-    if !meta.path().is_ident("cfg_attr") {
-        return None;
-    }
-    let Meta::List(list) = meta else {
-        return None;
-    };
-    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse2(list.tokens.clone())
-        .ok()?;
-    let mut arguments = arguments.into_iter();
-    let gate = arguments.next()?;
-    let nested = arguments
-        .filter_map(|meta| meta_presence_predicate(&meta))
-        .collect::<Vec<_>>();
-    if nested.is_empty() {
-        return None;
-    }
-    let nested = quote!(all(#(#nested),*));
-    Some(quote!(any(not(#gate), #nested)))
-}
-
 fn has_skipped_source_field(declaration: &TypeDeclarationIr, variant_index: usize) -> bool {
-    source_variant_fields(declaration, variant_index).iter().any(|field| {
-        field.attrs.iter().any(|attribute| {
-            attribute.path().is_ident("reflect")
-                && attribute
-                    .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                    .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
+    source_variant_fields(declaration, variant_index)
+        .iter()
+        .any(|field| {
+            field.attrs.iter().any(|attribute| {
+                attribute.path().is_ident("reflect")
+                    && attribute
+                        .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                        .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
+            })
         })
-    })
 }
 
 fn enum_variant_provider(
@@ -655,7 +652,8 @@ fn enum_variant_provider(
             }),
         );
     }
-    let (local_methods, local_provider) = enum_variant_provider_mode(variant, facade, "local", quote!(Local));
+    let (local_methods, local_provider) =
+        enum_variant_provider_mode(variant, facade, "local", quote!(Local));
     if thread_safe {
         let (thread_safe_methods, thread_safe_provider) =
             enum_variant_provider_mode(variant, facade, "thread_safe", quote!(ThreadSafe));
@@ -756,11 +754,16 @@ fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
         return Vec::new();
     };
     let mut representations = Vec::new();
-    for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
+    for attribute in input
+        .attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("repr"))
+    {
         let Meta::List(list) = &attribute.meta else {
             continue;
         };
-        let Ok(values) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) else {
+        let Ok(values) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+        else {
             continue;
         };
         representations.extend(values.iter().filter_map(parse_enum_representation));
@@ -838,7 +841,10 @@ mod tests {
             .expect("the structural fixture should expand")
             .to_string();
 
-        assert!(generated.contains("codegen_v4"), "enum tokens must use the v4 protocol");
+        assert!(
+            generated.contains("codegen_v4"),
+            "enum tokens must use the v4 protocol"
+        );
         assert!(
             !generated.contains(concat!("codegen_", "v3")),
             "enum tokens must not use the v3 protocol"
@@ -847,7 +853,12 @@ mod tests {
         assert!(generated.contains("variant_metadata"));
         assert!(generated.contains("with_local_dynamic"));
         assert!(!generated.contains("with_thread_safe_dynamic"));
-        for forbidden in ["TypeIdentity", "FragmentIdentity", "RuntimeIdentity", "inventory"] {
+        for forbidden in [
+            "TypeIdentity",
+            "FragmentIdentity",
+            "RuntimeIdentity",
+            "inventory",
+        ] {
             assert!(
                 !generated.contains(forbidden),
                 "generated tokens must not mention {forbidden}"

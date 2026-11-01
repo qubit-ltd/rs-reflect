@@ -60,6 +60,8 @@ pub(crate) enum DeclarationIr {
 /// A struct, enum, or rejected union derive input.
 #[derive(Clone, Debug)]
 pub(crate) struct TypeDeclarationIr {
+    /// Whether this type must use local-only reflection adapters.
+    pub(crate) local_only: bool,
     /// The source type identifier.
     pub(crate) name: Ident,
     /// The Rust data-declaration form.

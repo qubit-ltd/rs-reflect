@@ -1,0 +1,17 @@
+error: expected `local_only`
+ --> tests/ui/fail/invalid_local_only_arguments_tests.rs:9:26
+  |
+9 | #[qubit_reflect::Reflect(local_only, local_only)]
+  |                          ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `local_only`
+  --> tests/ui/fail/invalid_local_only_arguments_tests.rs:14:26
+   |
+14 | #[qubit_reflect::Reflect(unknown)]
+   |                          ^^^^^^^
+
+error: unknown reflection helper `local_only`
+  --> tests/ui/fail/invalid_local_only_arguments_tests.rs:19:26
+   |
+19 | #[qubit_reflect::Reflect(local_only)]
+   |                          ^^^^^^^^^^

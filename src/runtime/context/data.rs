@@ -91,10 +91,15 @@ impl ContextData {
     pub(crate) fn build(mut registrations: Vec<Registration>) -> Result<Self, ContextError> {
         registrations.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
 
+        let issues: Box<[_]> = registrations.iter_mut().flat_map(Registration::take_issues).collect();
+        if let Some(error) = ContextError::from_issues(issues) {
+            return Err(error);
+        }
+
         let mut registration_group_by_type = HashMap::with_capacity(registrations.len());
         let mut origins_by_type = Vec::<(TypeId, Vec<_>)>::with_capacity(registrations.len());
         let mut types = Vec::with_capacity(registrations.len());
-        let mut type_definitions = HashMap::new();
+        let mut type_definitions: HashMap<TypeDefinitionId, &'static TypeDefinitionMetadata> = HashMap::new();
         let mut trait_definitions = HashMap::new();
         let mut impl_definitions = HashMap::new();
         let mut registered_impl_definitions = Vec::new();
@@ -134,13 +139,17 @@ impl ContextData {
             for metadata in registration.type_definitions() {
                 let origins = type_definition_origins.entry(metadata.id).or_default();
                 origins.push(registration.origin().clone());
-                if type_definitions.insert(metadata.id, *metadata).is_some() {
+                if let Some(previous) = type_definitions.get(&metadata.id) {
+                    if std::ptr::eq::<TypeDefinitionMetadata>(*previous, *metadata) {
+                        continue;
+                    }
                     return Err(ContextError::from_issues(vec![ContextIssue::ConflictingTypeDefinition {
                         identity: item_identity(ItemKind::TypeDefinition, metadata.path, metadata.name),
                         registrations: origins.clone().into_boxed_slice(),
                     }])
                     .expect("one context issue is nonempty"));
                 }
+                type_definitions.insert(metadata.id, *metadata);
             }
             for metadata in registration.trait_definitions() {
                 // Source paths are lookup candidates and display metadata. Multiple
@@ -276,13 +285,10 @@ impl ContextData {
             trait_definitions.values().copied(),
         );
         let registered_type_ids: std::collections::HashSet<_> = types.iter().map(|record| record.type_id()).collect();
-        let mut included_types = registered_type_ids.clone();
-        let method_catalog_registrations: Vec<_> = inventory::iter::<MethodCatalogRegistration>().collect();
-        included_types.extend(
-            method_catalog_registrations
-                .iter()
-                .map(|registration| registration.type_id()),
-        );
+        let included_types = &registered_type_ids;
+        let method_catalog_registrations: Vec<_> = inventory::iter::<MethodCatalogRegistration>()
+            .filter(|registration| included_types.contains(&registration.type_id()))
+            .collect();
         for (definition, instances) in &type_instances {
             if !type_definitions.contains_key(definition) {
                 return Err(ContextError::from_issues(vec![ContextIssue::MissingDependency {
@@ -439,7 +445,7 @@ impl ContextData {
             &trait_definition_ids_by_path,
         )?;
         let methods = aggregate_method_catalogs(
-            &included_types,
+            included_types,
             &impl_applications,
             &method_catalog_registrations,
             &method_bindings,
@@ -2006,19 +2012,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_type_definition_identity() {
-        let error = match ContextData::build(vec![
+    fn accepts_repeated_canonical_type_definition_metadata() {
+        let context = ContextData::build(vec![
             Registration::metadata_only().with_type_definition_metadata(&TYPE_DEFINITION),
             Registration::metadata_only().with_type_definition_metadata(&TYPE_DEFINITION),
-        ]) {
-            Ok(_) => panic!("one typed generic definition cannot be registered twice"),
-            Err(error) => error,
-        };
+        ])
+        .expect("repeated references to one canonical definition are idempotent");
 
-        assert!(matches!(
-            error.primary_issue(),
-            ContextIssue::ConflictingTypeDefinition { .. }
-        ));
+        assert_eq!(
+            context.type_definition(TYPE_DEFINITION.id).unwrap().name,
+            "TypeDefinitionMarker"
+        );
     }
 
     #[test]

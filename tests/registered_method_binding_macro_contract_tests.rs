@@ -37,6 +37,9 @@ impl GenericMethodOwner {
 register_method_binding!(GenericMethodOwner::convert::<u64> as fn(&GenericMethodOwner, u64) -> u64);
 qubit_reflect::__private::codegen_v4::registration::submit_type!(GenericMethodOwner);
 
+#[ReflectDerive]
+struct CatalogIsolationTarget;
+
 struct LifetimeBindingTarget;
 
 impl Reflect for LifetimeBindingTarget {
@@ -94,6 +97,32 @@ impl ExternalLifetimeBindingTrait<'static, u8> for ExternalLifetimeBindingTarget
 #[test]
 fn test_public_register_method_binding_accepts_typed_method_path() {
     assert_eq!(qubit_reflect::__private::codegen_v4::PROTOCOL_VERSION, 4,);
+}
+
+#[test]
+fn test_explicit_context_ignores_unselected_method_catalogs() {
+    let empty = ReflectionContext::builder()
+        .build()
+        .expect("an empty explicit context ignores global method catalogs");
+    assert!(empty.type_of::<GenericMethodOwner>().method("convert").is_err());
+
+    let unrelated = ReflectionContext::builder()
+        .include_type::<CatalogIsolationTarget>()
+        .build()
+        .expect("an unrelated explicit type ignores unselected method catalogs");
+    assert!(unrelated.type_of::<GenericMethodOwner>().method("convert").is_err());
+}
+
+#[test]
+fn test_selected_catalog_still_requires_its_trait_application() {
+    let result = ReflectionContext::builder()
+        .include_type::<LifetimeBindingTarget>()
+        .build();
+    let error = match result {
+        Ok(_) => panic!("a selected catalog without its trait application must fail"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("not registered"), "{error}");
 }
 
 #[test]

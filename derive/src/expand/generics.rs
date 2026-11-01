@@ -8,6 +8,13 @@
 
 //! Expansion helpers for generic syntax and source configuration attributes.
 
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::Meta;
+use syn::Token;
+
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
 
@@ -87,6 +94,68 @@ pub(crate) fn field_cfg_attributes(
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Converts field `cfg` and nested `cfg_attr` attributes to a predicate that
+/// describes when the source field exists in the compiled tuple shape.
+pub(crate) fn field_presence_predicate(attributes: &[syn::Attribute]) -> TokenStream {
+    let constraints = attributes
+        .iter()
+        .filter_map(attribute_presence_predicate)
+        .collect::<Vec<_>>();
+    quote!(all(#(#constraints),*))
+}
+
+fn attribute_presence_predicate(attribute: &syn::Attribute) -> Option<TokenStream> {
+    if attribute.path().is_ident("cfg") {
+        let predicate = attribute.parse_args::<Meta>().ok()?;
+        return Some(quote!(#predicate));
+    }
+    if !attribute.path().is_ident("cfg_attr") {
+        return None;
+    }
+    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(attribute.meta.require_list().ok()?.tokens.clone())
+        .ok()?;
+    let mut arguments = arguments.into_iter();
+    let gate = arguments.next()?;
+    let nested = arguments
+        .filter_map(|meta| meta_presence_predicate(&meta))
+        .collect::<Vec<_>>();
+    if nested.is_empty() {
+        return None;
+    }
+    let nested = quote!(all(#(#nested),*));
+    Some(quote!(any(not(#gate), #nested)))
+}
+
+fn meta_presence_predicate(meta: &Meta) -> Option<TokenStream> {
+    if meta.path().is_ident("cfg") {
+        let Meta::List(list) = meta else {
+            return None;
+        };
+        let predicate = syn::parse2::<Meta>(list.tokens.clone()).ok()?;
+        return Some(quote!(#predicate));
+    }
+    if !meta.path().is_ident("cfg_attr") {
+        return None;
+    }
+    let Meta::List(list) = meta else {
+        return None;
+    };
+    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()?;
+    let mut arguments = arguments.into_iter();
+    let gate = arguments.next()?;
+    let nested = arguments
+        .filter_map(|meta| meta_presence_predicate(&meta))
+        .collect::<Vec<_>>();
+    if nested.is_empty() {
+        return None;
+    }
+    let nested = quote!(all(#(#nested),*));
+    Some(quote!(any(not(#gate), #nested)))
 }
 
 /// Returns source `cfg` attributes for one enum variant.

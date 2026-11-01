@@ -277,8 +277,8 @@ impl Registration {
             Some(error) => self.issues.push(ContextIssue::InvalidMetadata {
                 item: ItemIdentity {
                     kind: ItemKind::Capability,
-                    stable_id: StableItemId("invalid capability registration".into()),
-                    display_name: "invalid capability registration".into(),
+                    stable_id: StableItemId(registration.id_str.into()),
+                    display_name: registration.id_str.into(),
                 },
                 reason: MetadataValidationError::new(error.to_string()),
             }),

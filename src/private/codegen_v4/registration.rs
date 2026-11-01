@@ -20,6 +20,14 @@ pub use crate::runtime::context::handle::registration::Registration;
 pub use crate::runtime::context::handle::registration::RegistrationFragment;
 pub use crate::runtime::context::handle::registration::TraitObjectRegistration;
 pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
+pub use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
+
+/// Returns the canonical metadata associated with a generated definition.
+pub fn type_definition_metadata<T: 'static>(
+    registration: &'static TypeDefinitionRegistration<T>,
+) -> &'static TypeDefinitionMetadata {
+    registration.metadata()
+}
 
 /// Combines generic definition metadata with a capability targeting its marker.
 ///

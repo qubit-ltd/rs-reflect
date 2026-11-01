@@ -32,6 +32,19 @@ struct PlainRecord {
 #[Reflect]
 struct ConstRecord<const SIGNED: i32, const FLAG: bool, const LETTER: char>;
 
+#[Reflect]
+struct SharedRecord<T> {
+    pub value: T,
+}
+
+#[Reflect]
+enum SharedEvent<T> {
+    Value(T),
+}
+
+#[Reflect]
+struct SharedArray<const N: usize>([u8; N]);
+
 struct Opaque;
 
 impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Opaque {
@@ -143,4 +156,105 @@ fn type_descriptor_reports_registration_definition_and_generic_arguments() {
     assert!(opaque.find_definition().is_none());
     assert!(opaque.definition().is_err());
     assert!(opaque.generic_arguments().is_empty());
+}
+
+#[test]
+fn two_instances_share_one_source_definition() {
+    let context = ReflectionContext::builder()
+        .include_type::<SharedRecord<String>>()
+        .include_type::<SharedEvent<u32>>()
+        .include_type::<SharedEvent<String>>()
+        .include_type::<SharedArray<4>>()
+        .include_type::<SharedArray<8>>()
+        .include_linked_for::<SharedRecord<u32>>()
+        .build()
+        .expect("one source definition permits multiple concrete instances");
+    let left = context.type_of::<SharedRecord<u32>>();
+    let right = context.type_of::<SharedRecord<String>>();
+    assert_ne!(left.type_id(), right.type_id());
+    assert_eq!(left.definition().unwrap().id(), right.definition().unwrap().id());
+    for (descriptor, expected) in [(&left, TypeId::of::<u32>()), (&right, TypeId::of::<String>())] {
+        assert_eq!(
+            descriptor
+                .generic_arguments()
+                .argument("T")
+                .unwrap()
+                .type_argument()
+                .unwrap()
+                .concrete_type()
+                .unwrap()
+                .type_id(),
+            expected
+        );
+    }
+
+    let event_u32 = context.type_of::<SharedEvent<u32>>();
+    let event_string = context.type_of::<SharedEvent<String>>();
+    assert_eq!(
+        event_u32.definition().unwrap().id(),
+        event_string.definition().unwrap().id()
+    );
+    assert_eq!(
+        event_u32
+            .generic_arguments()
+            .argument("T")
+            .unwrap()
+            .type_argument()
+            .unwrap()
+            .concrete_type()
+            .unwrap()
+            .type_id(),
+        TypeId::of::<u32>()
+    );
+    assert_eq!(
+        event_string
+            .generic_arguments()
+            .argument("T")
+            .unwrap()
+            .type_argument()
+            .unwrap()
+            .concrete_type()
+            .unwrap()
+            .type_id(),
+        TypeId::of::<String>()
+    );
+
+    let array_four = context.type_of::<SharedArray<4>>();
+    let array_eight = context.type_of::<SharedArray<8>>();
+    assert_eq!(
+        array_four.definition().unwrap().id(),
+        array_eight.definition().unwrap().id()
+    );
+    assert_eq!(
+        array_four
+            .generic_arguments()
+            .argument("N")
+            .unwrap()
+            .const_argument()
+            .unwrap()
+            .expression(),
+        qubit_reflect::descriptor::ConstExpression::UnsignedInteger(4)
+    );
+    assert_eq!(
+        array_eight
+            .generic_arguments()
+            .argument("N")
+            .unwrap()
+            .const_argument()
+            .unwrap()
+            .expression(),
+        qubit_reflect::descriptor::ConstExpression::UnsignedInteger(8)
+    );
+    assert_eq!(
+        left.generic_arguments()
+            .argument("T")
+            .unwrap()
+            .type_argument()
+            .unwrap()
+            .concrete_type()
+            .unwrap()
+            .type_id(),
+        TypeId::of::<u32>(),
+        "the instance introduced through include_linked_for retains its own type argument"
+    );
 }

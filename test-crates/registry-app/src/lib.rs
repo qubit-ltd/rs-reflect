@@ -105,6 +105,7 @@ mod tests {
     fn renamed_facade_binds_cross_crate_const_impl_with_trait_bound() {
         let context = ReflectionContext::builder()
             .include_linked()
+            .include_type::<BoundedConstService<u16, 5>>()
             .build()
             .expect("linked const-generic method binding builds");
         let target = BoundedConstService::<u16, 5>(10);
