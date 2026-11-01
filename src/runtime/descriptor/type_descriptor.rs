@@ -33,6 +33,7 @@ use crate::runtime::error::LookupSubject;
 use crate::runtime::error::ReflectionError;
 use crate::runtime::identity::TypeIdentity;
 use crate::runtime::lookup::Lookup;
+use crate::runtime::short_name::short_name;
 
 /// A context-bound descriptor for a concrete Rust type.
 #[derive(Clone, Copy)]
@@ -72,10 +73,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
 
     /// Returns the type name without its module path or generic arguments.
     pub fn short_name(self) -> &'static str {
-        let type_name = self.rust_type_name();
-        let path_name = type_name.rsplit("::").next().unwrap_or(type_name);
-        let end = path_name.find('<').unwrap_or(path_name.len());
-        &path_name[..end]
+        short_name(self.rust_type_name())
     }
 
     /// Returns Rust's diagnostic type name. This value is not a stable lookup

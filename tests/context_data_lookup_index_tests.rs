@@ -18,6 +18,25 @@ struct DataIndexGeneric<T> {
 }
 
 #[Reflect]
+struct DataIndexRecord<T> {
+    value: T,
+}
+
+mod first_module {
+    use qubit_reflect::Reflect;
+
+    #[Reflect]
+    pub struct SharedName(pub u8);
+}
+
+mod second_module {
+    use qubit_reflect::Reflect;
+
+    #[Reflect]
+    pub struct SharedName(pub u16);
+}
+
+#[Reflect]
 struct DataIndexTarget {
     value: u8,
 }
@@ -88,6 +107,33 @@ fn generic_definition_and_type_indexes_resolve_registered_instances() {
             .iter()
             .any(|candidate| candidate.id() == definition.id())
     );
+}
+
+#[test]
+fn descriptor_and_indexes_use_nominal_short_names() {
+    let context = ReflectionContext::builder()
+        .include_type::<DataIndexRecord<String>>()
+        .include_type::<first_module::SharedName>()
+        .include_type::<second_module::SharedName>()
+        .build()
+        .expect("the registered nominal types are valid");
+
+    let record = context.type_of::<DataIndexRecord<String>>();
+    assert_eq!(record.short_name(), "DataIndexRecord");
+    let definition = record
+        .definition()
+        .expect("the record has a retained nominal definition");
+    assert!(
+        context
+            .type_definitions_by_short_name("DataIndexRecord")
+            .expect("nominal definitions have short-name indexes")
+            .iter()
+            .any(|candidate| candidate.id() == definition.id())
+    );
+    assert!(matches!(
+        context.lookup_type_by_short_name("SharedName").unwrap(),
+        qubit_reflect::lookup::Lookup::Ambiguous(candidates) if candidates.len() == 2
+    ));
 }
 
 #[test]

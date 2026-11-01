@@ -59,6 +59,18 @@ fn set_registration<Collection: ?Sized + 'static, T: Reflect>() -> &'static Type
     })
 }
 
+fn smart_pointer_registration<Pointer: ?Sized + 'static, T: Reflect + ?Sized>() -> &'static TypeRegistration<Pointer> {
+    TypeRegistration::get_or_init_with(|| {
+        let arguments = Box::leak(
+            vec![GenericArgumentMetadata::reflected_type_argument::<T>(
+                &TYPE_PARAMETER_EXPRESSION,
+            )]
+            .into_boxed_slice(),
+        );
+        TypeRegistration::with_shape(&SMART_POINTER_KIND, None, &[]).with_generic_arguments(arguments)
+    })
+}
+
 macro_rules! impl_builtin_reflect {
     ($kind:ident; $($ty:ty),+ $(,)?) => {
         $(
@@ -163,7 +175,7 @@ macro_rules! impl_smart_pointer_reflect {
     ($module:ident, $pointer:ident) => {
         impl<T: Reflect + ?Sized> Reflect for std::$module::$pointer<T> {
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
-                shaped_registration(&SMART_POINTER_KIND)
+                smart_pointer_registration::<Self, T>()
             }
         }
     };

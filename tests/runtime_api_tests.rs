@@ -20,6 +20,9 @@ fn test_runtime_only_descriptor_and_value_path() {
     assert_eq!(descriptor.rust_type_name(), "u32");
     assert_eq!(descriptor.short_name(), "u32");
 
+    assert_eq!(TypeDescriptor::of::<Vec<String>>().short_name(), "Vec");
+    assert_eq!(TypeDescriptor::of::<Option<Vec<String>>>().short_name(), "Option");
+
     let value = DynamicOwned::<Local>::new(17_u32);
     assert_eq!(value.downcast_ref::<u32>(), Some(&17));
 }

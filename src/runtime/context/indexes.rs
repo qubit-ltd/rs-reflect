@@ -14,6 +14,7 @@ use crate::runtime::descriptor::generic::TypeDefinitionId;
 use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 use crate::runtime::descriptor::trait_descriptor::TraitDefinitionId;
 use crate::runtime::descriptor::trait_descriptor::TraitDefinitionMetadata;
+use crate::runtime::short_name::short_name;
 
 #[derive(Default)]
 pub(crate) struct ContextIndexes {
@@ -93,9 +94,4 @@ fn freeze_candidates<T>(index: HashMap<Box<str>, Vec<T>>) -> HashMap<Box<str>, B
         .into_iter()
         .map(|(name, candidates)| (name, candidates.into_boxed_slice()))
         .collect()
-}
-
-fn short_name(name: &str) -> &str {
-    let base = name.split('<').next().unwrap_or(name);
-    base.rsplit("::").next().unwrap_or(base)
 }

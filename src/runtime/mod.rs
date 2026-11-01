@@ -18,6 +18,7 @@ mod external_builtins;
 pub(crate) mod identity;
 pub(crate) mod invoke;
 pub(crate) mod lookup;
+pub(crate) mod short_name;
 pub(crate) mod value;
 
 #[cfg(test)]
