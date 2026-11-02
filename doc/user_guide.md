@@ -51,6 +51,10 @@ reflection can identify that concrete argument type.
 
 The macros generate source metadata and adapters at compile time. Reflection is opt-in: a member that is not generated into metadata cannot be found through a descriptor. `skip` is a metadata choice, not an access control feature.
 
+## Integrate a downstream derive
+
+A downstream derive crate may use the versioned `qubit_reflect::__private::codegen_v4` integration protocol when it coordinates its version with the runtime. The supported expression surface is limited to static `ExpressionData`/`TypeExpressionData`, `GenericExpressionArgument`, `TraitExpressionData`, `LifetimeExpression`, `ConstExpression`, `FunctionPointerData`, `TraitObjectData`, `OpaqueTypeData`, `PredicateData`, `TraitBoundModifier`, `GenericParameterMetadata`, `GenericArgumentMetadata`, `GenericDefinitionMetadata`, `TypeDefinitionMetadata`, `TypeDefinitionKind`, and `StructKind`, plus `type_expression_in` to bind data to an explicit context. This list matches the built-in derive output and the audited downstream derive consumer; it does not promise other expression or `codegen_v4` items. Check compatibility with `PROTOCOL_VERSION` and `protocol::assert_protocol_version`. This is not an application API or a promise that every `__private` item is supported. Keep runtime and derive versions aligned. An incompatible protocol change uses a new namespace and requires a coordinated derive and downstream upgrade; the current v4 namespace remains available.
+
 ## Reflect a trait implementation
 
 Mark a local trait with `#[Reflect]`, then name its definition explicitly on each implementation that should use its reflected definition and default-method adapters:
@@ -83,6 +87,8 @@ impl Check for Worker {
 `reflected_trait` points to the reflected trait definition. The trait path written after `impl` may use an import alias; Rust resolves that path as usual. A bare `#[ReflectImpl]` on any trait impl, including one for a local `#[Reflect]` trait, preserves the source path and records an unlinked application as `ExternalIncomplete`. It does not associate a reflected definition or provide default methods. Only `reflected_trait = ...` links a local reflected trait provider.
 
 `reflected_trait` and `external_trait` are caller assertions about the trait identity of the impl. Stable procedural macros cannot resolve import aliases to prove path equivalence. Ensure the selected provider or handle belongs to the trait the impl actually implements; otherwise reflection metadata will be associated with the wrong trait.
+
+Composite descriptors display their complete diagnostic name. Context short-name lookup keeps its existing final-segment alias for compatibility; the display string is not a lookup key. Rust diagnostic names are unstable, so use an application-defined identifier when a name must be persisted.
 
 ## Read, update, and invoke
 

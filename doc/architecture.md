@@ -19,6 +19,12 @@ flowchart LR
 
 The derive crate owns parsing, validation, and token generation. Its output uses `qubit_reflect::__private::codegen_v4`; application code should use the public descriptors and registration macros instead of depending on this protocol directly. `#[reflect(skip)]` is the only member helper attribute: skipped declarations remain in Rust but are omitted from generated reflection metadata.
 
+## Generated-code integration protocol
+
+The `__private::codegen_v4` namespace is a versioned integration protocol for derive crates and downstream metadata generators that coordinate their runtime and generator versions. Its supported expression surface is limited to `ExpressionData`/`TypeExpressionData`, `GenericExpressionArgument`, `TraitExpressionData`, `LifetimeExpression`, `ConstExpression`, `FunctionPointerData`, `TraitObjectData`, `OpaqueTypeData`, `PredicateData`, `TraitBoundModifier`, `GenericParameterMetadata`, `GenericArgumentMetadata`, `GenericDefinitionMetadata`, `TypeDefinitionMetadata`, `TypeDefinitionKind`, `StructKind`, `TypeExpression`, plus `type_expression_in` for binding static data to an explicit `ReflectionContext`. Compatibility checks use `PROTOCOL_VERSION` and `protocol::assert_protocol_version`. This list reflects symbols emitted by the built-in derive and consumed by the audited downstream derive; it does not promise other `expression` or `codegen_v4` items. This is not a general application API, and other codegen modules are not thereby promised as supported. Keep runtime and derive versions aligned. An incompatible protocol change requires a new versioned namespace and coordinated updates to the derive and downstream generators; v4 symbols remain available throughout this release line.
+
+Composite descriptors retain their complete diagnostic name for display. Context short-name indexes keep the historical final-segment alias, so a composite display name is not itself a lookup key. This preserves existing short-name lookup behavior while keeping the full type shape visible.
+
 ## Context and descriptor ownership
 
 `ReflectionContext::global()` is a process-wide, lazily initialized context. `ReflectionContext::builder()` creates an independent context for explicit registration and isolation. The context validates registration facts as a whole; a failed build does not expose a partial context.

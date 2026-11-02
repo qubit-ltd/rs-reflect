@@ -19,6 +19,12 @@ flowchart LR
 
 derive crate 负责解析、校验和生成 token。生成代码使用 `qubit_reflect::__private::codegen_v4`；应用应使用公开描述符和 registration 宏，不要直接依赖该协议。成员 helper attribute 只保留 `#[reflect(skip)]`：被 skip 的声明仍存在于 Rust 类型中，但不会进入生成的反射元数据。
 
+## 生成代码集成协议
+
+`__private::codegen_v4` 是供 derive crate 与下游元数据生成器协同使用的带版本集成协议，调用方必须协调 runtime 与生成器版本。受支持的表达式接口范围仅包括`ExpressionData`/`TypeExpressionData`、`GenericExpressionArgument`、`TraitExpressionData`、`LifetimeExpression`、`ConstExpression`、`FunctionPointerData`、`TraitObjectData`、`OpaqueTypeData`、`PredicateData`、`TraitBoundModifier`、`GenericParameterMetadata`、`GenericArgumentMetadata`、`GenericDefinitionMetadata`、`TypeDefinitionMetadata`、`TypeDefinitionKind`、`StructKind`、`TypeExpression`，以及用于将静态数据绑定到显式 `ReflectionContext` 的 `type_expression_in`。兼容性检查使用 `PROTOCOL_VERSION` 与 `protocol::assert_protocol_version`。该清单对应内置 derive 生成及已核查下游 derive 消费的符号；不代表 `expression` 或 `codegen_v4` 下其他项目也获得支持承诺。它不是通用应用 API，也不代表其他 codegen 模块获得支持承诺。runtime 与 derive 版本应保持一致。不兼容的协议变更须采用新的版本化命名空间，并协同更新 derive 与下游生成器；当前发布线保留 v4 符号。
+
+复合类型描述符会为展示保留完整诊断名称。context 的短名称索引继续使用历史上的末段别名，因此复合类型的完整展示名本身不是查找键。这样既保留已有短名称查找行为，也能完整显示类型结构。
+
 ## Context 与描述符的关系
 
 `ReflectionContext::global()` 提供进程级惰性 context。`ReflectionContext::builder()` 可构建相互隔离、使用显式注册的 context。context 会整体校验注册事实；构建失败时不会暴露半成品。

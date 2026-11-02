@@ -47,6 +47,10 @@ pinned receiver 和参数以供恢复。若运行时实参类型仍是方法泛�
 
 宏在编译期生成源码元数据和操作适配器。反射采用显式启用：没有生成进元数据的成员无法通过描述符查到。`skip` 只决定元数据是否包含该成员，不承担访问控制职责。
 
+## 集成下游 derive
+
+下游 derive crate 可使用带版本的 `qubit_reflect::__private::codegen_v4` 集成协议，但必须协调 runtime 与自身版本。受支持的表达式范围仅包括静态 `ExpressionData`/`TypeExpressionData`、`GenericExpressionArgument`、`TraitExpressionData`、`LifetimeExpression`、`ConstExpression`、`FunctionPointerData`、`TraitObjectData`、`OpaqueTypeData`、`PredicateData`、`TraitBoundModifier`、`GenericParameterMetadata`、`GenericArgumentMetadata`、`GenericDefinitionMetadata`、`TypeDefinitionMetadata`、`TypeDefinitionKind` 和 `StructKind`，以及用于绑定到显式 context 的 `type_expression_in`。该清单与内置 derive 生成及已核查下游 derive 消费的符号一致；不代表其他 expression 或 `codegen_v4` 项目也受支持。兼容性检查使用 `PROTOCOL_VERSION` 与 `protocol::assert_protocol_version`。这不是应用 API，也不表示所有 `__private` 项目都受支持。runtime 与 derive 版本应保持一致。不兼容的协议变更须使用新命名空间并协同升级 derive 和下游生成器；当前 v4 命名空间继续保留。
+
 ## 反射 trait 实现
 
 用 `#[Reflect]` 标记本地 trait。需要关联其反射定义并生成默认方法 adapter 的 impl，须在属性中显式给出 trait 定义路径：
@@ -79,6 +83,8 @@ impl Check for Worker {
 `reflected_trait` 指向已反射的 trait 定义。`impl` 后的 trait 路径可以使用导入别名，仍由 Rust 按常规规则解析。任何裸 `#[ReflectImpl]` trait impl（包括实现本地 `#[Reflect]` trait 的 impl）都会保留源码路径，并将未关联的 application 记为 `ExternalIncomplete`；它不会关联反射定义或提供默认方法。只有 `reflected_trait = ...` 才会链接本地反射 trait provider。
 
 `reflected_trait` 和 `external_trait` 是调用者对 impl trait 身份的断言。稳定过程宏不能解析导入别名来证明路径等价；请确保参数指向 impl 实际实现的 trait，否则反射信息会关联到错误的 trait。
+
+复合类型描述符会展示完整诊断名称。为兼容已有行为，context 短名称查找仍使用末段别名；完整展示字符串不是查找键。Rust 诊断名称并不稳定，需要持久化时应使用应用自定义标识。
 
 ## 读取、更新和调用
 

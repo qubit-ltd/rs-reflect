@@ -8,6 +8,21 @@
 
 //! Structural type-expression contracts for generated metadata.
 //!
+//! This is a limited, versioned integration surface for coordinated derive
+//! implementations. The supported contract covers `ExpressionData` and its
+//! `TypeExpressionData` alias; `GenericExpressionArgument`,
+//! `TraitExpressionData`, `LifetimeExpression`, `ConstExpression`,
+//! `FunctionPointerData`, `TraitObjectData`, `OpaqueTypeData`, `PredicateData`,
+//! and `TraitBoundModifier`; the generic metadata types
+//! `GenericParameterMetadata`, `GenericArgumentMetadata`,
+//! `GenericDefinitionMetadata`, `TypeDefinitionMetadata`, `TypeDefinitionKind`,
+//! and `StructKind`; plus
+//! [`type_expression_in`](crate::__private::codegen_v4::expression::type_expression_in)
+//! for binding static data to an explicit context. Compatibility checks use
+//! `PROTOCOL_VERSION` and `protocol::assert_protocol_version`. This does not
+//! make other `expression` or `codegen_v4` items a supported application API;
+//! incompatible changes require a new protocol namespace.
+//!
 //! Generated code needs constructors for lifetime, const, and type parameters;
 //! generic arguments; predicates; and concrete or unresolved type expressions.
 //! The current runtime stores these in `runtime::expression::{ExpressionData,
@@ -39,6 +54,9 @@ use crate::runtime::expression::TypeExpression;
 pub type TypeExpressionData = ExpressionData;
 
 /// Binds generated static type-expression data to a reflection context.
+///
+/// This function is part of the coordinated `codegen_v4` derive integration
+/// surface. Keep the runtime and generator versions aligned.
 ///
 /// Every nested expression view produced from the returned value uses the
 /// supplied context. This is intended for generated metadata and downstream
