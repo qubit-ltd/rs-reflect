@@ -6,14 +6,16 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Typed linked-registration contracts consumed by reflection contexts.
+//! Versioned registration contracts used by generated code and contexts.
 //!
-//! The current runtime stores `RegistrationFragment` and its inventory
-//! collector under `runtime::context`; both are crate-private. Derive needs a
-//! safe submit macro or typed registration constructor that binds a concrete
-//! `Reflect` type to its generated registration and source origin. It must not
-//! expose caller-constructed fragment identities, raw payload variants, or the
-//! inventory macro as part of this protocol.
+//! The runtime implementation modules remain private. This hidden v4 module
+//! re-exports `RegistrationFragment`, `Registration`, trait-object and type-
+//! definition registration types, and `TypeDefinitionMetadata`, and provides
+//! typed submission macros. These entry points let generated code associate
+//! registrations with concrete types and definitions without exposing the
+//! inventory dependency. Their accessibility does not make the whole module a
+//! supported compatibility surface; see the architecture and user guides for
+//! the items the project currently supports.
 
 pub use crate::runtime::context::handle::TraitObjectDescriptor;
 pub use crate::runtime::context::handle::registration::Registration;

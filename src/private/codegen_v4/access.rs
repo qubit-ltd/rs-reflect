@@ -6,13 +6,17 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-//! Typed field and variant access adapters emitted by derive.
+//! Versioned field and variant access contracts used by generated code.
 //!
-//! The runtime counterparts are `FieldMetadata`, `TypeShapeRegistration`,
-//! `FieldAdapter`, `DynamicFieldAdapter`, `VariantMetadata`, and
-//! `VariantAdapter` in `runtime::descriptor` and `runtime::access`. Derive
-//! needs safe typed constructors that keep each adapter tied to the owner and
-//! value types. These internal traits and metadata are currently crate-private.
+//! The runtime implementation modules are private. This module re-exports
+//! metadata, access results, and typed adapter constructors such as
+//! `FieldMetadata`, `TypeShapeRegistration`, `TypedFieldAdapter`, and
+//! `TypedVariantAdapter`; `VariantAdapter` is also re-exported. The erased
+//! `FieldAdapter` and `DynamicFieldAdapter` traits are not re-exported. These
+//! names are accessible to generated code through the hidden v4 namespace, but
+//! accessibility alone does not make every item a supported compatibility
+//! contract. The supported protocol surface is documented in the architecture
+//! and user guides.
 
 pub use crate::runtime::descriptor::collections::TypeShapeRegistration;
 pub use crate::runtime::descriptor::field::FieldAccess;
