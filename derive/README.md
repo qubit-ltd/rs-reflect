@@ -1,5 +1,12 @@
 # `qubit-reflect-derive`
 
+[![Rust CI](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml/badge.svg)](https://github.com/qubit-ltd/rs-reflect/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://qubit-ltd.github.io/rs-reflect/coverage-badge.json)](https://qubit-ltd.github.io/rs-reflect/coverage/)
+[![Crates.io](https://img.shields.io/crates/v/qubit-reflect-derive.svg?color=blue)](https://crates.io/crates/qubit-reflect-derive)
+[![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](../LICENSE)
+[![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
+
 `qubit-reflect-derive` provides the `#[Reflect]`, `#[ReflectImpl]`, and `bind_method!` procedural macros. They generate metadata and adapters; runtime descriptors, contexts, and checked operations are provided by `qubit-reflect`.
 
 ## Installation
@@ -82,4 +89,39 @@ cargo run --example support_action
 
 - [English user guide](../doc/user_guide.md) · [中文用户手册](../doc/user_guide.zh_CN.md)
 - [Runtime overview](../README.md) · [中文 README](../README.zh_CN.md)
-- [Macro API docs](../src/lib.rs)
+- [Macro API docs](src/lib.rs)
+
+## Testing
+
+```bash
+# Run tests with the default feature set
+cargo test
+
+# Run tests with all declared features
+cargo test --all-features
+
+# Project CI checks
+../.infra/bin/ci-check.sh
+
+# Check code coverage
+../.infra/bin/coverage.sh
+```
+
+## License
+
+Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](../LICENSE) for the
+full license text.
+
+## Contributing
+
+Contributions are welcome. Please follow the Rust API guidelines, keep public
+API documentation and tests current, and run `../.infra/bin/align-ci.sh` to format code and
+`../.infra/bin/ci-check.sh` to satisfy CI requirements before submitting a pull request.
+
+## Author
+
+**Haixing Hu** - *Qubit Co. Ltd.*
+
+Repository: [https://github.com/qubit-ltd/rs-reflect](https://github.com/qubit-ltd/rs-reflect)
