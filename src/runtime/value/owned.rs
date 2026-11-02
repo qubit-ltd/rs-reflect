@@ -36,7 +36,7 @@ fn descriptor_for<'ctx, T: Reflect>(context: &'ctx ReflectionContext) -> TypeDes
     TypeDescriptor::of_in::<T>(context)
 }
 
-struct OwnedValue<T: Reflect + 'static>(T);
+pub(super) struct OwnedValue<T: Reflect + 'static>(T);
 
 impl<T: Reflect + 'static> ErasedOwned for OwnedValue<T> {
     fn type_id(&self) -> TypeId {
@@ -48,9 +48,8 @@ impl<T: Reflect + 'static> ErasedOwned for OwnedValue<T> {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         &mut self.0
     }
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        let OwnedValue(value) = *self;
-        Box::new(value)
+    fn into_holder_any(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
     fn shared_local(&self) -> std::rc::Rc<dyn super::mode::ErasedRef + '_> {
         erase_ref_local(&self.0)
@@ -114,8 +113,11 @@ impl<T: Reflect + Send + Sync + 'static> ValueForInternal<ThreadSafe> for T {
         if !value.0.as_any().is::<Self>() {
             return Err(value);
         }
-        match ThreadSafe::owned_into_any(value).downcast::<Self>() {
-            Ok(value) => Ok(*value),
+        match ThreadSafe::owned_into_holder_any(value).downcast::<OwnedValue<Self>>() {
+            Ok(value) => {
+                let OwnedValue(inner) = *value;
+                Ok(inner)
+            }
             Err(_) => panic!("erased value changed type after its identity check"),
         }
     }
@@ -134,8 +136,11 @@ impl<T: Reflect + 'static> ValueFor<Local> for T {}
 impl<T: Reflect + Send + Sync + 'static> ValueFor<ThreadSafe> for T {}
 
 fn m_local_recover<T: Reflect + 'static>(value: LocalOwned) -> Result<T, LocalOwned> {
-    match Local::owned_into_any(value).downcast::<T>() {
-        Ok(value) => Ok(*value),
+    match Local::owned_into_holder_any(value).downcast::<OwnedValue<T>>() {
+        Ok(value) => {
+            let OwnedValue(inner) = *value;
+            Ok(inner)
+        }
         Err(_) => panic!("erased value changed type after its identity check"),
     }
 }

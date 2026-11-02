@@ -38,7 +38,7 @@ pub(crate) trait ErasedOwned {
     fn type_id(&self) -> TypeId;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+    fn into_holder_any(self: Box<Self>) -> Box<dyn Any>;
     fn shared_local(&self) -> Rc<dyn ErasedRef + '_>;
     fn mutable_local(&mut self) -> Box<dyn ErasedMut + '_>;
 }
@@ -70,7 +70,7 @@ pub(crate) trait ValueModeInternal {
     fn owned_as_any(value: &Self::Owned) -> &dyn Any;
     fn shared_type_id(value: &Self::Shared<'_>) -> TypeId;
     fn mutable_type_id(value: &Self::Mutable<'_>) -> TypeId;
-    fn owned_into_any(value: Self::Owned) -> Box<dyn Any>;
+    fn owned_into_holder_any(value: Self::Owned) -> Box<dyn Any>;
     fn shared_from_owned<'a>(value: &'a Self::Owned) -> Self::Shared<'a>;
     fn shared_reborrow<'a, 'b>(value: &'b Self::Shared<'a>) -> Self::Shared<'b>
     where
@@ -117,8 +117,8 @@ impl ValueModeInternal for Local {
     fn mutable_type_id(value: &Self::Mutable<'_>) -> TypeId {
         ErasedMut::type_id(value.as_ref())
     }
-    fn owned_into_any(value: Self::Owned) -> Box<dyn Any> {
-        value.0.into_any()
+    fn owned_into_holder_any(value: Self::Owned) -> Box<dyn Any> {
+        value.0.into_holder_any()
     }
     fn shared_from_owned<'a>(value: &'a Self::Owned) -> Self::Shared<'a> {
         value.0.shared_local()
@@ -165,10 +165,10 @@ impl ValueModeInternal for ThreadSafe {
     fn mutable_type_id(value: &Self::Mutable<'_>) -> TypeId {
         ErasedMut::type_id(value.as_ref())
     }
-    fn owned_into_any(value: Self::Owned) -> Box<dyn Any> {
+    fn owned_into_holder_any(value: Self::Owned) -> Box<dyn Any> {
         let ThreadSafeOwned(value) = value;
         let value: Box<dyn ErasedOwned> = value;
-        value.into_any()
+        value.into_holder_any()
     }
     fn shared_from_owned<'a>(value: &'a Self::Owned) -> Self::Shared<'a> {
         value.0.shared_thread_safe()
@@ -273,8 +273,12 @@ mod tests {
         drop(mutable_reborrow);
         drop(mutable);
 
-        let erased = Local::owned_into_any(owned);
-        assert_eq!(*erased.downcast::<i32>().expect("owned type is preserved"), 41);
+        let holder_ptr = (&*owned.0) as *const dyn super::ErasedOwned as *const ();
+        let erased = Local::owned_into_holder_any(owned);
+        let holder = erased
+            .downcast_ref::<crate::runtime::value::owned::OwnedValue<i32>>()
+            .expect("owned holder type is preserved");
+        assert_eq!(holder as *const _ as *const (), holder_ptr);
     }
 
     #[test]
@@ -362,7 +366,11 @@ mod tests {
         drop(mutable_reborrow);
         drop(mutable);
 
-        let erased = ThreadSafe::owned_into_any(owned);
-        assert_eq!(*erased.downcast::<i32>().expect("owned type is preserved"), 73);
+        let holder_ptr = (&*owned.0) as *const dyn super::ErasedOwnedThreadSafe as *const ();
+        let erased = ThreadSafe::owned_into_holder_any(owned);
+        let holder = erased
+            .downcast_ref::<crate::runtime::value::owned::OwnedValue<i32>>()
+            .expect("owned holder type is preserved");
+        assert_eq!(holder as *const _ as *const (), holder_ptr);
     }
 }

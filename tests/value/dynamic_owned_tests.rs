@@ -7,6 +7,7 @@
 // =============================================================================
 
 //! Integration tests for owned dynamic values.
+use qubit_reflect::Reflect;
 use qubit_reflect::value::DynamicOwned;
 use qubit_reflect::value::Local;
 use qubit_reflect::value::ThreadSafe;
@@ -75,3 +76,68 @@ fn test_thread_safe_owned_typed_and_any_access_preserve_value() {
 
 /// Verifies that a value retains both thread-safety auto traits.
 fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
+
+static DROP_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[Reflect]
+struct DropProbe;
+
+impl Drop for DropProbe {
+    fn drop(&mut self) {
+        DROP_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[repr(align(128))]
+#[Reflect]
+struct HighlyAligned(u8);
+
+#[derive(Debug, PartialEq, Eq)]
+#[Reflect]
+struct ZeroSized;
+
+#[test]
+fn test_local_error_recovery_any_and_single_drop() {
+    DROP_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+    let value = DynamicOwned::<Local>::new(DropProbe);
+    assert!(value.as_any().downcast_ref::<DropProbe>().is_some());
+    let failure = value
+        .downcast::<String>()
+        .expect_err("DropProbe must not downcast to String");
+    let recovered = failure
+        .into_value()
+        .downcast::<DropProbe>()
+        .unwrap_or_else(|_| panic!("error value must retain its original type"));
+    assert_eq!(DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst), 0);
+    drop(recovered);
+    assert_eq!(DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[test]
+fn test_thread_safe_error_recovery_and_any_borrow() {
+    let value = DynamicOwned::<ThreadSafe>::new(73_u64);
+    assert_eq!(value.as_any().downcast_ref::<u64>(), Some(&73));
+    let failure = value.downcast::<String>().expect_err("u64 must not downcast to String");
+    let recovered = failure
+        .into_value()
+        .downcast::<u64>()
+        .unwrap_or_else(|_| panic!("error value must retain its original type"));
+    assert_eq!(recovered, 73);
+}
+
+#[test]
+fn test_owned_recovery_handles_zero_sized_and_high_alignment_values() {
+    assert_eq!(
+        DynamicOwned::<Local>::new(ZeroSized).downcast::<ZeroSized>().ok(),
+        Some(ZeroSized)
+    );
+    let value = DynamicOwned::<Local>::new(HighlyAligned(9));
+    assert_eq!(
+        (value.downcast_ref::<HighlyAligned>().unwrap() as *const HighlyAligned as usize) % 128,
+        0
+    );
+    let recovered = value
+        .downcast::<HighlyAligned>()
+        .unwrap_or_else(|_| panic!("aligned value must be recoverable"));
+    assert_eq!(recovered.0, 9);
+}

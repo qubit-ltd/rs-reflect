@@ -75,6 +75,19 @@ fn dynamic_operations(criterion: &mut Criterion) {
         .construct::<BenchmarkRecord, _>(NamedFields::<Local>::new().field("id", 3_u64))
         .expect("dynamic construction setup must succeed");
 
+    criterion.bench_function("owned/downcast", |bench| {
+        bench.iter_batched(
+            || DynamicOwned::<Local>::new(black_box(41_u64)),
+            |value| {
+                black_box(
+                    value
+                        .downcast::<u64>()
+                        .unwrap_or_else(|_| panic!("owned benchmark value must downcast")),
+                );
+            },
+            BatchSize::SmallInput,
+        );
+    });
     criterion.bench_function("field/direct_get", |bench| {
         let direct = BenchmarkRecord { id: 0 };
         bench.iter(|| black_box(&direct).id);
