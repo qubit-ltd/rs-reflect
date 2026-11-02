@@ -133,7 +133,7 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 fn lookup_demo(ty: qubit_reflect::TypeDescriptor<'_>) {
     let email = ty.fields().get("email");
     assert!(email.is_some());
-    match ty.lookup_method("unknown_action").expect("查询操作") {
+    match ty.lookup_method("reset").expect("查询操作") {
         qubit_reflect::lookup::Lookup::Missing => {}
         qubit_reflect::lookup::Lookup::Unique(_) => panic!("操作不应存在"),
         qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("操作不应歧义"),

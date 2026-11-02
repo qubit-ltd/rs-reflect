@@ -137,7 +137,7 @@ Use a strict singular accessor when the application requires exactly one member.
 fn lookup_demo(ty: qubit_reflect::TypeDescriptor<'_>) {
     let email = ty.fields().get("email");
     assert!(email.is_some());
-    match ty.lookup_method("unknown_action").expect("lookup action") {
+    match ty.lookup_method("reset").expect("lookup action") {
         qubit_reflect::lookup::Lookup::Missing => {}
         qubit_reflect::lookup::Lookup::Unique(_) => panic!("unknown action unexpectedly exists"),
         qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("unknown action is ambiguous"),
