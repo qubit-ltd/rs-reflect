@@ -9,6 +9,7 @@
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
+use std::thread::ThreadId;
 
 use super::ReflectionContext;
 use super::builder::ReflectionContextBuilder;
@@ -18,12 +19,17 @@ use crate::runtime::error::ContextError;
 #[derive(Default)]
 struct InitializationState {
     building: bool,
+    owner: Option<ThreadId>,
     result: Option<Result<Arc<ContextData>, ContextError>>,
+    #[cfg(test)]
+    waiters: usize,
 }
 
 pub(crate) struct GlobalContext {
     state: Mutex<InitializationState>,
     changed: Condvar,
+    #[cfg(test)]
+    waiter_changed: Condvar,
 }
 
 impl GlobalContext {
@@ -31,9 +37,14 @@ impl GlobalContext {
         Self {
             state: Mutex::new(InitializationState {
                 building: false,
+                owner: None,
                 result: None,
+                #[cfg(test)]
+                waiters: 0,
             }),
             changed: Condvar::new(),
+            #[cfg(test)]
+            waiter_changed: Condvar::new(),
         }
     }
 
@@ -53,6 +64,7 @@ impl GlobalContext {
             }
             if !state.building {
                 state.building = true;
+                state.owner = Some(std::thread::current().id());
                 drop(state);
 
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -60,6 +72,7 @@ impl GlobalContext {
                 }));
 
                 let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                state.owner = None;
                 state.building = false;
                 self.changed.notify_all();
                 match result {
@@ -73,10 +86,23 @@ impl GlobalContext {
                     }
                 }
             }
+            if state.owner.as_ref() == Some(&std::thread::current().id()) {
+                drop(state);
+                panic!("recursive global reflection context initialization");
+            }
+            #[cfg(test)]
+            {
+                state.waiters += 1;
+                self.waiter_changed.notify_all();
+            }
             state = self
                 .changed
                 .wait(state)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
+            #[cfg(test)]
+            {
+                state.waiters -= 1;
+            }
         }
     }
 
@@ -91,6 +117,17 @@ impl GlobalContext {
     #[cfg(test)]
     pub(crate) fn state_lock_is_available(&self) -> bool {
         self.state.try_lock().is_ok()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn wait_for_waiters(&self, count: usize) {
+        let mut state = self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        while state.waiters < count {
+            state = self
+                .waiter_changed
+                .wait(state)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        }
     }
 }
 

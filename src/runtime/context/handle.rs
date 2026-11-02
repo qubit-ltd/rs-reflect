@@ -214,6 +214,12 @@ impl ReflectionContext {
     ///
     /// Returns an error if linked registration materialization or validation
     /// fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `recursive global reflection context initialization` if a
+    /// registration callback recursively accesses the global context while it
+    /// is being initialized.
     pub fn initialize(&self) -> Result<&Self, ContextError> {
         if let ContextState::Global(state) = &self.state {
             state.data()?;
@@ -292,6 +298,12 @@ impl ReflectionContext {
     }
 
     /// Returns all registered concrete types in context order.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `recursive global reflection context initialization` if a
+    /// registration callback recursively accesses the global context while it
+    /// is being initialized.
     pub fn types(&self) -> Result<Types<'_>, ContextError> {
         let data = self.data()?;
         Ok(Types::new(

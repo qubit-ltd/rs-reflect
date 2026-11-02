@@ -6,9 +6,45 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use std::process::Command;
+use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
+use std::thread;
+use std::time::Duration;
+use std::time::Instant;
+
+fn run_bounded_unit_test_child(test_name: &str, environment: &str) {
+    let mut child = Command::new(std::env::current_exe().expect("test executable path"))
+        .arg("--exact")
+        .arg(test_name)
+        .arg("--nocapture")
+        .env(environment, "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start isolated child test");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let timed_out = loop {
+        if let Some(status) = child.try_wait().expect("poll child") {
+            assert!(status.success(), "child exited unsuccessfully: {status}");
+            break false;
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill timed-out child");
+            child.wait().expect("reap timed-out child");
+            break true;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    let output = child.wait_with_output().expect("collect child output");
+    assert!(
+        !timed_out,
+        "child test {test_name} exceeded its five-second deadline: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
 
 use crate::runtime::context::handle::ReflectionContext;
 use crate::runtime::context::handle::builder::ReflectionContextBuilder;
@@ -759,4 +795,159 @@ fn global_initialization_caches_success_and_failure_without_holding_its_lock() {
     assert_eq!(first_error.message(), second_error.message());
     assert!(failed.is_initialized());
     assert_eq!(failure_calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn global_initialization_recursive_reentry_child() {
+    if std::env::var_os("QUBIT_REFLECT_INTERNAL_REENTRY_CHILD").is_none() {
+        return;
+    }
+    let context = GlobalContext::new();
+    let panic = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        context.get_or_initialize(|| {
+            let _ = context.get_or_initialize(|| {
+                Ok(crate::runtime::context::handle::data::ContextData::empty())
+            });
+            Ok(crate::runtime::context::handle::data::ContextData::empty())
+        })
+    })) {
+        Ok(_) => panic!("recursive initialization must panic"),
+        Err(panic) => panic,
+    };
+    assert!(
+        panic.downcast_ref::<String>().is_some_and(|message| {
+            message == "recursive global reflection context initialization"
+        }) || panic.downcast_ref::<&str>().is_some_and(|message| {
+            *message == "recursive global reflection context initialization"
+        }),
+        "recursive initialization used an unexpected panic payload"
+    );
+    let _retried = context
+        .get_or_initialize(|| Ok(crate::runtime::context::handle::data::ContextData::empty()))
+        .expect("a recursive panic must reset the initializer for retry");
+}
+
+#[test]
+fn global_initialization_recursive_reentry_is_bounded() {
+    let mut child = Command::new(std::env::current_exe().expect("test executable path"))
+        .arg("--exact")
+        .arg("runtime::tests::context::global_initialization_recursive_reentry_child")
+        .arg("--nocapture")
+        .env("QUBIT_REFLECT_INTERNAL_REENTRY_CHILD", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start isolated child test");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let timed_out = loop {
+        if let Some(status) = child.try_wait().expect("poll child") {
+            assert!(status.success(), "child exited unsuccessfully: {status}");
+            break false;
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill timed-out child");
+            child.wait().expect("reap timed-out child");
+            break true;
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    let output = child.wait_with_output().expect("collect child output");
+    assert!(
+        !timed_out
+            && String::from_utf8_lossy(&output.stderr)
+                .contains("recursive global reflection context initialization"),
+        "expected recursive initialization to panic with the fixed diagnostic before the deadline; timed_out={timed_out}, stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn global_initialization_concurrent_callers_share_one_arc() {
+    if std::env::var_os("QUBIT_REFLECT_CONCURRENT_INITIALIZATION_CHILD").is_none() {
+        run_bounded_unit_test_child(
+            "runtime::tests::context::global_initialization_concurrent_callers_share_one_arc",
+            "QUBIT_REFLECT_CONCURRENT_INITIALIZATION_CHILD",
+        );
+        return;
+    }
+    let context = Arc::new(GlobalContext::new());
+    let barrier = Arc::new(std::sync::Barrier::new(5));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let release_rx = Arc::new(std::sync::Mutex::new(release_rx));
+    let mut callers = Vec::new();
+    for _ in 0..4 {
+        let context = Arc::clone(&context);
+        let barrier = Arc::clone(&barrier);
+        let calls = Arc::clone(&calls);
+        let entered_tx = entered_tx.clone();
+        let release_rx = Arc::clone(&release_rx);
+        callers.push(std::thread::spawn(move || {
+            barrier.wait();
+            entered_tx.send(()).expect("report caller ready");
+            context
+                .get_or_initialize(|| {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    release_rx
+                        .lock()
+                        .expect("release receiver lock")
+                        .recv()
+                        .expect("release initializer");
+                    Ok(crate::runtime::context::handle::data::ContextData::empty())
+                })
+                .expect("initialization succeeds")
+        }));
+    }
+    barrier.wait();
+    for _ in 0..4 {
+        entered_rx.recv().expect("all callers reached initialization");
+    }
+    release_tx.send(()).expect("release the winning initializer");
+    let results: Vec<_> = callers
+        .into_iter()
+        .map(|caller| caller.join().expect("caller thread completes"))
+        .collect();
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert!(results.iter().all(|result| Arc::ptr_eq(&results[0], result)));
+}
+
+#[test]
+fn global_initialization_waiter_restarts_after_initializer_panic() {
+    if std::env::var_os("QUBIT_REFLECT_PANIC_WAITER_CHILD").is_none() {
+        run_bounded_unit_test_child(
+            "runtime::tests::context::global_initialization_waiter_restarts_after_initializer_panic",
+            "QUBIT_REFLECT_PANIC_WAITER_CHILD",
+        );
+        return;
+    }
+    let context = Arc::new(GlobalContext::new());
+    let (initializer_entered_tx, initializer_entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let initializer_context = Arc::clone(&context);
+    let initializer = std::thread::spawn(move || {
+        initializer_context.get_or_initialize(|| {
+            initializer_entered_tx.send(()).expect("report initializer started");
+            release_rx.recv().expect("release panicking initializer");
+            panic!("fixture initializer panic");
+        })
+    });
+    initializer_entered_rx.recv().expect("initializer started");
+
+    let waiter_context = Arc::clone(&context);
+    let waiter = std::thread::spawn(move || {
+        waiter_context
+            .get_or_initialize(|| Ok(crate::runtime::context::handle::data::ContextData::empty()))
+            .expect("waiter retries initialization after panic")
+    });
+    context.wait_for_waiters(1);
+    release_tx.send(()).expect("release initializer");
+    assert!(initializer.join().is_err(), "initializer panic propagates");
+    let waiter_result = waiter.join().expect("waiter completes after notification");
+    assert!(Arc::ptr_eq(
+        &waiter_result,
+        &context
+            .get_or_initialize(|| panic!("waiter should cache successful retry"))
+            .expect("retry result is cached")
+    ));
 }

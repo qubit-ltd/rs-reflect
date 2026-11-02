@@ -29,6 +29,8 @@ derive crate 负责解析、校验和生成 token。生成代码使用 `qubit_re
 
 `ReflectionContext::global()` 提供进程级惰性 context。`ReflectionContext::builder()` 可构建相互隔离、使用显式注册的 context。context 会整体校验注册事实；构建失败时不会暴露半成品。
 
+全局 context 初始化期间会执行链接注册回调，且不会持有 context 状态锁。回调不得递归查询或初始化 `ReflectionContext::global()`：运行时会以 `recursive global reflection context initialization` panic 结束，而不会让同一线程等待自身。回调应只生成静态注册数据；将 context 查询移到初始化完成后的应用代码中，或在回调需要检查注册时使用独立的显式 context。
+
 描述符由静态声明元数据和 context 借用组成。从描述符取得的字段或方法会沿用同一个 context。调用方不必在方法查找和调用时再传入另一个 registry，因此不会把一个 context 中解析出的方法误用于另一个 context 的适配器。
 
 字段和 variant 属于类型的局部声明信息，不需要先聚合 context。方法、按名称发现类型、trait/impl application 和 capability 则使用 context 数据。`field()`、`method()` 要求结果唯一并返回结构化查找错误；`fields().get()` 表示可选查询，`lookup_method()` 则返回 Missing、Unique 或 Ambiguous 的完整状态。

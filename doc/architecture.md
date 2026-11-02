@@ -29,6 +29,8 @@ Composite descriptors retain their complete diagnostic name for display. Context
 
 `ReflectionContext::global()` is a process-wide, lazily initialized context. `ReflectionContext::builder()` creates an independent context for explicit registration and isolation. The context validates registration facts as a whole; a failed build does not expose a partial context.
 
+Linked registration callbacks run as part of global context initialization, outside the context state lock. A callback must not query or initialize `ReflectionContext::global()` recursively: the runtime panics with `recursive global reflection context initialization` instead of waiting on the same thread. Keep callback work limited to producing static registration data; move context queries to application code after initialization, or use a separate explicit context when the callback needs to inspect registrations.
+
 Descriptors contain static declaration metadata and a borrow of their context. A field or method reached from a descriptor therefore uses that same context. Callers do not pass a second registry to method lookup or invocation. This prevents a method resolved in one context from being invoked against another context's adapters.
 
 Fields and variants are local declaration facts, so their views do not require aggregate context initialization. Methods, type-name discovery, trait and impl applications, and capabilities use context data. `field()` and `method()` require one result and return structured lookup errors; `fields().get()` is optional, while `lookup_method()` exposes Missing, Unique, or Ambiguous.
