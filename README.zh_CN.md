@@ -88,6 +88,8 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 - [核心 API 重设计规范](doc/2026-10-20-core-api-redesign.zh_CN.md) · [Core API Contract](doc/core_api_contract.md)
 - [中文用户手册](doc/user_guide.zh_CN.md) · [English user guide](doc/user_guide.md)
+- [构造客户](doc/user_guide.zh_CN.md#构造客户) · [更新客户](doc/user_guide.zh_CN.md#更新客户) · [选择显式 context](doc/user_guide.zh_CN.md#选择显式-context)
+- [Construct a customer](doc/user_guide.md#construct-a-customer) · [Update a customer](doc/user_guide.md#update-a-customer) · [Select an explicit context](doc/user_guide.md#select-an-explicit-context)
 - [中文架构](doc/architecture.zh_CN.md) · [Architecture](doc/architecture.md)
 - [API 文档](https://docs.rs/qubit-reflect)
 - [English README](README.md)

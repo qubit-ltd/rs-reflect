@@ -127,25 +127,134 @@ fn update(customer: &mut Customer) -> Result<(), Box<dyn std::error::Error>> {
 
 ## 处理缺失和歧义
 
-业务要求必须唯一找到成员时，使用严格单数 accessor：
+业务要求必须唯一找到成员时，使用严格单数 accessor。字段可能不存在时，用集合的可选查询 `get`；同名方法可能有多个候选项时，用 `lookup_method` 获取完整状态：
 
 ```rust
-let method = ty.method("raise_credit_limit")?;
-```
-
-字段可能不存在时，用集合的可选查询 `get`；同名方法可能有多个候选项时，用 `lookup_method` 获取完整状态：
-
-```rust
-let email = ty.fields().get("email");
-let matches = ty.lookup_method("reset")?;
-match matches {
-    qubit_reflect::Lookup::Missing => { /* 提示不支持该操作 */ }
-    qubit_reflect::Lookup::Unique(method) => { /* 使用该方法 */ }
-    qubit_reflect::Lookup::Ambiguous(methods) => { /* 要求调用方明确选择 */ }
+fn lookup_demo(ty: qubit_reflect::TypeDescriptor<'_>) {
+    let email = ty.fields().get("email");
+    assert!(email.is_some());
+    match ty.lookup_method("unknown_action").expect("查询操作") {
+        qubit_reflect::lookup::Lookup::Missing => {}
+        qubit_reflect::lookup::Lookup::Unique(_) => panic!("操作不应存在"),
+        qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("操作不应歧义"),
+    }
+    match ty.lookup_method("raise_credit_limit").expect("查询方法") {
+        qubit_reflect::lookup::Lookup::Missing => panic!("方法已注册"),
+        qubit_reflect::lookup::Lookup::Unique(method) => {
+            let mut customer = Customer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000, internal_note: String::new() };
+            let result = method.invoke(qubit_reflect::Invocation::<qubit_reflect::value::Local>::on_mut(&mut customer).arg(25_000_u64))
+                .unwrap_or_else(|_| panic!("调用方法"));
+            assert!(result.into_owned::<bool>().unwrap_or_else(|_| panic!("布尔结果")));
+            assert_eq!(customer.credit_limit_cents, 25_000);
+        }
+        qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("方法只有一个候选项"),
+    }
 }
 ```
 
 `method()` 会通过 `LookupError` 报告缺失或歧义；`lookup_method()` 返回完整的 `Lookup` 状态，并把 context 初始化错误保留在外层结果中。按名称发现类型时，`ReflectionContext::type_by_name` 要求唯一，`lookup_type_by_name` 返回完整状态。诊断用的 Rust 类型名和 `TypeId` 都不应作为持久化标识。
+
+## 构造客户
+
+如果调用方可以构造某个类型，应为它使用字段公开且参与反射的独立类型。安全构造要求每个字段都有值，并拒绝 Rust 类型不匹配的值；`into_input()` 会归还被拒绝的命名输入，供修正或报告。示例不包含 skipped 或私有字段，也不使用 unchecked 构造。
+
+```rust
+#[derive(Debug, PartialEq)]
+#[qubit_reflect::Reflect]
+struct NewCustomer {
+    pub email: String,
+    pub credit_limit_cents: u64,
+}
+
+fn construct_demo() {
+    use qubit_reflect::construct::{NamedFields, RecoveredConstructionInput};
+    use qubit_reflect::value::Local;
+
+    let ty = qubit_reflect::TypeDescriptor::of::<NewCustomer>();
+    let customer = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new()
+            .field("email", String::from("ada@corp.example"))
+            .field("credit_limit_cents", 10_000_u64),
+    ).expect("构造客户");
+    assert_eq!(customer.credit_limit_cents, 10_000);
+
+    let missing = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new().field("email", String::from("ada@corp.example")),
+    ).expect_err("拒绝缺失字段");
+    assert!(matches!(missing.into_input(), RecoveredConstructionInput::Named(_)));
+
+    let wrong_type = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new()
+            .field("email", String::from("ada@corp.example"))
+            .field("credit_limit_cents", String::from("类型错误")),
+    ).expect_err("拒绝错误字段类型");
+    assert!(matches!(wrong_type.into_input(), RecoveredConstructionInput::Named(_)));
+}
+```
+
+返回的新值表示构造成功。构造不会替应用校验鉴权、授信规则等业务约束；保存之前仍应执行应用校验。
+
+## 更新客户
+
+`UpdateInput` 将多个替换值与一个拥有所有权的基值组合起来。更新被拒绝时会保留二者：先检查基值，再通过 `into_input()` 取得完整恢复输入的所有权。
+
+```rust
+fn update_owned_demo() {
+    use qubit_reflect::construct::UpdateInput;
+    use qubit_reflect::value::Local;
+
+    let ty = qubit_reflect::TypeDescriptor::of::<NewCustomer>();
+    let customer = NewCustomer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000 };
+    let updated = ty.update::<NewCustomer, _>(
+        UpdateInput::<Local>::new(customer)
+            .field("email", String::from("new@corp.example"))
+            .field("credit_limit_cents", 75_000_u64),
+    ).expect("更新客户");
+    assert_eq!(updated.email, "new@corp.example");
+    assert_eq!(updated.credit_limit_cents, 75_000);
+
+    let customer = NewCustomer { email: String::from("before@corp.example"), credit_limit_cents: 20_000 };
+    let failure = ty.update::<NewCustomer, _>(
+        UpdateInput::<Local>::new(customer)
+            .field("email", String::from("after@corp.example"))
+            .field("credit_limit_cents", String::from("类型错误")),
+    ).expect_err("拒绝错误字段类型");
+    assert_eq!(failure.base().downcast_ref::<NewCustomer>().expect("恢复基值").credit_limit_cents, 20_000);
+    let recovered = failure.into_input();
+    let repeated_failure = ty.update::<NewCustomer, _>(recovered)
+        .expect_err("恢复的替换值仍可再次被拒绝");
+    assert_eq!(repeated_failure.base().downcast_ref::<NewCustomer>().expect("恢复基值").credit_limit_cents, 20_000);
+    drop(repeated_failure.into_input());
+}
+```
+
+这证明用户代码执行前的类型校验和输入所有权恢复，并不构成事务：它无法撤销任意用户副作用，也不处理析构函数 panic 的回滚。应用仍负责业务校验、持久化以及事务或补偿策略。
+
+## 选择显式 context
+
+`include_type` 选择某个具体类型注册；`include_linked` 汇集 linked registrations；`include_linked_for` 为目标选择其 linked 闭包，并按库的规则纳入全局定义和 capability。它用于选择注册集合，不是安全边界，也不保证排除所有无关元数据。
+
+```rust
+fn explicit_context_demo() {
+    use qubit_reflect::{Invocation, ReflectionContext, TypeDescriptor};
+    use qubit_reflect::value::Local;
+
+    let context = ReflectionContext::builder()
+        .include_linked_for::<Customer>()
+        .build()
+        .expect("构建所选 context");
+    let ty = TypeDescriptor::of_in::<Customer>(&context);
+    assert!(ty.method("raise_credit_limit").is_ok());
+    let mut customer = Customer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000, internal_note: String::new() };
+    let output = ty.method("raise_credit_limit").expect("已注册方法")
+        .invoke(Invocation::<Local>::on_mut(&mut customer).arg(25_000_u64))
+        .unwrap_or_else(|_| panic!("调用已注册方法"));
+    assert!(output.into_owned::<bool>().unwrap_or_else(|_| panic!("布尔结果")));
+    assert_eq!(customer.credit_limit_cents, 25_000);
+}
+```
+
+应处理 `build()` 返回的 `ContextError`，并根据诊断定位缺失或无效的注册。选择显式 context 不能替代鉴权。
 
 ## 恢复被拒绝的更新和调用
 

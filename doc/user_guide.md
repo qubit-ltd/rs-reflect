@@ -131,25 +131,134 @@ The runnable example deliberately stops before storage. An application can assem
 
 ## Handle missing and ambiguous results
 
-Use a strict singular accessor when the application requires exactly one member:
+Use a strict singular accessor when the application requires exactly one member. Use a collection's optional `get` for a field that may be absent, or `lookup_method` when same-name methods may have more than one candidate:
 
 ```rust
-let method = ty.method("raise_credit_limit")?;
-```
-
-Use a collection's optional `get` for a field that may be absent, or `lookup_method` when same-name methods may have more than one candidate:
-
-```rust
-let email = ty.fields().get("email");
-let matches = ty.lookup_method("reset")?;
-match matches {
-    qubit_reflect::Lookup::Missing => { /* report an unsupported action */ }
-    qubit_reflect::Lookup::Unique(method) => { /* use the method */ }
-    qubit_reflect::Lookup::Ambiguous(methods) => { /* ask for a qualified choice */ }
+fn lookup_demo(ty: qubit_reflect::TypeDescriptor<'_>) {
+    let email = ty.fields().get("email");
+    assert!(email.is_some());
+    match ty.lookup_method("unknown_action").expect("lookup action") {
+        qubit_reflect::lookup::Lookup::Missing => {}
+        qubit_reflect::lookup::Lookup::Unique(_) => panic!("unknown action unexpectedly exists"),
+        qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("unknown action is ambiguous"),
+    }
+    match ty.lookup_method("raise_credit_limit").expect("lookup method") {
+        qubit_reflect::lookup::Lookup::Missing => panic!("method is registered"),
+        qubit_reflect::lookup::Lookup::Unique(method) => {
+            let mut customer = Customer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000, internal_note: String::new() };
+            let result = method.invoke(qubit_reflect::Invocation::<qubit_reflect::value::Local>::on_mut(&mut customer).arg(25_000_u64))
+                .unwrap_or_else(|_| panic!("invoke method"));
+            assert!(result.into_owned::<bool>().unwrap_or_else(|_| panic!("boolean result")));
+            assert_eq!(customer.credit_limit_cents, 25_000);
+        }
+        qubit_reflect::lookup::Lookup::Ambiguous(_) => panic!("method has one candidate"),
+    }
 }
 ```
 
 `method()` reports missing or ambiguous names as `LookupError`; `lookup_method()` returns the complete `Lookup` state and keeps context initialization errors separate. For type discovery, `ReflectionContext::type_by_name` is strict and `lookup_type_by_name` returns the complete state. Do not treat a diagnostic Rust type name or a `TypeId` as a persistent identifier.
+
+## Construct a customer
+
+Use a separate type with public reflected fields when callers are allowed to construct it. Checked construction requires every field and rejects values of the wrong Rust type; `into_input()` returns the rejected named input for correction or reporting. This example avoids skipped and private fields, and does not use unchecked construction.
+
+```rust
+#[derive(Debug, PartialEq)]
+#[qubit_reflect::Reflect]
+struct NewCustomer {
+    pub email: String,
+    pub credit_limit_cents: u64,
+}
+
+fn construct_demo() {
+    use qubit_reflect::construct::{NamedFields, RecoveredConstructionInput};
+    use qubit_reflect::value::Local;
+
+    let ty = qubit_reflect::TypeDescriptor::of::<NewCustomer>();
+    let customer = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new()
+            .field("email", String::from("ada@corp.example"))
+            .field("credit_limit_cents", 10_000_u64),
+    ).expect("construct customer");
+    assert_eq!(customer.credit_limit_cents, 10_000);
+
+    let missing = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new().field("email", String::from("ada@corp.example")),
+    ).expect_err("missing required field is rejected");
+    assert!(matches!(missing.into_input(), RecoveredConstructionInput::Named(_)));
+
+    let wrong_type = ty.construct::<NewCustomer, _>(
+        NamedFields::<Local>::new()
+            .field("email", String::from("ada@corp.example"))
+            .field("credit_limit_cents", String::from("too many")),
+    ).expect_err("wrong field type is rejected");
+    assert!(matches!(wrong_type.into_input(), RecoveredConstructionInput::Named(_)));
+}
+```
+
+The returned value is the success signal. Construction does not validate application rules such as authorization or credit policy; validate the value before saving it.
+
+## Update a customer
+
+`UpdateInput` groups several replacements with an owned base. A rejected update retains both; inspect the base before consuming the failure, then use `into_input()` to take ownership of the complete recovery input.
+
+```rust
+fn update_owned_demo() {
+    use qubit_reflect::construct::UpdateInput;
+    use qubit_reflect::value::Local;
+
+    let ty = qubit_reflect::TypeDescriptor::of::<NewCustomer>();
+    let customer = NewCustomer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000 };
+    let updated = ty.update::<NewCustomer, _>(
+        UpdateInput::<Local>::new(customer)
+            .field("email", String::from("new@corp.example"))
+            .field("credit_limit_cents", 75_000_u64),
+    ).expect("update customer");
+    assert_eq!(updated.email, "new@corp.example");
+    assert_eq!(updated.credit_limit_cents, 75_000);
+
+    let customer = NewCustomer { email: String::from("before@corp.example"), credit_limit_cents: 20_000 };
+    let failure = ty.update::<NewCustomer, _>(
+        UpdateInput::<Local>::new(customer)
+            .field("email", String::from("after@corp.example"))
+            .field("credit_limit_cents", String::from("invalid")),
+    ).expect_err("wrong field type is rejected");
+    assert_eq!(failure.base().downcast_ref::<NewCustomer>().expect("recover base").credit_limit_cents, 20_000);
+    let recovered = failure.into_input();
+    let repeated_failure = ty.update::<NewCustomer, _>(recovered)
+        .expect_err("recovered replacement remains available for correction");
+    assert_eq!(repeated_failure.base().downcast_ref::<NewCustomer>().expect("recover base").credit_limit_cents, 20_000);
+    drop(repeated_failure.into_input());
+}
+```
+
+This proves checked input validation and ownership recovery before user code runs. It is not a transaction: it cannot undo arbitrary user side effects or a destructor panic. The application remains responsible for validation, persistence, and transaction or compensation policy.
+
+## Select an explicit context
+
+`include_type` selects a concrete type registration. `include_linked` gathers linked registrations. `include_linked_for` selects the linked closure for a target and also applies the library's global definitions and capability handling. It is a registration-selection tool, not a security boundary or a promise to exclude all unrelated metadata.
+
+```rust
+fn explicit_context_demo() {
+    use qubit_reflect::{Invocation, ReflectionContext, TypeDescriptor};
+    use qubit_reflect::value::Local;
+
+    let context = ReflectionContext::builder()
+        .include_linked_for::<Customer>()
+        .build()
+        .expect("build selected context");
+    let ty = TypeDescriptor::of_in::<Customer>(&context);
+    assert!(ty.method("raise_credit_limit").is_ok());
+    let mut customer = Customer { email: String::from("ada@corp.example"), credit_limit_cents: 10_000, internal_note: String::new() };
+    let output = ty.method("raise_credit_limit").expect("registered method")
+        .invoke(Invocation::<Local>::on_mut(&mut customer).arg(25_000_u64))
+        .unwrap_or_else(|_| panic!("invoke registered method"));
+    assert!(output.into_owned::<bool>().unwrap_or_else(|_| panic!("boolean result")));
+    assert_eq!(customer.credit_limit_cents, 25_000);
+}
+```
+
+Handle `build()`'s `ContextError` and use its diagnostics to identify missing or invalid registrations. Choosing an explicit context does not replace authorization checks.
 
 ## Recover from rejected updates and calls
 

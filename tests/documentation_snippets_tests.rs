@@ -64,6 +64,62 @@ const SNIPPETS: &[Snippet] = &[
         derive: false,
         main: "fn main() { let mut customer = Customer { email: String::new(), credit_limit_cents: 10_000, internal_note: String::new() }; update(&mut customer).expect(\"更新客户\"); assert_eq!(customer.email, \"ada@corp.example\"); assert_eq!(customer.credit_limit_cents, 75_000); }",
     },
+    Snippet {
+        file: "doc/user_guide.md",
+        heading: "## Handle missing and ambiguous results",
+        prefix_heading: Some("## Add reflection to a type"),
+        derive: false,
+        main: "fn main() { let ty = qubit_reflect::TypeDescriptor::of::<Customer>(); lookup_demo(ty); }",
+    },
+    Snippet {
+        file: "doc/user_guide.zh_CN.md",
+        heading: "## 处理缺失和歧义",
+        prefix_heading: Some("## 在类型上启用反射"),
+        derive: false,
+        main: "fn main() { let ty = qubit_reflect::TypeDescriptor::of::<Customer>(); lookup_demo(ty); }",
+    },
+    Snippet {
+        file: "doc/user_guide.md",
+        heading: "## Construct a customer",
+        prefix_heading: None,
+        derive: false,
+        main: "fn main() { construct_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.zh_CN.md",
+        heading: "## 构造客户",
+        prefix_heading: None,
+        derive: false,
+        main: "fn main() { construct_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.md",
+        heading: "## Update a customer",
+        prefix_heading: Some("## Construct a customer"),
+        derive: false,
+        main: "fn main() { update_owned_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.zh_CN.md",
+        heading: "## 更新客户",
+        prefix_heading: Some("## 构造客户"),
+        derive: false,
+        main: "fn main() { update_owned_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.md",
+        heading: "## Select an explicit context",
+        prefix_heading: Some("## Add reflection to a type"),
+        derive: false,
+        main: "fn main() { explicit_context_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.zh_CN.md",
+        heading: "## 选择显式 context",
+        prefix_heading: Some("## 在类型上启用反射"),
+        derive: false,
+        main: "fn main() { explicit_context_demo(); }",
+    },
 ];
 
 fn rust_block_after(markdown: &str, heading: &str) -> Option<String> {
