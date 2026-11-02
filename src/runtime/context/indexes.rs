@@ -14,7 +14,7 @@ use crate::runtime::descriptor::generic::TypeDefinitionId;
 use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 use crate::runtime::descriptor::trait_descriptor::TraitDefinitionId;
 use crate::runtime::descriptor::trait_descriptor::TraitDefinitionMetadata;
-use crate::runtime::short_name::short_name;
+use crate::runtime::short_name::index_short_name;
 
 #[derive(Default)]
 pub(crate) struct ContextIndexes {
@@ -42,7 +42,7 @@ impl ContextIndexes {
             let name = metadata.rust_name();
             types_by_name.entry(name.into()).or_default().push(index);
             types_by_short_name
-                .entry(short_name(name).into())
+                .entry(index_short_name(name).into())
                 .or_default()
                 .push(index);
         }
@@ -57,7 +57,7 @@ impl ContextIndexes {
                 .or_default()
                 .push(definition.id);
             type_definitions_by_short_name
-                .entry(short_name(definition.path).into())
+                .entry(index_short_name(definition.path).into())
                 .or_default()
                 .push(definition.id);
         }
@@ -72,7 +72,7 @@ impl ContextIndexes {
                 .or_default()
                 .push(definition.id);
             trait_definitions_by_short_name
-                .entry(short_name(definition.path).into())
+                .entry(index_short_name(definition.path).into())
                 .or_default()
                 .push(definition.id);
         }

@@ -66,12 +66,17 @@ impl<'ctx> TypeDescriptor<'ctx> {
         self.metadata.type_id()
     }
 
-    /// Returns the final path component from Rust's diagnostic type name.
+    /// Returns a compact name for a nominal type, or the complete diagnostic
+    /// name for a composite type. Composite names are not stable identifiers.
     pub fn name(self) -> &'static str {
         self.short_name()
     }
 
-    /// Returns the type name without its module path or generic arguments.
+    /// Returns the final path component without generic arguments for a nominal
+    /// type. Composite types retain their complete diagnostic name. Context
+    /// lookup indexes preserve the legacy final-segment alias for composite
+    /// types, so this display value is not a lookup key. Names may change with
+    /// compiler versions and are not stable identifiers.
     pub fn short_name(self) -> &'static str {
         short_name(self.rust_type_name())
     }

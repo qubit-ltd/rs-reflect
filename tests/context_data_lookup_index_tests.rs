@@ -113,6 +113,7 @@ fn generic_definition_and_type_indexes_resolve_registered_instances() {
 fn descriptor_and_indexes_use_nominal_short_names() {
     let context = ReflectionContext::builder()
         .include_type::<DataIndexRecord<String>>()
+        .include_type::<&'static String>()
         .include_type::<first_module::SharedName>()
         .include_type::<second_module::SharedName>()
         .build()
@@ -120,6 +121,20 @@ fn descriptor_and_indexes_use_nominal_short_names() {
 
     let record = context.type_of::<DataIndexRecord<String>>();
     assert_eq!(record.short_name(), "DataIndexRecord");
+    assert!(matches!(
+        context.lookup_type_by_short_name("DataIndexRecord").unwrap(),
+        qubit_reflect::lookup::Lookup::Unique(candidate)
+            if candidate.type_id() == record.type_id()
+    ));
+    let module_type = context.type_of::<first_module::SharedName>();
+    assert_eq!(module_type.short_name(), "SharedName");
+    let reference = context.type_of::<&'static String>();
+    assert_eq!(reference.short_name(), reference.rust_type_name());
+    assert!(matches!(
+        context.lookup_type_by_short_name("String").unwrap(),
+        qubit_reflect::lookup::Lookup::Unique(candidate)
+            if candidate.type_id() == reference.type_id()
+    ));
     let definition = record
         .definition()
         .expect("the record has a retained nominal definition");
