@@ -431,10 +431,7 @@ impl RegistrationFragment {
         Self::for_linked_definition(label, registration)
     }
 
-    pub(crate) const fn for_linked_definition(
-        label: &'static str,
-        registration: fn() -> Registration,
-    ) -> Self {
+    pub(crate) const fn for_linked_definition(label: &'static str, registration: fn() -> Registration) -> Self {
         Self {
             sort_key: ("generated", None, "generated", Some(label), None, None, label),
             target_type_id: None,

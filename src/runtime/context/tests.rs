@@ -805,9 +805,7 @@ fn global_initialization_recursive_reentry_child() {
     let context = GlobalContext::new();
     let panic = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         context.get_or_initialize(|| {
-            let _ = context.get_or_initialize(|| {
-                Ok(crate::runtime::context::handle::data::ContextData::empty())
-            });
+            let _ = context.get_or_initialize(|| Ok(crate::runtime::context::handle::data::ContextData::empty()));
             Ok(crate::runtime::context::handle::data::ContextData::empty())
         })
     })) {
@@ -815,11 +813,12 @@ fn global_initialization_recursive_reentry_child() {
         Err(panic) => panic,
     };
     assert!(
-        panic.downcast_ref::<String>().is_some_and(|message| {
-            message == "recursive global reflection context initialization"
-        }) || panic.downcast_ref::<&str>().is_some_and(|message| {
-            *message == "recursive global reflection context initialization"
-        }),
+        panic
+            .downcast_ref::<String>()
+            .is_some_and(|message| { message == "recursive global reflection context initialization" })
+            || panic
+                .downcast_ref::<&str>()
+                .is_some_and(|message| { *message == "recursive global reflection context initialization" }),
         "recursive initialization used an unexpected panic payload"
     );
     let _retried = context
@@ -854,8 +853,7 @@ fn global_initialization_recursive_reentry_is_bounded() {
     let output = child.wait_with_output().expect("collect child output");
     assert!(
         !timed_out
-            && String::from_utf8_lossy(&output.stderr)
-                .contains("recursive global reflection context initialization"),
+            && String::from_utf8_lossy(&output.stderr).contains("recursive global reflection context initialization"),
         "expected recursive initialization to panic with the fixed diagnostic before the deadline; timed_out={timed_out}, stderr={}",
         String::from_utf8_lossy(&output.stderr)
     );
