@@ -553,7 +553,7 @@ pub const fn impl_definition_fragment(
     label: &'static str,
     registration: fn() -> crate::__private::codegen_v4::registration::Registration,
 ) -> crate::__private::codegen_v4::registration::RegistrationFragment {
-    crate::__private::codegen_v4::registration::RegistrationFragment::for_global_registration(label, registration)
+    crate::__private::codegen_v4::registration::RegistrationFragment::for_linked_definition(label, registration)
 }
 
 /// Creates an impl application fragment bound to `T`.

@@ -428,6 +428,13 @@ impl RegistrationFragment {
     /// Creates a global definition fragment that is also visible in linked
     /// contexts.
     pub const fn for_type_definition(label: &'static str, registration: fn() -> Registration) -> Self {
+        Self::for_linked_definition(label, registration)
+    }
+
+    pub(crate) const fn for_linked_definition(
+        label: &'static str,
+        registration: fn() -> Registration,
+    ) -> Self {
         Self {
             sort_key: ("generated", None, "generated", Some(label), None, None, label),
             target_type_id: None,
