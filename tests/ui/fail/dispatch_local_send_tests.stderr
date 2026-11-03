@@ -10,9 +10,6 @@ error[E0277]: `(dyn qubit_reflect::runtime::value::mode::ErasedOwned + 'static)`
    = note: required for `std::ptr::Unique<(dyn qubit_reflect::runtime::value::mode::ErasedOwned + 'static)>` to implement `Send`
 note: required because it appears within the type `Box<(dyn qubit_reflect::runtime::value::mode::ErasedOwned + 'static)>`
   --> $RUST/alloc/src/boxed.rs
-   |
-   | pub struct Box<
-   |            ^^^
 note: required because it appears within the type `qubit_reflect::runtime::value::mode::LocalOwned`
   --> src/runtime/value/mode.rs
    |
@@ -30,9 +27,3 @@ note: required because it's used within this closure
    |                        ^^^^^^^
 note: required by a bound in `spawn`
   --> $RUST/std/src/thread/functions.rs
-   |
-   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-   |        ----- required by a bound in this function
-...
-   |     F: Send + 'static,
-   |        ^^^^ required by this bound in `spawn`
