@@ -15,6 +15,12 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+/// Runs a unit test child process with a fixed timeout.
+///
+/// # Parameters
+///
+/// * `test_name` — exact test name passed to the child process.
+/// * `environment` — environment variable that activates the child path.
 fn run_bounded_unit_test_child(test_name: &str, environment: &str) {
     let mut child = Command::new(std::env::current_exe().expect("test executable path"))
         .arg("--exact")
@@ -67,16 +73,30 @@ use crate::runtime::descriptor::trait_descriptor::TraitDefinitionMetadata;
 use crate::runtime::descriptor::trait_descriptor::Visibility;
 use crate::runtime::expression::TraitExpressionData;
 
-#[derive(Clone)]
-struct First;
-struct Second;
-struct LinkedRoot;
-struct LinkedDependency;
-struct LinkedOutside;
-struct LinkedMissing;
-struct MissingTarget;
+mod context_fixture;
+use context_fixture::ContextFixture;
+
+/// First reflected type used by context tests.
+type First = ContextFixture<0>;
+/// Second reflected type used by context tests.
+type Second = ContextFixture<1>;
+/// Root type for linked registration tests.
+type LinkedRoot = ContextFixture<2>;
+/// Dependency type for linked registration tests.
+type LinkedDependency = ContextFixture<3>;
+/// Unrelated type excluded from a linked context.
+type LinkedOutside = ContextFixture<4>;
+/// Type whose linked registration has a missing dependency.
+type LinkedMissing = ContextFixture<5>;
+/// Root type whose target fragment does not include its type.
+type RootWithoutTypeFragment = ContextFixture<6>;
+/// Dependency type included by the root target fragment.
+type RootFragmentDependency = ContextFixture<7>;
+/// Type identifier with no matching registration fragment.
+type MissingTarget = ContextFixture<8>;
 
 impl Reflect for First {
+    /// Returns the static registration used by this test fixture.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         static REGISTRATION: TypeRegistration<First> = TypeRegistration::new();
         &REGISTRATION
@@ -84,6 +104,7 @@ impl Reflect for First {
 }
 
 impl Reflect for Second {
+    /// Returns the static registration used by this test fixture.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         static REGISTRATION: TypeRegistration<Second> = TypeRegistration::new();
         &REGISTRATION
@@ -104,33 +125,57 @@ reflect_fixture!(LinkedRoot);
 reflect_fixture!(LinkedDependency);
 reflect_fixture!(LinkedOutside);
 reflect_fixture!(LinkedMissing);
+reflect_fixture!(RootWithoutTypeFragment);
+reflect_fixture!(RootFragmentDependency);
 
+/// Returns the linked dependency declared by the root fixture.
 fn linked_root_dependencies() -> &'static [std::any::TypeId] {
     static DEPENDENCIES: [std::any::TypeId; 1] = [std::any::TypeId::of::<LinkedDependency>()];
     &DEPENDENCIES
 }
+/// Returns the dependency used to exercise root type fallback.
+fn root_fragment_dependencies() -> &'static [std::any::TypeId] {
+    static DEPENDENCIES: [std::any::TypeId; 1] = [std::any::TypeId::of::<RootFragmentDependency>()];
+    &DEPENDENCIES
+}
+/// Returns an empty dependency list for an isolated fixture.
 fn no_linked_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
+/// Returns a type identifier with no corresponding registration fragment.
 fn missing_target_dependency() -> &'static [std::any::TypeId] {
     static DEPENDENCIES: [std::any::TypeId; 1] = [std::any::TypeId::of::<MissingTarget>()];
     &DEPENDENCIES
 }
+/// Creates the registration for the linked root fixture.
 fn linked_root_registration() -> Registration {
     Registration::of::<LinkedRoot>()
 }
+/// Creates the registration for the linked dependency fixture.
 fn linked_dependency_registration() -> Registration {
     Registration::of::<LinkedDependency>()
 }
+/// Creates the registration for an unrelated linked fixture.
 fn linked_outside_registration() -> Registration {
     Registration::of::<LinkedOutside>()
 }
+/// Creates the registration for a fixture with a missing dependency.
 fn linked_missing_registration() -> Registration {
     Registration::of::<LinkedMissing>()
 }
+/// Creates metadata without a type record for the root application fragment.
+fn root_fragment_registration() -> Registration {
+    Registration::metadata_only()
+}
+/// Creates the type registration for the root fragment's dependency.
+fn root_fragment_dependency_registration() -> Registration {
+    Registration::of::<RootFragmentDependency>()
+}
 
-struct GenericStructDefinitionMarker;
-struct GenericEnumDefinitionMarker;
+/// Marker identity for the generic struct definition fixture.
+type GenericStructDefinitionMarker = ContextFixture<9>;
+/// Marker identity for the generic enum definition fixture.
+type GenericEnumDefinitionMarker = ContextFixture<10>;
 static GENERIC_TYPE_PARAMETERS: [crate::runtime::descriptor::generic::GenericParameterMetadata; 1] =
     [crate::runtime::descriptor::generic::GenericParameterMetadata::type_parameter("T", 0, &[], None)];
 static GENERIC_DEFINITION_METADATA: GenericDefinitionMetadata =
@@ -150,10 +195,12 @@ static GENERIC_ENUM_DEFINITION: TypeDefinitionRegistration<GenericEnumDefinition
         &GENERIC_DEFINITION_METADATA,
     );
 
+/// Creates the generic struct definition registration used by context tests.
 fn generic_struct_definition_registration() -> Registration {
     Registration::type_definition(&GENERIC_STRUCT_DEFINITION)
 }
 
+/// Creates the generic enum definition registration used by context tests.
 fn generic_enum_definition_registration() -> Registration {
     Registration::type_definition(&GENERIC_ENUM_DEFINITION)
 }
@@ -199,8 +246,23 @@ inventory::submit! {
         linked_outside_registration,
     )
 }
+inventory::submit! {
+    RegistrationFragment::for_target::<RootWithoutTypeFragment>(
+        ("tests", None, "root_without_type", None, None, None, "RootWithoutTypeFragment"),
+        root_fragment_dependencies,
+        root_fragment_registration,
+    )
+}
+inventory::submit! {
+    RegistrationFragment::for_type::<RootFragmentDependency>(
+        ("tests", None, "root_fragment_dependency", None, None, None, "RootFragmentDependency"),
+        no_linked_dependencies,
+        root_fragment_dependency_registration,
+    )
+}
 
-struct EnvelopeMarker;
+/// Marker identity for the envelope type definition fixture.
+type EnvelopeMarker = ContextFixture<11>;
 static EMPTY_GENERIC_DEFINITION: GenericDefinitionMetadata = GenericDefinitionMetadata {
     parameters: &[],
     predicates: &[],
@@ -213,10 +275,14 @@ static ENVELOPE_DEFINITION: TypeDefinitionMetadata = TypeDefinitionMetadata {
     generics: &EMPTY_GENERIC_DEFINITION,
 };
 
-struct SharedTraitMarkerA;
-struct SharedTraitMarkerB;
-struct ConflictingTypeDefinitionMarker;
-struct DuplicatePathTypeDefinitionMarker;
+/// Marker identity for the first shared trait definition fixture.
+type SharedTraitMarkerA = ContextFixture<12>;
+/// Marker identity for the second shared trait definition fixture.
+type SharedTraitMarkerB = ContextFixture<13>;
+/// Marker identity for a conflicting type definition fixture.
+type ConflictingTypeDefinitionMarker = ContextFixture<14>;
+/// Marker identity for a duplicate path type definition fixture.
+type DuplicatePathTypeDefinitionMarker = ContextFixture<15>;
 
 static SHARED_TRAIT_A: TraitDefinitionMetadata = TraitDefinitionMetadata::new::<SharedTraitMarkerA>(
     "Shared",
@@ -272,42 +338,23 @@ static DUPLICATE_PATH_TYPE_DEFINITION: TypeDefinitionMetadata = TypeDefinitionMe
     generics: &EMPTY_GENERIC_DEFINITION,
 };
 
+/// Creates the first shared-trait registration used by lookup tests.
 fn shared_trait_a_registration() -> Registration {
     Registration::metadata_only()
         .with_trait_definition(&SHARED_TRAIT_A)
         .with_trait_application(&SHARED_TRAIT_APPLICATION)
 }
 
+/// Creates the second shared-trait registration used by lookup tests.
 fn shared_trait_b_registration() -> Registration {
     Registration::metadata_only().with_trait_definition(&SHARED_TRAIT_B)
 }
 
-mod first {
-    pub struct Thing;
-
-    impl crate::runtime::descriptor::Reflect for Thing {
-        fn __reflect_registration() -> &'static crate::runtime::descriptor::TypeRegistration<Self> {
-            static REGISTRATION: crate::runtime::descriptor::TypeRegistration<Thing> =
-                crate::runtime::descriptor::TypeRegistration::new();
-            &REGISTRATION
-        }
-    }
-}
-
-mod second {
-    pub struct Thing;
-
-    impl crate::runtime::descriptor::Reflect for Thing {
-        fn __reflect_registration() -> &'static crate::runtime::descriptor::TypeRegistration<Self> {
-            static REGISTRATION: crate::runtime::descriptor::TypeRegistration<Thing> =
-                crate::runtime::descriptor::TypeRegistration::new();
-            &REGISTRATION
-        }
-    }
-}
+mod first;
+mod second;
 
 #[test]
-fn metadata_only_fragments_register_definitions_without_a_type_record() {
+fn test_metadata_only_fragments_register_definitions_without_a_type_record() {
     struct DefinitionMarker;
     static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
     static DEFINITION: TypeDefinitionRegistration<DefinitionMarker> = TypeDefinitionRegistration::new(
@@ -339,7 +386,7 @@ fn metadata_only_fragments_register_definitions_without_a_type_record() {
 }
 
 #[test]
-fn explicit_contexts_are_isolated_and_frozen() {
+fn test_explicit_contexts_are_isolated_and_frozen() {
     let first = ReflectionContext::builder()
         .include_type::<First>()
         .build()
@@ -386,7 +433,7 @@ fn explicit_contexts_are_isolated_and_frozen() {
 }
 
 #[test]
-fn descriptors_distinguish_registered_types_from_unindexed_metadata() {
+fn test_descriptors_distinguish_registered_types_from_unindexed_metadata() {
     let context = ReflectionContext::builder()
         .include_type::<First>()
         .build()
@@ -415,7 +462,7 @@ fn descriptors_distinguish_registered_types_from_unindexed_metadata() {
 }
 
 #[test]
-fn definition_path_ambiguity_and_iteration_preserve_distinct_identities() {
+fn test_definition_path_ambiguity_and_iteration_preserve_distinct_identities() {
     let context = ReflectionContext::builder()
         .register(Registration::type_definition(&GENERIC_STRUCT_DEFINITION))
         .register(Registration::type_definition(&GENERIC_ENUM_DEFINITION))
@@ -473,7 +520,7 @@ fn definition_path_ambiguity_and_iteration_preserve_distinct_identities() {
 }
 
 #[test]
-fn same_trait_path_keeps_typed_links_and_reports_lookup_ambiguity() {
+fn test_same_trait_path_keeps_typed_links_and_reports_lookup_ambiguity() {
     let context = ReflectionContext::builder()
         .register(shared_trait_a_registration())
         .register(shared_trait_b_registration())
@@ -526,7 +573,7 @@ fn same_trait_path_keeps_typed_links_and_reports_lookup_ambiguity() {
 }
 
 #[test]
-fn unsized_reflect_types_can_be_included_in_contexts() {
+fn test_unsized_reflect_types_can_be_included_in_contexts() {
     let explicitly_included = ReflectionContext::builder()
         .include_type::<str>()
         .build()
@@ -559,7 +606,7 @@ fn unsized_reflect_types_can_be_included_in_contexts() {
 }
 
 #[test]
-fn generic_definitions_and_instances_are_context_bound() {
+fn test_generic_definitions_and_instances_are_context_bound() {
     let included = ReflectionContext::builder()
         .register(
             Registration::of::<First>()
@@ -589,7 +636,7 @@ fn generic_definitions_and_instances_are_context_bound() {
 }
 
 #[test]
-fn linked_contexts_discover_generic_struct_and_enum_definitions_without_type_records() {
+fn test_linked_contexts_discover_generic_struct_and_enum_definitions_without_type_records() {
     let context = ReflectionContext::builder()
         .include_linked_for::<LinkedRoot>()
         .build()
@@ -623,7 +670,7 @@ fn linked_contexts_discover_generic_struct_and_enum_definitions_without_type_rec
 }
 
 #[test]
-fn capability_registrations_are_frozen_per_context() {
+fn test_capability_registrations_are_frozen_per_context() {
     use crate::runtime::capability::capability_registration::CapabilityRegistration;
     use crate::runtime::capability::capability_registration_origin::CapabilityRegistrationOrigin;
 
@@ -665,7 +712,7 @@ fn capability_registrations_are_frozen_per_context() {
 }
 
 #[test]
-fn linked_target_closure_includes_dependencies_and_excludes_unrelated_fragments() {
+fn test_linked_target_closure_includes_dependencies_and_excludes_unrelated_fragments() {
     let context = ReflectionContext::builder()
         .include_linked_for::<LinkedRoot>()
         .build()
@@ -682,7 +729,28 @@ fn linked_target_closure_includes_dependencies_and_excludes_unrelated_fragments(
 }
 
 #[test]
-fn linked_target_closure_reports_missing_dependency_before_publishing_context() {
+fn test_linked_target_closure_registers_root_without_type_fragment() {
+    let context = ReflectionContext::builder()
+        .include_linked_for::<RootWithoutTypeFragment>()
+        .build()
+        .expect("root and its dependency are registered");
+
+    assert!(
+        context
+            .find_type_by_id(std::any::TypeId::of::<RootWithoutTypeFragment>())
+            .expect("root lookup succeeds")
+            .is_some()
+    );
+    assert!(
+        context
+            .find_type_by_id(std::any::TypeId::of::<RootFragmentDependency>())
+            .expect("dependency lookup succeeds")
+            .is_some()
+    );
+}
+
+#[test]
+fn test_linked_target_closure_reports_missing_dependency_before_publishing_context() {
     let error = match ReflectionContext::builder()
         .include_linked_for::<LinkedMissing>()
         .build()
@@ -700,7 +768,7 @@ fn linked_target_closure_reports_missing_dependency_before_publishing_context() 
 }
 
 #[test]
-fn duplicate_type_registration_fails_without_publishing_a_context() {
+fn test_duplicate_type_registration_fails_without_publishing_a_context() {
     let error = ReflectionContext::builder()
         .include_type::<First>()
         .include_type::<First>()
@@ -722,7 +790,7 @@ fn duplicate_type_registration_fails_without_publishing_a_context() {
 }
 
 #[test]
-fn lookup_candidates_have_stable_registration_order() {
+fn test_lookup_candidates_have_stable_registration_order() {
     let context = ReflectionContext::builder()
         .include_type::<second::Thing>()
         .include_type::<first::Thing>()
@@ -757,7 +825,7 @@ fn lookup_candidates_have_stable_registration_order() {
 }
 
 #[test]
-fn global_initialization_caches_success_and_failure_without_holding_its_lock() {
+fn test_global_initialization_caches_success_and_failure_without_holding_its_lock() {
     let successful = GlobalContext::new();
     assert!(!successful.is_initialized());
     let success_calls = AtomicUsize::new(0);
@@ -798,7 +866,7 @@ fn global_initialization_caches_success_and_failure_without_holding_its_lock() {
 }
 
 #[test]
-fn global_initialization_recursive_reentry_child() {
+fn test_global_initialization_recursive_reentry_child() {
     if std::env::var_os("QUBIT_REFLECT_INTERNAL_REENTRY_CHILD").is_none() {
         return;
     }
@@ -827,10 +895,10 @@ fn global_initialization_recursive_reentry_child() {
 }
 
 #[test]
-fn global_initialization_recursive_reentry_is_bounded() {
+fn test_global_initialization_recursive_reentry_is_bounded() {
     let mut child = Command::new(std::env::current_exe().expect("test executable path"))
         .arg("--exact")
-        .arg("runtime::tests::context::global_initialization_recursive_reentry_child")
+        .arg("runtime::tests::context::test_global_initialization_recursive_reentry_child")
         .arg("--nocapture")
         .env("QUBIT_REFLECT_INTERNAL_REENTRY_CHILD", "1")
         .stdout(Stdio::piped())
@@ -860,10 +928,10 @@ fn global_initialization_recursive_reentry_is_bounded() {
 }
 
 #[test]
-fn global_initialization_concurrent_callers_share_one_arc() {
+fn test_global_initialization_concurrent_callers_share_one_arc() {
     if std::env::var_os("QUBIT_REFLECT_CONCURRENT_INITIALIZATION_CHILD").is_none() {
         run_bounded_unit_test_child(
-            "runtime::tests::context::global_initialization_concurrent_callers_share_one_arc",
+            "runtime::tests::context::test_global_initialization_concurrent_callers_share_one_arc",
             "QUBIT_REFLECT_CONCURRENT_INITIALIZATION_CHILD",
         );
         return;
@@ -911,10 +979,10 @@ fn global_initialization_concurrent_callers_share_one_arc() {
 }
 
 #[test]
-fn global_initialization_waiter_restarts_after_initializer_panic() {
+fn test_global_initialization_waiter_restarts_after_initializer_panic() {
     if std::env::var_os("QUBIT_REFLECT_PANIC_WAITER_CHILD").is_none() {
         run_bounded_unit_test_child(
-            "runtime::tests::context::global_initialization_waiter_restarts_after_initializer_panic",
+            "runtime::tests::context::test_global_initialization_waiter_restarts_after_initializer_panic",
             "QUBIT_REFLECT_PANIC_WAITER_CHILD",
         );
         return;

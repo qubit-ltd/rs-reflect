@@ -26,7 +26,9 @@ use crate::runtime::identity::StableItemId;
 /// context.
 #[derive(Default)]
 pub struct ReflectionContextBuilder {
+    /// Registrations accumulated for the context.
     registrations: Vec<Registration>,
+    /// Validation issues collected while registrations are added.
     issues: Vec<ContextIssue>,
 }
 
@@ -37,6 +39,17 @@ impl ReflectionContextBuilder {
     }
 
     /// Includes all statically linked registration fragments.
+    ///
+    /// Each selected fragment's registration factory runs while this method is
+    /// called. Calling this method again, or using another builder, can run the
+    /// same factory again. A panic from a factory propagates from this call;
+    /// [`build`](Self::build) only reports registration and metadata errors.
+    ///
+    /// Factories should only produce registration data. They must not
+    /// recursively query or initialize [`ReflectionContext::global`], which
+    /// panics during same-thread global initialization. Do not build another
+    /// linked context from a factory to inspect registrations: that can invoke
+    /// the same factories again.
     pub fn include_linked(mut self) -> Self {
         let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>.into_iter().copied().collect();
         fragments.sort_by_key(|fragment| fragment.sort_key());
@@ -50,12 +63,33 @@ impl ReflectionContextBuilder {
     }
 
     /// Includes the concrete metadata and registrations generated for `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — the reflected type to register.
     pub fn include_type<T: Reflect + ?Sized>(mut self) -> Self {
         self.registrations.push(Registration::of::<T>());
         self
     }
 
     /// Includes linked fragments reachable from the reflected type `T`.
+    ///
+    /// Selected fragment factories run while this method is called, and can
+    /// run again for another builder or repeated inclusion. Factory panics
+    /// propagate from this call; [`build`](Self::build) reports registration
+    /// and metadata errors, not caught factory panics. Factories should only
+    /// produce registration data and must not recursively query or initialize
+    /// [`ReflectionContext::global`], which panics during same-thread global
+    /// initialization. Building a linked context from a factory to inspect
+    /// registrations can run the same factories again.
+    ///
+    /// This also includes the library's linked global definitions and
+    /// capabilities. Selection is not a security boundary and does not
+    /// guarantee that every unrelated metadata item is excluded.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — the root reflected type whose linked fragments are selected.
     pub fn include_linked_for<T: Reflect + ?Sized>(self) -> Self {
         let ReflectionContextBuilder {
             mut registrations,
@@ -95,11 +129,9 @@ impl ReflectionContextBuilder {
             }
         }
 
-        if !fragments
-            .iter()
-            .enumerate()
-            .any(|(index, fragment)| selected[index] && fragment.includes_type())
-        {
+        if !fragments.iter().enumerate().any(|(index, fragment)| {
+            selected[index] && fragment.includes_type() && fragment.target_type_id() == Some(root)
+        }) {
             registrations.push(Registration::of::<T>());
         }
         let mut registered_types: HashSet<_> = registrations
@@ -138,6 +170,10 @@ impl ReflectionContextBuilder {
     }
 
     /// Adds a registration or registration fragment to this builder.
+    ///
+    /// # Parameters
+    ///
+    /// * `registration` — the registration to add.
     pub fn register(mut self, registration: impl Into<Registration>) -> Self {
         let mut registration = registration.into();
         self.issues.extend(registration.take_issues());
@@ -146,6 +182,14 @@ impl ReflectionContextBuilder {
     }
 
     /// Adds a typed method binding to this context's target method catalog.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — the binding's target type.
+    ///
+    /// # Parameters
+    ///
+    /// * `binding` — the method binding to add.
     pub fn bind<T: Reflect>(self, binding: MethodBinding<T>) -> Self {
         self.register(binding)
     }
@@ -158,6 +202,7 @@ impl ReflectionContextBuilder {
         Ok(ReflectionContext::from_data(ContextData::build(self.registrations)?))
     }
 
+    /// Builds and validates the context data for internal callers.
     pub(crate) fn build_data(self) -> Result<ContextData, ContextError> {
         if let Some(error) = ContextError::from_issues(self.issues.into_boxed_slice()) {
             return Err(error);
@@ -166,6 +211,11 @@ impl ReflectionContextBuilder {
     }
 }
 
+/// Creates a diagnostic identity for a reflected type identifier.
+///
+/// # Parameters
+///
+/// * `type_id` — the type identity to describe.
 fn type_item_identity(type_id: TypeId) -> ItemIdentity {
     let name = format!("{type_id:?}");
     ItemIdentity {
@@ -182,6 +232,10 @@ impl ReflectionContext {
     }
 
     /// Returns a context-bound descriptor for the concrete Rust type `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — the reflected type to describe.
     pub fn type_of<T: Reflect + ?Sized>(&self) -> TypeDescriptor<'_> {
         TypeDescriptor::of_in::<T>(self)
     }
