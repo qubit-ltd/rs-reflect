@@ -9,6 +9,7 @@
 mod data;
 mod error;
 mod predicate;
+mod structural_eq;
 mod type_expression;
 
 pub use data::ConstExpression;

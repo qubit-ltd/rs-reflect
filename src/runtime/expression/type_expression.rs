@@ -113,8 +113,32 @@ impl<'ctx> TypeExpression<'ctx> {
     }
 
     /// Formats source facts for logs and diagnostics only.
+    ///
+    /// The formatted text is not a type identity; use
+    /// [`structurally_eq`](Self::structurally_eq) when comparing retained
+    /// source structure.
     pub fn display(self) -> impl fmt::Display + 'ctx {
         ExpressionDisplay { expression: self }
+    }
+
+    /// Compares the retained source structure of two type expressions.
+    ///
+    /// This compares source facts only. It does not compare contexts, resolve
+    /// aliases, evaluate constants, or establish Rust type identity. Parameter
+    /// references compare by name, and binder names and bound order are
+    /// significant. Use this for consistency checks within the same declaration
+    /// environment, not for registration identity or access control.
+    ///
+    /// # Parameters
+    ///
+    /// - `self`: The first type expression.
+    /// - `other`: The second type expression.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the retained source structures match.
+    pub fn structurally_eq(self, other: TypeExpression<'_>) -> bool {
+        super::structural_eq::expression_eq(self.data, other.data)
     }
 }
 

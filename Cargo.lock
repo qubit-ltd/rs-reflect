@@ -476,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-datatype"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "serde",
  "thiserror",
