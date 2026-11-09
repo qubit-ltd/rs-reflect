@@ -142,7 +142,7 @@ pub(crate) fn analyze_method(method: &MethodIr, context: MethodContext<'_>) -> s
     let supported_receiver = !matches!(receiver, Some(ReceiverPlan::Unsupported));
     let supported_parameters = parameters.iter().all(|plan| plan.supported);
     let optional_borrow_return = is_optional_borrow_return(&method.return_type);
-    let supported_borrow = if optional_borrow_return {
+    let supported_borrow = if optional_borrow_return && return_contains_non_static_lifetime(&method.return_type) {
         optional_shared_borrow_origin(method).is_some()
     } else {
         !return_contains_non_static_lifetime(&method.return_type)
@@ -232,7 +232,9 @@ fn unavailable_reasons(
     if method.qualifiers.is_variadic {
         reasons.push(UnavailableReasonPlan::Variadic);
     }
-    if (is_optional_borrow_return(&method.return_type) && optional_shared_borrow_origin(method).is_none())
+    if (is_optional_borrow_return(&method.return_type)
+        && return_contains_non_static_lifetime(&method.return_type)
+        && optional_shared_borrow_origin(method).is_none())
         || (return_contains_non_static_lifetime(&method.return_type)
             && !is_supported_shared_borrow_return(&method.return_type)
             && optional_shared_borrow_origin(method).is_none()

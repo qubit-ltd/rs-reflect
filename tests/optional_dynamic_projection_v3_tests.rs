@@ -54,10 +54,6 @@ impl OptionalTarget {
         Some(value)
     }
 
-    #[expect(
-        dead_code,
-        reason = "The fixture checks conservative handling of static reference outputs."
-    )]
     pub fn maybe_static(&self, present: bool) -> Option<&'static u32> {
         static VALUE: u32 = 41;
         present.then_some(&VALUE)
@@ -266,17 +262,15 @@ fn explicit_optional_borrow_lifetimes_are_not_inferred_as_receiver_borrows() {
 }
 
 #[test]
-fn static_optional_reference_output_is_not_misclassified_as_owned() {
+fn test_static_optional_reference_output_is_invocable_as_owned() {
     let target = OptionalTarget { value: 59 };
-    let failure = match maybe_static().invoke(Invocation::<Local>::on_ref(&target).arg(true)) {
-        Ok(_) => panic!("a static reference remains borrowed, not owned Option data"),
-        Err(failure) => failure,
-    };
+    let output = maybe_static()
+        .invoke(Invocation::<Local>::on_ref(&target).arg(true))
+        .unwrap_or_else(|_| panic!("a static reference may be retained inside owned Option data"));
     assert_eq!(
-        failure.error().kind(),
-        &InvocationErrorKind::MethodUnavailable {
-            reasons: &[InvocationUnavailableReason::UnsupportedBorrowedReturn],
-        },
-        "a static reference is unavailable in the local adapter",
+        output
+            .into_owned::<Option<&'static u32>>()
+            .unwrap_or_else(|_| panic!("static Option output keeps its declared type")),
+        Some(&41),
     );
 }

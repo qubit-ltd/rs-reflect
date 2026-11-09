@@ -249,7 +249,8 @@ impl Reflect for dyn std::any::Any {
 }
 
 macro_rules! impl_function_pointer_reflect {
-    ($($argument:ident),* $(,)?) => {
+    (@with_attributes [$($attribute:meta),*]; $($argument:ident),* $(,)?) => {
+        $(#[$attribute])*
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for fn($($argument),*) -> Return {
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
                 shaped_registration(&FUNCTION_KIND)
@@ -310,10 +311,16 @@ macro_rules! impl_function_pointer_reflect {
             }
         }
     };
+    (@hrtb_overlap; $($argument:ident),* $(,)?) => {
+        impl_function_pointer_reflect!(@with_attributes [allow(coherence_leak_check)]; $($argument),*);
+    };
+    ($($argument:ident),* $(,)?) => {
+        impl_function_pointer_reflect!(@with_attributes []; $($argument),*);
+    };
 }
 
 impl_function_pointer_reflect!();
-impl_function_pointer_reflect!(A);
+impl_function_pointer_reflect!(@hrtb_overlap; A);
 impl_function_pointer_reflect!(A, B);
 impl_function_pointer_reflect!(A, B, C);
 impl_function_pointer_reflect!(A, B, C, D);
@@ -340,6 +347,12 @@ impl_function_pointer_reflect!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q
 impl_function_pointer_reflect!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y
 );
+
+impl<T: Reflect, Return: Reflect> Reflect for for<'a> fn(&'a T) -> Return {
+    fn __reflect_registration() -> &'static TypeRegistration<Self> {
+        shaped_registration(&FUNCTION_KIND)
+    }
+}
 impl_function_pointer_reflect!(
     A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
 );
