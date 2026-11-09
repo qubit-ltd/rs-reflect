@@ -260,6 +260,14 @@ fn explicit_context_demo() {
 
 Handle `build()`'s `ContextError` and use its diagnostics to identify missing or invalid registrations. Choosing an explicit context does not replace authorization checks.
 
+Linked registration factories run during `include_linked()` or
+`include_linked_for()`, and may run again when included by another builder.
+Keep them limited to producing registration data: do not query or initialize
+`ReflectionContext::global()` recursively, or build a linked context from
+inside a factory to inspect registrations. Same-thread recursive global
+initialization panics, and a factory panic propagates from the include call;
+`build()` does not catch it.
+
 ## Recover from rejected updates and calls
 
 A typed field replacement returns `FieldSetFailure<V>` on failure. Its `into_parts()` method returns both the diagnostic and the replacement value, so a handler can preserve or report the rejected input. Before a method begins, invocation validation can fail because the receiver or an argument has the wrong type or mode, the parameter binding is invalid, or the method is unavailable. `InvocationFailure` retains the recovery state for inputs rejected before execution.

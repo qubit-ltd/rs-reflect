@@ -256,6 +256,12 @@ fn explicit_context_demo() {
 
 应处理 `build()` 返回的 `ContextError`，并根据诊断定位缺失或无效的注册。选择显式 context 不能替代鉴权。
 
+链接注册工厂会在调用 `include_linked()` 或 `include_linked_for()` 时执行，
+另一个 builder 再次选择它们时也可能重跑。工厂应只生成注册数据：不要递归查询或
+初始化 `ReflectionContext::global()`，也不要在工厂内构建 linked context 来检查注册项。
+同一线程递归初始化 global 会 panic；工厂 panic 会从 include 调用处传播，`build()`
+不会捕获它。
+
 ## 恢复被拒绝的更新和调用
 
 typed 字段替换失败时返回 `FieldSetFailure<V>`。调用 `into_parts()` 可以同时取回诊断信息和原替换值，便于 handler 保留或报告输入。方法开始执行前，调用校验可能因为 receiver 或参数的类型、传递模式、参数绑定或方法可用性而失败。此时 `InvocationFailure` 会保留执行前被拒绝的输入。
