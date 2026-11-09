@@ -275,17 +275,58 @@ derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定�
 Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。
 
 ```rust
-use qubit_reflect::{bind_method, ReflectionContext};
+use qubit_reflect::descriptor::MethodArguments;
+use qubit_reflect::value::Local;
+use qubit_reflect::descriptor::Reflect as ReflectTrait;
+use qubit_reflect::{bind_method, Invocation, ReflectImpl, ReflectionContext};
 
-let context = ReflectionContext::builder()
-    .include_linked()
-    .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
-    .build()?;
+#[qubit_reflect::Reflect]
+struct Converter;
+
+#[ReflectImpl]
+impl Converter {
+    pub fn convert<T>(&self, value: String) -> T
+    where
+        T: ReflectTrait + std::str::FromStr,
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
+    {
+        value.parse().expect("示例输入可解析为选择的类型")
+    }
+}
+
+fn convert_demo() {
+    let context = ReflectionContext::builder()
+        .include_linked()
+        .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
+        .build()
+        .expect("显式 context 包含 converter 绑定");
+    let method = context
+        .type_of::<Converter>()
+        .method("convert")
+        .expect("泛型方法已反射");
+    let specialization = method
+        .specialization(&MethodArguments::new().type_of::<u8>())
+        .expect("u8 特化已绑定");
+    let converter = Converter;
+    let output = match specialization
+        .invoke(Invocation::<Local>::on_ref(&converter).arg(String::from("42")))
+    {
+        Ok(output) => output,
+        Err(failure) => panic!("converter 方法执行成功: {:?}", failure.error().kind()),
+    };
+    let value = match output.into_owned::<u8>() {
+        Ok(value) => value,
+        Err(_) => panic!("结果类型为 u8"),
+    };
+    assert_eq!(value, 42);
+}
 ```
+
+`Converter::convert` 将文本解析为选定的结果类型；此处 context 绑定了 `u8` 特化。该正文示例由文档片段测试编译并执行。
 
 trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflected_trait` 指向 trait 定义；binder 会从 impl 的 trait 路径调用隐藏 hook，因此 rustc 能解析导入 alias 并补齐默认类型和 const 实参：
 
-```rust
+```text
 .bind(bind_method!(
     <Service as ImportedService>::refresh as fn(&Service) -> String,
     reflected_trait = api::ServiceContract,
@@ -295,6 +336,8 @@ trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflect
 对外部 trait，先用 `reflect_external_trait!` 创建 identity handle，再以 `external_trait = Handle` 绑定显式方法。handle 不提供外部方法声明或默认参数信息；application identity 仅包含 impl 路径中明确写出的类型和 const 实参。此绑定是调用者登记的方法事实。
 
 方法描述符仍表示源码声明。调用前使用 `MethodArguments` 选择具体特化。未绑定或不受支持的方法仍会以元数据和可用性原因呈现，不会被静默地绕过安全检查。
+
+比较保留的类型表达式元数据时，使用 `TypeExpression::structurally_eq`，不要比较 `display()` 输出。显示文本用于诊断；结构比较检查源码事实，不证明 Rust 类型身份。
 
 ## 依赖功能
 

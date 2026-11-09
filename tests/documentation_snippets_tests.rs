@@ -120,6 +120,20 @@ const SNIPPETS: &[Snippet] = &[
         derive: false,
         main: "fn main() { explicit_context_demo(); }",
     },
+    Snippet {
+        file: "doc/user_guide.md",
+        heading: "## Bind a generic method",
+        prefix_heading: None,
+        derive: false,
+        main: "fn main() { convert_demo(); }",
+    },
+    Snippet {
+        file: "doc/user_guide.zh_CN.md",
+        heading: "## 绑定泛型方法",
+        prefix_heading: None,
+        derive: false,
+        main: "fn main() { convert_demo(); }",
+    },
 ];
 
 fn rust_block_after(markdown: &str, heading: &str) -> Option<String> {
@@ -248,7 +262,7 @@ fn compile_and_run(root: &Path, temp_root: &Path, snippet: &Snippet) -> Result<(
 }
 
 #[test]
-fn documentation_body_snippets_compile_and_run() {
+fn test_documentation_body_snippets_compile_and_run() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let temp_root = unique_temp_dir();
     fs::create_dir_all(&temp_root).expect("create isolated temporary consumers directory");

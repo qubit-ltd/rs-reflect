@@ -278,16 +278,61 @@ Derive-generated invocation adapters for `async fn` currently support only `Loca
 
 Rust creates a generic method's concrete code at compile time. Register each supported specialization with `bind_method!` when building an explicit context; runtime reflection does not synthesize a new monomorphization from a `TypeId`.
 
+The example below shows the full path from the generic method definition to a
+selected specialization and its result. `Converter::convert` parses its text
+input as the chosen output type; this context binds the `u8` specialization.
+
 ```rust
-let context = ReflectionContext::builder()
-    .include_linked()
-    .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
-    .build()?;
+use qubit_reflect::descriptor::MethodArguments;
+use qubit_reflect::value::Local;
+use qubit_reflect::descriptor::Reflect as ReflectTrait;
+use qubit_reflect::{bind_method, Invocation, ReflectImpl, ReflectionContext};
+
+#[qubit_reflect::Reflect]
+struct Converter;
+
+#[ReflectImpl]
+impl Converter {
+    pub fn convert<T>(&self, value: String) -> T
+    where
+        T: ReflectTrait + std::str::FromStr,
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
+    {
+        value.parse().expect("the example input parses as the selected type")
+    }
+}
+
+fn convert_demo() {
+    let context = ReflectionContext::builder()
+        .include_linked()
+        .bind(bind_method!(Converter::convert::<u8> as fn(&Converter, String) -> u8))
+        .build()
+        .expect("the explicit context contains the converter binding");
+    let method = context
+        .type_of::<Converter>()
+        .method("convert")
+        .expect("the generic method is reflected");
+    let specialization = method
+        .specialization(&MethodArguments::new().type_of::<u8>())
+        .expect("the u8 specialization is bound");
+    let converter = Converter;
+    let output = match specialization
+        .invoke(Invocation::<Local>::on_ref(&converter).arg(String::from("42")))
+    {
+        Ok(output) => output,
+        Err(failure) => panic!("the converter method runs: {:?}", failure.error().kind()),
+    };
+    let value = match output.into_owned::<u8>() {
+        Ok(value) => value,
+        Err(_) => panic!("the result is u8"),
+    };
+    assert_eq!(value, 42);
+}
 ```
 
 Trait method bindings should carry an explicit identity hint. For a local reflected trait, `reflected_trait` names its definition; the binder calls the hidden application hook through the impl's trait path, so rustc resolves imports and fills omitted type and const defaults:
 
-```rust
+```text
 .bind(bind_method!(
     <Service as ImportedService>::refresh as fn(&Service) -> String,
     reflected_trait = api::ServiceContract,
@@ -297,6 +342,8 @@ Trait method bindings should carry an explicit identity hint. For a local reflec
 For an external trait, create an identity handle with `reflect_external_trait!` and bind the explicit method with `external_trait = Handle`. The handle provides no external method declarations or default-argument information. Application identity contains only type and const arguments written in the impl path; the binding is an explicitly supplied method fact.
 
 The method descriptor keeps the source declaration. Select a concrete specialization with `MethodArguments` before invoking it. Unbound or unsupported methods remain visible as metadata with an availability reason; they are not silently called through an unsafe fallback.
+
+When comparing retained type-expression metadata, use `TypeExpression::structurally_eq` instead of comparing `display()` output. Display text is for diagnostics; structural comparison checks source facts and does not establish Rust type identity.
 
 ## Dependency features
 
