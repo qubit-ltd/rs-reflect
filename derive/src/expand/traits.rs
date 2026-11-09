@@ -2,6 +2,8 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
 //! Expansion of reflected trait declarations to typed codegen v4 metadata.
@@ -28,6 +30,15 @@ use crate::ir::PathIr;
 use crate::ir::TraitDeclarationIr;
 use crate::ir::VisibilityIr;
 
+/// Generates the hidden metadata providers for a reflected trait declaration.
+///
+/// Supertrait applications retain source arguments and use linked providers
+/// when the referenced trait has a local reflected binding.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed trait declaration to turn into metadata providers.
+/// - `context`: Expansion context supplying runtime paths and stable identity.
 pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext) -> TokenStream {
     let facade = context.facade().clone();
     let codegen = quote!(#facade::__private::codegen_v4);
@@ -336,6 +347,13 @@ pub(crate) fn expand(declaration: TraitDeclarationIr, context: &ExpansionContext
 
 /// Builds the hidden trait method that exposes compiler-resolved generic
 /// arguments for one local reflected trait application.
+///
+/// # Parameters
+///
+/// - `declaration`: Reflected trait whose generic arguments are exposed.
+/// - `spec_provider`: Generated provider for the trait definition.
+/// - `hook`: Generated method identifier.
+/// - `facade`: Runtime facade path used by generated code.
 fn trait_application_hook(
     declaration: &TraitDeclarationIr,
     spec_provider: &syn::Ident,
@@ -433,6 +451,11 @@ fn trait_application_hook(
     }
 }
 
+/// Reports whether any supertrait path segment has explicit generic arguments.
+///
+/// # Parameters
+///
+/// - `path`: Parsed supertrait path to inspect.
 fn has_supertrait_arguments(path: &PathIr) -> bool {
     path.segments.iter().any(
         |segment| matches!(&segment.arguments, PathArgumentsIr::AngleBracketed(arguments) if !arguments.is_empty()),
@@ -442,6 +465,11 @@ fn has_supertrait_arguments(path: &PathIr) -> bool {
 /// Returns whether a supertrait argument contains an associated-type
 /// projection whose resolved type cannot be proven `'static` from source
 /// syntax alone.
+///
+/// # Parameters
+///
+/// - `path`: Supertrait path whose arguments are inspected.
+/// - `generics`: Generic parameters declared by the reflected trait.
 fn supertrait_path_contains_projection(path: &PathIr, generics: &crate::ir::GenericsIr) -> bool {
     path.segments.iter().any(|segment| match &segment.arguments {
         PathArgumentsIr::None => false,
@@ -462,6 +490,12 @@ fn supertrait_path_contains_projection(path: &PathIr, generics: &crate::ir::Gene
     })
 }
 
+/// Detects associated-type projections or opaque syntax in a type expression.
+///
+/// # Parameters
+///
+/// - `ty`: Type expression to inspect.
+/// - `generics`: Trait generic parameters used to resolve source references.
 fn type_contains_projection(ty: &crate::ir::TypeIr, generics: &crate::ir::GenericsIr) -> bool {
     use crate::ir::TypeKindIr;
 
@@ -518,6 +552,12 @@ fn type_contains_projection(ty: &crate::ir::TypeIr, generics: &crate::ir::Generi
     }
 }
 
+/// Reports whether a path mentions one of the trait's declared lifetimes.
+///
+/// # Parameters
+///
+/// - `path`: Parsed path whose token stream is searched.
+/// - `generics`: Trait parameters defining the child lifetime names.
 fn path_references_child_lifetime(path: &PathIr, generics: &crate::ir::GenericsIr) -> bool {
     let lifetimes = generics
         .params
@@ -528,6 +568,12 @@ fn path_references_child_lifetime(path: &PathIr, generics: &crate::ir::GenericsI
     token_stream_references_lifetime(&path.tokens, &lifetimes)
 }
 
+/// Searches nested token groups for a lifetime from the supplied name set.
+///
+/// # Parameters
+///
+/// - `tokens`: Token stream to search, including nested groups.
+/// - `lifetimes`: Lifetime names considered references to child parameters.
 fn token_stream_references_lifetime(tokens: &TokenStream, lifetimes: &[&str]) -> bool {
     let token_trees = tokens.clone().into_iter().collect::<Vec<_>>();
     for (index, token) in token_trees.iter().enumerate() {
@@ -553,6 +599,14 @@ fn token_stream_references_lifetime(tokens: &TokenStream, lifetimes: &[&str]) ->
     false
 }
 
+/// Converts source generic arguments into runtime values and identity metadata.
+///
+/// # Parameters
+///
+/// - `path`: Source supertrait path containing the arguments.
+/// - `environment`: Generic environment used to resolve type expressions.
+/// - `facade`: Runtime facade path used in generated expressions.
+/// - `concrete`: Whether arguments should be emitted as concrete values.
 fn supertrait_application_arguments(
     path: &PathIr,
     environment: &crate::expand::generic_environment::GenericEnvironment,
@@ -603,6 +657,16 @@ fn supertrait_application_arguments(
     (arguments, identity)
 }
 
+/// Builds a linked or unresolved runtime application for a supertrait path.
+///
+/// # Parameters
+///
+/// - `path`: Parsed source supertrait path.
+/// - `lifetimes`: Child lifetime names to preserve in expression metadata.
+/// - `generics`: Generic declaration used to resolve source arguments.
+/// - `facade`: Runtime facade path referenced by generated code.
+/// - `concrete`: Whether type arguments are fully concrete.
+/// - `binding_provider`: Optional local trait provider path for linking.
 fn supertrait_application(
     path: &PathIr,
     lifetimes: &[String],
@@ -672,10 +736,21 @@ fn supertrait_application(
     }
 }
 
+/// Names the generated trait-spec provider associated with a source path.
+///
+/// # Parameters
+///
+/// - `path`: Source trait path whose final segment is rewritten.
 fn trait_spec_provider_path(path: &PathIr) -> syn::Path {
     generated_trait_path(path, "SPEC")
 }
 
+/// Builds a call to the direct or transitive supertrait provider for a path.
+///
+/// # Parameters
+///
+/// - `path`: Source trait path whose generated provider is called.
+/// - `all`: Selects the transitive provider when true.
 fn trait_applications_provider_call(path: &PathIr, all: bool) -> TokenStream {
     let suffix = if all {
         "APPLICATION_ALL_SUPERTRAITS"
@@ -686,6 +761,12 @@ fn trait_applications_provider_call(path: &PathIr, all: bool) -> TokenStream {
     quote!(#provider_path())
 }
 
+/// Rewrites the final trait path segment to a generated provider name.
+///
+/// # Parameters
+///
+/// - `path`: Source path identifying the reflected trait.
+/// - `suffix`: Generated provider suffix appended to the trait name.
 fn generated_trait_path(path: &PathIr, suffix: &str) -> syn::Path {
     let mut provider: syn::Path =
         syn::parse_str(&path.source).expect("validated trait binding path must parse as a Rust path");

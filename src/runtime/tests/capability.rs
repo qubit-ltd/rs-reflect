@@ -69,7 +69,7 @@ fn view_for_cloneable(registrations: impl IntoIterator<Item = CapabilityRegistra
 }
 
 #[test]
-fn typed_lookup_binds_the_id_and_adapter_type() {
+fn test_typed_lookup_binds_the_id_and_adapter_type() {
     let capabilities = view_for_cloneable([registration::<Cloneable>(
         9,
         CapabilityRegistrationOrigin::Explicit(origin("typed")),
@@ -89,7 +89,7 @@ fn typed_lookup_binds_the_id_and_adapter_type() {
 }
 
 #[test]
-fn descriptor_metadata_and_clones_preserve_linked_capability_state() {
+fn test_descriptor_metadata_and_clones_preserve_linked_capability_state() {
     use crate::runtime::capability::capability_origin::CapabilityOrigin;
 
     let capabilities = view_for_cloneable([registration::<Cloneable>(
@@ -120,7 +120,7 @@ fn descriptor_metadata_and_clones_preserve_linked_capability_state() {
 }
 
 #[test]
-fn capability_views_resolve_targets_and_explicit_origins_in_the_query_context() {
+fn test_capability_views_resolve_targets_and_explicit_origins_in_the_query_context() {
     use crate::runtime::capability::capability_origin::CapabilityOrigin;
     use crate::runtime::context::ReflectionContext;
     use crate::runtime::context::handle::registration::Registration;
@@ -154,7 +154,7 @@ fn capability_views_resolve_targets_and_explicit_origins_in_the_query_context() 
 }
 
 #[test]
-fn missing_capability_is_distinct_from_a_contract_mismatch() {
+fn test_missing_capability_is_distinct_from_a_contract_mismatch() {
     let capabilities = view_for_cloneable([]);
     assert!(matches!(
         capabilities.capability::<CountCapability>(),
@@ -178,7 +178,7 @@ fn missing_capability_is_distinct_from_a_contract_mismatch() {
 }
 
 #[test]
-fn erased_descriptor_reports_contract_mismatch_without_calling_it_missing() {
+fn test_erased_descriptor_reports_contract_mismatch_without_calling_it_missing() {
     let capabilities = view_for_cloneable([CapabilityRegistration::new::<WrongCountCapability>(
         target::<Cloneable>(),
         7_u16,
@@ -199,7 +199,7 @@ fn erased_descriptor_reports_contract_mismatch_without_calling_it_missing() {
 }
 
 #[test]
-fn conflicting_ids_retain_all_registration_origins() {
+fn test_conflicting_ids_retain_all_registration_origins() {
     let error = Capabilities::try_new(
         target::<u32>(),
         [
@@ -217,7 +217,7 @@ fn conflicting_ids_retain_all_registration_origins() {
 }
 
 #[test]
-fn capability_sets_reject_registrations_for_another_target() {
+fn test_capability_sets_reject_registrations_for_another_target() {
     let error = Capabilities::try_new(
         target::<u32>(),
         [registration::<u64>(
@@ -235,7 +235,7 @@ fn capability_sets_reject_registrations_for_another_target() {
 }
 
 #[test]
-fn builtin_registrations_require_the_corresponding_rust_trait_bound() {
+fn test_builtin_registrations_require_the_corresponding_rust_trait_bound() {
     let send = CapabilityRegistration::send::<String>(CapabilityRegistrationOrigin::Explicit(origin("send")))
         .expect("String is Send");
     assert_eq!(send.id.as_str(), SendCapability::ID);
@@ -261,7 +261,7 @@ fn builtin_registrations_require_the_corresponding_rust_trait_bound() {
 }
 
 #[test]
-fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
+fn test_builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
     let clone_registration =
         CapabilityRegistration::clone::<Cloneable>(CapabilityRegistrationOrigin::Explicit(origin("clone")))
             .expect("Cloneable implements Clone");
@@ -372,7 +372,7 @@ fn builtin_clone_and_default_adapters_operate_on_the_proven_concrete_type() {
 }
 
 #[test]
-fn invalid_external_capability_id_is_rejected_during_registration() {
+fn test_invalid_external_capability_id_is_rejected_during_registration() {
     struct InvalidCapability;
     impl CapabilitySpec for InvalidCapability {
         type Adapter = ();
@@ -410,7 +410,7 @@ fn invalid_external_capability_id_is_rejected_during_registration() {
 }
 
 #[test]
-fn capability_contract_errors_report_id_and_adapter_identity_boundaries() {
+fn test_capability_contract_errors_report_id_and_adapter_identity_boundaries() {
     struct SameAdapterDifferentId;
     impl CapabilitySpec for SameAdapterDifferentId {
         type Adapter = CountAdapter;
@@ -458,7 +458,7 @@ fn capability_contract_errors_report_id_and_adapter_identity_boundaries() {
 }
 
 #[test]
-fn capability_builder_keeps_type_and_definition_targets_distinct() {
+fn test_capability_builder_keeps_type_and_definition_targets_distinct() {
     use crate::runtime::descriptor::generic::TypeDefinitionId;
 
     let definition = TypeDefinitionId::of::<Cloneable>();
@@ -484,7 +484,7 @@ fn capability_builder_keeps_type_and_definition_targets_distinct() {
 }
 
 #[test]
-fn capability_errors_preserve_sources_and_render_each_public_error_category() {
+fn test_capability_errors_preserve_sources_and_render_each_public_error_category() {
     let target_id = target::<Cloneable>();
     let context_error = crate::runtime::error::ContextError::new("invalid context fixture");
     let context = CapabilityError::Context(context_error.clone());
@@ -550,7 +550,7 @@ fn capability_errors_preserve_sources_and_render_each_public_error_category() {
 }
 
 #[test]
-fn invocation_errors_distinguish_wrong_value_types_from_unsupported_modes() {
+fn test_invocation_errors_distinguish_wrong_value_types_from_unsupported_modes() {
     use crate::runtime::capability::capability_error::CapabilityInvocationError;
     use crate::runtime::capability::capability_error::CapabilityInvocationMode;
 
@@ -582,7 +582,7 @@ fn invocation_errors_distinguish_wrong_value_types_from_unsupported_modes() {
 }
 
 #[test]
-fn invalid_registration_id_error_keeps_the_validation_cause() {
+fn test_invalid_registration_id_error_keeps_the_validation_cause() {
     use crate::runtime::capability::capability_error::CapabilityRegistrationError;
 
     let id_error = crate::identity::CapabilityId::new("invalid..id").expect_err("malformed IDs fail validation");

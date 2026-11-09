@@ -36,7 +36,7 @@ struct ExplicitOnly {
 }
 
 #[test]
-fn explicit_context_indexes_only_included_types() {
+fn test_explicit_context_indexes_only_included_types() {
     let context = ReflectionContext::builder()
         .include_type::<ExplicitOnly>()
         .build()
@@ -54,7 +54,7 @@ fn explicit_context_indexes_only_included_types() {
 }
 
 #[test]
-fn descriptor_created_in_context_keeps_that_context() {
+fn test_descriptor_created_in_context_keeps_that_context() {
     let context = ReflectionContext::builder()
         .include_type::<ExplicitOnly>()
         .build()
@@ -70,7 +70,7 @@ fn descriptor_created_in_context_keeps_that_context() {
 }
 
 #[test]
-fn short_name_lookup_reports_ambiguity_without_selecting_a_candidate() {
+fn test_short_name_lookup_reports_ambiguity_without_selecting_a_candidate() {
     let context = ReflectionContext::builder()
         .include_type::<duplicate_a::Shared>()
         .include_type::<duplicate_b::Shared>()
@@ -95,7 +95,7 @@ fn short_name_lookup_reports_ambiguity_without_selecting_a_candidate() {
 }
 
 #[test]
-fn global_context_initializes_linked_registrations_once() {
+fn test_global_context_initializes_linked_registrations_once() {
     let first = ReflectionContext::global();
     let initialized = first.initialize().expect("linked registrations are valid");
     let second = ReflectionContext::global();

@@ -16,18 +16,32 @@ use crate::runtime::descriptor::trait_descriptor::TraitDefinitionId;
 use crate::runtime::descriptor::trait_descriptor::TraitDefinitionMetadata;
 use crate::runtime::short_name::index_short_name;
 
+/// Lookup maps built from the descriptors registered in a context.
 #[derive(Default)]
 pub(crate) struct ContextIndexes {
+    /// Maps concrete Rust type IDs to descriptor positions.
     pub(crate) types_by_id: HashMap<TypeId, usize>,
+    /// Maps fully qualified Rust names to matching descriptor positions.
     pub(crate) types_by_name: HashMap<Box<str>, Box<[usize]>>,
+    /// Maps short Rust names to matching descriptor positions.
     pub(crate) types_by_short_name: HashMap<Box<str>, Box<[usize]>>,
+    /// Maps source type paths to their definition IDs.
     pub(crate) type_definitions_by_path: HashMap<Box<str>, Box<[TypeDefinitionId]>>,
+    /// Maps short source type names to their definition IDs.
     pub(crate) type_definitions_by_short_name: HashMap<Box<str>, Box<[TypeDefinitionId]>>,
+    /// Maps source trait paths to their definition IDs.
     pub(crate) trait_definitions_by_path: HashMap<Box<str>, Box<[TraitDefinitionId]>>,
+    /// Maps short source trait names to their definition IDs.
     pub(crate) trait_definitions_by_short_name: HashMap<Box<str>, Box<[TraitDefinitionId]>>,
 }
 
 impl ContextIndexes {
+    /// Builds context lookup maps from concrete and source definition metadata.
+    ///
+    /// # Parameters
+    /// - `types`: concrete type records in descriptor order.
+    /// - `type_definitions`: source type definitions to index.
+    /// - `trait_definitions`: source trait definitions to index.
     pub(crate) fn build(
         types: &[TypeRecord],
         type_definitions: impl IntoIterator<Item = &'static TypeDefinitionMetadata>,
@@ -89,6 +103,13 @@ impl ContextIndexes {
     }
 }
 
+/// Converts mutable candidate vectors into immutable slices for lookup.
+///
+/// # Type Parameters
+/// - `T`: the candidate value stored in each index.
+///
+/// # Parameters
+/// - `index`: mutable candidate vectors grouped by lookup name.
 fn freeze_candidates<T>(index: HashMap<Box<str>, Vec<T>>) -> HashMap<Box<str>, Box<[T]>> {
     index
         .into_iter()

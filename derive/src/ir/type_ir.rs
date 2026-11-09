@@ -45,7 +45,10 @@ pub(crate) enum PathArgumentsIr {
     /// No arguments follow the path segment.
     None,
     /// Angle-bracketed lifetime, type, const, or associated arguments.
-    AngleBracketed(Vec<PathArgumentIr>),
+    AngleBracketed(
+        /// Generic arguments in source order.
+        Vec<PathArgumentIr>,
+    ),
     /// Parenthesized function-trait arguments and optional output type.
     Parenthesized {
         /// Input types in declaration order.
@@ -59,19 +62,46 @@ pub(crate) enum PathArgumentsIr {
 #[derive(Clone, Debug)]
 pub(crate) enum PathArgumentIr {
     /// Lifetime argument, including its leading apostrophe.
-    Lifetime(String),
+    Lifetime(
+        /// Lifetime spelling, including its apostrophe.
+        String,
+    ),
     /// Nested type argument.
-    Type(TypeIr),
+    Type(
+        /// Parsed nested type argument.
+        TypeIr,
+    ),
     /// Const expression tokens with source spans.
-    Const(TokenStream),
+    Const(
+        /// Original const expression tokens.
+        TokenStream,
+    ),
     /// Associated type equality binding.
-    AssociatedType { name: String, ty: TypeIr },
+    AssociatedType {
+        /// Associated type identifier.
+        name: String,
+        /// Type assigned to the associated type.
+        ty: TypeIr,
+    },
     /// Associated const equality binding.
-    AssociatedConst { name: String, value: TokenStream },
+    AssociatedConst {
+        /// Associated const identifier.
+        name: String,
+        /// Const expression assigned to the associated const.
+        value: TokenStream,
+    },
     /// Associated type bounds constraint.
-    Constraint { name: String, bounds: Vec<GenericBoundIr> },
+    Constraint {
+        /// Associated type identifier constrained by the bound list.
+        name: String,
+        /// Bounds applied to the associated type.
+        bounds: Vec<GenericBoundIr>,
+    },
     /// Argument syntax not represented by the known structured forms.
-    Other(TokenStream),
+    Other(
+        /// Original argument tokens retained for unsupported syntax.
+        TokenStream,
+    ),
 }
 
 /// The semantic facts of a qualified-self path prefix.
@@ -102,7 +132,10 @@ pub(crate) struct TypeIr {
 #[derive(Clone, Debug)]
 pub(crate) enum TypeKindIr {
     /// A path type, including qualified paths.
-    Path(PathIr),
+    Path(
+        /// Parsed path and its generic arguments.
+        PathIr,
+    ),
     /// A reference and its mutability, lifetime, and pointee.
     Reference {
         /// Explicit lifetime, when written.
@@ -113,9 +146,15 @@ pub(crate) enum TypeKindIr {
         element: Box<TypeIr>,
     },
     /// Tuple elements in source order.
-    Tuple(Vec<TypeIr>),
+    Tuple(
+        /// Element types in source order.
+        Vec<TypeIr>,
+    ),
     /// Slice element type.
-    Slice(Box<TypeIr>),
+    Slice(
+        /// Type of each element in the slice.
+        Box<TypeIr>,
+    ),
     /// Array element type and unevaluated length expression.
     Array {
         /// Array element type.

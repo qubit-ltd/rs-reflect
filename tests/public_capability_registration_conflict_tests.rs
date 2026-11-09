@@ -23,7 +23,7 @@ register_capability!(DuplicateCapabilityTarget: Clone);
 register_capability!(DuplicateCapabilityTarget: Clone);
 
 #[test]
-fn duplicate_public_capability_registration_returns_context_conflict() {
+fn test_duplicate_public_capability_registration_returns_context_conflict() {
     let result = ReflectionContext::builder()
         .include_linked_for::<DuplicateCapabilityTarget>()
         .build();

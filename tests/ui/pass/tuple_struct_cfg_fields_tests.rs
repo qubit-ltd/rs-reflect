@@ -7,11 +7,7 @@
 // =============================================================================
 
 #[qubit_reflect::Reflect]
-struct Conditional(
-    #[cfg(any())] u8,
-    #[cfg_attr(all(), cfg(any()))] u16,
-    pub u32,
-);
+struct Conditional(#[cfg(any())] u8, #[cfg_attr(all(), cfg(any()))] u16, pub u32);
 
 #[qubit_reflect::Reflect]
 struct ConditionalNested(

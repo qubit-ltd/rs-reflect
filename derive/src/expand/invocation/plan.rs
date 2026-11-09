@@ -104,12 +104,21 @@ pub(crate) enum ReceiverPlan {
     /// Method receives an exclusive mutable reference.
     MutableReference,
     /// Method receives a standard owned container around the target.
-    OwnedContainer(TokenStream),
+    OwnedContainer(
+        /// Tokens naming the standard owned container type.
+        TokenStream,
+    ),
     /// Method receives a pinned shared or mutable reference.
-    Pinned { mutable: bool },
+    Pinned {
+        /// Whether the pinned reference grants mutable access.
+        mutable: bool,
+    },
     /// Method receives a non-core explicit receiver using an adapter
     /// capability.
-    Extension(TokenStream),
+    Extension(
+        /// Tokens naming the explicit extension receiver type.
+        TokenStream,
+    ),
     /// Receiver syntax has no supported dynamic adaptation.
     Unsupported,
 }
@@ -167,7 +176,10 @@ pub(crate) enum AvailabilityPlan {
     /// The method can be called through a generated adapter.
     Executable,
     /// Only metadata is available, with ordered reasons explaining why.
-    DescribedOnly(Vec<UnavailableReasonPlan>),
+    DescribedOnly(
+        /// Ordered reasons why no executable adapter can be emitted.
+        Vec<UnavailableReasonPlan>,
+    ),
 }
 
 /// One stable reason an adapter cannot be emitted.

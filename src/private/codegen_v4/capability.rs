@@ -19,6 +19,15 @@ use crate::runtime::context::handle::registration::Registration;
 use crate::runtime::context::handle::registration::RegistrationFragment;
 use crate::runtime::identity::RegistrationOrigin;
 
+/// Captures the source location of a linked capability registration.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module that contains the registration.
+/// * `file` — source file containing the registration.
+/// * `line` — source line at which the registration was declared.
 fn linked_origin(
     crate_name: &'static str,
     crate_version: &'static str,
@@ -37,6 +46,17 @@ fn linked_origin(
 }
 
 /// Creates a linked capability registration for `T: Send`.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Send capability requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_send<T: crate::runtime::descriptor::Reflect + Send + 'static>(
     crate_name: &'static str,
@@ -52,6 +72,17 @@ pub fn register_send<T: crate::runtime::descriptor::Reflect + Send + 'static>(
 }
 
 /// Creates a linked capability registration for `T: Sync`.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Sync capability requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_sync<T: crate::runtime::descriptor::Reflect + Sync + 'static>(
     crate_name: &'static str,
@@ -67,6 +98,18 @@ pub fn register_sync<T: crate::runtime::descriptor::Reflect + Sync + 'static>(
 }
 
 /// Creates a linked local-mode Clone capability registration for `T`.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Clone capability
+///   requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_clone<T: crate::runtime::descriptor::Reflect + std::clone::Clone + 'static>(
     crate_name: &'static str,
@@ -83,6 +126,18 @@ pub fn register_clone<T: crate::runtime::descriptor::Reflect + std::clone::Clone
 
 /// Creates a linked Clone capability registration with Local and ThreadSafe
 /// adapters.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Clone capability
+///   requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_thread_safe_clone<
     T: crate::runtime::descriptor::Reflect
@@ -109,6 +164,18 @@ pub fn register_thread_safe_clone<
 }
 
 /// Creates a linked local-mode Default capability registration for `T`.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Default capability
+///   requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_default<T: crate::runtime::descriptor::Reflect + std::default::Default + 'static>(
     crate_name: &'static str,
@@ -125,6 +192,18 @@ pub fn register_default<T: crate::runtime::descriptor::Reflect + std::default::D
 
 /// Creates a linked Default capability registration with Local and ThreadSafe
 /// adapters.
+/// # Type Parameters
+///
+/// * `T` — reflected concrete type satisfying the Default capability
+///   requirements.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
 #[doc(hidden)]
 pub fn register_thread_safe_default<
     T: crate::runtime::descriptor::Reflect
@@ -150,10 +229,26 @@ pub fn register_thread_safe_default<
     Registration::metadata_only().with_capability(capability)
 }
 
+/// Returns the empty dependency list used by built-in capability registrations.
 fn no_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
 
+/// Creates registration metadata for one target and its capability callback.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type receiving the capability registration.
+///
+/// # Parameters
+///
+/// * `crate_name` — package name compiled into the registering crate.
+/// * `crate_version` — package version compiled into the registering crate.
+/// * `module_path` — module containing the capability declaration.
+/// * `file` — source file containing the capability declaration.
+/// * `line` — source line of the capability declaration.
+/// * `label` — stable human-readable label for the registration fragment.
+/// * `registration` — callback that constructs the typed registration.
 #[doc(hidden)]
 pub const fn capability_fragment<T: 'static>(
     crate_name: &'static str,
@@ -411,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    fn linked_origin_and_fragment_bind_registration_to_the_typed_target() {
+    fn test_linked_origin_and_fragment_bind_registration_to_the_typed_target() {
         let fragment = super::capability_fragment::<CapabilityFixture>(
             "capability-tests",
             "1.2.3",
@@ -433,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn registration_functions_cover_marker_and_local_adapter_capabilities() {
+    fn test_registration_functions_cover_marker_and_local_adapter_capabilities() {
         let context = linked_context([
             super::register_send::<CapabilityFixture>("capability-tests", "1.2.3", "tests", "caps.rs", 1),
             super::register_sync::<CapabilityFixture>("capability-tests", "1.2.3", "tests", "caps.rs", 2),
@@ -506,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    fn thread_safe_registrations_support_local_and_thread_safe_adapter_modes() {
+    fn test_thread_safe_registrations_support_local_and_thread_safe_adapter_modes() {
         let context = linked_context([
             super::register_thread_safe_clone::<CapabilityFixture>("capability-tests", "1.2.3", "tests", "caps.rs", 11),
             super::register_thread_safe_default::<CapabilityFixture>(

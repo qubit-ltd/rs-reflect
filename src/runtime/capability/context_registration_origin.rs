@@ -12,11 +12,19 @@ use crate::runtime::identity::RegistrationOrigin;
 /// Registration source metadata bound to the context that resolved it.
 #[derive(Clone)]
 pub struct ContextRegistrationOrigin<'ctx> {
+    /// Module and source location where the registration originated.
     origin: RegistrationOrigin,
+    /// Context that resolved the registration.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ContextRegistrationOrigin<'ctx> {
+    /// Associates registration provenance with the context that resolved it.
+    ///
+    /// # Parameters
+    ///
+    /// * `origin` — source metadata recorded during registration.
+    /// * `context` — context through which the registration was found.
     pub(crate) fn new(origin: RegistrationOrigin, context: &'ctx ReflectionContext) -> Self {
         Self { origin, context }
     }

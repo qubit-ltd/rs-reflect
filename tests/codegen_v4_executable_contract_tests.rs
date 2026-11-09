@@ -179,7 +179,7 @@ qubit_reflect::__private::codegen_v4::registration::submit_type!(ConstructibleFi
 qubit_reflect::__private::codegen_v4::invoke::submit_method_catalog_provider!(Fixture, provide_fixture_methods);
 
 #[test]
-fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
+fn test_downstream_can_implement_typed_adapter_and_register_method_catalog() {
     assert_eq!(qubit_reflect::__private::codegen_v4::PROTOCOL_VERSION, 4);
     let descriptor = qubit_reflect::__private::codegen_v4::descriptor::TypeDescriptor::of::<Fixture>();
     assert_eq!(descriptor.method("echo").unwrap().name(), "echo");
@@ -194,7 +194,7 @@ fn downstream_can_implement_typed_adapter_and_register_method_catalog() {
 }
 
 #[test]
-fn typed_value_adapters_preserve_values_across_mismatch_recovery() {
+fn test_typed_value_adapters_preserve_values_across_mismatch_recovery() {
     let owned = DynamicOwned::<Local>::new(String::from("owned"));
     let failure = owned
         .downcast::<u32>()
@@ -227,7 +227,7 @@ fn typed_value_adapters_preserve_values_across_mismatch_recovery() {
 }
 
 #[test]
-fn linked_thread_safe_capability_adapters_execute_and_report_type_mismatch() {
+fn test_linked_thread_safe_capability_adapters_execute_and_report_type_mismatch() {
     let registration = qubit_reflect::__private::codegen_v4::capability::register_thread_safe_clone::<CloneableFixture>(
         "test",
         "0",
@@ -286,7 +286,7 @@ fn linked_thread_safe_capability_adapters_execute_and_report_type_mismatch() {
 }
 
 #[test]
-fn typed_construction_provider_executes_through_its_target_descriptor() {
+fn test_typed_construction_provider_executes_through_its_target_descriptor() {
     let constructed: ConstructibleFixture = TypeDescriptor::of::<ConstructibleFixture>()
         .construct(NamedFields::<ApiLocal>::new().field("value", 29_u32))
         .expect("the typed provider constructs its reflected target");
@@ -294,7 +294,7 @@ fn typed_construction_provider_executes_through_its_target_descriptor() {
 }
 
 #[test]
-fn typed_impl_registration_factories_return_registrations_for_static_metadata() {
+fn test_typed_impl_registration_factories_return_registrations_for_static_metadata() {
     static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
     struct ImplMarker;
     static DEFINITION: ImplDefinitionSpec<ImplMarker> = ImplDefinitionSpec::new(

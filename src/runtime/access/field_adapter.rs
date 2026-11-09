@@ -37,20 +37,36 @@ pub trait FieldAdapter: Sync {
 
     /// # Safety
     /// `owner` must point to the exact owner type returned by `owner()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — erased pointer to a valid shared owner value.
     unsafe fn ref_ptr(&self, owner: *const ()) -> Option<*const ()>;
 
     /// # Safety
     /// `owner` must be uniquely borrowed and point to the exact owner type.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — erased pointer to a uniquely borrowed owner value.
     unsafe fn mut_ptr(&self, owner: *mut ()) -> Option<*mut ()>;
 
     /// # Safety
     /// `owner` must point to the exact owner type returned by `owner()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `_owner` — erased pointer to a valid shared owner value.
     unsafe fn active_variant(&self, _owner: *const ()) -> Option<VariantIdentity> {
         None
     }
 }
 
 /// Performs dynamic access to a concrete reflected field in value mode `M`.
+///
+/// # Type Parameters
+///
+/// * `M` — value mode that controls ownership and thread-safety guarantees.
 pub trait DynamicFieldAdapter<M: ValueMode>: Sync {
     /// Reports whether shared dynamic field access is supported.
     fn can_get(&self) -> bool {
@@ -69,6 +85,12 @@ pub trait DynamicFieldAdapter<M: ValueMode>: Sync {
 
     /// Gets the field value after checking the target type and optional
     /// variant.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically borrowed owner value.
+    /// * `expected_variant` — required active variant, when the field belongs
+    ///   to one.
     fn get<'a>(
         &self,
         target: DynamicRef<'a, M>,
@@ -76,6 +98,12 @@ pub trait DynamicFieldAdapter<M: ValueMode>: Sync {
     ) -> Result<DynamicRef<'a, M>, FieldAccessError>;
 
     /// Gets the field value mutably after checking the target type and variant.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically and mutably borrowed owner value.
+    /// * `expected_variant` — required active variant, when the field belongs
+    ///   to one.
     fn get_mut<'a>(
         &self,
         target: DynamicMut<'a, M>,
@@ -84,6 +112,13 @@ pub trait DynamicFieldAdapter<M: ValueMode>: Sync {
 
     /// Sets the field value, returning ownership of the rejected value on
     /// error.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically and mutably borrowed owner value.
+    /// * `value` — replacement value to assign to the field.
+    /// * `expected_variant` — required active variant, when the field belongs
+    ///   to one.
     // The failure owns the input value so callers can recover it after a
     // rejected field update.
     #[allow(clippy::result_large_err)]
@@ -98,18 +133,34 @@ pub trait DynamicFieldAdapter<M: ValueMode>: Sync {
 /// Dispatches field operations to metadata's adapter for one value mode.
 pub trait DynamicFieldMode: ValueMode + Sized {
     /// Gets a field using metadata's adapter for this value mode.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static metadata describing the field and its adapter.
+    /// * `target` — dynamically borrowed owner value.
     fn get<'a>(
         metadata: &'static FieldMetadata,
         target: DynamicRef<'a, Self>,
     ) -> Result<DynamicRef<'a, Self>, FieldAccessError>;
 
     /// Gets a field mutably using metadata's adapter for this value mode.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static metadata describing the field and its adapter.
+    /// * `target` — dynamically and mutably borrowed owner value.
     fn get_mut<'a>(
         metadata: &'static FieldMetadata,
         target: DynamicMut<'a, Self>,
     ) -> Result<DynamicMut<'a, Self>, FieldAccessError>;
 
     /// Sets a field using metadata's adapter, preserving the value on failure.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static metadata describing the field and its adapter.
+    /// * `target` — dynamically and mutably borrowed owner value.
+    /// * `value` — replacement value to assign to the field.
     // The failure owns the input value so callers can recover it after a
     // rejected field update.
     #[allow(clippy::result_large_err)]
@@ -174,24 +225,53 @@ field_mode!(Local, dynamic_local);
 field_mode!(ThreadSafe, dynamic_thread_safe);
 
 /// An adapter generated from field accessors for a concrete owner and value.
+///
+/// # Type Parameters
+///
+/// * `Owner` — concrete type that contains the reflected field.
+/// * `Value` — concrete type stored in the reflected field.
 pub struct TypedFieldAdapter<Owner: 'static, Value: 'static> {
+    /// Retrieves a shared reference to the field value.
     get_ref: for<'a> fn(&'a Owner) -> &'a Value,
+    /// Retrieves an exclusive reference to the field value.
     get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
+    /// Identifies the active enum variant for safe access.
     active_variant: Option<for<'a> fn(&'a Owner) -> VariantIdentity>,
+    /// Provides metadata from which to identify the active enum variant.
     active_variant_metadata: Option<for<'a> fn(&'a Owner) -> &'static VariantMetadata>,
 }
 
+/// Converts a typed shared reference into the selected dynamic value mode.
+///
+/// # Type Parameters
+///
+/// * `M` — value mode used to represent the dynamic reference.
 trait TypedDynamicRef<M: ValueMode> {
+    /// Wraps a shared reference in a dynamic reference.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — typed value to borrow dynamically.
     fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, M>;
 }
 
 impl<T: ValueForRef<Local> + Any> TypedDynamicRef<Local> for T {
+    /// Wraps a local value reference in a local dynamic reference.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — typed value to borrow dynamically.
     fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, Local> {
         DynamicRef::<Local>::new_any(value)
     }
 }
 
 impl<T: ValueForRef<ThreadSafe> + Any + Sync> TypedDynamicRef<ThreadSafe> for T {
+    /// Wraps a thread-safe value reference in a thread-safe dynamic reference.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — typed value to borrow dynamically.
     fn new_any<'a>(value: &'a Self) -> DynamicRef<'a, ThreadSafe> {
         DynamicRef::<ThreadSafe>::new_any(value)
     }
@@ -208,6 +288,12 @@ pub(crate) struct DynamicOnlyFieldAdapter<Owner: ?Sized + 'static, Value: ?Sized
 
 #[cfg(test)]
 impl<Owner: ?Sized + 'static, Value: ?Sized + 'static> DynamicOnlyFieldAdapter<Owner, Value> {
+    /// Creates an adapter with shared and mutable field accessors.
+    ///
+    /// # Parameters
+    ///
+    /// * `get_ref` — accessor for a shared field reference.
+    /// * `get_mut` — accessor for an exclusive field reference.
     pub const fn new(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
@@ -319,6 +405,11 @@ where
 
 impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
     /// Creates an adapter from typed shared and mutable field accessors.
+    ///
+    /// # Parameters
+    ///
+    /// * `get_ref` — accessor for a shared field reference.
+    /// * `get_mut` — accessor for an exclusive field reference.
     pub const fn new(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
@@ -332,6 +423,12 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
     }
 
     /// Creates an enum field adapter from a safe source variant selector.
+    ///
+    /// # Parameters
+    ///
+    /// * `get_ref` — accessor for a shared field reference.
+    /// * `get_mut` — accessor for an exclusive field reference.
+    /// * `active_variant` — selector returning the value's active variant.
     pub const fn for_variant(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
@@ -346,6 +443,13 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
     }
 
     #[cfg(test)]
+    /// Creates a test adapter associated with an enum variant selector.
+    ///
+    /// # Parameters
+    ///
+    /// * `get_ref` — accessor for a shared field reference.
+    /// * `get_mut` — accessor for an exclusive field reference.
+    /// * `active_variant` — selector returning the value's active variant.
     pub(crate) const fn with_variant(
         get_ref: for<'a> fn(&'a Owner) -> &'a Value,
         get_mut: for<'a> fn(&'a mut Owner) -> &'a mut Value,
@@ -361,6 +465,11 @@ impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
 }
 
 impl<Owner: 'static, Value: 'static> TypedFieldAdapter<Owner, Value> {
+    /// Returns the active variant when the adapter can identify it.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — owner value whose active variant is inspected.
     fn active_variant(&self, owner: &Owner) -> Option<VariantIdentity> {
         self.active_variant
             .map(|active| active(owner))
@@ -375,6 +484,12 @@ where
     Value: Reflect + ValueForRef<M> + ValueForMut<M> + ValueFor<M> + TypedDynamicRef<M> + 'static,
     M: ValueMode,
 {
+    /// Gets the typed field after validating the owner and optional variant.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically borrowed owner value.
+    /// * `expected_variant` — required active variant, when applicable.
     fn get<'a>(
         &self,
         target: DynamicRef<'a, M>,
@@ -396,6 +511,12 @@ where
         Ok(<Value as TypedDynamicRef<M>>::new_any((self.get_ref)(owner)))
     }
 
+    /// Gets the typed field mutably after validating the owner and variant.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically and mutably borrowed owner value.
+    /// * `expected_variant` — required active variant, when applicable.
     fn get_mut<'a>(
         &self,
         target: DynamicMut<'a, M>,
@@ -417,6 +538,13 @@ where
         Ok(DynamicMut::new((self.get_mut)(owner)))
     }
 
+    /// Replaces the typed field while returning the input value on failure.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — dynamically and mutably borrowed owner value.
+    /// * `value` — replacement value to assign to the field.
+    /// * `expected_variant` — required active variant, when applicable.
     fn set<'a>(
         &self,
         target: DynamicMut<'a, M>,
@@ -462,6 +590,7 @@ where
     Owner: Reflect + ValueForRef<Local> + ValueForMut<Local> + 'static,
     Value: Reflect + ValueForRef<Local> + ValueForMut<Local> + ValueFor<Local> + 'static,
 {
+    /// Exposes this adapter through the local dynamic access trait.
     pub(crate) const fn local_dynamic(&'static self) -> &'static dyn DynamicFieldAdapter<Local> {
         self
     }
@@ -472,12 +601,14 @@ where
     Owner: Reflect + ValueForRef<ThreadSafe> + ValueForMut<ThreadSafe> + 'static,
     Value: Reflect + ValueForRef<ThreadSafe> + ValueForMut<ThreadSafe> + ValueFor<ThreadSafe> + Sync + 'static,
 {
+    /// Exposes this adapter through the thread-safe dynamic access trait.
     pub(crate) const fn thread_safe_dynamic(&'static self) -> &'static dyn DynamicFieldAdapter<ThreadSafe> {
         self
     }
 }
 
 impl<Owner: 'static, Value: 'static> FieldAdapter for TypedFieldAdapter<Owner, Value> {
+    /// Returns the concrete owner type handled by this adapter.
     fn owner(&self) -> TypeIdentity {
         TypeIdentity {
             type_id: TypeId::of::<Owner>(),
@@ -485,6 +616,7 @@ impl<Owner: 'static, Value: 'static> FieldAdapter for TypedFieldAdapter<Owner, V
         }
     }
 
+    /// Returns the concrete field value type handled by this adapter.
     fn value(&self) -> TypeIdentity {
         TypeIdentity {
             type_id: TypeId::of::<Value>(),
@@ -492,18 +624,42 @@ impl<Owner: 'static, Value: 'static> FieldAdapter for TypedFieldAdapter<Owner, V
         }
     }
 
+    /// Returns the field address for a shared owner pointer.
+    ///
+    /// # Safety
+    /// `owner` must point to the exact owner type returned by `owner()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — erased pointer to the shared owner value.
     unsafe fn ref_ptr(&self, owner: *const ()) -> Option<*const ()> {
         // SAFETY: the descriptor checks the owner TypeId before this call.
         let owner = unsafe { &*owner.cast::<Owner>() };
         Some((self.get_ref)(owner) as *const Value as *const ())
     }
 
+    /// Returns the field address for a uniquely borrowed owner pointer.
+    ///
+    /// # Safety
+    /// `owner` must point to the exact owner type and be exclusively borrowed.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — erased pointer to the uniquely borrowed owner value.
     unsafe fn mut_ptr(&self, owner: *mut ()) -> Option<*mut ()> {
         // SAFETY: the descriptor checks the owner TypeId and has exclusive access.
         let owner = unsafe { &mut *owner.cast::<Owner>() };
         Some((self.get_mut)(owner) as *mut Value as *mut ())
     }
 
+    /// Returns the active enum variant for a shared owner pointer.
+    ///
+    /// # Safety
+    /// `owner` must point to the exact owner type returned by `owner()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `owner` — erased pointer to the shared owner value.
     unsafe fn active_variant(&self, owner: *const ()) -> Option<VariantIdentity> {
         // SAFETY: required by this method's contract.
         let owner = unsafe { &*owner.cast::<Owner>() };
@@ -549,7 +705,7 @@ mod tests {
     static DYNAMIC_ONLY: DynamicOnlyFieldAdapter<u32, u32> = DynamicOnlyFieldAdapter::new(identity_ref, identity_mut);
 
     #[test]
-    fn dynamic_only_adapter_checks_variants_and_preserves_unsupported_set_value() {
+    fn test_dynamic_only_adapter_checks_variants_and_preserves_unsupported_set_value() {
         let expected = identity_variant(&0);
         assert_eq!(DYNAMIC_ONLY.check_variant(&7, None), Ok(()));
         assert_eq!(
@@ -640,7 +796,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_adapter_reports_identities_and_returns_field_pointers() {
+    fn test_typed_adapter_reports_identities_and_returns_field_pointers() {
         let owner_identity = POINTER_ADAPTER.owner();
         assert_eq!(owner_identity.type_id, TypeId::of::<PointerOwner>());
         assert_eq!(POINTER_ADAPTER.value().type_id, TypeId::of::<u32>());

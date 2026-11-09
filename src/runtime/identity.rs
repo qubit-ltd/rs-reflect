@@ -8,8 +8,8 @@
 
 use std::any::TypeId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 /// Runtime and display identity for one concrete Rust type.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TypeIdentity {
     /// Exact process-local Rust type identifier.
     pub type_id: TypeId,
@@ -17,9 +17,9 @@ pub struct TypeIdentity {
     pub rust_name: &'static str,
 }
 
+/// Category of reflected item represented by an [`ItemIdentity`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-/// Category of reflected item represented by an [`ItemIdentity`].
 pub enum ItemKind {
     /// A concrete Rust type.
     Type,
@@ -49,12 +49,15 @@ pub enum ItemKind {
     Capability,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// Stable textual identifier assigned to a reflected item.
-pub struct StableItemId(pub Box<str>);
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct StableItemId(
+    /// Opaque stable key used to identify the item.
+    pub Box<str>,
+);
+
 /// Kind, stable key, and user-facing name for a reflected item.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ItemIdentity {
     /// Category of the item.
     pub kind: ItemKind,
@@ -64,28 +67,59 @@ pub struct ItemIdentity {
     pub display_name: Box<str>,
 }
 
+/// Structural identity of a type, const, or lifetime generic argument.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-/// Structural identity of a type, const, or lifetime generic argument.
 pub enum GenericArgumentIdentity {
     /// Type argument represented by its recorded type name.
-    Type(Box<str>),
+    Type(
+        /// Recorded name of the type argument.
+        Box<str>,
+    ),
     /// Const argument represented by its source expression.
-    Const(Box<str>),
+    Const(
+        /// Source expression representing the const argument.
+        Box<str>,
+    ),
     /// Lifetime argument represented by its source lifetime.
-    Lifetime(Box<str>),
+    Lifetime(
+        /// Source spelling of the lifetime argument.
+        Box<str>,
+    ),
 }
 
 /// Exact internal key used to select a concrete method specialization.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum GenericArgumentSelector {
-    Type(TypeId),
-    Const { type_id: TypeId, value: Box<str> },
-    Lifetime(Box<str>),
-    UnsupportedConst(TypeId),
+    /// Identifies a concrete type argument by its runtime type ID.
+    Type(
+        /// Runtime identity of the selected type argument.
+        TypeId,
+    ),
+    /// Identifies a const argument by its type and normalized value.
+    Const {
+        /// Runtime identity of the const argument's type.
+        type_id: TypeId,
+        /// Normalized representation of the const argument value.
+        value: Box<str>,
+    },
+    /// Identifies a lifetime argument by its source spelling.
+    Lifetime(
+        /// Source spelling of the lifetime argument.
+        Box<str>,
+    ),
+    /// Const value that cannot be compared for stable identity.
+    UnsupportedConst(
+        /// Runtime type identity of the unsupported const value.
+        TypeId,
+    ),
 }
 
 impl GenericArgumentSelector {
+    /// Checks whether two selectors identify the same supported argument.
+    ///
+    /// # Parameters
+    /// - `other`: selector to compare with this one.
     pub(crate) fn matches(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Type(left), Self::Type(right)) => left == right,
@@ -108,8 +142,8 @@ impl GenericArgumentSelector {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// Source location and package metadata for a registration.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegistrationOrigin {
     /// Name of the crate containing the registration.
     pub crate_name: &'static str,
@@ -125,9 +159,9 @@ pub struct RegistrationOrigin {
     pub column: Option<u32>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// A candidate item returned by a lookup, with optional registration
 /// provenance.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LookupCandidate {
     /// Stable identity of the candidate.
     pub identity: ItemIdentity,
@@ -145,6 +179,7 @@ pub trait IntoLookupCandidate {
 }
 
 impl IntoLookupCandidate for LookupCandidate {
+    /// Returns this lookup candidate unchanged.
     fn into_lookup_candidate(self) -> LookupCandidate {
         self
     }

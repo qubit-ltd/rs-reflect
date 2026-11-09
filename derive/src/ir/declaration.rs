@@ -50,11 +50,20 @@ pub(crate) struct ValidatedDeclaration {
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum DeclarationIr {
     /// Struct, enum, or union declaration.
-    Type(TypeDeclarationIr),
+    Type(
+        /// Parsed struct, enum, or union declaration.
+        TypeDeclarationIr,
+    ),
     /// Trait declaration.
-    Trait(TraitDeclarationIr),
+    Trait(
+        /// Parsed trait declaration.
+        TraitDeclarationIr,
+    ),
     /// Inherent or trait impl declaration.
-    Impl(ImplDeclarationIr),
+    Impl(
+        /// Parsed inherent or trait implementation.
+        ImplDeclarationIr,
+    ),
 }
 
 /// A struct, enum, or rejected union derive input.
@@ -333,7 +342,10 @@ pub(crate) enum ReturnTypeIr {
     /// No explicit return type, equivalent to `()`.
     Unit,
     /// Explicit non-unit return type.
-    Type(TypeIr),
+    Type(
+        /// Parsed type expression returned by the method.
+        TypeIr,
+    ),
 }
 
 /// A trait or impl associated type declaration/binding.
@@ -415,7 +427,10 @@ pub(crate) enum WherePredicateIr {
         declaration: TokenStream,
     },
     /// Predicate syntax outside the structured forms.
-    Other(TokenStream),
+    Other(
+        /// Original predicate tokens preserved for unsupported syntax.
+        TokenStream,
+    ),
 }
 
 /// One lifetime, type, or const generic parameter.
@@ -441,7 +456,10 @@ pub(crate) struct GenericParamIr {
 #[derive(Clone, Debug)]
 pub(crate) enum GenericBoundIr {
     /// Lifetime outlives bound.
-    Lifetime(String),
+    Lifetime(
+        /// Lifetime bound name, including its apostrophe.
+        String,
+    ),
     /// Trait bound with modifiers and higher-ranked lifetimes.
     Trait {
         /// Bound trait path.
@@ -452,7 +470,10 @@ pub(crate) enum GenericBoundIr {
         lifetimes: Vec<String>,
     },
     /// Bound syntax not covered by the structured variants.
-    Other(TokenStream),
+    Other(
+        /// Original bound tokens preserved for unsupported syntax.
+        TokenStream,
+    ),
 }
 
 /// The optionality modifier of a trait bound.
@@ -468,9 +489,15 @@ pub(crate) enum TraitBoundModifierIr {
 #[derive(Clone, Debug)]
 pub(crate) enum GenericDefaultIr {
     /// Default type argument.
-    Type(TypeIr),
+    Type(
+        /// Parsed default type argument.
+        TypeIr,
+    ),
     /// Default const expression tokens.
-    Const(TokenStream),
+    Const(
+        /// Original default const expression tokens.
+        TokenStream,
+    ),
 }
 
 /// The kind of a source generic parameter.
@@ -496,7 +523,10 @@ pub(crate) enum VisibilityIr {
     /// Current-module visibility.
     SelfValue,
     /// Restricted path visibility.
-    Restricted(PathIr),
+    Restricted(
+        /// Path that limits visibility to a named module subtree.
+        PathIr,
+    ),
     /// Private inherited visibility.
     Inherited,
 }

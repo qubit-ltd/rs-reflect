@@ -15,6 +15,7 @@
 // retry without cloning or boxing the supplied values.
 #![allow(clippy::result_large_err)]
 
+mod binding;
 pub(crate) mod input;
 mod recovery;
 mod schema;
@@ -50,6 +51,7 @@ pub(crate) use schema::resolve_plan;
 #[cfg(test)]
 pub(crate) use schema::resolve_variant_plan;
 
+use self::binding::Binding;
 use self::input::ConstructionInputValue;
 use self::input::InputEntryRef;
 use crate::runtime::descriptor::TypeDescriptor;
@@ -123,10 +125,20 @@ impl<'ctx> VariantDescriptor<'ctx> {
 }
 
 impl<'ctx> ConstructionDescriptor<'ctx> {
+    /// Returns the plan required to execute construction or update operations.
     fn required_plan(&self) -> &'ctx ConstructionPlan {
         self.plan.expect("construction execution requires a provider plan")
     }
 
+    /// Constructs a concrete value after validating its input and target type.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to construct.
+    /// - `M`: value storage mode used by the provider.
+    /// - `I`: construction input representation.
+    ///
+    /// # Parameters
+    /// - `input`: named, positional, or unit input values for the target.
     pub(crate) fn construct<T, M, I>(self, input: I) -> Result<T, ConstructionFailure<M>>
     where
         T: ValueFor<M>,
@@ -167,6 +179,14 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
     /// fields.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to construct.
+    /// - `M`: value storage mode used by the provider.
+    /// - `I`: construction input representation.
+    ///
+    /// # Parameters
+    /// - `input`: construction input values for the target.
     pub(crate) unsafe fn construct_unchecked<T, M, I>(self, input: I) -> Result<T, ConstructionFailure<M>>
     where
         T: ValueFor<M>,
@@ -202,6 +222,15 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.construct_inner(input.into_input(), true)
     }
 
+    /// Validates input and invokes the provider for a concrete value.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to construct.
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: validated construction values.
+    /// - `unchecked_visibility`: whether private field checks are bypassed.
     fn construct_inner<T, M>(
         self,
         input: ConstructionInputValue<M>,
@@ -238,6 +267,14 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         }
     }
 
+    /// Constructs a dynamically typed value from validated input.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
+    /// - `I`: construction input representation.
+    ///
+    /// # Parameters
+    /// - `input`: named, positional, or unit input values for the target.
     pub(crate) fn construct_dynamic<M, I>(self, input: I) -> Result<DynamicOwned<M>, ConstructionFailure<M>>
     where
         M: ConstructionMode,
@@ -264,6 +301,13 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
     /// fields.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
+    /// - `I`: construction input representation.
+    ///
+    /// # Parameters
+    /// - `input`: construction input values for the target.
     pub(crate) unsafe fn construct_dynamic_unchecked<M, I>(
         self,
         input: I,
@@ -287,6 +331,14 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.construct_dynamic_inner(input.into_input(), true)
     }
 
+    /// Validates input and invokes the provider for a dynamic value.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: validated construction values.
+    /// - `unchecked_visibility`: whether private field checks are bypassed.
     fn construct_dynamic_inner<M: ConstructionMode>(
         self,
         input: ConstructionInputValue<M>,
@@ -317,6 +369,14 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         Ok(value)
     }
 
+    /// Updates a concrete struct from replacement field values.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to update.
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
     pub(crate) fn update<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -348,6 +408,13 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
     /// fields.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to update.
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
     pub(crate) unsafe fn update_unchecked<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -373,6 +440,15 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.update_inner(input, true)
     }
 
+    /// Validates replacements and invokes the provider for a concrete value.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type to update.
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
+    /// - `unchecked_visibility`: whether private field checks are bypassed.
     fn update_inner<T, M>(self, input: UpdateInput<M>, unchecked_visibility: bool) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -412,6 +488,13 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         }
     }
 
+    /// Updates a dynamically typed struct value.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
     pub(crate) fn update_dynamic<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -434,6 +517,12 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
     /// fields.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
     pub(crate) unsafe fn update_dynamic_unchecked<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -450,6 +539,14 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.update_dynamic_inner(input, true)
     }
 
+    /// Validates replacements and invokes the provider for a dynamic value.
+    ///
+    /// # Type Parameters
+    /// - `M`: value storage mode used by the provider.
+    ///
+    /// # Parameters
+    /// - `input`: original value and requested field replacements.
+    /// - `unchecked_visibility`: whether private field checks are bypassed.
     fn update_dynamic_inner<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -486,10 +583,15 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 }
 
-struct Binding {
-    input_indices: Vec<Option<usize>>,
-}
-
+/// Binds construction input entries to the fields declared by a plan.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied values.
+///
+/// # Parameters
+/// - `plan`: construction metadata describing the target fields.
+/// - `input`: validated input values to bind.
+/// - `unchecked_visibility`: whether field visibility checks are bypassed.
 fn bind_input<M: ValueMode>(
     plan: &ConstructionPlan,
     input: &ConstructionInputValue<M>,
@@ -517,6 +619,15 @@ fn bind_input<M: ValueMode>(
     bind_entries(plan, &entries, unchecked_visibility, true)
 }
 
+/// Binds named update replacements to the fields declared by a plan.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied values.
+///
+/// # Parameters
+/// - `plan`: construction metadata describing the target fields.
+/// - `input`: named replacement values to bind.
+/// - `unchecked_visibility`: whether field visibility checks are bypassed.
 fn bind_replacements<M: ValueMode>(
     plan: &ConstructionPlan,
     input: &NamedFields<M>,
@@ -545,6 +656,16 @@ fn bind_replacements<M: ValueMode>(
     Ok(binding)
 }
 
+/// Binds entries according to the input shape declared by the plan.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied values.
+///
+/// # Parameters
+/// - `plan`: construction metadata describing the target fields.
+/// - `entries`: input entries in their supplied order.
+/// - `unchecked_visibility`: whether field visibility checks are bypassed.
+/// - `check_required`: whether omitted required fields produce an error.
 fn bind_entries<M: ValueMode>(
     plan: &ConstructionPlan,
     entries: &[InputEntryRef<'_, M>],
@@ -592,6 +713,16 @@ fn bind_entries<M: ValueMode>(
     }
 }
 
+/// Binds named input entries and validates their field policies.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied values.
+///
+/// # Parameters
+/// - `plan`: construction metadata describing the target fields.
+/// - `entries`: named input entries to bind.
+/// - `unchecked_visibility`: whether field visibility checks are bypassed.
+/// - `check_required`: whether omitted required fields produce an error.
 fn bind_named_entries<M: ValueMode>(
     plan: &ConstructionPlan,
     entries: &[InputEntryRef<'_, M>],
@@ -639,6 +770,11 @@ fn bind_named_entries<M: ValueMode>(
     Ok(binding)
 }
 
+/// Checks that the caller may initialize the specified field.
+///
+/// # Parameters
+/// - `field`: field metadata to check.
+/// - `unchecked_visibility`: whether access checks are bypassed.
 fn validate_visibility(field: &ConstructField, unchecked_visibility: bool) -> Result<(), ConstructionError> {
     if !unchecked_visibility && !field.visibility.is_public() {
         return Err(ConstructionError::FieldNotPublic { field: field.name });
@@ -646,6 +782,14 @@ fn validate_visibility(field: &ConstructField, unchecked_visibility: bool) -> Re
     Ok(())
 }
 
+/// Checks that a dynamic value has the field's registered Rust type.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied value.
+///
+/// # Parameters
+/// - `field`: field metadata containing the expected type identity.
+/// - `value`: dynamic value supplied for the field.
 fn validate_value<M: ValueMode>(field: &ConstructField, value: &DynamicOwned<M>) -> Result<(), ConstructionError> {
     let field_identity = field.value_identity();
     if value.type_id() != field_identity.type_id {
@@ -657,6 +801,14 @@ fn validate_value<M: ValueMode>(field: &ConstructField, value: &DynamicOwned<M>)
     Ok(())
 }
 
+/// Reorders validated input values into the provider's field declaration order.
+///
+/// # Type Parameters
+/// - `M`: value storage mode of the supplied values.
+///
+/// # Parameters
+/// - `input`: input values after validation.
+/// - `binding`: mapping from plan fields to input positions.
 fn take_bound_values<M: ValueMode>(input: ConstructionInputValue<M>, binding: Binding) -> Vec<Option<DynamicOwned<M>>> {
     let mut entries = input.into_entries();
     binding

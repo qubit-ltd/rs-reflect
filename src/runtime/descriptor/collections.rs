@@ -21,12 +21,22 @@ use crate::runtime::error::LookupSubject;
 
 /// Generated source metadata for fields, variants, and the concrete type kind.
 pub struct TypeShapeRegistration {
+    /// Type ID getter used to match the registration to reflected values.
     type_id: fn() -> TypeId,
+    /// Static generated metadata describing the registered type's shape.
     metadata: &'static TypeKindMetadata,
 }
 
 impl TypeShapeRegistration {
     /// Associates static shape metadata with a reflected concrete type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type described by `metadata`.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — generated kind and member metadata for `T`.
     pub const fn new<T: super::Reflect>(metadata: &'static TypeKindMetadata) -> Self {
         Self {
             type_id: TypeId::of::<T>,
@@ -34,10 +44,12 @@ impl TypeShapeRegistration {
         }
     }
 
+    /// Returns the concrete type ID for which this shape was registered.
     pub(crate) fn type_id(&self) -> TypeId {
         (self.type_id)()
     }
 
+    /// Returns the static metadata describing this registered type's shape.
     pub(crate) fn metadata(&self) -> &'static TypeKindMetadata {
         self.metadata
     }
@@ -66,6 +78,10 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Finds a field by name, returning a lookup error when it is absent.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — source field name to look up.
     pub fn field(self, name: &str) -> Result<FieldDescriptor<'ctx>, LookupError> {
         self.fields().require(name)
     }
@@ -81,6 +97,10 @@ impl<'ctx> TypeDescriptor<'ctx> {
 
     /// Finds an enum variant by name, returning a lookup error when it is
     /// absent.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — source variant name to look up.
     pub fn variant(self, name: &str) -> Result<VariantDescriptor<'ctx>, LookupError> {
         self.variants().require(name)
     }
@@ -104,12 +124,22 @@ impl<'ctx> TypeDescriptor<'ctx> {
 /// A lightweight view over source ordered fields.
 #[derive(Clone, Copy)]
 pub struct Fields<'ctx> {
+    /// Type whose fields are exposed by this view.
     declaring_type: TypeDescriptor<'ctx>,
+    /// Field metadata in declaration order.
     metadata: &'static [FieldMetadata],
+    /// Variant that owns these fields, when they belong to an enum variant.
     declaring_variant: Option<VariantDescriptor<'ctx>>,
 }
 
 impl<'ctx> Fields<'ctx> {
+    /// Creates a field view with its owning type and optional variant context.
+    ///
+    /// # Parameters
+    ///
+    /// * `declaring_type` — type descriptor that owns the fields.
+    /// * `metadata` — source ordered field metadata.
+    /// * `declaring_variant` — enum variant owning the fields, if applicable.
     pub(crate) const fn new(
         declaring_type: TypeDescriptor<'ctx>,
         metadata: &'static [FieldMetadata],
@@ -133,6 +163,10 @@ impl<'ctx> Fields<'ctx> {
     }
 
     /// Finds a field by its source name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — exact source field name.
     pub fn get(&self, name: &str) -> Option<FieldDescriptor<'ctx>> {
         self.metadata
             .iter()
@@ -141,6 +175,10 @@ impl<'ctx> Fields<'ctx> {
     }
 
     /// Returns the field at its ordinal position in this view.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — zero-based position in source declaration order.
     pub fn get_at(&self, index: usize) -> Option<FieldDescriptor<'ctx>> {
         self.metadata.get(index).map(|field| self.descriptor(field))
     }
@@ -150,6 +188,12 @@ impl<'ctx> Fields<'ctx> {
         self.metadata.iter().map(|field| self.descriptor(field))
     }
 
+    /// Requires a field by name and preserves the failed query in lookup
+    /// errors.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — exact source field name to require.
     pub(crate) fn require(&self, name: &str) -> Result<FieldDescriptor<'ctx>, LookupError> {
         self.get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::Field,
@@ -157,6 +201,11 @@ impl<'ctx> Fields<'ctx> {
         })
     }
 
+    /// Binds one field metadata entry to this view's type and variant.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static field metadata to expose.
     fn descriptor(&self, metadata: &'static FieldMetadata) -> FieldDescriptor<'ctx> {
         FieldDescriptor::new(metadata, self.declaring_type, self.declaring_variant)
     }
@@ -165,11 +214,19 @@ impl<'ctx> Fields<'ctx> {
 /// A lightweight view over source ordered enum variants.
 #[derive(Clone, Copy)]
 pub struct Variants<'ctx> {
+    /// Type descriptor whose enum variants are exposed.
     declaring_type: TypeDescriptor<'ctx>,
+    /// Variant metadata in source declaration order.
     metadata: &'static [VariantMetadata],
 }
 
 impl<'ctx> Variants<'ctx> {
+    /// Creates a variant view for one reflected enum type.
+    ///
+    /// # Parameters
+    ///
+    /// * `declaring_type` — descriptor for the enum that owns the variants.
+    /// * `metadata` — generated variant metadata in source order.
     pub(crate) const fn new(declaring_type: TypeDescriptor<'ctx>, metadata: &'static [VariantMetadata]) -> Self {
         Self {
             declaring_type,
@@ -188,6 +245,10 @@ impl<'ctx> Variants<'ctx> {
     }
 
     /// Finds a variant by its source name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — exact source variant name.
     pub fn get(&self, name: &str) -> Option<VariantDescriptor<'ctx>> {
         self.metadata
             .iter()
@@ -196,6 +257,10 @@ impl<'ctx> Variants<'ctx> {
     }
 
     /// Finds a variant by its original Rust discriminant index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — discriminant index recorded from source declaration order.
     pub fn get_at(&self, index: usize) -> Option<VariantDescriptor<'ctx>> {
         self.metadata
             .iter()
@@ -208,6 +273,12 @@ impl<'ctx> Variants<'ctx> {
         self.metadata.iter().map(|variant| self.descriptor(variant))
     }
 
+    /// Requires a variant by name and preserves the failed query in lookup
+    /// errors.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — exact source variant name to require.
     pub(crate) fn require(&self, name: &str) -> Result<VariantDescriptor<'ctx>, LookupError> {
         self.get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::Variant,
@@ -215,6 +286,11 @@ impl<'ctx> Variants<'ctx> {
         })
     }
 
+    /// Binds one variant metadata entry to the type represented by this view.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static variant metadata to expose.
     fn descriptor(&self, metadata: &'static VariantMetadata) -> VariantDescriptor<'ctx> {
         VariantDescriptor::new(metadata, self.declaring_type)
     }
@@ -248,7 +324,7 @@ mod tests {
     struct Opaque;
 
     #[test]
-    fn field_collection_preserves_order_and_source_indices() {
+    fn test_field_collection_preserves_order_and_source_indices() {
         let descriptor = TypeDescriptor::of::<Record>();
         let fields = descriptor.fields();
 
@@ -282,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn variant_collection_uses_source_indices_and_source_order() {
+    fn test_variant_collection_uses_source_indices_and_source_order() {
         let variants = TypeDescriptor::of::<Event>().variants();
         assert!(matches!(Event::Start, Event::Start));
         assert!(matches!(Event::Finish(5), Event::Finish(5)));
@@ -307,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn absent_field_and_variant_return_structured_lookup_errors() {
+    fn test_absent_field_and_variant_return_structured_lookup_errors() {
         let descriptor = TypeDescriptor::of::<Record>();
         let field_error = match descriptor.field("missing") {
             Ok(_) => panic!("unknown field should be rejected"),
@@ -336,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn non_struct_and_non_enum_collections_are_empty() {
+    fn test_non_struct_and_non_enum_collections_are_empty() {
         let descriptor = TypeDescriptor::of::<Opaque>();
         let fields = descriptor.fields();
         let variants = descriptor.variants();

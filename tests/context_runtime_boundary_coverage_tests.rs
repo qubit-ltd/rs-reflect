@@ -57,7 +57,7 @@ struct ContextBoundaryExternalTarget;
 impl ContextBoundaryExternalTrait for ContextBoundaryExternalTarget {}
 
 #[test]
-fn generic_definition_queries_return_only_registered_concrete_instances() {
+fn test_generic_definition_queries_return_only_registered_concrete_instances() {
     let context = ReflectionContext::builder()
         .include_type::<ContextBoundaryGeneric<u8>>()
         .build()
@@ -83,7 +83,7 @@ fn generic_definition_queries_return_only_registered_concrete_instances() {
 }
 
 #[test]
-fn reflected_trait_queries_link_applications_by_definition_and_path() {
+fn test_reflected_trait_queries_link_applications_by_definition_and_path() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -122,7 +122,7 @@ fn reflected_trait_queries_link_applications_by_definition_and_path() {
 }
 
 #[test]
-fn external_trait_lookup_preserves_incomplete_metadata_without_inventing_a_definition() {
+fn test_external_trait_lookup_preserves_incomplete_metadata_without_inventing_a_definition() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

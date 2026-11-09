@@ -44,7 +44,10 @@ pub(super) enum EnumReprIr {
     /// Explicit minimum alignment in bytes.
     ///
     /// The payload is the requested alignment.
-    Align(usize),
+    Align(
+        /// Minimum alignment in bytes requested by the source attribute.
+        usize,
+    ),
 }
 
 impl EnumReprIr {

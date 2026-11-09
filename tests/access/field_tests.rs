@@ -40,7 +40,7 @@ impl Drop for DropProbe {
 }
 
 #[test]
-fn field_descriptor_keeps_declaring_type_and_source_identity() {
+fn test_field_descriptor_keeps_declaring_type_and_source_identity() {
     let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.fields().get("secret").expect("private field is described");
 
@@ -51,7 +51,7 @@ fn field_descriptor_keeps_declaring_type_and_source_identity() {
 }
 
 #[test]
-fn public_field_uses_typed_borrows_and_owned_values() {
+fn test_public_field_uses_typed_borrows_and_owned_values() {
     let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.field("balance").expect("public field is described");
     let mut account = Account {
@@ -68,7 +68,7 @@ fn public_field_uses_typed_borrows_and_owned_values() {
 }
 
 #[test]
-fn private_field_requires_unsafe_visibility_bypass() {
+fn test_private_field_requires_unsafe_visibility_bypass() {
     let descriptor = TypeDescriptor::of_in::<Account>(ReflectionContext::global());
     let field = descriptor.field("secret").expect("private field is described");
     let mut account = Account {
@@ -103,7 +103,7 @@ fn private_field_requires_unsafe_visibility_bypass() {
 }
 
 #[test]
-fn failures_recover_typed_replacements_before_mutation() {
+fn test_failures_recover_typed_replacements_before_mutation() {
     let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
         .field("balance")
         .expect("field exists");
@@ -159,7 +159,7 @@ fn failures_recover_typed_replacements_before_mutation() {
 }
 
 #[test]
-fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
+fn test_failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
     let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
         .field("balance")
         .expect("field exists");
@@ -183,7 +183,7 @@ fn failed_set_retains_the_exact_value_without_dropping_or_duplicating_it() {
 }
 
 #[test]
-fn typed_failure_exposes_the_exact_replacement_value() {
+fn test_typed_failure_exposes_the_exact_replacement_value() {
     let field = TypeDescriptor::of_in::<Account>(ReflectionContext::global())
         .field("balance")
         .expect("field exists");

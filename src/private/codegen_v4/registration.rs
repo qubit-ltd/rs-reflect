@@ -25,6 +25,12 @@ pub use crate::runtime::context::handle::registration::TypeDefinitionRegistratio
 pub use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 
 /// Returns the canonical metadata associated with a generated definition.
+///
+/// # Type Parameters
+/// - `T`: generated marker type for the definition.
+///
+/// # Parameters
+/// - `registration`: static registration that owns the generated metadata.
 pub fn type_definition_metadata<T: 'static>(
     registration: &'static TypeDefinitionRegistration<T>,
 ) -> &'static TypeDefinitionMetadata {
@@ -36,6 +42,14 @@ pub fn type_definition_metadata<T: 'static>(
 /// This keeps the definition identity and capability target tied to the same
 /// generated marker, so downstream code does not need to construct or expose a
 /// `TypeDefinitionId`.
+///
+/// # Type Parameters
+/// - `TMarker`: generated marker identifying the generic definition.
+/// - `C`: capability contract implemented by the adapter.
+///
+/// # Parameters
+/// - `definition`: static registration for the generic definition.
+/// - `adapter`: implementation of the declared capability contract.
 pub fn type_definition_with_capability<TMarker: 'static, C: crate::runtime::capability::CapabilitySpec>(
     definition: &'static TypeDefinitionRegistration<TMarker>,
     adapter: C::Adapter,
@@ -46,6 +60,10 @@ pub fn type_definition_with_capability<TMarker: 'static, C: crate::runtime::capa
 }
 
 /// Creates a linked capability-only fragment for a generic definition.
+///
+/// # Parameters
+/// - `label`: stable label for the linked registration fragment.
+/// - `registration`: function that creates the capability registration.
 #[doc(hidden)]
 pub const fn linked_definition_capability_fragment(
     label: &'static str,
@@ -55,19 +73,31 @@ pub const fn linked_definition_capability_fragment(
 }
 
 /// Creates a global registration fragment for a compiler-checked trait object.
+///
+/// # Parameters
+/// - `label`: stable label for the global registration fragment.
+/// - `registration`: function that creates the trait object registration.
 #[doc(hidden)]
 pub const fn trait_object_fragment(label: &'static str, registration: fn() -> Registration) -> RegistrationFragment {
     RegistrationFragment::for_global_registration(label, registration)
 }
 
 /// A method binding whose target type is fixed by `T`.
+///
+/// # Type Parameters
+/// - `T`: reflected target type for the bound method.
 pub struct MethodBinding<T: crate::runtime::descriptor::Reflect> {
+    /// Method metadata combined with its generated adapters and policies.
     effective: crate::runtime::descriptor::method::EffectiveMethod,
+    /// Associates the binding with its target without storing a value.
     _target: std::marker::PhantomData<fn() -> T>,
 }
 
 impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
     /// Adds statically typed generic method specializations to this binding.
+    ///
+    /// # Parameters
+    /// - `specializations`: specialization metadata to attach to the method.
     pub const fn with_specializations(
         mut self,
         specializations: &'static [crate::runtime::descriptor::method::MethodSpecializationSpec],
@@ -77,6 +107,9 @@ impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
     }
 
     /// Marks this binding unavailable with typed reasons.
+    ///
+    /// # Parameters
+    /// - `reasons`: reasons that prevent invocation of the method.
     pub const fn with_unavailable(
         mut self,
         reasons: &'static [crate::runtime::invoke::InvocationUnavailableReason],
@@ -94,6 +127,10 @@ impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
 impl<T: crate::runtime::descriptor::Reflect> From<MethodBinding<T>>
     for crate::runtime::context::handle::registration::Registration
 {
+    /// Converts the binding into a registration fragment for its target type.
+    ///
+    /// # Parameters
+    /// - `binding`: statically typed method binding to register.
     fn from(binding: MethodBinding<T>) -> Self {
         crate::runtime::context::handle::registration::Registration::metadata_only()
             .with_method_binding::<T>(binding.effective)
@@ -101,6 +138,13 @@ impl<T: crate::runtime::descriptor::Reflect> From<MethodBinding<T>>
 }
 
 /// Binds method metadata and generated adapters to their concrete target type.
+///
+/// # Type Parameters
+/// - `T`: reflected target type that owns the method.
+///
+/// # Parameters
+/// - `metadata`: generated metadata describing the method.
+/// - `adapters`: invocation adapters generated for the method.
 pub const fn bind_method<T: crate::runtime::descriptor::Reflect>(
     metadata: &'static crate::runtime::descriptor::method::MethodMetadata,
     adapters: crate::runtime::descriptor::method::InvocationAdapters,

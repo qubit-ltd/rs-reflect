@@ -38,7 +38,7 @@ pub struct Profile {
 }
 
 #[test]
-fn skipped_fields_are_absent_and_disable_construction_with_a_reason() {
+fn test_skipped_fields_are_absent_and_disable_construction_with_a_reason() {
     let descriptor = TypeDescriptor::of::<SkippedRecord>();
     let record = SkippedRecord {
         id: 4,
@@ -55,7 +55,7 @@ fn skipped_fields_are_absent_and_disable_construction_with_a_reason() {
 }
 
 #[test]
-fn update_preserves_unmodified_fields_and_replaces_selected_fields() {
+fn test_update_preserves_unmodified_fields_and_replaces_selected_fields() {
     let updated: Profile = TypeDescriptor::of::<Profile>()
         .update(
             UpdateInput::<Local>::new(Profile {
@@ -71,7 +71,7 @@ fn update_preserves_unmodified_fields_and_replaces_selected_fields() {
 }
 
 #[test]
-fn construction_rejects_unknown_names_and_wrong_input_shapes_with_recovery() {
+fn test_construction_rejects_unknown_names_and_wrong_input_shapes_with_recovery() {
     let descriptor = TypeDescriptor::of::<Profile>();
     let unknown = descriptor
         .construct::<Profile, _>(NamedFields::<Local>::new().field("other", 4_u32))
@@ -96,7 +96,7 @@ fn construction_rejects_unknown_names_and_wrong_input_shapes_with_recovery() {
 }
 
 #[test]
-fn update_validation_recovers_base_and_original_overrides() {
+fn test_update_validation_recovers_base_and_original_overrides() {
     let descriptor = TypeDescriptor::of::<Profile>();
     let failure = descriptor
         .update::<Profile, Local>(
@@ -131,7 +131,7 @@ fn update_validation_recovers_base_and_original_overrides() {
 }
 
 #[test]
-fn wrong_update_base_is_recovered_without_losing_overrides() {
+fn test_wrong_update_base_is_recovered_without_losing_overrides() {
     let descriptor = TypeDescriptor::of::<Profile>();
     let failure = descriptor
         .update::<Profile, Local>(
@@ -157,7 +157,7 @@ fn wrong_update_base_is_recovered_without_losing_overrides() {
 }
 
 #[test]
-fn wrong_update_kind_is_structured() {
+fn test_wrong_update_kind_is_structured() {
     let failure = TypeDescriptor::of::<Event>()
         .update::<Event, Local>(UpdateInput::<Local>::new(Event::Started))
         .expect_err("owned-value update only applies to structs");
@@ -174,7 +174,7 @@ enum Event {
 }
 
 #[test]
-fn unit_shapes_remain_explicit_in_the_public_input_model() {
+fn test_unit_shapes_remain_explicit_in_the_public_input_model() {
     use qubit_reflect::value::Local;
 
     assert_eq!(

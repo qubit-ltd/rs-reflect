@@ -40,7 +40,7 @@ impl Drop for DropProbe {
 }
 
 #[test]
-fn validation_failure_recovers_the_original_named_input_for_retry() {
+fn test_validation_failure_recovers_the_original_named_input_for_retry() {
     let descriptor = TypeDescriptor::of::<User>();
     let failure = descriptor
         .construct::<User, _>(
@@ -67,7 +67,7 @@ fn validation_failure_recovers_the_original_named_input_for_retry() {
 }
 
 #[test]
-fn construction_failure_exposes_owned_recovery_through_shared_trait() {
+fn test_construction_failure_exposes_owned_recovery_through_shared_trait() {
     let descriptor = TypeDescriptor::of::<User>();
     let failure = descriptor
         .construct::<User, _>(
@@ -104,7 +104,7 @@ fn construction_failure_exposes_owned_recovery_through_shared_trait() {
 }
 
 #[test]
-fn missing_and_duplicate_inputs_report_structured_errors_and_keep_their_shape() {
+fn test_missing_and_duplicate_inputs_report_structured_errors_and_keep_their_shape() {
     let descriptor = TypeDescriptor::of::<User>();
     let missing = descriptor
         .construct::<User, _>(NamedFields::<Local>::new().field("id", 1_u64))
@@ -140,7 +140,7 @@ fn missing_and_duplicate_inputs_report_structured_errors_and_keep_their_shape() 
 }
 
 #[test]
-fn rejected_owned_values_remain_owned_until_recovery_is_dropped() {
+fn test_rejected_owned_values_remain_owned_until_recovery_is_dropped() {
     let drops = Rc::new(Cell::new(0));
     let failure = TypeDescriptor::of::<User>()
         .construct::<User, _>(
@@ -168,7 +168,7 @@ fn rejected_owned_values_remain_owned_until_recovery_is_dropped() {
 }
 
 #[test]
-fn positional_recovery_retains_shape_and_original_type_error() {
+fn test_positional_recovery_retains_shape_and_original_type_error() {
     let descriptor = TypeDescriptor::of::<Pair>();
     let failure = descriptor
         .construct::<Pair, _>(
@@ -195,7 +195,7 @@ fn positional_recovery_retains_shape_and_original_type_error() {
 }
 
 #[test]
-fn failed_update_retains_base_and_replacements_for_retry() {
+fn test_failed_update_retains_base_and_replacements_for_retry() {
     let descriptor = TypeDescriptor::of::<User>();
     let failure = descriptor
         .update::<User, Local>(
@@ -231,7 +231,7 @@ fn failed_update_retains_base_and_replacements_for_retry() {
 }
 
 #[test]
-fn update_failure_exposes_owned_recovery_through_shared_trait() {
+fn test_update_failure_exposes_owned_recovery_through_shared_trait() {
     let descriptor = TypeDescriptor::of::<User>();
     let failure = descriptor
         .update::<User, Local>(
@@ -265,7 +265,7 @@ fn update_failure_exposes_owned_recovery_through_shared_trait() {
 }
 
 #[test]
-fn wrong_update_base_keeps_base_and_replacements() {
+fn test_wrong_update_base_keeps_base_and_replacements() {
     let descriptor = TypeDescriptor::of::<User>();
     let failure = descriptor
         .update::<User, Local>(

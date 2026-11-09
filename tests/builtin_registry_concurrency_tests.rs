@@ -15,7 +15,7 @@ use std::thread;
 use qubit_reflect::ReflectionContext;
 
 #[test]
-fn global_context_concurrently_freezes_once() {
+fn test_global_context_concurrently_freezes_once() {
     let workers = 16;
     let barrier = Arc::new(Barrier::new(workers));
     let handles: Vec<_> = (0..workers)

@@ -8,7 +8,6 @@
 
 use std::cell::Cell;
 
-
 #[qubit_reflect::Reflect]
 struct Worker {
     #[reflect(skip)]

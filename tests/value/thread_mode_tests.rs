@@ -16,7 +16,7 @@ use qubit_reflect::value::ThreadSafe;
 fn assert_send_and_sync<T: Send + Sync>(_: &T) {}
 
 #[test]
-fn thread_safe_borrows_are_send_sync_and_preserve_mutation() {
+fn test_thread_safe_borrows_are_send_sync_and_preserve_mutation() {
     let number = 42_u32;
     let shared = DynamicRef::<ThreadSafe>::new(&number);
     assert_send_and_sync(&shared);
@@ -34,7 +34,7 @@ fn thread_safe_borrows_are_send_sync_and_preserve_mutation() {
 }
 
 #[test]
-fn thread_safe_owned_values_are_send_sync_and_keep_typed_access() {
+fn test_thread_safe_owned_values_are_send_sync_and_keep_typed_access() {
     let mut value = DynamicOwned::<ThreadSafe>::new(41_u32);
     assert_send_and_sync(&value);
     assert!(value.is::<u32>());
@@ -47,7 +47,7 @@ fn thread_safe_owned_values_are_send_sync_and_keep_typed_access() {
 }
 
 #[test]
-fn thread_safe_owned_borrow_bridges_preserve_the_mode_and_value() {
+fn test_thread_safe_owned_borrow_bridges_preserve_the_mode_and_value() {
     let mut value = DynamicOwned::<ThreadSafe>::new(61_u32);
     let shared: DynamicRef<'_, ThreadSafe> = value.as_ref();
     assert_send_and_sync(&shared);
@@ -64,7 +64,7 @@ fn thread_safe_owned_borrow_bridges_preserve_the_mode_and_value() {
 }
 
 #[test]
-fn thread_safe_str_borrows_support_typed_access_and_mutation() {
+fn test_thread_safe_str_borrows_support_typed_access_and_mutation() {
     let text = String::from("hello");
     let shared = DynamicRef::<ThreadSafe>::new(text.as_str());
     assert_send_and_sync(&shared);

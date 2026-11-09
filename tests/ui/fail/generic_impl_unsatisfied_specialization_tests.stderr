@@ -1,5 +1,5 @@
 error: reflection helper `specialize` is unsupported; only `skip` is accepted
-  --> tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs:15:30
+  --> tests/ui/fail/generic_impl_unsatisfied_specialization_tests.rs:14:30
    |
-15 | #[qubit_reflect::ReflectImpl(specialize(T = String))]
+14 | #[qubit_reflect::ReflectImpl(specialize(T = String))]
    |                              ^^^^^^^^^^

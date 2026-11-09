@@ -53,6 +53,12 @@ pub(crate) fn dispatch(declaration: DeclarationIr) -> Result<TokenStream> {
 }
 
 /// Expands a declaration after resolving its runtime path.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed declaration to dispatch to its type, trait, or impl
+///   backend.
+/// - `context`: Runtime expansion context resolved for this declaration.
 fn dispatch_with_context(declaration: DeclarationIr, context: &ExpansionContext) -> Result<TokenStream> {
     let expanded = match declaration {
         DeclarationIr::Type(declaration) => match declaration.kind {

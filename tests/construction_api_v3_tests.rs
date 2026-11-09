@@ -44,7 +44,7 @@ struct RestrictedRecord {
 }
 
 #[test]
-fn named_positional_and_variant_construction_use_plain_values() {
+fn test_named_positional_and_variant_construction_use_plain_values() {
     let value: PublicRecord = TypeDescriptor::of::<PublicRecord>()
         .construct(
             NamedFields::<Local>::new()
@@ -79,7 +79,7 @@ fn named_positional_and_variant_construction_use_plain_values() {
 }
 
 #[test]
-fn dynamic_construction_returns_the_exact_root_value() {
+fn test_dynamic_construction_returns_the_exact_root_value() {
     let erased = TypeDescriptor::of::<PublicRecord>()
         .construct_dynamic::<_>(
             NamedFields::<Local>::new()
@@ -92,7 +92,7 @@ fn dynamic_construction_returns_the_exact_root_value() {
 }
 
 #[test]
-fn failed_construction_preserves_the_original_input_for_retry() {
+fn test_failed_construction_preserves_the_original_input_for_retry() {
     let descriptor = TypeDescriptor::of::<PublicRecord>();
     let failure = descriptor
         .construct::<PublicRecord, _>(
@@ -119,7 +119,7 @@ fn failed_construction_preserves_the_original_input_for_retry() {
 }
 
 #[test]
-fn update_preserves_unmodified_values_and_recovers_invalid_bases() {
+fn test_update_preserves_unmodified_values_and_recovers_invalid_bases() {
     let descriptor = TypeDescriptor::of::<PublicRecord>();
     let updated: PublicRecord = descriptor
         .update(
@@ -149,7 +149,7 @@ fn update_preserves_unmodified_values_and_recovers_invalid_bases() {
 }
 
 #[test]
-fn private_fields_require_unchecked_construction_and_update() {
+fn test_private_fields_require_unchecked_construction_and_update() {
     let descriptor = TypeDescriptor::of::<RestrictedRecord>();
     let failure = descriptor
         .construct::<RestrictedRecord, _>(
@@ -179,7 +179,7 @@ fn private_fields_require_unchecked_construction_and_update() {
 }
 
 #[test]
-fn wrong_shape_errors_keep_the_structured_category_and_input() {
+fn test_wrong_shape_errors_keep_the_structured_category_and_input() {
     let failure = TypeDescriptor::of::<PublicRecord>()
         .construct::<PublicRecord, _>(PositionalFields::<Local>::new())
         .expect_err("named structs reject positional input");

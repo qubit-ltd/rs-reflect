@@ -64,7 +64,7 @@ fn method(name: &str) -> qubit_reflect::MethodDescriptor<'static> {
 }
 
 #[test]
-fn positional_struct_and_variant_arity_failures_retain_original_inputs() {
+fn test_positional_struct_and_variant_arity_failures_retain_original_inputs() {
     let tuple = TypeDescriptor::of::<TupleRecord>();
     let Err(failure) = tuple.construct::<TupleRecord, _>(
         PositionalFields::<Local>::new()
@@ -128,7 +128,7 @@ fn positional_struct_and_variant_arity_failures_retain_original_inputs() {
 }
 
 #[test]
-fn variant_type_errors_and_unavailable_schema_keep_caller_data() {
+fn test_variant_type_errors_and_unavailable_schema_keep_caller_data() {
     let pair = TypeDescriptor::of::<Choice>()
         .variant("Pair")
         .expect("tuple variant exists");
@@ -165,7 +165,7 @@ fn variant_type_errors_and_unavailable_schema_keep_caller_data() {
 }
 
 #[test]
-fn invocation_binding_schema_errors_recover_the_original_call() {
+fn test_invocation_binding_schema_errors_recover_the_original_call() {
     let target = InvocationTarget {
         _local_state: Rc::new(()),
         value: 4,
@@ -242,7 +242,7 @@ fn invocation_binding_schema_errors_recover_the_original_call() {
 }
 
 #[test]
-fn invocation_type_mode_visibility_and_availability_failures_are_structured() {
+fn test_invocation_type_mode_visibility_and_availability_failures_are_structured() {
     let target = InvocationTarget {
         _local_state: Rc::new(()),
         value: 4,
@@ -289,7 +289,7 @@ fn invocation_type_mode_visibility_and_availability_failures_are_structured() {
 }
 
 #[test]
-fn mutable_borrow_argument_mode_mismatch_does_not_consume_the_input() {
+fn test_mutable_borrow_argument_mode_mismatch_does_not_consume_the_input() {
     let mut target = InvocationTarget {
         _local_state: Rc::new(()),
         value: 4,

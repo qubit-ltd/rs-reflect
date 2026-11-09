@@ -6,6 +6,14 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+/// Returns a concise lookup key for a source-level type name.
+///
+/// Ordinary paths are reduced to their final segment. Composite type syntax is
+/// kept intact because stripping its path components would discard structure.
+///
+/// # Parameters
+///
+/// * `name` — the source-level type name to shorten.
 pub(crate) fn short_name(name: &str) -> &str {
     if is_composite_type_name(name) {
         return name;
@@ -14,12 +22,24 @@ pub(crate) fn short_name(name: &str) -> &str {
     base.rsplit("::").next().unwrap_or(base)
 }
 
-/// Preserves the historical final-segment key used by context lookup indexes.
+/// Preserves the final-segment key used by existing context lookup indexes.
+///
+/// Unlike [`short_name`], this intentionally shortens composite names so old
+/// index entries remain addressable.
+///
+/// # Parameters
+///
+/// * `name` — the source-level type name indexed by a context.
 pub(crate) fn index_short_name(name: &str) -> &str {
     let base = name.split('<').next().unwrap_or(name);
     base.rsplit("::").next().unwrap_or(base)
 }
 
+/// Reports whether shortening a type name would discard composite syntax.
+///
+/// # Parameters
+///
+/// * `name` — the source-level type name to classify.
 fn is_composite_type_name(name: &str) -> bool {
     name.starts_with('&')
         || name.starts_with("*const ")
@@ -42,7 +62,7 @@ mod tests {
     use super::short_name;
 
     #[test]
-    fn composite_names_remain_complete() {
+    fn test_composite_names_remain_complete() {
         for name in [
             "for<'a> fn(&'a alloc::string::String) -> u32",
             "dyn core::fmt::Display",
@@ -53,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn composite_index_aliases_keep_the_previous_final_segment() {
+    fn test_composite_index_aliases_keep_the_previous_final_segment() {
         assert_eq!(index_short_name("dyn std::fmt::Display"), "Display");
     }
 }

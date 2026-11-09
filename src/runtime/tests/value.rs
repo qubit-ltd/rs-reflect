@@ -37,7 +37,7 @@ impl Reflect for Dropped {
 }
 
 #[test]
-fn downcast_failure_returns_the_same_owned_value() {
+fn test_downcast_failure_returns_the_same_owned_value() {
     let value = DynamicOwned::<Local>::new(String::from("retained"));
     let failure = value.downcast::<u64>().expect_err("wrong target type must fail");
     assert_eq!(failure.expected(), std::any::TypeId::of::<u64>());
@@ -61,7 +61,7 @@ fn downcast_failure_returns_the_same_owned_value() {
 }
 
 #[test]
-fn dynamic_owned_exposes_the_actual_value_as_any() {
+fn test_dynamic_owned_exposes_the_actual_value_as_any() {
     let value = DynamicOwned::<Local>::new(String::from("owned"));
     assert_eq!(
         value.as_any().downcast_ref::<String>().map(String::as_str),
@@ -70,7 +70,7 @@ fn dynamic_owned_exposes_the_actual_value_as_any() {
 }
 
 #[test]
-fn owned_value_is_dropped_exactly_once_after_failed_downcast_recovery() {
+fn test_owned_value_is_dropped_exactly_once_after_failed_downcast_recovery() {
     DROPS.store(0, Ordering::SeqCst);
     let value = DynamicOwned::<Local>::new(Dropped);
     let value = value
@@ -83,7 +83,7 @@ fn owned_value_is_dropped_exactly_once_after_failed_downcast_recovery() {
 }
 
 #[test]
-fn thread_safe_owned_values_can_be_downgraded_to_local() {
+fn test_thread_safe_owned_values_can_be_downgraded_to_local() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<DynamicOwned<ThreadSafe>>();
     assert_send_sync::<DynamicRef<'static, ThreadSafe>>();
@@ -95,7 +95,7 @@ fn thread_safe_owned_values_can_be_downgraded_to_local() {
 }
 
 #[test]
-fn dynamic_value_reports_kind_and_exposes_a_shared_view() {
+fn test_dynamic_value_reports_kind_and_exposes_a_shared_view() {
     let owned = DynamicValue::Owned(DynamicOwned::<Local>::new(String::from("owned")));
     assert_eq!(owned.kind(), DynamicValueKind::Owned);
     assert_eq!(owned.type_id(), std::any::TypeId::of::<String>());
@@ -123,7 +123,7 @@ fn dynamic_value_reports_kind_and_exposes_a_shared_view() {
 }
 
 #[test]
-fn dynamic_shared_references_preserve_dst_metadata() {
+fn test_dynamic_shared_references_preserve_dst_metadata() {
     let text: &str = "hello";
     let dynamic = DynamicRef::<Local>::new(text);
     assert_eq!(
@@ -140,7 +140,7 @@ fn dynamic_shared_references_preserve_dst_metadata() {
 }
 
 #[test]
-fn dynamic_ref_exposes_any_only_when_constructed_with_a_sized_any_view() {
+fn test_dynamic_ref_exposes_any_only_when_constructed_with_a_sized_any_view() {
     use std::any::Any;
 
     let text = String::from("borrowed");
@@ -161,7 +161,7 @@ fn dynamic_ref_exposes_any_only_when_constructed_with_a_sized_any_view() {
 }
 
 #[test]
-fn borrowed_downcast_failures_return_the_original_borrow_handles() {
+fn test_borrowed_downcast_failures_return_the_original_borrow_handles() {
     let text: &str = "kept";
     let failure = DynamicRef::<Local>::new(text)
         .downcast::<[u64]>()
@@ -190,7 +190,7 @@ fn borrowed_downcast_failures_return_the_original_borrow_handles() {
 }
 
 #[test]
-fn dynamic_mut_reborrow_and_downcast_preserve_the_original_borrow() {
+fn test_dynamic_mut_reborrow_and_downcast_preserve_the_original_borrow() {
     let mut values = [1_u64, 2, 3];
     let mut dynamic = DynamicMut::<Local>::new(&mut values[..]);
     {
@@ -201,7 +201,7 @@ fn dynamic_mut_reborrow_and_downcast_preserve_the_original_borrow() {
 }
 
 #[test]
-fn local_mode_accepts_non_thread_safe_reflected_values() {
+fn test_local_mode_accepts_non_thread_safe_reflected_values() {
     let value = DynamicOwned::<Local>::new(Rc::new(String::from("local")));
     assert_eq!(
         value.downcast_ref::<Rc<String>>().map(|value| value.as_str()),
@@ -215,7 +215,7 @@ fn local_mode_accepts_non_thread_safe_reflected_values() {
 }
 
 #[test]
-fn thread_safe_shared_and_mutable_views_preserve_type_and_mutation() {
+fn test_thread_safe_shared_and_mutable_views_preserve_type_and_mutation() {
     let text = String::from("shared");
     let shared = DynamicRef::<ThreadSafe>::new(&text);
     assert!(shared.clone().is::<String>());
@@ -240,7 +240,7 @@ fn thread_safe_shared_and_mutable_views_preserve_type_and_mutation() {
 }
 
 #[test]
-fn dynamic_value_converts_owned_and_borrowed_forms_without_losing_failures() {
+fn test_dynamic_value_converts_owned_and_borrowed_forms_without_losing_failures() {
     let owned = DynamicValue::Owned(DynamicOwned::<Local>::new(String::from("owned")));
     assert_eq!(
         owned
@@ -290,7 +290,7 @@ fn dynamic_value_converts_owned_and_borrowed_forms_without_losing_failures() {
 }
 
 #[test]
-fn downcast_failure_exposes_structured_mismatch_and_borrowed_recovery() {
+fn test_downcast_failure_exposes_structured_mismatch_and_borrowed_recovery() {
     let failure = DynamicRef::<Local>::new("text")
         .downcast::<[u8]>()
         .expect_err("str is not a byte slice");

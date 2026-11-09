@@ -63,7 +63,7 @@ impl DataIndexTarget {
 qubit_reflect::register_trait_object!(dyn std::fmt::Display);
 
 #[test]
-fn generic_definition_and_type_indexes_resolve_registered_instances() {
+fn test_generic_definition_and_type_indexes_resolve_registered_instances() {
     let context = ReflectionContext::builder()
         .include_type::<DataIndexGeneric<u16>>()
         .build()
@@ -110,7 +110,7 @@ fn generic_definition_and_type_indexes_resolve_registered_instances() {
 }
 
 #[test]
-fn descriptor_and_indexes_use_nominal_short_names() {
+fn test_descriptor_and_indexes_use_nominal_short_names() {
     let context = ReflectionContext::builder()
         .include_type::<DataIndexRecord<String>>()
         .include_type::<&'static String>()
@@ -152,7 +152,7 @@ fn descriptor_and_indexes_use_nominal_short_names() {
 }
 
 #[test]
-fn trait_indexes_and_impl_indexes_link_the_same_concrete_application() {
+fn test_trait_indexes_and_impl_indexes_link_the_same_concrete_application() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -210,7 +210,7 @@ fn trait_indexes_and_impl_indexes_link_the_same_concrete_application() {
 }
 
 #[test]
-fn implementation_definition_index_returns_concrete_instances_and_trait_objects() {
+fn test_implementation_definition_index_returns_concrete_instances_and_trait_objects() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

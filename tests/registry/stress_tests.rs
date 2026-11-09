@@ -23,7 +23,7 @@ struct ConcurrentRoot {
 }
 
 #[test]
-fn concurrent_global_initialization_publishes_one_immutable_context() {
+fn test_concurrent_global_initialization_publishes_one_immutable_context() {
     let workers = 16;
     let barrier = Arc::new(std::sync::Barrier::new(workers));
     let handles: Vec<_> = (0..workers)

@@ -8,7 +8,6 @@
 
 use core::fmt::Debug;
 
-
 #[qubit_reflect::Reflect]
 trait UnsizedAssociatedConstContract {
     const SLICE: [u8];

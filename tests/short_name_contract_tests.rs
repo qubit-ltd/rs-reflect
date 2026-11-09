@@ -9,7 +9,7 @@
 use qubit_reflect::TypeDescriptor;
 
 #[test]
-fn reports_diagnostic_names_for_reflected_type_shapes() {
+fn test_reports_diagnostic_names_for_reflected_type_shapes() {
     let nominal = TypeDescriptor::of::<String>();
     assert_eq!(nominal.short_name(), "String");
     let names = [

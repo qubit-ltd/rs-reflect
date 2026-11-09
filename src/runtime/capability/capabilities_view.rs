@@ -17,12 +17,22 @@ use crate::runtime::context::ReflectionContext;
 
 /// A lightweight capability view bound to the context that performed lookup.
 pub struct CapabilitiesView<'ctx> {
+    /// Immutable capability records resolved for the target.
     pub(super) set: Arc<Capabilities>,
+    /// Entity whose registrations populate this view.
     pub(super) target: CapabilityTarget<'ctx>,
+    /// Context used to resolve descriptors returned by this view.
     pub(super) context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> CapabilitiesView<'ctx> {
+    /// Creates a view over resolved capability records.
+    ///
+    /// # Parameters
+    ///
+    /// * `set` — immutable records associated with the target.
+    /// * `target` — entity whose capabilities are described.
+    /// * `context` — context used by returned descriptors.
     pub(crate) fn new(
         set: Arc<Capabilities>,
         target: CapabilityTarget<'ctx>,
@@ -31,6 +41,12 @@ impl<'ctx> CapabilitiesView<'ctx> {
         Self { set, target, context }
     }
 
+    /// Creates an empty view for a target that has no capability records.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — entity whose capability lookup returned no records.
+    /// * `context` — context used by descriptors obtained from the view.
     pub(crate) fn empty(target: CapabilityTarget<'ctx>, context: &'ctx ReflectionContext) -> Self {
         Self::new(Arc::new(Capabilities::empty(target.id())), target, context)
     }
@@ -54,6 +70,10 @@ impl<'ctx> CapabilitiesView<'ctx> {
     ///
     /// Returns `None` when no capability with `id` is registered for this
     /// target.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — stable textual capability identifier.
     pub fn get(&self, id: &str) -> Option<CapabilityDescriptor<'ctx>> {
         self.set
             .records
@@ -81,6 +101,11 @@ impl<'ctx> CapabilitiesView<'ctx> {
             })
     }
 
+    /// Restores a capability descriptor when its adapter satisfies `C`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `C` — capability contract to verify.
     pub(crate) fn find<C: CapabilitySpec>(
         &self,
     ) -> Result<Option<super::capability::Capability<'ctx, C>>, CapabilityError> {
@@ -104,6 +129,12 @@ impl<'ctx> CapabilitiesView<'ctx> {
         })
     }
 
+    /// Restores a required capability or reports its absence or invalid
+    /// contract.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `C` — required capability contract.
     pub(crate) fn capability<C: CapabilitySpec>(
         &self,
     ) -> Result<super::capability::Capability<'ctx, C>, CapabilityError> {

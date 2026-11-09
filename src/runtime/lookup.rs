@@ -12,16 +12,26 @@ use super::error::LookupSubject;
 use super::identity::IntoLookupCandidate;
 use super::identity::LookupCandidate;
 
+/// Result of looking up an item before requiring a unique match.
+///
+/// # Type Parameters
+///
+/// * `T` — the candidate value retained by a successful lookup.
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Result of looking up an item before requiring a unique match.
 pub enum Lookup<T> {
     /// No item matched the lookup criteria.
     Missing,
     /// Exactly one item matched.
-    Unique(T),
+    Unique(
+        /// The only candidate matching the lookup criteria.
+        T,
+    ),
     /// Multiple items matched; candidates retain their lookup order.
-    Ambiguous(Box<[T]>),
+    Ambiguous(
+        /// Candidates retained in the order in which lookup found them.
+        Box<[T]>,
+    ),
 }
 
 impl<T> Lookup<T> {
@@ -75,6 +85,11 @@ impl<T> Lookup<T> {
     /// no candidate matched, or
     /// [`LookupError::Ambiguous`](super::error::LookupError::Ambiguous)
     /// with candidate identities and origins if multiple items matched.
+    ///
+    /// # Parameters
+    ///
+    /// * `subject` — kind of item being looked up.
+    /// * `query` — exact query that produced this result.
     pub fn into_unique(self, subject: LookupSubject, query: LookupQuery) -> Result<T, LookupError>
     where
         T: IntoLookupCandidate,

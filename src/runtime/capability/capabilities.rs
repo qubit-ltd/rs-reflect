@@ -6,32 +6,30 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use std::any::TypeId;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::capability_error::CapabilityError;
 use super::capability_id::CapabilityIdentifier;
+use super::capability_record::CapabilityRecord;
 use super::capability_registration_origin::CapabilityRegistrationOrigin;
 use super::capability_target_id::CapabilityTargetId;
 use crate::runtime::identity::RegistrationOrigin;
 
-pub(crate) struct CapabilityRecord {
-    pub(super) id: CapabilityIdentifier,
-    pub(super) id_str: &'static str,
-    pub(super) adapter_type: TypeId,
-    pub(super) adapter: Arc<dyn std::any::Any + Send + Sync>,
-    pub(super) origin: CapabilityRegistrationOrigin,
-}
-
 /// Immutable, context-independent storage shared by reflection contexts.
 pub(crate) struct Capabilities {
+    /// Stable identity of the target that owns this capability set.
     pub(super) target: CapabilityTargetId,
+    /// Registrations stored in stable capability ID order.
     pub(super) records: Box<[CapabilityRecord]>,
 }
 
 impl Capabilities {
+    /// Creates an empty set for the specified target.
+    ///
+    /// # Parameters
+    /// - `target`: target identity associated with the set.
     pub(crate) fn empty(target: CapabilityTargetId) -> Self {
         Self {
             target,
@@ -39,6 +37,11 @@ impl Capabilities {
         }
     }
 
+    /// Creates a validated set and rejects duplicate capability IDs.
+    ///
+    /// # Parameters
+    /// - `target`: target identity that all registrations must reference.
+    /// - `registrations`: capability registrations to validate and store.
     pub(crate) fn try_new(
         target: CapabilityTargetId,
         registrations: impl IntoIterator<Item = super::capability_registration::CapabilityRegistration>,
@@ -85,6 +88,7 @@ impl Capabilities {
     }
 }
 
+/// Creates provenance metadata for a built-in capability registration.
 pub(crate) fn synthetic_registration_origin() -> RegistrationOrigin {
     RegistrationOrigin {
         crate_name: "qubit-reflect",

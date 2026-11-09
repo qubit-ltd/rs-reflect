@@ -2,9 +2,15 @@
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
 //    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
 //! Generic adapters for trait methods that provide a default body.
+
+mod default_method_context;
+mod thread_safe_default_adapter;
+mod thread_safe_default_adapter_context;
 
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
@@ -15,6 +21,9 @@ use syn::GenericParam;
 use syn::ItemTrait;
 use syn::LitStr;
 
+use self::default_method_context::DefaultMethodContext;
+use self::thread_safe_default_adapter::ThreadSafeDefaultAdapter;
+use self::thread_safe_default_adapter_context::ThreadSafeDefaultAdapterContext;
 use crate::expand::ExpansionContext;
 use crate::ir::GenericBoundIr;
 use crate::ir::GenericKindIr;
@@ -34,6 +43,16 @@ use crate::ir::TypeKindIr;
 /// The provider is generated beside the trait declaration, where its method
 /// identifiers are available. Impl derives call it with the concrete target
 /// and the names overridden by that impl.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed trait declaration whose defaults are emitted.
+/// - `retained`: Original trait item needed for compiler-checked signatures.
+/// - `trait_name`: Source trait identifier used in generated bounds.
+/// - `spec_provider`: Generated trait-spec provider identifier.
+/// - `provider`: Generated default-method provider identifier.
+/// - `facade`: Runtime facade path used in emitted code.
+/// - `context`: Expansion context containing resolved runtime paths.
 #[must_use]
 pub(super) fn default_methods_provider(
     declaration: &TraitDeclarationIr,
@@ -329,18 +348,14 @@ pub(super) fn default_methods_provider(
     }
 }
 
-struct DefaultMethodContext<'a> {
-    trait_path: &'a TokenStream,
-    helper_generic_parameters: &'a [TokenStream],
-    marker_type: &'a TokenStream,
-    target_generic_arguments: &'a TokenStream,
-    spec_provider: &'a Ident,
-    codegen: &'a TokenStream,
-    facade: &'a TokenStream,
-    context: &'a ExpansionContext,
-    trait_type_parameters: &'a [String],
-}
-
+/// Emits one default method adapter when its signature is supported.
+///
+/// # Parameters
+///
+/// - `method`: Parsed default method to adapt.
+/// - `index`: Source method index used for stable generated names.
+/// - `thread_safe_supported`: Whether the trait enables thread-safe adapters.
+/// - `context`: Shared generated paths and generic metadata for the method.
 fn emit_default_method(
     method: &MethodIr,
     index: usize,
@@ -624,6 +639,12 @@ fn emit_default_method(
     })
 }
 
+/// Reports whether a method signature contains an unresolved associated type.
+///
+/// # Parameters
+///
+/// - `method`: Method whose receiver, arguments, and result are inspected.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn method_uses_unproven_associated_type(method: &MethodIr, trait_type_parameters: &[String]) -> bool {
     method
         .receiver
@@ -639,6 +660,12 @@ fn method_uses_unproven_associated_type(method: &MethodIr, trait_type_parameters
         )
 }
 
+/// Recursively detects associated-type projections that need compiler proof.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type expression to inspect.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn type_uses_unproven_associated_type(ty: &TypeIr, trait_type_parameters: &[String]) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -689,6 +716,12 @@ fn type_uses_unproven_associated_type(ty: &TypeIr, trait_type_parameters: &[Stri
     }
 }
 
+/// Detects projections rooted in a trait parameter within a parsed path.
+///
+/// # Parameters
+///
+/// - `path`: Parsed path and its generic arguments.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn path_uses_unproven_associated_type(path: &PathIr, trait_type_parameters: &[String]) -> bool {
     let direct_projection = path.qualified_self.is_none()
         && path.segments.len() > 1
@@ -727,6 +760,13 @@ fn path_uses_unproven_associated_type(path: &PathIr, trait_type_parameters: &[St
         })
 }
 
+/// Reports whether a nested type expression mentions an enclosing trait
+/// parameter.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type expression to inspect recursively.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn type_references_trait_parameter(ty: &TypeIr, trait_type_parameters: &[String]) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -776,6 +816,12 @@ fn type_references_trait_parameter(ty: &TypeIr, trait_type_parameters: &[String]
     }
 }
 
+/// Detects unresolved associated-type projections within a generic bound.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed trait or lifetime bound to inspect.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn bound_uses_unproven_associated_type(bound: &GenericBoundIr, trait_type_parameters: &[String]) -> bool {
     match bound {
         GenericBoundIr::Trait { path, .. } => path_uses_unproven_associated_type(path, trait_type_parameters),
@@ -783,29 +829,23 @@ fn bound_uses_unproven_associated_type(bound: &GenericBoundIr, trait_type_parame
     }
 }
 
+/// Reports whether a name is `Self` or a declared trait type parameter.
+///
+/// # Parameters
+///
+/// - `name`: Path segment identifier to compare.
+/// - `trait_type_parameters`: Names of the enclosing trait's type parameters.
 fn is_trait_type_parameter(name: &str, trait_type_parameters: &[String]) -> bool {
     name == "Self" || trait_type_parameters.iter().any(|parameter| parameter == name)
 }
 
-/// Generates a thread-safe adapter only for the narrow, fully owned signature
-/// subset whose value-mode bounds can be proven by stable Rust.
-#[must_use]
-struct ThreadSafeDefaultAdapter {
-    definition: TokenStream,
-    adapter_type: Ident,
-    invoke: Ident,
-    bounds: Vec<TokenStream>,
-}
-
-struct ThreadSafeDefaultAdapterContext<'a> {
-    trait_path: &'a TokenStream,
-    helper_generic_parameters: &'a [TokenStream],
-    marker_type: &'a TokenStream,
-    target_generic_arguments: &'a TokenStream,
-    codegen: &'a TokenStream,
-    value_eligibility: &'a Ident,
-}
-
+/// Builds a thread-safe adapter when the default method has a supported shape.
+///
+/// # Parameters
+///
+/// - `method`: Parsed default method to adapt.
+/// - `index`: Source method index used for generated identifiers.
+/// - `context`: Paths and generic data required by generated adapter code.
 fn thread_safe_default_adapter(
     method: &MethodIr,
     index: usize,
@@ -1014,12 +1054,22 @@ fn thread_safe_default_adapter(
     })
 }
 
+/// Reports whether retained type tokens directly mention the `Self` type.
+///
+/// # Parameters
+///
+/// - `ty`: Type token stream to scan for the `Self` identifier.
 fn type_mentions_self(ty: &TokenStream) -> bool {
     ty.to_string()
         .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
         .any(|identifier| identifier == "Self")
 }
 
+/// Splits trait generic parameters into generated declarations and arguments.
+///
+/// # Parameters
+///
+/// - `parameters`: Source trait generic parameters in declaration order.
 fn trait_generic_parts(
     parameters: &syn::punctuated::Punctuated<GenericParam, syn::Token![,]>,
 ) -> (Vec<TokenStream>, Vec<TokenStream>) {
@@ -1052,6 +1102,11 @@ fn trait_generic_parts(
     (declarations, arguments)
 }
 
+/// Returns trait generic declarations in their original order.
+///
+/// # Parameters
+///
+/// - `parameters`: Source trait generic parameters to retain.
 fn ordered_generic_parameters(
     parameters: &syn::punctuated::Punctuated<GenericParam, syn::Token![,]>,
 ) -> Vec<TokenStream> {

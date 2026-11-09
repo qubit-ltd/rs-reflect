@@ -14,9 +14,15 @@ use crate::runtime::descriptor::generic::TypeDefinitionDescriptor;
 #[derive(Clone, Copy)]
 pub enum CapabilityTarget<'ctx> {
     /// A concrete reflected Rust type.
-    Type(TypeDescriptor<'ctx>),
+    Type(
+        /// Descriptor for the concrete registered type.
+        TypeDescriptor<'ctx>,
+    ),
     /// A reflected source type definition.
-    Definition(TypeDefinitionDescriptor<'ctx>),
+    Definition(
+        /// Descriptor for the source-level type definition.
+        TypeDefinitionDescriptor<'ctx>,
+    ),
 }
 
 impl CapabilityTarget<'_> {

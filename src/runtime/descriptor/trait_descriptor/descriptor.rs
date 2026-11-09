@@ -38,12 +38,19 @@ use crate::runtime::identity::StableItemId;
 /// Context-bound view of one source trait declaration.
 #[derive(Clone, Copy)]
 pub struct TraitDefinitionDescriptor<'ctx> {
+    /// Static source metadata for the trait declaration.
     metadata: &'static TraitDefinitionMetadata,
+    /// Context that owns the declaration and resolves its expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TraitDefinitionDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static metadata for this trait declaration.
+    /// * `context` — reflection context that owns the declaration.
     pub(crate) const fn new(metadata: &'static TraitDefinitionMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -84,6 +91,10 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
         MethodDefinitions::new(self.metadata.methods, MethodDefinitionOwner::Trait(self), self.context)
     }
     /// Finds a uniquely named method declaration.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the method declaration.
     pub fn method(self, name: &str) -> Result<MethodDefinitionDescriptor<'ctx>, LookupError> {
         unique_named(
             self.metadata
@@ -102,6 +113,10 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
         AssociatedTypeDefinitions::new(self.metadata.associated_types, self.context)
     }
     /// Finds an associated type declaration by name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated type.
     pub fn associated_type(self, name: &str) -> Result<AssociatedTypeDefinitionDescriptor<'ctx>, LookupError> {
         unique_named(
             self.metadata
@@ -118,6 +133,10 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
         AssociatedConstDefinitions::new(self.metadata.associated_consts, self.context)
     }
     /// Finds an associated constant declaration by name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated constant.
     pub fn associated_const(self, name: &str) -> Result<AssociatedConstDefinitionDescriptor<'ctx>, LookupError> {
         unique_named(
             self.metadata
@@ -140,12 +159,19 @@ impl<'ctx> TraitDefinitionDescriptor<'ctx> {
 /// Context-bound view of a compiled, target-independent trait application.
 #[derive(Clone, Copy)]
 pub struct TraitDescriptor<'ctx> {
+    /// Static metadata for the concrete trait application.
     metadata: &'static TraitApplicationMetadata,
+    /// Context that resolves this application's expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TraitDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static metadata for this trait application.
+    /// * `context` — reflection context that owns the application.
     pub(crate) const fn new(metadata: &'static TraitApplicationMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -203,6 +229,10 @@ impl<'ctx> TraitDescriptor<'ctx> {
         self.metadata.supertrait_completeness
     }
     /// Returns the `same_application` metadata retained for this item.
+    ///
+    /// # Parameters
+    ///
+    /// * `other` — application compared with this descriptor.
     pub(crate) fn same_application(self, other: Self) -> bool {
         if self.context.id() != other.context.id() {
             return false;
@@ -218,12 +248,19 @@ impl<'ctx> TraitDescriptor<'ctx> {
 /// A trait expression retained in source syntax.
 #[derive(Clone, Copy)]
 pub struct TraitExpressionDescriptor<'ctx> {
+    /// Static source expression and its optional linked definition.
     metadata: &'static TraitExpressionMetadata,
+    /// Context that resolves the expression's source identities.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TraitExpressionDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static source expression metadata.
+    /// * `context` — reflection context used to resolve the expression.
     pub(crate) const fn new(metadata: &'static TraitExpressionMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -257,13 +294,22 @@ impl<'ctx> TraitExpressionDescriptor<'ctx> {
 /// Context-bound method declaration and its source owner.
 #[derive(Clone, Copy)]
 pub struct MethodDefinitionDescriptor<'ctx> {
+    /// Static source metadata for the method declaration.
     metadata: &'static MethodMetadata,
+    /// Trait or impl declaration that owns this method.
     owner: MethodDefinitionOwner<'ctx>,
+    /// Context used to resolve method type expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> MethodDefinitionDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static source metadata for the method.
+    /// * `owner` — trait or impl declaration containing the method.
+    /// * `context` — reflection context used to resolve its types.
     pub(crate) const fn new(
         metadata: &'static MethodMetadata,
         owner: MethodDefinitionOwner<'ctx>,
@@ -334,7 +380,9 @@ impl<'ctx> MethodDefinitionDescriptor<'ctx> {
 /// declaration's receiver type can be resolved in the reflection context.
 #[derive(Clone, Copy)]
 pub struct ReceiverDefinitionDescriptor<'ctx> {
+    /// Receiver syntax retained for the source method.
     receiver: ReceiverDescriptor,
+    /// Context used to resolve the receiver type.
     context: &'ctx ReflectionContext,
 }
 
@@ -355,20 +403,35 @@ impl<'ctx> ReceiverDefinitionDescriptor<'ctx> {
 #[derive(Clone, Copy)]
 pub enum MethodDefinitionOwner<'ctx> {
     /// The method is declared by a trait definition.
-    Trait(TraitDefinitionDescriptor<'ctx>),
+    Trait(
+        /// Descriptor for the trait that declares the method.
+        TraitDefinitionDescriptor<'ctx>,
+    ),
     /// The method is declared by an inherent or trait impl block.
-    Impl(crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor<'ctx>),
+    Impl(
+        /// Descriptor for the impl block that declares the method.
+        crate::runtime::descriptor::impl_descriptor::ImplDefinitionDescriptor<'ctx>,
+    ),
 }
 
 /// Ordered source method declarations for one trait or impl block.
 pub struct MethodDefinitions<'ctx> {
+    /// Method declarations in their source order.
     values: &'static [MethodMetadata],
+    /// Declaration that owns every method in the collection.
     owner: MethodDefinitionOwner<'ctx>,
+    /// Context used to resolve each method descriptor.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> MethodDefinitions<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `values` — method declarations in source order.
+    /// * `owner` — declaration that owns each method.
+    /// * `context` — reflection context used to resolve their types.
     pub(crate) const fn new(
         values: &'static [MethodMetadata],
         owner: MethodDefinitionOwner<'ctx>,
@@ -395,6 +458,10 @@ impl<'ctx> MethodDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Finds an item by name or collection position.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the requested method.
     pub fn get(&self, name: &str) -> Option<MethodDefinitionDescriptor<'ctx>> {
         self.values
             .iter()
@@ -406,11 +473,18 @@ impl<'ctx> MethodDefinitions<'ctx> {
 /// A source-level direct supertrait expression list.
 #[derive(Clone, Copy)]
 pub struct TraitExpressions<'ctx> {
+    /// Retained source expressions in declaration order.
     expressions: &'static [TraitExpressionMetadata],
+    /// Context used to resolve expression identities.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TraitExpressions<'ctx> {
+    ///
+    /// # Parameters
+    ///
+    /// * `expressions` — retained source expressions in declaration order.
+    /// * `context` — reflection context used to resolve their identities.
     const fn new(expressions: &'static [TraitExpressionMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { expressions, context }
     }
@@ -433,15 +507,27 @@ impl<'ctx> TraitExpressions<'ctx> {
 /// An ordered set of concrete trait applications.
 #[derive(Clone)]
 pub struct Traits<'ctx> {
+    /// Concrete trait applications in registration or source order.
     values: Box<[TraitDescriptor<'ctx>]>,
+    /// Context that owns the applications.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> Traits<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `values` — trait application descriptors to collect.
+    /// * `context` — context that owns the applications.
     pub(crate) fn new(values: Box<[TraitDescriptor<'ctx>]>, context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
+    /// Wraps static application metadata in context-bound descriptors.
+    /// # Parameters
+    ///
+    /// * `values` — static application metadata to wrap.
+    /// * `context` — context that owns the applications.
     fn from_metadata(values: &'static [&'static TraitApplicationMetadata], context: &'ctx ReflectionContext) -> Self {
         Self::new(
             values
@@ -468,6 +554,10 @@ impl<'ctx> Traits<'ctx> {
         self.values.is_empty()
     }
     /// Finds an item by name or collection position.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — source-order position of the application.
     pub fn get(&self, index: usize) -> Option<TraitDescriptor<'ctx>> {
         self.values.get(index).copied()
     }
@@ -476,12 +566,19 @@ impl<'ctx> Traits<'ctx> {
 /// A definition of one associated type in a trait.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeDefinitionDescriptor<'ctx> {
+    /// Static metadata for the associated type declaration.
     metadata: &'static AssociatedTypeDefinitionMetadata,
+    /// Context used to resolve the declaration's expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> AssociatedTypeDefinitionDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static declaration metadata for the associated type.
+    /// * `context` — reflection context used to resolve its expressions.
     pub(crate) const fn new(
         metadata: &'static AssociatedTypeDefinitionMetadata,
         context: &'ctx ReflectionContext,
@@ -513,11 +610,18 @@ impl<'ctx> AssociatedTypeDefinitionDescriptor<'ctx> {
 /// Lookups return `None` when no declaration has the requested name or when
 /// more than one declaration matches it.
 pub struct AssociatedTypeDefinitions<'ctx> {
+    /// Associated type declarations in source order.
     values: &'static [AssociatedTypeDefinitionMetadata],
+    /// Context used to resolve associated type expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> AssociatedTypeDefinitions<'ctx> {
+    ///
+    /// # Parameters
+    ///
+    /// * `values` — associated type declarations in source order.
+    /// * `context` — reflection context used to resolve their expressions.
     const fn new(values: &'static [AssociatedTypeDefinitionMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -536,6 +640,10 @@ impl<'ctx> AssociatedTypeDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Finds an item by name or collection position.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated type.
     pub fn get(self, name: &str) -> Option<AssociatedTypeDefinitionDescriptor<'ctx>> {
         unique_named(
             self.values
@@ -552,12 +660,19 @@ impl<'ctx> AssociatedTypeDefinitions<'ctx> {
 /// A definition of one associated constant in a trait.
 #[derive(Clone, Copy)]
 pub struct AssociatedConstDefinitionDescriptor<'ctx> {
+    /// Static metadata for the associated constant declaration.
     metadata: &'static AssociatedConstDefinitionMetadata,
+    /// Context used to resolve the declaration's type.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> AssociatedConstDefinitionDescriptor<'ctx> {
-    /// Returns the `new` metadata retained for this item.
+    /// Creates a context-bound view over the supplied static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `metadata` — static declaration metadata for the associated constant.
+    /// * `context` — reflection context used to resolve its type.
     pub(crate) const fn new(
         metadata: &'static AssociatedConstDefinitionMetadata,
         context: &'ctx ReflectionContext,
@@ -587,11 +702,18 @@ impl<'ctx> AssociatedConstDefinitionDescriptor<'ctx> {
 /// Lookups return `None` when no declaration has the requested name or when
 /// more than one declaration matches it.
 pub struct AssociatedConstDefinitions<'ctx> {
+    /// Associated constant declarations in source order.
     values: &'static [AssociatedConstDefinitionMetadata],
+    /// Context used to resolve associated constant expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> AssociatedConstDefinitions<'ctx> {
+    ///
+    /// # Parameters
+    ///
+    /// * `values` — associated constant declarations in source order.
+    /// * `context` — reflection context used to resolve their types.
     const fn new(values: &'static [AssociatedConstDefinitionMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -610,6 +732,10 @@ impl<'ctx> AssociatedConstDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Finds an item by name or collection position.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated constant.
     pub fn get(self, name: &str) -> Option<AssociatedConstDefinitionDescriptor<'ctx>> {
         unique_named(
             self.values
@@ -623,6 +749,18 @@ impl<'ctx> AssociatedConstDefinitions<'ctx> {
     }
 }
 
+/// Returns the unique matching item or an error describing missing or ambiguous
+/// names.
+///
+/// # Type Parameters
+///
+/// * `T` — copyable descriptor convertible to a lookup candidate.
+///
+/// # Parameters
+///
+/// * `matches` — candidate descriptors matching the requested name.
+/// * `subject` — kind of reflected declaration being resolved.
+/// * `name` — requested Rust item name.
 fn unique_named<T>(mut matches: impl Iterator<Item = T>, subject: LookupSubject, name: &str) -> Result<T, LookupError>
 where
     T: Copy + IntoLookupCandidate,
@@ -649,6 +787,7 @@ where
 }
 
 impl IntoLookupCandidate for MethodDefinitionDescriptor<'_> {
+    /// Converts the method identity into a lookup candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.name().into();
         LookupCandidate {
@@ -664,6 +803,7 @@ impl IntoLookupCandidate for MethodDefinitionDescriptor<'_> {
 }
 
 impl IntoLookupCandidate for AssociatedTypeDefinitionDescriptor<'_> {
+    /// Converts the associated type identity into a lookup candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.name().into();
         LookupCandidate {
@@ -679,6 +819,7 @@ impl IntoLookupCandidate for AssociatedTypeDefinitionDescriptor<'_> {
 }
 
 impl IntoLookupCandidate for AssociatedConstDefinitionDescriptor<'_> {
+    /// Converts the associated constant identity into a lookup candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.name().into();
         LookupCandidate {
@@ -741,7 +882,7 @@ mod external_identity_tests {
         TraitExpressionMetadata::unresolved(&GENERIC_EXPRESSION);
 
     #[test]
-    fn unresolved_impl_trait_expression_does_not_resolve_from_matching_path() {
+    fn test_unresolved_impl_trait_expression_does_not_resolve_from_matching_path() {
         let registration = Registration::metadata_only().with_trait_definition(&DEFINITION);
         let context = ReflectionContext::from_data(
             ContextData::build(vec![registration]).expect("valid external trait registration"),
@@ -756,7 +897,7 @@ mod external_identity_tests {
     }
 
     #[test]
-    fn unregistered_external_application_remains_incomplete_with_its_source_path() {
+    fn test_unregistered_external_application_remains_incomplete_with_its_source_path() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let application = TraitDescriptor::new(&UNREGISTERED_APPLICATION, &context);
 
@@ -767,7 +908,7 @@ mod external_identity_tests {
     }
 
     #[test]
-    fn the_same_unresolved_application_record_has_stable_identity() {
+    fn test_the_same_unresolved_application_record_has_stable_identity() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let application = TraitDescriptor::new(&UNREGISTERED_APPLICATION, &context);
         let same_record = TraitDescriptor::new(&UNREGISTERED_APPLICATION, &context);
@@ -776,7 +917,7 @@ mod external_identity_tests {
     }
 
     #[test]
-    fn unresolved_trait_expression_exposes_its_source_arguments() {
+    fn test_unresolved_trait_expression_exposes_its_source_arguments() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let expression = TraitExpressionDescriptor::new(&GENERIC_EXPRESSION_METADATA, &context);
 
@@ -874,7 +1015,7 @@ mod metadata_boundary_tests {
     }
 
     #[test]
-    fn trait_definition_retains_source_metadata_and_declared_supertrait() {
+    fn test_trait_definition_retains_source_metadata_and_declared_supertrait() {
         let context = context_with_trait_metadata();
         let definition = TraitDefinitionDescriptor::new(&CHILD_DEFINITION, &context);
 
@@ -892,7 +1033,7 @@ mod metadata_boundary_tests {
     }
 
     #[test]
-    fn trait_definition_applications_query_is_scoped_by_definition_identity() {
+    fn test_trait_definition_applications_query_is_scoped_by_definition_identity() {
         let context = context_with_trait_metadata();
         let child = TraitDefinitionDescriptor::new(&CHILD_DEFINITION, &context);
         let parent = TraitDefinitionDescriptor::new(&PARENT_DEFINITION, &context);
@@ -913,7 +1054,7 @@ mod metadata_boundary_tests {
     }
 
     #[test]
-    fn linked_application_preserves_source_path_and_supertrait_completeness() {
+    fn test_linked_application_preserves_source_path_and_supertrait_completeness() {
         let context = context_with_trait_metadata();
         let application = TraitDescriptor::new(&CHILD_APPLICATION, &context);
 
@@ -939,7 +1080,7 @@ mod metadata_boundary_tests {
     }
 
     #[test]
-    fn linked_application_identity_uses_definition_and_arguments_within_context() {
+    fn test_linked_application_identity_uses_definition_and_arguments_within_context() {
         let context = context_with_trait_metadata();
         let application = TraitDescriptor::new(&CHILD_APPLICATION, &context);
         let same_application_with_another_source_path = TraitDescriptor::new(&ALTERNATE_CHILD_APPLICATION, &context);
@@ -954,7 +1095,7 @@ mod metadata_boundary_tests {
     }
 
     #[test]
-    fn unresolved_application_stays_external_incomplete_at_lookup_boundaries() {
+    fn test_unresolved_application_stays_external_incomplete_at_lookup_boundaries() {
         let context = context_with_trait_metadata();
         let application = TraitDescriptor::new(&EXTERNAL_APPLICATION, &context);
 
@@ -1064,7 +1205,7 @@ mod declaration_lookup_tests {
     );
 
     #[test]
-    fn method_lookup_reports_missing_and_ambiguous_declarations() {
+    fn test_method_lookup_reports_missing_and_ambiguous_declarations() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let declaration = TraitDefinitionDescriptor::new(&DEFINITION, &context);
 
@@ -1098,7 +1239,7 @@ mod declaration_lookup_tests {
     }
 
     #[test]
-    fn declaration_collections_expose_source_metadata_and_duplicate_policy() {
+    fn test_declaration_collections_expose_source_metadata_and_duplicate_policy() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let declaration = TraitDefinitionDescriptor::new(&DEFINITION, &context);
         let methods = declaration.methods();
@@ -1170,7 +1311,7 @@ mod declaration_lookup_tests {
     }
 
     #[test]
-    fn method_declaration_exposes_receiver_parameters_qualifiers_and_output() {
+    fn test_method_declaration_exposes_receiver_parameters_qualifiers_and_output() {
         let context = ReflectionContext::from_data(ContextData::empty());
         let method = super::MethodDefinitionDescriptor::new(
             &DIAGNOSTIC_METHOD,

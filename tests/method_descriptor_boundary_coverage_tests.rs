@@ -44,7 +44,7 @@ fn thread_safe_mode_binding() -> qubit_reflect::__private::codegen_v4::registrat
 }
 
 #[test]
-fn generic_method_descriptor_exposes_parameters_and_specialization_selection() {
+fn test_generic_method_descriptor_exposes_parameters_and_specialization_selection() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(thread_safe_echo_binding())
@@ -94,7 +94,7 @@ fn generic_method_descriptor_exposes_parameters_and_specialization_selection() {
 }
 
 #[test]
-fn specialization_invocation_reports_unavailable_value_mode_and_runs_supported_mode() {
+fn test_specialization_invocation_reports_unavailable_value_mode_and_runs_supported_mode() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(thread_safe_echo_binding())

@@ -31,7 +31,7 @@ struct ExplicitCloneTarget(String);
 struct UnregisteredTarget;
 
 #[test]
-fn empty_context_does_not_import_linked_registrations() {
+fn test_empty_context_does_not_import_linked_registrations() {
     let context = ReflectionContext::builder()
         .build()
         .expect("an empty explicit context is valid");
@@ -45,7 +45,7 @@ fn empty_context_does_not_import_linked_registrations() {
 }
 
 #[test]
-fn explicit_capabilities_are_isolated_from_the_global_context() {
+fn test_explicit_capabilities_are_isolated_from_the_global_context() {
     let registration = CapabilityRegistration::for_type::<ExplicitCloneTarget, ExplicitMarkerCapability>(17);
     let context = ReflectionContext::builder()
         .include_type::<ExplicitCloneTarget>()
@@ -72,7 +72,7 @@ fn explicit_capabilities_are_isolated_from_the_global_context() {
 }
 
 #[test]
-fn explicit_type_members_do_not_implicitly_register_other_types() {
+fn test_explicit_type_members_do_not_implicitly_register_other_types() {
     let context = ReflectionContext::builder()
         .include_type::<ExplicitCloneTarget>()
         .build()
@@ -88,7 +88,7 @@ fn explicit_type_members_do_not_implicitly_register_other_types() {
 }
 
 #[test]
-fn conflicting_capability_registrations_fail_context_construction() {
+fn test_conflicting_capability_registrations_fail_context_construction() {
     let registration = || CapabilityRegistration::for_type::<ExplicitCloneTarget, ExplicitMarkerCapability>(17);
     let result = ReflectionContext::builder()
         .include_type::<ExplicitCloneTarget>()

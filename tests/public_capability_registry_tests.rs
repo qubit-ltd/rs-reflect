@@ -24,7 +24,7 @@ struct LinkedCloneValue(u8);
 register_capability!(LinkedCloneValue: CloneCapability);
 
 #[test]
-fn linked_capability_macro_registers_a_typed_adapter() {
+fn test_linked_capability_macro_registers_a_typed_adapter() {
     let descriptor = TypeDescriptor::of::<LinkedCloneValue>();
     let capability = descriptor
         .capability::<CloneCapability>()

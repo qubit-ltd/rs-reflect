@@ -52,7 +52,7 @@ fn echo_number_u64_binding() -> qubit_reflect::__private::codegen_v4::registrati
 }
 
 #[test]
-fn selected_pinned_specializations_invoke_and_preserve_rejected_inputs() {
+fn test_selected_pinned_specializations_invoke_and_preserve_rejected_inputs() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(echo_type_u32_binding())

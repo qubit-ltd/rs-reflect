@@ -8,11 +8,12 @@
 
 //! Shared reflected root used by the cross-crate registry fixture.
 
-mod generic_bound_service;
+mod bounded_const_service;
+mod cross_crate_service;
 pub mod registry_dyn_parent;
 mod registry_user;
 
-pub use generic_bound_service::BoundedConstService;
+pub use bounded_const_service::BoundedConstService;
+pub use cross_crate_service::CrossCrateService;
 pub use registry_dyn_parent::RegistryDynParent;
-pub use registry_user::CrossCrateService;
 pub use registry_user::RegistryUser;

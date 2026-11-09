@@ -8,28 +8,15 @@
 
 //! Compile fixture for direct derive macros with a runtime-only dependency.
 
-// The derives generate fixture-only public helper items whose documentation is
-// not part of this compile-test crate's API.
-#![allow(missing_docs)]
+#[cfg(not(doc))]
+mod runtime_only_impl;
+#[cfg(not(doc))]
+mod runtime_only_target;
+#[cfg(not(doc))]
+mod runtime_only_trait;
 
-use qubit_reflect_derive::Reflect;
-use qubit_reflect_derive::ReflectImpl;
-
-#[Reflect]
-struct RuntimeOnlyTarget;
-
-#[Reflect]
-trait RuntimeOnlyTrait {
-    #[cfg(any())]
-    fn disabled(&self) -> MissingTraitType;
+/// Runs the compile fixture for direct derive macros.
+fn main() {
+    #[cfg(not(doc))]
+    runtime_only_trait::assert_runtime_only_trait();
 }
-
-#[ReflectImpl]
-impl RuntimeOnlyTarget {
-    #[cfg(any())]
-    fn disabled(&self) -> MissingImplType {
-        unreachable!()
-    }
-}
-
-fn main() {}

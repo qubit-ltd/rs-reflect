@@ -28,11 +28,7 @@ use crate::parse::parse_declaration;
 use crate::validate::validate_declaration;
 
 /// Parses and validates a declaration, failing the test with its diagnostic.
-fn parse_valid(
-    kind: MacroKind,
-    args: TokenStream,
-    input: TokenStream,
-) -> crate::ir::ValidatedDeclaration {
+fn parse_valid(kind: MacroKind, args: TokenStream, input: TokenStream) -> crate::ir::ValidatedDeclaration {
     let parsed = parse_declaration(kind, args, input).expect("the declaration should parse");
     validate_declaration(parsed).expect("the declaration should validate")
 }
@@ -173,12 +169,7 @@ fn test_parse_trait_and_impl_with_skip_only() {
     assert_eq!(reflected_trait.methods.len(), 2);
     assert_eq!(reflected_trait.associated_types.len(), 1);
     assert_eq!(reflected_trait.associated_consts.len(), 1);
-    assert!(
-        !reflected_trait
-            .retained_tokens
-            .to_string()
-            .contains("reflect")
-    );
+    assert!(!reflected_trait.retained_tokens.to_string().contains("reflect"));
 
     let reflected_impl = parse_valid(
         MacroKind::Impl,
@@ -196,12 +187,7 @@ fn test_parse_trait_and_impl_with_skip_only() {
     assert_eq!(reflected_impl.methods.len(), 0);
     assert_eq!(reflected_impl.target_type.source, "Packet < T >");
     assert!(reflected_impl.trait_path.is_some());
-    assert!(
-        !reflected_impl
-            .retained_tokens
-            .to_string()
-            .contains("reflect")
-    );
+    assert!(!reflected_impl.retained_tokens.to_string().contains("reflect"));
 }
 
 #[test]
@@ -381,10 +367,7 @@ fn test_removed_options_are_rejected_and_skip_remains_supported() {
             TokenStream::new(),
             quote! { struct OldApi { #[reflect(#tokens)] value: String } },
         );
-        assert!(
-            diagnostic.contains("only `skip` is accepted"),
-            "{tokens}: {diagnostic}"
-        );
+        assert!(diagnostic.contains("only `skip` is accepted"), "{tokens}: {diagnostic}");
     }
 
     let impl_diagnostic = parse_invalid(
@@ -489,19 +472,10 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
         declaration.generics.params[2].default,
         Some(GenericDefaultIr::Const(_))
     ));
-    assert!(
-        !declaration
-            .generics
-            .impl_declaration
-            .to_string()
-            .contains('=')
-    );
+    assert!(!declaration.generics.impl_declaration.to_string().contains('='));
     assert_eq!(declaration.generics.arguments.to_string(), "< 'a , T , N >");
     assert!(declaration.generics.where_clause.is_empty());
-    let TypeKindIr::Reference {
-        lifetime, element, ..
-    } = &declaration.fields[0].ty.kind
-    else {
+    let TypeKindIr::Reference { lifetime, element, .. } = &declaration.fields[0].ty.kind else {
         panic!("expected a reference type");
     };
     assert_eq!(lifetime.as_deref(), Some("'a"));
@@ -541,13 +515,8 @@ fn test_parse_preserves_structured_generics_receivers_patterns_and_type_bounds()
     ));
     assert_eq!(method.parameters.len(), 1);
     assert_eq!(method.parameters[0].name.as_deref(), Some("value"));
-    assert_eq!(
-        method.parameters[0].pattern.kind,
-        ParameterPatternKindIr::Identifier
-    );
-    assert!(
-        matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if ty.source == "T")
-    );
+    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Identifier);
+    assert!(matches!(method.return_type, crate::ir::ReturnTypeIr::Type(ref ty) if ty.source == "T"));
 }
 
 #[test]
@@ -612,15 +581,9 @@ fn test_parse_treats_identifier_at_subpattern_as_destructure() {
     let method = &declaration.methods[0];
 
     assert_eq!(method.parameters[0].name, None);
-    assert_eq!(
-        method.parameters[0].pattern.kind,
-        ParameterPatternKindIr::Destructure
-    );
+    assert_eq!(method.parameters[0].pattern.kind, ParameterPatternKindIr::Destructure);
     assert_eq!(method.parameters[1].name.as_deref(), Some("simple"));
-    assert_eq!(
-        method.parameters[1].pattern.kind,
-        ParameterPatternKindIr::Identifier
-    );
+    assert_eq!(method.parameters[1].pattern.kind, ParameterPatternKindIr::Identifier);
 }
 
 #[test]
@@ -691,20 +654,10 @@ fn test_explicit_runtime_crate_helper_is_rejected() {
             trait Service {}
         ),
     );
-    assert!(
-        trait_error.contains("unknown"),
-        "unexpected trait error: {trait_error}"
-    );
+    assert!(trait_error.contains("unknown"), "unexpected trait error: {trait_error}");
 
-    let impl_error = parse_invalid(
-        MacroKind::Impl,
-        quote!(crate = qubit_reflect),
-        quote!(impl Service {}),
-    );
-    assert!(
-        impl_error.contains("unknown"),
-        "unexpected impl error: {impl_error}"
-    );
+    let impl_error = parse_invalid(MacroKind::Impl, quote!(crate = qubit_reflect), quote!(impl Service {}));
+    assert!(impl_error.contains("unknown"), "unexpected impl error: {impl_error}");
 }
 
 /// The versioned provider hook accepts only one caller-owned identifier on a

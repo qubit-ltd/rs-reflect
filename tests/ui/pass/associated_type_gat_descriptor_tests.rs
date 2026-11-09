@@ -29,8 +29,5 @@ fn main() {
     let definition = ReflectionContext::global()
         .trait_definition_by_name(concat!(module_path!(), "::GatContract"))
         .expect("linked trait definition is available");
-    assert_eq!(
-        definition.associated_type("Output").unwrap().name(),
-        "Output"
-    );
+    assert_eq!(definition.associated_type("Output").unwrap().name(), "Output");
 }

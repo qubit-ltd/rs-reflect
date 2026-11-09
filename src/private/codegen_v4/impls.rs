@@ -38,13 +38,30 @@ use crate::runtime::descriptor::trait_descriptor::TraitExpressionMetadata;
 use crate::runtime::expression::ExpressionData;
 
 /// Marker-bound static metadata for one source impl block.
+///
+/// # Type Parameters
+///
+/// * `D` — marker identifying the source impl definition.
 pub struct ImplDefinitionSpec<D: 'static> {
+    /// Validated definition metadata emitted by the derive implementation.
     metadata: ImplDefinitionMetadata,
+    /// Associates the metadata with its source marker without storing it.
     _marker: PhantomData<fn() -> D>,
 }
 
 impl<D: 'static> ImplDefinitionSpec<D> {
     /// Creates definition metadata whose identity is bound to marker type `D`.
+    ///
+    /// # Parameters
+    ///
+    /// * `kind` — inherent or trait implementation kind.
+    /// * `target` — structural type expression for the impl target.
+    /// * `implemented_trait` — trait expression for a trait impl, when present.
+    /// * `generics` — generic parameters and predicates declared by the impl.
+    /// * `qualifiers` — safety and const qualifiers written on the impl.
+    /// * `methods` — methods declared by the impl.
+    /// * `associated_types` — associated type declarations in the impl.
+    /// * `associated_consts` — associated constants declared in the impl.
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         kind: ImplKind,
@@ -77,6 +94,10 @@ impl<D: 'static> ImplDefinitionSpec<D> {
     }
 
     /// Returns an impl generic parameter by its source-order index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — zero-based position in the impl's generic parameter list.
     pub const fn generic_parameter_at(&'static self, index: usize) -> &'static GenericParameterMetadata {
         if index >= self.metadata.generics.parameters.len() {
             panic!("impl generic parameter index is out of range");
@@ -86,13 +107,33 @@ impl<D: 'static> ImplDefinitionSpec<D> {
 }
 
 /// Static application metadata for one concrete target type.
+///
+/// # Type Parameters
+///
+/// * `T` — concrete reflected target receiving the impl application.
 pub struct ImplApplicationSpec<T: 'static> {
+    /// Resolved implementation and associated item metadata.
     metadata: ImplApplicationMetadata,
+    /// Associates the application with its target without storing a value.
     _target: PhantomData<fn() -> T>,
 }
 
 impl<T: crate::runtime::descriptor::Reflect + 'static> ImplApplicationSpec<T> {
     /// Creates a concrete application linked to marker-bound impl metadata.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `D` — marker identifying the source impl definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — static declaration metadata associated with `D`.
+    /// * `implemented_trait` — trait application implemented by the target.
+    /// * `arguments` — concrete generic arguments substituted into the impl.
+    /// * `identity` — stable identity of the trait arguments.
+    /// * `methods` — effective methods for the concrete application.
+    /// * `associated_types` — bindings resolved for associated types.
+    /// * `associated_consts` — bindings resolved for associated constants.
     #[allow(clippy::too_many_arguments)]
     pub const fn for_target<D: 'static>(
         definition: &'static ImplDefinitionSpec<D>,
@@ -124,6 +165,12 @@ impl<T: crate::runtime::descriptor::Reflect + 'static> ImplApplicationSpec<T> {
 }
 
 /// Creates a typed associated type binding from its trait declaration item.
+///
+/// # Parameters
+///
+/// * `definition` — trait declaration item implemented by the binding.
+/// * `expression` — source expression assigned to the associated type.
+/// * `source` — whether this item was declared, defaulted, or overridden.
 pub const fn associated_type_binding(
     definition: &'static AssociatedType,
     expression: &'static ExpressionData,
@@ -133,6 +180,16 @@ pub const fn associated_type_binding(
 }
 
 /// Creates an associated type binding linked to its exact reflected Rust type.
+///
+/// # Type Parameters
+///
+/// * `T` — exact Rust type represented by the associated type binding.
+///
+/// # Parameters
+///
+/// * `definition` — trait declaration item implemented by the binding.
+/// * `expression` — source expression assigned to the associated type.
+/// * `source` — whether this item was declared, defaulted, or overridden.
 pub const fn associated_type_binding_for<T: 'static>(
     definition: &'static AssociatedType,
     expression: &'static ExpressionData,
@@ -147,6 +204,17 @@ pub const fn associated_type_binding_for<T: 'static>(
 }
 
 /// Merges explicit associated type bindings with trait defaults.
+///
+/// # Type Parameters
+///
+/// * `D` — marker identifying the trait definition.
+///
+/// # Parameters
+///
+/// * `definition` — trait metadata containing default associated types.
+/// * `application` — concrete trait application used for substitution.
+/// * `declared` — associated type names explicitly supplied by the impl.
+/// * `bindings` — explicit associated type bindings to retain.
 #[doc(hidden)]
 pub fn associated_type_bindings_with_defaults<D: 'static>(
     definition: &'static crate::__private::codegen_v4::traits::TraitDefinitionSpec<D>,
@@ -184,6 +252,12 @@ pub fn associated_type_bindings_with_defaults<D: 'static>(
     Box::leak(values.into_boxed_slice())
 }
 
+/// Finds a reflected concrete type getter for a generic type argument.
+///
+/// # Parameters
+///
+/// * `expression` — default expression that may reference a type parameter.
+/// * `arguments` — concrete generic arguments available to substitute.
 fn type_argument_concrete(
     expression: &'static ExpressionData,
     arguments: &[GenericArgumentMetadata],
@@ -206,6 +280,17 @@ fn type_argument_concrete(
 }
 
 /// Merges explicit associated constant bindings with trait defaults.
+///
+/// # Type Parameters
+///
+/// * `D` — marker identifying the trait definition.
+///
+/// # Parameters
+///
+/// * `definition` — trait metadata containing default associated constants.
+/// * `application` — concrete trait application used for substitution.
+/// * `overridden` — names of defaults replaced by the impl.
+/// * `bindings` — explicit associated constant bindings to retain.
 #[doc(hidden)]
 pub fn associated_const_bindings_with_defaults<D: 'static>(
     definition: &'static crate::__private::codegen_v4::traits::TraitDefinitionSpec<D>,
@@ -240,6 +325,12 @@ pub fn associated_const_bindings_with_defaults<D: 'static>(
     Box::leak(values.into_boxed_slice())
 }
 
+/// Replaces a const generic parameter with its concrete application argument.
+///
+/// # Parameters
+///
+/// * `expression` — default const expression to substitute.
+/// * `arguments` — concrete generic arguments available to the impl.
 fn substitute_const_expression(
     expression: crate::runtime::expression::ConstExpression,
     arguments: &[GenericArgumentMetadata],
@@ -260,6 +351,12 @@ fn substitute_const_expression(
         .unwrap_or(expression)
 }
 
+/// Recursively substitutes type parameters in a static type expression.
+///
+/// # Parameters
+///
+/// * `expression` — static source expression to specialize.
+/// * `arguments` — concrete generic arguments available to the impl.
 fn substitute_type_expression(
     expression: &'static ExpressionData,
     arguments: &[GenericArgumentMetadata],
@@ -420,6 +517,12 @@ fn substitute_type_expression(
     Box::leak(Box::new(result))
 }
 
+/// Substitutes generic arguments inside a trait expression.
+///
+/// # Parameters
+///
+/// * `expression` — trait path and source arguments to specialize.
+/// * `arguments` — concrete impl arguments used for substitution.
 fn substitute_trait_expression(
     expression: &crate::runtime::expression::TraitExpressionData,
     arguments: &[GenericArgumentMetadata],
@@ -468,6 +571,12 @@ fn substitute_trait_expression(
     )
 }
 
+/// Substitutes type and const expressions inside a source predicate.
+///
+/// # Parameters
+///
+/// * `predicate` — predicate metadata to specialize.
+/// * `arguments` — concrete impl arguments used for substitution.
 fn substitute_predicate(
     predicate: &crate::runtime::expression::PredicateData,
     arguments: &[GenericArgumentMetadata],
@@ -499,6 +608,12 @@ fn substitute_predicate(
 }
 
 /// Creates a typed associated constant binding without a dynamic value adapter.
+///
+/// # Parameters
+///
+/// * `definition` — trait declaration item implemented by the binding.
+/// * `expression` — structural const expression assigned by the impl.
+/// * `source` — whether this item was declared, defaulted, or overridden.
 pub const fn associated_const_binding(
     definition: &'static AssociatedConst,
     expression: crate::runtime::expression::ConstExpression,
@@ -508,6 +623,14 @@ pub const fn associated_const_binding(
 }
 
 /// Builds a registration value from a marker-bound impl definition.
+///
+/// # Type Parameters
+///
+/// * `D` — marker identifying the impl definition.
+///
+/// # Parameters
+///
+/// * `definition` — static metadata for the source impl block.
 #[doc(hidden)]
 pub fn register_impl_definition<D: 'static>(
     definition: &'static ImplDefinitionSpec<D>,
@@ -518,6 +641,14 @@ pub fn register_impl_definition<D: 'static>(
 
 /// Builds an impl definition registration from a cached static metadata
 /// provider.
+///
+/// # Type Parameters
+///
+/// * `D` — marker identifying the impl definition.
+///
+/// # Parameters
+///
+/// * `definition` — function returning the cached definition metadata.
 #[doc(hidden)]
 pub fn register_impl_definition_from<D: 'static>(
     definition: fn() -> &'static ImplDefinitionSpec<D>,
@@ -526,6 +657,14 @@ pub fn register_impl_definition_from<D: 'static>(
 }
 
 /// Builds a concrete registration value from an impl application.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type associated with the application.
+///
+/// # Parameters
+///
+/// * `application` — static metadata for the target's impl application.
 #[doc(hidden)]
 pub fn register_impl_application<T: crate::runtime::descriptor::Reflect + 'static>(
     application: &'static ImplApplicationSpec<T>,
@@ -536,6 +675,14 @@ pub fn register_impl_application<T: crate::runtime::descriptor::Reflect + 'stati
 
 /// Builds an impl application registration from a cached static metadata
 /// provider.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type associated with the application.
+///
+/// # Parameters
+///
+/// * `application` — function returning the cached application metadata.
 #[doc(hidden)]
 pub fn register_impl_application_from<T: crate::runtime::descriptor::Reflect + 'static>(
     application: fn() -> &'static ImplApplicationSpec<T>,
@@ -543,11 +690,17 @@ pub fn register_impl_application_from<T: crate::runtime::descriptor::Reflect + '
     register_impl_application(application())
 }
 
+/// Returns the empty dependency list used by standalone impl fragments.
 const fn no_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
 
 /// Creates a global definition fragment without exposing inventory payloads.
+///
+/// # Parameters
+///
+/// * `label` — marker label identifying the linked impl definition.
+/// * `registration` — callback that builds the definition registration.
 #[doc(hidden)]
 pub const fn impl_definition_fragment(
     label: &'static str,
@@ -557,6 +710,15 @@ pub const fn impl_definition_fragment(
 }
 
 /// Creates an impl application fragment bound to `T`.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type that owns the application.
+///
+/// # Parameters
+///
+/// * `label` — marker label identifying the linked application.
+/// * `registration` — callback that builds the application registration.
 #[doc(hidden)]
 pub const fn impl_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
     label: &'static str,
@@ -662,7 +824,7 @@ mod tests {
     ];
 
     #[test]
-    fn type_substitution_rewrites_parameters_recursively_and_preserves_non_parameters() {
+    fn test_type_substitution_rewrites_parameters_recursively_and_preserves_non_parameters() {
         let reference = Box::leak(Box::new(ExpressionData::Reference {
             lifetime: Some(LifetimeExpression::Named("a")),
             mutable: true,
@@ -716,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    fn trait_and_predicate_substitution_rewrites_nested_arguments_and_bounds() {
+    fn test_trait_and_predicate_substitution_rewrites_nested_arguments_and_bounds() {
         static TRAIT_ARGUMENTS: [GenericExpressionArgument; 5] = [
             GenericExpressionArgument::Type(&TYPE_PARAMETER_EXPRESSION),
             GenericExpressionArgument::Lifetime(LifetimeExpression::Placeholder),
@@ -819,7 +981,7 @@ mod tests {
     }
 
     #[test]
-    fn substitution_covers_pointer_projection_slice_function_trait_object_and_opaque_nodes() {
+    fn test_substitution_covers_pointer_projection_slice_function_trait_object_and_opaque_nodes() {
         static PROJECTION_ARGUMENTS: [GenericExpressionArgument; 1] =
             [GenericExpressionArgument::Type(&U_PARAMETER_EXPRESSION)];
         static PROJECTION_TRAIT_ARGUMENTS: [GenericExpressionArgument; 1] =
@@ -894,7 +1056,7 @@ mod tests {
     }
 
     #[test]
-    fn associated_default_merges_preserve_declared_override_and_default_sources() {
+    fn test_associated_default_merges_preserve_declared_override_and_default_sources() {
         static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
         static TYPE_DEFAULT: ExpressionData = ExpressionData::Parameter(&TYPE_PARAMETER);
         static TYPE_DECLARATIONS: [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata; 2] = [

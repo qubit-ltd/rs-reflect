@@ -117,7 +117,7 @@ fn trait_implementation<T: qubit_reflect::descriptor::Reflect>(
 }
 
 #[test]
-fn trait_definition_exposes_declaration_defaults_and_precise_missing_errors() {
+fn test_trait_definition_exposes_declaration_defaults_and_precise_missing_errors() {
     let context = ReflectionContext::global();
     context.initialize().expect("descriptor fixtures register");
     let definition = context
@@ -171,7 +171,7 @@ fn trait_definition_exposes_declaration_defaults_and_precise_missing_errors() {
 }
 
 #[test]
-fn trait_application_reports_supertrait_closure_completeness_and_unresolved_external_trait() {
+fn test_trait_application_reports_supertrait_closure_completeness_and_unresolved_external_trait() {
     let child = trait_implementation::<DescriptorTarget>("DescriptorChild")
         .implemented_trait()
         .expect("the child trait application is present");
@@ -198,7 +198,7 @@ fn trait_application_reports_supertrait_closure_completeness_and_unresolved_exte
 }
 
 #[test]
-fn impl_descriptors_distinguish_source_declarations_and_concrete_applications() {
+fn test_impl_descriptors_distinguish_source_declarations_and_concrete_applications() {
     let context = ReflectionContext::global();
     context.initialize().expect("descriptor fixtures register");
     let source = context
@@ -263,7 +263,7 @@ fn impl_descriptors_distinguish_source_declarations_and_concrete_applications() 
 }
 
 #[test]
-fn impl_collection_reports_missing_and_ambiguous_trait_definition_queries() {
+fn test_impl_collection_reports_missing_and_ambiguous_trait_definition_queries() {
     let descriptor = TypeDescriptor::of::<DescriptorTarget>();
     let implementations = descriptor.trait_impls().expect("trait impls are indexed");
     let context = ReflectionContext::global();
@@ -300,7 +300,7 @@ fn impl_collection_reports_missing_and_ambiguous_trait_definition_queries() {
 }
 
 #[test]
-fn impl_collection_rejects_descriptors_from_a_different_context() {
+fn test_impl_collection_rejects_descriptors_from_a_different_context() {
     let global = ReflectionContext::global();
     global.initialize().expect("global metadata initializes");
     let foreign_definition = global

@@ -10,7 +10,7 @@ use renamed_reflect::ReflectionContext;
 use renamed_reflect::TypeDescriptor;
 
 #[test]
-fn same_named_types_from_two_crate_versions_keep_distinct_identities() {
+fn test_same_named_types_from_two_crate_versions_keep_distinct_identities() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

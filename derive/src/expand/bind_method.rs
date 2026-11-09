@@ -1,4 +1,15 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 //! Call-site binding of one explicitly monomorphized method.
+
+mod binding_input;
+mod trait_binding_hint;
 
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -8,90 +19,39 @@ use syn::Expr;
 use syn::ExprPath;
 use syn::Lit;
 use syn::Result;
-use syn::Token;
 use syn::Type;
-use syn::TypeFnPtr;
-use syn::parse::Parse;
-use syn::parse::ParseStream;
 use syn::parse2;
 use syn::spanned::Spanned;
 
-use crate::expand::context::ExpansionContext;
+use self::binding_input::BindingInput;
+use self::trait_binding_hint::TraitBindingHint;
+use crate::expand::ExpansionContext;
 use crate::expand::generic_environment::GenericEnvironment;
 
-struct BindingInput {
-    method: ExprPath,
-    signature: TypeFnPtr,
-    asynchronous: bool,
-    thread_safe: bool,
-    trait_binding: Option<TraitBindingHint>,
-}
-
-enum TraitBindingHint {
-    Reflected(syn::Path),
-    External(syn::Path),
-}
-
-impl Parse for BindingInput {
-    fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let method = input.parse()?;
-        input.parse::<Token![as]>()?;
-        let thread_safe = input.peek(syn::Ident) && input.fork().parse::<syn::Ident>()? == "thread_safe";
-        if thread_safe {
-            let mode = input.parse::<syn::Ident>()?;
-            if mode != "thread_safe" {
-                return Err(syn::Error::new_spanned(mode, "expected `thread_safe` adapter mode"));
-            }
-        }
-        let asynchronous = input.peek(Token![async]);
-        if asynchronous {
-            input.parse::<Token![async]>()?;
-        }
-        let ty = input.parse::<Type>()?;
-        let Type::FnPtr(signature) = ty else {
-            return Err(syn::Error::new_spanned(
-                ty,
-                "expected a function pointer signature such as `fn(&T) -> U`",
-            ));
-        };
-        let trait_binding = if input.peek(Token![,]) {
-            input.parse::<Token![,]>()?;
-            let name = input.parse::<syn::Ident>()?;
-            input.parse::<Token![=]>()?;
-            let path = input.parse::<syn::Path>()?;
-            match name.to_string().as_str() {
-                "reflected_trait" => Some(TraitBindingHint::Reflected(path)),
-                "external_trait" => Some(TraitBindingHint::External(path)),
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        name,
-                        "expected `reflected_trait = TraitPath` or `external_trait = Handle`",
-                    ));
-                }
-            }
-        } else {
-            None
-        };
-        if !input.is_empty() {
-            return Err(input.error("unexpected tokens after the method signature"));
-        }
-        Ok(Self {
-            method,
-            signature,
-            asynchronous,
-            thread_safe,
-            trait_binding,
-        })
-    }
-}
-
 /// Expands `bind_method!(path as fn(signature))` to a concrete binding value.
+///
+/// # Parameters
+///
+/// - `input`: Binding macro tokens to parse and expand.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the runtime facade or binding is invalid.
 pub(crate) fn expand(input: TokenStream) -> Result<TokenStream> {
     let context = ExpansionContext::from_attributes(&[])?;
     expand_with_context(input, &context)
 }
 
 /// Expands a binding using a pre-resolved runtime facade.
+///
+/// # Parameters
+///
+/// - `input`: Binding macro tokens to parse and expand.
+/// - `context`: Resolved expansion context containing the runtime path.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the signature or trait binding is invalid.
 pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext) -> Result<TokenStream> {
     let input: BindingInput = parse2(input)?;
     let asynchronous = input.asynchronous;
@@ -539,6 +499,11 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
     }})
 }
 
+/// Formats a source trait path using its original path segments.
+///
+/// # Parameters
+///
+/// - `path`: Trait path from the binding hint.
 fn source_trait_path(path: &syn::Path) -> String {
     let mut source = path
         .segments
@@ -552,6 +517,11 @@ fn source_trait_path(path: &syn::Path) -> String {
     source
 }
 
+/// Rewrites a local trait path to the generated definition provider.
+///
+/// # Parameters
+///
+/// - `path`: Reflected trait path attached to a qualified method.
 fn trait_definition_provider_path(path: &syn::Path) -> syn::Path {
     let mut provider: syn::Path = path.clone();
     let last = provider
@@ -563,6 +533,19 @@ fn trait_definition_provider_path(path: &syn::Path) -> syn::Path {
     provider
 }
 
+/// Emits identity metadata for a supported type or const trait argument.
+///
+/// Lifetime arguments are omitted because they do not distinguish runtime
+/// trait implementations.
+///
+/// # Parameters
+///
+/// - `argument`: Source generic argument to encode.
+/// - `facade`: Runtime facade path used by generated metadata.
+///
+/// # Errors
+///
+/// Returns an error when a const argument cannot be converted.
 fn trait_argument_identity(argument: &syn::GenericArgument, facade: &TokenStream) -> Result<Option<TokenStream>> {
     let identity = quote!(#facade::__private::codegen_v4::traits::ArgumentIdentity);
     let token = match argument {
@@ -591,12 +574,29 @@ fn trait_argument_identity(argument: &syn::GenericArgument, facade: &TokenStream
 }
 
 /// Expands a concrete method binding into a linked method-catalog registration.
+///
+/// # Parameters
+///
+/// - `input`: Method binding tokens to register in the catalog.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the runtime path or binding is invalid.
 pub(crate) fn expand_registered(input: TokenStream) -> Result<TokenStream> {
     let context = ExpansionContext::from_attributes(&[])?;
     expand_registered_with_context(input, &context)
 }
 
 /// Expands a linked registration using a pre-resolved runtime facade.
+///
+/// # Parameters
+///
+/// - `input`: Method binding tokens to register in the catalog.
+/// - `context`: Resolved expansion context containing the runtime path.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the method path cannot be registered.
 pub(crate) fn expand_registered_with_context(input: TokenStream, context: &ExpansionContext) -> Result<TokenStream> {
     let binding_input: BindingInput = parse2(input.clone())?;
     let target_type = binding_target_type(&binding_input.method)?;
@@ -620,6 +620,15 @@ pub(crate) fn expand_registered_with_context(input: TokenStream, context: &Expan
     })
 }
 
+/// Extracts the target type from a concrete or qualified method path.
+///
+/// # Parameters
+///
+/// - `method_path`: Method expression path whose receiver type is inferred.
+///
+/// # Errors
+///
+/// Returns an error when the path does not identify a concrete target type.
 fn binding_target_type(method_path: &ExprPath) -> Result<Type> {
     if let Some(qself) = &method_path.qself {
         return Ok((*qself.ty).clone());
@@ -647,6 +656,12 @@ fn binding_target_type(method_path: &ExprPath) -> Result<Type> {
     }))
 }
 
+/// Derives a stable generated identifier from input tokens and source location.
+///
+/// # Parameters
+///
+/// - `input`: Macro input used as part of the stable identifier seed.
+/// - `span`: Source location distinguishing otherwise equal invocations.
 fn registered_provider_ident(input: &TokenStream, span: proc_macro2::Span) -> proc_macro2::Ident {
     let start = span.start();
     let source = format!("{input}:{}:{}", start.line, start.column);
@@ -656,6 +671,16 @@ fn registered_provider_ident(input: &TokenStream, span: proc_macro2::Span) -> pr
     format_ident!("__qubit_reflect_registered_method_catalog_{hash:016x}")
 }
 
+/// Encodes one supported method specialization argument for the runtime.
+///
+/// # Parameters
+///
+/// - `argument`: Type, lifetime, or scalar const argument from the source path.
+/// - `facade`: Runtime facade path used by generated argument metadata.
+///
+/// # Errors
+///
+/// Returns a diagnostic for unsupported argument kinds or const expressions.
 fn specialization_argument(argument: &syn::GenericArgument, facade: &TokenStream) -> Result<TokenStream> {
     let path = quote!(#facade::__private::codegen_v4::invoke::MethodSpecializationArgument);
     let token = match argument {
@@ -675,6 +700,16 @@ fn specialization_argument(argument: &syn::GenericArgument, facade: &TokenStream
     Ok(token)
 }
 
+/// Encodes a scalar literal const argument for method specialization.
+///
+/// # Parameters
+///
+/// - `expression`: Source const expression to validate and encode.
+/// - `path`: Runtime specialization-argument path.
+///
+/// # Errors
+///
+/// Returns a diagnostic unless the expression is a supported scalar literal.
 fn const_specialization_argument(expression: &Expr, path: &TokenStream) -> Result<TokenStream> {
     let (negative, literal) = match expression {
         Expr::Lit(literal) => (false, &literal.lit),
@@ -760,6 +795,11 @@ fn const_specialization_argument(expression: &Expr, path: &TokenStream) -> Resul
     Ok(token)
 }
 
+/// Returns the pointee type used as the invocation receiver target.
+///
+/// # Parameters
+///
+/// - `ty`: Receiver type, optionally wrapped in a reference or `Pin`.
 fn receiver_target(ty: &Type) -> Option<&Type> {
     match ty {
         Type::Reference(reference) => Some(&reference.elem),
@@ -776,6 +816,11 @@ fn receiver_target(ty: &Type) -> Option<&Type> {
     }
 }
 
+/// Reports whether a type is `Pin<&mut T>` for some pointee `T`.
+///
+/// # Parameters
+///
+/// - `ty`: Receiver type to inspect.
 fn is_pin_mut_type(ty: &Type) -> bool {
     matches!(ty, Type::Path(path)
     if path.path.segments.last().is_some_and(|segment| segment.ident == "Pin")
@@ -785,6 +830,11 @@ fn is_pin_mut_type(ty: &Type) -> bool {
         )))
 }
 
+/// Reports whether a type is `Pin<&T>` for some pointee `T`.
+///
+/// # Parameters
+///
+/// - `ty`: Receiver type to inspect.
 fn is_pin_shared_type(ty: &Type) -> bool {
     matches!(ty, Type::Path(path)
     if path.path.segments.last().is_some_and(|segment| segment.ident == "Pin")
@@ -794,18 +844,40 @@ fn is_pin_shared_type(ty: &Type) -> bool {
         )))
 }
 
+/// Reports whether a type is a mutable reference.
+///
+/// # Parameters
+///
+/// - `ty`: Type syntax to inspect.
 fn is_mut_reference(ty: &Type) -> bool {
     matches!(ty, Type::Reference(reference) if reference.mutability.is_some())
 }
 
+/// Reports whether a type is a reference of either mutability.
+///
+/// # Parameters
+///
+/// - `ty`: Type syntax to inspect.
 fn is_reference(ty: &Type) -> bool {
     matches!(ty, Type::Reference(_))
 }
 
+/// Reports whether a type path names the unsized string type `str`.
+///
+/// # Parameters
+///
+/// - `ty`: Type syntax to inspect.
 fn is_str_type(ty: &Type) -> bool {
     matches!(ty, Type::Path(path) if path.path.is_ident("str"))
 }
 
+/// Generates extraction code for one argument in a dynamic invocation.
+///
+/// # Parameters
+///
+/// - `ty`: Declared argument type used for the downcast.
+/// - `index`: Position used to name the generated local binding.
+/// - `_facade`: Runtime facade retained for the helper's call contract.
 fn binding(ty: &Type, index: usize, _facade: &TokenStream) -> TokenStream {
     let value = format_ident!("__arg_{index}");
     match ty {

@@ -1,7 +1,7 @@
 error[E0515]: cannot return value referencing local variable `argument`
-  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:19:25
+  --> tests/ui/fail/dispatch_input_lifetime_tests.rs:17:25
    |
-18 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
+16 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
    |                                                                   --------- `argument` is borrowed here
-19 |         Err(failure) => failure,
+17 |         Err(failure) => failure,
    |                         ^^^^^^^ returns a value referencing data owned by the current function

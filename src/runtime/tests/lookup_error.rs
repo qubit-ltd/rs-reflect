@@ -34,7 +34,7 @@ fn candidate(name: &str) -> LookupCandidate {
 }
 
 #[test]
-fn into_unique_reports_missing_with_the_original_query() {
+fn test_into_unique_reports_missing_with_the_original_query() {
     let error = Lookup::<LookupCandidate>::Missing
         .into_unique(LookupSubject::Type, LookupQuery::Name("Widget".into()))
         .unwrap_err();
@@ -49,7 +49,7 @@ fn into_unique_reports_missing_with_the_original_query() {
 }
 
 #[test]
-fn into_unique_retains_all_ambiguous_candidates_as_owned_summaries() {
+fn test_into_unique_retains_all_ambiguous_candidates_as_owned_summaries() {
     let error = Lookup::Ambiguous(vec![candidate("first"), candidate("second")].into_boxed_slice())
         .into_unique(LookupSubject::Type, LookupQuery::Name("Widget".into()))
         .unwrap_err();
@@ -65,7 +65,7 @@ fn into_unique_retains_all_ambiguous_candidates_as_owned_summaries() {
 }
 
 #[test]
-fn context_error_clone_shares_structured_issues() {
+fn test_context_error_clone_shares_structured_issues() {
     let error = ContextError::new("invalid registration");
     let clone = error.clone();
 
@@ -75,7 +75,7 @@ fn context_error_clone_shares_structured_issues() {
 }
 
 #[test]
-fn lookup_state_accessors_and_consuming_extractors_cover_each_variant() {
+fn test_lookup_state_accessors_and_consuming_extractors_cover_each_variant() {
     let missing = Lookup::<&str>::Missing;
     assert!(missing.is_missing());
     assert!(!missing.is_unique());
@@ -105,7 +105,7 @@ fn lookup_state_accessors_and_consuming_extractors_cover_each_variant() {
 }
 
 #[test]
-fn into_unique_returns_the_unique_value_without_changing_it() {
+fn test_into_unique_returns_the_unique_value_without_changing_it() {
     let result = Lookup::Unique(candidate("Widget"))
         .into_unique(LookupSubject::Type, LookupQuery::Name("Widget".into()))
         .expect("a unique lookup should return its candidate");
@@ -115,7 +115,7 @@ fn into_unique_returns_the_unique_value_without_changing_it() {
 }
 
 #[test]
-fn lookup_errors_display_and_clone_all_variants() {
+fn test_lookup_errors_display_and_clone_all_variants() {
     let missing = LookupError::Missing {
         subject: LookupSubject::Method,
         query: LookupQuery::ShortName("run".into()),
@@ -148,7 +148,7 @@ fn lookup_errors_display_and_clone_all_variants() {
 }
 
 #[test]
-fn context_error_from_issues_handles_empty_and_preserves_issue_order() {
+fn test_context_error_from_issues_handles_empty_and_preserves_issue_order() {
     assert!(ContextError::from_issues(Vec::<ContextIssue>::new()).is_none());
 
     let first = ContextIssue::Message("first issue".into());
@@ -163,7 +163,7 @@ fn context_error_from_issues_handles_empty_and_preserves_issue_order() {
 }
 
 #[test]
-fn context_error_uses_generic_message_for_structured_primary_issue() {
+fn test_context_error_uses_generic_message_for_structured_primary_issue() {
     let dependency = ItemIdentity {
         kind: ItemKind::Type,
         stable_id: StableItemId("crate::Widget".into()),
@@ -183,7 +183,7 @@ fn context_error_uses_generic_message_for_structured_primary_issue() {
 }
 
 #[test]
-fn validation_and_unsupported_errors_preserve_messages_and_clone() {
+fn test_validation_and_unsupported_errors_preserve_messages_and_clone() {
     let adapter = AdapterValidationError::new("adapter has an invalid signature");
     assert_eq!(adapter.to_string(), "adapter has an invalid signature");
     assert_eq!(adapter.clone(), adapter);
@@ -199,7 +199,7 @@ fn validation_and_unsupported_errors_preserve_messages_and_clone() {
 }
 
 #[test]
-fn recoverable_failure_parts_expose_and_consume_both_values() {
+fn test_recoverable_failure_parts_expose_and_consume_both_values() {
     let parts = RecoverableFailureParts::new("rejected", String::from("retry input"));
     assert_eq!(parts.error, "rejected");
     assert_eq!(parts.recovery, "retry input");

@@ -69,6 +69,7 @@ descriptor_collection!(
 );
 
 impl IntoLookupCandidate for TypeDefinitionDescriptor<'_> {
+    /// Converts a type definition into a lookup candidate keyed by its path.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.path().into();
         LookupCandidate {
@@ -84,6 +85,8 @@ impl IntoLookupCandidate for TypeDefinitionDescriptor<'_> {
 }
 
 impl IntoLookupCandidate for TraitDefinitionDescriptor<'_> {
+    /// Converts a trait definition into a lookup candidate keyed by its path
+    /// and ID.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.path().into();
         LookupCandidate {

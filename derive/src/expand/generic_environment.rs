@@ -108,6 +108,10 @@ impl GenericEnvironment {
     }
 
     /// Adds one type parameter for focused generator tests.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Type-parameter name to add to the test environment.
     #[cfg(test)]
     #[must_use]
     #[inline]
@@ -117,6 +121,10 @@ impl GenericEnvironment {
     }
 
     /// Adds one const parameter for focused generator tests.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Const-parameter name to add to the test environment.
     #[cfg(test)]
     #[must_use]
     #[inline]

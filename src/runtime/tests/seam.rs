@@ -27,7 +27,7 @@ impl Reflect for Fixture {
 }
 
 #[test]
-fn descriptor_is_bound_to_the_requested_context() {
+fn test_descriptor_is_bound_to_the_requested_context() {
     let context = ReflectionContext::empty();
     let descriptor = TypeDescriptor::new(Fixture::__reflect_registration().metadata(), &context);
 
@@ -36,7 +36,7 @@ fn descriptor_is_bound_to_the_requested_context() {
 }
 
 #[test]
-fn of_uses_the_global_context_without_building_aggregate_state() {
+fn test_of_uses_the_global_context_without_building_aggregate_state() {
     REGISTRATION_CALLS.store(0, Ordering::SeqCst);
     let before = ReflectionContext::global() as *const ReflectionContext;
     let descriptor = TypeDescriptor::of::<Fixture>();

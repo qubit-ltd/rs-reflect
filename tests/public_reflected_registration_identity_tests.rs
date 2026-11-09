@@ -20,7 +20,7 @@ use qubit_reflect::TypeDescriptor;
 struct IdentityFixture;
 
 #[test]
-fn context_identity_matches_the_registered_rust_type() {
+fn test_context_identity_matches_the_registered_rust_type() {
     let context = ReflectionContext::builder()
         .include_type::<IdentityFixture>()
         .build()

@@ -59,7 +59,7 @@ struct SameNameTraitMarker;
 static EMPTY_GENERIC_DEFINITION: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
 
 #[test]
-fn explicit_typed_capability_registration_converts_into_context_registration() {
+fn test_explicit_typed_capability_registration_converts_into_context_registration() {
     let registration = CapabilityRegistration::for_type::<CapabilityTarget, MarkerCapability>(7);
     let registration: Registration = registration.into();
     let context = ReflectionContext::builder()
@@ -72,7 +72,7 @@ fn explicit_typed_capability_registration_converts_into_context_registration() {
 }
 
 #[test]
-fn generated_method_catalog_does_not_satisfy_capability_target_inclusion() {
+fn test_generated_method_catalog_does_not_satisfy_capability_target_inclusion() {
     let registration = CapabilityRegistration::for_type::<MethodCatalogOnlyTarget, MarkerCapability>(7);
     let missing_target = ReflectionContext::builder().register(registration).build();
     let error = match missing_target {
@@ -104,13 +104,13 @@ fn generated_method_catalog_does_not_satisfy_capability_target_inclusion() {
 }
 
 #[test]
-fn capability_registration_accepts_unsized_reflected_types() {
+fn test_capability_registration_accepts_unsized_reflected_types() {
     let registration = CapabilityRegistration::for_type::<str, MarkerCapability>(11);
     let _: Registration = registration.into();
 }
 
 #[test]
-fn capability_registration_can_target_a_generic_definition_without_exposing_its_id() {
+fn test_capability_registration_can_target_a_generic_definition_without_exposing_its_id() {
     let source_context = ReflectionContext::builder()
         .include_type::<GenericCapabilityTarget<u8>>()
         .build()
@@ -145,7 +145,7 @@ fn capability_registration_can_target_a_generic_definition_without_exposing_its_
 }
 
 #[test]
-fn definition_capability_requires_exact_type_definition_identity() {
+fn test_definition_capability_requires_exact_type_definition_identity() {
     let source_context = ReflectionContext::builder()
         .include_type::<GenericCapabilityTarget<u8>>()
         .build()
@@ -207,7 +207,7 @@ fn definition_capability_requires_exact_type_definition_identity() {
 }
 
 #[test]
-fn typed_capability_lookup_reports_missing_and_contract_mismatch() {
+fn test_typed_capability_lookup_reports_missing_and_contract_mismatch() {
     let missing_context = ReflectionContext::builder()
         .include_type::<CapabilityTarget>()
         .build()
@@ -259,7 +259,7 @@ fn typed_capability_lookup_reports_missing_and_contract_mismatch() {
 }
 
 #[test]
-fn invalid_capability_id_is_reported_by_context_build_without_panicking() {
+fn test_invalid_capability_id_is_reported_by_context_build_without_panicking() {
     struct InvalidIdCapability;
 
     impl CapabilitySpec for InvalidIdCapability {

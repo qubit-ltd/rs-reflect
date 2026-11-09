@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-use qubit_reflect::TypeDescriptor;
 // =============================================================================
 //    Copyright (c) 2025 - 2026 Haixing Hu.
 //
@@ -14,8 +13,9 @@ use qubit_reflect::TypeDescriptor;
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-
 use std::marker::PhantomData;
+
+use qubit_reflect::TypeDescriptor;
 
 #[qubit_reflect::Reflect]
 struct Page<T>(#[reflect(skip)] PhantomData<T>);

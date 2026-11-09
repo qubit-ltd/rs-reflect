@@ -14,7 +14,7 @@ use qubit_reflect::error::LookupQuery;
 use qubit_reflect::error::LookupSubject;
 
 #[test]
-fn missing_type_error_keeps_the_exact_query() {
+fn test_missing_type_error_keeps_the_exact_query() {
     let context = ReflectionContext::builder().build().expect("an empty context is valid");
     let result = context.type_by_name("missing::Type");
     let error = match result {

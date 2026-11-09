@@ -34,7 +34,7 @@ impl CapabilitySpec for U64AdapterSpec {
 }
 
 #[test]
-fn duplicate_typed_providers_report_a_structured_context_conflict() {
+fn test_duplicate_typed_providers_report_a_structured_context_conflict() {
     let result = ReflectionContext::builder()
         .include_type::<ConflictingCloneTarget>()
         .register(CapabilityRegistration::for_type::<ConflictingCloneTarget, U32AdapterSpec>(3_u32))

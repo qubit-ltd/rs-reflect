@@ -80,7 +80,7 @@ fn application_for<T: 'static>(context: &ReflectionContext) -> qubit_reflect::de
 }
 
 #[test]
-fn default_and_explicit_arguments_share_one_application_identity() {
+fn test_default_and_explicit_arguments_share_one_application_identity() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -148,7 +148,7 @@ fn default_and_explicit_arguments_share_one_application_identity() {
 }
 
 #[test]
-fn partial_defaults_aliases_and_generic_targets_keep_resolved_arguments() {
+fn test_partial_defaults_aliases_and_generic_targets_keep_resolved_arguments() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -208,7 +208,7 @@ fn partial_defaults_aliases_and_generic_targets_keep_resolved_arguments() {
 }
 
 #[test]
-fn application_hook_keeps_generic_target_instantiations_distinct() {
+fn test_application_hook_keeps_generic_target_instantiations_distinct() {
     let (u8_arguments, u8_identity, _, _) = <GenericTarget<u8> as Defaulted<u8>>::__qbr_trait_application_metadata();
     let (string_arguments, string_identity, _, _) =
         <GenericTarget<String> as Defaulted<String>>::__qbr_trait_application_metadata();
@@ -234,7 +234,7 @@ fn application_hook_keeps_generic_target_instantiations_distinct() {
 }
 
 #[test]
-fn external_handle_does_not_infer_unwritten_default_arguments() {
+fn test_external_handle_does_not_infer_unwritten_default_arguments() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

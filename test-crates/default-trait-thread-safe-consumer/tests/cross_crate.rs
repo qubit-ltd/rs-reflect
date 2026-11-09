@@ -1,3 +1,11 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+
 use default_trait_thread_safe_consumer::LocalTarget;
 use default_trait_thread_safe_consumer::SharedTarget;
 use default_trait_thread_safe_consumer::local_marker_count;
@@ -8,7 +16,7 @@ use qubit_reflect::value::Local;
 use qubit_reflect::value::ThreadSafe;
 
 #[test]
-fn external_default_method_has_thread_safe_adapter_for_send_target() {
+fn test_external_default_method_has_thread_safe_adapter_for_send_target() {
     let method = ReflectionContext::global()
         .type_of::<SharedTarget>()
         .method("render")
@@ -24,7 +32,7 @@ fn external_default_method_has_thread_safe_adapter_for_send_target() {
 }
 
 #[test]
-fn external_default_method_keeps_local_adapter_for_rc_target() {
+fn test_external_default_method_keeps_local_adapter_for_rc_target() {
     let method = ReflectionContext::global()
         .type_of::<LocalTarget>()
         .method("render")

@@ -51,7 +51,7 @@ fn invalid_context(
 }
 
 #[test]
-fn invalid_explicit_capability_fails_context_build() {
+fn test_invalid_explicit_capability_fails_context_build() {
     let capability = __qubit_reflect_v4_definition_capability_LinkedCapabilityTarget::<InvalidCapability>(());
     let result = ReflectionContext::builder()
         .include_type::<LinkedCapabilityTarget<u8>>()
@@ -61,7 +61,7 @@ fn invalid_explicit_capability_fails_context_build() {
 }
 
 #[test]
-fn invalid_linked_capability_fails_all_linked_build_paths() {
+fn test_invalid_linked_capability_fails_all_linked_build_paths() {
     assert_invalid_id(invalid_context(ReflectionContext::builder().include_linked().build()));
     assert_invalid_id(invalid_context(
         ReflectionContext::builder()

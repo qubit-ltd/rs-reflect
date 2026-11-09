@@ -37,7 +37,7 @@ impl ApplicationMethod<u16> for ApplicationMethodTarget {
 }
 
 #[test]
-fn bind_method_selects_the_exact_generic_trait_application() {
+fn test_bind_method_selects_the_exact_generic_trait_application() {
     let u8_binding = bind_method!(
         <ApplicationMethodTarget as crate::invoke::trait_application_binding_tests::ApplicationMethod<u8>>::identify::<
             u32,
@@ -133,7 +133,7 @@ impl DefaultedApplicationMethod<u16> for PartiallyDefaultedApplicationTarget {
 }
 
 #[test]
-fn bind_method_uses_compiler_resolved_default_trait_arguments() {
+fn test_bind_method_uses_compiler_resolved_default_trait_arguments() {
     let full_binding = bind_method!(
         <FullyDefaultedApplicationTarget as defaulted_trait_alias::Imported>::identify
             as fn(&FullyDefaultedApplicationTarget) -> String,
@@ -190,7 +190,7 @@ fn bind_method_uses_compiler_resolved_default_trait_arguments() {
 }
 
 #[test]
-fn bind_method_resolves_super_path_provider_from_the_call_site_module() {
+fn test_bind_method_resolves_super_path_provider_from_the_call_site_module() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(super_path_provider::child::binding())

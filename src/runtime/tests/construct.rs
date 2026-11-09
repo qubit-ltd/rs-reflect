@@ -327,7 +327,7 @@ fn marker_plan() -> ConstructionPlan {
 }
 
 #[test]
-fn construct_accepts_named_positional_and_unit_shapes() {
+fn test_construct_accepts_named_positional_and_unit_shapes() {
     let record_plan = record_plan();
     let record = ConstructionDescriptor::new(&record_plan)
         .construct::<Record, Local, _>(
@@ -359,7 +359,7 @@ fn construct_accepts_named_positional_and_unit_shapes() {
 }
 
 #[test]
-fn named_input_rejects_duplicates_and_recovers_every_entry() {
+fn test_named_input_rejects_duplicates_and_recovers_every_entry() {
     let plan = record_plan();
     let failure = ConstructionDescriptor::new(&plan)
         .construct::<Record, Local, _>(NamedFields::new().field("count", 4_u32).field("count", 5_u32))
@@ -374,7 +374,7 @@ fn named_input_rejects_duplicates_and_recovers_every_entry() {
 }
 
 #[test]
-fn construction_rejects_a_typed_target_mismatch_before_provider_execution() {
+fn test_construction_rejects_a_typed_target_mismatch_before_provider_execution() {
     let plan = record_plan();
     let failure = ConstructionDescriptor::new(&plan)
         .construct::<Wrong, Local, _>(NamedFields::new().field("count", 3_u32))
@@ -388,7 +388,7 @@ fn construction_rejects_a_typed_target_mismatch_before_provider_execution() {
 }
 
 #[test]
-fn shape_mismatch_keeps_the_original_input_shape_and_values() {
+fn test_shape_mismatch_keeps_the_original_input_shape_and_values() {
     let plan = choice_variant_plan();
     let failure = ConstructionDescriptor::new(&plan)
         .construct::<Choice, Local, _>(NamedFields::new().field("0", 11_i32))
@@ -404,7 +404,7 @@ fn shape_mismatch_keeps_the_original_input_shape_and_values() {
 }
 
 #[test]
-fn recoverable_failure_protocol_borrows_and_splits_construction_and_update_failures() {
+fn test_recoverable_failure_protocol_borrows_and_splits_construction_and_update_failures() {
     let plan = choice_variant_plan();
     let failure = ConstructionDescriptor::new(&plan)
         .construct::<Choice, Local, _>(NamedFields::new().field("0", 11_i32))
@@ -457,7 +457,7 @@ fn recoverable_failure_protocol_borrows_and_splits_construction_and_update_failu
 }
 
 #[test]
-fn safe_visibility_and_unchecked_type_validation_are_separate() {
+fn test_safe_visibility_and_unchecked_type_validation_are_separate() {
     let plan = record_plan_with_visibility(ConstructVisibility::Private);
     let safe_failure = ConstructionDescriptor::new(&plan)
         .construct::<Record, Local, _>(
@@ -503,7 +503,7 @@ fn safe_visibility_and_unchecked_type_validation_are_separate() {
 }
 
 #[test]
-fn private_required_fields_make_only_safe_construction_unavailable() {
+fn test_private_required_fields_make_only_safe_construction_unavailable() {
     let plan = record_plan_with_policy(ConstructVisibility::Private, ConstructionFieldPolicy::Required);
     assert!(matches!(
         ConstructionDescriptor::new(&plan).availability(),
@@ -533,7 +533,7 @@ fn private_required_fields_make_only_safe_construction_unavailable() {
 }
 
 #[test]
-fn update_unchecked_only_skips_visibility_and_still_checks_update_policy() {
+fn test_update_unchecked_only_skips_visibility_and_still_checks_update_policy() {
     let plan = record_plan_with_visibility(ConstructVisibility::Private);
     let input = UpdateInput::new(Record {
         count: 1,
@@ -549,7 +549,7 @@ fn update_unchecked_only_skips_visibility_and_still_checks_update_policy() {
 }
 
 #[test]
-fn unavailable_update_policy_rejects_the_whole_update_and_recovers_inputs() {
+fn test_unavailable_update_policy_rejects_the_whole_update_and_recovers_inputs() {
     let plan = record_plan_with_unavailable_update();
     let failure = match ConstructionDescriptor::new(&plan).update_dynamic::<Local>(
         UpdateInput::new(Record {
@@ -572,7 +572,7 @@ fn unavailable_update_policy_rejects_the_whole_update_and_recovers_inputs() {
 }
 
 #[test]
-fn update_checks_all_inputs_before_consuming_base_and_replacements() {
+fn test_update_checks_all_inputs_before_consuming_base_and_replacements() {
     let plan = record_plan();
     let failure = ConstructionDescriptor::new(&plan)
         .update::<Record, Local>(
@@ -618,7 +618,7 @@ fn update_checks_all_inputs_before_consuming_base_and_replacements() {
 }
 
 #[test]
-fn thread_safe_mode_uses_its_typed_provider() {
+fn test_thread_safe_mode_uses_its_typed_provider() {
     let plan = record_plan();
     let record = ConstructionDescriptor::new(&plan)
         .construct::<Record, ThreadSafe, _>(
@@ -631,7 +631,7 @@ fn thread_safe_mode_uses_its_typed_provider() {
 }
 
 #[test]
-fn provider_lookup_reports_missing_and_ambiguous_metadata() {
+fn test_provider_lookup_reports_missing_and_ambiguous_metadata() {
     let plan = record_plan();
     assert!(matches!(
         resolve_plan(type_identity::<Wrong>(), std::slice::from_ref(&plan)),
@@ -661,7 +661,7 @@ fn provider_lookup_reports_missing_and_ambiguous_metadata() {
 }
 
 #[test]
-fn missing_provider_descriptor_reports_reason_and_recovers_input() {
+fn test_missing_provider_descriptor_reports_reason_and_recovers_input() {
     let target = ConstructionTarget::for_runtime(
         TypeIdentity {
             type_id: TypeId::of::<Record>(),
@@ -691,7 +691,7 @@ fn missing_provider_descriptor_reports_reason_and_recovers_input() {
 }
 
 #[test]
-fn context_freezes_construction_plans_without_calling_providers() {
+fn test_context_freezes_construction_plans_without_calling_providers() {
     FREEZE_PROVIDER_CALLS.store(0, Ordering::SeqCst);
     let context = crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
         .register(

@@ -65,14 +65,11 @@ pub(super) fn dyn_inherited_associated_types(
 /// Returns the generated supertrait path with explicit bindings and static
 /// lifetimes.
 #[must_use]
-pub(super) fn dyn_reflected_supertrait_path(
-    path: &crate::ir::PathIr,
-    declaration: &TraitDeclarationIr,
-) -> TokenStream {
-    let mut syntax: Path = parse2(path.tokens.clone())
-        .expect("validated reflected supertrait paths must parse as Rust paths");
-    for inherited in dyn_inherited_associated_types(declaration)
-        .filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
+pub(super) fn dyn_reflected_supertrait_path(path: &crate::ir::PathIr, declaration: &TraitDeclarationIr) -> TokenStream {
+    let mut syntax: Path =
+        parse2(path.tokens.clone()).expect("validated reflected supertrait paths must parse as Rust paths");
+    for inherited in
+        dyn_inherited_associated_types(declaration).filter(|inherited| inherited_belongs_to_supertrait(inherited, path))
     {
         let name = Ident::new(
             &inherited
@@ -161,10 +158,7 @@ pub(super) fn dyn_inherited_arguments_for_supertrait(
 /// Returns whether the inherited path extends the direct supertrait by one
 /// segment.
 #[must_use]
-pub(super) fn inherited_belongs_to_supertrait(
-    inherited: &crate::ir::PathIr,
-    supertrait: &crate::ir::PathIr,
-) -> bool {
+pub(super) fn inherited_belongs_to_supertrait(inherited: &crate::ir::PathIr, supertrait: &crate::ir::PathIr) -> bool {
     inherited.segments.len() == supertrait.segments.len() + 1
         && inherited
             .segments
@@ -191,10 +185,7 @@ pub(super) fn inherited_belongs_to_supertrait(
 /// Returns whether this trait can be treated as dyn-compatible by this
 /// analysis.
 #[must_use]
-pub(super) fn is_provably_dyn_compatible(
-    item: &ItemTrait,
-    declaration: &TraitDeclarationIr,
-) -> bool {
+pub(super) fn is_provably_dyn_compatible(item: &ItemTrait, declaration: &TraitDeclarationIr) -> bool {
     if where_clause_requires_sized_self(item.generics.where_clause.as_ref())
         || item
             .generics
@@ -373,10 +364,7 @@ pub(super) fn receiver_type_is_dyn_dispatchable(ty: &Type) -> bool {
             let Some(segment) = path.path.segments.last() else {
                 return false;
             };
-            if !matches!(
-                segment.ident.to_string().as_str(),
-                "Box" | "Rc" | "Arc" | "Pin"
-            ) {
+            if !matches!(segment.ident.to_string().as_str(), "Box" | "Rc" | "Arc" | "Pin") {
                 return false;
             }
             let SynPathArguments::AngleBracketed(arguments) = &segment.arguments else {

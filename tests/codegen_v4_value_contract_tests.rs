@@ -34,7 +34,7 @@ impl Reflect for OtherValue {
 }
 
 #[test]
-fn external_codegen_value_facade_preserves_owned_and_borrowed_values() {
+fn test_external_codegen_value_facade_preserves_owned_and_borrowed_values() {
     let owned = DynamicOwned::<Local>::new(ContractValue(String::from("value")));
     assert!(owned.is::<ContractValue>());
     assert_eq!(owned.downcast_ref::<ContractValue>().unwrap().0, "value");
@@ -67,7 +67,7 @@ fn external_codegen_value_facade_preserves_owned_and_borrowed_values() {
 }
 
 #[test]
-fn thread_safe_codegen_values_prove_auto_traits() {
+fn test_thread_safe_codegen_values_prove_auto_traits() {
     fn assert_send_sync<T: Send + Sync>() {}
 
     assert_send_sync::<DynamicOwned<ThreadSafe>>();
@@ -79,7 +79,7 @@ fn thread_safe_codegen_values_prove_auto_traits() {
 }
 
 #[test]
-fn external_codegen_value_facade_supports_string_slices() {
+fn test_external_codegen_value_facade_supports_string_slices() {
     let text = String::from("shared text");
     let dynamic = DynamicRef::<Local>::new_str(&text);
     assert_eq!(dynamic.into_str().unwrap(), "shared text");
@@ -91,7 +91,7 @@ fn external_codegen_value_facade_supports_string_slices() {
 }
 
 #[test]
-fn external_codegen_value_facade_accepts_builtin_scalars_and_unit() {
+fn test_external_codegen_value_facade_accepts_builtin_scalars_and_unit() {
     fn assert_builtin<T: ValueFor<Local>>(value: T) {
         drop(DynamicOwned::<Local>::new(value));
     }

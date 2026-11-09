@@ -26,18 +26,26 @@ use super::identity::TypeIdentity;
 use super::invoke::InvocationError;
 pub use super::value::TypeMismatch;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// Validation errors produced while building a reflection context.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContextError {
+    /// Shared issue list used for cloning this error without copying messages.
     data: Arc<ContextErrorData>,
 }
 
+/// Shared internal storage that makes cloning a context error inexpensive.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ContextErrorData {
+    /// Validation issues in their reported order.
     issues: Box<[ContextIssue]>,
 }
 
 impl ContextErrorData {
+    /// Retains an already ordered validation issue collection.
+    ///
+    /// # Parameters
+    ///
+    /// * `issues` — validation issues collected while building the context.
     fn new(issues: Box<[ContextIssue]>) -> Self {
         Self { issues }
     }
@@ -45,6 +53,10 @@ impl ContextErrorData {
 
 impl ContextError {
     /// Creates a context error with one free-form issue message.
+    ///
+    /// # Parameters
+    ///
+    /// * `message` — explanation retained as the primary validation issue.
     pub fn new(message: impl Into<Arc<str>>) -> Self {
         let issue = ContextIssue::Message(message.into());
         Self {
@@ -53,6 +65,10 @@ impl ContextError {
     }
 
     /// Creates an error from validation issues, or returns `None` when empty.
+    ///
+    /// # Parameters
+    ///
+    /// * `issues` — ordered validation issues collected by the context builder.
     pub fn from_issues(issues: impl Into<Box<[ContextIssue]>>) -> Option<Self> {
         let issues = issues.into();
         (!issues.is_empty()).then(|| Self {
@@ -80,6 +96,11 @@ impl ContextError {
 }
 
 impl fmt::Display for ContextError {
+    /// Formats the primary issue so the concise message remains stable.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}", self.primary_issue())
     }
@@ -87,9 +108,9 @@ impl fmt::Display for ContextError {
 
 impl std::error::Error for ContextError {}
 
+/// A specific registration or metadata validation problem.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-/// A specific registration or metadata validation problem.
 pub enum ContextIssue {
     /// Multiple registrations claim the same concrete Rust type.
     DuplicateTypeIdentity {
@@ -175,10 +196,18 @@ pub enum ContextIssue {
         reason: MetadataValidationError,
     },
     /// A caller supplied a free-form validation issue.
-    Message(Arc<str>),
+    Message(
+        /// Caller-supplied validation explanation.
+        Arc<str>,
+    ),
 }
 
 impl fmt::Display for ContextIssue {
+    /// Formats the issue's primary identity or validation reason.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DuplicateTypeIdentity { type_id, .. } => {
@@ -227,43 +256,67 @@ impl fmt::Display for ContextIssue {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// Explains why a generated runtime adapter cannot be used.
-pub struct AdapterValidationError(Box<str>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdapterValidationError(
+    /// Concise reason retained for diagnostics.
+    Box<str>,
+);
 
 impl AdapterValidationError {
     /// Creates an adapter validation error with the supplied explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `message` — reason the generated adapter failed validation.
     pub fn new(message: impl Into<Box<str>>) -> Self {
         Self(message.into())
     }
 }
 
 impl fmt::Display for AdapterValidationError {
+    /// Writes the retained validation explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// Explains why reflection metadata failed validation.
-pub struct MetadataValidationError(Box<str>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MetadataValidationError(
+    /// Concise reason retained for diagnostics.
+    Box<str>,
+);
 
 impl MetadataValidationError {
     /// Creates a metadata validation error with the supplied explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `message` — reason the metadata failed structural validation.
     pub fn new(message: impl Into<Box<str>>) -> Self {
         Self(message.into())
     }
 }
 
 impl fmt::Display for MetadataValidationError {
+    /// Writes the retained metadata validation explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
+/// Kind of reflected item requested by a lookup.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-/// Kind of reflected item requested by a lookup.
 pub enum LookupSubject {
     /// A concrete Rust type.
     Type,
@@ -293,30 +346,51 @@ pub enum LookupSubject {
     Capability,
 }
 
+/// Criterion used to select a reflected item during lookup.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-/// Criterion used to select a reflected item during lookup.
 pub enum LookupQuery {
     /// Match an item's fully qualified name.
-    Name(Box<str>),
+    Name(
+        /// Fully qualified source name used for exact lookup.
+        Box<str>,
+    ),
     /// Match an item's unqualified name.
-    ShortName(Box<str>),
+    ShortName(
+        /// Unqualified final path segment used for lookup.
+        Box<str>,
+    ),
     /// Match a concrete Rust type identity.
-    TypeId(std::any::TypeId),
+    TypeId(
+        /// Concrete Rust type identity used for lookup.
+        std::any::TypeId,
+    ),
     /// Match a stable reflected item identifier.
-    ItemId(super::identity::StableItemId),
+    ItemId(
+        /// Stable reflected item identity used for lookup.
+        super::identity::StableItemId,
+    ),
     /// Match a zero-based collection index.
-    Index(usize),
+    Index(
+        /// Zero-based source collection index used for lookup.
+        usize,
+    ),
     /// Match an exact set of generic arguments.
-    GenericArguments(Box<[GenericArgumentIdentity]>),
+    GenericArguments(
+        /// Exact generic argument sequence used for lookup.
+        Box<[GenericArgumentIdentity]>,
+    ),
 }
 
+/// Failure to resolve a unique reflected item or to construct its context.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-/// Failure to resolve a unique reflected item or to construct its context.
 pub enum LookupError {
     /// The reflection context could not be built or validated.
-    Context(ContextError),
+    Context(
+        /// Context construction or validation failure.
+        ContextError,
+    ),
     /// No item matched the requested subject and query.
     Missing {
         /// Kind of item requested.
@@ -336,6 +410,11 @@ pub enum LookupError {
 }
 
 impl fmt::Display for LookupError {
+    /// Formats the missing or ambiguous lookup request.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Context(error) => write!(formatter, "reflection context failed: {error}"),
@@ -356,6 +435,8 @@ impl fmt::Display for LookupError {
 }
 
 impl std::error::Error for LookupError {
+    /// Returns the nested context failure when lookup could not use its
+    /// context.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Context(error) => Some(error),
@@ -364,40 +445,81 @@ impl std::error::Error for LookupError {
     }
 }
 
+/// Top-level error returned by reflective operations.
 #[derive(Debug)]
 #[non_exhaustive]
-/// Top-level error returned by reflective operations.
 // Keep the typed construction causes intact when this aggregate error wraps them.
 #[allow(private_interfaces)]
 pub enum ReflectionError {
     /// Lookup failed because the item was missing, ambiguous, or
     /// context-invalid.
-    Lookup(LookupError),
+    Lookup(
+        /// Lookup failure with the original subject and query.
+        LookupError,
+    ),
     /// Reflection context validation failed.
-    Context(ContextError),
+    Context(
+        /// Context validation error that blocked the operation.
+        ContextError,
+    ),
     /// A runtime value had an unexpected concrete type.
-    TypeMismatch(TypeMismatch),
+    TypeMismatch(
+        /// Mismatch between expected and actual runtime value types.
+        TypeMismatch,
+    ),
     /// A field could not be read.
-    FieldAccess(FieldAccessError),
+    FieldAccess(
+        /// Failure returned while reading a reflected field.
+        FieldAccessError,
+    ),
     /// A field could not be set.
-    FieldSet(FieldSetError),
+    FieldSet(
+        /// Failure returned while setting a reflected field.
+        FieldSetError,
+    ),
     /// A reflected method call failed.
-    Invocation(InvocationError),
+    Invocation(
+        /// Failure returned while invoking a reflected method.
+        InvocationError,
+    ),
     /// A value could not be constructed.
-    Construction(ConstructionError),
+    Construction(
+        /// Failure returned while constructing a reflected value.
+        ConstructionError,
+    ),
     /// An existing value could not be updated.
-    Update(UpdateError),
+    Update(
+        /// Failure returned while updating a reflected value.
+        UpdateError,
+    ),
     /// A requested capability was unavailable or invalid.
-    Capability(CapabilityError),
+    Capability(
+        /// Capability lookup or contract validation failure.
+        CapabilityError,
+    ),
     /// A generic argument was used through the wrong kind-specific API.
-    GenericArgument(GenericArgumentError),
+    GenericArgument(
+        /// Generic argument kind-specific access failure.
+        GenericArgumentError,
+    ),
     /// A type expression could not provide the requested descriptor.
-    TypeExpression(TypeExpressionError),
+    TypeExpression(
+        /// Failure to resolve a requested concrete type expression.
+        TypeExpressionError,
+    ),
     /// The requested reflective operation is unsupported.
-    Unsupported(UnsupportedOperationError),
+    Unsupported(
+        /// Explanation for an unsupported reflective operation.
+        UnsupportedOperationError,
+    ),
 }
 
 impl fmt::Display for ReflectionError {
+    /// Delegates formatting to the retained operation-specific error.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Lookup(error) => error.fmt(formatter),
@@ -417,6 +539,7 @@ impl fmt::Display for ReflectionError {
 }
 
 impl std::error::Error for ReflectionError {
+    /// Exposes the wrapped operation-specific error as the source.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Lookup(error) => Some(error),
@@ -458,18 +581,30 @@ reflection_from!(GenericArgumentError, GenericArgument);
 reflection_from!(TypeExpressionError, TypeExpression);
 reflection_from!(UnsupportedOperationError, Unsupported);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
 /// Explains why a requested reflective operation is unsupported.
-pub struct UnsupportedOperationError(Box<str>);
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnsupportedOperationError(
+    /// Concise explanation retained for callers.
+    Box<str>,
+);
 
 impl UnsupportedOperationError {
     /// Creates an unsupported-operation error with the supplied explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `message` — reason the requested operation cannot be performed.
     pub fn new(message: impl Into<Box<str>>) -> Self {
         Self(message.into())
     }
 }
 
 impl fmt::Display for UnsupportedOperationError {
+    /// Writes the retained unsupported-operation explanation.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
     }
@@ -478,6 +613,11 @@ impl fmt::Display for UnsupportedOperationError {
 impl std::error::Error for UnsupportedOperationError {}
 
 /// The error and retained input extracted from a recoverable operation failure.
+///
+/// # Type Parameters
+///
+/// * `E` — operation-specific error type.
+/// * `R` — original input or state retained for recovery.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RecoverableFailureParts<E, R> {
     /// The error explaining why the operation was rejected.
@@ -488,6 +628,11 @@ pub struct RecoverableFailureParts<E, R> {
 
 impl<E, R> RecoverableFailureParts<E, R> {
     /// Creates a pair containing an operation error and its retained input.
+    ///
+    /// # Parameters
+    ///
+    /// * `error` — reason the operation failed.
+    /// * `recovery` — original input or state retained by the operation.
     pub const fn new(error: E, recovery: R) -> Self {
         Self { error, recovery }
     }
@@ -584,7 +729,7 @@ mod tests {
     }
 
     #[test]
-    fn context_error_constructors_keep_order_and_use_primary_issue() {
+    fn test_context_error_constructors_keep_order_and_use_primary_issue() {
         let free_form = ContextError::new("registration rejected");
         assert_eq!(free_form.message(), "registration rejected");
         assert_eq!(
@@ -608,7 +753,7 @@ mod tests {
     }
 
     #[test]
-    fn context_issue_displays_structured_validation_causes() {
+    fn test_context_issue_displays_structured_validation_causes() {
         let ty = type_identity::<u8>("u8");
         let type_item = item(ItemKind::TypeDefinition, "type:u8", "Number");
         let trait_item = item(ItemKind::TraitDefinition, "trait:Display", "Display");
@@ -681,7 +826,7 @@ mod tests {
     }
 
     #[test]
-    fn lookup_error_displays_variants_and_exposes_only_context_source() {
+    fn test_lookup_error_displays_variants_and_exposes_only_context_source() {
         let query = LookupQuery::ShortName("Thing".into());
         let missing = LookupError::Missing {
             subject: LookupSubject::Type,
@@ -717,7 +862,7 @@ mod tests {
     }
 
     #[test]
-    fn reflection_error_conversions_preserve_types_and_sources() {
+    fn test_reflection_error_conversions_preserve_types_and_sources() {
         let generic = GenericArgumentError::new(GenericArgumentKind::Type, GenericArgumentKind::Const);
         assert_eq!(generic.expected(), GenericArgumentKind::Type);
         assert_eq!(generic.actual(), GenericArgumentKind::Const);
@@ -775,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    fn recoverable_failure_parts_round_trip_error_and_input() {
+    fn test_recoverable_failure_parts_round_trip_error_and_input() {
         let parts = RecoverableFailureParts::new("rejected", vec![1, 2, 3]);
         assert_eq!(parts.error, "rejected");
         assert_eq!(parts.recovery, [1, 2, 3]);

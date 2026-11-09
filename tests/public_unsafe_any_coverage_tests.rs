@@ -42,7 +42,7 @@ struct PublicRecord {
 }
 
 #[test]
-fn unchecked_named_construction_bypasses_visibility_but_checks_types() {
+fn test_unchecked_named_construction_bypasses_visibility_but_checks_types() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     assert!(matches!(
         descriptor.construction().availability(),
@@ -85,7 +85,7 @@ fn unchecked_named_construction_bypasses_visibility_but_checks_types() {
 }
 
 #[test]
-fn dynamic_unchecked_construction_and_typed_root_checks() {
+fn test_dynamic_unchecked_construction_and_typed_root_checks() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     // SAFETY: both values match the declared types and preserve the private
     // field invariant.
@@ -119,7 +119,7 @@ fn dynamic_unchecked_construction_and_typed_root_checks() {
 }
 
 #[test]
-fn unchecked_positional_and_unit_construction_support_dynamic_results() {
+fn test_unchecked_positional_and_unit_construction_support_dynamic_results() {
     let tuple = TypeDescriptor::of::<TupleRecord>();
     // SAFETY: the supplied values match the positional field types.
     let typed: TupleRecord = unsafe {
@@ -159,7 +159,7 @@ fn unchecked_positional_and_unit_construction_support_dynamic_results() {
 }
 
 #[test]
-fn unchecked_update_bypasses_visibility_and_preserves_type_checks() {
+fn test_unchecked_update_bypasses_visibility_and_preserves_type_checks() {
     let descriptor = TypeDescriptor::of::<NamedRecord>();
     let base = NamedRecord {
         count: 5,
@@ -201,7 +201,7 @@ fn unchecked_update_bypasses_visibility_and_preserves_type_checks() {
 }
 
 #[test]
-fn unsafe_field_access_bypasses_visibility_but_checks_target_type() {
+fn test_unsafe_field_access_bypasses_visibility_but_checks_target_type() {
     let field = TypeDescriptor::of::<NamedRecord>()
         .field("secret")
         .expect("private field remains described");
@@ -224,7 +224,7 @@ fn unsafe_field_access_bypasses_visibility_but_checks_target_type() {
 }
 
 #[test]
-fn dynamic_owned_inputs_keep_runtime_type_validation_and_recovery() {
+fn test_dynamic_owned_inputs_keep_runtime_type_validation_and_recovery() {
     let public = TypeDescriptor::of::<PublicRecord>();
     let updated = public
         .update_dynamic(UpdateInput::<Local>::new(PublicRecord { count: 1 }).field("count", 2_u32))

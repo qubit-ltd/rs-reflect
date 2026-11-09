@@ -43,18 +43,31 @@ use crate::value::ValueMode;
 #[derive(Clone, Copy)]
 pub enum ConstructionTarget<'ctx> {
     /// A reflected struct or tuple struct.
-    Struct(TypeDescriptor<'ctx>),
+    Struct(
+        /// Descriptor whose type is the construction target.
+        TypeDescriptor<'ctx>,
+    ),
     /// An explicitly selected enum variant.
-    Variant(VariantDescriptor<'ctx>),
+    Variant(
+        /// Descriptor of the variant selected for construction.
+        VariantDescriptor<'ctx>,
+    ),
 }
 
 /// A view of the declaration-order fields used by construction and update.
 #[derive(Clone, Copy)]
 pub struct ConstructionFields<'a> {
+    /// Field metadata borrowed from the target's construction plan.
     fields: &'a [ConstructField],
 }
 
 impl<'a> ConstructionFields<'a> {
+    /// Creates a field view over metadata owned by a construction descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// - `fields`: Field metadata exposed by the target descriptor in
+    ///   declaration order.
     fn new(fields: &'a [ConstructField]) -> Self {
         Self { fields }
     }
@@ -69,7 +82,16 @@ impl<'a> ConstructionFields<'a> {
         self.fields.is_empty()
     }
 
-    /// Returns the field metadata at a declaration-order index.
+    /// Returns field metadata at a declaration-order index without allocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based declaration-order field index.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some` with the borrowed field metadata when `index` is in
+    /// range, or `None` when it is outside the target's fields.
     pub fn get(self, index: usize) -> Option<&'a ConstructField> {
         self.fields.get(index)
     }
@@ -81,7 +103,15 @@ impl<'a> ConstructionFields<'a> {
 }
 
 /// Named values supplied to struct-like construction or update.
+///
+/// Values remain owned by this builder until construction succeeds or a
+/// failure returns them for recovery.
+///
+/// # Type Parameters
+///
+/// - `M`: Value storage mode, local by default.
 pub struct NamedFields<M: ValueMode = Local> {
+    /// Runtime collection that retains the named values in insertion order.
     inner: RuntimeNamedFields<M>,
 }
 
@@ -93,13 +123,36 @@ impl<M: ValueMode> NamedFields<M> {
         }
     }
 
-    /// Adds a typed field value.
+    /// Adds a typed value under `name`; validation is deferred until
+    /// construction.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete value type accepted by the selected value mode.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for the construction attempt.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the named value appended.
     pub fn field<T: ValueFor<M>>(mut self, name: impl Into<Box<str>>, value: T) -> Self {
         self.inner = self.inner.field(name, value);
         self
     }
 
-    /// Adds a dynamically owned field value.
+    /// Adds a dynamically typed owned value under `name`.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Dynamic value retained for validation and construction.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the named value appended.
     pub fn field_dynamic(mut self, name: impl Into<Box<str>>, value: DynamicOwned<M>) -> Self {
         self.inner = self.inner.field_dynamic(name, value);
         self
@@ -107,13 +160,21 @@ impl<M: ValueMode> NamedFields<M> {
 }
 
 impl<M: ValueMode> Default for NamedFields<M> {
+    /// Creates an empty field input that can be populated with builder methods.
     fn default() -> Self {
         Self::new()
     }
 }
 
 /// Positional values supplied to tuple-like construction.
+///
+/// Values are retained in insertion order and matched to fields by position.
+///
+/// # Type Parameters
+///
+/// - `M`: Value storage mode, local by default.
 pub struct PositionalFields<M: ValueMode = Local> {
+    /// Runtime collection that retains positional values in insertion order.
     inner: RuntimePositionalFields<M>,
 }
 
@@ -125,13 +186,33 @@ impl<M: ValueMode> PositionalFields<M> {
         }
     }
 
-    /// Adds a typed positional value.
+    /// Appends a typed value at the next positional field index.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete value type accepted by the selected value mode.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned positional value retained for construction.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the value appended.
     pub fn value<T: ValueFor<M>>(mut self, value: T) -> Self {
         self.inner = self.inner.value(value);
         self
     }
 
-    /// Adds a dynamically owned positional value.
+    /// Appends a dynamically typed value at the next positional field index.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Dynamic value retained for validation and construction.
+    ///
+    /// # Returns
+    ///
+    /// Returns this builder with the value appended.
     pub fn value_dynamic(mut self, value: DynamicOwned<M>) -> Self {
         self.inner = self.inner.value_dynamic(value);
         self
@@ -139,6 +220,7 @@ impl<M: ValueMode> PositionalFields<M> {
 }
 
 impl<M: ValueMode> Default for PositionalFields<M> {
+    /// Creates an empty field input that can be populated with builder methods.
     fn default() -> Self {
         Self::new()
     }
@@ -158,12 +240,47 @@ impl UnitFields {
 /// Value modes supported by the construction runtime.
 #[doc(hidden)]
 pub trait ConstructionMode: ValueMode {
+    /// Constructs a typed output after validating the selected target and
+    /// input.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete output type requested by the caller.
+    /// - `I`: Sealed input shape and value collection.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction policy.
+    /// - `input`: Owned values to validate and apply.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed value or a failure retaining the input.
     #[doc(hidden)]
     fn construct<T, I>(descriptor: ConstructionDescriptor<'_>, input: I) -> Result<T, ConstructionFailure<Self>>
     where
         T: ValueFor<Self>,
         I: ConstructionInputMode<Mode = Self> + ConstructionInput<Self>;
 
+    /// Constructs a typed output without enforcing reflected visibility policy.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete output type requested by the caller.
+    /// - `I`: Sealed input shape and value collection.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction policy.
+    /// - `input`: Owned values to validate and apply.
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed value or a failure retaining the input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants normally enforced by field visibility.
     #[doc(hidden)]
     unsafe fn construct_unchecked<T, I>(
         descriptor: ConstructionDescriptor<'_>,
@@ -173,6 +290,20 @@ pub trait ConstructionMode: ValueMode {
         T: ValueFor<Self>,
         I: ConstructionInputMode<Mode = Self> + ConstructionInput<Self>;
 
+    /// Constructs a dynamic owned output after validating target and input.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Sealed input shape and value collection.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction policy.
+    /// - `input`: Owned values to validate and apply.
+    ///
+    /// # Returns
+    ///
+    /// Returns the dynamic value or a failure retaining the input.
     #[doc(hidden)]
     fn construct_dynamic<I>(
         descriptor: ConstructionDescriptor<'_>,
@@ -181,6 +312,25 @@ pub trait ConstructionMode: ValueMode {
     where
         I: ConstructionInputMode<Mode = Self> + ConstructionInput<Self>;
 
+    /// Constructs a dynamic output without enforcing reflected visibility
+    /// policy.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Sealed input shape and value collection.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction policy.
+    /// - `input`: Owned values to validate and apply.
+    ///
+    /// # Returns
+    ///
+    /// Returns the dynamic value or a failure retaining the input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants normally enforced by field visibility.
     #[doc(hidden)]
     unsafe fn construct_dynamic_unchecked<I>(
         descriptor: ConstructionDescriptor<'_>,
@@ -189,11 +339,44 @@ pub trait ConstructionMode: ValueMode {
     where
         I: ConstructionInputMode<Mode = Self> + ConstructionInput<Self>;
 
+    /// Applies named replacements to an owned base and returns the typed
+    /// result.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete updated output type.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and update policy.
+    /// - `input`: Base value and owned replacements.
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated value or a failure retaining the update input.
     #[doc(hidden)]
     fn update<T>(descriptor: ConstructionDescriptor<'_>, input: UpdateInput<Self>) -> Result<T, UpdateFailure<Self>>
     where
         T: ValueFor<Self>;
 
+    /// Applies replacements while bypassing reflected visibility policy.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete updated output type.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and update policy.
+    /// - `input`: Base value and owned replacements.
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated value or a failure retaining the update input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants normally enforced by field visibility.
     #[doc(hidden)]
     unsafe fn update_unchecked<T>(
         descriptor: ConstructionDescriptor<'_>,
@@ -202,12 +385,36 @@ pub trait ConstructionMode: ValueMode {
     where
         T: ValueFor<Self>;
 
+    /// Applies replacements and returns the result as a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and update policy.
+    /// - `input`: Base value and owned replacements.
+    ///
+    /// # Returns
+    ///
+    /// Returns the dynamic result or a failure retaining the update input.
     #[doc(hidden)]
     fn update_dynamic(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
     ) -> Result<DynamicOwned<Self>, UpdateFailure<Self>>;
 
+    /// Applies replacements dynamically without enforcing visibility policy.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and update policy.
+    /// - `input`: Base value and owned replacements.
+    ///
+    /// # Returns
+    ///
+    /// Returns the dynamic result or a failure retaining the update input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants normally enforced by field visibility.
     #[doc(hidden)]
     unsafe fn update_dynamic_unchecked(
         descriptor: ConstructionDescriptor<'_>,
@@ -216,6 +423,29 @@ pub trait ConstructionMode: ValueMode {
 }
 
 impl ConstructionMode for Local {
+    /// Constructs a typed output through the runtime for this value mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn construct<T, I>(descriptor: ConstructionDescriptor<'_>, input: I) -> Result<T, ConstructionFailure<Self>>
     where
         T: ValueFor<Self>,
@@ -225,6 +455,33 @@ impl ConstructionMode for Local {
             .construct_runtime::<T, Self>(input.__into_runtime())
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a typed output while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn construct_unchecked<T, I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -236,6 +493,27 @@ impl ConstructionMode for Local {
         unsafe { descriptor.construct_unchecked_runtime::<T, Self>(input.__into_runtime()) }
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a dynamic output through the runtime for this value mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn construct_dynamic<I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -247,6 +525,31 @@ impl ConstructionMode for Local {
             .construct_dynamic_runtime::<Self>(input.__into_runtime())
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a dynamic output while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn construct_dynamic_unchecked<I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -257,12 +560,60 @@ impl ConstructionMode for Local {
         unsafe { descriptor.construct_dynamic_unchecked_runtime::<Self>(input.__into_runtime()) }
             .map_err(ConstructionFailure::new)
     }
+    /// Applies named replacements to the owned base through the runtime.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn update<T>(descriptor: ConstructionDescriptor<'_>, input: UpdateInput<Self>) -> Result<T, UpdateFailure<Self>>
     where
         T: ValueFor<Self>,
     {
         descriptor.update_runtime::<T, Self>(input).map_err(UpdateFailure::new)
     }
+    /// Applies replacements while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn update_unchecked<T>(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -272,6 +623,16 @@ impl ConstructionMode for Local {
     {
         unsafe { descriptor.update_unchecked_runtime::<T, Self>(input) }.map_err(UpdateFailure::new)
     }
+    /// Applies named replacements and returns a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn update_dynamic(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -280,6 +641,20 @@ impl ConstructionMode for Local {
             .update_dynamic_runtime::<Self>(input)
             .map_err(UpdateFailure::new)
     }
+    /// Applies replacements dynamically while bypassing visibility checks.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn update_dynamic_unchecked(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -289,6 +664,29 @@ impl ConstructionMode for Local {
 }
 
 impl ConstructionMode for ThreadSafe {
+    /// Constructs a typed output through the runtime for this value mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn construct<T, I>(descriptor: ConstructionDescriptor<'_>, input: I) -> Result<T, ConstructionFailure<Self>>
     where
         T: ValueFor<Self>,
@@ -298,6 +696,33 @@ impl ConstructionMode for ThreadSafe {
             .construct_runtime::<T, Self>(input.__into_runtime())
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a typed output while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn construct_unchecked<T, I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -309,6 +734,27 @@ impl ConstructionMode for ThreadSafe {
         unsafe { descriptor.construct_unchecked_runtime::<T, Self>(input.__into_runtime()) }
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a dynamic output through the runtime for this value mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn construct_dynamic<I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -320,6 +766,31 @@ impl ConstructionMode for ThreadSafe {
             .construct_dynamic_runtime::<Self>(input.__into_runtime())
             .map_err(ConstructionFailure::new)
     }
+    /// Constructs a dynamic output while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn construct_dynamic_unchecked<I>(
         descriptor: ConstructionDescriptor<'_>,
         input: I,
@@ -330,12 +801,60 @@ impl ConstructionMode for ThreadSafe {
         unsafe { descriptor.construct_dynamic_unchecked_runtime::<Self>(input.__into_runtime()) }
             .map_err(ConstructionFailure::new)
     }
+    /// Applies named replacements to the owned base through the runtime.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn update<T>(descriptor: ConstructionDescriptor<'_>, input: UpdateInput<Self>) -> Result<T, UpdateFailure<Self>>
     where
         T: ValueFor<Self>,
     {
         descriptor.update_runtime::<T, Self>(input).map_err(UpdateFailure::new)
     }
+    /// Applies replacements while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and its construction or update policy.
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn update_unchecked<T>(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -345,6 +864,16 @@ impl ConstructionMode for ThreadSafe {
     {
         unsafe { descriptor.update_unchecked_runtime::<T, Self>(input) }.map_err(UpdateFailure::new)
     }
+    /// Applies named replacements and returns a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
     fn update_dynamic(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -353,6 +882,20 @@ impl ConstructionMode for ThreadSafe {
             .update_dynamic_runtime::<Self>(input)
             .map_err(UpdateFailure::new)
     }
+    /// Applies replacements dynamically while bypassing visibility checks.
+    ///
+    /// # Parameters
+    ///
+    /// - `descriptor`: Target metadata and construction or update policy.
+    /// - `input`: Owned input values retained for validation and recovery.
+    ///
+    /// # Returns
+    ///
+    /// Returns the value or a failure that retains the supplied input.
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold invariants protected by field visibility.
     unsafe fn update_dynamic_unchecked(
         descriptor: ConstructionDescriptor<'_>,
         input: UpdateInput<Self>,
@@ -369,28 +912,45 @@ pub trait ConstructionInputMode {
 }
 
 impl<M: ConstructionMode> ConstructionInputMode for NamedFields<M> {
+    /// Value mode used to store this input’s values.
     type Mode = M;
 }
 impl<M: ConstructionMode> ConstructionInputMode for PositionalFields<M> {
+    /// Value mode used to store this input’s values.
     type Mode = M;
 }
 impl ConstructionInputMode for UnitFields {
+    /// Value mode used to store this input’s values.
     type Mode = Local;
 }
 
 /// Opaque bridge used by the public input contract to reach runtime validation.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 #[doc(hidden)]
 pub struct RuntimeConstructionInput<M: ValueMode> {
+    /// Runtime input storage that owns the values until construction succeeds
+    /// or failure recovery.
     inner: runtime::input::ConstructionInputValue<M>,
 }
 
 impl<M: ValueMode> RuntimeConstructionInput<M> {
+    /// Wraps a runtime input value produced by the corresponding public
+    /// builder. # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
+    /// # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
     fn new(inner: runtime::input::ConstructionInputValue<M>) -> Self {
         Self { inner }
     }
 }
 
 impl<M: runtime::ConstructionMode> runtime::input::sealed::Sealed<M> for RuntimeConstructionInput<M> {
+    /// Transfers the retained input values into the construction runtime.
     fn into_input(self) -> runtime::input::ConstructionInputValue<M> {
         self.inner
     }
@@ -398,35 +958,46 @@ impl<M: runtime::ConstructionMode> runtime::input::sealed::Sealed<M> for Runtime
 impl<M: runtime::ConstructionMode> runtime::ConstructionInput<M> for RuntimeConstructionInput<M> {}
 
 /// Input shape accepted by construction operations.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 #[doc(hidden)]
 pub trait ConstructionInput<M: ConstructionMode> {
     /// Returns the shape of this input.
     fn shape(&self) -> ConstructionShape;
 
+    /// Moves this public input into the sealed runtime validation carrier.
     #[doc(hidden)]
     fn __into_runtime(self) -> RuntimeConstructionInput<M>;
 }
 
 impl<M: ConstructionMode> ConstructionInput<M> for NamedFields<M> {
+    /// Returns the input layout used to match values with target fields.
     fn shape(&self) -> ConstructionShape {
         ConstructionShape::Named
     }
+    /// Moves this public input into the sealed runtime validation carrier.
     fn __into_runtime(self) -> RuntimeConstructionInput<M> {
         RuntimeConstructionInput::new(self.inner.into_input())
     }
 }
 impl<M: ConstructionMode> ConstructionInput<M> for PositionalFields<M> {
+    /// Returns the input layout used to match values with target fields.
     fn shape(&self) -> ConstructionShape {
         ConstructionShape::Positional
     }
+    /// Moves this public input into the sealed runtime validation carrier.
     fn __into_runtime(self) -> RuntimeConstructionInput<M> {
         RuntimeConstructionInput::new(self.inner.into_input())
     }
 }
 impl<M: ConstructionMode> ConstructionInput<M> for UnitFields {
+    /// Returns the input layout used to match values with target fields.
     fn shape(&self) -> ConstructionShape {
         ConstructionShape::Unit
     }
+    /// Moves this public input into the sealed runtime validation carrier.
     fn __into_runtime(self) -> RuntimeConstructionInput<M> {
         RuntimeConstructionInput::new(RuntimeUnitFields::new().into_input())
     }
@@ -449,9 +1020,15 @@ pub enum ConstructionError {
     /// constructible.
     WrongTargetKind,
     /// The selected target is unavailable for the reported reasons.
-    Unavailable(ConstructionAvailability),
+    Unavailable(
+        /// Structured reasons this target cannot be constructed.
+        ConstructionAvailability,
+    ),
     /// The requested output type does not match the provider target type.
-    TargetTypeMismatch(crate::error::TypeMismatch),
+    TargetTypeMismatch(
+        /// Expected target type and type supplied by the caller.
+        crate::error::TypeMismatch,
+    ),
     /// The input layout does not match the target's construction shape.
     ShapeMismatch {
         /// Shape required by the target.
@@ -508,6 +1085,10 @@ pub enum ConstructionError {
 }
 
 impl fmt::Display for ConstructionError {
+    /// Formats the structured error using its stable debug representation.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{self:?}")
     }
@@ -515,10 +1096,18 @@ impl fmt::Display for ConstructionError {
 
 impl std::error::Error for ConstructionError {}
 
+/// Copies the expected and actual type identities into the public error type.
+/// # Parameters
+///
+/// - `inner`: Runtime representation being adapted to the public API.
 fn public_mismatch(inner: &crate::runtime::value::TypeMismatch) -> crate::error::TypeMismatch {
     inner.clone()
 }
 
+/// Maps every runtime construction error variant to its public counterpart.
+/// # Parameters
+///
+/// - `inner`: Runtime representation being adapted to the public API.
 fn public_construction_error(inner: &runtime::ConstructionError) -> ConstructionError {
     use runtime::ConstructionError as RuntimeError;
     match inner {
@@ -558,9 +1147,15 @@ fn public_construction_error(inner: &runtime::ConstructionError) -> Construction
 #[non_exhaustive]
 pub enum UpdateError {
     /// The supplied base value is not of the type being updated.
-    BaseTypeMismatch(crate::error::TypeMismatch),
+    BaseTypeMismatch(
+        /// Expected base type and type supplied by the caller.
+        crate::error::TypeMismatch,
+    ),
     /// The requested output type does not match the provider target type.
-    TargetTypeMismatch(crate::error::TypeMismatch),
+    TargetTypeMismatch(
+        /// Expected update target type and type requested by the caller.
+        crate::error::TypeMismatch,
+    ),
     /// Update was requested for a type or descriptor that cannot be updated.
     WrongTargetKind,
     /// The selected target has no registered update provider.
@@ -573,7 +1168,10 @@ pub enum UpdateError {
         count: usize,
     },
     /// The selected target is unavailable for the reported reasons.
-    Unavailable(ConstructionAvailability),
+    Unavailable(
+        /// Structured reasons this target cannot be updated.
+        ConstructionAvailability,
+    ),
     /// The input layout does not match the target's update shape.
     ShapeMismatch {
         /// Shape required by the target.
@@ -640,10 +1238,17 @@ pub enum UpdateError {
         reason: UpdateUnavailableReason,
     },
     /// The target cannot be updated for the reported reason.
-    UpdateUnavailable(UpdateUnavailableReason),
+    UpdateUnavailable(
+        /// Structured reason the target has no usable update path.
+        UpdateUnavailableReason,
+    ),
 }
 
 impl fmt::Display for UpdateError {
+    /// Formats the structured error using its stable debug representation.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{self:?}")
     }
@@ -651,6 +1256,10 @@ impl fmt::Display for UpdateError {
 
 impl std::error::Error for UpdateError {}
 
+/// Maps every runtime update error variant to its public counterpart.
+/// # Parameters
+///
+/// - `inner`: Runtime representation being adapted to the public API.
 fn public_update_error(inner: &runtime::UpdateError) -> UpdateError {
     use runtime::UpdateError as RuntimeError;
     match inner {
@@ -690,13 +1299,23 @@ fn public_update_error(inner: &runtime::UpdateError) -> UpdateError {
 }
 
 /// Construction failure with recoverable owned input.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 #[must_use]
 pub struct ConstructionFailure<M: ValueMode> {
+    /// Structured reason the construction or update operation failed.
     error: ConstructionError,
+    /// Original input retained so its values can be recovered after failure.
     recovery: RecoveredConstructionInput<M>,
 }
 
 impl<M: ValueMode> fmt::Debug for ConstructionFailure<M> {
+    /// Formats the structured error using its stable debug representation.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ConstructionFailure")
@@ -707,6 +1326,13 @@ impl<M: ValueMode> fmt::Debug for ConstructionFailure<M> {
 }
 
 impl<M: ValueMode> ConstructionFailure<M> {
+    /// Wraps a runtime input value produced by the corresponding public
+    /// builder. # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
+    /// # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
     fn new(inner: runtime::ConstructionFailure<M>) -> Self {
         let error = public_construction_error(inner.error());
         let recovery = recovered_input(inner.into_input());
@@ -731,15 +1357,40 @@ impl<M: ValueMode> ConstructionFailure<M> {
 
 /// Recovered construction values, preserving declaration-independent input
 /// order.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub enum RecoveredConstructionInput<M: ValueMode> {
     /// Recovered named field values.
-    Named(NamedFields<M>),
+    Named(
+        /// Builder containing the original name/value pairs.
+        NamedFields<M>,
+    ),
     /// Recovered positional values in their original order.
-    Positional(PositionalFields<M>),
+    Positional(
+        /// Builder containing the original positional values.
+        PositionalFields<M>,
+    ),
     /// Recovered empty input for a unit target.
-    Unit(UnitFields),
+    Unit(
+        /// Empty builder corresponding to the original unit input.
+        UnitFields,
+    ),
 }
 
+/// Converts runtime recovery values back into the corresponding public builder.
+/// # Parameters
+///
+/// - `input`: Owned values supplied for validation and application.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+///
+/// # Parameters
+///
+/// - `input`: Owned values supplied for validation and application.
 fn recovered_input<M: ValueMode>(input: runtime::RecoveredConstructionInput<M>) -> RecoveredConstructionInput<M> {
     match input {
         runtime::RecoveredConstructionInput::Named(inner) => RecoveredConstructionInput::Named(NamedFields { inner }),
@@ -751,7 +1402,13 @@ fn recovered_input<M: ValueMode>(input: runtime::RecoveredConstructionInput<M>) 
 }
 
 /// Recoverable construction input view.
+///
+/// # Type Parameters
+///
+/// - `'a`: Lifetime of the borrowed input or view.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct ConstructionRecovery<'a, M: ValueMode> {
+    /// Borrowed recovered input retained by the failure object.
     input: &'a RecoveredConstructionInput<M>,
 }
 
@@ -767,30 +1424,45 @@ impl<M: ValueMode> ConstructionRecovery<'_, M> {
 }
 
 impl<M: ValueMode> RecoverableFailure for ConstructionFailure<M> {
+    /// Public error category returned by the recoverable failure contract.
     type Error = ConstructionError;
+    /// Owned construction or update input retained on failure.
     type Recovery = RecoveredConstructionInput<M>;
 
+    /// Structured reason the construction or update operation failed.
     fn error(&self) -> &Self::Error {
         &self.error
     }
 
+    /// Original input retained so its values can be recovered after failure.
     fn recovery(&self) -> &Self::Recovery {
         &self.recovery
     }
 
+    /// Separates the structured error from the values retained for recovery.
     fn into_parts(self) -> (Self::Error, Self::Recovery) {
         (self.error, self.recovery)
     }
 }
 
 /// Failure from an owned update, retaining the base and every replacement.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 #[must_use]
 pub struct UpdateFailure<M: ValueMode> {
+    /// Structured reason the construction or update operation failed.
     error: UpdateError,
+    /// Original input retained so its values can be recovered after failure.
     recovery: UpdateInput<M>,
 }
 
 impl<M: ValueMode> fmt::Debug for UpdateFailure<M> {
+    /// Formats the structured error using its stable debug representation.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("UpdateFailure")
@@ -800,6 +1472,13 @@ impl<M: ValueMode> fmt::Debug for UpdateFailure<M> {
 }
 
 impl<M: ValueMode> UpdateFailure<M> {
+    /// Wraps a runtime input value produced by the corresponding public
+    /// builder. # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
+    /// # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
     fn new(inner: runtime::UpdateFailure<M>) -> Self {
         let error = public_update_error(inner.error());
         let recovery = UpdateInput {
@@ -830,29 +1509,55 @@ impl<M: ValueMode> UpdateFailure<M> {
 }
 
 impl<M: ValueMode> RecoverableFailure for UpdateFailure<M> {
+    /// Public error category returned by the recoverable failure contract.
     type Error = UpdateError;
+    /// Owned construction or update input retained on failure.
     type Recovery = UpdateInput<M>;
 
+    /// Structured reason the construction or update operation failed.
     fn error(&self) -> &Self::Error {
         &self.error
     }
 
+    /// Original input retained so its values can be recovered after failure.
     fn recovery(&self) -> &Self::Recovery {
         &self.recovery
     }
 
+    /// Separates the structured error from the values retained for recovery.
     fn into_parts(self) -> (Self::Error, Self::Recovery) {
         (self.error, self.recovery)
     }
 }
 
 /// Owned base value plus its named replacements.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct UpdateInput<M: ValueMode = Local> {
+    /// Runtime input storage that owns the values until construction succeeds
+    /// or failure recovery.
     inner: RuntimeUpdateInput<M>,
 }
 
 impl<M: ValueMode> UpdateInput<M> {
     /// Starts an update from a typed owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `base`: Owned base value whose fields may be replaced.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `base`: Owned base value whose fields may be replaced.
     pub fn new<T: ValueFor<M>>(base: T) -> Self {
         Self {
             inner: RuntimeUpdateInput::new(base),
@@ -860,6 +1565,10 @@ impl<M: ValueMode> UpdateInput<M> {
     }
 
     /// Starts an update from a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `base`: Owned base value whose fields may be replaced.
     pub fn from_dynamic(base: DynamicOwned<M>) -> Self {
         Self {
             inner: RuntimeUpdateInput::from_dynamic(base),
@@ -867,12 +1576,34 @@ impl<M: ValueMode> UpdateInput<M> {
     }
 
     /// Adds a typed replacement.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn field<T: ValueFor<M>>(mut self, name: impl Into<Box<str>>, value: T) -> Self {
         self.inner = self.inner.field(name, value);
         self
     }
 
     /// Adds a dynamically owned replacement.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn field_dynamic(mut self, name: impl Into<Box<str>>, value: DynamicOwned<M>) -> Self {
         self.inner = self.inner.field_dynamic(name, value);
         self
@@ -880,7 +1611,13 @@ impl<M: ValueMode> UpdateInput<M> {
 }
 
 /// Recovery view for an update failure.
+///
+/// # Type Parameters
+///
+/// - `'a`: Lifetime of the borrowed input or view.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct UpdateRecovery<'a, M: ValueMode> {
+    /// Borrowed recovered input retained by the failure object.
     input: &'a UpdateInput<M>,
 }
 
@@ -894,11 +1631,25 @@ impl<M: ValueMode> UpdateRecovery<'_, M> {
 /// Construction descriptor that always carries availability and field policy.
 #[derive(Clone, Copy)]
 pub struct ConstructionDescriptor<'ctx> {
+    /// Runtime input storage that owns the values until construction succeeds
+    /// or failure recovery.
     inner: runtime::ConstructionDescriptor<'ctx>,
+    /// Public descriptor identifying the struct or selected variant.
     target: ConstructionTarget<'ctx>,
 }
 
 impl<'ctx> ConstructionDescriptor<'ctx> {
+    /// Wraps a runtime input value produced by the corresponding public
+    /// builder. # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
+    /// - `target`: Target type whose effective method metadata is being
+    ///   resolved.
+    /// # Parameters
+    ///
+    /// - `inner`: Runtime representation being adapted to the public API.
+    /// - `target`: Target descriptor whose construction or method metadata is
+    ///   queried.
     fn new(inner: runtime::ConstructionDescriptor<'ctx>, target: ConstructionTarget<'ctx>) -> Self {
         Self { inner, target }
     }
@@ -924,6 +1675,20 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         ConstructionFields::new(self.inner.fields())
     }
 
+    /// Delegates typed construction to the runtime descriptor and preserves its
+    /// recovery input. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     fn construct_runtime<T, M>(self, input: RuntimeConstructionInput<M>) -> Result<T, runtime::ConstructionFailure<M>>
     where
         T: ValueFor<M>,
@@ -932,6 +1697,24 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.construct::<T, M, _>(input)
     }
 
+    /// Delegates typed construction while bypassing the visibility policy.
+    ///
+    /// # Safety
+    ///
+    /// The caller must preserve invariants normally enforced by reflected field
+    /// visibility. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     unsafe fn construct_unchecked_runtime<T, M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -943,6 +1726,18 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.construct_unchecked::<T, M, _>(input) }
     }
 
+    /// Delegates dynamic construction and preserves runtime validation
+    /// failures. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     fn construct_dynamic_runtime<M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -953,6 +1748,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.construct_dynamic::<M, _>(input)
     }
 
+    /// Delegates dynamic construction while bypassing the visibility policy.
+    ///
+    /// # Safety
+    ///
+    /// The caller must preserve invariants normally enforced by reflected field
+    /// visibility. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     unsafe fn construct_dynamic_unchecked_runtime<M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -963,6 +1774,20 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.construct_dynamic_unchecked::<M, _>(input) }
     }
 
+    /// Delegates typed update and preserves runtime recovery data.
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     fn update_runtime<T, M>(self, input: UpdateInput<M>) -> Result<T, runtime::UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -971,6 +1796,24 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.update::<T, M>(input.inner)
     }
 
+    /// Delegates typed update while bypassing the visibility policy.
+    ///
+    /// # Safety
+    ///
+    /// The caller must preserve invariants normally enforced by reflected field
+    /// visibility. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     unsafe fn update_unchecked_runtime<T, M>(self, input: UpdateInput<M>) -> Result<T, runtime::UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -979,6 +1822,18 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.update_unchecked::<T, M>(input.inner) }
     }
 
+    /// Delegates dynamic update to the runtime descriptor.
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     fn update_dynamic_runtime<M>(self, input: UpdateInput<M>) -> Result<DynamicOwned<M>, runtime::UpdateFailure<M>>
     where
         M: runtime::ConstructionMode,
@@ -986,6 +1841,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.update_dynamic(input.inner)
     }
 
+    /// Delegates dynamic update while bypassing the visibility policy.
+    ///
+    /// # Safety
+    ///
+    /// The caller must preserve invariants normally enforced by reflected field
+    /// visibility. # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     unsafe fn update_dynamic_unchecked_runtime<M>(
         self,
         input: UpdateInput<M>,
@@ -997,6 +1868,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Constructs a typed value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -1006,6 +1893,23 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Constructs a typed value while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1019,6 +1923,20 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Constructs a dynamically owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct_dynamic<I>(self, input: I) -> Result<DynamicOwned<I::Mode>, ConstructionFailure<I::Mode>>
     where
         I: ConstructionInputMode + ConstructionInput<I::Mode>,
@@ -1027,6 +1945,21 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Constructs a dynamic value while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1042,6 +1975,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Updates a typed owned struct value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn update<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -1051,6 +2000,20 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Updates a dynamic owned struct value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn update_dynamic<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -1059,6 +2022,23 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Updates a typed owned struct value while bypassing visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1072,6 +2052,21 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     }
 
     /// Updates a dynamic owned struct value while bypassing visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1091,6 +2086,22 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Constructs this struct into a typed owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -1100,6 +2111,23 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Constructs this struct while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1113,6 +2141,20 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Constructs this struct into a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct_dynamic<I>(self, input: I) -> Result<DynamicOwned<I::Mode>, ConstructionFailure<I::Mode>>
     where
         I: ConstructionInputMode + ConstructionInput<I::Mode>,
@@ -1122,6 +2164,21 @@ impl<'ctx> TypeDescriptor<'ctx> {
 
     /// Constructs this struct into a dynamic value while bypassing visibility
     /// checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1137,6 +2194,22 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Updates an owned struct value after validating every replacement.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn update<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -1146,6 +2219,23 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Updates a typed owned struct value while bypassing visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1159,6 +2249,20 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Updates a dynamic owned struct value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn update_dynamic<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -1167,6 +2271,21 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Updates a dynamic owned struct value while bypassing visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1187,6 +2306,22 @@ impl<'ctx> VariantDescriptor<'ctx> {
     }
 
     /// Constructs this enum variant into a typed owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -1196,6 +2331,20 @@ impl<'ctx> VariantDescriptor<'ctx> {
     }
 
     /// Constructs this enum variant into a dynamic owned value.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     pub fn construct_dynamic<I>(self, input: I) -> Result<DynamicOwned<I::Mode>, ConstructionFailure<I::Mode>>
     where
         I: ConstructionInputMode + ConstructionInput<I::Mode>,
@@ -1204,6 +2353,23 @@ impl<'ctx> VariantDescriptor<'ctx> {
     }
 
     /// Constructs this variant while bypassing reflected visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1217,6 +2383,21 @@ impl<'ctx> VariantDescriptor<'ctx> {
     }
 
     /// Constructs this variant dynamically while bypassing visibility checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
+    ///
+    /// - `I`: Input type carrying values for the operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: Owned values supplied for validation and application.
     ///
     /// # Safety
     /// The caller must uphold invariants protected by private or restricted
@@ -1297,7 +2478,7 @@ mod tests {
     }
 
     #[test]
-    fn construction_errors_preserve_every_runtime_error_detail() {
+    fn test_construction_errors_preserve_every_runtime_error_detail() {
         let mismatch = mismatch();
         let unavailable = ConstructionAvailability::Unavailable {
             reasons: Box::new([ConstructionUnavailableReason::PrivateRequiredField]),
@@ -1397,7 +2578,7 @@ mod tests {
     }
 
     #[test]
-    fn update_errors_preserve_every_runtime_error_detail() {
+    fn test_update_errors_preserve_every_runtime_error_detail() {
         let mismatch = mismatch();
         let unavailable = ConstructionAvailability::Unavailable {
             reasons: Box::new([ConstructionUnavailableReason::UnsupportedShape]),
@@ -1513,7 +2694,7 @@ mod tests {
     }
 
     #[test]
-    fn recovered_inputs_and_field_views_preserve_shape_and_bounds() {
+    fn test_recovered_inputs_and_field_views_preserve_shape_and_bounds() {
         let named = recovered_input(RuntimeRecoveredInput::Named(runtime::NamedFields::<Local>::new()));
         let positional = recovered_input(RuntimeRecoveredInput::Positional(
             runtime::PositionalFields::<Local>::new(),
@@ -1548,7 +2729,7 @@ mod tests {
     }
 
     #[test]
-    fn public_facade_constructs_and_updates_local_and_thread_safe_values() {
+    fn test_public_facade_constructs_and_updates_local_and_thread_safe_values() {
         let descriptor = crate::TypeDescriptor::of::<PublicRecord>();
         let plan = descriptor.construction();
         assert!(matches!(plan.target(), ConstructionTarget::Struct(_)));
@@ -1709,7 +2890,7 @@ mod tests {
     }
 
     #[test]
-    fn enum_variant_facade_covers_named_and_unit_construction_paths() {
+    fn test_enum_variant_facade_covers_named_and_unit_construction_paths() {
         let descriptor = crate::TypeDescriptor::of::<PublicEvent>();
         let named = descriptor.variant("Named").expect("named variant is reflected");
         assert!(matches!(named.construction().target(), ConstructionTarget::Variant(_)));
@@ -1741,7 +2922,7 @@ mod tests {
     }
 
     #[test]
-    fn public_failures_format_and_retain_update_and_construction_inputs() {
+    fn test_public_failures_format_and_retain_update_and_construction_inputs() {
         let descriptor = crate::TypeDescriptor::of::<PublicRecord>();
         let failure = descriptor
             .construct::<PublicRecord, _>(NamedFields::<Local>::new().field("id", "wrong".to_owned()))

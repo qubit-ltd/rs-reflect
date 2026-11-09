@@ -34,7 +34,7 @@ impl<T> Boxed<T> {
 }
 
 #[test]
-fn concrete_send_sync_binding_selects_thread_safe_adapter() {
+fn test_concrete_send_sync_binding_selects_thread_safe_adapter() {
     let binding = bind_method!(
         Boxed::<u32>::send_sync_value as thread_safe fn(&Boxed<u32>) -> u32
     );
@@ -65,7 +65,7 @@ fn concrete_send_sync_binding_selects_thread_safe_adapter() {
 }
 
 #[test]
-fn non_send_generic_target_uses_local_concrete_binding() {
+fn test_non_send_generic_target_uses_local_concrete_binding() {
     let binding = bind_method!(Boxed::<Rc<()>>::local_value as fn(&Boxed<Rc<()>>) -> usize);
     let context = ReflectionContext::builder()
         .include_linked()

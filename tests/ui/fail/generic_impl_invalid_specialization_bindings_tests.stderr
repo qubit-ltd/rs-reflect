@@ -1,11 +1,11 @@
 error: reflection helper `specialize` is unsupported; only `skip` is accepted
-  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:15:30
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:14:30
    |
-15 | #[qubit_reflect::ReflectImpl(specialize(T = u8))]
+14 | #[qubit_reflect::ReflectImpl(specialize(T = u8))]
    |                              ^^^^^^^^^^
 
 error: reflection helper `specialize` is unsupported; only `skip` is accepted
-  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:21:30
+  --> tests/ui/fail/generic_impl_invalid_specialization_bindings_tests.rs:20:30
    |
-21 | #[qubit_reflect::ReflectImpl(specialize(T = u8, T = u16, N = 4))]
+20 | #[qubit_reflect::ReflectImpl(specialize(T = u8, T = u16, N = 4))]
    |                              ^^^^^^^^^^

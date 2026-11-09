@@ -22,7 +22,7 @@ struct ContextFreezeFixture {
 }
 
 #[test]
-fn initialization_discovers_linked_builtins_and_derived_types() {
+fn test_initialization_discovers_linked_builtins_and_derived_types() {
     let context = ReflectionContext::global()
         .initialize()
         .expect("all static registrations must validate");
@@ -37,7 +37,7 @@ fn initialization_discovers_linked_builtins_and_derived_types() {
 }
 
 #[test]
-fn descriptor_queries_do_not_change_the_frozen_context_snapshot() {
+fn test_descriptor_queries_do_not_change_the_frozen_context_snapshot() {
     let context = ReflectionContext::global()
         .initialize()
         .expect("all static registrations must validate");

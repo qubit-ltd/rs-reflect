@@ -11,91 +11,48 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use crate::runtime::descriptor::Reflect;
 use crate::runtime::value as runtime_value;
 pub use crate::runtime::value::Local;
 pub use crate::runtime::value::ThreadSafe;
 
-mod sealed {
-    use super::Reflect;
-    use super::runtime_value;
+mod sealed;
+mod value_for;
+mod value_for_mut;
+mod value_for_ref;
 
-    // These traits are public within a private module so the public marker
-    // traits below can use them as sealed bounds without triggering
-    // `private_bounds`. Downstream crates cannot name this module, so the
-    // value-mode and conversion traits remain sealed.
-    pub trait Mode: 'static {
-        type Runtime: runtime_value::RuntimeValueMode;
-    }
-
-    pub trait OwnedValue<M: Mode>: Reflect + Sized + 'static + runtime_value::RuntimeValueFor<M::Runtime> {}
-
-    pub trait SharedValue<M: Mode>: Reflect + runtime_value::RuntimeValueForRef<M::Runtime> {}
-
-    pub trait MutableValue<M: Mode>: Reflect + runtime_value::RuntimeValueForMut<M::Runtime> {}
-
-    pub trait Sealed {}
-
-    impl<T: Reflect + Sized + 'static, M: Mode> OwnedValue<M> for T where T: runtime_value::RuntimeValueFor<M::Runtime> {}
-
-    impl<T: Reflect + ?Sized, M: Mode> SharedValue<M> for T where T: runtime_value::RuntimeValueForRef<M::Runtime> {}
-
-    impl<T: Reflect + ?Sized, M: Mode> MutableValue<M> for T where T: runtime_value::RuntimeValueForMut<M::Runtime> {}
-}
+use sealed::Mode as SealedMode;
+use sealed::Sealed;
+pub use value_for::ValueFor;
+pub use value_for_mut::ValueForMut;
+pub use value_for_ref::ValueForRef;
 
 /// A sealed mode controlling which values can cross a thread boundary.
-pub trait ValueMode: sealed::Mode + sealed::Sealed {}
+pub trait ValueMode: SealedMode + Sealed {
+    // empty
+}
 
-impl sealed::Sealed for Local {}
-impl sealed::Sealed for ThreadSafe {}
-impl sealed::Mode for Local {
-    type Runtime = runtime_value::Local;
-}
-impl sealed::Mode for ThreadSafe {
-    type Runtime = runtime_value::ThreadSafe;
-}
+impl Sealed for Local {}
+impl Sealed for ThreadSafe {}
 impl ValueMode for Local {}
 impl ValueMode for ThreadSafe {}
 
-/// A sealed marker for sized values that can be stored in a dynamic owner.
-pub trait ValueFor<M: ValueMode>: Reflect + Sized + 'static + sealed::OwnedValue<M> {}
-
-impl<T: Reflect + Sized + 'static> ValueFor<Local> for T where T: runtime_value::RuntimeValueFor<runtime_value::Local> {}
-
-impl<T: Reflect + Send + Sync + Sized + 'static> ValueFor<ThreadSafe> for T where
-    T: runtime_value::RuntimeValueFor<runtime_value::ThreadSafe>
-{
-}
-
-/// A sealed marker for values that can be represented by a shared dynamic
-/// borrow.
-pub trait ValueForRef<M: ValueMode>: Reflect + sealed::SharedValue<M> {}
-
-impl<T: Reflect + ?Sized> ValueForRef<Local> for T where T: runtime_value::RuntimeValueForRef<runtime_value::Local> {}
-
-impl<T: Reflect + Sync + ?Sized> ValueForRef<ThreadSafe> for T where
-    T: runtime_value::RuntimeValueForRef<runtime_value::ThreadSafe>
-{
-}
-
-/// A sealed marker for values that can be represented by a mutable dynamic
-/// borrow.
-pub trait ValueForMut<M: ValueMode>: Reflect + sealed::MutableValue<M> {}
-
-impl<T: Reflect + ?Sized> ValueForMut<Local> for T where T: runtime_value::RuntimeValueForMut<runtime_value::Local> {}
-
-impl<T: Reflect + Send + Sync + ?Sized> ValueForMut<ThreadSafe> for T where
-    T: runtime_value::RuntimeValueForMut<runtime_value::ThreadSafe>
-{
-}
-
 /// A failed exact downcast that retains its dynamic value.
+///
+/// # Type Parameters
+///
+/// * `V` — dynamic wrapper that retains the unmatched value.
 #[must_use]
 pub struct DowncastFailure<V> {
+    /// Dynamic value retained after its type did not match.
     value: V,
 }
 
 impl<V> DowncastFailure<V> {
+    /// Retains a value after a failed exact type conversion.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — original value that could not be converted.
     fn new(value: V) -> Self {
         Self { value }
     }
@@ -112,6 +69,11 @@ impl<V> DowncastFailure<V> {
 }
 
 impl<V> fmt::Debug for DowncastFailure<V> {
+    /// Formats the type of the retained value without requiring `V: Debug`.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — formatter receiving the failure description.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DowncastFailure")
@@ -121,13 +83,27 @@ impl<V> fmt::Debug for DowncastFailure<V> {
 }
 
 /// An owned dynamic value with a sealed value mode.
+///
+/// # Type Parameters
+///
+/// * `M` — value mode that controls supported dynamic conversions.
 pub struct DynamicOwned<M: ValueMode> {
+    /// Runtime wrapper that owns the erased value.
     inner: runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime>,
+    /// Associates the wrapper with its public value mode.
     mode: PhantomData<M>,
 }
 
 impl<M: ValueMode> DynamicOwned<M> {
     /// Stores a reflected value using the selected mode's compile-time bounds.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — concrete reflected value type to store.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — value transferred into the dynamic owner.
     pub fn new<T: ValueFor<M>>(value: T) -> Self {
         Self {
             inner: runtime_value::DynamicOwned::new(value),
@@ -135,10 +111,16 @@ impl<M: ValueMode> DynamicOwned<M> {
         }
     }
 
+    /// Converts this wrapper into its underlying runtime representation.
     pub(crate) fn into_runtime(self) -> runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime> {
         self.inner
     }
 
+    /// Wraps a runtime-owned value in the sealed public mode type.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` — owned runtime representation to wrap.
     pub(crate) fn from_runtime(inner: runtime_value::DynamicOwned<<M as sealed::Mode>::Runtime>) -> Self {
         Self {
             inner,
@@ -147,21 +129,37 @@ impl<M: ValueMode> DynamicOwned<M> {
     }
 
     /// Returns whether the exact stored type is `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to check.
     pub fn is<T: ValueFor<M>>(&self) -> bool {
         self.inner.is::<T>()
     }
 
     /// Borrows the stored value as `T` when its exact type matches.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to borrow.
     pub fn downcast_ref<T: ValueFor<M>>(&self) -> Option<&T> {
         self.inner.downcast_ref::<T>()
     }
 
     /// Mutably borrows the stored value as `T` when its exact type matches.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to borrow mutably.
     pub fn downcast_mut<T: ValueFor<M>>(&mut self) -> Option<&mut T> {
         self.inner.downcast_mut::<T>()
     }
 
     /// Takes the stored value as `T`, retaining it if its type does not match.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to recover.
     pub fn downcast<T: ValueFor<M>>(self) -> Result<T, DowncastFailure<Self>> {
         self.inner.downcast::<T>().map_err(|failure| {
             DowncastFailure::new(Self {
@@ -189,13 +187,28 @@ impl<M: ValueMode> DynamicOwned<M> {
 }
 
 /// A shared dynamic borrow with its original borrow lifetime.
+///
+/// # Type Parameters
+///
+/// * `'a` — lifetime of the retained shared borrow.
+/// * `M` — value mode that controls supported dynamic conversions.
 pub struct DynamicRef<'a, M: ValueMode> {
+    /// Runtime wrapper retaining the original shared borrow.
     inner: runtime_value::DynamicRef<'a, <M as sealed::Mode>::Runtime>,
+    /// Associates the wrapper with its public value mode.
     mode: PhantomData<M>,
 }
 
 impl<'a, M: ValueMode> DynamicRef<'a, M> {
     /// Erases a reflected shared borrow.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected value type being borrowed.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — shared borrow retained by the dynamic wrapper.
     pub fn new<T: ValueForRef<M> + ?Sized>(value: &'a T) -> Self {
         Self {
             inner: runtime_value::DynamicRef::new(value),
@@ -204,6 +217,10 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
     }
 
     /// Erases a string slice borrow.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — string slice borrow retained by the wrapper.
     pub fn new_str(value: &'a str) -> Self
     where
         str: ValueForRef<M>,
@@ -212,16 +229,28 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
     }
 
     /// Returns whether the exact borrowed type is `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to check.
     pub fn is<T: ValueForRef<M> + ?Sized>(&self) -> bool {
         self.inner.clone().is::<T>()
     }
 
     /// Borrows the value as `T` when its exact type matches.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to borrow.
     pub fn downcast_ref<T: ValueForRef<M> + ?Sized>(&self) -> Option<&T> {
         self.inner.downcast_ref::<T>()
     }
 
     /// Recovers the original shared borrow, retaining the wrapper on mismatch.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to recover.
     pub fn downcast<T: ValueForRef<M> + ?Sized>(self) -> Result<&'a T, DowncastFailure<Self>> {
         self.inner.downcast::<T>().map_err(|failure| {
             DowncastFailure::new(Self {
@@ -249,6 +278,7 @@ impl<'a, M: ValueMode> DynamicRef<'a, M> {
 }
 
 impl<M: ValueMode> Clone for DynamicRef<'_, M> {
+    /// Clones the shared dynamic borrow while preserving its lifetime.
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -258,13 +288,28 @@ impl<M: ValueMode> Clone for DynamicRef<'_, M> {
 }
 
 /// A mutable dynamic borrow with its original borrow lifetime.
+///
+/// # Type Parameters
+///
+/// * `'a` — lifetime of the retained exclusive borrow.
+/// * `M` — value mode that controls supported dynamic conversions.
 pub struct DynamicMut<'a, M: ValueMode> {
+    /// Runtime wrapper retaining the original exclusive borrow.
     inner: runtime_value::DynamicMut<'a, <M as sealed::Mode>::Runtime>,
+    /// Associates the wrapper with its public value mode.
     mode: PhantomData<M>,
 }
 
 impl<'a, M: ValueMode> DynamicMut<'a, M> {
     /// Erases a reflected mutable borrow.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected value type being borrowed.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — exclusive borrow retained by the dynamic wrapper.
     pub fn new<T: ValueForMut<M> + ?Sized>(value: &'a mut T) -> Self {
         Self {
             inner: runtime_value::DynamicMut::new(value),
@@ -273,6 +318,10 @@ impl<'a, M: ValueMode> DynamicMut<'a, M> {
     }
 
     /// Erases a mutable string slice borrow.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — mutable string slice borrow retained by the wrapper.
     pub fn new_str_mut(value: &'a mut str) -> Self
     where
         str: ValueForMut<M>,
@@ -281,21 +330,37 @@ impl<'a, M: ValueMode> DynamicMut<'a, M> {
     }
 
     /// Returns whether the exact borrowed type is `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to check.
     pub fn is<T: ValueForMut<M> + ?Sized>(&self) -> bool {
         self.inner.is::<T>()
     }
 
     /// Borrows the value as `T` when its exact type matches.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to borrow.
     pub fn downcast_ref<T: ValueForRef<M> + ?Sized>(&self) -> Option<&T> {
         self.inner.downcast_ref::<T>()
     }
 
     /// Mutably borrows the value as `T` when its exact type matches.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to borrow mutably.
     pub fn downcast_mut<T: ValueForMut<M> + ?Sized>(&mut self) -> Option<&mut T> {
         self.inner.downcast_mut::<T>()
     }
 
     /// Recovers the original mutable borrow, retaining the wrapper on mismatch.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected type to recover.
     pub fn downcast<T: ValueForMut<M> + ?Sized>(self) -> Result<&'a mut T, DowncastFailure<Self>> {
         self.inner.downcast::<T>().map_err(|failure| {
             DowncastFailure::new(Self {
@@ -339,8 +404,8 @@ mod tests {
     use super::DynamicOwned;
     use super::DynamicRef;
     use super::Local;
-    use super::Reflect;
     use super::ThreadSafe;
+    use crate::runtime::descriptor::Reflect;
 
     struct LocalOnly(Rc<Cell<u32>>);
 
@@ -351,7 +416,7 @@ mod tests {
     impl Reflect for SharedCounter {}
 
     #[test]
-    fn local_owned_adapter_preserves_typed_and_dynamic_values() {
+    fn test_local_owned_adapter_preserves_typed_and_dynamic_values() {
         let mut value = DynamicOwned::<Local>::new(LocalOnly(Rc::new(Cell::new(7))));
         assert!(value.is::<LocalOnly>());
         assert_eq!(value.downcast_ref::<LocalOnly>().map(|value| value.0.get()), Some(7));
@@ -380,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn thread_safe_owned_adapter_preserves_typed_and_dynamic_values() {
+    fn test_thread_safe_owned_adapter_preserves_typed_and_dynamic_values() {
         let mut value = DynamicOwned::<ThreadSafe>::new(SharedCounter(12));
         assert!(value.is::<SharedCounter>());
         assert_eq!(value.downcast_ref::<SharedCounter>().map(|value| value.0), Some(12));
@@ -400,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn local_borrowed_adapters_recover_and_retain_mismatches() {
+    fn test_local_borrowed_adapters_recover_and_retain_mismatches() {
         let local = LocalOnly(Rc::new(Cell::new(21)));
         let shared = DynamicRef::<Local>::new(&local);
         assert!(shared.is::<LocalOnly>());
@@ -429,7 +494,7 @@ mod tests {
     }
 
     #[test]
-    fn thread_safe_borrowed_adapters_support_sized_and_slice_values() {
+    fn test_thread_safe_borrowed_adapters_support_sized_and_slice_values() {
         let value = SharedCounter(40);
         let shared = DynamicRef::<ThreadSafe>::new(&value);
         assert_eq!(shared.downcast_ref::<SharedCounter>().map(|value| value.0), Some(40));

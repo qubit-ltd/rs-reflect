@@ -29,7 +29,7 @@ impl CapabilitySpec for ModelCapability {
 }
 
 #[test]
-fn public_consumer_keeps_descriptors_and_capabilities_bound_to_their_context() {
+fn test_public_consumer_keeps_descriptors_and_capabilities_bound_to_their_context() {
     let configured = ReflectionContext::builder()
         .include_type::<ConsumerRecord>()
         .include_type::<u32>()

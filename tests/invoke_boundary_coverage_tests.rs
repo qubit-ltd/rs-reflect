@@ -81,7 +81,7 @@ fn method(name: &str) -> qubit_reflect::MethodDescriptor<'static> {
 }
 
 #[test]
-fn invocation_preflight_checks_receiver_shape_and_recoverable_arguments() {
+fn test_invocation_preflight_checks_receiver_shape_and_recoverable_arguments() {
     let target = BoundaryTarget { value: 3 };
 
     let Err(missing) = method("shared").invoke(Invocation::<Local>::associated().arg(1_i32).arg(2_i32)) else {
@@ -213,7 +213,7 @@ fn invocation_preflight_checks_receiver_shape_and_recoverable_arguments() {
 }
 
 #[test]
-fn invocation_dispatch_covers_reordering_outputs_panics_and_unavailable_specializations() {
+fn test_invocation_dispatch_covers_reordering_outputs_panics_and_unavailable_specializations() {
     let target = BoundaryTarget { value: 10 };
     let output = method("shared")
         .invoke(

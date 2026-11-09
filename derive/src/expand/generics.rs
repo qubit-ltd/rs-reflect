@@ -10,10 +10,10 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse::Parser;
-use syn::punctuated::Punctuated;
 use syn::Meta;
 use syn::Token;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
 
 use crate::ir::TypeDeclarationIr;
 use crate::ir::TypeDeclarationKindIr;
@@ -64,6 +64,13 @@ pub(crate) fn parse_type_generics(declaration: &TypeDeclarationIr) -> syn::Resul
 /// are compiler evaluated after procedural macro expansion. Reapplying these
 /// attributes to generated items keeps their presence in step with the Rust
 /// field.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed type declaration retaining source attributes.
+/// - `variant_index`: Variant index for enum fields, or `None` for struct
+///   fields.
+/// - `field_index`: Source-order index of the field.
 #[must_use]
 pub(crate) fn field_cfg_attributes(
     declaration: &TypeDeclarationIr,
@@ -98,6 +105,10 @@ pub(crate) fn field_cfg_attributes(
 
 /// Converts field `cfg` and nested `cfg_attr` attributes to a predicate that
 /// describes when the source field exists in the compiled tuple shape.
+///
+/// # Parameters
+///
+/// - `attributes`: Source conditional attributes attached to the field.
 pub(crate) fn field_presence_predicate(attributes: &[syn::Attribute]) -> TokenStream {
     let constraints = attributes
         .iter()
@@ -106,6 +117,12 @@ pub(crate) fn field_presence_predicate(attributes: &[syn::Attribute]) -> TokenSt
     quote!(all(#(#constraints),*))
 }
 
+/// Converts one `cfg` or `cfg_attr` attribute into its field-presence
+/// predicate.
+///
+/// # Parameters
+///
+/// - `attribute`: Conditional attribute attached to a source field.
 fn attribute_presence_predicate(attribute: &syn::Attribute) -> Option<TokenStream> {
     if attribute.path().is_ident("cfg") {
         let predicate = attribute.parse_args::<Meta>().ok()?;
@@ -129,6 +146,11 @@ fn attribute_presence_predicate(attribute: &syn::Attribute) -> Option<TokenStrea
     Some(quote!(any(not(#gate), #nested)))
 }
 
+/// Converts nested conditional metadata into a field-presence predicate.
+///
+/// # Parameters
+///
+/// - `meta`: Nested conditional metadata from a `cfg_attr` attribute.
 fn meta_presence_predicate(meta: &Meta) -> Option<TokenStream> {
     if meta.path().is_ident("cfg") {
         let Meta::List(list) = meta else {
@@ -159,6 +181,11 @@ fn meta_presence_predicate(meta: &Meta) -> Option<TokenStream> {
 }
 
 /// Returns source `cfg` attributes for one enum variant.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed enum declaration retaining source attributes.
+/// - `variant_index`: Source-order index of the variant.
 #[must_use]
 pub(crate) fn variant_cfg_attributes(declaration: &TypeDeclarationIr, variant_index: usize) -> Vec<syn::Attribute> {
     let input: syn::DeriveInput =

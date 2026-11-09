@@ -34,7 +34,7 @@ fn assert_pointee(pointer: TypeDescriptor<'_>, pointee_type: std::any::TypeId) {
 }
 
 #[test]
-fn smart_pointer_descriptors_retain_the_exact_pointee_and_context() {
+fn test_smart_pointer_descriptors_retain_the_exact_pointee_and_context() {
     let context = ReflectionContext::builder()
         .include_type::<Rc<String>>()
         .include_type::<Arc<String>>()
@@ -58,7 +58,7 @@ fn smart_pointer_descriptors_retain_the_exact_pointee_and_context() {
 }
 
 #[test]
-fn smart_pointer_descriptors_retain_unsized_slice_pointees() {
+fn test_smart_pointer_descriptors_retain_unsized_slice_pointees() {
     let context = ReflectionContext::builder()
         .include_type::<Rc<[u8]>>()
         .include_type::<Arc<[u8]>>()

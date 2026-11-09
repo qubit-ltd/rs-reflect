@@ -38,17 +38,20 @@ use crate::ir::VisibilityIr;
 ///
 /// Returns a syntax diagnostic when the declaration is not a struct or retained
 /// generic syntax cannot be parsed.
-pub(crate) fn expand(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> syn::Result<TokenStream> {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     expand_v4(declaration, context)
 }
 
-fn expand_v4(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> syn::Result<TokenStream> {
+/// Generates reflection metadata, accessors, and providers for a struct.
+///
+/// Conditional fields and fields excluded by `reflect(skip)` remain unavailable
+/// to generated construction APIs.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed struct declaration to expand.
+/// - `context`: Expansion context providing runtime paths and stable identity.
+fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Struct {
         return Err(syn::Error::new(
             declaration.span,
@@ -77,9 +80,10 @@ fn expand_v4(
         .iter()
         .all(|field| supports_construction(&field.ty, &owner_name))
         && !has_skipped_source_field(&declaration)
-        && declaration.fields.iter().all(|field| {
-            super::generics::field_cfg_attributes(&declaration, None, field.index).is_empty()
-        })
+        && declaration
+            .fields
+            .iter()
+            .all(|field| super::generics::field_cfg_attributes(&declaration, None, field.index).is_empty())
         && visible_fields.len() == declaration.fields.len();
     {
         let where_clause = generics.make_where_clause();
@@ -90,9 +94,7 @@ fn expand_v4(
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = syn::Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#lifetime: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#lifetime: 'static));
         }
         for parameter in declaration
             .generics
@@ -101,9 +103,7 @@ fn expand_v4(
             .filter(|parameter| parameter.kind == GenericKindIr::Type)
         {
             let parameter = syn::Ident::new(&parameter.name, parameter.span);
-            where_clause
-                .predicates
-                .push(syn::parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field in visible_fields.iter().filter(|field| {
             supports_reflection(&field.ty, &owner_name)
@@ -130,10 +130,7 @@ fn expand_v4(
         } else {
             let binding = format_ident!("field_value");
             let pattern = tuple_field_patterns(&declaration, index, &binding);
-            (
-                quote!(match value { #pattern }),
-                quote!(match value { #pattern }),
-            )
+            (quote!(match value { #pattern }), quote!(match value { #pattern }))
         };
         let source_name = field
             .name
@@ -141,8 +138,7 @@ fn expand_v4(
             .map(ToString::to_string)
             .unwrap_or_else(|| index.to_string());
         let visibility = v4_visibility(&field.visibility, &facade, field.span);
-        let expression =
-            super::expression_codegen::type_expression(&field.ty, &environment, &facade);
+        let expression = super::expression_codegen::type_expression(&field.ty, &environment, &facade);
         field_functions.push(quote! {
             #(#cfg)*
             fn #get(value: &Self) -> & #ty { #getter_body }
@@ -161,12 +157,12 @@ fn expand_v4(
         } else {
             TokenStream::new()
         };
-        let thread_safe_dynamic =
-            if constructible && declaration.generics.params.is_empty() && !declaration.local_only {
-                quote!(.with_thread_safe_dynamic(#adapter))
-            } else {
-                TokenStream::new()
-            };
+        let thread_safe_dynamic = if constructible && declaration.generics.params.is_empty() && !declaration.local_only
+        {
+            quote!(.with_thread_safe_dynamic(#adapter))
+        } else {
+            TokenStream::new()
+        };
         let concrete_type = if supports_reflection(&field.ty, &owner_name) && cfg.is_empty() {
             quote!(.with_concrete_type::<#ty>())
         } else {
@@ -217,16 +213,10 @@ fn expand_v4(
     let kind = quote!(#facade::__private::codegen_v4::expression::TypeDefinitionKind::Struct(#struct_kind));
     let type_definition_ident = format_ident!("__qubit_reflect_type_definition");
     let definition_fn = format_ident!("{}_definition_registration", module);
-    let generic_definition = super::expression_codegen::generic_definition(
-        &declaration.generics,
-        declaration.span,
-        &facade,
-    );
-    let generic_arguments = super::expression_codegen::generic_arguments(
-        &declaration.generics,
-        &type_definition_ident,
-        &facade,
-    );
+    let generic_definition =
+        super::expression_codegen::generic_definition(&declaration.generics, declaration.span, &facade);
+    let generic_arguments =
+        super::expression_codegen::generic_arguments(&declaration.generics, &type_definition_ident, &facade);
     let type_definition_and_arguments = if declaration.generics.params.is_empty() {
         let rust_name = name.to_string();
         quote!({
@@ -333,6 +323,12 @@ fn expand_v4(
     })
 }
 
+/// Reports whether the type shape can be represented by generated constructors.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed field type to inspect recursively.
+/// - `owner_name`: Name of the struct being expanded.
 pub(super) fn supports_construction(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
     use crate::ir::TypeKindIr;
     if contains_recursive_owner_type(ty, owner_name) {
@@ -340,14 +336,19 @@ pub(super) fn supports_construction(ty: &crate::ir::TypeIr, owner_name: &str) ->
     }
     match &ty.kind {
         TypeKindIr::Path(path) if path.qualified_self.is_none() => !path.segments.is_empty(),
-        TypeKindIr::Tuple(values) => values
-            .iter()
-            .all(|value| supports_construction(value, owner_name)),
+        TypeKindIr::Tuple(values) => values.iter().all(|value| supports_construction(value, owner_name)),
         TypeKindIr::Array { element, .. } => supports_construction(element, owner_name),
         _ => false,
     }
 }
 
+/// Builds tuple patterns that account for fields conditionally removed by cfg.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed struct declaration retaining source cfg attributes.
+/// - `field_index`: Source-order index of the field to bind.
+/// - `binding`: Identifier used for the selected field.
 fn tuple_field_patterns(
     declaration: &TypeDeclarationIr,
     field_index: usize,
@@ -393,6 +394,12 @@ fn tuple_field_patterns(
     quote!(#(#arms)* _ => unreachable!("field is present in the active tuple shape"))
 }
 
+/// Reports whether a type shape can be recursively reflected without its owner.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed field type to inspect recursively.
+/// - `owner_name`: Name of the struct being expanded.
 pub(super) fn supports_reflection(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
     use crate::ir::TypeKindIr;
 
@@ -401,14 +408,18 @@ pub(super) fn supports_reflection(ty: &crate::ir::TypeIr, owner_name: &str) -> b
     }
     match &ty.kind {
         TypeKindIr::Path(path) if path.qualified_self.is_none() => !path.segments.is_empty(),
-        TypeKindIr::Tuple(values) => values
-            .iter()
-            .all(|value| supports_reflection(value, owner_name)),
+        TypeKindIr::Tuple(values) => values.iter().all(|value| supports_reflection(value, owner_name)),
         TypeKindIr::Array { element, .. } => supports_reflection(element, owner_name),
         _ => false,
     }
 }
 
+/// Detects an occurrence of the owning type anywhere within a type shape.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type expression searched for owner references.
+/// - `owner_name`: Name of the expanded struct, including `Self` references.
 fn contains_recursive_owner_type(ty: &crate::ir::TypeIr, owner_name: &str) -> bool {
     use crate::ir::PathArgumentIr;
     use crate::ir::PathArgumentsIr;
@@ -423,29 +434,23 @@ fn contains_recursive_owner_type(ty: &crate::ir::TypeIr, owner_name: &str) -> bo
                     .segments
                     .last()
                     .is_some_and(|segment| segment.name == owner_name || segment.name == "Self")
-                || path
-                    .segments
-                    .iter()
-                    .any(|segment| match &segment.arguments {
-                        PathArgumentsIr::AngleBracketed(arguments) => {
-                            arguments.iter().any(|argument| match argument {
-                                PathArgumentIr::Type(nested)
-                                | PathArgumentIr::AssociatedType { ty: nested, .. } => {
-                                    contains_recursive_owner_type(nested, owner_name)
-                                }
-                                _ => false,
-                            })
+                || path.segments.iter().any(|segment| match &segment.arguments {
+                    PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().any(|argument| match argument {
+                        PathArgumentIr::Type(nested) | PathArgumentIr::AssociatedType { ty: nested, .. } => {
+                            contains_recursive_owner_type(nested, owner_name)
                         }
-                        PathArgumentsIr::Parenthesized { inputs, output } => {
-                            inputs
-                                .iter()
-                                .any(|input| contains_recursive_owner_type(input, owner_name))
-                                || output.as_ref().is_some_and(|output| {
-                                    contains_recursive_owner_type(output, owner_name)
-                                })
-                        }
-                        PathArgumentsIr::None => false,
-                    })
+                        _ => false,
+                    }),
+                    PathArgumentsIr::Parenthesized { inputs, output } => {
+                        inputs
+                            .iter()
+                            .any(|input| contains_recursive_owner_type(input, owner_name))
+                            || output
+                                .as_ref()
+                                .is_some_and(|output| contains_recursive_owner_type(output, owner_name))
+                    }
+                    PathArgumentsIr::None => false,
+                })
         }
         TypeKindIr::Reference { element, .. }
         | TypeKindIr::Slice(element)
@@ -466,9 +471,15 @@ fn contains_recursive_owner_type(ty: &crate::ir::TypeIr, owner_name: &str) -> bo
     }
 }
 
+/// Reports whether a source struct field is excluded with `reflect(skip)`.
+///
+/// # Parameters
+///
+/// - `declaration`: Struct declaration whose retained source fields are
+///   checked.
 fn has_skipped_source_field(declaration: &TypeDeclarationIr) -> bool {
-    let input: syn::DeriveInput = syn::parse2(declaration.retained_tokens.clone())
-        .expect("the parser retains a valid struct declaration");
+    let input: syn::DeriveInput =
+        syn::parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid struct declaration");
     let syn::Data::Struct(data) = input.data else {
         return false;
     };
@@ -476,14 +487,20 @@ fn has_skipped_source_field(declaration: &TypeDeclarationIr) -> bool {
         field.attrs.iter().any(|attribute| {
             attribute.path().is_ident("reflect")
                 && attribute
-                    .parse_args_with(
-                        syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-                    )
+                    .parse_args_with(syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
                     .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
         })
     })
 }
 
+/// Builds constructor and update providers for all reflected struct fields.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed struct with source field metadata.
+/// - `facade`: Runtime facade path used in generated providers.
+/// - `constructible`: Whether every field has supported construction semantics.
+/// - `fingerprint`: Stable suffix identifying generated helper functions.
 fn struct_provider(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
@@ -509,14 +526,8 @@ fn struct_provider(
                 .any(|attribute| attribute.name == HelperName::Skip)
         })
         .collect();
-    let (local_functions, local_provider) = struct_provider_mode(
-        declaration,
-        facade,
-        &fields,
-        "local",
-        quote!(Local),
-        fingerprint,
-    );
+    let (local_functions, local_provider) =
+        struct_provider_mode(declaration, facade, &fields, "local", quote!(Local), fingerprint);
     let (thread_safe_functions, thread_safe_provider) =
         if declaration.generics.params.is_empty() && !declaration.local_only {
             struct_provider_mode(
@@ -531,7 +542,8 @@ fn struct_provider(
             (TokenStream::new(), TokenStream::new())
         };
     let make_functions = quote!(#local_functions #thread_safe_functions);
-    let local_providers = quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(Some(#local_provider)));
+    let local_providers =
+        quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(Some(#local_provider)));
     let provider = if declaration.generics.params.is_empty() && !declaration.local_only {
         quote!({
             let providers = #local_providers;
@@ -547,6 +559,16 @@ fn struct_provider(
     )
 }
 
+/// Builds generated constructor and update functions for one execution mode.
+///
+/// # Parameters
+///
+/// - `declaration`: Struct declaration used to assemble constructed values.
+/// - `facade`: Runtime facade path used by generated code.
+/// - `fields`: Fields included in this provider mode.
+/// - `suffix`: Name suffix distinguishing local and thread-safe helpers.
+/// - `mode`: Runtime ownership mode used by generated values.
+/// - `fingerprint`: Stable identifier included in helper names.
 fn struct_provider_mode(
     declaration: &TypeDeclarationIr,
     facade: &TokenStream,
@@ -608,11 +630,14 @@ fn struct_provider_mode(
     (functions, provider)
 }
 
-pub(super) fn v4_visibility(
-    visibility: &VisibilityIr,
-    facade: &TokenStream,
-    span: Span,
-) -> TokenStream {
+/// Maps parsed Rust visibility to the corresponding runtime access descriptor.
+///
+/// # Parameters
+///
+/// - `visibility`: Parsed source visibility to encode.
+/// - `facade`: Runtime facade path used in the generated expression.
+/// - `span`: Source location used for generated syntax.
+pub(super) fn v4_visibility(visibility: &VisibilityIr, facade: &TokenStream, span: Span) -> TokenStream {
     match visibility {
         VisibilityIr::Public => quote!(#facade::__private::codegen_v4::access::Visibility::Public),
         VisibilityIr::Crate => quote!(#facade::__private::codegen_v4::access::Visibility::Crate),
@@ -680,10 +705,7 @@ mod tests {
         );
         assert!(generated.contains("with_local_dynamic"));
         assert!(!generated.contains("with_thread_safe_dynamic"));
-        assert!(
-            !generated.contains("\"skipped\""),
-            "skipped fields produce no metadata"
-        );
+        assert!(!generated.contains("\"skipped\""), "skipped fields produce no metadata");
         for forbidden in [
             "TypeId",
             "TypeIdentity",
@@ -722,9 +744,8 @@ mod tests {
                 false,
             ),
         ] {
-            let parsed =
-                parse_and_validate_declaration(MacroKind::Derive, TokenStream::new(), source)
-                    .expect("the struct fixture should parse");
+            let parsed = parse_and_validate_declaration(MacroKind::Derive, TokenStream::new(), source)
+                .expect("the struct fixture should parse");
             let DeclarationIr::Type(declaration) = parsed.declaration else {
                 panic!("the fixture should be a struct");
             };
@@ -780,16 +801,13 @@ mod tests {
         let DeclarationIr::Type(declaration) = parsed.declaration else {
             panic!("the fixture should be a struct");
         };
-        let generated =
-            expand(declaration, &ExpansionContext::for_tests()).expect("the struct should expand");
+        let generated = expand(declaration, &ExpansionContext::for_tests()).expect("the struct should expand");
         let file = syn::parse2::<syn::File>(generated).expect("generated struct tokens must parse");
         let implementation = file
             .items
             .iter()
             .find_map(|item| match item {
-                syn::Item::Impl(implementation) if implementation.trait_.is_none() => {
-                    Some(implementation)
-                }
+                syn::Item::Impl(implementation) if implementation.trait_.is_none() => Some(implementation),
                 _ => None,
             })
             .expect("the expansion should contain an inherent helper impl");
@@ -809,9 +827,7 @@ mod tests {
             "__qubit_reflect_v4_update_local_",
         ] {
             assert!(
-                method_names
-                    .iter()
-                    .any(|name| name.starts_with(expected_prefix)),
+                method_names.iter().any(|name| name.starts_with(expected_prefix)),
                 "inherent helper impl must declare `{expected_prefix}…`: {method_names:?}"
             );
         }

@@ -38,12 +38,17 @@ use crate::runtime::short_name::short_name;
 /// A context-bound descriptor for a concrete Rust type.
 #[derive(Clone, Copy)]
 pub struct TypeDescriptor<'ctx> {
+    /// Static reflection metadata for the concrete Rust type.
     metadata: &'static TypeMetadata,
+    /// Context used to resolve registries associated with this descriptor.
     context: &'ctx ReflectionContext,
 }
 
 impl TypeDescriptor<'static> {
     /// Creates a descriptor using the process-wide reflection context.
+    ///
+    /// # Type Parameters
+    /// - `T`: reflected Rust type represented by the descriptor.
     pub fn of<T: Reflect + ?Sized>() -> Self {
         Self::new(T::__reflect_registration().metadata(), ReflectionContext::global())
     }
@@ -51,12 +56,23 @@ impl TypeDescriptor<'static> {
 
 impl<'ctx> TypeDescriptor<'ctx> {
     /// Creates a descriptor associated with `context`.
+    ///
+    /// # Type Parameters
+    /// - `T`: reflected Rust type represented by the descriptor.
+    ///
+    /// # Parameters
+    /// - `context`: reflection context used for registry queries.
     pub fn of_in<T: Reflect + ?Sized>(context: &'ctx ReflectionContext) -> Self {
         Self::new(T::__reflect_registration().metadata(), context)
     }
 }
 
 impl<'ctx> TypeDescriptor<'ctx> {
+    /// Creates a context-bound descriptor from static metadata.
+    ///
+    /// # Parameters
+    /// - `metadata`: registered type metadata to describe.
+    /// - `context`: reflection context used for registry queries.
     pub(crate) fn new(metadata: &'static TypeMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -87,6 +103,7 @@ impl<'ctx> TypeDescriptor<'ctx> {
         self.metadata.rust_name()
     }
 
+    /// Returns the full identity used for registry queries.
     pub(crate) fn type_identity(self) -> TypeIdentity {
         TypeIdentity {
             type_id: self.type_id(),
@@ -94,12 +111,15 @@ impl<'ctx> TypeDescriptor<'ctx> {
         }
     }
 
+    /// Returns the reflected structural shape, consulting the context when
+    /// needed.
     pub(crate) fn shape_metadata(self) -> Option<&'static super::type_kind::TypeKindMetadata> {
         self.metadata
             .shape()
             .or_else(|| self.context.shape_for(self.type_id()).ok().flatten())
     }
 
+    /// Returns the optional input layout declared for construction.
     pub(crate) fn construction_shape_metadata(self) -> Option<crate::runtime::construct::ConstructionShape> {
         self.metadata.construction_shape()
     }
@@ -166,6 +186,9 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Finds a capability using its statically declared adapter contract.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn find_capability<C: CapabilitySpec>(self) -> Result<Option<Capability<'ctx, C>>, CapabilityError> {
         self.capabilities()?.find::<C>()
     }
@@ -175,25 +198,38 @@ impl<'ctx> TypeDescriptor<'ctx> {
     ///
     /// Returns an error when the capability ID exists with a different adapter
     /// type.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn has_capability<C: CapabilitySpec>(self) -> Result<bool, CapabilityError> {
         self.find_capability::<C>().map(|capability| capability.is_some())
     }
 
     /// Requires a capability using its statically declared adapter contract.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn capability<C: CapabilitySpec>(self) -> Result<Capability<'ctx, C>, CapabilityError> {
         self.capabilities()?.capability::<C>()
     }
 
+    /// Returns generated construction plans bound to this context.
     pub(crate) fn construction_plans(self) -> Result<Box<[ConstructionDescriptor<'ctx>]>, ContextError> {
         self.context.construction_plans(self.type_id())
     }
 
     /// Looks up methods by name while preserving ambiguity information.
+    ///
+    /// # Parameters
+    /// - `name`: method name to look up.
     pub fn lookup_method(self, name: &str) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
         MethodCatalog::from_shared(self, self.context.methods_for(self.type_id())?).lookup_method(name)
     }
 
     /// Requires a unique method with the requested name.
+    ///
+    /// # Parameters
+    /// - `name`: method name to resolve.
     pub fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.lookup_method(name).map_err(LookupError::Context)?.into_unique(
             crate::runtime::error::LookupSubject::Method,
@@ -234,11 +270,17 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Finds the implementation for one exact trait application.
+    ///
+    /// # Parameters
+    /// - `trait_`: reflected trait application to find on this type.
     pub fn find_trait_impl(self, trait_: TraitDescriptor<'ctx>) -> Result<Option<ImplDescriptor<'ctx>>, ContextError> {
         self.trait_impls()?.find_trait_application(trait_)
     }
 
     /// Requires the implementation for one exact trait application.
+    ///
+    /// # Parameters
+    /// - `trait_`: reflected trait application that must be implemented.
     pub fn trait_impl(self, trait_: TraitDescriptor<'ctx>) -> Result<ImplDescriptor<'ctx>, LookupError> {
         self.find_trait_impl(trait_)
             .map_err(LookupError::Context)?
@@ -249,6 +291,9 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Looks up trait implementations by declaration, preserving ambiguity.
+    ///
+    /// # Parameters
+    /// - `trait_`: source trait declaration whose applications to find.
     pub fn lookup_trait_impl_by_definition(
         self,
         trait_: TraitDefinitionDescriptor<'ctx>,
@@ -257,6 +302,9 @@ impl<'ctx> TypeDescriptor<'ctx> {
     }
 
     /// Requires exactly one implementation application of a trait declaration.
+    ///
+    /// # Parameters
+    /// - `trait_`: source trait declaration that must have one application.
     pub fn trait_impl_by_definition(
         self,
         trait_: TraitDefinitionDescriptor<'ctx>,

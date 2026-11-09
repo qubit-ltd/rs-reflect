@@ -26,7 +26,7 @@ impl CapabilitySpec for DuplicateCapability {
 }
 
 #[test]
-fn duplicate_typed_providers_return_a_structured_context_issue() {
+fn test_duplicate_typed_providers_return_a_structured_context_issue() {
     let result = ReflectionContext::builder()
         .include_type::<DuplicateTarget>()
         .register(CapabilityRegistration::for_type::<DuplicateTarget, DuplicateCapability>(3))

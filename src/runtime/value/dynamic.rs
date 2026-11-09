@@ -27,13 +27,27 @@ pub enum DynamicValueKind {
 }
 
 /// A tagged dynamic value that retains whether it is owned or borrowed.
+///
+/// # Type Parameters
+///
+/// * `'a` — maximum lifetime of a borrow held by the value.
+/// * `M` — local or thread-safe value handling mode.
 pub enum DynamicValue<'a, M: ValueMode = super::mode::Local> {
     /// An owned reflected value.
-    Owned(DynamicOwned<M>),
+    Owned(
+        /// Value retained by ownership.
+        DynamicOwned<M>,
+    ),
     /// A shared borrow of a reflected value.
-    Ref(DynamicRef<'a, M>),
+    Ref(
+        /// Borrow handle retaining the shared reference.
+        DynamicRef<'a, M>,
+    ),
     /// An exclusive borrow of a reflected value.
-    Mut(DynamicMut<'a, M>),
+    Mut(
+        /// Borrow handle retaining the exclusive reference.
+        DynamicMut<'a, M>,
+    ),
 }
 
 impl<'a, M: ValueMode> DynamicValue<'a, M> {
@@ -61,6 +75,10 @@ impl<'a, M: ValueMode> DynamicValue<'a, M> {
     }
 
     /// Describes the represented type using `context`.
+    ///
+    /// # Parameters
+    ///
+    /// * `context` — reflection context used to resolve the represented type.
     pub fn ty_in<'ctx>(&self, context: &'ctx ReflectionContext) -> TypeDescriptor<'ctx> {
         match self {
             Self::Owned(value) => value.ty_in(context),
@@ -82,6 +100,10 @@ impl<'a, M: ValueMode> DynamicValue<'a, M> {
     ///
     /// Returns the original tagged value when it is borrowed or its concrete
     /// type differs from `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to recover.
     pub fn into_owned<T: super::owned::ValueFor<M>>(self) -> Result<T, Self> {
         match self {
             Self::Owned(value) => match value.downcast::<T>() {
@@ -96,6 +118,10 @@ impl<'a, M: ValueMode> DynamicValue<'a, M> {
     ///
     /// Returns the original tagged value when it is not shared or its
     /// concrete type differs from `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to borrow.
     pub fn into_ref<T: super::borrowed::ValueForRef<M> + ?Sized>(self) -> Result<&'a T, Self> {
         match self {
             Self::Ref(value) => match value.downcast::<T>() {
@@ -110,6 +136,10 @@ impl<'a, M: ValueMode> DynamicValue<'a, M> {
     ///
     /// Returns the original tagged value when it is not mutable or its
     /// concrete type differs from `T`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected concrete type to borrow mutably.
     pub fn into_mut<T: super::borrowed::ValueForMut<M> + ?Sized>(self) -> Result<&'a mut T, Self> {
         match self {
             Self::Mut(value) => match value.downcast::<T>() {

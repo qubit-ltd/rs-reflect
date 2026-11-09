@@ -6,16 +6,13 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use qubit_reflect::ReflectionContext;
+use qubit_reflect::TypeDescriptor;
 use qubit_reflect::capability::CapabilityKey;
 use qubit_reflect::context::ReflectRegistry;
 use qubit_reflect::descriptor::ReflectedType;
-use qubit_reflect::ReflectionContext;
-use qubit_reflect::TypeDescriptor;
 
-fn old_require_methods_are_not_public(
-    context: &ReflectionContext,
-    descriptor: TypeDescriptor<'static>,
-) {
+fn old_require_methods_are_not_public(context: &ReflectionContext, descriptor: TypeDescriptor<'static>) {
     let _ = context.require_type_by_name("fixture::Type");
     let _ = descriptor.require_field("field");
     let _ = descriptor.require_method("method");

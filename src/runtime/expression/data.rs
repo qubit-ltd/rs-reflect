@@ -14,7 +14,10 @@ pub enum LifetimeExpression {
     /// The `'static` lifetime.
     Static,
     /// A named lifetime without its leading apostrophe.
-    Named(&'static str),
+    Named(
+        /// Lifetime name without the source apostrophe.
+        &'static str,
+    ),
     /// A lifetime omitted in the source and elided by Rust.
     Elided,
     /// The placeholder lifetime `'_`.
@@ -25,22 +28,48 @@ pub enum LifetimeExpression {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConstExpression {
     /// A signed integer value recorded without evaluating source code.
-    SignedInteger(i128),
+    SignedInteger(
+        /// Signed const value preserved as source metadata.
+        i128,
+    ),
     /// An unsigned integer value recorded without evaluating source code.
-    UnsignedInteger(u128),
+    UnsignedInteger(
+        /// Unsigned const value preserved as source metadata.
+        u128,
+    ),
     /// A boolean const value.
-    Boolean(bool),
+    Boolean(
+        /// Boolean const value preserved as source metadata.
+        bool,
+    ),
     /// A character const value.
-    Character(char),
+    Character(
+        /// Character const value preserved as source metadata.
+        char,
+    ),
     /// A const generic parameter name.
-    Parameter(&'static str),
+    Parameter(
+        /// Const generic parameter name as written in source.
+        &'static str,
+    ),
     /// A path retained as a const expression.
-    Path(&'static str),
+    Path(
+        /// Const path retained without evaluating the Rust expression.
+        &'static str,
+    ),
 }
 
 impl ConstExpression {
     /// Converts a supported Rust const-generic value to its structural
     /// representation.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — supported primitive const type.
+    ///
+    /// # Parameters
+    ///
+    /// * `value` — const value to retain in reflection metadata.
     #[doc(hidden)]
     pub fn from_const<T: IntoConstExpression>(value: T) -> Self {
         value.into_const_expression()
@@ -78,12 +107,14 @@ signed_const_expression!(i8, i16, i32, i64, i128, isize);
 unsigned_const_expression!(u8, u16, u32, u64, u128, usize);
 
 impl IntoConstExpression for bool {
+    /// Retains the boolean value as structural const metadata.
     fn into_const_expression(self) -> ConstExpression {
         ConstExpression::Boolean(self)
     }
 }
 
 impl IntoConstExpression for char {
+    /// Retains the character value as structural const metadata.
     fn into_const_expression(self) -> ConstExpression {
         ConstExpression::Character(self)
     }
@@ -94,11 +125,20 @@ impl IntoConstExpression for char {
 #[derive(Clone, Copy)]
 pub enum GenericExpressionArgument {
     /// A nested type expression.
-    Type(&'static ExpressionData),
+    Type(
+        /// Nested type expression supplied as the generic argument.
+        &'static ExpressionData,
+    ),
     /// A lifetime argument.
-    Lifetime(LifetimeExpression),
+    Lifetime(
+        /// Lifetime argument supplied to the source type.
+        LifetimeExpression,
+    ),
     /// A const argument.
-    Const(ConstExpression),
+    Const(
+        /// Structural const argument supplied to the source type.
+        ConstExpression,
+    ),
     /// An associated-type equality.
     AssociatedType {
         /// Associated-type name.
@@ -150,7 +190,10 @@ pub enum PredicateData {
         right: &'static ExpressionData,
     },
     /// A const expression appears in a const-evaluatable predicate.
-    ConstEvaluatable(ConstExpression),
+    ConstEvaluatable(
+        /// Const expression whose evaluatability is required by the predicate.
+        ConstExpression,
+    ),
 }
 
 /// The modifier syntax attached to a Rust trait bound.
@@ -176,6 +219,12 @@ pub struct TraitExpressionData {
 
 impl TraitExpressionData {
     /// Creates static source facts for a trait path and its generic arguments.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — trait path as written in source.
+    /// * `arguments` — type, lifetime, const, and associated-type arguments.
+    /// * `lifetimes` — explicit lifetime arguments in source order.
     pub const fn new(
         path: &'static str,
         arguments: &'static [GenericExpressionArgument],
@@ -203,11 +252,17 @@ pub enum ExpressionData {
         arguments: &'static [GenericExpressionArgument],
     },
     /// A generic parameter linked to its declaration metadata.
-    Parameter(&'static GenericParameterMetadata),
+    Parameter(
+        /// Declaration metadata for the referenced type parameter.
+        &'static GenericParameterMetadata,
+    ),
     /// A source generic parameter referenced by name when no definition link is
     /// available.
     /// A generic parameter referenced by name without a metadata link.
-    ParameterName(&'static str),
+    ParameterName(
+        /// Source name of the generic parameter.
+        &'static str,
+    ),
     /// The special `Self` type.
     SelfType,
     /// An associated-type projection.
@@ -238,7 +293,10 @@ pub enum ExpressionData {
         target: &'static ExpressionData,
     },
     /// A slice type and its element expression.
-    Slice(&'static ExpressionData),
+    Slice(
+        /// Element type expression of the slice.
+        &'static ExpressionData,
+    ),
     /// An array type and its structural length expression.
     Array {
         /// Element type expression.
@@ -247,13 +305,25 @@ pub enum ExpressionData {
         length: ConstExpression,
     },
     /// Tuple element expressions in source order.
-    Tuple(&'static [&'static ExpressionData]),
+    Tuple(
+        /// Element expressions in tuple declaration order.
+        &'static [&'static ExpressionData],
+    ),
     /// Function pointer signature facts.
-    FunctionPointer(&'static FunctionPointerData),
+    FunctionPointer(
+        /// Signature facts for the function pointer.
+        &'static FunctionPointerData,
+    ),
     /// Trait-object bounds and optional object lifetime.
-    TraitObject(&'static TraitObjectData),
+    TraitObject(
+        /// Bound facts and object lifetime for the trait object.
+        &'static TraitObjectData,
+    ),
     /// Bounds of an opaque `impl Trait` type.
-    Opaque(&'static OpaqueTypeData),
+    Opaque(
+        /// Bounds retained from the opaque `impl Trait` expression.
+        &'static OpaqueTypeData,
+    ),
     /// The never type `!`.
     Never,
 }
@@ -278,6 +348,15 @@ pub struct FunctionPointerData {
 
 impl FunctionPointerData {
     /// Creates static source facts for a function pointer type.
+    ///
+    /// # Parameters
+    ///
+    /// * `arguments` — parameter type expressions in source order.
+    /// * `result` — explicit return expression, or `None` when omitted.
+    /// * `unsafe_` — whether the function pointer is declared unsafe.
+    /// * `abi` — explicit ABI name, or `None` for Rust's default ABI.
+    /// * `variadic` — whether the signature accepts a variadic argument list.
+    /// * `lifetimes` — explicit higher-ranked lifetimes.
     pub const fn new(
         arguments: &'static [&'static ExpressionData],
         result: Option<&'static ExpressionData>,
@@ -309,6 +388,11 @@ pub struct TraitObjectData {
 
 impl TraitObjectData {
     /// Creates static source facts for a trait-object type.
+    ///
+    /// # Parameters
+    ///
+    /// * `traits` — trait bounds in source order.
+    /// * `lifetime` — explicit object lifetime, if present.
     pub const fn new(traits: &'static [TraitExpressionData], lifetime: Option<LifetimeExpression>) -> Self {
         Self { traits, lifetime }
     }
@@ -324,6 +408,10 @@ pub struct OpaqueTypeData {
 
 impl OpaqueTypeData {
     /// Creates static source facts for an opaque type's bounds.
+    ///
+    /// # Parameters
+    ///
+    /// * `bounds` — predicates retained from the opaque type bounds.
     pub const fn new(bounds: &'static [PredicateData]) -> Self {
         Self { bounds }
     }
@@ -375,7 +463,7 @@ mod tests {
     ];
 
     #[test]
-    fn primitive_const_conversions_preserve_signedness_and_values() {
+    fn test_primitive_const_conversions_preserve_signedness_and_values() {
         assert_eq!(
             ConstExpression::from_const(i8::MIN),
             ConstExpression::SignedInteger(i8::MIN as i128)
@@ -426,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn constructors_and_argument_views_preserve_empty_and_ordered_facts() {
+    fn test_constructors_and_argument_views_preserve_empty_and_ordered_facts() {
         static ARGUMENTS: [GenericExpressionArgument; 5] = [
             GenericExpressionArgument::Type(&TYPE),
             GenericExpressionArgument::Lifetime(LifetimeExpression::Static),
@@ -510,7 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_variants_retain_nested_context_and_values() {
+    fn test_predicate_variants_retain_nested_context_and_values() {
         static PREDICATES: [PredicateData; 5] = [
             PredicateData::TraitBound {
                 ty: &TYPE,
@@ -571,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    fn function_trait_object_and_opaque_constructors_format_edge_cases() {
+    fn test_function_trait_object_and_opaque_constructors_format_edge_cases() {
         static FUNCTION_ARGS: [&ExpressionData; 1] = [&U8];
         static FUNCTION: FunctionPointerData = FunctionPointerData::new(
             &FUNCTION_ARGS,

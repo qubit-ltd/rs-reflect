@@ -29,16 +29,27 @@ pub trait Reflect: 'static {
 }
 
 /// Static type metadata retained by the reflection runtime.
+///
+/// # Type Parameters
+/// - `T`: the Rust type represented by this registration.
 pub struct TypeRegistration<T: ?Sized + 'static> {
+    /// Shared identity and generic metadata for the registered Rust type.
     metadata: TypeMetadata,
+    /// Optional structural metadata for this type.
     shape: Option<&'static TypeKindMetadata>,
+    /// Optional source type definition represented by this registration.
     type_definition: Option<&'static TypeDefinitionMetadata>,
+    /// Generated construction plans associated with this type.
     construction_plans: &'static [ConstructionPlan],
+    /// Associates this registration with its Rust type without storing a value.
     _type: PhantomData<fn() -> T>,
 }
 
 impl<T: ?Sized + 'static> TypeRegistration<T> {
     /// Creates a registration containing only the concrete type identity.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type represented by the registration.
     pub const fn new() -> Self {
         Self {
             metadata: TypeMetadata::new::<T>(),
@@ -50,6 +61,14 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
     }
 
     /// Creates a registration with static source shape and construction plans.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type represented by the registration.
+    ///
+    /// # Parameters
+    /// - `shape`: structural metadata describing the type.
+    /// - `type_definition`: optional source definition metadata.
+    /// - `construction_plans`: generated construction plans for the type.
     pub fn with_shape(
         shape: &'static TypeKindMetadata,
         type_definition: Option<&'static TypeDefinitionMetadata>,
@@ -70,6 +89,12 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
 
     /// Returns the stable registration for this concrete type, initializing it
     /// once.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type whose registration is requested.
+    ///
+    /// # Parameters
+    /// - `initialize`: creates the registration when the cache has no entry.
     pub fn get_or_init_with(initialize: impl FnOnce() -> Self) -> &'static Self {
         let type_id = TypeId::of::<T>();
         let cell = {
@@ -85,11 +110,18 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
             .expect("registration cache is keyed by exact TypeId")
     }
 
+    /// Returns the shared metadata associated with this registration.
     pub(crate) fn metadata(&'static self) -> &'static TypeMetadata {
         &self.metadata
     }
 
     /// Adds concrete arguments retained for this compiled type application.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type represented by the registration.
+    ///
+    /// # Parameters
+    /// - `arguments`: generic arguments to retain in the registration.
     #[doc(hidden)]
     pub fn with_generic_arguments(
         mut self,
@@ -99,19 +131,25 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
         self
     }
 
+    /// Returns the optional structural metadata for this type.
     pub(crate) fn shape(&'static self) -> Option<&'static TypeKindMetadata> {
         self.shape
     }
 
+    /// Returns the optional source definition for this type.
     pub(crate) fn type_definition(&'static self) -> Option<&'static TypeDefinitionMetadata> {
         self.type_definition
     }
 
+    /// Returns the generated construction plans for this type.
     pub(crate) fn construction_plans(&'static self) -> &'static [ConstructionPlan] {
         self.construction_plans
     }
 
     /// Returns a source variant by index when this registration has enum shape.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based variant index in the enum metadata.
     pub fn variant(&'static self, index: usize) -> Option<&'static VariantMetadata> {
         match self.shape? {
             TypeKindMetadata::Enum(variants) => variants.get(index),
@@ -121,13 +159,16 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
 }
 
 impl<T: ?Sized + 'static> Default for TypeRegistration<T> {
+    /// Creates the default registration for `T`.
     fn default() -> Self {
         Self::new()
     }
 }
 
+/// Cache key and registration cell for each concrete reflected type.
 type RegistrationCache = HashMap<TypeId, &'static OnceLock<Box<dyn Any + Send + Sync>>>;
 
+/// Returns the process-wide cache of type registrations.
 fn registration_cache() -> &'static Mutex<RegistrationCache> {
     static REGISTRATIONS: OnceLock<Mutex<RegistrationCache>> = OnceLock::new();
     REGISTRATIONS.get_or_init(|| Mutex::new(HashMap::new()))

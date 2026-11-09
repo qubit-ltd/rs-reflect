@@ -370,7 +370,7 @@ fn make_context() -> ReflectionContext {
 }
 
 #[test]
-fn trait_applications_keep_distinct_generic_arguments() {
+fn test_trait_applications_keep_distinct_generic_arguments() {
     let context = make_context();
     let definition = TraitDefinitionDescriptor::new(&TRAIT_DEFINITION, &context);
     let applications = definition.applications().expect("trait applications");
@@ -409,7 +409,7 @@ fn trait_applications_keep_distinct_generic_arguments() {
 }
 
 #[test]
-fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
+fn test_impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
     let context = make_context();
     let applications = Impls::new(
         vec![
@@ -495,7 +495,7 @@ fn impl_lookup_is_exact_by_application_and_ambiguous_by_definition() {
 }
 
 #[test]
-fn effective_methods_and_associated_item_sources_preserve_overrides() {
+fn test_effective_methods_and_associated_item_sources_preserve_overrides() {
     let context = make_context();
     let overridden = crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&STRING_IMPL, &context);
     let defaulted = crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(&U64_IMPL, &context);
@@ -560,7 +560,7 @@ fn effective_methods_and_associated_item_sources_preserve_overrides() {
 }
 
 #[test]
-fn definition_descriptors_retain_visibility_and_missing_queries() {
+fn test_definition_descriptors_retain_visibility_and_missing_queries() {
     let context = make_context();
     let definition = TraitDefinitionDescriptor::new(&TRAIT_DEFINITION, &context);
     assert_eq!(definition.visibility(), Visibility::Public);
@@ -593,6 +593,6 @@ fn definition_descriptors_retain_visibility_and_missing_queries() {
 }
 
 #[test]
-fn lifetime_trait_argument_identity_does_not_use_source_names() {
+fn test_lifetime_trait_argument_identity_does_not_use_source_names() {
     assert!(TraitArgumentIdentity::lifetime("'a") == TraitArgumentIdentity::lifetime("'b"));
 }

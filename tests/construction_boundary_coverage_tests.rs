@@ -41,7 +41,7 @@ enum ConstructionEvent {
 }
 
 #[test]
-fn descriptor_target_and_field_iteration_report_declared_shape() {
+fn test_descriptor_target_and_field_iteration_report_declared_shape() {
     let descriptor = TypeDescriptor::of::<ConstructionRecord>().construction();
     assert!(matches!(
         descriptor.target(),
@@ -66,7 +66,7 @@ fn descriptor_target_and_field_iteration_report_declared_shape() {
 }
 
 #[test]
-fn builders_and_dynamic_construction_accept_local_and_thread_safe_values() {
+fn test_builders_and_dynamic_construction_accept_local_and_thread_safe_values() {
     let local = TypeDescriptor::of::<ConstructionRecord>()
         .construct_dynamic::<_>(
             NamedFields::<Local>::new()
@@ -109,7 +109,7 @@ fn builders_and_dynamic_construction_accept_local_and_thread_safe_values() {
 }
 
 #[test]
-fn thread_safe_dynamic_updates_and_public_errors_keep_their_contract() {
+fn test_thread_safe_dynamic_updates_and_public_errors_keep_their_contract() {
     let descriptor = TypeDescriptor::of::<ConstructionRecord>();
     let updated = descriptor
         .update_dynamic(

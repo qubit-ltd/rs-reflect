@@ -83,7 +83,7 @@ fn owner() -> FieldOwner {
 }
 
 #[test]
-fn field_descriptor_exposes_context_type_expression_and_concrete_lookup() {
+fn test_field_descriptor_exposes_context_type_expression_and_concrete_lookup() {
     let context = ReflectionContext::builder()
         .include_type::<FieldOwner>()
         .include_type::<u32>()
@@ -107,7 +107,7 @@ fn field_descriptor_exposes_context_type_expression_and_concrete_lookup() {
 }
 
 #[test]
-fn field_visibility_and_dynamic_access_capabilities_match_metadata() {
+fn test_field_visibility_and_dynamic_access_capabilities_match_metadata() {
     let descriptor = TypeDescriptor::of::<FieldOwner>();
     let public = descriptor.field("count").expect("public field exists");
     let private = descriptor.field("private_label").expect("private field exists");
@@ -142,7 +142,7 @@ fn field_visibility_and_dynamic_access_capabilities_match_metadata() {
 }
 
 #[test]
-fn dynamic_unsafe_field_read_bypasses_visibility_but_keeps_adapter_checks() {
+fn test_dynamic_unsafe_field_read_bypasses_visibility_but_keeps_adapter_checks() {
     let context = ReflectionContext::builder()
         .include_type::<FieldOwner>()
         .build()
@@ -167,7 +167,7 @@ fn dynamic_unsafe_field_read_bypasses_visibility_but_keeps_adapter_checks() {
 }
 
 #[test]
-fn derived_array_field_supports_dynamic_reads_with_visibility_checks() {
+fn test_derived_array_field_supports_dynamic_reads_with_visibility_checks() {
     let context = ReflectionContext::builder()
         .include_type::<ArrayOwner>()
         .include_type::<[String; 2]>()
@@ -192,7 +192,7 @@ fn derived_array_field_supports_dynamic_reads_with_visibility_checks() {
 }
 
 #[test]
-fn derived_option_field_supports_dynamic_reads_for_some_and_none() {
+fn test_derived_option_field_supports_dynamic_reads_for_some_and_none() {
     let field = TypeDescriptor::of::<OptionalOwner>()
         .field("value")
         .expect("optional field exists");
@@ -214,7 +214,7 @@ fn derived_option_field_supports_dynamic_reads_for_some_and_none() {
 }
 
 #[test]
-fn derived_option_field_with_custom_reflect_inner_supports_dynamic_reads() {
+fn test_derived_option_field_with_custom_reflect_inner_supports_dynamic_reads() {
     let field = TypeDescriptor::of::<OptionalCustomOwner>()
         .field("value")
         .expect("optional custom field exists");
@@ -239,7 +239,7 @@ fn derived_option_field_with_custom_reflect_inner_supports_dynamic_reads() {
 }
 
 #[test]
-fn dynamic_custom_field_supports_dynamic_read_and_write() {
+fn test_dynamic_custom_field_supports_dynamic_read_and_write() {
     let field = TypeDescriptor::of::<NestedCustomOwner>()
         .field("middle")
         .expect("nested custom field exists");
@@ -264,7 +264,7 @@ fn dynamic_custom_field_supports_dynamic_read_and_write() {
 }
 
 #[test]
-fn dynamic_field_adapter_errors_preserve_the_rejected_value() {
+fn test_dynamic_field_adapter_errors_preserve_the_rejected_value() {
     let field = TypeDescriptor::of::<FieldOwner>()
         .field("count")
         .expect("public field exists");
@@ -304,7 +304,7 @@ fn dynamic_field_adapter_errors_preserve_the_rejected_value() {
 }
 
 #[test]
-fn thread_safe_dynamic_field_supports_mutation_and_replacement() {
+fn test_thread_safe_dynamic_field_supports_mutation_and_replacement() {
     let field = TypeDescriptor::of::<ThreadSafeOwner>()
         .field("count")
         .expect("thread-safe owner field exists");
@@ -325,7 +325,7 @@ fn thread_safe_dynamic_field_supports_mutation_and_replacement() {
 }
 
 #[test]
-fn reflect_skip_explicitly_excludes_an_unreflected_field() {
+fn test_reflect_skip_explicitly_excludes_an_unreflected_field() {
     let descriptor = TypeDescriptor::of::<SkipOwner>();
     assert!(descriptor.field("omitted").is_err());
     assert!(descriptor.field("count").is_ok());
@@ -337,7 +337,7 @@ fn reflect_skip_explicitly_excludes_an_unreflected_field() {
 }
 
 #[test]
-fn typed_access_rejects_value_mismatches_and_thread_safe_dynamic_access_works() {
+fn test_typed_access_rejects_value_mismatches_and_thread_safe_dynamic_access_works() {
     let field = TypeDescriptor::of::<FieldOwner>()
         .field("count")
         .expect("public field exists");

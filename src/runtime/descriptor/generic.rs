@@ -39,10 +39,16 @@ use crate::runtime::identity::StableItemId;
 
 /// Process-local identity of one generic source declaration.
 #[derive(Clone, Copy)]
-pub struct TypeDefinitionId(fn() -> TypeId);
+pub struct TypeDefinitionId(
+    /// Resolves the generated marker type ID for this declaration.
+    fn() -> TypeId,
+);
 
 impl TypeDefinitionId {
     /// Creates an identity from a generated marker type.
+    ///
+    /// # Type Parameters
+    /// - `T`: generated marker type uniquely identifying the declaration.
     pub(crate) const fn of<T: 'static>() -> Self {
         Self(TypeId::of::<T>)
     }
@@ -54,12 +60,20 @@ impl TypeDefinitionId {
 }
 
 impl std::fmt::Debug for TypeDefinitionId {
+    /// Formats this process-local marker identity.
+    ///
+    /// # Parameters
+    /// - `formatter`: destination for the debug representation.
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.type_id().fmt(formatter)
     }
 }
 
 impl PartialEq for TypeDefinitionId {
+    /// Compares declaration identities by their marker type IDs.
+    ///
+    /// # Parameters
+    /// - `other`: identity to compare with this one.
     fn eq(&self, other: &Self) -> bool {
         self.type_id() == other.type_id()
     }
@@ -68,6 +82,13 @@ impl PartialEq for TypeDefinitionId {
 impl Eq for TypeDefinitionId {}
 
 impl Hash for TypeDefinitionId {
+    /// Hashes this identity using its process-local marker type ID.
+    ///
+    /// # Type Parameters
+    /// - `H`: hasher implementation receiving the identity.
+    ///
+    /// # Parameters
+    /// - `state`: hasher that receives the identity value.
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.type_id().hash(state);
     }
@@ -77,7 +98,10 @@ impl Hash for TypeDefinitionId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TypeDefinitionKind {
     /// A struct declaration, including its named, tuple, or unit shape.
-    Struct(StructKind),
+    Struct(
+        /// Retained field shape of the struct declaration.
+        StructKind,
+    ),
     /// An enum declaration.
     Enum,
     /// A union declaration.
@@ -100,25 +124,35 @@ pub enum StructKind {
 /// Static source metadata for one generic declaration.
 #[derive(Clone, Copy)]
 pub struct TypeDefinitionMetadata {
+    /// Marker identity assigned by generated registration code.
     pub(crate) id: TypeDefinitionId,
+    /// Source-level declaration name.
     pub(crate) name: &'static str,
+    /// Fully qualified source path retained for lookup and diagnostics.
     pub(crate) path: &'static str,
+    /// Source shape category of the declaration.
     pub(crate) kind: TypeDefinitionKind,
+    /// Generic parameters and predicates declared by the item.
     pub(crate) generics: &'static GenericDefinitionMetadata,
 }
 
 /// Generic declaration metadata in source order.
 #[derive(Clone, Copy)]
 pub struct GenericDefinitionMetadata {
+    /// Generic parameters in source declaration order.
     pub(crate) parameters: &'static [GenericParameterMetadata],
+    /// Predicates declared on the generic item.
     pub(crate) predicates: &'static [PredicateData],
 }
 
 /// One lifetime, type, or const parameter declared by a generic definition.
 #[derive(Clone, Copy)]
 pub struct GenericParameterMetadata {
+    /// Source name of the parameter.
     pub(crate) name: &'static str,
+    /// Zero-based source position among generic parameters.
     pub(crate) index: usize,
+    /// Bounds, type, or default specific to the parameter kind.
     pub(crate) kind: GenericParameterMetadataKind,
 }
 
@@ -148,6 +182,15 @@ pub enum GenericParameterMetadataKind {
 
 impl TypeDefinitionMetadata {
     /// Creates static metadata bound to a marker type chosen by generated code.
+    ///
+    /// # Type Parameters
+    /// - `T`: generated marker type for the declaration.
+    ///
+    /// # Parameters
+    /// - `name`: source declaration name.
+    /// - `path`: fully qualified source declaration path.
+    /// - `kind`: source shape category.
+    /// - `generics`: source-ordered generic declaration metadata.
     pub const fn new<T: 'static>(
         name: &'static str,
         path: &'static str,
@@ -172,6 +215,10 @@ impl TypeDefinitionMetadata {
 
 impl GenericDefinitionMetadata {
     /// Creates static generic parameters and predicates in source order.
+    ///
+    /// # Parameters
+    /// - `parameters`: generic parameters in source order.
+    /// - `predicates`: predicates declared on the generic item.
     pub const fn new(parameters: &'static [GenericParameterMetadata], predicates: &'static [PredicateData]) -> Self {
         Self { parameters, predicates }
     }
@@ -185,6 +232,11 @@ impl GenericDefinitionMetadata {
 
 impl GenericParameterMetadata {
     /// Creates a lifetime parameter and its source bounds.
+    ///
+    /// # Parameters
+    /// - `name`: source name of the lifetime parameter.
+    /// - `index`: zero-based position in the declaration.
+    /// - `bounds`: lifetime bounds retained from source syntax.
     pub const fn lifetime(name: &'static str, index: usize, bounds: &'static [LifetimeExpression]) -> Self {
         Self {
             name,
@@ -194,6 +246,12 @@ impl GenericParameterMetadata {
     }
 
     /// Creates a type parameter and its source bounds and optional default.
+    ///
+    /// # Parameters
+    /// - `name`: source name of the type parameter.
+    /// - `index`: zero-based position in the declaration.
+    /// - `bounds`: predicates constraining the parameter.
+    /// - `default`: default type expression, when declared.
     pub const fn type_parameter(
         name: &'static str,
         index: usize,
@@ -208,6 +266,12 @@ impl GenericParameterMetadata {
     }
 
     /// Creates a const parameter and its source type and optional default.
+    ///
+    /// # Parameters
+    /// - `name`: source name of the const parameter.
+    /// - `index`: zero-based position in the declaration.
+    /// - `ty`: source expression for the const parameter type.
+    /// - `default`: default const value, when declared.
     pub const fn const_parameter(
         name: &'static str,
         index: usize,
@@ -225,11 +289,18 @@ impl GenericParameterMetadata {
 /// Context-bound view of a generic type declaration.
 #[derive(Clone, Copy)]
 pub struct TypeDefinitionDescriptor<'ctx> {
+    /// Static source metadata for this declaration.
     metadata: &'static TypeDefinitionMetadata,
+    /// Context used to resolve instances and registered capabilities.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TypeDefinitionDescriptor<'ctx> {
+    /// Creates a context-bound view of static definition metadata.
+    ///
+    /// # Parameters
+    /// - `metadata`: source metadata for the declaration.
+    /// - `context`: context used to resolve registered instances.
     pub(crate) const fn new(metadata: &'static TypeDefinitionMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -275,6 +346,9 @@ impl<'ctx> TypeDefinitionDescriptor<'ctx> {
     }
 
     /// Finds a capability using its statically declared adapter contract.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn find_capability<C: CapabilitySpec>(self) -> Result<Option<Capability<'ctx, C>>, CapabilityError> {
         self.capabilities()?.find::<C>()
     }
@@ -284,11 +358,17 @@ impl<'ctx> TypeDefinitionDescriptor<'ctx> {
     ///
     /// Returns an error when the capability ID exists with a different adapter
     /// type.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn has_capability<C: CapabilitySpec>(self) -> Result<bool, CapabilityError> {
         self.find_capability::<C>().map(|capability| capability.is_some())
     }
 
     /// Requires a capability using its statically declared adapter contract.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn capability<C: CapabilitySpec>(self) -> Result<Capability<'ctx, C>, CapabilityError> {
         self.capabilities()?.capability::<C>()
     }
@@ -297,11 +377,18 @@ impl<'ctx> TypeDefinitionDescriptor<'ctx> {
 /// Context-bound view of a declaration's generic parameters and predicates.
 #[derive(Clone, Copy)]
 pub struct GenericDefinitionDescriptor<'ctx> {
+    /// Source metadata for the generic declaration.
     metadata: &'static GenericDefinitionMetadata,
+    /// Context used to bind parameter and predicate expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> GenericDefinitionDescriptor<'ctx> {
+    /// Creates a context-bound view of generic declaration metadata.
+    ///
+    /// # Parameters
+    /// - `metadata`: generic parameters and predicates to expose.
+    /// - `context`: context used to resolve their expressions.
     pub(crate) const fn new(metadata: &'static GenericDefinitionMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -317,6 +404,9 @@ impl<'ctx> GenericDefinitionDescriptor<'ctx> {
             .map(move |parameter| GenericParameterDescriptor::new(parameter, self.context))
     }
     /// Looks up a generic parameter by name.
+    ///
+    /// # Parameters
+    /// - `name`: source parameter name to resolve.
     pub fn parameter(self, name: &str) -> Result<GenericParameterDescriptor<'ctx>, LookupError> {
         let mut candidates = self
             .metadata
@@ -356,11 +446,18 @@ impl<'ctx> GenericDefinitionDescriptor<'ctx> {
 /// Context-bound view of one declared generic parameter.
 #[derive(Clone, Copy)]
 pub struct GenericParameterDescriptor<'ctx> {
+    /// Static source facts for the declared parameter.
     metadata: &'static GenericParameterMetadata,
+    /// Context used to bind the parameter's expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> GenericParameterDescriptor<'ctx> {
+    /// Creates a context-bound view of a generic parameter.
+    ///
+    /// # Parameters
+    /// - `metadata`: static parameter metadata to expose.
+    /// - `context`: context used to bind its expressions.
     pub(crate) const fn new(metadata: &'static GenericParameterMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -390,6 +487,7 @@ impl<'ctx> GenericParameterDescriptor<'ctx> {
             },
         }
     }
+    /// Builds the lookup candidate used for ambiguous parameter diagnostics.
     fn lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.metadata.name.into();
         LookupCandidate {
@@ -430,26 +528,47 @@ pub enum GenericParameterKind<'ctx> {
 /// Static concrete type or const argument associated with a parameter.
 #[derive(Clone, Copy)]
 pub struct GenericArgumentMetadata {
+    /// Declared parameter associated with this argument, if known.
     pub(crate) parameter: Option<&'static GenericParameterMetadata>,
+    /// Concrete type or const payload retained for the argument.
     pub(crate) kind: GenericArgumentMetadataKind,
 }
 
 /// Payload of a concrete generic argument.
 #[derive(Clone, Copy)]
 pub(crate) enum GenericArgumentMetadataKind {
+    /// Type argument with source syntax and optional reflected metadata.
     Type {
+        /// Source type expression for this argument.
         expression: &'static ExpressionData,
+        /// Factory for concrete reflected type metadata, when available.
         concrete: Option<fn() -> &'static TypeMetadata>,
     },
-    Const(ConstExpression),
+    /// Structural const expression retained for this argument.
+    /// Const argument retained as its source-level structural expression.
+    Const(
+        /// Structural const expression associated with this argument.
+        ConstExpression,
+    ),
 }
 
+/// Returns the reflected metadata factory for a concrete type.
+///
+/// # Type Parameters
+/// - `T`: reflected type whose metadata is requested.
 fn reflected_type_metadata<T: super::Reflect + ?Sized>() -> &'static TypeMetadata {
     T::__reflect_registration().metadata()
 }
 
 impl GenericArgumentMetadata {
     /// Creates a type argument tied to a reflected concrete Rust type.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type represented by the argument.
+    ///
+    /// # Parameters
+    /// - `parameter`: source parameter associated with this argument.
+    /// - `expression`: source syntax representing the type argument.
     pub const fn type_argument<T: ?Sized + 'static>(
         parameter: &'static GenericParameterMetadata,
         expression: &'static ExpressionData,
@@ -465,6 +584,10 @@ impl GenericArgumentMetadata {
 
     /// Creates a type argument while retaining source syntax without requiring
     /// reflection.
+    ///
+    /// # Parameters
+    /// - `parameter`: source parameter associated with this argument.
+    /// - `expression`: source syntax retained for the type argument.
     pub const fn type_expression(
         parameter: &'static GenericParameterMetadata,
         expression: &'static ExpressionData,
@@ -478,6 +601,11 @@ impl GenericArgumentMetadata {
         }
     }
 
+    /// Creates a concrete type argument from a metadata factory.
+    ///
+    /// # Parameters
+    /// - `parameter`: source parameter associated with this argument.
+    /// - `type_metadata`: factory returning the concrete type metadata.
     pub(crate) const fn concrete_type(
         parameter: &'static GenericParameterMetadata,
         type_metadata: fn() -> &'static TypeMetadata,
@@ -492,6 +620,10 @@ impl GenericArgumentMetadata {
     }
 
     /// Creates a const argument associated with its declared parameter.
+    ///
+    /// # Parameters
+    /// - `parameter`: source const parameter associated with the value.
+    /// - `value`: structural const expression retained for the argument.
     pub const fn const_argument(parameter: &'static GenericParameterMetadata, value: ConstExpression) -> Self {
         Self {
             parameter: Some(parameter),
@@ -500,6 +632,12 @@ impl GenericArgumentMetadata {
     }
 
     /// Creates a positional type argument when the declaration is unknown.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete Rust type represented by the argument.
+    ///
+    /// # Parameters
+    /// - `expression`: source syntax retained for the argument.
     pub const fn positional_type_argument<T: ?Sized + 'static>(expression: &'static ExpressionData) -> Self {
         Self {
             parameter: None,
@@ -510,6 +648,13 @@ impl GenericArgumentMetadata {
         }
     }
 
+    /// Creates a positional type argument from a reflected marker type.
+    ///
+    /// # Type Parameters
+    /// - `T`: reflected Rust type represented by the argument.
+    ///
+    /// # Parameters
+    /// - `expression`: source syntax retained for the argument.
     pub(crate) const fn reflected_type_argument<T: super::Reflect + ?Sized>(
         expression: &'static ExpressionData,
     ) -> Self {
@@ -524,6 +669,9 @@ impl GenericArgumentMetadata {
 
     /// Creates a positional type argument that retains source syntax without
     /// claiming that the type is concrete or reflected.
+    ///
+    /// # Parameters
+    /// - `expression`: source syntax retained for the argument.
     pub const fn positional_type_expression(expression: &'static ExpressionData) -> Self {
         Self {
             parameter: None,
@@ -535,6 +683,9 @@ impl GenericArgumentMetadata {
     }
 
     /// Creates a positional const argument when the declaration is unknown.
+    ///
+    /// # Parameters
+    /// - `value`: structural const expression retained for the argument.
     pub const fn positional_const_argument(value: ConstExpression) -> Self {
         Self {
             parameter: None,
@@ -549,17 +700,29 @@ static OPAQUE_TYPE_EXPRESSION: ExpressionData =
 /// Context-bound collection of the type and const arguments of one application.
 #[derive(Clone)]
 pub struct GenericArguments<'ctx> {
+    /// Static or shared generic argument metadata.
     arguments: GenericArgumentMetadataSlice,
+    /// Context used to resolve type expressions.
     context: &'ctx ReflectionContext,
 }
 
+/// Storage representation for generic arguments retained by an application.
 #[derive(Clone)]
 enum GenericArgumentMetadataSlice {
-    Static(&'static [GenericArgumentMetadata]),
-    Shared(Arc<[GenericArgumentMetadata]>),
+    /// Borrowed static metadata emitted by generated code.
+    Static(
+        /// Static argument records shared with generated metadata.
+        &'static [GenericArgumentMetadata],
+    ),
+    /// Shared owned metadata collected at runtime.
+    Shared(
+        /// Reference-counted argument records collected at runtime.
+        Arc<[GenericArgumentMetadata]>,
+    ),
 }
 
 impl GenericArgumentMetadataSlice {
+    /// Returns the argument metadata as a borrowed slice.
     fn as_slice(&self) -> &[GenericArgumentMetadata] {
         match self {
             Self::Static(arguments) => arguments,
@@ -569,6 +732,11 @@ impl GenericArgumentMetadataSlice {
 }
 
 impl<'ctx> GenericArguments<'ctx> {
+    /// Creates a collection from static generated metadata.
+    ///
+    /// # Parameters
+    /// - `arguments`: static type and const argument metadata.
+    /// - `context`: context used to resolve type expressions.
     pub(crate) const fn new(arguments: &'static [GenericArgumentMetadata], context: &'ctx ReflectionContext) -> Self {
         Self {
             arguments: GenericArgumentMetadataSlice::Static(arguments),
@@ -576,6 +744,11 @@ impl<'ctx> GenericArguments<'ctx> {
         }
     }
 
+    /// Creates a collection from shared runtime metadata.
+    ///
+    /// # Parameters
+    /// - `arguments`: shared type and const argument metadata.
+    /// - `context`: context used to resolve type expressions.
     pub(crate) fn from_shared(arguments: Arc<[GenericArgumentMetadata]>, context: &'ctx ReflectionContext) -> Self {
         Self {
             arguments: GenericArgumentMetadataSlice::Shared(arguments),
@@ -597,6 +770,9 @@ impl<'ctx> GenericArguments<'ctx> {
             .into_iter()
     }
     /// Finds a uniquely named argument; positional arguments have no name.
+    ///
+    /// # Parameters
+    /// - `name`: source parameter name associated with the argument.
     pub fn get(&self, name: &str) -> Option<GenericArgumentDescriptor<'ctx>> {
         let mut matches = self
             .arguments
@@ -611,6 +787,9 @@ impl<'ctx> GenericArguments<'ctx> {
     }
     /// Requires a uniquely named argument, returning missing or ambiguous
     /// lookup errors.
+    ///
+    /// # Parameters
+    /// - `name`: source parameter name associated with the argument.
     pub fn argument(&self, name: &str) -> Result<GenericArgumentDescriptor<'ctx>, LookupError> {
         let matches = self
             .arguments
@@ -637,6 +816,9 @@ impl<'ctx> GenericArguments<'ctx> {
     }
     /// Returns the type or const argument at its position, excluding lifetime
     /// parameters.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based position among type and const arguments.
     pub fn get_at(&self, index: usize) -> Option<GenericArgumentDescriptor<'ctx>> {
         self.arguments
             .as_slice()
@@ -657,11 +839,18 @@ impl<'ctx> GenericArguments<'ctx> {
 /// A concrete type or const argument in one already compiled application.
 #[derive(Clone, Copy)]
 pub struct GenericArgumentDescriptor<'ctx> {
+    /// Static metadata describing this application argument.
     metadata: GenericArgumentMetadata,
+    /// Context used to resolve concrete type descriptors.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> GenericArgumentDescriptor<'ctx> {
+    /// Creates a context-bound descriptor for one generic argument.
+    ///
+    /// # Parameters
+    /// - `metadata`: argument metadata to expose.
+    /// - `context`: context used to resolve this argument.
     const fn new(metadata: GenericArgumentMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -698,7 +887,9 @@ impl<'ctx> GenericArgumentDescriptor<'ctx> {
 /// A type argument, preserving syntax when no reflected descriptor exists.
 #[derive(Clone, Copy)]
 pub struct TypeArgumentDescriptor<'ctx> {
+    /// Metadata for the concrete or source-only type argument.
     metadata: GenericArgumentMetadata,
+    /// Context used to resolve the concrete type, when available.
     context: &'ctx ReflectionContext,
 }
 
@@ -747,7 +938,9 @@ impl<'ctx> TypeArgumentDescriptor<'ctx> {
 /// A const argument retained as a structural expression.
 #[derive(Clone, Copy)]
 pub struct ConstArgumentDescriptor<'ctx> {
+    /// Metadata containing the structural const expression.
     metadata: GenericArgumentMetadata,
+    /// Context used to resolve the source parameter association.
     _context: &'ctx ReflectionContext,
 }
 
@@ -836,7 +1029,7 @@ mod tests {
     }
 
     #[test]
-    fn definition_identity_uses_marker_type_for_equality_and_hashing() {
+    fn test_definition_identity_uses_marker_type_for_equality_and_hashing() {
         let marker = TypeDefinitionId::of::<Marker>();
         let same_marker = TypeDefinitionId::of::<Marker>();
         let other_marker = TypeDefinitionId::of::<OtherMarker>();
@@ -848,7 +1041,7 @@ mod tests {
     }
 
     #[test]
-    fn definition_and_generic_descriptors_preserve_metadata_and_context() {
+    fn test_definition_and_generic_descriptors_preserve_metadata_and_context() {
         let context = ReflectionContext::empty();
         let definition = TypeDefinitionDescriptor::new(&DEFINITION, &context);
         let generics = definition.generics();
@@ -882,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn generic_parameter_kinds_retain_bounds_defaults_and_declared_positions() {
+    fn test_generic_parameter_kinds_retain_bounds_defaults_and_declared_positions() {
         let context = ReflectionContext::empty();
         let generics = GenericDefinitionDescriptor::new(&GENERICS, &context);
         let lifetime = generics.parameter("a").expect("lifetime parameter exists");
@@ -910,7 +1103,7 @@ mod tests {
     }
 
     #[test]
-    fn positional_and_shared_arguments_preserve_argument_kind_and_source() {
+    fn test_positional_and_shared_arguments_preserve_argument_kind_and_source() {
         static POSITIONAL_TYPE: ExpressionData = ExpressionData::ParameterName("External");
         static NAMED_TYPE: ExpressionData = ExpressionData::ParameterName("T");
         let context = ReflectionContext::empty();
@@ -965,7 +1158,7 @@ mod tests {
     }
 
     #[test]
-    fn concrete_and_unreflected_type_argument_constructors_keep_their_contracts() {
+    fn test_concrete_and_unreflected_type_argument_constructors_keep_their_contracts() {
         static TYPE_EXPRESSION: ExpressionData = ExpressionData::ParameterName("T");
         let context = ReflectionContext::empty();
         let concrete = GenericArgumentMetadata::type_argument::<u8>(&TYPE_PARAMETER, &TYPE_EXPRESSION);

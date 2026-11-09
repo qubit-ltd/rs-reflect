@@ -23,7 +23,7 @@ pub enum Event {
 struct NotAnEvent;
 
 #[test]
-fn variant_active_check_and_public_payload_access_are_typed() {
+fn test_variant_active_check_and_public_payload_access_are_typed() {
     let descriptor = TypeDescriptor::of_in::<Event>(ReflectionContext::global());
     let progress = descriptor.variant("Progress").expect("variant is described");
     let done = descriptor.variant("Done").expect("variant is described");
@@ -40,7 +40,7 @@ fn variant_active_check_and_public_payload_access_are_typed() {
 }
 
 #[test]
-fn inactive_variant_field_set_recovers_the_replacement() {
+fn test_inactive_variant_field_set_recovers_the_replacement() {
     let descriptor = TypeDescriptor::of_in::<Event>(ReflectionContext::global());
     let field = descriptor
         .variant("Progress")
@@ -59,7 +59,7 @@ fn inactive_variant_field_set_recovers_the_replacement() {
 }
 
 #[test]
-fn variant_field_errors_keep_root_type_and_variant_identity() {
+fn test_variant_field_errors_keep_root_type_and_variant_identity() {
     let descriptor = TypeDescriptor::of_in::<Event>(ReflectionContext::global());
     let progress = descriptor
         .variant("Progress")

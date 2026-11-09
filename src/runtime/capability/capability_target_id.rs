@@ -13,7 +13,13 @@ use crate::runtime::identity::TypeIdentity;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CapabilityTargetId {
     /// A concrete registered Rust type.
-    Type(TypeIdentity),
+    Type(
+        /// Identity of the concrete registered Rust type.
+        TypeIdentity,
+    ),
     /// A source type definition identified by its process-local marker.
-    Definition(TypeDefinitionId),
+    Definition(
+        /// Identity of the source-level type definition.
+        TypeDefinitionId,
+    ),
 }

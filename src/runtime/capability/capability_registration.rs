@@ -23,16 +23,30 @@ use super::capability_target_id::CapabilityTargetId;
 
 /// A typed capability registration with an opaque erased adapter payload.
 pub struct CapabilityRegistration {
+    /// Target identity where this adapter should be registered.
     pub(crate) target: CapabilityTargetId,
+    /// Opaque typed capability ID.
     pub(crate) id: crate::identity::CapabilityId,
+    /// Static text form of the capability's declared ID.
     pub(crate) id_str: &'static str,
+    /// Type-erased adapter payload retained by the capability set.
     pub(crate) adapter: Box<dyn Any + Send + Sync>,
+    /// Origin metadata used in registration diagnostics.
     pub(crate) origin: CapabilityRegistrationOrigin,
+    /// Deferred validation error for registrations built through infallible
+    /// APIs.
     pub(crate) validation_error: Option<CapabilityRegistrationError>,
 }
 
 impl CapabilityRegistration {
     /// Creates a typed capability registration for one concrete Rust type.
+    ///
+    /// # Type Parameters
+    /// - `T`: concrete reflected target type.
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `adapter`: implementation of the declared capability contract.
     pub fn for_type<T: crate::runtime::descriptor::Reflect + ?Sized, C: CapabilitySpec>(adapter: C::Adapter) -> Self {
         Self::typed::<C>(type_target::<T>(), adapter, explicit_origin(std::any::type_name::<T>()))
     }
@@ -43,6 +57,13 @@ impl CapabilityRegistration {
     /// The opaque handle supplies its process-local identity without exposing
     /// the underlying marker type or allowing callers to construct new
     /// identities.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `definition`: reflected generic type definition to target.
+    /// - `adapter`: implementation of the declared capability contract.
     pub fn for_definition<C: CapabilitySpec>(
         definition: crate::runtime::descriptor::generic::TypeDefinitionId,
         adapter: C::Adapter,
@@ -56,6 +77,13 @@ impl CapabilityRegistration {
 
     /// Creates a typed capability registration for a reflected generic
     /// definition identified by its generated marker type.
+    ///
+    /// # Type Parameters
+    /// - `TMarker`: generated marker identifying the generic definition.
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `adapter`: implementation of the declared capability contract.
     pub fn for_type_definition<TMarker: 'static, C: CapabilitySpec>(adapter: C::Adapter) -> Self {
         Self::typed::<C>(
             CapabilityTargetId::Definition(crate::runtime::descriptor::generic::TypeDefinitionId::of::<TMarker>()),
@@ -64,6 +92,15 @@ impl CapabilityRegistration {
         )
     }
 
+    /// Builds a registration after validating the contract's stable ID.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `target`: reflected target receiving the capability.
+    /// - `adapter`: implementation of the declared contract.
+    /// - `origin`: registration provenance for diagnostics.
     fn typed<C: CapabilitySpec>(
         target: CapabilityTargetId,
         adapter: C::Adapter,
@@ -87,6 +124,15 @@ impl CapabilityRegistration {
         }
     }
 
+    /// Creates a registration and returns any invalid ID as an error.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `target`: reflected target receiving the capability.
+    /// - `adapter`: implementation of the declared contract.
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn new<C: CapabilitySpec>(
         target: CapabilityTargetId,
         adapter: C::Adapter,
@@ -96,6 +142,15 @@ impl CapabilityRegistration {
         Self::with_id::<C>(target, id, adapter, origin)
     }
 
+    /// Creates a registration using an identifier reserved for a core contract.
+    ///
+    /// # Type Parameters
+    /// - `C`: core capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `target`: reflected target receiving the capability.
+    /// - `adapter`: implementation of the declared contract.
+    /// - `origin`: registration provenance for diagnostics.
     fn new_core<C: CapabilitySpec + CoreCapabilitySpec>(
         target: CapabilityTargetId,
         adapter: C::Adapter,
@@ -105,6 +160,16 @@ impl CapabilityRegistration {
         Self::with_id::<C>(target, id, adapter, origin)
     }
 
+    /// Packages a validated identifier and typed adapter into a registration.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract implemented by the adapter.
+    ///
+    /// # Parameters
+    /// - `target`: reflected target receiving the capability.
+    /// - `id`: validated typed identifier.
+    /// - `adapter`: implementation of the declared contract.
+    /// - `origin`: registration provenance for diagnostics.
     fn with_id<C: CapabilitySpec>(
         target: CapabilityTargetId,
         id: crate::identity::CapabilityId,
@@ -121,24 +186,52 @@ impl CapabilityRegistration {
         })
     }
 
+    /// Creates the built-in `Send` capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: target type that must implement `Send`.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn send<T: Send + 'static>(
         origin: CapabilityRegistrationOrigin,
     ) -> Result<Self, CapabilityRegistrationError> {
         Self::new_core::<SendCapability>(type_target::<T>(), (), origin)
     }
 
+    /// Creates the built-in `Sync` capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: target type that must implement `Sync`.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn sync<T: Sync + 'static>(
         origin: CapabilityRegistrationOrigin,
     ) -> Result<Self, CapabilityRegistrationError> {
         Self::new_core::<SyncCapability>(type_target::<T>(), (), origin)
     }
 
+    /// Creates a local clone capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: reflected target type with a local clone adapter.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn clone<T: Clone + crate::runtime::descriptor::Reflect + 'static>(
         origin: CapabilityRegistrationOrigin,
     ) -> Result<Self, CapabilityRegistrationError> {
         Self::new_core::<CloneCapability>(type_target::<T>(), CloneAdapter::new::<T>(), origin)
     }
 
+    /// Creates a thread-safe clone capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: target type with a thread-safe clone adapter.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn clone_thread_safe<
         T: Clone + crate::runtime::value::ValueFor<crate::runtime::value::ThreadSafe> + Send + Sync,
     >(
@@ -147,12 +240,26 @@ impl CapabilityRegistration {
         Self::new_core::<CloneCapability>(type_target::<T>(), CloneAdapter::new_thread_safe::<T>(), origin)
     }
 
+    /// Creates a local default capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: reflected target type with a local default adapter.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn default<T: Default + crate::runtime::descriptor::Reflect + 'static>(
         origin: CapabilityRegistrationOrigin,
     ) -> Result<Self, CapabilityRegistrationError> {
         Self::new_core::<DefaultCapability>(type_target::<T>(), DefaultAdapter::new::<T>(), origin)
     }
 
+    /// Creates a thread-safe default capability registration for `T`.
+    ///
+    /// # Type Parameters
+    /// - `T`: target type with a thread-safe default adapter.
+    ///
+    /// # Parameters
+    /// - `origin`: registration provenance for diagnostics.
     pub(crate) fn default_thread_safe<
         T: Default + crate::runtime::value::ValueFor<crate::runtime::value::ThreadSafe> + Send + Sync,
     >(
@@ -162,6 +269,10 @@ impl CapabilityRegistration {
     }
 }
 
+/// Creates the capability target identity for a concrete Rust type.
+///
+/// # Type Parameters
+/// - `T`: Rust type represented by the target identity.
 fn type_target<T: 'static + ?Sized>() -> CapabilityTargetId {
     CapabilityTargetId::Type(crate::runtime::identity::TypeIdentity {
         type_id: std::any::TypeId::of::<T>(),
@@ -169,6 +280,10 @@ fn type_target<T: 'static + ?Sized>() -> CapabilityTargetId {
     })
 }
 
+/// Creates provenance metadata for a direct registration call.
+///
+/// # Parameters
+/// - `module_path`: path or descriptive label identifying the caller.
 fn explicit_origin(module_path: &'static str) -> CapabilityRegistrationOrigin {
     CapabilityRegistrationOrigin::Explicit(crate::runtime::identity::RegistrationOrigin {
         crate_name: "explicit",

@@ -34,7 +34,7 @@ fn context_for<T: Reflect>() -> ReflectionContext {
 }
 
 #[test]
-fn built_in_collections_register_their_type_kinds() {
+fn test_built_in_collections_register_their_type_kinds() {
     let vector_context = context_for::<Vec<u8>>();
     assert!(matches!(
         vector_context.type_of::<Vec<u8>>().kind(),
@@ -61,7 +61,7 @@ fn built_in_collections_register_their_type_kinds() {
 }
 
 #[test]
-fn built_in_arrays_retain_nested_element_type_arguments_in_context() {
+fn test_built_in_arrays_retain_nested_element_type_arguments_in_context() {
     type InnerArray = [u8; 4];
     type OuterArray = [InnerArray; 2];
 
@@ -104,7 +104,7 @@ fn built_in_arrays_retain_nested_element_type_arguments_in_context() {
 }
 
 #[test]
-fn built_in_tuples_register_tuple_kind_including_unit() {
+fn test_built_in_tuples_register_tuple_kind_including_unit() {
     let tuple_context = context_for::<(u8, String)>();
     assert!(matches!(
         tuple_context.type_of::<(u8, String)>().kind(),
@@ -116,7 +116,7 @@ fn built_in_tuples_register_tuple_kind_including_unit() {
 }
 
 #[test]
-fn built_in_sets_and_maps_register_container_kinds() {
+fn test_built_in_sets_and_maps_register_container_kinds() {
     assert_kind!(HashSet<u8>, TypeKind::Set(_));
     assert_kind!(BTreeSet<u8>, TypeKind::Set(_));
     assert_kind!(HashMap<u8, String>, TypeKind::Map(_));
@@ -127,7 +127,7 @@ fn built_in_sets_and_maps_register_container_kinds() {
 }
 
 #[test]
-fn built_in_maps_retain_key_and_value_type_arguments() {
+fn test_built_in_maps_retain_key_and_value_type_arguments() {
     fn assert_map_arguments<T: Reflect>(context: &ReflectionContext) {
         let arguments = context.type_of::<T>().generic_arguments();
         assert_eq!(arguments.len(), 2);
@@ -187,7 +187,7 @@ fn built_in_maps_retain_key_and_value_type_arguments() {
 }
 
 #[test]
-fn built_in_pointer_and_unsized_types_register_shape_kinds() {
+fn test_built_in_pointer_and_unsized_types_register_shape_kinds() {
     assert_kind!(Box<u8>, TypeKind::SmartPointer(_));
     assert_kind!(Rc<u8>, TypeKind::SmartPointer(_));
     assert_kind!(Arc<u8>, TypeKind::SmartPointer(_));
@@ -204,7 +204,7 @@ fn built_in_pointer_and_unsized_types_register_shape_kinds() {
 }
 
 #[test]
-fn built_in_primitive_registrations_preserve_concrete_type_identity() {
+fn test_built_in_primitive_registrations_preserve_concrete_type_identity() {
     macro_rules! assert_primitive {
         ($($ty:ty),+ $(,)?) => {
             $(
@@ -225,7 +225,7 @@ fn built_in_primitive_registrations_preserve_concrete_type_identity() {
 }
 
 #[test]
-fn built_in_function_pointer_registrations_cover_abi_and_safety_variants() {
+fn test_built_in_function_pointer_registrations_cover_abi_and_safety_variants() {
     macro_rules! assert_function {
         ($($ty:ty),+ $(,)?) => {
             $(
@@ -251,7 +251,7 @@ fn built_in_function_pointer_registrations_cover_abi_and_safety_variants() {
 }
 
 #[test]
-fn built_in_array_and_tuple_registrations_cover_empty_and_large_shapes() {
+fn test_built_in_array_and_tuple_registrations_cover_empty_and_large_shapes() {
     assert_kind!([u8; 0], TypeKind::Array(_));
     assert_kind!([[u8; 2]; 3], TypeKind::Array(_));
 
@@ -270,7 +270,7 @@ fn built_in_array_and_tuple_registrations_cover_empty_and_large_shapes() {
 }
 
 #[test]
-fn built_in_smart_pointer_and_reference_registrations_accept_unsized_targets() {
+fn test_built_in_smart_pointer_and_reference_registrations_accept_unsized_targets() {
     assert_kind!(Box<str>, TypeKind::SmartPointer(_));
     assert_kind!(Rc<str>, TypeKind::SmartPointer(_));
     assert_kind!(Arc<str>, TypeKind::SmartPointer(_));

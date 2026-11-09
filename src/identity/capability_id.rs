@@ -11,6 +11,7 @@
 use std::fmt;
 
 use crate::error::IdError;
+use crate::old_id_authority::IdAuthority;
 
 /// An internal stable, namespaced identifier for a reflection capability.
 ///
@@ -19,7 +20,10 @@ use crate::error::IdError;
 /// [`crate::capability::CapabilityRegistration`]. This implementation type is
 /// not exposed as a public module API.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CapabilityId(&'static str);
+pub struct CapabilityId(
+    /// Validated stable textual capability identifier.
+    &'static str,
+);
 
 impl CapabilityId {
     /// Creates an externally defined static capability ID.
@@ -129,23 +133,6 @@ impl fmt::Display for CapabilityId {
     }
 }
 
-/// Determines whether an ID is owned by this crate or an external crate.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct IdAuthority {
-    /// Whether IDs using the reserved core namespace are accepted.
-    is_core: bool,
-}
-
-impl IdAuthority {
-    /// Marks an ID as externally owned and ineligible for the reserved
-    /// namespace.
-    pub(crate) const EXTERNAL: Self = Self { is_core: false };
-
-    /// Marks an ID as owned by this crate and eligible for the reserved
-    /// namespace.
-    const CORE: Self = Self { is_core: true };
-}
-
 /// Validates a namespaced ID according to its owning authority.
 ///
 /// # Parameters
@@ -202,7 +189,7 @@ mod tests {
     use super::CapabilityId;
 
     #[test]
-    fn display_and_as_ref_return_the_stable_identifier() {
+    fn test_display_and_as_ref_return_the_stable_identifier() {
         let id = CapabilityId::new("example.capability").expect("valid capability ID");
 
         assert_eq!(id.to_string(), "example.capability");

@@ -10,7 +10,6 @@ use std::cell::Cell;
 use std::future::ready;
 use std::rc::Rc;
 
-
 #[qubit_reflect::Reflect]
 struct Worker;
 

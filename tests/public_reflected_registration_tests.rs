@@ -21,7 +21,7 @@ struct DerivedRegistration {
 }
 
 #[test]
-fn derived_registration_is_discovered_by_an_explicit_context() {
+fn test_derived_registration_is_discovered_by_an_explicit_context() {
     let context = ReflectionContext::builder()
         .include_linked_for::<DerivedRegistration>()
         .build()

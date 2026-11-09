@@ -78,6 +78,11 @@ impl GenericSubstituter<'_> {
 }
 
 impl VisitMut for GenericSubstituter<'_> {
+    /// Replaces generic type paths while preserving any qualified path tail.
+    ///
+    /// # Parameters
+    ///
+    /// - `ty`: Type syntax tree to update in place.
     fn visit_type_mut(&mut self, ty: &mut Type) {
         if let Type::Path(path) = ty
             && path.qself.is_none()
@@ -119,6 +124,11 @@ impl VisitMut for GenericSubstituter<'_> {
         visit_type_mut(self, ty);
     }
 
+    /// Replaces generic paths in expressions, including associated path tails.
+    ///
+    /// # Parameters
+    ///
+    /// - `expression`: Expression syntax tree to update in place.
     fn visit_expr_mut(&mut self, expression: &mut Expr) {
         if let Expr::Path(path) = expression
             && path.qself.is_none()
@@ -160,6 +170,12 @@ impl VisitMut for GenericSubstituter<'_> {
         visit_expr_mut(self, expression);
     }
 
+    /// Converts generic type arguments to const arguments when the replacement
+    /// parses as an expression but not as a type.
+    ///
+    /// # Parameters
+    ///
+    /// - `argument`: Generic argument syntax tree to update in place.
     fn visit_generic_argument_mut(&mut self, argument: &mut GenericArgument) {
         if let GenericArgument::Type(Type::Path(path)) = argument
             && path.qself.is_none()

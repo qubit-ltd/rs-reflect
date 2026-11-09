@@ -30,10 +30,26 @@ static TYPE_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName
 static KEY_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName("K");
 static VALUE_PARAMETER_EXPRESSION: ExpressionData = ExpressionData::ParameterName("V");
 
+/// Builds a shape-only registration for a built-in type with no generic args.
+///
+/// # Type Parameters
+///
+/// * `T` — concrete built-in type represented by the registration.
+///
+/// # Parameters
+///
+/// * `kind` — static shape category assigned to the type.
 fn shaped_registration<T: ?Sized + 'static>(kind: &'static TypeKindMetadata) -> &'static TypeRegistration<T> {
     TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(kind, None, &[]))
 }
 
+/// Builds a map registration while retaining its key and value type arguments.
+///
+/// # Type Parameters
+///
+/// * `T` — concrete map type being registered.
+/// * `K` — reflected key type stored by the map.
+/// * `V` — reflected value type stored by the map.
 fn map_registration<T: ?Sized + 'static, K: Reflect, V: Reflect>() -> &'static TypeRegistration<T> {
     TypeRegistration::get_or_init_with(|| {
         let arguments = Box::leak(
@@ -47,6 +63,12 @@ fn map_registration<T: ?Sized + 'static, K: Reflect, V: Reflect>() -> &'static T
     })
 }
 
+/// Builds a set registration while retaining its element type argument.
+///
+/// # Type Parameters
+///
+/// * `Collection` — concrete set type being registered.
+/// * `T` — reflected element type stored by the set.
 fn set_registration<Collection: ?Sized + 'static, T: Reflect>() -> &'static TypeRegistration<Collection> {
     TypeRegistration::get_or_init_with(|| {
         let arguments = Box::leak(
@@ -59,6 +81,12 @@ fn set_registration<Collection: ?Sized + 'static, T: Reflect>() -> &'static Type
     })
 }
 
+/// Builds a smart-pointer registration while retaining the pointee type.
+///
+/// # Type Parameters
+///
+/// * `Pointer` — concrete pointer wrapper being registered.
+/// * `T` — reflected pointee type.
 fn smart_pointer_registration<Pointer: ?Sized + 'static, T: Reflect + ?Sized>() -> &'static TypeRegistration<Pointer> {
     TypeRegistration::get_or_init_with(|| {
         let arguments = Box::leak(
@@ -75,6 +103,7 @@ macro_rules! impl_builtin_reflect {
     ($kind:ident; $($ty:ty),+ $(,)?) => {
         $(
             impl Reflect for $ty {
+                /// Registers a scalar with the kind metadata selected by the macro.
                 fn __reflect_registration() -> &'static TypeRegistration<Self> {
                     TypeRegistration::get_or_init_with(|| {
                         TypeRegistration::with_shape(&$kind, None, &[])
@@ -92,12 +121,14 @@ impl_builtin_reflect!(PRIMITIVE_KIND;
 impl_builtin_reflect!(TEXT_KIND; String);
 
 impl Reflect for str {
+    /// Registers strings with text shape metadata and no struct fields.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(&TEXT_KIND, None, &[]))
     }
 }
 
 impl Reflect for () {
+    /// Registers the unit type with an empty tuple shape.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| TypeRegistration::with_shape(&TUPLE_KIND, None, &[]))
     }
@@ -106,6 +137,7 @@ impl Reflect for () {
 crate::__private::codegen_v4::registration::submit_type!(());
 
 impl<T: Reflect> Reflect for Vec<T> {
+    /// Registers the sequence shape and retains the element type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| {
             let arguments = Box::leak(
@@ -120,6 +152,7 @@ impl<T: Reflect> Reflect for Vec<T> {
 }
 
 impl<T: Reflect> Reflect for Option<T> {
+    /// Registers the optional shape and retains the wrapped type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| {
             let arguments = Box::leak(
@@ -134,6 +167,7 @@ impl<T: Reflect> Reflect for Option<T> {
 }
 
 impl<T: Reflect, const N: usize> Reflect for [T; N] {
+    /// Registers the array shape and retains its element type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| {
             let arguments = Box::leak(
@@ -148,24 +182,28 @@ impl<T: Reflect, const N: usize> Reflect for [T; N] {
 }
 
 impl<T: Reflect, S: 'static> Reflect for std::collections::HashSet<T, S> {
+    /// Registers an unordered set and retains its element type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         set_registration::<Self, T>()
     }
 }
 
 impl<T: Reflect> Reflect for std::collections::BTreeSet<T> {
+    /// Registers an ordered set and retains its element type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         set_registration::<Self, T>()
     }
 }
 
 impl<K: Reflect, V: Reflect> Reflect for std::collections::BTreeMap<K, V> {
+    /// Registers an ordered map and retains its key and value type arguments.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         map_registration::<Self, K, V>()
     }
 }
 
 impl<K: Reflect, V: Reflect, S: 'static> Reflect for std::collections::HashMap<K, V, S> {
+    /// Registers a hash map and retains its key and value type arguments.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         map_registration::<Self, K, V>()
     }
@@ -174,6 +212,7 @@ impl<K: Reflect, V: Reflect, S: 'static> Reflect for std::collections::HashMap<K
 macro_rules! impl_smart_pointer_reflect {
     ($module:ident, $pointer:ident) => {
         impl<T: Reflect + ?Sized> Reflect for std::$module::$pointer<T> {
+            /// Registers the smart-pointer shape and its pointee argument.
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
                 smart_pointer_registration::<Self, T>()
             }
@@ -182,6 +221,7 @@ macro_rules! impl_smart_pointer_reflect {
 }
 
 impl<T: Reflect + ?Sized> Reflect for Box<T> {
+    /// Registers box indirection and retains the pointee type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| {
             let arguments = Box::leak(
@@ -199,18 +239,22 @@ impl_smart_pointer_reflect!(rc, Rc);
 impl_smart_pointer_reflect!(sync, Arc);
 
 impl<T: Reflect + ?Sized> Reflect for &'static T {
+    /// Registers a shared reference shape without claiming ownership of its
+    /// target.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&REFERENCE_KIND)
     }
 }
 
 impl<T: Reflect + ?Sized> Reflect for &'static mut T {
+    /// Registers an exclusive reference shape without owning its target.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&REFERENCE_KIND)
     }
 }
 
 impl<T: Reflect> Reflect for [T] {
+    /// Registers a slice and retains its element type argument.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         TypeRegistration::get_or_init_with(|| {
             let arguments = Box::leak(
@@ -225,24 +269,28 @@ impl<T: Reflect> Reflect for [T] {
 }
 
 impl<T: Reflect + ?Sized> Reflect for *const T {
+    /// Registers a const raw-pointer shape without dereferencing the pointer.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&RAW_POINTER_KIND)
     }
 }
 
 impl<T: Reflect + ?Sized> Reflect for *mut T {
+    /// Registers a mutable raw-pointer shape without dereferencing the pointer.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&RAW_POINTER_KIND)
     }
 }
 
 impl Reflect for dyn std::fmt::Debug {
+    /// Registers the trait-object shape; no object instance is inspected.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&TRAIT_OBJECT_KIND)
     }
 }
 
 impl Reflect for dyn std::any::Any {
+    /// Registers the trait-object shape; no object instance is inspected.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&TRAIT_OBJECT_KIND)
     }
@@ -252,6 +300,7 @@ macro_rules! impl_function_pointer_reflect {
     (@with_attributes [$($attribute:meta),*]; $($argument:ident),* $(,)?) => {
         $(#[$attribute])*
         impl<$($argument: Reflect,)* Return: Reflect> Reflect for fn($($argument),*) -> Return {
+            /// Registers this signature as a function pointer without evaluating it.
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
                 shaped_registration(&FUNCTION_KIND)
             }
@@ -349,6 +398,8 @@ impl_function_pointer_reflect!(
 );
 
 impl<T: Reflect, Return: Reflect> Reflect for for<'a> fn(&'a T) -> Return {
+    /// Registers the function-pointer shape while retaining its higher-ranked
+    /// signature.
     fn __reflect_registration() -> &'static TypeRegistration<Self> {
         shaped_registration(&FUNCTION_KIND)
     }
@@ -378,6 +429,7 @@ impl_function_pointer_reflect!(
 macro_rules! impl_tuple_reflect {
     ($($type:ident),+ $(,)?) => {
         impl<$($type: Reflect),+> Reflect for ($($type,)+) {
+            /// Registers tuple shape and retains each component type argument.
             fn __reflect_registration() -> &'static TypeRegistration<Self> {
                 TypeRegistration::get_or_init_with(|| {
                     let arguments = Box::leak(
@@ -446,5 +498,4 @@ impl_tuple_reflect!(
 );
 
 #[cfg(test)]
-#[path = "builtin_tests.rs"]
 mod tests;

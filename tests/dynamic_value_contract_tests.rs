@@ -17,7 +17,7 @@ use qubit_reflect::value::DynamicValueKind;
 use qubit_reflect::value::Local;
 
 #[test]
-fn public_dynamic_value_facade_supports_all_ownership_kinds() {
+fn test_public_dynamic_value_facade_supports_all_ownership_kinds() {
     let context = ReflectionContext::builder()
         .build()
         .expect("an empty explicit context is valid");

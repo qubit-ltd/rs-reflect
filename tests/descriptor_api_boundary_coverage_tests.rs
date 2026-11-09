@@ -74,7 +74,7 @@ fn service() -> BoundaryService {
 }
 
 #[test]
-fn trait_and_method_definition_views_preserve_source_declarations() {
+fn test_trait_and_method_definition_views_preserve_source_declarations() {
     let context = ReflectionContext::global();
     context.initialize().expect("reflected metadata initializes");
     let definition = context
@@ -181,7 +181,7 @@ fn trait_and_method_definition_views_preserve_source_declarations() {
 }
 
 #[test]
-fn generic_type_descriptors_cover_named_and_positional_access() {
+fn test_generic_type_descriptors_cover_named_and_positional_access() {
     let descriptor = TypeDescriptor::of::<GenericBoundary<u32, 4>>();
     assert_eq!(descriptor.context().id(), ReflectionContext::global().id());
     assert_eq!(descriptor.type_id(), std::any::TypeId::of::<GenericBoundary<u32, 4>>());
@@ -231,7 +231,7 @@ fn generic_type_descriptors_cover_named_and_positional_access() {
 }
 
 #[test]
-fn field_variant_and_trait_impl_lookups_report_exact_results() {
+fn test_field_variant_and_trait_impl_lookups_report_exact_results() {
     let descriptor = TypeDescriptor::of::<BoundaryService>();
     let value = service();
 

@@ -29,6 +29,17 @@ use crate::ir::TypeKindIr;
 use crate::ir::VisibilityIr;
 
 /// Emits typed codegen_v4 metadata for one implementation method.
+///
+/// # Parameters
+///
+/// - `method`: Parsed implementation method whose signature is described.
+/// - `environment`: Enclosing generic environment extended with method
+///   generics.
+/// - `target`: Generated target type expression.
+/// - `namespace`: Generated registration namespace.
+/// - `facade`: Runtime facade path used in emitted metadata.
+/// - `symbolic_target`: Whether the target is represented symbolically.
+/// - `trait_impl`: Whether visibility follows trait method rules.
 fn method_metadata(
     method: &MethodIr,
     environment: &GenericEnvironment,
@@ -182,6 +193,12 @@ fn method_metadata(
     }
 }
 
+/// Returns the concrete pointee or value type for a statically known parameter.
+///
+/// # Parameters
+///
+/// - `parameter_type`: Parsed parameter type, possibly a reference.
+/// - `environment`: Generic environment used to reject unresolved types.
 fn parameter_concrete_type<'a>(
     parameter_type: &'a crate::ir::TypeIr,
     environment: &GenericEnvironment,
@@ -193,6 +210,13 @@ fn parameter_concrete_type<'a>(
     is_static_concrete_type(concrete_type, environment).then_some(concrete_type)
 }
 
+/// Reports whether a type contains no generic or otherwise unresolved
+/// component.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect recursively.
+/// - `environment`: Generic environment defining unresolved parameters.
 fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironment) -> bool {
     use crate::ir::PathArgumentIr;
     use crate::ir::PathArgumentsIr;
@@ -247,6 +271,12 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
     }
 }
 
+/// Reports whether tokens contain a const parameter known to the environment.
+///
+/// # Parameters
+///
+/// - `tokens`: Source tokens to scan for identifiers.
+/// - `environment`: Generic environment containing const parameter names.
 fn contains_generic_const(tokens: &TokenStream, environment: &GenericEnvironment) -> bool {
     tokens
         .to_string()
@@ -472,7 +502,7 @@ fn expand_generic_impl_definition(
 /// Returns the deterministic hidden module identifier.
 #[must_use]
 fn generic_impl_definition_module(declaration: &ImplDeclarationIr) -> Ident {
-    let fingerprint = super::context::fingerprint(&declaration.retained_tokens.to_string());
+    let fingerprint = super::fingerprint(&declaration.retained_tokens.to_string());
     let location = declaration.span.start();
     format_ident!(
         "__qubit_reflect_impl_definition_{fingerprint:x}_{}_{}",
@@ -1157,6 +1187,11 @@ fn expand_concrete_impl(
     tokens
 }
 
+/// Formats a reflected trait path using its source segment names.
+///
+/// # Parameters
+///
+/// - `path`: Parsed trait path to format.
 fn trait_source_path(path: &crate::ir::PathIr) -> String {
     let mut source = path
         .segments
@@ -1170,6 +1205,12 @@ fn trait_source_path(path: &crate::ir::PathIr) -> String {
     source
 }
 
+/// Rewrites a source trait path to its generated provider path.
+///
+/// # Parameters
+///
+/// - `path`: Parsed trait path whose final segment names the trait.
+/// - `suffix`: Generated provider suffix appended to the trait name.
 fn trait_provider_path(path: &crate::ir::PathIr, suffix: &str) -> syn::Path {
     let mut provider_path: syn::Path = syn::parse2(path.tokens.clone()).expect("validated trait path parses");
     let first = provider_path
@@ -1193,6 +1234,11 @@ fn trait_provider_path(path: &crate::ir::PathIr, suffix: &str) -> syn::Path {
     provider_path
 }
 
+/// Resolves the metadata provider expression for a reflected or external trait.
+///
+/// # Parameters
+///
+/// - `declaration`: Implementation declaration carrying its trait binding.
 fn trait_definition_provider(declaration: &ImplDeclarationIr) -> Option<TokenStream> {
     declaration
         .reflected_trait
@@ -1222,7 +1268,7 @@ mod parameter_concrete_type_tests {
     }
 
     #[test]
-    fn resolves_static_concrete_parameter_types() {
+    fn test_resolves_static_concrete_parameter_types() {
         let environment = GenericEnvironment::new();
 
         assert_eq!(
@@ -1246,7 +1292,7 @@ mod parameter_concrete_type_tests {
     }
 
     #[test]
-    fn leaves_generic_or_non_static_parameter_types_unresolved() {
+    fn test_leaves_generic_or_non_static_parameter_types_unresolved() {
         let environment = GenericEnvironment::new().with_type_parameter("T");
 
         assert!(parameter_concrete_type(&parameter_type("T"), &environment).is_none());

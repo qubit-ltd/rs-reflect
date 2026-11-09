@@ -36,7 +36,10 @@ pub enum Visibility {
     /// The item is visible within its defining crate.
     Crate,
     /// The item is visible within the named module subtree.
-    Restricted(&'static str),
+    Restricted(
+        /// Module path that bounds the restricted visibility.
+        &'static str,
+    ),
     /// The item is private to its defining module.
     Private,
 }
@@ -56,6 +59,12 @@ pub struct FieldAccess {
 
 impl FieldAccess {
     /// Creates a set of field access capabilities.
+    ///
+    /// # Parameters
+    /// - `readable`: whether safe field reads are available.
+    /// - `mutable`: whether safe mutable borrows are available.
+    /// - `replaceable`: whether safe replacement is available.
+    /// - `constructible`: whether construction may initialize the field.
     pub const fn new(readable: bool, mutable: bool, replaceable: bool, constructible: bool) -> Self {
         Self {
             readable,
@@ -83,11 +92,20 @@ pub enum FieldAccessUnavailableReason {
 #[non_exhaustive]
 pub enum FieldAccessError {
     /// The supplied owner value does not match the field's declaring type.
-    TargetTypeMismatch(TypeMismatch),
+    TargetTypeMismatch(
+        /// Expected and actual owner type identities.
+        TypeMismatch,
+    ),
     /// The requested field value type does not match the declared field type.
-    ValueTypeMismatch(TypeMismatch),
+    ValueTypeMismatch(
+        /// Expected field value and supplied value type identities.
+        TypeMismatch,
+    ),
     /// The requested access operation has no usable adapter.
-    Unavailable(FieldAccessUnavailableReason),
+    Unavailable(
+        /// Reason the requested adapter could not be used.
+        FieldAccessUnavailableReason,
+    ),
     /// The field is not readable.
     NotReadable,
     /// The field is not mutably accessible.
@@ -104,6 +122,10 @@ pub enum FieldAccessError {
 }
 
 impl fmt::Display for FieldAccessError {
+    /// Formats the access failure using its diagnostic representation.
+    ///
+    /// # Parameters
+    /// - `formatter`: destination for the error text.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{self:?}")
     }
@@ -116,11 +138,20 @@ impl std::error::Error for FieldAccessError {}
 #[non_exhaustive]
 pub enum FieldSetError {
     /// The supplied owner value does not match the field's declaring type.
-    TargetTypeMismatch(TypeMismatch),
+    TargetTypeMismatch(
+        /// Expected and actual owner type identities.
+        TypeMismatch,
+    ),
     /// The replacement value type does not match the declared field type.
-    ValueTypeMismatch(TypeMismatch),
+    ValueTypeMismatch(
+        /// Expected field value and replacement value type identities.
+        TypeMismatch,
+    ),
     /// No replacement adapter is available.
-    Unavailable(FieldAccessUnavailableReason),
+    Unavailable(
+        /// Reason the replacement adapter could not be used.
+        FieldAccessUnavailableReason,
+    ),
     /// The field cannot be replaced.
     NotReplaceable,
     /// Safe replacement is denied by source visibility.
@@ -135,6 +166,10 @@ pub enum FieldSetError {
 }
 
 impl fmt::Display for FieldSetError {
+    /// Formats the replacement failure using its diagnostic representation.
+    ///
+    /// # Parameters
+    /// - `formatter`: destination for the error text.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{self:?}")
     }
@@ -143,13 +178,26 @@ impl fmt::Display for FieldSetError {
 impl std::error::Error for FieldSetError {}
 
 /// A failed replacement that returns the original replacement value.
+///
+/// # Type Parameters
+/// - `V`: replacement value type retained for recovery.
 #[must_use]
 pub struct FieldSetFailure<V> {
+    /// Diagnostic reason the field assignment failed.
     error: FieldSetError,
+    /// Value returned to the caller without being consumed.
     replacement: V,
 }
 
 impl<V> FieldSetFailure<V> {
+    /// Creates a field replacement failure while retaining the rejected value.
+    ///
+    /// # Type Parameters
+    /// - `V`: replacement value type retained for recovery.
+    ///
+    /// # Parameters
+    /// - `error`: reason the replacement could not be applied.
+    /// - `replacement`: original value returned to the caller.
     pub(crate) fn new(error: FieldSetError, replacement: V) -> Self {
         Self { error, replacement }
     }
@@ -172,23 +220,32 @@ impl<V> FieldSetFailure<V> {
 }
 
 impl<V> RecoverableFailure for FieldSetFailure<V> {
+    /// Diagnostic type associated with this recoverable failure.
     type Error = FieldSetError;
+    /// Original replacement value retained after the failed assignment.
     type Recovery = V;
 
+    /// Returns the field assignment error without consuming the failure.
     fn error(&self) -> &Self::Error {
         &self.error
     }
 
+    /// Borrows the original replacement value for recovery.
     fn recovery(&self) -> &Self::Recovery {
         &self.replacement
     }
 
+    /// Returns the error and replacement value as owned parts.
     fn into_parts(self) -> (Self::Error, Self::Recovery) {
         (self.error, self.replacement)
     }
 }
 
 impl<V> fmt::Debug for FieldSetFailure<V> {
+    /// Formats the error and the retained replacement value's type name.
+    ///
+    /// # Parameters
+    /// - `formatter`: destination for the debug representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("FieldSetFailure")
@@ -198,6 +255,10 @@ impl<V> fmt::Debug for FieldSetFailure<V> {
     }
 }
 
+/// Creates the runtime identity for a concrete Rust type.
+///
+/// # Type Parameters
+/// - `T`: type whose identity is requested.
 fn identity<T: 'static>() -> TypeIdentity {
     TypeIdentity {
         type_id: TypeId::of::<T>(),
@@ -205,6 +266,13 @@ fn identity<T: 'static>() -> TypeIdentity {
     }
 }
 
+/// Creates a descriptor for a reflected field value in the supplied context.
+///
+/// # Type Parameters
+/// - `Value`: reflected value type of the field.
+///
+/// # Parameters
+/// - `context`: context in which the value descriptor is bound.
 fn concrete_type_of<'ctx, Value: crate::runtime::descriptor::Reflect>(
     context: &'ctx ReflectionContext,
 ) -> TypeDescriptor<'ctx> {
@@ -213,23 +281,48 @@ fn concrete_type_of<'ctx, Value: crate::runtime::descriptor::Reflect>(
 
 /// Static source facts for a field, consumed when binding a descriptor.
 pub struct FieldMetadata {
+    /// Zero-based source position of the field.
     pub(crate) index: usize,
+    /// Source name or generated tuple-field name.
     pub(crate) name: &'static str,
+    /// Source visibility retained for safe access checks.
     pub(crate) visibility: Visibility,
+    /// Source expression describing the field's declared type.
     pub(crate) type_expression: &'static crate::runtime::expression::ExpressionData,
+    /// Optional factory for the concrete reflected field type.
     pub(crate) concrete_type: Option<for<'ctx> fn(&'ctx ReflectionContext) -> TypeDescriptor<'ctx>>,
+    /// Typed adapter for reading or writing the field in its owner.
     pub(crate) adapter: &'static dyn FieldAdapter,
+    /// Variant metadata when the field belongs to an enum variant.
     pub(crate) variant: Option<&'static VariantMetadata>,
+    /// Deferred metadata factory for a variant field.
     pub(crate) variant_source: Option<fn() -> &'static VariantMetadata>,
+    /// Adapter that identifies the active enum variant for safe access.
     pub(crate) active_variant: Option<unsafe fn(*const ()) -> VariantIdentity>,
+    /// Local-mode adapter for dynamic field operations, when generated.
     pub(crate) dynamic_local: Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::Local>>,
+    /// Thread-safe adapter for dynamic field operations, when generated.
     pub(crate) dynamic_thread_safe: Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::ThreadSafe>>,
+    /// Reason dynamic operations are unavailable when no adapter exists.
     pub(crate) dynamic_unavailable: FieldAccessUnavailableReason,
+    /// Safe access operations supported by the source field.
     pub(crate) access: FieldAccess,
 }
 
 impl FieldMetadata {
     /// Creates metadata for a statically typed field adapter.
+    ///
+    /// # Type Parameters
+    /// - `Owner`: Rust type containing the field.
+    /// - `Value`: Rust type stored in the field.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based source position of the field.
+    /// - `name`: source name or generated tuple-field name.
+    /// - `visibility`: source visibility of the field.
+    /// - `type_expression`: source expression for the field type.
+    /// - `adapter`: typed owner/value access adapter.
+    /// - `access`: safe operations available for the field.
     pub const fn typed<Owner: 'static, Value: 'static>(
         index: usize,
         name: &'static str,
@@ -256,6 +349,19 @@ impl FieldMetadata {
     }
 
     /// Creates metadata for a typed field declared inside an enum variant.
+    ///
+    /// # Type Parameters
+    /// - `Owner`: enum type containing the variant field.
+    /// - `Value`: Rust type stored in the field.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based source position of the field.
+    /// - `name`: source name or generated tuple-field name.
+    /// - `visibility`: source visibility of the field.
+    /// - `type_expression`: source expression for the field type.
+    /// - `adapter`: typed owner/value access adapter.
+    /// - `variant`: deferred metadata for the declaring variant.
+    /// - `access`: safe operations available for the field.
     pub const fn typed_variant<Owner: 'static, Value: 'static>(
         index: usize,
         name: &'static str,
@@ -284,6 +390,9 @@ impl FieldMetadata {
 
     /// Associates a context-bound descriptor factory for a concrete reflected
     /// field type.
+    ///
+    /// # Type Parameters
+    /// - `Value`: concrete reflected field type.
     #[doc(hidden)]
     pub const fn with_concrete_type<Value: crate::runtime::descriptor::Reflect>(mut self) -> Self {
         self.concrete_type = Some(concrete_type_of::<Value>);
@@ -291,6 +400,13 @@ impl FieldMetadata {
     }
 
     /// Enables local dynamic access when both field types support reflection.
+    ///
+    /// # Type Parameters
+    /// - `Owner`: owner type containing the field.
+    /// - `Value`: concrete type stored in the field.
+    ///
+    /// # Parameters
+    /// - `adapter`: generated typed adapter used for local dynamic access.
     pub const fn with_local_dynamic<Owner, Value>(mut self, adapter: &'static TypedFieldAdapter<Owner, Value>) -> Self
     where
         Owner: crate::runtime::descriptor::Reflect
@@ -309,6 +425,13 @@ impl FieldMetadata {
 
     /// Enables thread-safe dynamic access when both field types are `Send +
     /// Sync`.
+    ///
+    /// # Type Parameters
+    /// - `Owner`: owner type containing the field.
+    /// - `Value`: thread-safe concrete type stored in the field.
+    ///
+    /// # Parameters
+    /// - `adapter`: generated typed adapter used for thread-safe access.
     pub const fn with_thread_safe_dynamic<Owner, Value>(
         mut self,
         adapter: &'static TypedFieldAdapter<Owner, Value>,
@@ -329,8 +452,18 @@ impl FieldMetadata {
         self
     }
 
-    #[allow(clippy::too_many_arguments)]
     /// Creates field metadata with its typed adapter and source facts.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based source position of the field.
+    /// - `name`: source name or generated tuple-field name.
+    /// - `visibility`: source visibility of the field.
+    /// - `type_expression`: source expression for the field type.
+    /// - `adapter`: typed adapter for field access.
+    /// - `variant`: optional declaring variant metadata.
+    /// - `active_variant`: optional adapter that identifies the active variant.
+    /// - `access`: safe operations available for the field.
+    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         index: usize,
         name: &'static str,
@@ -358,11 +491,16 @@ impl FieldMetadata {
         }
     }
 
+    /// Resolves the field's declaring variant from stored or deferred metadata.
     pub(crate) fn variant_metadata(&self) -> Option<&'static VariantMetadata> {
         self.variant.or_else(|| self.variant_source.map(|source| source()))
     }
 
     /// Adds adapters for dynamically typed reads and writes.
+    ///
+    /// # Parameters
+    /// - `local`: optional adapter supporting local dynamic operations.
+    /// - `thread_safe`: optional adapter supporting thread-safe operations.
     pub const fn with_dynamic_adapters(
         mut self,
         local: Option<&'static dyn DynamicFieldAdapter<crate::runtime::value::Local>>,
@@ -374,6 +512,9 @@ impl FieldMetadata {
     }
 
     /// Records why dynamic field access cannot be provided.
+    ///
+    /// # Parameters
+    /// - `reason`: reason returned when no dynamic adapter is available.
     pub const fn with_dynamic_unavailable_reason(mut self, reason: FieldAccessUnavailableReason) -> Self {
         self.dynamic_unavailable = reason;
         self
@@ -383,12 +524,21 @@ impl FieldMetadata {
 /// A context-bound view of one reflected field.
 #[derive(Clone, Copy)]
 pub struct FieldDescriptor<'ctx> {
+    /// Static metadata that defines this field's source and access rules.
     pub(crate) metadata: &'static FieldMetadata,
+    /// Reflected owner type that declares the field.
     declaring_type: TypeDescriptor<'ctx>,
+    /// Declaring enum variant, when the field is variant-specific.
     declaring_variant: Option<VariantDescriptor<'ctx>>,
 }
 
 impl<'ctx> FieldDescriptor<'ctx> {
+    /// Creates a field descriptor bound to its owner and optional variant.
+    ///
+    /// # Parameters
+    /// - `metadata`: static source metadata for the field.
+    /// - `declaring_type`: reflected owner type descriptor.
+    /// - `declaring_variant`: declaring enum variant, when applicable.
     pub(crate) const fn new(
         metadata: &'static FieldMetadata,
         declaring_type: TypeDescriptor<'ctx>,
@@ -485,6 +635,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
     }
 
     /// Reads a public field after checking owner and value types.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: expected field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is read.
     pub fn get<T: 'static, V: 'static>(self, target: &T) -> Result<&V, FieldAccessError> {
         self.check_target::<T>()?;
         if self.metadata.visibility != Visibility::Public {
@@ -513,6 +670,12 @@ impl<'ctx> FieldDescriptor<'ctx> {
     }
 
     /// Reads a public field through a dynamically typed value.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to read.
     pub fn get_dynamic<'a, M: DynamicFieldMode>(
         self,
         target: DynamicRef<'a, M>,
@@ -535,6 +698,12 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must ensure that reading this field is authorized even when
     /// its source visibility is private or restricted.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to read.
     pub unsafe fn get_dynamic_unsafe<'a, M: DynamicFieldMode>(
         self,
         target: DynamicRef<'a, M>,
@@ -546,6 +715,12 @@ impl<'ctx> FieldDescriptor<'ctx> {
     }
 
     /// Mutably borrows a public field through a dynamically typed value.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to borrow mutably.
     pub fn get_dynamic_mut<'a, M: DynamicFieldMode>(
         self,
         target: DynamicMut<'a, M>,
@@ -568,6 +743,12 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must ensure that mutating this field is authorized even when
     /// its source visibility is private or restricted.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to borrow mutably.
     pub unsafe fn get_dynamic_mut_unsafe<'a, M: DynamicFieldMode>(
         self,
         target: DynamicMut<'a, M>,
@@ -580,6 +761,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
 
     /// Replaces a public field dynamically, retaining the replacement on
     /// failure.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target and replacement.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to update.
+    /// - `value`: replacement value retained if the assignment fails.
     pub fn set_dynamic<M: DynamicFieldMode>(
         self,
         target: DynamicMut<'_, M>,
@@ -603,6 +791,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must ensure that replacing this field is authorized even
     /// when its source visibility is private or restricted.
+    ///
+    /// # Type Parameters
+    /// - `M`: dynamic value mode of the target and replacement.
+    ///
+    /// # Parameters
+    /// - `target`: dynamically typed owner value to update.
+    /// - `value`: replacement value retained if the assignment fails.
     pub unsafe fn set_dynamic_unsafe<M: DynamicFieldMode>(
         self,
         target: DynamicMut<'_, M>,
@@ -619,6 +814,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold the access policy that makes this private field
     /// readable.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: expected field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is read.
     pub unsafe fn get_unsafe<T: 'static, V: 'static>(self, target: &T) -> Result<&V, FieldAccessError> {
         self.check_target::<T>()?;
         if !self.metadata.access.readable {
@@ -648,6 +850,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold the access policy that makes this private field
     /// mutable.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: expected field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is borrowed mutably.
     pub unsafe fn get_mut_unsafe<T: 'static, V: 'static>(self, target: &mut T) -> Result<&mut V, FieldAccessError> {
         self.check_target::<T>()?;
         if !self.metadata.access.mutable {
@@ -676,6 +885,14 @@ impl<'ctx> FieldDescriptor<'ctx> {
     /// # Safety
     /// The caller must uphold the access policy that permits replacing this
     /// private field.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: replacement field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is replaced.
+    /// - `value`: replacement returned if assignment fails.
     pub unsafe fn set_unsafe<T: 'static, V: 'static>(self, target: &mut T, value: V) -> Result<(), FieldSetFailure<V>> {
         if let Err(FieldAccessError::TargetTypeMismatch(mismatch)) = self.check_target::<T>() {
             return Err(FieldSetFailure::new(FieldSetError::TargetTypeMismatch(mismatch), value));
@@ -713,6 +930,13 @@ impl<'ctx> FieldDescriptor<'ctx> {
     }
 
     /// Mutably borrows a public field after checking owner and value types.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: expected field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is borrowed mutably.
     pub fn get_mut<T: 'static, V: 'static>(self, target: &mut T) -> Result<&mut V, FieldAccessError> {
         self.check_target::<T>()?;
         if self.metadata.visibility != Visibility::Public {
@@ -742,6 +966,14 @@ impl<'ctx> FieldDescriptor<'ctx> {
 
     /// Replaces a public field; on error, the failure contains the unconsumed
     /// value.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the target value.
+    /// - `V`: replacement field value type.
+    ///
+    /// # Parameters
+    /// - `target`: owner value whose field is replaced.
+    /// - `value`: replacement returned if assignment fails.
     pub fn set<T: 'static, V: 'static>(self, target: &mut T, value: V) -> Result<(), FieldSetFailure<V>> {
         if let Err(error) = self.check_target::<T>() {
             return Err(FieldSetFailure::new(
@@ -788,6 +1020,10 @@ impl<'ctx> FieldDescriptor<'ctx> {
         Ok(())
     }
 
+    /// Checks that the target owner type matches this field's adapter.
+    ///
+    /// # Type Parameters
+    /// - `T`: owner type of the supplied target.
     fn check_target<T: 'static>(self) -> Result<(), FieldAccessError> {
         let actual = identity::<T>();
         (actual.type_id == self.metadata.adapter.owner().type_id)
@@ -797,6 +1033,10 @@ impl<'ctx> FieldDescriptor<'ctx> {
             })
     }
 
+    /// Verifies that this field's enum variant is active in `target`.
+    ///
+    /// # Parameters
+    /// - `target`: pointer to the owner whose active variant is checked.
     fn check_variant(self, target: *const ()) -> Result<(), FieldAccessError> {
         let Some(expected) = self.metadata.variant_metadata() else {
             return Ok(());
@@ -892,7 +1132,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_access_reports_unavailable_when_adapter_cannot_return_field_pointer() {
+    fn test_typed_access_reports_unavailable_when_adapter_cannot_return_field_pointer() {
         let field = descriptor();
         let mut owner = Owner { value: 7 };
 
@@ -950,7 +1190,7 @@ mod tests {
     }
 
     #[test]
-    fn unsafe_dynamic_access_can_mutate_a_private_field() {
+    fn test_unsafe_dynamic_access_can_mutate_a_private_field() {
         let descriptor = TypeDescriptor::of::<PrivateOwner>();
         let field = descriptor.field("value").expect("private reflected field");
         let mut owner = PrivateOwner { value: 7 };

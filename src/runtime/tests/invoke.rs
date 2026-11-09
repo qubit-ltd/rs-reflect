@@ -533,7 +533,7 @@ fn type_descriptor(context: &ReflectionContext) -> TypeDescriptor<'_> {
 }
 
 #[test]
-fn invocation_calls_the_selected_adapter_with_checked_typed_inputs() {
+fn test_invocation_calls_the_selected_adapter_with_checked_typed_inputs() {
     let context = ReflectionContext::empty();
     let methods = [effective()];
     let catalog = MethodCatalog::new(type_descriptor(&context), &methods);
@@ -549,7 +549,7 @@ fn invocation_calls_the_selected_adapter_with_checked_typed_inputs() {
 }
 
 #[test]
-fn thread_safe_mode_selects_a_send_sync_adapter() {
+fn test_thread_safe_mode_selects_a_send_sync_adapter() {
     let context = ReflectionContext::empty();
     let methods = [effective()];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -566,7 +566,7 @@ fn thread_safe_mode_selects_a_send_sync_adapter() {
 }
 
 #[test]
-fn caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declaration_order() {
+fn test_caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declaration_order() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
         target: counter_type_metadata,
@@ -595,7 +595,7 @@ fn caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declaration
 }
 
 #[test]
-fn lookup_preserves_missing_unique_and_ambiguous_states() {
+fn test_lookup_preserves_missing_unique_and_ambiguous_states() {
     let context = ReflectionContext::empty();
     let inherent = effective();
     let trait_method = EffectiveMethod {
@@ -631,7 +631,7 @@ fn lookup_preserves_missing_unique_and_ambiguous_states() {
 }
 
 #[test]
-fn preflight_failure_keeps_inputs_available_for_correction_and_retry() {
+fn test_preflight_failure_keeps_inputs_available_for_correction_and_retry() {
     let context = ReflectionContext::empty();
     let methods = [effective()];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -660,7 +660,7 @@ fn preflight_failure_keeps_inputs_available_for_correction_and_retry() {
 
 #[test]
 #[allow(unsafe_code)]
-fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
+fn test_unsafe_method_rejection_preserves_receiver_and_all_arguments() {
     let context = ReflectionContext::empty();
     let methods = [effective_for(&UNSAFE_METHOD)];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -734,7 +734,7 @@ fn unsafe_method_rejection_preserves_receiver_and_all_arguments() {
 }
 
 #[test]
-fn ordinary_invoke_leaves_user_panics_unwinding() {
+fn test_ordinary_invoke_leaves_user_panics_unwinding() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
         target: counter_type_metadata,
@@ -759,7 +759,7 @@ fn ordinary_invoke_leaves_user_panics_unwinding() {
 }
 
 #[test]
-fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
+fn test_catching_invoke_reports_panics_but_preserves_preflight_rejections() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
         target: counter_type_metadata,
@@ -872,7 +872,7 @@ fn catching_invoke_reports_panics_but_preserves_preflight_rejections() {
 }
 
 #[test]
-fn builder_catching_slot_catches_only_explicit_invocation() {
+fn test_builder_catching_slot_catches_only_explicit_invocation() {
     let context = ReflectionContext::empty();
     let method = EffectiveMethod {
         target: counter_type_metadata,
@@ -910,7 +910,7 @@ fn builder_catching_slot_catches_only_explicit_invocation() {
 }
 
 #[test]
-fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure() {
+fn test_pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure() {
     let context = ReflectionContext::empty();
     let effective = EffectiveMethod {
         target: pinned_counter_type_metadata,
@@ -957,7 +957,7 @@ fn pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_failure()
 }
 
 #[test]
-fn pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
+fn test_pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
     let context = ReflectionContext::empty();
     let effective = EffectiveMethod {
         target: pinned_counter_type_metadata,
@@ -993,7 +993,7 @@ fn pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() {
 }
 
 #[test]
-fn pinned_holder_preserves_trait_object_and_slice_metadata() {
+fn test_pinned_holder_preserves_trait_object_and_slice_metadata() {
     let trait_object: Pin<Box<dyn PinnedProbe>> = Box::pin(PinnedProbeValue(73, PhantomPinned));
     let (receiver, arguments) = PinnedInvocation::<Local, _>::shared(trait_object.as_ref()).into_parts();
     assert_eq!(arguments.argument_count(), 0);
@@ -1017,7 +1017,7 @@ fn pinned_holder_preserves_trait_object_and_slice_metadata() {
 }
 
 #[test]
-fn preflight_errors_preserve_the_specific_binding_and_receiver_failure() {
+fn test_preflight_errors_preserve_the_specific_binding_and_receiver_failure() {
     let context = ReflectionContext::empty();
     let methods = [effective()];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -1100,7 +1100,7 @@ fn preflight_errors_preserve_the_specific_binding_and_receiver_failure() {
 }
 
 #[test]
-fn argument_binding_reports_unavailable_names_and_concrete_types() {
+fn test_argument_binding_reports_unavailable_names_and_concrete_types() {
     static PATTERN_PARAMETER: ParameterMetadata = ParameterMetadata {
         index: 0,
         pattern: ParameterPattern::Destructure,
@@ -1158,7 +1158,7 @@ fn argument_binding_reports_unavailable_names_and_concrete_types() {
 }
 
 #[test]
-fn output_extractors_retain_values_and_borrow_origins_after_mismatch() {
+fn test_output_extractors_retain_values_and_borrow_origins_after_mismatch() {
     use crate::runtime::invoke::BorrowOrigin;
     use crate::runtime::invoke::OutputMismatch;
     use crate::runtime::value::DynamicMut;
@@ -1225,7 +1225,7 @@ fn output_extractors_retain_values_and_borrow_origins_after_mismatch() {
 }
 
 #[test]
-fn unavailable_method_reasons_are_reported_and_inputs_are_recoverable() {
+fn test_unavailable_method_reasons_are_reported_and_inputs_are_recoverable() {
     let context = ReflectionContext::empty();
     let unavailable = EffectiveMethod {
         specializations: &UNAVAILABLE_SPECIALIZATIONS,
@@ -1251,7 +1251,7 @@ fn unavailable_method_reasons_are_reported_and_inputs_are_recoverable() {
 }
 
 #[test]
-fn pinned_thread_safe_dispatch_without_a_mode_adapter_recovers_the_pin() {
+fn test_pinned_thread_safe_dispatch_without_a_mode_adapter_recovers_the_pin() {
     let context = ReflectionContext::empty();
     let effective = EffectiveMethod {
         target: pinned_counter_type_metadata,
@@ -1288,7 +1288,7 @@ fn pinned_thread_safe_dispatch_without_a_mode_adapter_recovers_the_pin() {
 }
 
 #[test]
-fn optional_and_slice_return_extractors_restore_origins_and_values() {
+fn test_optional_and_slice_return_extractors_restore_origins_and_values() {
     use crate::runtime::invoke::BorrowOrigin;
     use crate::runtime::invoke::InvocationOutput;
 
@@ -1359,7 +1359,7 @@ fn optional_and_slice_return_extractors_restore_origins_and_values() {
 }
 
 #[test]
-fn reflected_future_extracts_and_polls_local_and_thread_safe_results() {
+fn test_reflected_future_extracts_and_polls_local_and_thread_safe_results() {
     use std::future::Future;
     use std::task::Context;
     use std::task::Waker;

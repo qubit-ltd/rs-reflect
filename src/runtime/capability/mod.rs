@@ -23,6 +23,7 @@ pub(crate) mod capability;
 pub(crate) mod capability_error;
 pub(crate) mod capability_id;
 pub(crate) mod capability_origin;
+mod capability_record;
 pub(crate) mod capability_registration;
 pub(crate) mod capability_registration_origin;
 pub(crate) mod capability_target;

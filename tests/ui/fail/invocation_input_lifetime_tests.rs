@@ -11,9 +11,7 @@ use qubit_reflect::InvocationOutput;
 use qubit_reflect::MethodDescriptor;
 use qubit_reflect::value::Local;
 
-fn escape_receiver(
-    method: &MethodDescriptor<'_>,
-) -> InvocationOutput<'static, Local> {
+fn escape_receiver(method: &MethodDescriptor<'_>) -> InvocationOutput<'static, Local> {
     let receiver = String::from("borrowed receiver");
     match method.invoke(Invocation::<Local>::on_ref(&receiver)) {
         Ok(output) => output,
@@ -21,9 +19,7 @@ fn escape_receiver(
     }
 }
 
-fn escape_argument(
-    method: &MethodDescriptor<'_>,
-) -> InvocationOutput<'static, Local> {
+fn escape_argument(method: &MethodDescriptor<'_>) -> InvocationOutput<'static, Local> {
     let argument = String::from("borrowed argument");
     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
         Ok(output) => output,

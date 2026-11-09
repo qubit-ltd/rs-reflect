@@ -8,7 +8,6 @@
 
 use core::fmt::Debug;
 
-
 type Bytes = [u8];
 
 #[qubit_reflect::Reflect]

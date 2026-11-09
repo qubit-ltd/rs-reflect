@@ -25,6 +25,7 @@ pub trait LabelA {
 
 #[ReflectImpl(reflected_trait = LabelA)]
 impl LabelA for RegistryUser {
+    /// Returns the label contributed by implementation fragment A.
     fn label_a(&self) -> u8 {
         self.id + 10
     }

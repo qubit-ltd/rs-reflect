@@ -8,11 +8,14 @@
 
 //! Invocation adapter generation for concrete reflected impl methods.
 
+mod thread_safe_definition;
+
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 
+use self::thread_safe_definition::ThreadSafeDefinition;
 use super::specialization_codegen::typed_extension_receiver_type;
 use crate::ir::MethodIr;
 use crate::ir::ReceiverKindIr;
@@ -20,18 +23,20 @@ use crate::ir::ReturnTypeIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
 
-/// One compile-time-selected thread-safe adapter provider.
-pub(super) struct ThreadSafeDefinition {
-    pub(super) tokens: TokenStream,
-    pub(super) selector: TokenStream,
-}
-
 /// Builds a thread-safe adapter behind a stable-Rust trait-bound probe.
 ///
 /// The generated method-call trait keeps the target concrete at the call
 /// boundary while the adapter function is generic over that trait. This lets
 /// Rust type-check the thread-safe body only for targets and value types that
 /// satisfy the corresponding `ValueFor<ThreadSafe>` bounds.
+///
+/// # Parameters
+///
+/// - `method`: Parsed method whose signature controls adapter eligibility.
+/// - `index`: Source method index used to form generated identifiers.
+/// - `target`: Concrete type tokens for the method receiver.
+/// - `trait_call_path`: Optional path used for a qualified trait call.
+/// - `facade`: Runtime facade path used in the generated adapter.
 #[must_use]
 pub(super) fn thread_safe_definition(
     method: &MethodIr,
@@ -322,6 +327,11 @@ pub(super) fn thread_safe_definition(
     Some(ThreadSafeDefinition { tokens, selector })
 }
 
+/// Reports whether the retained type tokens contain the `Self` identifier.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type whose source tokens are inspected.
 fn contains_self_type(ty: &TypeIr) -> bool {
     ty.tokens
         .to_string()

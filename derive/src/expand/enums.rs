@@ -46,17 +46,21 @@ use crate::ir::VariantKindIr;
 ///
 /// Returns a syntax diagnostic when the declaration is not an enum or retained
 /// generic syntax cannot be parsed.
-pub(crate) fn expand(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> syn::Result<TokenStream> {
+pub(crate) fn expand(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     expand_v4(declaration, context)
 }
 
-fn expand_v4(
-    declaration: TypeDeclarationIr,
-    context: &ExpansionContext,
-) -> syn::Result<TokenStream> {
+/// Generates reflection metadata and accessors for an enum declaration.
+///
+/// The function retains the source enum's conditional fields and variant
+/// availability when emitting its v4 providers.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed enum declaration whose fields and variants are
+///   emitted.
+/// - `context`: Expansion context providing the runtime facade and fingerprint.
+fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn::Result<TokenStream> {
     if declaration.kind != TypeDeclarationKindIr::Enum {
         return Err(syn::Error::new(
             declaration.span,
@@ -69,8 +73,7 @@ fn expand_v4(
     let fingerprint = context.fingerprint(&declaration.retained_tokens.to_string());
     let module = format_ident!("__qubit_reflect_v4_enum_{fingerprint:016x}");
     let marker = format_ident!("TypeDefinitionMarker");
-    let environment =
-        super::generic_environment::GenericEnvironment::from_generics(&declaration.generics);
+    let environment = super::generic_environment::GenericEnvironment::from_generics(&declaration.generics);
     let constructible_variants: Vec<_> = declaration
         .variants
         .iter()
@@ -89,12 +92,7 @@ fn expand_v4(
                         || super::structs::supports_construction(&field.ty, &owner_name)
                 })
                 && variant.fields.iter().all(|field| {
-                    super::generics::field_cfg_attributes(
-                        &declaration,
-                        Some(variant.index),
-                        field.index,
-                    )
-                    .is_empty()
+                    super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
                 })
                 && variant.fields.iter().all(|field| {
                     !field
@@ -120,12 +118,8 @@ fn expand_v4(
                         .iter()
                         .any(|attribute| attribute.name == HelperName::Skip)
                         && super::structs::supports_construction(&field.ty, &owner_name)
-                        && super::generics::field_cfg_attributes(
-                            &declaration,
-                            Some(variant.index),
-                            field.index,
-                        )
-                        .is_empty()
+                        && super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index)
+                            .is_empty()
                 })
         });
     let integer_repr = declaration
@@ -151,9 +145,7 @@ fn expand_v4(
             .filter(|parameter| parameter.kind == GenericKindIr::Lifetime)
         {
             let lifetime = Lifetime::new(&format!("'{}", parameter.name), parameter.span);
-            where_clause
-                .predicates
-                .push(parse_quote!(#lifetime: 'static));
+            where_clause.predicates.push(parse_quote!(#lifetime: 'static));
         }
         for parameter in declaration
             .generics
@@ -162,9 +154,7 @@ fn expand_v4(
             .filter(|parameter| parameter.kind == GenericKindIr::Type)
         {
             let parameter = Ident::new(&parameter.name, parameter.span);
-            where_clause
-                .predicates
-                .push(parse_quote!(#parameter: 'static));
+            where_clause.predicates.push(parse_quote!(#parameter: 'static));
         }
         for variant in &declaration.variants {
             for field in &variant.fields {
@@ -173,12 +163,7 @@ fn expand_v4(
                     .iter()
                     .any(|attribute| attribute.name == HelperName::Skip)
                     || !super::structs::supports_reflection(&field.ty, &owner_name)
-                    || !super::generics::field_cfg_attributes(
-                        &declaration,
-                        Some(variant.index),
-                        field.index,
-                    )
-                    .is_empty()
+                    || !super::generics::field_cfg_attributes(&declaration, Some(variant.index), field.index).is_empty()
                 {
                     continue;
                 }
@@ -202,9 +187,10 @@ fn expand_v4(
             syn::Fields::Unnamed(_) => quote!(Self::#name(..)),
             syn::Fields::Named(_) => quote!(Self::#name { .. }),
         };
-        let cfg = variant.attrs.iter().filter(|attribute| {
-            attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr")
-        });
+        let cfg = variant
+            .attrs
+            .iter()
+            .filter(|attribute| attribute.path().is_ident("cfg") || attribute.path().is_ident("cfg_attr"));
         let name = name.to_string();
         quote! {
             #(#cfg)*
@@ -270,27 +256,11 @@ fn expand_v4(
                 )
             } else {
                 (
-                    tuple_field_patterns(
-                        &declaration,
-                        variant.index,
-                        field_index,
-                        variant_name,
-                        &binding,
-                    ),
-                    tuple_field_patterns(
-                        &declaration,
-                        variant.index,
-                        field_index,
-                        variant_name,
-                        &binding,
-                    ),
+                    tuple_field_patterns(&declaration, variant.index, field_index, variant_name, &binding),
+                    tuple_field_patterns(&declaration, variant.index, field_index, variant_name, &binding),
                 )
             };
-            let cfg_field = super::generics::field_cfg_attributes(
-                &declaration,
-                Some(variant.index),
-                field_index,
-            );
+            let cfg_field = super::generics::field_cfg_attributes(&declaration, Some(variant.index), field_index);
             methods.push(quote! {
                 #(#cfg_field)*
                 fn #get(value: &Self) -> & #ty {
@@ -307,15 +277,13 @@ fn expand_v4(
                 .map(ToString::to_string)
                 .unwrap_or_else(|| field_index.to_string());
             let visibility = super::structs::v4_visibility(&field.visibility, &facade, field.span);
-            let expression =
-                super::expression_codegen::type_expression(&field.ty, &environment, &facade);
+            let expression = super::expression_codegen::type_expression(&field.ty, &environment, &facade);
             let adapter = quote!(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #facade::__private::codegen_v4::access::TypedFieldAdapter::<Self, #ty>::for_variant(
                     Self::#get, Self::#get_mut, Self::#active_variant_identity,
                 )
             )));
-            let local_dynamic = if super::structs::supports_construction(&field.ty, &owner_name)
-                && cfg_field.is_empty()
+            let local_dynamic = if super::structs::supports_construction(&field.ty, &owner_name) && cfg_field.is_empty()
             {
                 quote!(.with_local_dynamic(#adapter))
             } else {
@@ -326,9 +294,7 @@ fn expand_v4(
             } else {
                 TokenStream::new()
             };
-            let concrete_type = if super::structs::supports_reflection(&field.ty, &owner_name)
-                && cfg_field.is_empty()
-            {
+            let concrete_type = if super::structs::supports_reflection(&field.ty, &owner_name) && cfg_field.is_empty() {
                 quote!(.with_concrete_type::<#ty>())
             } else {
                 TokenStream::new()
@@ -374,8 +340,7 @@ fn expand_v4(
                 quote!(#facade::__private::codegen_v4::access::VariantShape::Struct)
             }
         };
-        let variant_visibility =
-            super::structs::v4_visibility(&declaration.visibility, &facade, declaration.span);
+        let variant_visibility = super::structs::v4_visibility(&declaration.visibility, &facade, declaration.span);
         let variant_name_text = variant_name.to_string();
         let origin = if variant.discriminant.is_some() {
             quote!(#facade::__private::codegen_v4::access::DiscriminantOrigin::Explicit)
@@ -383,7 +348,8 @@ fn expand_v4(
             quote!(#facade::__private::codegen_v4::access::DiscriminantOrigin::Implicit)
         };
         let numeric = numeric_discriminant_v4(&name, variant_name, integer_repr, &facade);
-        let variant_discriminant = quote!(#facade::__private::codegen_v4::access::VariantDiscriminant::new(#origin, #numeric));
+        let variant_discriminant =
+            quote!(#facade::__private::codegen_v4::access::VariantDiscriminant::new(#origin, #numeric));
         variant_metadata.push(quote! {
             #(#cfg)*
             #facade::__private::codegen_v4::access::VariantMetadata::new(
@@ -424,16 +390,10 @@ fn expand_v4(
     }
     let type_definition_ident = format_ident!("__qubit_reflect_type_definition");
     let definition_fn = format_ident!("{}_definition_registration", module);
-    let generic_definition = super::expression_codegen::generic_definition(
-        &declaration.generics,
-        declaration.span,
-        &facade,
-    );
-    let generic_arguments = super::expression_codegen::generic_arguments(
-        &declaration.generics,
-        &type_definition_ident,
-        &facade,
-    );
+    let generic_definition =
+        super::expression_codegen::generic_definition(&declaration.generics, declaration.span, &facade);
+    let generic_arguments =
+        super::expression_codegen::generic_arguments(&declaration.generics, &type_definition_ident, &facade);
     let type_definition_and_arguments = if declaration.generics.params.is_empty() {
         let rust_name = name.to_string();
         quote!({
@@ -518,6 +478,16 @@ fn expand_v4(
     })
 }
 
+/// Encodes a supported integer representation as a runtime discriminant.
+///
+/// Returns `None` when the source enum has no supported integer `repr`.
+///
+/// # Parameters
+///
+/// - `enum_name`: Source enum identifier used in the generated cast.
+/// - `variant_name`: Variant identifier supplying the diagnostic span.
+/// - `repr`: Integer representation name, if one was declared.
+/// - `facade`: Runtime facade path used in the generated expression.
 #[allow(dead_code)]
 fn numeric_discriminant_v4(
     enum_name: &Ident,
@@ -549,6 +519,12 @@ fn numeric_discriminant_v4(
     )))
 }
 
+/// Returns the source fields for a variant using its source-order index.
+///
+/// # Parameters
+///
+/// - `declaration`: Enum declaration retaining its original token stream.
+/// - `variant_index`: Source-order index of the requested variant.
 fn source_variant_fields(declaration: &TypeDeclarationIr, variant_index: usize) -> syn::Fields {
     let input = source_enum(declaration);
     input
@@ -558,9 +534,14 @@ fn source_variant_fields(declaration: &TypeDeclarationIr, variant_index: usize) 
         .clone()
 }
 
+/// Parses the retained declaration tokens and returns the source enum variants.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed IR containing the retained enum declaration.
 fn source_enum(declaration: &TypeDeclarationIr) -> Vec<syn::Variant> {
-    let input: DeriveInput = parse2(declaration.retained_tokens.clone())
-        .expect("the parser retains a valid enum declaration");
+    let input: DeriveInput =
+        parse2(declaration.retained_tokens.clone()).expect("the parser retains a valid enum declaration");
     let syn::Data::Enum(data) = input.data else {
         unreachable!("enum expansion receives an enum declaration");
     };
@@ -570,6 +551,14 @@ fn source_enum(declaration: &TypeDeclarationIr) -> Vec<syn::Variant> {
 /// Builds tuple-variant patterns that account for source fields removed by
 /// conditional compilation. Each cfg alternative has its own pattern because
 /// Rust does not permit cfg attributes on individual tuple-pattern elements.
+///
+/// # Parameters
+///
+/// - `declaration`: Parsed source declaration that retains conditional fields.
+/// - `variant_index`: Source-order index of the variant being matched.
+/// - `field_index`: Source-order index of the target field.
+/// - `variant_name`: Name used to construct the variant pattern.
+/// - `binding`: Identifier bound to the target field.
 fn tuple_field_patterns(
     declaration: &TypeDeclarationIr,
     variant_index: usize,
@@ -580,8 +569,7 @@ fn tuple_field_patterns(
     let mut conditional_prefix = Vec::new();
     let mut fixed_prefix = Vec::new();
     for source_index in 0..field_index {
-        let cfg =
-            super::generics::field_cfg_attributes(declaration, Some(variant_index), source_index);
+        let cfg = super::generics::field_cfg_attributes(declaration, Some(variant_index), source_index);
         if cfg.is_empty() {
             fixed_prefix.push(source_index);
         } else {
@@ -624,19 +612,31 @@ fn tuple_field_patterns(
     quote!(#(#arms)* _ => unreachable!("field is only active for its variant"))
 }
 
+/// Reports whether a source variant contains a field marked `reflect(skip)`.
+///
+/// # Parameters
+///
+/// - `declaration`: Enum declaration containing the source attributes.
+/// - `variant_index`: Source-order index of the variant to inspect.
 fn has_skipped_source_field(declaration: &TypeDeclarationIr, variant_index: usize) -> bool {
-    source_variant_fields(declaration, variant_index)
-        .iter()
-        .any(|field| {
-            field.attrs.iter().any(|attribute| {
-                attribute.path().is_ident("reflect")
-                    && attribute
-                        .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-                        .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
-            })
+    source_variant_fields(declaration, variant_index).iter().any(|field| {
+        field.attrs.iter().any(|attribute| {
+            attribute.path().is_ident("reflect")
+                && attribute
+                    .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                    .is_ok_and(|items| items.iter().any(|item| item.path().is_ident("skip")))
         })
+    })
 }
 
+/// Builds constructor and update providers for one reflected enum variant.
+///
+/// # Parameters
+///
+/// - `variant`: Reflected variant supplying names and field types.
+/// - `facade`: Runtime facade path for generated provider references.
+/// - `constructible`: Whether all source fields can be constructed.
+/// - `thread_safe`: Whether to emit the thread-safe provider as well.
 fn enum_variant_provider(
     variant: &VariantIr,
     facade: &TokenStream,
@@ -652,8 +652,7 @@ fn enum_variant_provider(
             }),
         );
     }
-    let (local_methods, local_provider) =
-        enum_variant_provider_mode(variant, facade, "local", quote!(Local));
+    let (local_methods, local_provider) = enum_variant_provider_mode(variant, facade, "local", quote!(Local));
     if thread_safe {
         let (thread_safe_methods, thread_safe_provider) =
             enum_variant_provider_mode(variant, facade, "thread_safe", quote!(ThreadSafe));
@@ -674,6 +673,14 @@ fn enum_variant_provider(
     )
 }
 
+/// Builds the generated functions and provider for one execution mode.
+///
+/// # Parameters
+///
+/// - `variant`: Reflected variant supplying field metadata.
+/// - `facade`: Runtime facade path for emitted types.
+/// - `suffix`: Suffix distinguishing generated function names.
+/// - `mode`: Runtime ownership mode used by the provider.
 fn enum_variant_provider_mode(
     variant: &VariantIr,
     facade: &TokenStream,
@@ -748,22 +755,21 @@ fn enum_variant_provider_mode(
 }
 
 /// Returns the unique supported representation hints in canonical order.
+///
+/// # Parameters
+///
+/// - `tokens`: Retained enum declaration tokens containing `repr` attributes.
 #[must_use]
 fn enum_representations(tokens: &TokenStream) -> Vec<EnumReprIr> {
     let Ok(input) = parse2::<DeriveInput>(tokens.clone()) else {
         return Vec::new();
     };
     let mut representations = Vec::new();
-    for attribute in input
-        .attrs
-        .iter()
-        .filter(|attribute| attribute.path().is_ident("repr"))
-    {
+    for attribute in input.attrs.iter().filter(|attribute| attribute.path().is_ident("repr")) {
         let Meta::List(list) = &attribute.meta else {
             continue;
         };
-        let Ok(values) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-        else {
+        let Ok(values) = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) else {
             continue;
         };
         representations.extend(values.iter().filter_map(parse_enum_representation));
@@ -841,10 +847,7 @@ mod tests {
             .expect("the structural fixture should expand")
             .to_string();
 
-        assert!(
-            generated.contains("codegen_v4"),
-            "enum tokens must use the v4 protocol"
-        );
+        assert!(generated.contains("codegen_v4"), "enum tokens must use the v4 protocol");
         assert!(
             !generated.contains(concat!("codegen_", "v3")),
             "enum tokens must not use the v3 protocol"
@@ -853,12 +856,7 @@ mod tests {
         assert!(generated.contains("variant_metadata"));
         assert!(generated.contains("with_local_dynamic"));
         assert!(!generated.contains("with_thread_safe_dynamic"));
-        for forbidden in [
-            "TypeIdentity",
-            "FragmentIdentity",
-            "RuntimeIdentity",
-            "inventory",
-        ] {
+        for forbidden in ["TypeIdentity", "FragmentIdentity", "RuntimeIdentity", "inventory"] {
             assert!(
                 !generated.contains(forbidden),
                 "generated tokens must not mention {forbidden}"

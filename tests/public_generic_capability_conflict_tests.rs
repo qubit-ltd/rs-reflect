@@ -37,7 +37,7 @@ impl CapabilitySpec for SecondCapability {
 }
 
 #[test]
-fn conflicting_registration_reports_the_concrete_generic_target() {
+fn test_conflicting_registration_reports_the_concrete_generic_target() {
     let error = match ReflectionContext::builder()
         .include_type::<GenericTarget<u32>>()
         .register(CapabilityRegistration::for_type::<GenericTarget<u32>, FirstCapability>(
@@ -80,7 +80,7 @@ fn conflicting_registration_reports_the_concrete_generic_target() {
 }
 
 #[test]
-fn conflicting_definition_registrations_preserve_identity_and_origins() {
+fn test_conflicting_definition_registrations_preserve_identity_and_origins() {
     let definition_id = ReflectionContext::builder()
         .include_type::<GenericTarget<u32>>()
         .build()

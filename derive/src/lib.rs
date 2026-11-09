@@ -189,6 +189,17 @@ pub fn register_trait_object(input: TokenStream) -> TokenStream {
     macros::register_trait_object(input)
 }
 
+/// Runs the internal derive entry point after the configured macro has
+/// preserved source attributes for parsing.
+///
+/// # Parameters
+///
+/// - `input`: Struct, enum, or union tokens carrying configured reflection
+///   data.
+///
+/// # Returns
+///
+/// Returns generated reflection items or compile-time diagnostics.
 #[proc_macro_derive(
     ConfiguredReflection,
     attributes(
@@ -200,7 +211,6 @@ pub fn register_trait_object(input: TokenStream) -> TokenStream {
     )
 )]
 #[doc(hidden)]
-/// Internal derive entry point for configured reflection metadata.
 pub fn derive_configured_reflection(input: TokenStream) -> TokenStream {
     configure::process_configured(input)
 }

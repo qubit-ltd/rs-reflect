@@ -12,7 +12,13 @@ use crate::runtime::identity::RegistrationOrigin;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CapabilityRegistrationOrigin {
     /// The capability came from statically linked registration metadata.
-    Linked(RegistrationOrigin),
+    Linked(
+        /// Origin recorded in linked registration metadata.
+        RegistrationOrigin,
+    ),
     /// The capability was added explicitly while building a context.
-    Explicit(RegistrationOrigin),
+    Explicit(
+        /// Origin supplied while constructing the context.
+        RegistrationOrigin,
+    ),
 }

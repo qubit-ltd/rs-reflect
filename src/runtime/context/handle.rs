@@ -46,11 +46,11 @@ use crate::runtime::lookup::Lookup;
 
 #[path = "builder.rs"]
 pub(crate) mod builder;
-#[path = "data.rs"]
+#[path = "context_data.rs"]
 pub(crate) mod data;
-#[path = "global.rs"]
+#[path = "global_context.rs"]
 pub(crate) mod global;
-#[path = "indexes.rs"]
+#[path = "context_indexes.rs"]
 pub(crate) mod indexes;
 #[path = "registration.rs"]
 pub(crate) mod registration;
@@ -61,9 +61,13 @@ static NEXT_CONTEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Unique process-local identity of a reflection context instance.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ReflectionContextId(u64);
+pub struct ReflectionContextId(
+    /// Monotonically allocated identifier for this process-local context.
+    u64,
+);
 
 impl ReflectionContextId {
+    /// Allocates the next unique process-local context identity.
     fn next() -> Self {
         Self(NEXT_CONTEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
@@ -72,21 +76,27 @@ impl ReflectionContextId {
 /// A context containing the registrations and indexes used for reflection
 /// queries.
 pub struct ReflectionContext {
+    /// Unique identity allocated when the context handle is created.
     id: ReflectionContextId,
+    /// Owned or process-wide state used to answer reflection queries.
     state: ContextState,
 }
 
 /// Context-bound description of one registered Rust trait-object type.
 #[derive(Clone, Copy)]
 pub struct TraitObjectDescriptor<'ctx> {
+    /// Compiler-checked identity and source path for the registered object.
     registration: TraitObjectRegistration,
+    /// Ties this descriptor to the context that resolved the registration.
     _context: std::marker::PhantomData<&'ctx ReflectionContext>,
 }
 
 /// Context-bound declaration facts for one marker-identified trait.
 #[derive(Clone, Copy)]
 pub struct RegisteredTraitDescriptor<'ctx> {
+    /// Static declaration facts for the registered trait.
     metadata: &'static TraitDefinitionMetadata,
+    /// Ties this descriptor to the context that owns the declaration.
     _context: std::marker::PhantomData<&'ctx ReflectionContext>,
 }
 
@@ -119,13 +129,30 @@ impl TraitObjectDescriptor<'_> {
     }
 }
 
+/// Storage backing a reflection context handle.
 enum ContextState {
-    Explicit(Arc<ContextData>),
-    Global(&'static GlobalContext),
+    /// Registrations owned by a separately created context.
+    Explicit(
+        /// Data and indexes owned by this explicit context.
+        Arc<ContextData>,
+    ),
+    /// Registrations shared by the process-wide context.
+    Global(
+        /// Shared process-wide context state.
+        &'static GlobalContext,
+    ),
 }
 
 impl ReflectionContext {
     /// Looks up a trait declaration by its opaque marker identity.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `D` — marker type identifying the registered trait definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `self` — context queried for the marker registration.
     pub fn trait_definition_for<D: 'static>(&self) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
         Ok(self
             .data()?
@@ -137,6 +164,10 @@ impl ReflectionContext {
     }
 
     /// Looks up a uniquely registered incomplete external trait by source path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full source path of the external trait.
     pub fn external_trait_definition(&self, path: &str) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
         Ok(self
             .external_trait_definition_by_path(path)?
@@ -152,6 +183,10 @@ impl ReflectionContext {
     /// Applications without a registered identity handle remain queryable and
     /// report [`TraitCompleteness::ExternalIncomplete`] through their
     /// descriptors.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — exact source path associated with the applications.
     pub fn trait_applications_by_path(&self, path: &str) -> Result<Box<[TraitDescriptor<'_>]>, ContextError> {
         Ok(self
             .data()?
@@ -174,6 +209,14 @@ impl ReflectionContext {
     }
 
     /// Looks up a compiler-checked registered trait-object type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — exact trait-object type whose registration is queried.
+    ///
+    /// # Parameters
+    ///
+    /// * `self` — context queried for the trait-object registration.
     pub fn trait_object<T: ?Sized + 'static>(&self) -> Result<Option<TraitObjectDescriptor<'_>>, ContextError> {
         Ok(self
             .data()?
@@ -195,6 +238,12 @@ impl ReflectionContext {
         Self::from_data(ContextData::empty())
     }
 
+    /// Creates an explicit context from its already assembled registration
+    /// data.
+    ///
+    /// # Parameters
+    ///
+    /// * `data` — owned registrations and indexes for the context.
     pub(crate) fn from_data(data: ContextData) -> Self {
         Self {
             id: ReflectionContextId::next(),
@@ -202,6 +251,7 @@ impl ReflectionContext {
         }
     }
 
+    /// Creates a handle to the lazily initialized process-wide context.
     fn new_global() -> Self {
         static GLOBAL_STATE: std::sync::OnceLock<GlobalContext> = std::sync::OnceLock::new();
         Self {
@@ -240,6 +290,7 @@ impl ReflectionContext {
         self.id
     }
 
+    /// Returns the materialized registration data for this context.
     pub(crate) fn data(&self) -> Result<Arc<ContextData>, ContextError> {
         match &self.state {
             ContextState::Explicit(data) => Ok(Arc::clone(data)),
@@ -250,6 +301,10 @@ impl ReflectionContext {
     /// Finds a registered concrete type by its Rust `TypeId`.
     ///
     /// Returns `None` when the context has no registration for `id`.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — compiler identity of the requested concrete type.
     pub fn find_type_by_id(&self, id: TypeId) -> Result<Option<TypeDescriptor<'_>>, ContextError> {
         Ok(self
             .data()?
@@ -257,23 +312,41 @@ impl ReflectionContext {
             .map(|type_record| type_record.descriptor(self)))
     }
 
+    /// Reports whether a concrete type with this compiler identity is
+    /// registered.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — compiler identity of the concrete type.
     pub(crate) fn contains_type_id(&self, id: TypeId) -> Result<bool, ContextError> {
         Ok(self.data()?.contains_type_id(id))
     }
 
     /// Looks up concrete types by their full reflected name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — full reflected Rust type name.
     pub fn lookup_type_by_name(&self, name: &str) -> Result<Lookup<TypeDescriptor<'_>>, ContextError> {
         let data = self.data()?;
         Ok(self.lookup_by_indexes(&data, data.indexes.types_by_name.get(name).map(Box::as_ref)))
     }
 
     /// Looks up concrete types by their final reflected name segment.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — final segment of the reflected Rust type name.
     pub fn lookup_type_by_short_name(&self, name: &str) -> Result<Lookup<TypeDescriptor<'_>>, ContextError> {
         let data = self.data()?;
         Ok(self.lookup_by_indexes(&data, data.indexes.types_by_short_name.get(name).map(Box::as_ref)))
     }
 
     /// Requires a registered concrete type with the given Rust `TypeId`.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — compiler identity of the requested concrete type.
     pub fn type_by_id(&self, id: TypeId) -> Result<TypeDescriptor<'_>, LookupError> {
         self.find_type_by_id(id)
             .map_err(LookupError::Context)?
@@ -284,6 +357,10 @@ impl ReflectionContext {
     }
 
     /// Requires exactly one concrete type with the given full reflected name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — full reflected Rust type name.
     pub fn type_by_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
         self.lookup_type_by_name(name)
             .map_err(LookupError::Context)?
@@ -291,6 +368,10 @@ impl ReflectionContext {
     }
 
     /// Requires exactly one concrete type with the given short name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — final segment of the reflected Rust type name.
     pub fn type_by_short_name(&self, name: &str) -> Result<TypeDescriptor<'_>, LookupError> {
         self.lookup_type_by_short_name(name)
             .map_err(LookupError::Context)?
@@ -326,6 +407,10 @@ impl ReflectionContext {
     }
 
     /// Looks up a source type definition by its full reflected path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full reflected path of the source definition.
     pub fn lookup_type_definition_by_name(
         &self,
         path: &str,
@@ -348,6 +433,10 @@ impl ReflectionContext {
     }
 
     /// Requires exactly one source type definition with the given full path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full reflected path of the source definition.
     pub fn type_definition_by_name(&self, path: &str) -> Result<TypeDefinitionDescriptor<'_>, LookupError> {
         self.lookup_type_definition_by_name(path)
             .map_err(LookupError::Context)?
@@ -355,6 +444,10 @@ impl ReflectionContext {
     }
 
     /// Finds a source type definition by its opaque process-local identity.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — opaque process-local identity of the source definition.
     pub fn find_type_definition_by_id(
         &self,
         id: TypeDefinitionId,
@@ -363,6 +456,10 @@ impl ReflectionContext {
     }
 
     /// Requires a source type definition with the given opaque identity.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — opaque process-local identity of the source definition.
     pub fn type_definition_by_id(&self, id: TypeDefinitionId) -> Result<TypeDefinitionDescriptor<'_>, LookupError> {
         self.find_type_definition_by_id(id)
             .map_err(LookupError::Context)?
@@ -373,6 +470,10 @@ impl ReflectionContext {
     }
 
     /// Returns source type definitions whose final path segment matches `name`.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — final segment of the source definition path.
     pub fn type_definitions_by_short_name(&self, name: &str) -> Result<TypeDefinitions<'_>, ContextError> {
         let data = self.data()?;
         let definitions = data
@@ -411,6 +512,10 @@ impl ReflectionContext {
     }
 
     /// Looks up a source trait definition by its full reflected path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full reflected path of the source trait.
     pub fn lookup_trait_definition_by_name(
         &self,
         path: &str,
@@ -433,6 +538,10 @@ impl ReflectionContext {
     }
 
     /// Requires exactly one source trait definition with the given full path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full reflected path of the source trait.
     pub fn trait_definition_by_name(&self, path: &str) -> Result<TraitDefinitionDescriptor<'_>, LookupError> {
         self.lookup_trait_definition_by_name(path)
             .map_err(LookupError::Context)?
@@ -441,6 +550,10 @@ impl ReflectionContext {
 
     /// Returns source trait definitions whose final path segment matches
     /// `name`.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — final segment of the source trait path.
     pub fn trait_definitions_by_short_name(&self, name: &str) -> Result<TraitDefinitions<'_>, ContextError> {
         let data = self.data()?;
         let definitions = data
@@ -455,6 +568,12 @@ impl ReflectionContext {
         Ok(TraitDefinitions::new(definitions))
     }
 
+    /// Resolves a candidate index list into a type lookup result.
+    ///
+    /// # Parameters
+    ///
+    /// * `data` — context data containing the indexed type records.
+    /// * `indexes` — candidate type positions for the requested name.
     fn lookup_by_indexes(&self, data: &ContextData, indexes: Option<&[usize]>) -> Lookup<TypeDescriptor<'_>> {
         let Some(indexes) = indexes else {
             return Lookup::Missing;
@@ -475,14 +594,25 @@ impl ReflectionContext {
     }
 
     #[cfg(test)]
+    /// Returns the number of concrete types registered in the context.
     pub(crate) fn registered_type_count(&self) -> Result<usize, ContextError> {
         Ok(self.data()?.types.len())
     }
 
+    /// Returns source shape metadata for a concrete type when available.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — compiler identity of the concrete type.
     pub(crate) fn shape_for(&self, id: TypeId) -> Result<Option<&'static TypeKindMetadata>, ContextError> {
         Ok(self.data()?.shape(id))
     }
 
+    /// Returns effective methods registered for a concrete type.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — compiler identity of the target type.
     pub(crate) fn methods_for(
         &self,
         id: TypeId,
@@ -490,6 +620,11 @@ impl ReflectionContext {
         Ok(self.data()?.methods(id))
     }
 
+    /// Resolves a source type definition by its opaque identity.
+    ///
+    /// # Parameters
+    ///
+    /// * `id` — process-local identity of the source definition.
     pub(crate) fn type_definition(
         &self,
         id: TypeDefinitionId,
@@ -500,6 +635,11 @@ impl ReflectionContext {
             .map(|metadata| TypeDefinitionDescriptor::new(metadata, self)))
     }
 
+    /// Resolves incomplete external trait metadata by source path.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` — full source path of the external trait.
     pub(crate) fn external_trait_definition_by_path(
         &self,
         path: &str,
@@ -510,6 +650,12 @@ impl ReflectionContext {
             .filter(|metadata| metadata.completeness == TraitCompleteness::ExternalIncomplete))
     }
 
+    /// Returns capabilities registered for a concrete type identity.
+    ///
+    /// # Parameters
+    ///
+    /// * `type_id` — compiler identity of the target type.
+    /// * `rust_name` — compiler type name used to form the target identity.
     pub(crate) fn capabilities_for_type(
         &self,
         type_id: TypeId,
@@ -520,6 +666,11 @@ impl ReflectionContext {
             .capabilities(&CapabilityTargetId::Type(TypeIdentity { type_id, rust_name })))
     }
 
+    /// Returns capabilities registered for a generic definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — process-local identity of the generic definition.
     pub(crate) fn capabilities_for_definition(
         &self,
         definition: TypeDefinitionId,
@@ -527,6 +678,11 @@ impl ReflectionContext {
         Ok(self.data()?.capabilities(&CapabilityTargetId::Definition(definition)))
     }
 
+    /// Returns concrete type registrations that instantiate a definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — identity of the generic type definition.
     pub(crate) fn type_instances(
         &self,
         definition: TypeDefinitionId,
@@ -540,6 +696,11 @@ impl ReflectionContext {
             .collect())
     }
 
+    /// Returns concrete trait applications associated with a definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — identity of the source trait definition.
     pub(crate) fn trait_applications_for_definition(
         &self,
         definition: TraitDefinitionId,
@@ -552,6 +713,11 @@ impl ReflectionContext {
             .collect())
     }
 
+    /// Returns concrete impl applications associated with a definition.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — identity of the source impl definition.
     pub(crate) fn impl_applications(
         &self,
         definition: ImplDefinitionId,
@@ -564,6 +730,11 @@ impl ReflectionContext {
             .collect())
     }
 
+    /// Returns impl applications whose target type matches this identity.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — compiler identity of the target concrete type.
     pub(crate) fn impl_applications_for_target(
         &self,
         target: TypeId,
@@ -576,6 +747,11 @@ impl ReflectionContext {
             .collect())
     }
 
+    /// Returns construction plans registered for a concrete target type.
+    ///
+    /// # Parameters
+    ///
+    /// * `target` — compiler identity of the concrete target type.
     pub(crate) fn construction_plans(&self, target: TypeId) -> Result<Box<[ConstructionDescriptor<'_>]>, ContextError> {
         let data = self.data()?;
         Ok(data
@@ -587,6 +763,7 @@ impl ReflectionContext {
 }
 
 impl IntoLookupCandidate for TypeDescriptor<'_> {
+    /// Converts the descriptor identity into its lookup index candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let identity = self.type_identity();
         let display_name: Box<str> = identity.rust_name.into();
@@ -631,7 +808,7 @@ mod tests {
     );
 
     #[test]
-    fn empty_context_lookups_return_precise_missing_results_and_remain_usable() {
+    fn test_empty_context_lookups_return_precise_missing_results_and_remain_usable() {
         let context = ReflectionContext::empty();
 
         assert!(
@@ -685,7 +862,7 @@ mod tests {
     }
 
     #[test]
-    fn strict_lookup_failure_does_not_prevent_later_successful_lookup() {
+    fn test_strict_lookup_failure_does_not_prevent_later_successful_lookup() {
         struct Registered;
         impl crate::runtime::descriptor::Reflect for Registered {
             fn __reflect_registration() -> &'static crate::runtime::descriptor::TypeRegistration<Self> {
@@ -713,7 +890,7 @@ mod tests {
     }
 
     #[test]
-    fn registered_trait_handle_getters_preserve_metadata_and_object_path() {
+    fn test_registered_trait_handle_getters_preserve_metadata_and_object_path() {
         let context = ReflectionContext::builder()
             .register(
                 Registration::metadata_only()

@@ -54,6 +54,12 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
     }
 }
 
+/// Converts an optional function-pointer ABI into runtime metadata.
+///
+/// # Parameters
+///
+/// - `abi`: Source ABI name, or `None` for the Rust ABI.
+/// - `span`: Source location used for generated string literals.
 fn function_pointer_abi(abi: Option<&str>, span: Span) -> TokenStream {
     match abi {
         Some("Rust") | None => quote!(None),
@@ -194,6 +200,13 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
 
 /// Emits the concrete type and const arguments for one reflected type
 /// application.
+///
+/// # Parameters
+///
+/// - `generics`: Generic declaration whose type and const arguments are
+///   emitted.
+/// - `definition`: Runtime generic definition supplying parameter metadata.
+/// - `facade`: Runtime facade path used by generated expressions.
 #[must_use]
 pub(crate) fn generic_arguments(generics: &GenericsIr, definition: &Ident, facade: &TokenStream) -> TokenStream {
     let arguments = generics.params.iter().enumerate().filter_map(|(index, parameter)| {
@@ -279,11 +292,22 @@ fn generic_bounds(
         .collect()
 }
 
+/// Emits an expression that leaks collected tokens into a static boxed slice.
+///
+/// # Parameters
+///
+/// - `values`: Generated expressions to collect into the leaked slice.
 fn leak_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
     let values = values.into_iter().collect::<Vec<_>>();
     quote!(::std::boxed::Box::leak(::std::vec![#(#values),*].into_boxed_slice()))
 }
 
+/// Emits a static slice of typed runtime expression references.
+///
+/// # Parameters
+///
+/// - `values`: Generated expression values to store in the slice.
+/// - `facade`: Runtime facade path naming the expression data type.
 fn leak_expression_slice(values: impl IntoIterator<Item = TokenStream>, facade: &TokenStream) -> TokenStream {
     let values = values.into_iter().map(|value| {
         quote!({
@@ -294,10 +318,21 @@ fn leak_expression_slice(values: impl IntoIterator<Item = TokenStream>, facade: 
     leak_slice(values)
 }
 
+/// Emits an expression that stores one generated value in a leaked box.
+///
+/// # Parameters
+///
+/// - `expression`: Generated runtime expression to allocate.
 fn leaked_expression(expression: TokenStream) -> TokenStream {
     quote!(::std::boxed::Box::leak(::std::boxed::Box::new(#expression)))
 }
 
+/// Converts a parsed trait-bound modifier to its runtime representation.
+///
+/// # Parameters
+///
+/// - `modifier`: Parsed `?Trait` modifier state.
+/// - `facade`: Runtime facade path used in the generated expression.
 fn trait_bound_modifier(modifier: crate::ir::TraitBoundModifierIr, facade: &TokenStream) -> TokenStream {
     match modifier {
         crate::ir::TraitBoundModifierIr::None => {
@@ -309,6 +344,16 @@ fn trait_bound_modifier(modifier: crate::ir::TraitBoundModifierIr, facade: &Toke
     }
 }
 
+/// Builds expression metadata for a source trait path and its generic
+/// arguments.
+///
+/// # Parameters
+///
+/// - `path`: Parsed trait path to describe.
+/// - `lifetime_binders`: Higher-ranked lifetime binders from the source bound.
+/// - `environment`: Generic environment used to resolve path arguments.
+/// - `facade`: Runtime facade path referenced by generated code.
+/// - `span`: Source location for generated syntax.
 fn trait_expression_data(
     path: &crate::ir::PathIr,
     lifetime_binders: &[String],

@@ -16,11 +16,20 @@ use crate::runtime::context::ReflectionContext;
 /// Context-bound view of a declaration predicate.
 #[derive(Clone, Copy)]
 pub struct PredicateDescriptor<'ctx> {
+    /// Static source predicate represented by this view.
     data: &'static PredicateData,
+    /// Context used to resolve nested type and trait expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> PredicateDescriptor<'ctx> {
+    /// Binds static predicate metadata to the context that owns its lookups.
+    ///
+    /// # Parameters
+    ///
+    /// * `data` — source predicate metadata emitted by the derive
+    ///   implementation.
+    /// * `context` — context used to resolve any nested expressions.
     pub(crate) const fn new(data: &'static PredicateData, context: &'ctx ReflectionContext) -> Self {
         Self { data, context }
     }
@@ -87,17 +96,28 @@ pub enum PredicateKind<'ctx> {
         right: TypeExpression<'ctx>,
     },
     /// A structural const expression retained from a const-evaluatable bound.
-    ConstEvaluatable(super::data::ConstExpression),
+    ConstEvaluatable(
+        /// Constant expression constrained to be evaluatable.
+        super::data::ConstExpression,
+    ),
 }
 
 /// Ordered context-bound view over predicate metadata.
 #[derive(Clone, Copy)]
 pub struct Predicates<'ctx> {
+    /// Static predicates in source declaration order.
     data: &'static [PredicateData],
+    /// Context used to resolve nested expressions from each predicate.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> Predicates<'ctx> {
+    /// Binds static predicate metadata to the context used for its views.
+    ///
+    /// # Parameters
+    ///
+    /// * `data` — predicates emitted by the derive implementation.
+    /// * `context` — context used to resolve nested type and trait expressions.
     pub(crate) const fn new(data: &'static [PredicateData], context: &'ctx ReflectionContext) -> Self {
         Self { data, context }
     }

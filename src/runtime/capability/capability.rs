@@ -10,9 +10,9 @@ use std::any::TypeId;
 use std::sync::Arc;
 
 use super::capabilities::Capabilities;
-use super::capabilities::CapabilityRecord;
 use super::capability_error::CapabilityContractError;
 use super::capability_origin::CapabilityOrigin;
+use super::capability_record::CapabilityRecord;
 use super::capability_target::CapabilityTarget;
 use super::context_registration_origin::ContextRegistrationOrigin;
 use crate::runtime::context::ReflectionContext;
@@ -29,9 +29,13 @@ pub trait CapabilitySpec: 'static {
 /// A context-bound descriptor used to inspect and downcast a capability.
 #[derive(Clone)]
 pub struct CapabilityDescriptor<'ctx> {
+    /// Immutable target capability registrations.
     pub(super) set: Arc<Capabilities>,
+    /// Position of this capability's record in the shared set.
     pub(super) index: usize,
+    /// Reflected entity to which the capability is bound.
     pub(super) target: CapabilityTarget<'ctx>,
+    /// Context used to resolve registration provenance.
     pub(super) context: &'ctx ReflectionContext,
 }
 
@@ -60,6 +64,9 @@ impl<'ctx> CapabilityDescriptor<'ctx> {
     ///
     /// Returns an error when either the stable ID or adapter type differs from
     /// `C`.
+    ///
+    /// # Type Parameters
+    /// - `C`: capability contract whose ID and adapter type must match.
     pub fn downcast<C: CapabilitySpec>(self) -> Result<Capability<'ctx, C>, CapabilityContractError> {
         let record = self.record();
         if record.id.as_str() != C::ID {
@@ -92,6 +99,7 @@ impl<'ctx> CapabilityDescriptor<'ctx> {
         })
     }
 
+    /// Returns the registered record for this descriptor.
     pub(super) fn record(&self) -> &CapabilityRecord {
         &self.set.records[self.index]
     }
@@ -99,9 +107,15 @@ impl<'ctx> CapabilityDescriptor<'ctx> {
 
 /// A capability handle whose adapter and reflection context are fixed by
 /// lookup.
+///
+/// # Type Parameters
+/// - `C`: stable capability contract implemented by the adapter.
 pub struct Capability<'ctx, C: CapabilitySpec> {
+    /// Entity to which the capability is bound.
     target: CapabilityTarget<'ctx>,
+    /// Adapter implementing the typed capability contract.
     adapter: Arc<C::Adapter>,
+    /// Registration provenance bound to the lookup context.
     origin: CapabilityOrigin<'ctx>,
 }
 
@@ -123,6 +137,7 @@ impl<'ctx, C: CapabilitySpec> Capability<'ctx, C> {
 }
 
 impl<C: CapabilitySpec> Clone for Capability<'_, C> {
+    /// Clones the handle while sharing its adapter allocation.
     fn clone(&self) -> Self {
         Self {
             target: self.target,
@@ -132,6 +147,11 @@ impl<C: CapabilitySpec> Clone for Capability<'_, C> {
     }
 }
 
+/// Binds stored registration provenance to the context that performed lookup.
+///
+/// # Parameters
+/// - `origin`: registration provenance stored in the immutable capability set.
+/// - `context`: reflection context that owns the descriptor.
 fn bind_origin<'ctx>(
     origin: &super::capability_registration_origin::CapabilityRegistrationOrigin,
     context: &'ctx ReflectionContext,

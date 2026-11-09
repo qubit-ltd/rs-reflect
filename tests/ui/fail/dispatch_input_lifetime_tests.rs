@@ -11,9 +11,7 @@ use qubit_reflect::MethodDescriptor;
 use qubit_reflect::invoke::InvocationFailure;
 use qubit_reflect::value::Local;
 
-fn escape_failure(
-    method: &MethodDescriptor<'_>,
-) -> InvocationFailure<'static, Local> {
+fn escape_failure(method: &MethodDescriptor<'_>) -> InvocationFailure<'static, Local> {
     let argument = String::from("borrowed");
     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
         Err(failure) => failure,

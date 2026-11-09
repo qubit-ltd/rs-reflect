@@ -10,7 +10,6 @@
 
 #[cfg(test)]
 mod tests {
-    #[path = "multi_version_tests.rs"]
     mod multi_version_tests;
 
     use registry_impl_a::LabelA;
@@ -54,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn global_context_discovers_impl_methods_from_two_dependencies() {
+    fn test_global_context_discovers_impl_methods_from_two_dependencies() {
         let context = ReflectionContext::builder()
             .include_linked()
             .build()
@@ -84,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn call_site_crate_binds_and_invokes_a_public_dependency_method() {
+    fn test_call_site_crate_binds_and_invokes_a_public_dependency_method() {
         let context = ReflectionContext::builder()
             .include_linked()
             .build()
@@ -102,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn renamed_facade_binds_cross_crate_const_impl_with_trait_bound() {
+    fn test_renamed_facade_binds_cross_crate_const_impl_with_trait_bound() {
         let context = ReflectionContext::builder()
             .include_linked()
             .include_type::<BoundedConstService<u16, 5>>()
@@ -126,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn renamed_runtime_dependency_links_default_method_adapter() {
+    fn test_renamed_runtime_dependency_links_default_method_adapter() {
         let context = ReflectionContext::builder()
             .include_linked()
             .build()

@@ -33,7 +33,7 @@ struct ThreadSafeAccess {
 }
 
 #[test]
-fn access_capabilities_follow_available_dynamic_adapters() {
+fn test_access_capabilities_follow_available_dynamic_adapters() {
     let descriptor = TypeDescriptor::of::<AccessMatrix>();
     let reflected = descriptor.field("reflected").unwrap();
     let private = descriptor.field("private").unwrap();
@@ -58,7 +58,7 @@ fn access_capabilities_follow_available_dynamic_adapters() {
 }
 
 #[test]
-fn thread_safe_private_write_retains_dynamic_replacement() {
+fn test_thread_safe_private_write_retains_dynamic_replacement() {
     let descriptor = TypeDescriptor::of::<ThreadSafeAccess>();
     let private = descriptor.field("private").unwrap();
     let mut owner = ThreadSafeAccess { value: 7, private: 9 };
@@ -79,7 +79,7 @@ fn thread_safe_private_write_retains_dynamic_replacement() {
 }
 
 #[test]
-fn unsafe_dynamic_mutable_access_can_borrow_a_private_field() {
+fn test_unsafe_dynamic_mutable_access_can_borrow_a_private_field() {
     let descriptor = TypeDescriptor::of::<ThreadSafeAccess>();
     let private = descriptor.field("private").unwrap();
     let mut owner = ThreadSafeAccess { value: 7, private: 9 };
@@ -96,7 +96,7 @@ fn unsafe_dynamic_mutable_access_can_borrow_a_private_field() {
 }
 
 #[test]
-fn unsafe_dynamic_set_can_replace_a_private_field() {
+fn test_unsafe_dynamic_set_can_replace_a_private_field() {
     let descriptor = TypeDescriptor::of::<ThreadSafeAccess>();
     let private = descriptor.field("private").unwrap();
     let mut owner = ThreadSafeAccess { value: 7, private: 9 };
@@ -117,7 +117,7 @@ fn unsafe_dynamic_set_can_replace_a_private_field() {
 }
 
 #[test]
-fn field_access_errors_have_stable_debug_display_text() {
+fn test_field_access_errors_have_stable_debug_display_text() {
     assert_eq!(FieldAccessError::NotReadable.to_string(), "NotReadable");
     assert_eq!(FieldSetError::NotReplaceable.to_string(), "NotReplaceable");
 }

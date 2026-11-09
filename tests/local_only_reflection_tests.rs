@@ -28,7 +28,7 @@ pub enum LocalEvent {
 }
 
 #[test]
-fn local_only_struct_supports_local_field_and_construction_operations() {
+fn test_local_only_struct_supports_local_field_and_construction_operations() {
     let descriptor = TypeDescriptor::of::<LocalRecord>();
     let field = descriptor.field("value").unwrap();
     let mut value = LocalRecord { value: Rc::new(1_u8) };
@@ -46,7 +46,7 @@ fn local_only_struct_supports_local_field_and_construction_operations() {
 }
 
 #[test]
-fn local_only_enum_is_reflected() {
+fn test_local_only_enum_is_reflected() {
     let descriptor = TypeDescriptor::of::<LocalEvent>();
     let variant = descriptor.variant("Value").unwrap();
     let field = variant.field("0").unwrap();
@@ -78,7 +78,7 @@ struct ConditionalNestedTuple(
 );
 
 #[test]
-fn ordinary_types_keep_thread_safe_access_and_construction() {
+fn test_ordinary_types_keep_thread_safe_access_and_construction() {
     let descriptor = TypeDescriptor::of::<ThreadSafeRecord>();
     let field = descriptor.field("value").unwrap();
     let mut value = ThreadSafeRecord { value: 6 };
@@ -90,7 +90,7 @@ fn ordinary_types_keep_thread_safe_access_and_construction() {
 }
 
 #[test]
-fn cfg_tuple_survivor_is_accessible_by_source_index() {
+fn test_cfg_tuple_survivor_is_accessible_by_source_index() {
     let descriptor = TypeDescriptor::of::<ConditionalTuple>();
     let field = descriptor.field("2").unwrap();
     let mut value = ConditionalTuple(7);
@@ -100,7 +100,7 @@ fn cfg_tuple_survivor_is_accessible_by_source_index() {
 }
 
 #[test]
-fn nested_and_multiple_tuple_cfg_attributes_preserve_source_index_access() {
+fn test_nested_and_multiple_tuple_cfg_attributes_preserve_source_index_access() {
     let descriptor = TypeDescriptor::of::<ConditionalNestedTuple>();
     let field = descriptor.field("2").unwrap();
     let mut value = ConditionalNestedTuple(11_u32);

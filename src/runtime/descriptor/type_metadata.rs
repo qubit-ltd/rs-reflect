@@ -15,16 +15,27 @@ use super::generic::GenericArgumentMetadata;
 use super::generic::TypeDefinitionMetadata;
 use crate::runtime::construct::ConstructionShape;
 
+/// Cached runtime type information shared by reflected descriptors.
 pub(crate) struct TypeMetadata {
+    /// Resolver for the concrete Rust `TypeId`.
     type_id: fn() -> TypeId,
+    /// Resolver for the fully qualified Rust type name.
     rust_name: fn() -> &'static str,
+    /// Optional reflected shape information.
     shape: Option<&'static super::type_kind::TypeKindMetadata>,
+    /// Optional input layout used for construction.
     construction_shape: Option<ConstructionShape>,
+    /// Optional source definition associated with this type.
     type_definition: Option<&'static TypeDefinitionMetadata>,
+    /// Reflected arguments for a generic type application.
     generic_arguments: &'static [GenericArgumentMetadata],
 }
 
 impl TypeMetadata {
+    /// Creates metadata for a Rust type without optional reflection details.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type represented by this metadata.
     pub(crate) const fn new<T: ?Sized + 'static>() -> Self {
         Self {
             type_id: TypeId::of::<T>,
@@ -36,6 +47,15 @@ impl TypeMetadata {
         }
     }
 
+    /// Creates metadata with reflected shape and source definition details.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type represented by this metadata.
+    ///
+    /// # Parameters
+    /// - `shape`: reflected type shape metadata.
+    /// - `construction_shape`: optional construction input layout.
+    /// - `type_definition`: optional source type definition.
     pub(crate) const fn with_shape<T: ?Sized + 'static>(
         shape: &'static super::type_kind::TypeKindMetadata,
         construction_shape: Option<ConstructionShape>,
@@ -51,6 +71,10 @@ impl TypeMetadata {
         }
     }
 
+    /// Adds the generic arguments associated with this type application.
+    ///
+    /// # Parameters
+    /// - `generic_arguments`: reflected generic arguments to retain.
     pub(crate) const fn with_generic_arguments(
         mut self,
         generic_arguments: &'static [GenericArgumentMetadata],
@@ -59,30 +83,40 @@ impl TypeMetadata {
         self
     }
 
+    /// Returns optional reflected shape information.
     pub(crate) const fn shape(&self) -> Option<&'static super::type_kind::TypeKindMetadata> {
         self.shape
     }
 
+    /// Returns the optional construction input layout.
     pub(crate) const fn construction_shape(&self) -> Option<ConstructionShape> {
         self.construction_shape
     }
 
+    /// Returns the optional source type definition.
     pub(crate) const fn type_definition(&self) -> Option<&'static TypeDefinitionMetadata> {
         self.type_definition
     }
 
+    /// Returns the reflected generic arguments.
     pub(crate) const fn generic_arguments(&self) -> &'static [GenericArgumentMetadata] {
         self.generic_arguments
     }
 
+    /// Resolves and returns the concrete Rust type ID.
     pub(crate) fn type_id(&self) -> TypeId {
         (self.type_id)()
     }
 
+    /// Resolves and returns the fully qualified Rust type name.
     pub(crate) fn rust_name(&self) -> &'static str {
         (self.rust_name)()
     }
 
+    /// Returns the cached metadata for `T`, creating it on first access.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type whose metadata is requested.
     pub(crate) fn of<T: ?Sized + 'static>() -> &'static Self {
         let type_id = TypeId::of::<T>();
         let metadata = metadata_cache();
@@ -93,6 +127,7 @@ impl TypeMetadata {
     }
 }
 
+/// Returns the process-wide cache of concrete type metadata.
 fn metadata_cache() -> &'static Mutex<HashMap<TypeId, &'static TypeMetadata>> {
     static METADATA: OnceLock<Mutex<HashMap<TypeId, &'static TypeMetadata>>> = OnceLock::new();
     METADATA.get_or_init(|| Mutex::new(HashMap::new()))

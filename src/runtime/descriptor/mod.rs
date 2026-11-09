@@ -14,6 +14,7 @@ pub(crate) mod collections;
 pub(crate) mod field;
 pub(crate) mod generic;
 pub(crate) mod impl_descriptor;
+#[path = "type_metadata.rs"]
 pub(crate) mod metadata;
 pub(crate) mod method;
 pub(crate) mod reflect;

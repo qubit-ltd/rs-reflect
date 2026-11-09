@@ -145,7 +145,7 @@ static ASSOCIATED_TYPE_PROJECTION: TypeExpressionData = TypeExpressionData::Asso
 };
 
 #[test]
-fn external_consumer_can_use_context_bound_model_and_capability_contract() {
+fn test_external_consumer_can_use_context_bound_model_and_capability_contract() {
     let first = ReflectionContext::builder()
         .include_type::<ConsumerModel>()
         .include_type::<u32>()
@@ -231,7 +231,7 @@ fn external_consumer_can_use_context_bound_model_and_capability_contract() {
 }
 
 #[test]
-fn external_consumer_resolves_tuple_and_set_generic_children_in_context() {
+fn test_external_consumer_resolves_tuple_and_set_generic_children_in_context() {
     let context = ReflectionContext::builder()
         .include_type::<BuiltinStructureConsumer>()
         .include_type::<(u8, String)>()
@@ -348,7 +348,7 @@ fn external_consumer_resolves_tuple_and_set_generic_children_in_context() {
 }
 
 #[test]
-fn codegen_type_expression_binding_preserves_nested_generic_structure_and_context() {
+fn test_codegen_type_expression_binding_preserves_nested_generic_structure_and_context() {
     let context = ReflectionContext::builder().build().expect("empty context builds");
     let expression = type_expression_in(&NESTED_GENERIC_TYPE, &context);
 
@@ -382,7 +382,7 @@ fn codegen_type_expression_binding_preserves_nested_generic_structure_and_contex
 }
 
 #[test]
-fn codegen_type_expression_binding_preserves_associated_type_arguments() {
+fn test_codegen_type_expression_binding_preserves_associated_type_arguments() {
     let context = ReflectionContext::builder().build().expect("empty context builds");
     let expression = type_expression_in(&ASSOCIATED_TYPE_PROJECTION, &context);
     assert_eq!(expression.display().to_string(), "T::Assoc<'a>");
@@ -400,7 +400,7 @@ fn codegen_type_expression_binding_preserves_associated_type_arguments() {
 }
 
 #[test]
-fn derive_codegen_retains_direct_and_qualified_associated_type_arguments() {
+fn test_derive_codegen_retains_direct_and_qualified_associated_type_arguments() {
     let context = ReflectionContext::builder()
         .include_type::<AssociatedProjection<AssocProvider>>()
         .build()
@@ -439,7 +439,7 @@ fn derive_codegen_retains_direct_and_qualified_associated_type_arguments() {
 }
 
 #[test]
-fn generated_marker_attaches_capability_to_generic_definition() {
+fn test_generated_marker_attaches_capability_to_generic_definition() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -459,7 +459,7 @@ fn generated_marker_attaches_capability_to_generic_definition() {
 }
 
 #[test]
-fn derive_generated_marker_hook_registers_generic_definition_capability() {
+fn test_derive_generated_marker_hook_registers_generic_definition_capability() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()
@@ -479,7 +479,7 @@ fn derive_generated_marker_hook_registers_generic_definition_capability() {
 }
 
 #[test]
-fn external_consumer_can_register_capability_for_generic_definition() {
+fn test_external_consumer_can_register_capability_for_generic_definition() {
     let source = ReflectionContext::builder()
         .include_type::<GenericConsumerModel<u8>>()
         .build()
@@ -513,7 +513,7 @@ fn external_consumer_can_register_capability_for_generic_definition() {
 }
 
 #[test]
-fn external_consumer_reports_wrong_adapter_and_keeps_global_context_isolated() {
+fn test_external_consumer_reports_wrong_adapter_and_keeps_global_context_isolated() {
     let explicit = ReflectionContext::builder()
         .include_type::<ConsumerModel>()
         .register(CapabilityRegistration::for_type::<ConsumerModel, WrongModelCapability>(

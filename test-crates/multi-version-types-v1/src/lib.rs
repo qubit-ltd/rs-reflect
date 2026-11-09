@@ -10,6 +10,6 @@
 
 use qubit_reflect::Reflect;
 
-#[Reflect]
 /// A reflected type with the same crate and type name as the v2 fixture.
+#[Reflect]
 pub struct SameName;

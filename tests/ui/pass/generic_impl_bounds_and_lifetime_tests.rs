@@ -23,12 +23,6 @@ struct Borrowed<'scope, T>(#[reflect(skip)] PhantomData<&'scope T>);
 impl<'scope, T: 'scope> Borrowed<'scope, T> {}
 
 fn main() {
-    assert_eq!(
-        TypeDescriptor::of::<Constrained<u8>>().name(),
-        "Constrained"
-    );
-    assert_eq!(
-        TypeDescriptor::of::<Borrowed<'static, u8>>().name(),
-        "Borrowed"
-    );
+    assert_eq!(TypeDescriptor::of::<Constrained<u8>>().name(), "Constrained");
+    assert_eq!(TypeDescriptor::of::<Borrowed<'static, u8>>().name(), "Borrowed");
 }

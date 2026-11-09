@@ -20,11 +20,20 @@ pub enum GenericArgumentKind {
 /// A request to view a generic argument through the wrong kind-specific API.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GenericArgumentError {
+    /// The kind-specific operation that the caller attempted.
     expected: GenericArgumentKind,
+    /// The kind of the argument that was actually supplied.
     actual: GenericArgumentKind,
 }
 
 impl GenericArgumentError {
+    /// Constructs the mismatch returned by a kind-specific generic argument
+    /// accessor.
+    ///
+    /// # Parameters
+    ///
+    /// * `expected` — the kind required by the attempted accessor.
+    /// * `actual` — the kind represented by the argument.
     pub(crate) const fn new(expected: GenericArgumentKind, actual: GenericArgumentKind) -> Self {
         Self { expected, actual }
     }
@@ -41,6 +50,11 @@ impl GenericArgumentError {
 }
 
 impl fmt::Display for GenericArgumentError {
+    /// Formats the expected and actual generic argument kinds for diagnostics.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
@@ -64,6 +78,11 @@ pub enum TypeExpressionError {
 }
 
 impl fmt::Display for TypeExpressionError {
+    /// Formats the unavailable concrete descriptor and parameter name.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ConcreteDescriptorUnavailable { parameter } => {

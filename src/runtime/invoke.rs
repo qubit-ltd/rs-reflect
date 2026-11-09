@@ -41,59 +41,157 @@ pub(crate) trait ModeAdapter: Sized {
     /// Future object retained by this invocation mode.
     type Future<'a, O: 'a>: Future<Output = O> + Unpin + 'a;
 
+    /// Selects the generated adapter for ordinary validated calls in this value
+    /// mode. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>>
     where
         Self: ValueMode;
+    /// Selects the adapter that catches panics raised by the generated method
+    /// body. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_catching_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>>
     where
         Self: ValueMode;
+    /// Selects the adapter that receives the receiver through its pinned
+    /// representation. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_pinned_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn PinnedInvocationAdapter<Self>>
     where
         Self: ValueMode;
 }
 
 impl ModeAdapter for Local {
+    /// Future type produced by this mode; thread-safe mode additionally
+    /// requires `Send`.
     type Future<'a, O: 'a> = Pin<Box<dyn Future<Output = O> + 'a>>;
 
+    /// Selects the generated adapter for ordinary validated calls in this value
+    /// mode. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.local
     }
+    /// Selects the adapter that catches panics raised by the generated method
+    /// body. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_catching_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.catching_local
     }
+    /// Selects the adapter that receives the receiver through its pinned
+    /// representation. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_pinned_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn PinnedInvocationAdapter<Self>> {
         adapters.pinned_local
     }
 }
 
 impl ModeAdapter for ThreadSafe {
+    /// Future type produced by this mode; thread-safe mode additionally
+    /// requires `Send`.
     type Future<'a, O: 'a> = Pin<Box<dyn Future<Output = O> + Send + 'a>>;
 
+    /// Selects the generated adapter for ordinary validated calls in this value
+    /// mode. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.thread_safe
     }
+    /// Selects the adapter that catches panics raised by the generated method
+    /// body. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_catching_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn InvocationAdapter<Self>> {
         adapters.catching_thread_safe
     }
+    /// Selects the adapter that receives the receiver through its pinned
+    /// representation. # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated adapter set from which this mode selects its
+    ///   invocation entry point.
     fn select_pinned_adapter(adapters: &InvocationAdapters) -> Option<&'static dyn PinnedInvocationAdapter<Self>> {
         adapters.pinned_thread_safe
     }
 }
 
 /// A mode-specific adapter generated for one statically bound Rust method.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub trait InvocationAdapter<M: ValueMode>: Sync {
     /// Executes a previously validated invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     fn invoke<'call>(&self, invocation: ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>;
 }
 
 /// Function-pointer adapter for generated method bodies.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct FunctionInvocationAdapter<M: ValueMode> {
+    /// Runs the generated method body after invocation inputs have passed
+    /// preflight validation.
     invoke: for<'call> fn(ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
+    /// Carries the selected value mode in the type without storing a runtime
+    /// value.
     _mode: std::marker::PhantomData<fn() -> M>,
 }
 
 impl<M: ValueMode> FunctionInvocationAdapter<M> {
     /// Binds a generated function to the invocation adapter contract.
+    ///
+    /// # Parameters
+    ///
+    /// - `invoke`: Generated function pointer that executes the already
+    ///   validated call.
     pub const fn new(invoke: for<'call> fn(ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>) -> Self {
         Self {
             invoke,
@@ -103,16 +201,43 @@ impl<M: ValueMode> FunctionInvocationAdapter<M> {
 }
 
 impl<M: ValueMode> InvocationAdapter<M> for FunctionInvocationAdapter<M> {
+    /// Runs the generated method body after invocation inputs have passed
+    /// preflight validation. # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated receiver and arguments passed to the generated
+    ///   adapter.
     fn invoke<'call>(&self, invocation: ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M> {
         (self.invoke)(invocation)
     }
 }
 
 /// Adapter for a method whose receiver is pinned.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
+    /// Returns the concrete receiver type used to guard typed pinned recovery.
     fn receiver_type_id(&self) -> TypeId;
+    /// Returns whether the pinned receiver grants shared or mutable access.
     fn receiver_kind(&self) -> ReceiverKind;
 
+    /// Runs the generated method body after invocation inputs have passed
+    /// preflight validation. # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// # Parameters
+    ///
+    /// - `receiver`: Pinned receiver value checked against the adapter’s exact
+    ///   receiver type.
+    /// - `invocation`: Validated receiver and arguments passed to the generated
+    ///   adapter.
     fn invoke<'call>(
         &self,
         receiver: PinnedReceiver<'call>,
@@ -121,15 +246,32 @@ pub(crate) trait PinnedInvocationAdapter<M: ValueMode>: Sync {
 }
 
 /// Function-pointer adapter for a receiver whose type and pin mode are fixed.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
 pub struct PinnedFunctionInvocationAdapter<M: ValueMode, T: ?Sized + 'static> {
+    /// Records whether the pinned receiver grants shared or mutable access.
     kind: ReceiverKind,
+    /// Runs the generated method body after invocation inputs have passed
+    /// preflight validation.
     invoke: for<'call> fn(PinnedReceiver<'call>, ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
+    /// Carries the pinned receiver type in the adapter without storing a
+    /// receiver.
     _receiver: std::marker::PhantomData<fn(&T)>,
+    /// Carries the selected value mode in the type without storing a runtime
+    /// value.
     _mode: std::marker::PhantomData<fn() -> M>,
 }
 
 impl<M: ValueMode, T: ?Sized + 'static> PinnedFunctionInvocationAdapter<M, T> {
     /// Creates a pinned shared-receiver adapter for the exact type `T`.
+    ///
+    /// # Parameters
+    ///
+    /// - `invoke`: Generated function pointer that executes the already
+    ///   validated call.
     pub const fn shared(
         invoke: for<'call> fn(PinnedReceiver<'call>, ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
     ) -> Self {
@@ -142,6 +284,11 @@ impl<M: ValueMode, T: ?Sized + 'static> PinnedFunctionInvocationAdapter<M, T> {
     }
 
     /// Creates a pinned mutable-receiver adapter for the exact type `T`.
+    ///
+    /// # Parameters
+    ///
+    /// - `invoke`: Generated function pointer that executes the already
+    ///   validated call.
     pub const fn mutable(
         invoke: for<'call> fn(PinnedReceiver<'call>, ValidatedInvocation<'call, M>) -> InvocationOutput<'call, M>,
     ) -> Self {
@@ -155,14 +302,28 @@ impl<M: ValueMode, T: ?Sized + 'static> PinnedFunctionInvocationAdapter<M, T> {
 }
 
 impl<M: ValueMode, T: ?Sized + 'static> PinnedInvocationAdapter<M> for PinnedFunctionInvocationAdapter<M, T> {
+    /// Returns the concrete receiver type used to guard typed pinned recovery.
     fn receiver_type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
 
+    /// Returns whether the pinned receiver grants shared or mutable access.
     fn receiver_kind(&self) -> ReceiverKind {
         self.kind
     }
 
+    /// Runs the generated method body after invocation inputs have passed
+    /// preflight validation. # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// # Parameters
+    ///
+    /// - `receiver`: Pinned receiver value checked against the adapter’s exact
+    ///   receiver type.
+    /// - `invocation`: Validated receiver and arguments passed to the generated
+    ///   adapter.
     fn invoke<'call>(
         &self,
         receiver: PinnedReceiver<'call>,
@@ -172,39 +333,79 @@ impl<M: ValueMode, T: ?Sized + 'static> PinnedInvocationAdapter<M> for PinnedFun
     }
 }
 
+/// Carries the erasedpinnedreceiver required by invocation dispatch.
 trait ErasedPinnedReceiver {
+    /// Returns the concrete type identity represented by this erased receiver
+    /// holder.
     fn type_id(&self) -> TypeId;
+    /// Exposes the stable holder address used for the checked concrete
+    /// downcast.
     fn holder_ptr(&mut self) -> *mut ();
+    /// Reports whether the erased receiver grants mutable access.
     fn is_mutable(&self) -> bool;
 }
 
+/// Retains the PinnedSharedHolder required to validate or recover this
+/// invocation. # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
+/// # Type Parameters
+///
+/// - `'call`: Lifetime of the invocation borrows retained by its receiver or
+///   result.
+/// - `T`: Concrete value type represented by the operation.
 struct PinnedSharedHolder<'call, T: ?Sized + 'static> {
+    /// Retains the typed pinned receiver until the generated adapter recovers
+    /// it.
     receiver: Pin<&'call T>,
 }
 
 impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedSharedHolder<'_, T> {
+    /// Returns the concrete type identity represented by this erased receiver
+    /// holder.
     fn type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
+    /// Exposes the stable holder address used for the checked concrete
+    /// downcast.
     fn holder_ptr(&mut self) -> *mut () {
         self as *mut Self as *mut ()
     }
+    /// Reports whether the erased receiver grants mutable access.
     fn is_mutable(&self) -> bool {
         false
     }
 }
 
+/// Retains the PinnedMutableHolder required to validate or recover this
+/// invocation. # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
+/// # Type Parameters
+///
+/// - `'call`: Lifetime of the invocation borrows retained by its receiver or
+///   result.
+/// - `T`: Concrete value type represented by the operation.
 struct PinnedMutableHolder<'call, T: ?Sized + 'static> {
+    /// Retains the typed pinned receiver until the generated adapter recovers
+    /// it.
     receiver: Option<Pin<&'call mut T>>,
 }
 
 impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedMutableHolder<'_, T> {
+    /// Returns the concrete type identity represented by this erased receiver
+    /// holder.
     fn type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
+    /// Exposes the stable holder address used for the checked concrete
+    /// downcast.
     fn holder_ptr(&mut self) -> *mut () {
         self as *mut Self as *mut ()
     }
+    /// Reports whether the erased receiver grants mutable access.
     fn is_mutable(&self) -> bool {
         true
     }
@@ -213,15 +414,27 @@ impl<T: ?Sized + 'static> ErasedPinnedReceiver for PinnedMutableHolder<'_, T> {
 /// A pinned receiver erased for a generated typed adapter. The holder retains
 /// the typed Pin, including any DST metadata, until the adapter downcasts it.
 pub struct PinnedReceiver<'call> {
+    /// Stores the runtime representation retained by this public wrapper.
     inner: PinnedReceiverKind<'call>,
 }
 
+/// Carries the pinnedreceiverkind required by invocation dispatch.
 enum PinnedReceiverKind<'call> {
-    Shared(Box<dyn ErasedPinnedReceiver + 'call>),
-    Mutable(Box<dyn ErasedPinnedReceiver + 'call>),
+    /// Carries the receiver through shared pinned access.
+    Shared(
+        /// Type-erased holder that retains the typed pinned borrow.
+        Box<dyn ErasedPinnedReceiver + 'call>,
+    ),
+    /// Carries the receiver through exclusive pinned access.
+    Mutable(
+        /// Type-erased holder that retains the typed pinned mutable borrow.
+        Box<dyn ErasedPinnedReceiver + 'call>,
+    ),
 }
 
 impl<'call> PinnedReceiver<'call> {
+    /// Returns the concrete type identity represented by this erased receiver
+    /// holder.
     fn type_id(&self) -> TypeId {
         match &self.inner {
             PinnedReceiverKind::Shared(holder) | PinnedReceiverKind::Mutable(holder) => {
@@ -229,14 +442,20 @@ impl<'call> PinnedReceiver<'call> {
             }
         }
     }
+    /// Reports whether the erased receiver grants mutable access.
     fn is_mutable(&self) -> bool {
         matches!(self.inner, PinnedReceiverKind::Mutable(_))
     }
 
-    #[allow(unsafe_code)]
     /// Recovers the pinned shared receiver as `T` when its type matches.
     ///
     /// Returns `None` for a different receiver type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    #[allow(unsafe_code)]
     pub fn downcast_ref<T: ?Sized + 'static>(self) -> Option<Pin<&'call T>> {
         match self.inner {
             PinnedReceiverKind::Shared(mut holder)
@@ -263,10 +482,15 @@ impl<'call> PinnedReceiver<'call> {
         }
     }
 
-    #[allow(unsafe_code)]
     /// Recovers the pinned mutable receiver as `T` when its type matches.
     ///
     /// Returns `None` for a different receiver type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    #[allow(unsafe_code)]
     pub fn downcast_mut<T: ?Sized + 'static>(self) -> Option<Pin<&'call mut T>> {
         match self.inner {
             PinnedReceiverKind::Mutable(mut holder)
@@ -285,16 +509,31 @@ impl<'call> PinnedReceiver<'call> {
 }
 
 /// A shared or mutable receiver passed to an invocation.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub enum InvocationReceiver<'call, M: ValueMode> {
     /// An owned receiver.
-    Owned(DynamicOwned<M>),
+    Owned(
+        /// Value transferred into the reflected method call.
+        DynamicOwned<M>,
+    ),
     /// A shared borrowed receiver.
-    Ref(DynamicRef<'call, M>),
+    Ref(
+        /// Shared borrow whose lifetime bounds the invocation.
+        DynamicRef<'call, M>,
+    ),
     /// An exclusively borrowed receiver.
-    Mut(DynamicMut<'call, M>),
+    Mut(
+        /// Mutable borrow retained for the duration of the invocation.
+        DynamicMut<'call, M>,
+    ),
 }
 
 impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
+    /// Records whether the pinned receiver grants shared or mutable access.
     fn kind(&self) -> DynamicValueKind {
         match self {
             Self::Owned(_) => DynamicValueKind::Owned,
@@ -302,6 +541,8 @@ impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
             Self::Mut(_) => DynamicValueKind::Mut,
         }
     }
+    /// Returns the concrete type identity represented by this erased receiver
+    /// holder.
     fn type_id(&self) -> TypeId {
         match self {
             Self::Owned(value) => value.type_id(),
@@ -311,6 +552,11 @@ impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
     }
 
     /// Recovers an owned receiver of its validated concrete type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_owned<T: ValueFor<M>>(self) -> Result<T, Self> {
         match self {
             Self::Owned(value) => match value.downcast::<T>() {
@@ -322,6 +568,11 @@ impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
     }
 
     /// Recovers a shared receiver of its validated concrete type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<&'call T, Self> {
         match self {
             Self::Ref(value) => match value.downcast::<T>() {
@@ -333,6 +584,11 @@ impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
     }
 
     /// Recovers a mutable receiver of its validated concrete type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_mut<T: ValueForMut<M> + ?Sized>(self) -> Result<&'call mut T, Self> {
         match self {
             Self::Mut(value) => match value.downcast::<T>() {
@@ -345,22 +601,48 @@ impl<'call, M: ValueMode> InvocationReceiver<'call, M> {
 }
 
 /// A receiver or argument supplied to a dynamic invocation builder.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M = Local`: Generic type or lifetime parameter carried by the descriptor.
 pub(crate) type InvocationArgument<'call, M = Local> = InvocationValue<'call, M>;
 /// A receiver supplied in owned, shared, or mutable form.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M = Local`: Generic type or lifetime parameter carried by the descriptor.
 pub(crate) type DynamicReceiver<'call, M = Local> = InvocationReceiver<'call, M>;
 
+/// Retains the Binding required to validate or recover this invocation.
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 struct Binding<'call, M: ValueMode> {
+    /// Stores the name used to resolve or execute this reflected invocation.
     name: Option<Box<str>>,
+    /// Stores the value used to resolve or execute this reflected invocation.
     value: InvocationValue<'call, M>,
 }
 
 /// Caller-owned receiver and argument bindings for one invocation.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct Invocation<'call, M: ValueMode = Local> {
+    /// Retains the typed pinned receiver until the generated adapter recovers
+    /// it.
     receiver: Option<InvocationReceiver<'call, M>>,
+    /// Owned receiver and argument values supplied to the invocation.
     bindings: Vec<Binding<'call, M>>,
 }
 
 impl<'call, M: ValueMode> Invocation<'call, M> {
+    /// Creates an invocation with no receiver or argument bindings.
     fn empty() -> Self {
         Self {
             receiver: None,
@@ -368,30 +650,130 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         }
     }
     /// Adds an owned positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg<T: ValueFor<M>>(self, value: T) -> Self {
         self.arg_dynamic(DynamicOwned::new(value))
     }
     /// Adds a shared positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_ref<T: ValueForRef<M> + ?Sized>(self, value: &'call T) -> Self {
         self.arg_dynamic_ref(DynamicRef::new(value))
     }
     /// Adds a mutable positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_mut<T: ValueForMut<M> + ?Sized>(self, value: &'call mut T) -> Self {
         self.arg_dynamic_mut(DynamicMut::new(value))
     }
     /// Adds a named owned argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg<T: ValueFor<M>>(self, name: impl Into<Box<str>>, value: T) -> Self {
         self.named_arg_dynamic(name, InvocationValue::Owned(DynamicOwned::new(value)))
     }
     /// Adds a named shared argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg_ref<T: ValueForRef<M> + ?Sized>(self, name: impl Into<Box<str>>, value: &'call T) -> Self {
         self.named_arg_dynamic(name, InvocationValue::Ref(DynamicRef::new(value)))
     }
     /// Adds a named mutable argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg_mut<T: ValueForMut<M> + ?Sized>(self, name: impl Into<Box<str>>, value: &'call mut T) -> Self {
         self.named_arg_dynamic(name, InvocationValue::Mut(DynamicMut::new(value)))
     }
     /// Adds an already erased owned argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_dynamic(mut self, value: DynamicOwned<M>) -> Self {
         self.bindings.push(Binding {
             name: None,
@@ -400,6 +782,10 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self
     }
     /// Adds an already erased shared argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_dynamic_ref(mut self, value: DynamicRef<'call, M>) -> Self {
         self.bindings.push(Binding {
             name: None,
@@ -408,6 +794,10 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self
     }
     /// Adds an already erased mutable argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_dynamic_mut(mut self, value: DynamicMut<'call, M>) -> Self {
         self.bindings.push(Binding {
             name: None,
@@ -416,6 +806,11 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self
     }
     /// Adds a named already erased argument in caller order.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg_dynamic(mut self, name: impl Into<Box<str>>, value: InvocationValue<'call, M>) -> Self {
         self.bindings.push(Binding {
             name: Some(name.into()),
@@ -428,6 +823,23 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self.bindings.len()
     }
     /// Replaces one recovered caller binding while retaining the other inputs.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based field position to inspect.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based field position to inspect.
+    /// - `value`: Owned value retained for validation and construction.
     pub(crate) fn replace_arg<T: ValueFor<M>>(mut self, index: usize, value: T) -> Result<Self, Self> {
         if index >= self.bindings.len() {
             return Err(self);
@@ -436,6 +848,15 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         Ok(self)
     }
 
+    /// Checks receiver and argument shape and returns a typed invocation only
+    /// on success. # Parameters
+    ///
+    /// - `method`: Method descriptor whose parameter and receiver metadata
+    ///   govern this call.
+    /// # Parameters
+    ///
+    /// - `method`: Method descriptor that defines receiver and argument
+    ///   validation for this call.
     pub(crate) fn validate(
         self,
         method: MethodDescriptor<'_>,
@@ -449,6 +870,14 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         }
     }
 
+    /// Reorders named bindings into the method descriptor’s declared parameter
+    /// order. # Parameters
+    ///
+    /// - `order`: Mapping from supplied bindings to the method’s declared
+    ///   parameter order.
+    /// # Parameters
+    ///
+    /// - `order`: Mapping that restores the method’s declared parameter order.
     fn reorder(self, order: Vec<(usize, usize)>) -> Self {
         let mut inputs = self.bindings.into_iter().map(Some).collect::<Vec<_>>();
         let mut slots = (0..inputs.len()).map(|_| None).collect::<Vec<_>>();
@@ -466,6 +895,12 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
 }
 
 /// A typed pinned receiver and its caller-ordered arguments.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
 pub enum PinnedInvocation<'call, M: ValueMode, T: ?Sized + 'static> {
     /// Invocation on a pinned shared receiver.
     Shared {
@@ -485,6 +920,10 @@ pub enum PinnedInvocation<'call, M: ValueMode, T: ?Sized + 'static> {
 
 impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
     /// Starts an invocation with a pinned shared receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn shared(receiver: Pin<&'call T>) -> Self {
         Self::Shared {
             receiver,
@@ -492,6 +931,10 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         }
     }
     /// Starts an invocation with a pinned mutable receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn mutable(receiver: Pin<&'call mut T>) -> Self {
         Self::Mutable {
             receiver,
@@ -499,6 +942,20 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         }
     }
     /// Adds an owned positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg<U: ValueFor<M>>(mut self, value: U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: None,
@@ -507,6 +964,20 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         self
     }
     /// Adds a shared positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_ref<U: ValueForRef<M> + ?Sized>(mut self, value: &'call U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: None,
@@ -515,6 +986,20 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         self
     }
     /// Adds a mutable positional argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn arg_mut<U: ValueForMut<M> + ?Sized>(mut self, value: &'call mut U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: None,
@@ -523,6 +1008,22 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         self
     }
     /// Adds a named owned argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg<U: ValueFor<M>>(mut self, name: impl Into<Box<str>>, value: U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: Some(name.into()),
@@ -531,6 +1032,22 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         self
     }
     /// Adds a named shared argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg_ref<U: ValueForRef<M> + ?Sized>(mut self, name: impl Into<Box<str>>, value: &'call U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: Some(name.into()),
@@ -539,6 +1056,22 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         self
     }
     /// Adds a named mutable argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `U`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `value`: Owned value retained for validation and construction.
     pub fn named_arg_mut<U: ValueForMut<M> + ?Sized>(mut self, name: impl Into<Box<str>>, value: &'call mut U) -> Self {
         self.arguments_mut().bindings.push(Binding {
             name: Some(name.into()),
@@ -546,31 +1079,40 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
         });
         self
     }
+    /// Returns the number of supplied argument bindings.
     pub(crate) fn argument_count(&self) -> usize {
         self.arguments().bindings.len()
     }
+    /// Returns the concrete receiver type used to guard typed pinned recovery.
     pub(crate) fn receiver_type_id(&self) -> TypeId {
         TypeId::of::<T>()
     }
+    /// Reports whether the invocation receiver carries exclusive access.
     pub(crate) fn receiver_is_mutable(&self) -> bool {
         matches!(self, Self::Mutable { .. })
     }
+    /// Returns the argument bindings in their current supplied order.
     fn arguments(&self) -> &Invocation<'call, M> {
         match self {
             Self::Shared { arguments, .. } | Self::Mutable { arguments, .. } => arguments,
         }
     }
+    /// Returns mutable access to the supplied bindings for validated
+    /// reordering.
     fn arguments_mut(&mut self) -> &mut Invocation<'call, M> {
         match self {
             Self::Shared { arguments, .. } | Self::Mutable { arguments, .. } => arguments,
         }
     }
+    /// Returns the pinned receiver kind and concrete type identity when
+    /// present.
     pub(crate) fn pinned_kind_and_type(&self) -> (ReceiverKind, TypeId) {
         match self {
             Self::Shared { .. } => (ReceiverKind::PinnedShared, TypeId::of::<T>()),
             Self::Mutable { .. } => (ReceiverKind::PinnedMutable, TypeId::of::<T>()),
         }
     }
+    /// Separates the error from the original invocation retained for recovery.
     pub(crate) fn into_parts(self) -> (PinnedReceiver<'call>, Invocation<'call, M>) {
         match self {
             Self::Shared { receiver, arguments } => (
@@ -589,6 +1131,15 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
             ),
         }
     }
+    /// Checks receiver and argument shape and returns a typed invocation only
+    /// on success. # Parameters
+    ///
+    /// - `method`: Method descriptor whose parameter and receiver metadata
+    ///   govern this call.
+    /// # Parameters
+    ///
+    /// - `method`: Method descriptor that defines receiver and argument
+    ///   validation for this call.
     pub(crate) fn validate(
         self,
         method: MethodDescriptor<'_>,
@@ -611,8 +1162,16 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
 }
 
 /// A pinned invocation whose receiver and argument bindings passed preflight.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
 pub struct ValidatedPinnedInvocation<'call, M: ValueMode, T: ?Sized + 'static> {
+    /// Retains the invocation required to validate or recover this invocation.
     invocation: PinnedInvocation<'call, M, T>,
+    /// Parameter-order mapping produced by invocation preflight validation.
     order: Vec<(usize, usize)>,
 }
 
@@ -636,12 +1195,25 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> ValidatedPinnedInvocation<'call, 
 }
 
 /// A failed pinned invocation with the original Pin and all arguments retained.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
 pub struct PinnedInvocationFailure<'call, M: ValueMode, T: ?Sized + 'static> {
+    /// Returns the structured error that explains why invocation failed.
     error: InvocationError,
+    /// Retains the invocation required to validate or recover this invocation.
     invocation: PinnedInvocation<'call, M, T>,
 }
 
 impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocationFailure<'call, M, T> {
+    /// Creates a wrapper that retains the supplied runtime representation.
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub(crate) fn new(error: InvocationError, invocation: PinnedInvocation<'call, M, T>) -> Self {
         Self { error, invocation }
     }
@@ -664,6 +1236,21 @@ impl<'call> Invocation<'call, Local> {
         }
     }
     /// Creates an invocation with an owned local receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_owned<T: ValueFor<Local>>(receiver: T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Owned(DynamicOwned::new(receiver))),
@@ -671,6 +1258,21 @@ impl<'call> Invocation<'call, Local> {
         }
     }
     /// Creates an invocation with a shared local receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_ref<T: ValueForRef<Local> + ?Sized>(receiver: &'call T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Ref(DynamicRef::new(receiver))),
@@ -678,6 +1280,21 @@ impl<'call> Invocation<'call, Local> {
         }
     }
     /// Creates an invocation with a mutable local receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_mut<T: ValueForMut<Local> + ?Sized>(receiver: &'call mut T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Mut(DynamicMut::new(receiver))),
@@ -685,6 +1302,10 @@ impl<'call> Invocation<'call, Local> {
         }
     }
     /// Creates an invocation from a pre-erased receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_dynamic(receiver: InvocationReceiver<'call, Local>) -> Self {
         Self {
             receiver: Some(receiver),
@@ -702,6 +1323,21 @@ impl<'call> Invocation<'call, ThreadSafe> {
         }
     }
     /// Creates an invocation with an owned thread-safe receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_owned<T: ValueFor<ThreadSafe>>(receiver: T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Owned(DynamicOwned::new(receiver))),
@@ -709,6 +1345,21 @@ impl<'call> Invocation<'call, ThreadSafe> {
         }
     }
     /// Creates an invocation with a shared thread-safe receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_ref<T: ValueForRef<ThreadSafe> + ?Sized>(receiver: &'call T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Ref(DynamicRef::new(receiver))),
@@ -716,6 +1367,21 @@ impl<'call> Invocation<'call, ThreadSafe> {
         }
     }
     /// Creates an invocation with a mutable thread-safe receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_mut<T: ValueForMut<ThreadSafe> + ?Sized>(receiver: &'call mut T) -> Self {
         Self {
             receiver: Some(InvocationReceiver::Mut(DynamicMut::new(receiver))),
@@ -723,6 +1389,10 @@ impl<'call> Invocation<'call, ThreadSafe> {
         }
     }
     /// Creates an invocation from a pre-erased receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
     pub fn on_dynamic(receiver: InvocationReceiver<'call, ThreadSafe>) -> Self {
         Self {
             receiver: Some(receiver),
@@ -732,8 +1402,15 @@ impl<'call> Invocation<'call, ThreadSafe> {
 }
 
 /// An invocation after declaration-order binding and all dynamic checks passed.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct ValidatedInvocation<'call, M: ValueMode> {
+    /// Retains the invocation required to validate or recover this invocation.
     invocation: Invocation<'call, M>,
+    /// Parameter-order mapping produced by invocation preflight validation.
     order: Vec<(usize, usize)>,
 }
 
@@ -756,11 +1433,35 @@ impl<'call, M: ValueMode> ValidatedInvocation<'call, M> {
             invocation.bindings.into_iter().map(|binding| binding.value).collect(),
         )
     }
+    /// Returns the invocation after its arguments have been reordered for the
+    /// method.
     pub(crate) fn into_invocation(self) -> Invocation<'call, M> {
         self.invocation
     }
 }
 
+/// Provides the validate bindings operation used by invocation validation or
+/// recovery. # Parameters
+///
+/// - `invocation`: Validated call values passed to the generated method
+///   adapter.
+/// - `method`: Method descriptor whose parameter and receiver metadata govern
+///   this call.
+/// - `pinned_receiver`: Pinned receiver retained until its typed adapter has
+///   finished.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+///
+/// # Parameters
+///
+/// - `invocation`: Validated call values passed to the generated method
+///   adapter.
+/// - `method`: Method descriptor whose parameter and receiver metadata govern
+///   this call.
+/// - `pinned_receiver`: Pinned receiver retained until its typed adapter has
+///   finished.
 fn validate_bindings<M: ValueMode>(
     invocation: &Invocation<'_, M>,
     method: MethodDescriptor<'_>,
@@ -903,6 +1604,16 @@ fn validate_bindings<M: ValueMode>(
     Ok(indexed)
 }
 
+/// Checks whether a runtime value kind is compatible with a parameter passing
+/// mode. # Parameters
+///
+/// - `parameter`: Declared parameter considered during argument matching.
+/// - `value`: Owned value retained for validation and construction.
+/// # Parameters
+///
+/// - `parameter`: Parameter metadata used when checking argument passing
+///   compatibility.
+/// - `value`: Owned value retained for validation and construction.
 fn passing_matches(parameter: ParameterDescriptor<'_>, value: DynamicValueKind) -> bool {
     matches!(
         (parameter.passing(), value),
@@ -957,10 +1668,20 @@ pub enum InvocationUnavailableReason {
 /// Invocation preflight and adapter errors.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InvocationError {
+    /// Records whether the pinned receiver grants shared or mutable access.
     kind: InvocationErrorKind,
 }
 
 impl InvocationError {
+    /// Creates a wrapper that retains the supplied runtime representation.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Structured preflight or adapter error to expose.
+    ///
+    /// # Returns
+    ///
+    /// Returns an invocation error containing `kind`.
     pub(crate) const fn new(kind: InvocationErrorKind) -> Self {
         Self { kind }
     }
@@ -971,6 +1692,10 @@ impl InvocationError {
 }
 
 impl std::fmt::Display for InvocationError {
+    /// Formats the structured invocation failure for human-readable output.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{:?}", self.kind)
     }
@@ -1064,7 +1789,15 @@ pub enum InvocationErrorKind {
 }
 
 /// Inputs retained after an invocation preflight failure.
-pub struct InvocationRecovery<'call, M: ValueMode>(Invocation<'call, M>);
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+pub struct InvocationRecovery<'call, M: ValueMode>(
+    /// Original receiver and argument values retained after preflight failure.
+    Invocation<'call, M>,
+);
 
 impl<'call, M: ValueMode> InvocationRecovery<'call, M> {
     /// Borrows the original invocation retained after preflight validation
@@ -1080,12 +1813,24 @@ impl<'call, M: ValueMode> InvocationRecovery<'call, M> {
 }
 
 /// An invocation error paired with all original, unconsumed inputs.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct InvocationFailure<'call, M: ValueMode> {
+    /// Returns the structured error that explains why invocation failed.
     error: InvocationError,
+    /// Borrows the original invocation inputs retained after failure.
     recovery: InvocationRecovery<'call, M>,
 }
 
 impl<'call, M: ValueMode> InvocationFailure<'call, M> {
+    /// Creates a wrapper that retains the supplied runtime representation.
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub(crate) fn new(error: InvocationError, invocation: Invocation<'call, M>) -> Self {
         Self {
             error,
@@ -1111,36 +1856,65 @@ impl<'call, M: ValueMode> InvocationFailure<'call, M> {
 }
 
 impl<'call, M: ValueMode> RecoverableFailure for InvocationFailure<'call, M> {
+    /// Error type exposed by the recoverable failure contract.
     type Error = InvocationError;
+    /// Owned input values preserved by the recoverable failure contract.
     type Recovery = InvocationRecovery<'call, M>;
 
+    /// Returns the structured error that explains why invocation failed.
     fn error(&self) -> &Self::Error {
         &self.error
     }
 
+    /// Borrows the original invocation inputs retained after failure.
     fn recovery(&self) -> &Self::Recovery {
         &self.recovery
     }
 
+    /// Separates the error from the original invocation retained for recovery.
     fn into_parts(self) -> (Self::Error, Self::Recovery) {
         RecoverableFailureParts::new(self.error, self.recovery).into_parts()
     }
 }
 
 /// Result of an invocation attempt that may reject inputs or catch a panic.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub(crate) enum InvocationAttempt<'call, M: ValueMode> {
-    Rejected(InvocationFailure<'call, M>),
-    Panicked(InvocationPanic),
+    /// Carries the rejected required by invocation dispatch.
+    Rejected(
+        /// Preflight error and original inputs retained for recovery.
+        InvocationFailure<'call, M>,
+    ),
+    /// Carries the panicked required by invocation dispatch.
+    Panicked(
+        /// Panic payload raised after the adapter started running.
+        InvocationPanic,
+    ),
 }
 
 /// A panic raised by a user adapter after invocation started.
 #[derive(Debug)]
 pub struct InvocationPanic {
+    /// Returns the panic message when the payload can be converted to text.
     message: Option<Box<str>>,
+    /// Returns a reference to the original panic payload for typed inspection.
     payload: Box<dyn std::any::Any + Send + 'static>,
 }
 
 impl InvocationPanic {
+    /// Captures a panic payload and its displayable message when available.
+    ///
+    /// # Parameters
+    ///
+    /// - `payload`: Original panic value returned by the unwind mechanism.
+    ///
+    /// # Returns
+    ///
+    /// Returns the payload with its string message extracted when possible.
     pub(crate) fn from_payload(payload: Box<dyn std::any::Any + Send>) -> Self {
         let message = payload
             .downcast_ref::<String>()
@@ -1166,11 +1940,22 @@ impl InvocationPanic {
 }
 
 /// Failure from explicit panic-catching invocation.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub enum CaughtInvocationFailure<'call, M: ValueMode> {
     /// Preflight rejected the inputs before calling the method.
-    Rejected(InvocationFailure<'call, M>),
+    Rejected(
+        /// Error and original invocation values retained for recovery.
+        InvocationFailure<'call, M>,
+    ),
     /// The method adapter panicked after invocation began.
-    Panicked(InvocationPanic),
+    Panicked(
+        /// Captured panic payload and optional message.
+        InvocationPanic,
+    ),
 }
 
 /// The origin of a borrow returned from a reflected method.
@@ -1179,15 +1964,37 @@ pub enum BorrowOrigin {
     /// The borrow comes from the method receiver.
     Receiver,
     /// The borrow comes from the zero-based parameter at this index.
-    Parameter(usize),
+    Parameter(
+        /// Zero-based index into the method's declared parameter list.
+        usize,
+    ),
 }
 
 /// An asynchronous result whose executor is selected by the caller.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct ReflectedFuture<'call, M: ValueMode> {
+    /// Returns mutable access to the future retained by this invocation output.
     future: <M as ModeAdapter>::Future<'call, InvocationOutput<'call, M>>,
 }
 
 impl<'call, M: ValueMode> ReflectedFuture<'call, M> {
+    /// Creates a wrapper that retains the supplied runtime representation.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `F`: Concrete future produced by the generated method adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `future`: Future retained until the caller polls it to completion.
+    ///
+    /// # Returns
+    ///
+    /// Returns a future wrapper using the storage type selected by `M`.
     pub(crate) fn new<F>(future: F) -> Self
     where
         F: IntoModeFuture<M, InvocationOutput<'call, M>> + 'call,
@@ -1197,7 +2004,13 @@ impl<'call, M: ValueMode> ReflectedFuture<'call, M> {
     }
 }
 impl<'call, M: ValueMode> Future for ReflectedFuture<'call, M> {
+    /// Result type yielded by the stored invocation future.
     type Output = InvocationOutput<'call, M>;
+    /// Polls the stored future without changing its invocation output type.
+    /// # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
     fn poll(self: Pin<&mut Self>, context: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         let this = self.get_mut();
         Pin::new(&mut this.future).poll(context)
@@ -1209,8 +2022,15 @@ impl<'call, M: ValueMode> Future for ReflectedFuture<'call, M> {
 ///
 /// `Local` accepts futures that are not `Send`; the `ThreadSafe` implementation
 /// exists only for futures that satisfy `Send`.
+///
+/// # Type Parameters
+///
+/// - `M`: Value mode that governs storage and thread-safety bounds.
+/// - `O`: Concrete Rust type whose metadata or value is used by the operation.
 #[allow(private_bounds)]
 pub(crate) trait IntoModeFuture<M: ModeAdapter, O>: Future<Output = O> {
+    /// Converts the concrete future into the future representation selected by
+    /// the value mode.
     fn erase<'a>(self) -> M::Future<'a, O>
     where
         Self: 'a,
@@ -1221,6 +2041,8 @@ impl<F, O> IntoModeFuture<Local, O> for F
 where
     F: Future<Output = O>,
 {
+    /// Converts the concrete future into the future representation selected by
+    /// the value mode.
     fn erase<'a>(self) -> <Local as ModeAdapter>::Future<'a, O>
     where
         Self: 'a,
@@ -1234,6 +2056,8 @@ impl<F, O> IntoModeFuture<ThreadSafe, O> for F
 where
     F: Future<Output = O> + Send,
 {
+    /// Converts the concrete future into the future representation selected by
+    /// the value mode.
     fn erase<'a>(self) -> <ThreadSafe as ModeAdapter>::Future<'a, O>
     where
         Self: 'a,
@@ -1245,12 +2069,20 @@ where
 
 /// A reflected method's result, retaining the borrow origins of reference
 /// outputs.
+///
+/// # Type Parameters
+///
+/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `M`: Value mode that governs storage and thread-safety bounds.
 #[must_use]
 pub enum InvocationOutput<'call, M: ValueMode = Local> {
     /// Unit return value.
     Unit,
     /// Owned return value.
-    Owned(DynamicOwned<M>),
+    Owned(
+        /// Dynamically typed owned result returned by the method.
+        DynamicOwned<M>,
+    ),
     /// Shared return borrow and the inputs from which it may originate.
     Ref {
         /// The returned shared value.
@@ -1280,11 +2112,19 @@ pub enum InvocationOutput<'call, M: ValueMode = Local> {
         origin: BorrowOrigin,
     },
     /// Asynchronous return value.
-    Future(ReflectedFuture<'call, M>),
+    Future(
+        /// Future whose polling and `Send` requirements follow `M`.
+        ReflectedFuture<'call, M>,
+    ),
 }
 
 /// Keeps the output when a typed output extraction expects another kind.
+///
+/// # Type Parameters
+///
+/// - `O`: Concrete Rust type whose metadata or value is used by the operation.
 pub struct OutputMismatch<O> {
+    /// Output value together with any borrow origins retained from the call.
     output: O,
 }
 impl<O> OutputMismatch<O> {
@@ -1301,16 +2141,65 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     }
 
     /// Erases an owned result while retaining its value mode.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn owned<T: ValueFor<M>>(value: T) -> Self {
         Self::Owned(DynamicOwned::new(value))
     }
 
     /// Erases a shared result and records which validated input it borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origin`: Borrow origin associated with a returned reference.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origin`: Borrow origin associated with a returned reference.
     pub fn shared<T: ValueForRef<M> + ?Sized>(value: &'call T, origin: BorrowOrigin) -> Self {
         Self::shared_with_origins(value, &[origin])
     }
 
     /// Erases a shared result with all validated input origins it may borrow.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origins`: Allowed input origins for a returned reference.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origins`: Allowed input origins for a returned reference.
     pub fn shared_with_origins<T: ValueForRef<M> + ?Sized>(value: &'call T, origins: &[BorrowOrigin]) -> Self {
         Self::Ref {
             value: DynamicRef::new(value),
@@ -1320,6 +2209,23 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
 
     /// Erases an optional shared result and records all possible borrow
     /// origins.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origins`: Allowed input origins for a returned reference.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origins`: Allowed input origins for a returned reference.
     pub fn optional_shared_with_origins<T: ValueForRef<M> + ?Sized>(
         value: Option<&'call T>,
         origins: &[BorrowOrigin],
@@ -1331,6 +2237,23 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     }
 
     /// Erases a mutable result and records which validated input it borrows.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origin`: Borrow origin associated with a returned reference.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    /// - `origin`: Borrow origin associated with a returned reference.
     pub fn mutable<T: ValueForMut<M> + ?Sized>(value: &'call mut T, origin: BorrowOrigin) -> Self {
         Self::Mut {
             value: DynamicMut::new(value),
@@ -1339,6 +2262,20 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     }
 
     /// Erases an asynchronous result for the invocation's selected value mode.
+    ///
+    /// # Parameters
+    ///
+    /// - `future`: Concrete future returned by the method adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `F`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `future`: Concrete future returned by the method adapter.
     #[allow(private_bounds)]
     pub fn future<F>(future: F) -> Self
     where
@@ -1359,6 +2296,11 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     ///
     /// Returns the original output if the result is not owned or has another
     /// concrete type.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_owned<T: ValueFor<M>>(self) -> Result<T, OutputMismatch<Self>> {
         match self {
             Self::Owned(value) => match value.downcast::<T>() {
@@ -1373,6 +2315,11 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     /// Extracts a shared value of type `T`.
     ///
     /// Returns the original output if its kind or concrete type differs.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<&'call T, OutputMismatch<Self>> {
         match self {
             Self::Ref { value, origins } => match value.downcast::<T>() {
@@ -1390,6 +2337,11 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     /// Extracts a mutable value of type `T`.
     ///
     /// Returns the original output if its kind or concrete type differs.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_mut<T: ValueForMut<M> + ?Sized>(self) -> Result<&'call mut T, OutputMismatch<Self>> {
         match self {
             Self::Mut { value, origin } => match value.downcast::<T>() {
@@ -1408,6 +2360,11 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     ///
     /// Returns `Ok(None)` when the method returned no value and retains the
     /// output in `Err` if its kind or concrete type differs.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_optional_ref<T: ValueForRef<M> + ?Sized>(self) -> Result<Option<&'call T>, OutputMismatch<Self>> {
         match self {
             Self::OptionalRef { value: None, .. } => Ok(None),
@@ -1430,6 +2387,11 @@ impl<'call, M: ValueMode> InvocationOutput<'call, M> {
     ///
     /// Returns the original output if its kind or any element's concrete type
     /// differs.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn into_ref_slice<T: ValueForRef<M> + ?Sized>(self) -> Result<Box<[&'call T]>, OutputMismatch<Self>> {
         match self {
             Self::RefSlice { values, origins } => {
@@ -1521,7 +2483,7 @@ mod tests {
         PinnedFunctionInvocationAdapter::shared(pinned_unit_thread_safe);
 
     #[test]
-    fn adapter_selection_uses_the_requested_value_mode_and_call_policy() {
+    fn test_adapter_selection_uses_the_requested_value_mode_and_call_policy() {
         let adapters = InvocationAdapters {
             local: Some(&LOCAL_ADAPTER),
             thread_safe: Some(&THREAD_SAFE_ADAPTER),
@@ -1545,7 +2507,7 @@ mod tests {
     }
 
     #[test]
-    fn recoverable_failure_retains_all_original_invocation_bindings() {
+    fn test_recoverable_failure_retains_all_original_invocation_bindings() {
         let invocation = Invocation::<Local>::associated().arg(17_u32).named_arg("label", "kept");
         let failure = InvocationFailure::new(
             InvocationError::new(InvocationErrorKind::ValueModeUnavailable),
@@ -1562,7 +2524,7 @@ mod tests {
     }
 
     #[test]
-    fn failed_argument_replacement_returns_the_unchanged_invocation() {
+    fn test_failed_argument_replacement_returns_the_unchanged_invocation() {
         let invocation = Invocation::<Local>::associated().arg(17_u32).named_arg("label", "kept");
         let invocation = match invocation.replace_arg(3, 99_u32) {
             Ok(_) => panic!("out-of-range replacement must preserve inputs"),
@@ -1573,7 +2535,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_output_type_mismatch_can_be_recovered_and_retried() {
+    fn test_owned_output_type_mismatch_can_be_recovered_and_retried() {
         let mismatch = InvocationOutput::<Local>::owned(42_u32)
             .into_owned::<String>()
             .expect_err("the requested type differs from the output type");
@@ -1586,7 +2548,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_output_type_mismatch_preserves_its_borrow_origins() {
+    fn test_shared_output_type_mismatch_preserves_its_borrow_origins() {
         let value = 12_u32;
         let mismatch = InvocationOutput::<Local>::shared_with_origins(
             &value,
@@ -1608,7 +2570,7 @@ mod tests {
     }
 
     #[test]
-    fn optional_and_slice_output_mismatches_keep_the_original_values() {
+    fn test_optional_and_slice_output_mismatches_keep_the_original_values() {
         let value = 23_u32;
         assert!(
             InvocationOutput::<Local>::optional_shared_with_origins(None::<&u32>, &[])
@@ -1643,7 +2605,7 @@ mod tests {
     }
 
     #[test]
-    fn local_future_adapter_accepts_a_non_send_future() {
+    fn test_local_future_adapter_accepts_a_non_send_future() {
         let local_state = std::rc::Rc::new(31_u32);
         let output = InvocationOutput::<Local>::future(async move { InvocationOutput::owned(*local_state) });
         let mut future = output.into_future().unwrap_or_else(|_| panic!("future output"));
@@ -1659,7 +2621,7 @@ mod tests {
     }
 
     #[test]
-    fn pinned_receiver_downcasts_preserve_the_pin_and_reject_other_types() {
+    fn test_pinned_receiver_downcasts_preserve_the_pin_and_reject_other_types() {
         let shared = Box::pin(41_u32);
         let (receiver, _) = PinnedInvocation::<Local, u32>::shared(shared.as_ref()).into_parts();
         assert_eq!(receiver.type_id(), std::any::TypeId::of::<u32>());
@@ -1693,7 +2655,7 @@ mod tests {
     }
 
     #[test]
-    fn invocation_receiver_type_mismatch_returns_the_original_receiver() {
+    fn test_invocation_receiver_type_mismatch_returns_the_original_receiver() {
         let owned = InvocationReceiver::<Local>::Owned(crate::runtime::value::DynamicOwned::new(17_u32));
         let owned = owned
             .into_owned::<String>()
@@ -1729,7 +2691,7 @@ mod tests {
     }
 
     #[test]
-    fn borrowed_and_named_arguments_keep_their_caller_bindings() {
+    fn test_borrowed_and_named_arguments_keep_their_caller_bindings() {
         let shared = 30_u32;
         let mut mutable = 31_u32;
         let mut named_mutable = 32_u32;
@@ -1753,7 +2715,7 @@ mod tests {
     }
 
     #[test]
-    fn output_extraction_mismatch_retains_other_kinds_and_mutable_borrow_origin() {
+    fn test_output_extraction_mismatch_retains_other_kinds_and_mutable_borrow_origin() {
         let unit = InvocationOutput::<Local>::unit()
             .into_owned::<u32>()
             .expect_err("unit is not an owned value")
@@ -1789,7 +2751,7 @@ mod tests {
     }
 
     #[test]
-    fn thread_safe_invocation_accepts_dynamic_and_associated_receivers() {
+    fn test_thread_safe_invocation_accepts_dynamic_and_associated_receivers() {
         let associated = Invocation::<ThreadSafe>::associated().arg(7_u32);
         assert_eq!(associated.argument_count(), 1);
         assert!(associated.receiver.is_none());
@@ -1800,7 +2762,7 @@ mod tests {
     }
 
     #[test]
-    fn validated_invocation_reorders_bindings_and_can_recover_original_order() {
+    fn test_validated_invocation_reorders_bindings_and_can_recover_original_order() {
         let invocation = Invocation::<Local>::associated().arg(10_u32).arg(20_u32);
         let validated = ValidatedInvocation {
             invocation,
@@ -1827,7 +2789,7 @@ mod tests {
     }
 
     #[test]
-    fn function_adapters_execute_validated_local_and_thread_safe_calls() {
+    fn test_function_adapters_execute_validated_local_and_thread_safe_calls() {
         let local = FunctionInvocationAdapter::<Local>::new(unit_local);
         let output = local.invoke(ValidatedInvocation {
             invocation: Invocation::<Local>::associated(),
@@ -1844,7 +2806,7 @@ mod tests {
     }
 
     #[test]
-    fn invocation_errors_and_panic_payloads_keep_their_display_and_message() {
+    fn test_invocation_errors_and_panic_payloads_keep_their_display_and_message() {
         let error = InvocationError::new(InvocationErrorKind::ReceiverMissing);
         assert_eq!(error.to_string(), "ReceiverMissing");
 

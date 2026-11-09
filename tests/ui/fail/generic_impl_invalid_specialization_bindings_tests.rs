@@ -8,7 +8,6 @@
 
 use std::marker::PhantomData;
 
-
 #[qubit_reflect::Reflect]
 struct Missing<T, const N: usize>(#[reflect(skip)] PhantomData<[T; N]>);
 

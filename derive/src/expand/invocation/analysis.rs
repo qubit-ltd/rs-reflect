@@ -8,9 +8,14 @@
 
 //! Pure invocation analysis shared by impl and trait expansion.
 
+mod method_context;
+mod optional_borrow_origin;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
+pub(crate) use self::method_context::MethodContext;
+pub(crate) use self::optional_borrow_origin::OptionalBorrowOrigin;
 use super::plan::AdapterModes;
 use super::plan::AvailabilityPlan;
 use super::plan::InvocationPlan;
@@ -26,62 +31,6 @@ use crate::ir::ReceiverKindIr;
 use crate::ir::ReturnTypeIr;
 use crate::ir::TypeIr;
 use crate::ir::TypeKindIr;
-
-/// Owner-specific facts needed by otherwise pure method analysis.
-pub(crate) struct MethodContext<'a> {
-    /// Concrete target type used to analyze explicit receiver forms.
-    pub(crate) target: &'a TokenStream,
-    /// Substituted extension receiver type, when provided by the owner.
-    pub(crate) extension_receiver: Option<TokenStream>,
-    /// Whether the method is a trait default body.
-    pub(crate) default_method: bool,
-    /// Whether associated types needed by a default body are not proven.
-    pub(crate) has_unproven_associated_type: bool,
-}
-
-impl<'a> MethodContext<'a> {
-    /// Creates ordinary impl-method analysis context.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: Concrete impl target type tokens.
-    ///
-    /// # Returns
-    ///
-    /// Returns an implementation context without trait-default constraints.
-    #[must_use]
-    #[inline]
-    pub(crate) fn implementation(target: &'a TokenStream) -> Self {
-        Self {
-            target,
-            extension_receiver: None,
-            default_method: false,
-            has_unproven_associated_type: false,
-        }
-    }
-
-    /// Creates default-trait-method analysis context.
-    ///
-    /// # Parameters
-    ///
-    /// - `target`: Trait self type tokens.
-    /// - `has_unproven_associated_type`: Whether required owner facts are
-    ///   unavailable.
-    ///
-    /// # Returns
-    ///
-    /// Returns a context for checking a trait default method.
-    #[must_use]
-    #[inline]
-    pub(crate) fn trait_default(target: &'a TokenStream, has_unproven_associated_type: bool) -> Self {
-        Self {
-            target,
-            extension_receiver: None,
-            default_method: true,
-            has_unproven_associated_type,
-        }
-    }
-}
 
 /// Produces one complete invocation decision without emitting tokens.
 ///
@@ -540,17 +489,15 @@ pub(crate) fn is_supported_shared_borrow_return(return_type: &ReturnTypeIr) -> b
     )
 }
 
-/// One source whose shared borrow can be returned by an optional reference.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum OptionalBorrowOrigin {
-    Receiver,
-    Parameter(usize),
-}
-
 /// Returns the optional shared-borrow origin inferred by Rust lifetime elision.
 ///
 /// A shared receiver wins when present. Without a receiver, exactly one shared
 /// reference parameter is required by Rust's output lifetime elision rule.
+///
+/// # Parameters
+///
+/// - `method`: Parsed method signature whose optional reference result is
+///   analyzed.
 #[must_use]
 pub(crate) fn optional_shared_borrow_origin(method: &MethodIr) -> Option<OptionalBorrowOrigin> {
     let ReturnTypeIr::Type(ty) = &method.return_type else {
@@ -581,11 +528,20 @@ pub(crate) fn optional_shared_borrow_origin(method: &MethodIr) -> Option<Optiona
 
 /// Returns whether an optional reference output has either reference
 /// mutability.
+///
+/// # Parameters
+///
+/// - `return_type`: Parsed method return category to inspect.
 #[must_use]
 pub(crate) fn is_optional_borrow_return(return_type: &ReturnTypeIr) -> bool {
     matches!(return_type, ReturnTypeIr::Type(ty) if optional_borrow_metadata(ty).is_some())
 }
 
+/// Extracts mutability and explicit lifetime metadata from `Option<&T>` types.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type expression to recognize.
 fn optional_borrow_metadata(ty: &TypeIr) -> Option<(bool, Option<&str>)> {
     let TypeKindIr::Path(path) = &ty.kind else {
         return None;

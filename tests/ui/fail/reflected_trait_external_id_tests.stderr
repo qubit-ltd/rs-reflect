@@ -1,5 +1,5 @@
 error: reflection helper `external_trait_id` is unsupported; only `skip` is accepted
-  --> tests/ui/fail/reflected_trait_external_id_tests.rs:18:30
+  --> tests/ui/fail/reflected_trait_external_id_tests.rs:17:30
    |
-18 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid.reflected.service")]
+17 | #[qubit_reflect::ReflectImpl(external_trait_id = "invalid.reflected.service")]
    |                              ^^^^^^^^^^^^^^^^^

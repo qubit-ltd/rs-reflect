@@ -49,11 +49,18 @@ use crate::runtime::value::ValueMode;
 /// Context-bound view of an `impl` source declaration.
 #[derive(Clone, Copy)]
 pub struct ImplDefinitionDescriptor<'ctx> {
+    /// Static metadata describing the source impl declaration.
     metadata: &'static ImplDefinitionMetadata,
+    /// Context used to find registrations produced by this declaration.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ImplDefinitionDescriptor<'ctx> {
+    /// Creates a context-bound descriptor for one source impl declaration.
+    ///
+    /// # Parameters
+    /// - `metadata`: static source metadata for the impl.
+    /// - `context`: context containing registrations for the impl.
     pub(crate) const fn new(metadata: &'static ImplDefinitionMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -93,6 +100,9 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
         MethodDefinitions::new(self.metadata.methods, MethodDefinitionOwner::Impl(self), self.context)
     }
     /// Finds a uniquely named method declaration in this impl.
+    ///
+    /// # Parameters
+    /// - `name`: source method name to resolve.
     pub fn method(self, name: &str) -> Result<MethodDefinitionDescriptor<'ctx>, LookupError> {
         unique_named(
             self.metadata
@@ -109,6 +119,9 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
         ImplAssociatedTypeDefinitions::new(self.metadata.associated_types, self.context)
     }
     /// Finds an associated type declaration by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated type name to resolve.
     pub fn associated_type(self, name: &str) -> Result<AssociatedTypeDefinitionDescriptor<'ctx>, LookupError> {
         self.associated_types().get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::AssociatedType,
@@ -120,6 +133,9 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
         ImplAssociatedConstDefinitions::new(self.metadata.associated_consts, self.context)
     }
     /// Finds an associated constant declaration by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated constant name to resolve.
     pub fn associated_const(self, name: &str) -> Result<AssociatedConstDefinitionDescriptor<'ctx>, LookupError> {
         self.associated_consts().get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::AssociatedConst,
@@ -137,11 +153,18 @@ impl<'ctx> ImplDefinitionDescriptor<'ctx> {
 /// Context-bound view of one compiled `impl` application.
 #[derive(Clone, Copy)]
 pub struct ImplDescriptor<'ctx> {
+    /// Static metadata for this compiled implementation application.
     metadata: &'static ImplApplicationMetadata,
+    /// Context that owns this implementation application.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ImplDescriptor<'ctx> {
+    /// Creates a context-bound descriptor for one compiled impl application.
+    ///
+    /// # Parameters
+    /// - `metadata`: static metadata for the compiled application.
+    /// - `context`: context that owns the application.
     pub(crate) const fn new(metadata: &'static ImplApplicationMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -187,6 +210,9 @@ impl<'ctx> ImplDescriptor<'ctx> {
         Methods::new(values, self.metadata, self.context)
     }
     /// Finds a method by its source name.
+    ///
+    /// # Parameters
+    /// - `name`: method name to resolve in this implementation.
     pub fn method(self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.methods().get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::Method,
@@ -198,6 +224,9 @@ impl<'ctx> ImplDescriptor<'ctx> {
         AssociatedTypeBindings::new(self.metadata.associated_types, self.context)
     }
     /// Finds a concrete associated type binding by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated type name to resolve.
     pub fn associated_type(self, name: &str) -> Result<AssociatedTypeBindingDescriptor<'ctx>, LookupError> {
         self.associated_types().get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::AssociatedType,
@@ -209,6 +238,9 @@ impl<'ctx> ImplDescriptor<'ctx> {
         AssociatedConstBindings::new(self.metadata.associated_consts, self.context)
     }
     /// Finds a concrete associated constant binding by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated constant name to resolve.
     pub fn associated_const(self, name: &str) -> Result<AssociatedConstBindingDescriptor<'ctx>, LookupError> {
         self.associated_consts().get(name).ok_or_else(|| LookupError::Missing {
             subject: LookupSubject::AssociatedConst,
@@ -216,6 +248,9 @@ impl<'ctx> ImplDescriptor<'ctx> {
         })
     }
     /// Returns whether both descriptors identify the same context-bound impl.
+    ///
+    /// # Parameters
+    /// - `other`: implementation descriptor to compare with this one.
     pub fn same_application(self, other: Self) -> bool {
         self.context.id() == other.context.id()
             && self.definition().id() == other.definition().id()
@@ -224,6 +259,11 @@ impl<'ctx> ImplDescriptor<'ctx> {
     }
 }
 
+/// Checks whether a resolved method entry belongs to one impl application.
+///
+/// # Parameters
+/// - `method`: effective method entry to test.
+/// - `application`: concrete impl application being inspected.
 fn context_method_belongs_to_application(
     method: &ContextEffectiveMethod,
     application: &'static ImplApplicationMetadata,
@@ -259,12 +299,21 @@ fn context_method_belongs_to_application(
 
 /// Ordered methods available on one concrete implementation.
 pub struct Methods<'ctx> {
+    /// Effective methods selected for this application.
     values: Box<[ContextEffectiveMethod]>,
+    /// Implementation application that owns the method collection.
     implementation: &'static ImplApplicationMetadata,
+    /// Context used to bind method descriptors.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> Methods<'ctx> {
+    /// Creates a method collection bound to one implementation and context.
+    ///
+    /// # Parameters
+    /// - `values`: effective methods selected for the implementation.
+    /// - `implementation`: implementation application that owns these methods.
+    /// - `context`: context used to resolve method descriptors.
     fn new(
         values: Box<[ContextEffectiveMethod]>,
         implementation: &'static ImplApplicationMetadata,
@@ -300,6 +349,9 @@ impl<'ctx> Methods<'ctx> {
         self.values.is_empty()
     }
     /// Finds a method by its source name.
+    ///
+    /// # Parameters
+    /// - `name`: method name to find.
     pub fn get(&self, name: &str) -> Option<MethodDescriptor<'ctx>> {
         self.values
             .iter()
@@ -317,10 +369,17 @@ impl<'ctx> Methods<'ctx> {
 
 /// Ordered source-level implementation declarations.
 pub struct ImplDefinitions<'ctx> {
+    /// Source impl declarations in context registration order.
     values: Box<[ImplDefinitionDescriptor<'ctx>]>,
+    /// Context that owns these declarations.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> ImplDefinitions<'ctx> {
+    /// Creates an ordered collection of source impl declarations.
+    ///
+    /// # Parameters
+    /// - `values`: declarations in context order.
+    /// - `context`: context that owns the declarations.
     pub(crate) fn new(values: Box<[ImplDefinitionDescriptor<'ctx>]>, context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -341,6 +400,9 @@ impl<'ctx> ImplDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Returns the declaration at its collection position, if present.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based collection position.
     pub fn get(&self, index: usize) -> Option<ImplDefinitionDescriptor<'ctx>> {
         self.values.get(index).copied()
     }
@@ -348,10 +410,17 @@ impl<'ctx> ImplDefinitions<'ctx> {
 
 /// Ordered concrete implementation applications.
 pub struct Impls<'ctx> {
+    /// Concrete impl applications in context registration order.
     values: Box<[ImplDescriptor<'ctx>]>,
+    /// Context that owns these applications.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> Impls<'ctx> {
+    /// Creates an ordered collection of concrete impl applications.
+    ///
+    /// # Parameters
+    /// - `values`: applications in context order.
+    /// - `context`: context that owns the applications.
     pub(crate) fn new(values: Box<[ImplDescriptor<'ctx>]>, context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -372,11 +441,17 @@ impl<'ctx> Impls<'ctx> {
         self.values.is_empty()
     }
     /// Returns the application at its collection position, if present.
+    ///
+    /// # Parameters
+    /// - `index`: zero-based collection position.
     pub fn get(&self, index: usize) -> Option<ImplDescriptor<'ctx>> {
         self.values.get(index).copied()
     }
     /// Looks up implementations linked to one trait declaration and preserves
     /// ambiguity.
+    ///
+    /// # Parameters
+    /// - `definition`: trait declaration whose registered impls are queried.
     pub fn lookup_trait_definition(
         &self,
         definition: crate::runtime::descriptor::trait_descriptor::TraitDefinitionDescriptor<'ctx>,
@@ -407,6 +482,9 @@ impl<'ctx> Impls<'ctx> {
         }
     }
     /// Finds the implementation for one exact trait application.
+    ///
+    /// # Parameters
+    /// - `trait_`: context-bound trait application to match.
     pub fn find_trait_application(
         &self,
         trait_: TraitDescriptor<'ctx>,
@@ -436,10 +514,17 @@ impl<'ctx> Impls<'ctx> {
 /// Final binding of one associated type for a concrete implementation.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeBindingDescriptor<'ctx> {
+    /// Static metadata for this associated type binding.
     metadata: &'static AssociatedTypeBindingMetadata,
+    /// Context used to resolve its source definition and expression.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> AssociatedTypeBindingDescriptor<'ctx> {
+    /// Creates a descriptor for a final associated type binding.
+    ///
+    /// # Parameters
+    /// - `metadata`: static metadata for the binding.
+    /// - `context`: context used to resolve the binding's declaration.
     const fn new(metadata: &'static AssociatedTypeBindingMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -465,10 +550,17 @@ impl<'ctx> AssociatedTypeBindingDescriptor<'ctx> {
 
 /// Collection of associated type bindings for one implementation.
 pub struct AssociatedTypeBindings<'ctx> {
+    /// Associated type bindings in declaration order.
     values: &'static [AssociatedTypeBindingMetadata],
+    /// Context used to bind the associated type descriptors.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> AssociatedTypeBindings<'ctx> {
+    /// Creates a view over associated type bindings in one context.
+    ///
+    /// # Parameters
+    /// - `values`: binding metadata in declaration order.
+    /// - `context`: context used to bind descriptors.
     const fn new(values: &'static [AssociatedTypeBindingMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -487,6 +579,9 @@ impl<'ctx> AssociatedTypeBindings<'ctx> {
         self.values.is_empty()
     }
     /// Finds an associated type binding by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated type name to find.
     pub fn get(self, name: &str) -> Option<AssociatedTypeBindingDescriptor<'ctx>> {
         self.values
             .iter()
@@ -498,10 +593,17 @@ impl<'ctx> AssociatedTypeBindings<'ctx> {
 /// Final binding of one associated constant for a concrete implementation.
 #[derive(Clone, Copy)]
 pub struct AssociatedConstBindingDescriptor<'ctx> {
+    /// Static metadata for this associated constant binding.
     metadata: &'static AssociatedConstBindingMetadata,
+    /// Context used to resolve its source declaration.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> AssociatedConstBindingDescriptor<'ctx> {
+    /// Creates a descriptor for a final associated constant binding.
+    ///
+    /// # Parameters
+    /// - `metadata`: static metadata for the binding.
+    /// - `context`: context used to resolve the binding's declaration.
     const fn new(metadata: &'static AssociatedConstBindingMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -513,11 +615,14 @@ impl<'ctx> AssociatedConstBindingDescriptor<'ctx> {
     pub const fn expression(self) -> ConstExpression {
         self.metadata.expression
     }
-    // Keep mode dispatch sealed to the built-in Local and ThreadSafe modes;
-    // exposing the adapter trait would make downstream implementations depend
-    // on the private associated-constant adapter representation.
-    #[allow(private_bounds)]
     /// Evaluates the constant when a value adapter exists for `M`.
+    ///
+    /// Mode dispatch stays restricted to the built-in Local and ThreadSafe
+    /// modes so callers do not depend on the private adapter representation.
+    ///
+    /// # Type Parameters
+    /// - `M`: built-in value mode used to produce the constant value.
+    #[allow(private_bounds)]
     pub fn value<M: AssociatedConstValueMode>(self) -> Result<Option<DynamicOwned<M>>, ReflectionError> {
         Ok(self.metadata.value.and_then(M::make))
     }
@@ -527,17 +632,32 @@ impl<'ctx> AssociatedConstBindingDescriptor<'ctx> {
     }
 }
 
+/// Dispatches associated constant construction to a built-in value mode.
 pub(crate) trait AssociatedConstValueMode: ValueMode + Sized {
+    /// Creates a dynamic value from the mode-specific associated-constant
+    /// adapter.
+    ///
+    /// # Parameters
+    /// - `adapter`: adapter containing a constructor for this mode.
     fn make(adapter: &super::metadata::AssociatedConstValueAdapter) -> Option<DynamicOwned<Self>>;
 }
 
 impl AssociatedConstValueMode for Local {
+    /// Calls the stored local associated-constant constructor, if present.
+    ///
+    /// # Parameters
+    /// - `adapter`: adapter containing the optional local constructor.
     fn make(adapter: &super::metadata::AssociatedConstValueAdapter) -> Option<DynamicOwned<Self>> {
         adapter.local.map(|make| make())
     }
 }
 
 impl AssociatedConstValueMode for ThreadSafe {
+    /// Calls the stored thread-safe associated-constant constructor, if
+    /// present.
+    ///
+    /// # Parameters
+    /// - `adapter`: adapter containing the optional thread-safe constructor.
     fn make(adapter: &super::metadata::AssociatedConstValueAdapter) -> Option<DynamicOwned<Self>> {
         adapter.thread_safe.map(|make| make())
     }
@@ -545,10 +665,17 @@ impl AssociatedConstValueMode for ThreadSafe {
 
 /// Collection of associated constant bindings for one implementation.
 pub struct AssociatedConstBindings<'ctx> {
+    /// Associated constant bindings in declaration order.
     values: &'static [AssociatedConstBindingMetadata],
+    /// Context used to bind the associated constant descriptors.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> AssociatedConstBindings<'ctx> {
+    /// Creates a view over associated constant bindings in one context.
+    ///
+    /// # Parameters
+    /// - `values`: binding metadata in declaration order.
+    /// - `context`: context used to bind descriptors.
     const fn new(values: &'static [AssociatedConstBindingMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { values, context }
     }
@@ -567,6 +694,9 @@ impl<'ctx> AssociatedConstBindings<'ctx> {
         self.values.is_empty()
     }
     /// Finds an associated constant binding by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated constant name to find.
     pub fn get(self, name: &str) -> Option<AssociatedConstBindingDescriptor<'ctx>> {
         self.values
             .iter()
@@ -577,10 +707,17 @@ impl<'ctx> AssociatedConstBindings<'ctx> {
 
 /// Collection of source-level associated type declarations in an impl.
 pub struct ImplAssociatedTypeDefinitions<'ctx> {
+    /// Associated type declarations in source order.
     values: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata],
+    /// Context used to bind declaration descriptors.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> ImplAssociatedTypeDefinitions<'ctx> {
+    /// Creates a view over an impl's associated type declarations.
+    ///
+    /// # Parameters
+    /// - `values`: source declarations in order.
+    /// - `context`: context used to bind descriptors.
     const fn new(
         values: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedTypeDefinitionMetadata],
         context: &'ctx ReflectionContext,
@@ -602,6 +739,9 @@ impl<'ctx> ImplAssociatedTypeDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Finds an associated type declaration by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated type name to find.
     pub fn get(self, name: &str) -> Option<AssociatedTypeDefinitionDescriptor<'ctx>> {
         self.values
             .iter()
@@ -612,10 +752,17 @@ impl<'ctx> ImplAssociatedTypeDefinitions<'ctx> {
 
 /// Collection of source-level associated constant declarations in an impl.
 pub struct ImplAssociatedConstDefinitions<'ctx> {
+    /// Associated constant declarations in source order.
     values: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata],
+    /// Context used to bind declaration descriptors.
     context: &'ctx ReflectionContext,
 }
 impl<'ctx> ImplAssociatedConstDefinitions<'ctx> {
+    /// Creates a view over an impl's associated constant declarations.
+    ///
+    /// # Parameters
+    /// - `values`: source declarations in order.
+    /// - `context`: context used to bind descriptors.
     const fn new(
         values: &'static [crate::runtime::descriptor::trait_descriptor::AssociatedConstDefinitionMetadata],
         context: &'ctx ReflectionContext,
@@ -637,6 +784,9 @@ impl<'ctx> ImplAssociatedConstDefinitions<'ctx> {
         self.values.is_empty()
     }
     /// Finds an associated constant declaration by name.
+    ///
+    /// # Parameters
+    /// - `name`: associated constant name to find.
     pub fn get(self, name: &str) -> Option<AssociatedConstDefinitionDescriptor<'ctx>> {
         self.values
             .iter()
@@ -645,6 +795,15 @@ impl<'ctx> ImplAssociatedConstDefinitions<'ctx> {
     }
 }
 
+/// Resolves a name when exactly one matching lookup candidate exists.
+///
+/// # Type Parameters
+/// - `T`: copyable candidate type that can provide diagnostic identity.
+///
+/// # Parameters
+/// - `matches`: candidates with the requested name.
+/// - `subject`: kind of reflected item being resolved.
+/// - `name`: source name used for lookup and diagnostics.
 fn unique_named<T>(mut matches: impl Iterator<Item = T>, subject: LookupSubject, name: &str) -> Result<T, LookupError>
 where
     T: Copy + IntoLookupCandidate,
@@ -671,6 +830,7 @@ where
 }
 
 impl IntoLookupCandidate for ImplDescriptor<'_> {
+    /// Converts this impl application to a diagnostic lookup candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.target().type_identity().rust_name.into();
         LookupCandidate {
@@ -686,6 +846,7 @@ impl IntoLookupCandidate for ImplDescriptor<'_> {
 }
 
 impl IntoLookupCandidate for ImplDefinitionDescriptor<'_> {
+    /// Converts this source impl declaration to a diagnostic lookup candidate.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = format!("{:?}", self.id()).into();
         LookupCandidate {
@@ -930,7 +1091,7 @@ mod tests {
     }
 
     #[test]
-    fn impl_descriptors_expose_kind_source_and_method_namespace() {
+    fn test_impl_descriptors_expose_kind_source_and_method_namespace() {
         let context = context();
         let definition = ImplDefinitionDescriptor::new(&INHERENT_DEFINITION, &context);
         assert_eq!(definition.kind(), ImplKind::Inherent);
@@ -953,7 +1114,7 @@ mod tests {
     }
 
     #[test]
-    fn associated_bindings_preserve_source_expression_and_resolution() {
+    fn test_associated_bindings_preserve_source_expression_and_resolution() {
         let context = context();
         let application = ImplDescriptor::new(&APPLICATION, &context);
         let type_binding = application.associated_type("Item").expect("type binding");
@@ -1004,7 +1165,7 @@ mod tests {
     }
 
     #[test]
-    fn impl_collections_preserve_order_and_bounds() {
+    fn test_impl_collections_preserve_order_and_bounds() {
         let context = context();
         let definition = ImplDefinitionDescriptor::new(&INHERENT_DEFINITION, &context);
         let definitions = ImplDefinitions::new(vec![definition].into_boxed_slice(), &context);
@@ -1035,7 +1196,7 @@ mod tests {
     }
 
     #[test]
-    fn impl_associated_declaration_collections_support_iteration_and_lookup() {
+    fn test_impl_associated_declaration_collections_support_iteration_and_lookup() {
         let context = context();
         let definition = ImplDefinitionDescriptor::new(&ASSOCIATED_ITEMS_DEFINITION, &context);
         assert_eq!(definition.associated_types().len(), 1);
@@ -1070,7 +1231,7 @@ mod tests {
     }
 
     #[test]
-    fn method_collection_exposes_lookup_and_empty_state() {
+    fn test_method_collection_exposes_lookup_and_empty_state() {
         let context = context();
         let implementation = ImplDescriptor::new(&APPLICATION, &context);
         let methods = implementation.methods();
@@ -1089,7 +1250,7 @@ mod tests {
     }
 
     #[test]
-    fn trait_impl_collection_preserves_lookup_results_and_context_errors() {
+    fn test_trait_impl_collection_preserves_lookup_results_and_context_errors() {
         let ctx = context();
         let trait_definition =
             crate::runtime::descriptor::trait_descriptor::TraitDefinitionDescriptor::new(&TRAIT_DEFINITION, &ctx);
@@ -1130,7 +1291,7 @@ mod tests {
     }
 
     #[test]
-    fn impl_lookup_reports_missing_and_ambiguous_names() {
+    fn test_impl_lookup_reports_missing_and_ambiguous_names() {
         let context = context();
         let missing_definition = ImplDefinitionDescriptor::new(&INHERENT_DEFINITION, &context);
         assert!(matches!(

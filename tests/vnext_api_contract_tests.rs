@@ -47,7 +47,7 @@ impl PublicBindingFixture {
 }
 
 #[test]
-fn public_facade_supports_named_type_and_member_queries() {
+fn test_public_facade_supports_named_type_and_member_queries() {
     let context = ReflectionContext::global();
     let type_name = std::any::type_name::<PublicFacadeFixture>();
 
@@ -74,7 +74,7 @@ fn public_facade_supports_named_type_and_member_queries() {
 }
 
 #[test]
-fn public_type_descriptor_is_the_context_bound_type_handle() {
+fn test_public_type_descriptor_is_the_context_bound_type_handle() {
     let context = ReflectionContext::global();
     let descriptor = TypeDescriptor::of_in::<PublicFacadeFixture>(context);
 
@@ -83,7 +83,7 @@ fn public_type_descriptor_is_the_context_bound_type_handle() {
 }
 
 #[test]
-fn public_context_facade_names_typed_bindings_and_trait_descriptors() {
+fn test_public_context_facade_names_typed_bindings_and_trait_descriptors() {
     let binding: MethodBinding<PublicBindingFixture> =
         bind_method!(PublicBindingFixture::run as fn(&PublicBindingFixture) -> u32);
     let context = ReflectionContext::builder()
@@ -105,7 +105,7 @@ fn public_context_facade_names_typed_bindings_and_trait_descriptors() {
 }
 
 #[test]
-fn public_lookup_errors_expose_constructible_candidate_identities() {
+fn test_public_lookup_errors_expose_constructible_candidate_identities() {
     let candidate = LookupCandidate {
         identity: ItemIdentity {
             kind: ItemKind::Type,

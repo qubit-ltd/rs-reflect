@@ -8,6 +8,11 @@
 
 pub(crate) use crate::identity::CapabilityId as CapabilityIdentifier;
 
+/// Validates a static capability identifier before it enters runtime metadata.
+///
+/// # Parameters
+///
+/// * `value` — the identifier string supplied by generated or handwritten code.
 pub(crate) fn validate_capability_id(value: &'static str) -> Result<CapabilityIdentifier, crate::error::IdError> {
     CapabilityIdentifier::new(value)
 }

@@ -10,6 +10,12 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[path = "method_entry.rs"]
+mod method_entry;
+#[path = "method_namespace_key.rs"]
+mod method_namespace_key;
+use self::method_entry::MethodEntry;
+use self::method_namespace_key::MethodNamespaceKey;
 use super::indexes::ContextIndexes;
 use super::registration::Registration;
 use super::registration::TraitObjectRegistration;
@@ -46,26 +52,44 @@ use crate::runtime::identity::RegistrationOrigin;
 use crate::runtime::identity::StableItemId;
 use crate::runtime::identity::TypeIdentity;
 
+/// Immutable registrations and lookup indexes owned by a reflection context.
 pub(crate) struct ContextData {
+    /// Concrete reflected type records in deterministic registration order.
     pub(crate) types: Box<[TypeRecord]>,
+    /// Lookup indexes derived from the registered type and definition records.
     pub(crate) indexes: ContextIndexes,
+    /// Structural metadata indexed by concrete type identity.
     shapes: HashMap<TypeId, &'static TypeKindMetadata>,
+    /// Effective method catalog entries indexed by owning type.
     methods: HashMap<TypeId, Arc<[ContextEffectiveMethod]>>,
+    /// Source type definitions indexed by their typed marker identity.
     type_definitions: HashMap<TypeDefinitionId, &'static TypeDefinitionMetadata>,
+    /// Source trait definitions indexed by their typed marker identity.
     trait_definitions: HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
+    /// Registered source implementation declarations in stable order.
     registered_impl_definitions: Box<[&'static ImplDefinitionMetadata]>,
+    /// Immutable capability sets indexed by their target identities.
     capabilities: HashMap<CapabilityTargetId, Arc<Capabilities>>,
+    /// Concrete Rust types associated with each source type definition.
     type_instances: HashMap<TypeDefinitionId, Box<[TypeId]>>,
+    /// All registered trait application metadata in stable order.
     all_trait_applications: Box<[&'static TraitApplicationMetadata]>,
+    /// Trait applications indexed by their linked definition identity.
     trait_applications: HashMap<TraitDefinitionId, Box<[&'static TraitApplicationMetadata]>>,
+    /// Trait applications indexed by their source path spelling.
     trait_applications_by_path: HashMap<&'static str, Box<[&'static TraitApplicationMetadata]>>,
+    /// Implementation applications indexed by their source declaration ID.
     impl_applications: HashMap<ImplDefinitionId, Box<[&'static ImplApplicationMetadata]>>,
+    /// Implementation applications indexed by concrete target type.
     impl_applications_by_target: HashMap<TypeId, Box<[&'static ImplApplicationMetadata]>>,
+    /// Generated construction plans indexed by concrete target type.
     construction_plans: HashMap<TypeId, Box<[&'static ConstructionPlan]>>,
+    /// Compiler-checked trait-object registrations indexed by Rust type.
     trait_objects: HashMap<TypeId, TraitObjectRegistration>,
 }
 
 impl ContextData {
+    /// Creates empty indexes for unit tests that exercise individual lookups.
     #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Self {
@@ -88,6 +112,10 @@ impl ContextData {
         }
     }
 
+    /// Validates registrations and builds all immutable context lookup data.
+    ///
+    /// # Parameters
+    /// - `registrations`: registration fragments to validate and aggregate.
     pub(crate) fn build(mut registrations: Vec<Registration>) -> Result<Self, ContextError> {
         registrations.sort_by(|left, right| left.sort_key().cmp(&right.sort_key()));
 
@@ -542,68 +570,117 @@ impl ContextData {
         })
     }
 
+    /// Returns the concrete type record indexed by its Rust `TypeId`.
+    ///
+    /// # Parameters
+    /// - `type_id`: runtime identity of the requested type.
     pub(crate) fn type_by_id(&self, type_id: TypeId) -> Option<TypeRecord> {
         self.indexes.types_by_id.get(&type_id).map(|index| self.types[*index])
     }
 
+    /// Reports whether a concrete type has a registered record.
+    ///
+    /// # Parameters
+    /// - `type_id`: runtime identity of the queried type.
     pub(crate) fn contains_type_id(&self, type_id: TypeId) -> bool {
         self.indexes.types_by_id.contains_key(&type_id)
     }
 
+    /// Returns structural metadata for a registered concrete type.
+    ///
+    /// # Parameters
+    /// - `type_id`: runtime identity of the queried type.
     pub(crate) fn shape(&self, type_id: TypeId) -> Option<&'static TypeKindMetadata> {
         self.shapes.get(&type_id).copied()
     }
 
+    /// Returns the immutable effective method catalog for a concrete type.
+    ///
+    /// # Parameters
+    /// - `type_id`: runtime identity of the catalog owner.
     pub(crate) fn methods(&self, type_id: TypeId) -> Arc<[ContextEffectiveMethod]> {
         self.methods.get(&type_id).cloned().unwrap_or_else(|| Arc::from([]))
     }
 
+    /// Returns one source type definition by its typed marker identity.
+    ///
+    /// # Parameters
+    /// - `id`: identity of the requested source definition.
     pub(crate) fn type_definition(&self, id: TypeDefinitionId) -> Option<&'static TypeDefinitionMetadata> {
         self.type_definitions.get(&id).copied()
     }
 
+    /// Returns source type definitions sorted by their registered paths.
     pub(crate) fn type_definitions(&self) -> Vec<&'static TypeDefinitionMetadata> {
         let mut definitions = self.type_definitions.values().copied().collect::<Vec<_>>();
         definitions.sort_by(|left, right| left.path.cmp(right.path));
         definitions
     }
 
+    /// Returns one source trait definition by its typed marker identity.
+    ///
+    /// # Parameters
+    /// - `id`: identity of the requested source trait.
     pub(crate) fn trait_definition(&self, id: TraitDefinitionId) -> Option<&'static TraitDefinitionMetadata> {
         self.trait_definitions.get(&id).copied()
     }
 
+    /// Returns source trait definitions sorted by their registered paths.
     pub(crate) fn trait_definitions(&self) -> Vec<&'static TraitDefinitionMetadata> {
         let mut definitions = self.trait_definitions.values().copied().collect::<Vec<_>>();
         definitions.sort_by(|left, right| left.path.cmp(right.path));
         definitions
     }
 
+    /// Returns registered source implementation declarations.
     pub(crate) fn impl_definitions(&self) -> &[&'static ImplDefinitionMetadata] {
         &self.registered_impl_definitions
     }
 
+    /// Returns every registered concrete or source trait application.
     pub(crate) fn trait_applications_all(&self) -> &[&'static TraitApplicationMetadata] {
         &self.all_trait_applications
     }
 
+    /// Returns a source trait definition only when its path is unambiguous.
+    ///
+    /// # Parameters
+    /// - `path`: fully qualified source path to query.
     pub(crate) fn trait_definition_by_path(&self, path: &str) -> Option<&'static TraitDefinitionMetadata> {
         let mut matches = self.trait_definitions.values().filter(|metadata| metadata.path == path);
         let definition = matches.next()?;
         matches.next().is_none().then_some(definition)
     }
 
+    /// Returns the immutable capability set registered for a target.
+    ///
+    /// # Parameters
+    /// - `target`: typed identity of the capability owner.
     pub(crate) fn capabilities(&self, target: &CapabilityTargetId) -> Option<Arc<Capabilities>> {
         self.capabilities.get(target).cloned()
     }
 
+    /// Returns concrete Rust types linked to a source type definition.
+    ///
+    /// # Parameters
+    /// - `definition`: source definition whose concrete instances are
+    ///   requested.
     pub(crate) fn type_instances(&self, definition: TypeDefinitionId) -> &[TypeId] {
         self.type_instances.get(&definition).map(Box::as_ref).unwrap_or(&[])
     }
 
+    /// Returns trait applications linked to a source trait definition.
+    ///
+    /// # Parameters
+    /// - `definition`: linked trait definition to query.
     pub(crate) fn trait_applications(&self, definition: TraitDefinitionId) -> &[&'static TraitApplicationMetadata] {
         self.trait_applications.get(&definition).map(Box::as_ref).unwrap_or(&[])
     }
 
+    /// Returns source trait applications with the requested path spelling.
+    ///
+    /// # Parameters
+    /// - `path`: source path used to register the application.
     pub(crate) fn trait_applications_by_path(&self, path: &str) -> &[&'static TraitApplicationMetadata] {
         self.trait_applications_by_path
             .get(path)
@@ -611,10 +688,18 @@ impl ContextData {
             .unwrap_or(&[])
     }
 
+    /// Returns implementation applications linked to a source declaration.
+    ///
+    /// # Parameters
+    /// - `definition`: implementation declaration identity to query.
     pub(crate) fn impl_applications(&self, definition: ImplDefinitionId) -> &[&'static ImplApplicationMetadata] {
         self.impl_applications.get(&definition).map(Box::as_ref).unwrap_or(&[])
     }
 
+    /// Returns implementation applications for a concrete target type.
+    ///
+    /// # Parameters
+    /// - `target`: runtime type identity of the implementation target.
     pub(crate) fn impl_applications_for_target(&self, target: TypeId) -> &[&'static ImplApplicationMetadata] {
         self.impl_applications_by_target
             .get(&target)
@@ -622,39 +707,29 @@ impl ContextData {
             .unwrap_or(&[])
     }
 
+    /// Returns generated construction plans for a concrete target type.
+    ///
+    /// # Parameters
+    /// - `target`: runtime type identity of the construction target.
     pub(crate) fn construction_plans(&self, target: TypeId) -> &[&'static ConstructionPlan] {
         self.construction_plans.get(&target).map(Box::as_ref).unwrap_or(&[])
     }
 
+    /// Returns compiler-checked trait-object metadata for a concrete type.
+    ///
+    /// # Parameters
+    /// - `type_id`: runtime identity of the registered trait object.
     pub(crate) fn trait_object(&self, type_id: TypeId) -> Option<TraitObjectRegistration> {
         self.trait_objects.get(&type_id).copied()
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum MethodNamespaceKey {
-    Inherent,
-    TraitApplication {
-        definition: TraitDefinitionId,
-        identity: &'static [TraitArgumentIdentity],
-    },
-    TraitPath {
-        path: &'static str,
-        identity: &'static [TraitArgumentIdentity],
-        // Unlinked source paths are not proof of Rust trait identity. Keep
-        // independently registered applications in separate method scopes.
-        application: Option<usize>,
-    },
-}
-
-struct MethodEntry {
-    namespace: MethodNamespaceKey,
-    method: EffectiveMethod,
-    implementation: Option<&'static ImplApplicationMetadata>,
-    specializations: Vec<ResolvedMethodSpecialization>,
-    pending_specs: bool,
-}
-
+/// Rejects duplicate registrations of the same linked trait implementation.
+///
+/// # Parameters
+/// - `registrations`: implementation applications paired with their origins.
+/// - `definitions`: typed source trait definitions available to resolve links.
+/// - `definitions_by_path`: source path index used for diagnostic lookup.
 fn validate_trait_impl_uniqueness(
     registrations: &[(&'static ImplApplicationMetadata, RegistrationOrigin)],
     definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
@@ -704,6 +779,15 @@ fn validate_trait_impl_uniqueness(
     Ok(())
 }
 
+/// Resolves a trait application through its typed definition link.
+///
+/// Unlinked source paths remain unresolved because matching path text cannot
+/// prove that two paths refer to the same Rust trait.
+///
+/// # Parameters
+/// - `application`: trait application metadata to resolve.
+/// - `definitions`: registered source definitions indexed by typed identity.
+/// - `definitions_by_path`: path index retained for lookup compatibility.
 fn resolve_trait_application_definition(
     application: &TraitApplicationMetadata,
     definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
@@ -725,6 +809,10 @@ fn resolve_trait_application_definition(
     Ok(Some(definition))
 }
 
+/// Returns the source path retained by a trait application, when available.
+///
+/// # Parameters
+/// - `application`: trait application whose display path is requested.
 fn trait_application_path(application: &TraitApplicationMetadata) -> Option<&'static str> {
     application
         .expression
@@ -732,10 +820,25 @@ fn trait_application_path(application: &TraitApplicationMetadata) -> Option<&'st
         .or_else(|| application.definition.map(|definition| definition.path))
 }
 
+/// Checks whether a trait application's retained source path matches `path`.
+///
+/// # Parameters
+/// - `application`: trait application metadata to inspect.
+/// - `path`: source path spelling to compare.
 fn trait_application_path_matches(application: &TraitApplicationMetadata, path: &str) -> bool {
     trait_application_path(application) == Some(path)
 }
 
+/// Checks whether a registered trait application satisfies a method binding.
+///
+/// A linked definition and matching generic argument identities are required;
+/// source path spelling alone is insufficient.
+///
+/// # Parameters
+/// - `application`: registered trait application to compare.
+/// - `_path`: retained source spelling, not used as proof of identity.
+/// - `identity`: generic argument identities required by the binding.
+/// - `definition`: linked trait definition expected by the binding.
 fn trait_application_matches_binding(
     application: &TraitApplicationMetadata,
     _path: &str,
@@ -755,6 +858,12 @@ fn trait_application_matches_binding(
     }
 }
 
+/// Builds a method namespace key for a typed or unresolved trait application.
+///
+/// # Parameters
+/// - `application`: trait application whose method scope is being resolved.
+/// - `definitions`: registered definitions used to resolve typed links.
+/// - `definitions_by_path`: source path index retained for lookup behavior.
 fn trait_application_namespace(
     application: &TraitApplicationMetadata,
     definitions: &HashMap<TraitDefinitionId, &'static TraitDefinitionMetadata>,
@@ -773,6 +882,15 @@ fn trait_application_namespace(
     }
 }
 
+/// Validates and merges implementation methods and generated method bindings.
+///
+/// # Parameters
+/// - `included_types`: concrete target types present in the context.
+/// - `impl_applications`: implementation metadata grouped by declaration.
+/// - `catalog_registrations`: generated method catalogs to merge.
+/// - `method_bindings`: explicit effective methods to merge.
+/// - `definitions`: typed trait definitions used to resolve method namespaces.
+/// - `definitions_by_path`: source trait path lookup index.
 fn aggregate_method_catalogs(
     included_types: &std::collections::HashSet<TypeId>,
     impl_applications: &HashMap<ImplDefinitionId, Vec<&'static ImplApplicationMetadata>>,
@@ -1041,6 +1159,12 @@ fn aggregate_method_catalogs(
         .collect()
 }
 
+/// Resolves specialization metadata and creates one validated method entry.
+///
+/// # Parameters
+/// - `namespace`: identity scope for the method declaration.
+/// - `method`: effective method metadata and generated adapters.
+/// - `implementation`: source implementation metadata, when present.
 fn method_entry(
     namespace: MethodNamespaceKey,
     method: EffectiveMethod,
@@ -1068,6 +1192,12 @@ fn method_entry(
     })
 }
 
+/// Inserts a method entry or merges it with a compatible declaration.
+///
+/// # Parameters
+/// - `entries_by_target`: method entries grouped by target type.
+/// - `type_id`: target type identity that owns the entry.
+/// - `entry`: method entry to insert or merge.
 fn push_method_entry(
     entries_by_target: &mut HashMap<TypeId, Vec<MethodEntry>>,
     type_id: TypeId,
@@ -1120,6 +1250,11 @@ fn push_method_entry(
     Ok(())
 }
 
+/// Checks whether two effective methods describe the same generic declaration.
+///
+/// # Parameters
+/// - `left`: first effective method to compare.
+/// - `right`: second effective method to compare.
 fn same_method_declaration(left: EffectiveMethod, right: EffectiveMethod) -> bool {
     if !left.metadata.is_generic
         || !right.metadata.is_generic
@@ -1137,6 +1272,11 @@ fn same_method_declaration(left: EffectiveMethod, right: EffectiveMethod) -> boo
     true
 }
 
+/// Creates a context error for a duplicate method specialization.
+///
+/// # Parameters
+/// - `method`: method whose specialization is duplicated.
+/// - `specialization`: duplicate specialization metadata.
 fn duplicate_method_specialization(
     method: EffectiveMethod,
     specialization: &ResolvedMethodSpecialization,
@@ -1155,6 +1295,10 @@ fn duplicate_method_specialization(
     .expect("one context issue is nonempty")
 }
 
+/// Formats a method namespace for conflict diagnostics.
+///
+/// # Parameters
+/// - `namespace`: namespace identity to describe.
 fn method_namespace_description(namespace: MethodNamespaceKey) -> Box<str> {
     match namespace {
         MethodNamespaceKey::Inherent => "inherent".into(),
@@ -1180,6 +1324,11 @@ fn method_namespace_description(namespace: MethodNamespaceKey) -> Box<str> {
     }
 }
 
+/// Creates a context error for invalid effective method metadata.
+///
+/// # Parameters
+/// - `method`: method whose metadata failed validation.
+/// - `reason`: static explanation of the validation failure.
 fn invalid_method_metadata(method: EffectiveMethod, reason: &'static str) -> ContextError {
     let target = (method.target)();
     ContextError::from_issues(vec![ContextIssue::InvalidMetadata {
@@ -1189,6 +1338,12 @@ fn invalid_method_metadata(method: EffectiveMethod, reason: &'static str) -> Con
     .expect("one context issue is nonempty")
 }
 
+/// Builds a stable diagnostic identity for a reflected item.
+///
+/// # Parameters
+/// - `kind`: category of item represented by the identity.
+/// - `stable_id`: stable key used to identify the item.
+/// - `display_name`: human-readable name used in diagnostics.
 fn item_identity(kind: ItemKind, stable_id: &str, display_name: &str) -> ItemIdentity {
     ItemIdentity {
         kind,
@@ -1197,11 +1352,19 @@ fn item_identity(kind: ItemKind, stable_id: &str, display_name: &str) -> ItemIde
     }
 }
 
+/// Builds a diagnostic identity for a concrete Rust type ID.
+///
+/// # Parameters
+/// - `type_id`: runtime type identity to format.
 fn type_identity(type_id: TypeId) -> ItemIdentity {
     let display_name = format!("{type_id:?}");
     item_identity(ItemKind::Type, &display_name, &display_name)
 }
 
+/// Converts a capability registry failure into a context validation issue.
+///
+/// # Parameters
+/// - `error`: capability error raised while constructing context data.
 fn capability_context_error(error: CapabilityError) -> ContextError {
     let issue = match error {
         CapabilityError::Conflict {
@@ -1225,6 +1388,10 @@ fn capability_context_error(error: CapabilityError) -> ContextError {
     ContextError::from_issues(vec![issue]).expect("one context issue is nonempty")
 }
 
+/// Extracts public registration provenance from a capability origin.
+///
+/// # Parameters
+/// - `origin`: capability registration origin to convert.
 fn capability_origin_registration(origin: &CapabilityRegistrationOrigin) -> RegistrationOrigin {
     match origin {
         CapabilityRegistrationOrigin::Linked(origin) | CapabilityRegistrationOrigin::Explicit(origin) => origin.clone(),
@@ -1317,7 +1484,7 @@ mod tests {
         ConstructionAvailability::Available,
     );
     #[test]
-    fn keeps_unlinked_trait_application_unresolved_despite_matching_path() {
+    fn test_keeps_unlinked_trait_application_unresolved_despite_matching_path() {
         let registration = Registration::metadata_only()
             .with_trait_definition(&EXTERNAL_TRAIT_DEFINITION)
             .with_trait_application(&EXTERNAL_TRAIT_APPLICATION);
@@ -1629,7 +1796,7 @@ mod tests {
     }
 
     #[test]
-    fn aggregates_inherent_methods_from_separate_impl_applications() {
+    fn test_aggregates_inherent_methods_from_separate_impl_applications() {
         let applications = application_map(&[&IMPL_ONE, &IMPL_TWO]);
         let catalog = catalog(CATALOG_WITH_RESET);
         let methods = aggregate_method_catalogs(
@@ -1654,7 +1821,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_catalog_is_frozen_and_its_adapter_remains_invokable() {
+    fn test_provider_catalog_is_frozen_and_its_adapter_remains_invokable() {
         let catalogs = [&PROVIDER_CATALOG];
         let methods = aggregate_method_catalogs(
             &included_types(),
@@ -1681,7 +1848,7 @@ mod tests {
     }
 
     #[test]
-    fn allows_same_method_name_in_distinct_trait_namespaces() {
+    fn test_allows_same_method_name_in_distinct_trait_namespaces() {
         let catalog = catalog(TRAIT_METHODS);
         let methods = aggregate_method_catalogs(
             &included_types(),
@@ -1696,7 +1863,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_method_name_in_one_inherent_namespace() {
+    fn test_rejects_duplicate_method_name_in_one_inherent_namespace() {
         let applications = application_map(&[&IMPL_ONE, &CONFLICTING_IMPL]);
         let error = match aggregate_method_catalogs(
             &included_types(),
@@ -1720,7 +1887,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_catalog_method_with_ambiguous_generic_trait_path() {
+    fn test_rejects_catalog_method_with_ambiguous_generic_trait_path() {
         let applications = application_map(&[&GENERIC_IMPL_ONE, &GENERIC_IMPL_TWO]);
         let catalog = catalog(AMBIGUOUS_TRAIT_METHODS);
         let definitions = HashMap::from([(GENERIC_TRAIT.id, &GENERIC_TRAIT)]);
@@ -1744,7 +1911,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_binding_for_unregistered_generic_trait_application() {
+    fn test_rejects_binding_for_unregistered_generic_trait_application() {
         let applications = application_map(&[&GENERIC_IMPL_ONE, &GENERIC_IMPL_TWO]);
         let definitions = HashMap::from([(GENERIC_TRAIT.id, &GENERIC_TRAIT)]);
         let definitions_by_path = HashMap::from([(GENERIC_TRAIT.path, GENERIC_TRAIT.id)]);
@@ -1767,7 +1934,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_application_binding_uses_definition_and_argument_identity() {
+    fn test_typed_application_binding_uses_definition_and_argument_identity() {
         assert!(trait_application_matches_binding(
             &GENERIC_TRAIT_A,
             "an::unrelated::Alias<A>",
@@ -1795,7 +1962,7 @@ mod tests {
     }
 
     #[test]
-    fn allows_distinct_generic_trait_applications_but_rejects_duplicate_application() {
+    fn test_allows_distinct_generic_trait_applications_but_rejects_duplicate_application() {
         let distinct = [
             (&GENERIC_IMPL_ONE, origin("impl_a")),
             (&GENERIC_IMPL_TWO, origin("impl_b")),
@@ -1819,7 +1986,7 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_source_path_does_not_create_trait_impl_identity_conflict() {
+    fn test_unresolved_source_path_does_not_create_trait_impl_identity_conflict() {
         let registrations = [
             (&UNRESOLVED_IMPL_ONE, origin("unresolved_one")),
             (&UNRESOLVED_IMPL_TWO, origin("unresolved_two")),
@@ -1830,7 +1997,7 @@ mod tests {
     }
 
     #[test]
-    fn links_same_path_trait_applications_by_typed_definition_identity() {
+    fn test_links_same_path_trait_applications_by_typed_definition_identity() {
         let context = ContextData::build(vec![
             Registration::metadata_only()
                 .with_trait_definition(&GENERIC_TRAIT)
@@ -1857,7 +2024,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_trait_application_when_typed_definition_is_unregistered() {
+    fn test_rejects_trait_application_when_typed_definition_is_unregistered() {
         let error = match ContextData::build(vec![
             Registration::metadata_only().with_trait_application(&MISSING_TRAIT_APPLICATION),
         ]) {
@@ -1883,7 +2050,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_registered_application_with_unregistered_supertrait() {
+    fn test_rejects_registered_application_with_unregistered_supertrait() {
         let error = match ContextData::build(vec![
             Registration::metadata_only()
                 .with_trait_definition(&GENERIC_TRAIT)
@@ -1901,7 +2068,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_typed_trait_definition_and_recovers_on_next_build() {
+    fn test_rejects_duplicate_typed_trait_definition_and_recovers_on_next_build() {
         let error = match ContextData::build(vec![
             Registration::metadata_only().with_trait_definition(&GENERIC_TRAIT),
             Registration::metadata_only().with_trait_definition(&GENERIC_TRAIT),
@@ -1925,7 +2092,7 @@ mod tests {
     }
 
     #[test]
-    fn preserves_target_indexes_and_registered_metadata_accessors() {
+    fn test_preserves_target_indexes_and_registered_metadata_accessors() {
         let trait_object = TraitObjectRegistration::of::<dyn std::fmt::Debug>("std::fmt::Debug");
         let context = ContextData::build(vec![
             Registration::of::<Target>()
@@ -1958,7 +2125,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_conflicting_trait_object_paths_for_one_compiler_type() {
+    fn test_rejects_conflicting_trait_object_paths_for_one_compiler_type() {
         let error = match ContextData::build(vec![
             Registration::metadata_only()
                 .with_trait_object(TraitObjectRegistration::of::<dyn std::fmt::Debug>("first::Debug")),
@@ -1977,7 +2144,7 @@ mod tests {
     }
 
     #[test]
-    fn deduplicates_repeated_application_pointer_and_indexes_type_instances() {
+    fn test_deduplicates_repeated_application_pointer_and_indexes_type_instances() {
         let context = ContextData::build(vec![
             Registration::metadata_only()
                 .with_trait_definition(&GENERIC_TRAIT)
@@ -2000,7 +2167,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_type_instance_without_registered_definition() {
+    fn test_rejects_type_instance_without_registered_definition() {
         let error = match ContextData::build(vec![
             Registration::of::<Target>().with_type_instance::<TypeDefinitionMarker>(),
         ]) {
@@ -2012,7 +2179,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_repeated_canonical_type_definition_metadata() {
+    fn test_accepts_repeated_canonical_type_definition_metadata() {
         let context = ContextData::build(vec![
             Registration::metadata_only().with_type_definition_metadata(&TYPE_DEFINITION),
             Registration::metadata_only().with_type_definition_metadata(&TYPE_DEFINITION),
@@ -2026,7 +2193,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_duplicate_impl_definition_identity() {
+    fn test_rejects_duplicate_impl_definition_identity() {
         let error = match ContextData::build(vec![
             Registration::metadata_only().with_impl_definition(&IMPL_ONE_DEFINITION),
             Registration::metadata_only().with_impl_definition(&IMPL_ONE_DEFINITION),
@@ -2043,7 +2210,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_impl_application_without_definition_and_without_registered_target() {
+    fn test_rejects_impl_application_without_definition_and_without_registered_target() {
         let missing_definition =
             match ContextData::build(vec![Registration::metadata_only().with_impl_application(&IMPL_ONE)]) {
                 Ok(_) => panic!("an impl application requires its definition"),
@@ -2071,7 +2238,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_duplicate_target_registration_origins() {
+    fn test_reports_duplicate_target_registration_origins() {
         let error = match ContextData::build(vec![Registration::of::<Target>(), Registration::of::<Target>()]) {
             Ok(_) => panic!("duplicate reflected type registrations must be reported"),
             Err(error) => error,
@@ -2085,7 +2252,7 @@ mod tests {
     }
 
     #[test]
-    fn describes_unlinked_trait_method_namespace_and_reports_invalid_metadata() {
+    fn test_describes_unlinked_trait_method_namespace_and_reports_invalid_metadata() {
         let definitions = HashMap::new();
         let definitions_by_path = HashMap::new();
         let namespace = trait_application_namespace(&EXTERNAL_TRAIT_APPLICATION, &definitions, &definitions_by_path)
@@ -2120,7 +2287,7 @@ mod tests {
     }
 
     #[test]
-    fn converts_both_capability_origins_to_registration_origins() {
+    fn test_converts_both_capability_origins_to_registration_origins() {
         let linked = CapabilityRegistrationOrigin::Linked(origin("fixture::linked"));
         let explicit = CapabilityRegistrationOrigin::Explicit(origin("fixture::explicit"));
 

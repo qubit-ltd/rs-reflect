@@ -24,12 +24,19 @@ use crate::runtime::descriptor::trait_descriptor::TraitDefinitionDescriptor;
 /// A read-only, context-bound view of source-level Rust type syntax.
 #[derive(Clone, Copy)]
 pub struct TypeExpression<'ctx> {
+    /// Static structure emitted from the source type syntax.
     data: &'static ExpressionData,
+    /// Context used to resolve links while preserving source-level structure.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TypeExpression<'ctx> {
     /// Binds static expression metadata to the supplied context.
+    ///
+    /// # Parameters
+    ///
+    /// - `data`: Static expression node retained by generated metadata.
+    /// - `context`: Runtime context used by nested descriptor views.
     pub(crate) const fn new(data: &'static ExpressionData, context: &'ctx ReflectionContext) -> Self {
         Self { data, context }
     }
@@ -145,15 +152,27 @@ impl<'ctx> TypeExpression<'ctx> {
 /// The complete structural shape of a source-level Rust type expression.
 pub enum TypeExpressionKind<'ctx> {
     /// A named path with source-level generic arguments.
-    Named(NamedTypeExpression<'ctx>),
+    Named(
+        /// Path expression and its optional definition link.
+        NamedTypeExpression<'ctx>,
+    ),
     /// A generic parameter linked to its declaration metadata.
-    Parameter(GenericParameterDescriptor<'ctx>),
+    Parameter(
+        /// Descriptor for the generic parameter declaration.
+        GenericParameterDescriptor<'ctx>,
+    ),
     /// A generic parameter name without a definition link.
-    ParameterName(&'static str),
+    ParameterName(
+        /// Source name retained when declaration metadata is unavailable.
+        &'static str,
+    ),
     /// The special `Self` type expression.
     SelfType,
     /// An associated-type projection.
-    AssociatedType(AssociatedTypeExpression<'ctx>),
+    AssociatedType(
+        /// Projection source, qualifier, and generic arguments.
+        AssociatedTypeExpression<'ctx>,
+    ),
     /// A borrowed type and its optional explicit lifetime.
     Reference {
         /// Lifetime written on the reference, when present.
@@ -171,7 +190,10 @@ pub enum TypeExpressionKind<'ctx> {
         target: TypeExpression<'ctx>,
     },
     /// A slice and its element type.
-    Slice(TypeExpression<'ctx>),
+    Slice(
+        /// Type of each slice element.
+        TypeExpression<'ctx>,
+    ),
     /// An array and its element type and structural length.
     Array {
         /// Type of each array element.
@@ -180,13 +202,25 @@ pub enum TypeExpressionKind<'ctx> {
         length: ConstExpression,
     },
     /// Tuple elements in source order.
-    Tuple(Box<[TypeExpression<'ctx>]>),
+    Tuple(
+        /// Element expressions in their original source order.
+        Box<[TypeExpression<'ctx>]>,
+    ),
     /// A function pointer signature.
-    FunctionPointer(FunctionPointerExpression<'ctx>),
+    FunctionPointer(
+        /// Signature, ABI, and qualifiers retained for the function pointer.
+        FunctionPointerExpression<'ctx>,
+    ),
     /// A trait-object bound list.
-    TraitObject(TraitObjectExpression<'ctx>),
+    TraitObject(
+        /// Trait bounds and object lifetime retained from source syntax.
+        TraitObjectExpression<'ctx>,
+    ),
     /// Bounds of an opaque `impl Trait` type.
-    Opaque(OpaqueTypeExpression<'ctx>),
+    Opaque(
+        /// Bounds retained for the opaque `impl Trait` type.
+        OpaqueTypeExpression<'ctx>,
+    ),
     /// The never type `!`.
     Never,
 }
@@ -194,9 +228,13 @@ pub enum TypeExpressionKind<'ctx> {
 /// A named path that may resolve to a known generic definition.
 #[derive(Clone, Copy)]
 pub struct NamedTypeExpression<'ctx> {
+    /// Complete source path, including qualification.
     path: &'static str,
+    /// Definition metadata when code generation established an explicit link.
     definition: Option<&'static super::super::descriptor::generic::TypeDefinitionMetadata>,
+    /// Generic arguments in source order.
     arguments: &'static [GenericExpressionArgument],
+    /// Context used for nested generic-argument views.
     context: &'ctx ReflectionContext,
 }
 
@@ -225,9 +263,13 @@ impl<'ctx> NamedTypeExpression<'ctx> {
 /// A projection such as `<T as Iterator>::Item`.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeExpression<'ctx> {
+    /// Type expression on the left side of the projection.
     self_type: TypeExpression<'ctx>,
+    /// Optional trait path qualifying the projection.
     trait_: Option<TraitExpression<'ctx>>,
+    /// Projected associated-type identifier.
     name: &'static str,
+    /// Arguments applied to the associated type.
     arguments: &'static [GenericExpressionArgument],
 }
 
@@ -259,11 +301,19 @@ impl<'ctx> AssociatedTypeExpression<'ctx> {
 /// A trait path attached to a projection or trait object.
 #[derive(Clone, Copy)]
 pub struct TraitExpression<'ctx> {
+    /// Retained path and generic arguments for the trait expression.
     data: &'static TraitExpressionData,
+    /// Context used by nested generic argument views.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> TraitExpression<'ctx> {
+    /// Binds retained trait-expression data to its reflection context.
+    ///
+    /// # Parameters
+    ///
+    /// - `data`: Static source path and arguments for the trait expression.
+    /// - `context`: Context inherited by nested argument views.
     pub(crate) const fn new(data: &'static TraitExpressionData, context: &'ctx ReflectionContext) -> Self {
         Self { data, context }
     }
@@ -307,11 +357,19 @@ impl<'ctx> TraitExpression<'ctx> {
 /// A context-bound view of one named, lifetime, const, or associated argument.
 #[derive(Clone, Copy)]
 pub struct GenericExpressionArgumentView<'ctx> {
+    /// Structural source argument represented by this view.
     data: GenericExpressionArgument,
+    /// Context used when the argument contains nested expressions.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> GenericExpressionArgumentView<'ctx> {
+    /// Binds one retained argument to the context used by nested views.
+    ///
+    /// # Parameters
+    ///
+    /// - `data`: Retained generic argument to expose.
+    /// - `context`: Context inherited by nested type and predicate views.
     const fn new(data: GenericExpressionArgument, context: &'ctx ReflectionContext) -> Self {
         Self { data, context }
     }
@@ -349,11 +407,20 @@ impl<'ctx> GenericExpressionArgumentView<'ctx> {
 /// Structural kind of a source-level generic argument.
 pub enum GenericExpressionArgumentKind<'ctx> {
     /// A nested type argument.
-    Type(TypeExpression<'ctx>),
+    Type(
+        /// Nested type expression supplied as the generic argument.
+        TypeExpression<'ctx>,
+    ),
     /// A lifetime argument.
-    Lifetime(LifetimeExpression),
+    Lifetime(
+        /// Lifetime value written in the source argument list.
+        LifetimeExpression,
+    ),
     /// A structural const argument.
-    Const(ConstExpression),
+    Const(
+        /// Structural const value retained from the source expression.
+        ConstExpression,
+    ),
     /// An associated-type equality such as `Item = u8`.
     AssociatedType {
         /// Name of the associated type.
@@ -373,11 +440,19 @@ pub enum GenericExpressionArgumentKind<'ctx> {
 /// An ordered context-bound view over type-expression arguments.
 #[derive(Clone, Copy)]
 pub struct GenericExpressionArguments<'ctx> {
+    /// Ordered source arguments associated with the type expression.
     arguments: &'static [GenericExpressionArgument],
+    /// Context used to bind each yielded argument view.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> GenericExpressionArguments<'ctx> {
+    /// Creates an ordered argument view for one context.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Static argument slice in source order.
+    /// - `context`: Reflection context inherited by argument views.
     const fn new(arguments: &'static [GenericExpressionArgument], context: &'ctx ReflectionContext) -> Self {
         Self { arguments, context }
     }
@@ -398,6 +473,14 @@ impl<'ctx> GenericExpressionArguments<'ctx> {
     }
 
     /// Returns one argument by its zero-based source position.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based index in the original generic argument list.
+    ///
+    /// # Returns
+    ///
+    /// Returns the argument view when the index is within the source list.
     pub fn get(self, index: usize) -> Option<GenericExpressionArgumentView<'ctx>> {
         self.arguments
             .get(index)
@@ -417,7 +500,9 @@ impl<'ctx> GenericExpressionArguments<'ctx> {
 /// Source-level associated-type constraints attached to a trait expression.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeConstraints<'ctx> {
+    /// Trait generic arguments containing associated type equality or bounds.
     arguments: &'static [GenericExpressionArgument],
+    /// Context used by the yielded constraint descriptors.
     context: &'ctx ReflectionContext,
 }
 
@@ -462,7 +547,9 @@ impl<'ctx> AssociatedTypeConstraints<'ctx> {
 /// One associated-type bound retained from a trait expression.
 #[derive(Clone, Copy)]
 pub struct AssociatedTypeConstraintDescriptor<'ctx> {
+    /// Associated type identifier constrained by this entry.
     name: &'static str,
+    /// Equality assignment or bound predicates retained from the source.
     kind: AssociatedTypeConstraintKind<'ctx>,
 }
 
@@ -470,10 +557,16 @@ pub struct AssociatedTypeConstraintDescriptor<'ctx> {
 #[derive(Clone, Copy)]
 pub enum AssociatedTypeConstraintKind<'ctx> {
     /// Assigns one type expression to the associated type, as in `Item = u8`.
-    Equality(TypeExpression<'ctx>),
+    Equality(
+        /// Type expression assigned to the associated type.
+        TypeExpression<'ctx>,
+    ),
     /// Records one or more predicates on the associated type, as in `Item:
     /// Copy`.
-    Bounds(super::predicate::Predicates<'ctx>),
+    Bounds(
+        /// Predicates applied to the associated type.
+        super::predicate::Predicates<'ctx>,
+    ),
 }
 
 impl<'ctx> AssociatedTypeConstraintDescriptor<'ctx> {
@@ -491,7 +584,9 @@ impl<'ctx> AssociatedTypeConstraintDescriptor<'ctx> {
 /// Facts retained for a function-pointer expression.
 #[derive(Clone, Copy)]
 pub struct FunctionPointerExpression<'ctx> {
+    /// Signature facts retained by the code generator.
     data: &'static FunctionPointerData,
+    /// Context used to bind argument and result expressions.
     context: &'ctx ReflectionContext,
 }
 
@@ -535,7 +630,9 @@ impl<'ctx> FunctionPointerExpression<'ctx> {
 /// Facts retained for a trait-object expression.
 #[derive(Clone, Copy)]
 pub struct TraitObjectExpression<'ctx> {
+    /// Trait bounds and optional object lifetime retained from source.
     data: &'static TraitObjectData,
+    /// Context used by the yielded trait expression views.
     context: &'ctx ReflectionContext,
 }
 
@@ -565,7 +662,9 @@ impl<'ctx> TraitObjectExpression<'ctx> {
 /// Bounds retained when an opaque source type cannot be navigated.
 #[derive(Clone, Copy)]
 pub struct OpaqueTypeExpression<'ctx> {
+    /// Bounds retained for the opaque type.
     data: &'static OpaqueTypeData,
+    /// Context used by nested predicate views.
     context: &'ctx ReflectionContext,
 }
 
@@ -580,11 +679,23 @@ impl<'ctx> OpaqueTypeExpression<'ctx> {
     }
 }
 
+/// Formatting adapter for displaying retained type-expression source facts.
 struct ExpressionDisplay<'ctx> {
+    /// Context-bound expression rendered by the formatter.
     expression: TypeExpression<'ctx>,
 }
 
 impl fmt::Display for ExpressionDisplay<'_> {
+    /// Formats the retained structure as Rust-like diagnostic text.
+    ///
+    /// # Parameters
+    ///
+    /// - `self`: Formatting adapter containing the expression to render.
+    /// - `formatter`: Destination formatter.
+    ///
+    /// # Errors
+    ///
+    /// Returns a formatting error if writing to the destination fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.expression.data {
             ExpressionData::Named { path, arguments, .. } => {
@@ -685,6 +796,17 @@ impl fmt::Display for ExpressionDisplay<'_> {
     }
 }
 
+/// Writes generic and associated-type arguments in source order.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `arguments`: Retained generic arguments to write.
+/// - `context`: Context used when recursively formatting nested type values.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing any argument fails.
 fn write_generic_arguments(
     formatter: &mut fmt::Formatter<'_>,
     arguments: &[GenericExpressionArgument],
@@ -711,6 +833,16 @@ fn write_generic_arguments(
     formatter.write_str(">")
 }
 
+/// Writes a lifetime using its retained source-level spelling.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `lifetime`: Lifetime value to render.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing to the destination fails.
 fn write_lifetime(formatter: &mut fmt::Formatter<'_>, lifetime: LifetimeExpression) -> fmt::Result {
     match lifetime {
         LifetimeExpression::Static => formatter.write_str("'static"),
@@ -720,6 +852,16 @@ fn write_lifetime(formatter: &mut fmt::Formatter<'_>, lifetime: LifetimeExpressi
     }
 }
 
+/// Writes the supported structural const value without evaluating it.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `expression`: Retained const value or source name to render.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing to the destination fails.
 fn write_const(formatter: &mut fmt::Formatter<'_>, expression: ConstExpression) -> fmt::Result {
     match expression {
         ConstExpression::SignedInteger(value) => write!(formatter, "{value}"),
@@ -730,6 +872,17 @@ fn write_const(formatter: &mut fmt::Formatter<'_>, expression: ConstExpression) 
     }
 }
 
+/// Writes function-pointer qualifiers, arguments, and optional return type.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `function`: Retained signature and qualifier facts.
+/// - `context`: Context used to render nested type expressions.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing any signature component fails.
 fn write_function_pointer(
     formatter: &mut fmt::Formatter<'_>,
     function: &FunctionPointerData,
@@ -761,6 +914,16 @@ fn write_function_pointer(
     Ok(())
 }
 
+/// Writes trait-object bounds and the optional object lifetime.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `object`: Retained trait bounds and object lifetime.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing a bound fails.
 fn write_trait_object(formatter: &mut fmt::Formatter<'_>, object: &TraitObjectData) -> fmt::Result {
     formatter.write_str("dyn ")?;
     for (index, trait_) in object.traits.iter().enumerate() {
@@ -778,6 +941,16 @@ fn write_trait_object(formatter: &mut fmt::Formatter<'_>, object: &TraitObjectDa
     Ok(())
 }
 
+/// Writes the retained trait and lifetime bounds of an opaque type.
+///
+/// # Parameters
+///
+/// - `formatter`: Destination formatter.
+/// - `opaque`: Opaque type bounds retained from source syntax.
+///
+/// # Errors
+///
+/// Returns a formatting error if writing any bound fails.
 fn write_opaque(formatter: &mut fmt::Formatter<'_>, opaque: &OpaqueTypeData) -> fmt::Result {
     formatter.write_str("impl ")?;
     for (index, bound) in opaque.bounds.iter().enumerate() {

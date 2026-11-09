@@ -253,6 +253,13 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
     }
 }
 
+/// Returns a parameter's concrete value type when it is fully statically known.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed parameter type, which may be a reference.
+/// - `environment`: Trait generic environment used to identify unresolved
+///   types.
 fn concrete_value_type<'a>(
     ty: &'a crate::ir::TypeIr,
     environment: &GenericEnvironment,
@@ -264,6 +271,12 @@ fn concrete_value_type<'a>(
     is_static_concrete_type(value_type, environment).then_some(value_type)
 }
 
+/// Reports whether a type contains only static, fully concrete components.
+///
+/// # Parameters
+///
+/// - `ty`: Parsed type to inspect recursively.
+/// - `environment`: Trait generic environment used to reject unresolved names.
 fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironment) -> bool {
     match &ty.kind {
         TypeKindIr::Path(path) => {
@@ -321,17 +334,37 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
     }
 }
 
+/// Reports whether token text mentions a declared const generic parameter.
+///
+/// # Parameters
+///
+/// - `value`: Const expression spelling to scan.
+/// - `environment`: Generic environment providing const parameter names.
 fn contains_generic_const(value: &str, environment: &GenericEnvironment) -> bool {
     value
         .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
         .any(|identifier| environment.is_const_parameter(identifier))
 }
 
+/// Emits a static boxed slice expression from generated values.
+///
+/// # Parameters
+///
+/// - `values`: Generated metadata expressions to collect and leak.
 fn leak_slice(values: impl IntoIterator<Item = TokenStream>) -> TokenStream {
     let values = values.into_iter().collect::<Vec<_>>();
     quote!(::std::boxed::Box::leak(::std::vec![#(#values),*].into_boxed_slice()))
 }
 
+/// Converts one bound into runtime metadata for a named associated type.
+///
+/// # Parameters
+///
+/// - `bound`: Parsed bound to encode.
+/// - `name`: Associated type name recorded in the expression.
+/// - `environment`: Generic environment used to resolve bound expressions.
+/// - `span`: Source location for generated syntax.
+/// - `facade`: Runtime facade path used in generated metadata.
 fn associated_type_bound(
     bound: &GenericBoundIr,
     name: &LitStr,

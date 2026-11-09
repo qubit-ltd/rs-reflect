@@ -60,7 +60,7 @@ impl LocalAsyncTarget {
 }
 
 #[test]
-fn explicit_thread_safe_async_binding_returns_a_send_reflected_future() {
+fn test_explicit_thread_safe_async_binding_returns_a_send_reflected_future() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(thread_safe_async_binding())
@@ -98,7 +98,7 @@ fn explicit_thread_safe_async_binding_returns_a_send_reflected_future() {
 }
 
 #[test]
-fn local_async_invocation_accepts_a_non_send_native_future() {
+fn test_local_async_invocation_accepts_a_non_send_native_future() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

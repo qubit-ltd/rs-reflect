@@ -62,6 +62,11 @@ pub type TypeExpressionData = ExpressionData;
 /// supplied context. This is intended for generated metadata and downstream
 /// derive integrations that retain source expressions independently of a
 /// context.
+///
+/// # Parameters
+///
+/// * `data` — static expression metadata emitted by the derive implementation.
+/// * `context` — the context used to resolve every nested expression view.
 pub fn type_expression_in<'ctx>(
     data: &'static TypeExpressionData,
     context: &'ctx ReflectionContext,

@@ -75,7 +75,7 @@ mod specialization_integer_tests {
         [MethodSpecializationArgument::const_integer_literal(false, 256)];
 
     #[test]
-    fn normalizes_untyped_integer_literal_using_declared_const_type() {
+    fn test_normalizes_untyped_integer_literal_using_declared_const_type() {
         let resolved = MethodSpecializationSpec::new(&MAX_ARGUMENT, NO_ADAPTERS)
             .resolve(&PARAMETERS)
             .expect("255 fits in u8");
@@ -86,7 +86,7 @@ mod specialization_integer_tests {
     }
 
     #[test]
-    fn rejects_untyped_integer_literal_outside_declared_const_type() {
+    fn test_rejects_untyped_integer_literal_outside_declared_const_type() {
         assert!(
             MethodSpecializationSpec::new(&OVERFLOW_ARGUMENT, NO_ADAPTERS)
                 .resolve(&PARAMETERS)
@@ -124,8 +124,12 @@ pub enum ReceiverKind {
 /// Metadata for the receiver parameter.
 #[derive(Clone, Copy)]
 pub struct ReceiverDescriptor {
+    /// Returns the declared return-value category.
     pub(crate) kind: ReceiverKind,
+    /// Provides the concrete receiver type metadata when the declaration is
+    /// statically typed.
     pub(crate) type_metadata: Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
+    /// Retains the source type expression used to describe this receiver.
     pub(crate) expression: Option<&'static ExpressionData>,
 }
 
@@ -136,6 +140,23 @@ impl ReceiverDescriptor {
     }
 
     /// Creates receiver metadata for one concrete reflected target type.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
     pub const fn for_type<T: super::Reflect>(kind: ReceiverKind) -> Self {
         Self {
             kind,
@@ -146,6 +167,13 @@ impl ReceiverDescriptor {
 
     /// Creates receiver metadata whose concrete type is supplied by an
     /// effective method.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
+    /// - `expression`: Source type expression retained for context-bound
+    ///   resolution.
     pub const fn trait_self(kind: ReceiverKind, expression: &'static ExpressionData) -> Self {
         Self {
             kind,
@@ -155,6 +183,11 @@ impl ReceiverDescriptor {
     }
 
     /// Binds an unbound receiver declaration to its effective target type.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Target type whose effective method metadata is being
+    ///   resolved.
     pub(crate) const fn for_target(
         mut self,
         target: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
@@ -166,6 +199,11 @@ impl ReceiverDescriptor {
     }
 
     /// Retains the source type expression for an explicitly typed receiver.
+    ///
+    /// # Parameters
+    ///
+    /// - `expression`: Source type expression retained for context-bound
+    ///   resolution.
     pub const fn with_expression(mut self, expression: &'static ExpressionData) -> Self {
         self.expression = Some(expression);
         self
@@ -176,13 +214,19 @@ impl ReceiverDescriptor {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParameterPattern {
     /// A parameter bound to the given identifier.
-    Identifier(&'static str),
+    Identifier(
+        /// Identifier text retained from the source pattern.
+        &'static str,
+    ),
     /// A wildcard parameter with no binding name.
     Wildcard,
     /// A destructured parameter whose nested pattern is not retained.
     Destructure,
     /// A destructured parameter with its source pattern text.
-    DestructurePattern(&'static str),
+    DestructurePattern(
+        /// Original pattern text, retained for diagnostics and inspection.
+        &'static str,
+    ),
 }
 
 /// How a method parameter receives its value.
@@ -199,15 +243,28 @@ pub enum PassingMode {
 /// Static facts about one declared parameter.
 #[derive(Clone, Copy)]
 pub struct ParameterMetadata {
+    /// Returns the parameter’s zero-based position, excluding the receiver.
     pub(crate) index: usize,
+    /// Returns the source binding pattern retained during registration.
     pub(crate) pattern: ParameterPattern,
+    /// Returns the argument passing mode declared by the method.
     pub(crate) passing: PassingMode,
+    /// Retains the source type expression used to describe this receiver.
     pub(crate) expression: &'static ExpressionData,
+    /// Optional metadata for the exact Rust type known at registration time.
     pub(crate) concrete_type: Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
 }
 
 impl ParameterMetadata {
     /// Creates static metadata for one method parameter.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based field position to inspect.
+    /// - `pattern`: Source binding pattern associated with the parameter.
+    /// - `passing`: Argument passing mode declared by the method.
+    /// - `expression`: Source type expression retained for context-bound
+    ///   resolution.
     pub const fn new(
         index: usize,
         pattern: ParameterPattern,
@@ -224,6 +281,11 @@ impl ParameterMetadata {
     }
 
     /// Records the exact concrete Rust type when the parameter has one.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub const fn with_concrete_type<T: ?Sized + 'static>(mut self) -> Self {
         self.concrete_type = Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>);
         self
@@ -233,11 +295,24 @@ impl ParameterMetadata {
 /// A context-bound view of one declared method parameter.
 #[derive(Clone, Copy)]
 pub struct ParameterDescriptor<'ctx> {
+    /// Static declaration facts shared by descriptors created in a reflection
+    /// context.
     metadata: &'static ParameterMetadata,
+    /// Returns the reflection context required to resolve this descriptor’s
+    /// referenced types.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ParameterDescriptor<'ctx> {
+    /// Creates static metadata from the declaration facts supplied by
+    /// registration. # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
+    /// # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve this descriptor’s source
+    ///   expressions.
     pub(crate) const fn new(metadata: &'static ParameterMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -281,11 +356,28 @@ impl<'ctx> ParameterDescriptor<'ctx> {
 /// A read-only, source-ordered view of a method's non-receiver parameters.
 #[derive(Clone, Copy)]
 pub struct Parameters<'ctx> {
+    /// Static declaration facts shared by descriptors created in a reflection
+    /// context.
     metadata: &'static [ParameterMetadata],
+    /// Returns the reflection context required to resolve this descriptor’s
+    /// referenced types.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> Parameters<'ctx> {
+    /// Creates static metadata from the declaration facts supplied by
+    /// registration. # Parameters
+    ///
+    /// - `metadata`: Static method declaration facts resolved in the reflection
+    ///   context.
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
+    /// # Parameters
+    ///
+    /// - `metadata`: Static method declaration facts resolved for this
+    ///   reflection context.
+    /// - `context`: Reflection context used to resolve this descriptor’s source
+    ///   expressions.
     const fn new(metadata: &'static [ParameterMetadata], context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -313,6 +405,10 @@ impl<'ctx> Parameters<'ctx> {
     }
 
     /// Returns the parameter at its zero-based source position, if present.
+    ///
+    /// # Parameters
+    ///
+    /// - `index`: Zero-based field position to inspect.
     pub fn get_at(self, index: usize) -> Option<ParameterDescriptor<'ctx>> {
         self.metadata
             .get(index)
@@ -324,6 +420,10 @@ impl<'ctx> Parameters<'ctx> {
     /// Parameters written with wildcard or destructuring patterns have no name.
     /// A duplicate name in malformed metadata is treated as ambiguous and
     /// returns `None`.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
     pub fn get(self, name: &str) -> Option<ParameterDescriptor<'ctx>> {
         let mut matches = self.metadata.iter().filter(
             |metadata| matches!(metadata.pattern, ParameterPattern::Identifier(candidate) if candidate == name),
@@ -362,8 +462,11 @@ pub enum ReturnKind {
 /// Static return metadata for a method declaration.
 #[derive(Clone, Copy)]
 pub struct ReturnMetadata {
+    /// Returns the declared return-value category.
     pub(crate) kind: ReturnKind,
+    /// Retains the source type expression used to describe this receiver.
     pub(crate) expression: Option<&'static ExpressionData>,
+    /// Optional metadata for the exact Rust type known at registration time.
     pub(crate) concrete_type: Option<fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata>,
 }
 
@@ -378,6 +481,13 @@ impl ReturnMetadata {
     }
 
     /// Creates metadata for a non-unit return value.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
+    /// - `expression`: Source type expression retained for context-bound
+    ///   resolution.
     pub const fn new(kind: ReturnKind, expression: &'static ExpressionData) -> Self {
         Self {
             kind,
@@ -387,6 +497,11 @@ impl ReturnMetadata {
     }
 
     /// Records the exact concrete Rust type when the return value has one.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub const fn with_concrete_type<T: super::Reflect>(mut self) -> Self {
         self.concrete_type = Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>);
         self
@@ -396,11 +511,24 @@ impl ReturnMetadata {
 /// A context-bound view of a method's declared return value.
 #[derive(Clone, Copy)]
 pub struct ReturnDescriptor<'ctx> {
+    /// Static declaration facts shared by descriptors created in a reflection
+    /// context.
     metadata: &'static ReturnMetadata,
+    /// Returns the reflection context required to resolve this descriptor’s
+    /// referenced types.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> ReturnDescriptor<'ctx> {
+    /// Creates static metadata from the declaration facts supplied by
+    /// registration. # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
+    /// # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve this descriptor’s source
+    ///   expressions.
     pub(crate) const fn new(metadata: &'static ReturnMetadata, context: &'ctx ReflectionContext) -> Self {
         Self { metadata, context }
     }
@@ -429,15 +557,28 @@ impl<'ctx> ReturnDescriptor<'ctx> {
 /// Source-level method qualifiers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MethodQualifiers {
+    /// Whether the source declaration marks the method `const`.
     pub(crate) is_const: bool,
+    /// Whether the source declaration marks the method `async`.
     pub(crate) is_async: bool,
+    /// Whether calling the source method requires an unsafe operation.
     pub(crate) is_unsafe: bool,
+    /// Optional calling convention declared for the method.
     pub(crate) abi: Option<FunctionAbi>,
+    /// Whether the method accepts a C-style variable argument list.
     pub(crate) is_variadic: bool,
 }
 
 impl MethodQualifiers {
     /// Creates source qualifiers without a custom ABI.
+    ///
+    /// # Parameters
+    ///
+    /// - `is_const`: Whether the source method is declared `const`.
+    /// - `is_async`: Whether the source method is declared `async`.
+    /// - `is_unsafe`: Whether calling the source method requires an unsafe
+    ///   operation.
+    /// - `is_variadic`: Whether the declaration accepts variadic arguments.
     pub const fn new(is_const: bool, is_async: bool, is_unsafe: bool, is_variadic: bool) -> Self {
         Self {
             is_const,
@@ -449,6 +590,10 @@ impl MethodQualifiers {
     }
 
     /// Records a non-default ABI without accepting runtime identity data.
+    ///
+    /// # Parameters
+    ///
+    /// - `abi`: Optional calling convention recorded from the declaration.
     pub const fn with_abi(mut self, abi: Option<FunctionAbi>) -> Self {
         self.abi = abi;
         self
@@ -465,7 +610,10 @@ pub enum FunctionAbi {
     /// The system ABI for the target platform.
     System,
     /// A named ABI other than the standard variants.
-    Other(&'static str),
+    Other(
+        /// ABI name written in the source declaration.
+        &'static str,
+    ),
 }
 
 /// Context-bound namespace of an effective method implementation.
@@ -507,6 +655,10 @@ pub enum MethodQualifiedName<'ctx> {
 }
 
 impl std::fmt::Display for MethodQualifiedName<'_> {
+    /// Formats the method metadata using its structured Debug representation.
+    /// # Parameters
+    ///
+    /// - `formatter`: Formatter receiving the human-readable representation.
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Inherent { target, name } => {
@@ -555,15 +707,28 @@ pub enum MethodAvailability {
 
 /// Source declaration metadata, shared by all effective implementations.
 pub struct MethodMetadata {
+    /// Returns the unique source identifier when the parameter pattern binds a
+    /// name.
     pub(crate) name: &'static str,
+    /// Inherent or trait implementation that supplies this effective method.
     pub(crate) namespace: MethodNamespaceMetadata,
+    /// Visibility recorded for this method declaration.
     pub(crate) visibility: MethodVisibility,
+    /// Receiver kind and type metadata used to validate invocation binding.
     pub(crate) receiver: Option<ReceiverDescriptor>,
+    /// Source-ordered metadata for the method’s non-receiver arguments.
     pub(crate) parameters: &'static [ParameterMetadata],
+    /// Return category and type metadata for values produced by the method.
     pub(crate) output: &'static ReturnMetadata,
+    /// Const, async, unsafe, ABI, and variadic facts copied from the
+    /// declaration.
     pub(crate) qualifiers: MethodQualifiers,
+    /// Generic parameter metadata required to select a method specialization.
     pub(crate) generics: &'static GenericDefinitionMetadata,
+    /// Whether the declaration requires specialization before invocation.
     pub(crate) is_generic: bool,
+    /// Whether a trait method uses its default body rather than an
+    /// implementation override.
     pub(crate) default_body: bool,
 }
 
@@ -608,6 +773,10 @@ static UNIT_OUTPUT: ReturnMetadata = ReturnMetadata {
 
 impl MethodMetadata {
     /// Creates method metadata from a complete typed specification.
+    ///
+    /// # Parameters
+    ///
+    /// - `spec`: Static specialization selector being registered.
     pub const fn from_spec(spec: MethodMetadataSpec) -> Self {
         Self {
             name: spec.name,
@@ -624,6 +793,12 @@ impl MethodMetadata {
     }
 
     /// Creates a zero-argument inherent method declaration with unit output.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `implementation`: Implementation block or function that supplies the
+    ///   method.
     pub const fn inherent(name: &'static str, implementation: &'static str) -> Self {
         Self {
             name,
@@ -648,20 +823,39 @@ impl MethodMetadata {
 
 /// Static source facts used to create a method declaration.
 pub struct MethodMetadataSpec {
+    /// Returns the unique source identifier when the parameter pattern binds a
+    /// name.
     name: &'static str,
+    /// Inherent or trait implementation that supplies this effective method.
     namespace: MethodNamespaceMetadata,
+    /// Visibility recorded for this method declaration.
     visibility: MethodVisibility,
+    /// Receiver kind and type metadata used to validate invocation binding.
     receiver: Option<ReceiverDescriptor>,
+    /// Source-ordered metadata for the method’s non-receiver arguments.
     parameters: &'static [ParameterMetadata],
+    /// Return category and type metadata for values produced by the method.
     output: &'static ReturnMetadata,
+    /// Const, async, unsafe, ABI, and variadic facts copied from the
+    /// declaration.
     qualifiers: MethodQualifiers,
+    /// Generic parameter metadata required to select a method specialization.
     generics: &'static GenericDefinitionMetadata,
+    /// Whether the declaration requires specialization before invocation.
     is_generic: bool,
+    /// Whether a trait method uses its default body rather than an
+    /// implementation override.
     default_body: bool,
 }
 
 impl MethodMetadataSpec {
     /// Creates an inherent method specification with no receiver or parameters.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `implementation`: Implementation block or function that supplies the
+    ///   method.
     pub const fn inherent(name: &'static str, implementation: &'static str) -> Self {
         Self {
             name,
@@ -678,6 +872,23 @@ impl MethodMetadataSpec {
     }
 
     /// Creates a complete method specification from typed static metadata.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
+    /// - `namespace`: Implementation namespace that supplies the method.
+    /// - `visibility`: Declared visibility used when checking invocation
+    ///   access.
+    /// - `receiver`: Receiver value and access mode supplied by the caller.
+    /// - `parameters`: Source-ordered metadata for non-receiver arguments.
+    /// - `output`: Return category and type metadata for the method.
+    /// - `qualifiers`: Const, async, unsafe, ABI, and variadic declaration
+    ///   facts.
+    /// - `generics`: Generic parameter metadata used to resolve
+    ///   specializations.
+    /// - `is_generic`: Whether invocation requires concrete generic arguments.
+    /// - `default_body`: Whether a trait method uses its default implementation
+    ///   body.
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         name: &'static str,
@@ -708,6 +919,23 @@ impl MethodMetadataSpec {
 
 impl EffectiveMethod {
     /// Binds a method declaration to its exact reflected target type.
+    ///
+    /// # Parameters
+    ///
+    /// - `metadata`: Static method declaration facts resolved in the reflection
+    ///   context.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `metadata`: Static method declaration facts resolved in the reflection
+    ///   context.
     pub const fn for_type<T: super::Reflect>(metadata: &'static MethodMetadata) -> Self {
         Self {
             target: crate::runtime::descriptor::metadata::TypeMetadata::of::<T>,
@@ -723,6 +951,10 @@ impl EffectiveMethod {
     }
 
     /// Binds generated adapters to the method's exact target type.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapters`: Generated invocation adapters registered for the method.
     pub const fn with_adapters(mut self, adapters: InvocationAdapters) -> Self {
         self.availability = MethodAvailability::Callable;
         self.specializations = &[];
@@ -732,6 +964,11 @@ impl EffectiveMethod {
     }
 
     /// Adds statically typed generic method bindings for this target.
+    ///
+    /// # Parameters
+    ///
+    /// - `specializations`: Concrete generic instantiations registered for the
+    ///   method.
     pub const fn with_specializations(mut self, specializations: &'static [MethodSpecializationSpec]) -> Self {
         self.availability = MethodAvailability::RequiresSpecialization;
         self.specializations = &[];
@@ -742,6 +979,10 @@ impl EffectiveMethod {
 
     /// Records why this implementation cannot be called through dynamic
     /// invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `reasons`: Structured reasons that prevent this operation.
     pub const fn with_unavailable(mut self, reasons: &'static [InvocationUnavailableReason]) -> Self {
         self.availability = MethodAvailability::Unavailable { reasons };
         self.specializations = &[];
@@ -752,11 +993,24 @@ impl EffectiveMethod {
 
     /// Records whether the callable implementation is declared, defaulted, or
     /// overridden.
+    ///
+    /// # Parameters
+    ///
+    /// - `source`: Source declaration or expression from which this metadata
+    ///   was derived.
     pub const fn with_source(mut self, source: MethodImplementationSource) -> Self {
         self.source = source;
         self
     }
 
+    /// Checks whether two registration records describe the same effective
+    /// method. # Parameters
+    ///
+    /// - `other`: ABI name or metadata value that is not one of the standard
+    ///   forms.
+    /// # Parameters
+    ///
+    /// - `other`: Second metadata value used in the equivalence comparison.
     pub(crate) fn same_registration(&self, other: &Self) -> bool {
         self.target_type_id() == other.target_type_id()
             && std::ptr::eq(self.metadata, other.metadata)
@@ -767,10 +1021,14 @@ impl EffectiveMethod {
             && same_adapters(self.adapters, other.adapters)
     }
 
+    /// Returns the concrete target type identity used to resolve registered
+    /// methods.
     pub(crate) fn target_type_id(&self) -> std::any::TypeId {
         (self.target)().type_id()
     }
 
+    /// Resolves declared generic arguments against the method’s specialization
+    /// metadata.
     pub(crate) fn resolve_specializations(&self) -> Result<Box<[ResolvedMethodSpecialization]>, &'static str> {
         if self.specialization_specs.is_empty() {
             Ok(self.specializations.to_vec().into_boxed_slice())
@@ -785,6 +1043,15 @@ impl EffectiveMethod {
     }
 }
 
+/// Checks whether adapter slots refer to the same generated invocation
+/// functions. # Parameters
+///
+/// - `left`: First metadata value in the equality comparison.
+/// - `right`: Second metadata value in the equality comparison.
+/// # Parameters
+///
+/// - `left`: First metadata value used in the equivalence comparison.
+/// - `right`: Second metadata value used in the equivalence comparison.
 fn same_adapters(left: Option<InvocationAdapters>, right: Option<InvocationAdapters>) -> bool {
     let (Some(left), Some(right)) = (left, right) else {
         return left.is_none() && right.is_none();
@@ -797,6 +1064,20 @@ fn same_adapters(left: Option<InvocationAdapters>, right: Option<InvocationAdapt
         && same_adapter(left.pinned_thread_safe, right.pinned_thread_safe)
 }
 
+/// Compares two optional adapter references by their registered function
+/// address. # Parameters
+///
+/// - `left`: First metadata value in the equality comparison.
+/// - `right`: Second metadata value in the equality comparison.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
+///
+/// # Parameters
+///
+/// - `left`: First metadata value in the equality comparison.
+/// - `right`: Second metadata value in the equality comparison.
 fn same_adapter<T: ?Sized>(left: Option<&'static T>, right: Option<&'static T>) -> bool {
     match (left, right) {
         (Some(left), Some(right)) => std::ptr::eq(left, right),
@@ -808,12 +1089,21 @@ fn same_adapter<T: ?Sized>(left: Option<&'static T>, right: Option<&'static T>) 
 /// The callable implementation selected for a target type.
 #[derive(Clone, Copy)]
 pub struct EffectiveMethod {
+    /// Concrete target type whose method metadata is being registered.
     pub(crate) target: fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    /// Static declaration facts shared by descriptors created in a reflection
+    /// context.
     pub(crate) metadata: &'static MethodMetadata,
+    /// Source method declaration used to build the effective method metadata.
     pub(crate) source: MethodImplementationSource,
+    /// Invocation availability after generic arguments are checked.
     pub(crate) availability: MethodAvailability,
+    /// Registered concrete generic instantiations available for this method.
     pub(crate) specializations: &'static [ResolvedMethodSpecialization],
+    /// Static specifications used to resolve generic arguments at invocation
+    /// time.
     pub(crate) specialization_specs: &'static [MethodSpecializationSpec],
+    /// Generated adapters for supported value modes and invocation variants.
     pub(crate) adapters: Option<InvocationAdapters>,
 }
 
@@ -821,38 +1111,101 @@ pub struct EffectiveMethod {
 /// specialization.
 #[derive(Clone, Copy)]
 pub struct MethodSpecializationArgument {
+    /// Concrete signed or unsigned constant used in a specialization selector.
     value: MethodSpecializationArgumentValue,
 }
 
+/// One concrete generic argument used to select a method specialization.
 #[derive(Clone, Copy)]
 enum MethodSpecializationArgumentValue {
-    Type(fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata),
-    Lifetime(&'static str),
-    ConstSigned { kind: ConstIntegerKind, value: i128 },
-    ConstUnsigned { kind: ConstIntegerKind, value: u128 },
-    ConstIntegerLiteral { negative: bool, magnitude: u128 },
-    ConstBoolean(bool),
-    ConstCharacter(char),
+    /// Concrete Rust type argument recorded by its static type metadata.
+    Type(
+        /// Function that resolves the type metadata without runtime allocation.
+        fn() -> &'static crate::runtime::descriptor::metadata::TypeMetadata,
+    ),
+    /// Lifetime argument represented by its source spelling.
+    Lifetime(
+        /// Lifetime name, including the leading apostrophe.
+        &'static str,
+    ),
+    /// Concrete signed or unsigned constant used in a specialization selector.
+    /// Returns the declared return-value category.
+    /// Signed integer constant argument.
+    ConstSigned {
+        /// Integer type used to interpret the constant.
+        kind: ConstIntegerKind,
+        /// Signed value supplied as the generic argument.
+        value: i128,
+    },
+    /// Concrete signed or unsigned constant used in a specialization selector.
+    /// Returns the declared return-value category.
+    /// Unsigned integer constant argument.
+    ConstUnsigned {
+        /// Integer type used to interpret the constant.
+        kind: ConstIntegerKind,
+        /// Unsigned value supplied as the generic argument.
+        value: u128,
+    },
+    /// Unsigned magnitude retained for an integer literal selector.
+    /// Whether an integer literal selector has a leading minus sign.
+    /// Integer literal selector before its inferred integer type is applied.
+    ConstIntegerLiteral {
+        /// Whether the source literal has a leading minus sign.
+        negative: bool,
+        /// Absolute value of the literal, stored without signed overflow.
+        magnitude: u128,
+    },
+    /// Boolean constant argument.
+    ConstBoolean(
+        /// Boolean value supplied by the specialization.
+        bool,
+    ),
+    /// Character constant argument.
+    ConstCharacter(
+        /// Unicode scalar value supplied by the specialization.
+        char,
+    ),
 }
 
+/// Provides the constintegerkind operation used to resolve or dispatch
+/// reflected methods.
 #[derive(Clone, Copy)]
 enum ConstIntegerKind {
+    /// The selector expects an `i8` constant.
     I8,
+    /// The selector expects an `i16` constant.
     I16,
+    /// The selector expects an `i32` constant.
     I32,
+    /// The selector expects an `i64` constant.
     I64,
+    /// The selector expects an `i128` constant.
     I128,
+    /// Provides the isize operation used to resolve or dispatch reflected
+    /// methods.
     Isize,
+    /// The selector expects a `u8` constant.
     U8,
+    /// The selector expects a `u16` constant.
     U16,
+    /// The selector expects a `u32` constant.
     U32,
+    /// The selector expects a `u64` constant.
     U64,
+    /// The selector expects a `u128` constant.
     U128,
+    /// Provides the usize operation used to resolve or dispatch reflected
+    /// methods.
     Usize,
 }
 
 impl MethodSpecializationArgument {
     /// Records a concrete type argument without exposing runtime identity data.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub const fn type_argument<T: 'static>() -> Self {
         Self {
             value: MethodSpecializationArgumentValue::Type(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>),
@@ -860,6 +1213,10 @@ impl MethodSpecializationArgument {
     }
 
     /// Records a concrete lifetime argument for exact specialization selection.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
     pub const fn lifetime(name: &'static str) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::Lifetime(name),
@@ -867,6 +1224,10 @@ impl MethodSpecializationArgument {
     }
 
     /// Records a boolean const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn const_bool(value: bool) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstBoolean(value),
@@ -874,6 +1235,10 @@ impl MethodSpecializationArgument {
     }
 
     /// Records a character const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn const_char(value: char) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstCharacter(value),
@@ -882,6 +1247,12 @@ impl MethodSpecializationArgument {
 
     /// Records an unsuffixed integer literal for validation against its
     /// declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `negative`: Whether the integer literal has a leading minus sign.
+    /// - `magnitude`: Absolute integer literal magnitude before applying its
+    ///   sign.
     pub const fn const_integer_literal(negative: bool, magnitude: u128) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstIntegerLiteral { negative, magnitude },
@@ -889,6 +1260,12 @@ impl MethodSpecializationArgument {
     }
 
     /// Records a signed integer const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
+    /// - `value`: Owned value retained for validation and construction.
     const fn const_signed(kind: ConstIntegerKind, value: i128) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstSigned { kind, value },
@@ -896,6 +1273,12 @@ impl MethodSpecializationArgument {
     }
 
     /// Records an unsigned integer const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `kind`: Receiver form, return category, or constant type being
+    ///   recorded.
+    /// - `value`: Owned value retained for validation and construction.
     const fn const_unsigned(kind: ConstIntegerKind, value: u128) -> Self {
         Self {
             value: MethodSpecializationArgumentValue::ConstUnsigned { kind, value },
@@ -903,61 +1286,109 @@ impl MethodSpecializationArgument {
     }
 
     /// Records an `i8` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn i8(value: i8) -> Self {
         Self::const_signed(ConstIntegerKind::I8, value as i128)
     }
 
     /// Records an `i16` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn i16(value: i16) -> Self {
         Self::const_signed(ConstIntegerKind::I16, value as i128)
     }
 
     /// Records an `i32` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn i32(value: i32) -> Self {
         Self::const_signed(ConstIntegerKind::I32, value as i128)
     }
 
     /// Records an `i64` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn i64(value: i64) -> Self {
         Self::const_signed(ConstIntegerKind::I64, value as i128)
     }
 
     /// Records an `i128` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn i128(value: i128) -> Self {
         Self::const_signed(ConstIntegerKind::I128, value)
     }
 
     /// Records an `isize` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn isize(value: isize) -> Self {
         Self::const_signed(ConstIntegerKind::Isize, value as i128)
     }
 
     /// Records a `u8` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn u8(value: u8) -> Self {
         Self::const_unsigned(ConstIntegerKind::U8, value as u128)
     }
 
     /// Records a `u16` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn u16(value: u16) -> Self {
         Self::const_unsigned(ConstIntegerKind::U16, value as u128)
     }
 
     /// Records a `u32` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn u32(value: u32) -> Self {
         Self::const_unsigned(ConstIntegerKind::U32, value as u128)
     }
 
     /// Records a `u64` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn u64(value: u64) -> Self {
         Self::const_unsigned(ConstIntegerKind::U64, value as u128)
     }
 
     /// Records a `u128` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn u128(value: u128) -> Self {
         Self::const_unsigned(ConstIntegerKind::U128, value)
     }
 
     /// Records a `usize` const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub const fn usize(value: usize) -> Self {
         Self::const_unsigned(ConstIntegerKind::Usize, value as u128)
     }
@@ -966,13 +1397,22 @@ impl MethodSpecializationArgument {
 /// A concrete specialization declaration with typed arguments and adapters.
 #[derive(Clone, Copy)]
 pub struct MethodSpecializationSpec {
+    /// Generic arguments supplied when selecting a method specialization.
     arguments: &'static [MethodSpecializationArgument],
+    /// Invocation availability after generic arguments are checked.
     availability: InvocationAvailability,
+    /// Generated adapters for supported value modes and invocation variants.
     adapters: InvocationAdapters,
 }
 
 impl MethodSpecializationSpec {
     /// Creates a callable specialization declaration.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Generic arguments or invocation arguments supplied by the
+    ///   caller.
+    /// - `adapters`: Generated invocation adapters registered for the method.
     pub const fn new(arguments: &'static [MethodSpecializationArgument], adapters: InvocationAdapters) -> Self {
         Self {
             arguments,
@@ -982,12 +1422,24 @@ impl MethodSpecializationSpec {
     }
 
     /// Marks this specialization unavailable with typed reasons.
+    ///
+    /// # Parameters
+    ///
+    /// - `reasons`: Structured reasons that prevent this operation.
     pub const fn with_unavailable(mut self, reasons: &'static [InvocationUnavailableReason]) -> Self {
         self.availability = InvocationAvailability::Unavailable { reasons };
         self.adapters = NO_ADAPTERS;
         self
     }
 
+    /// Matches requested specialization arguments against the registered
+    /// candidates. # Parameters
+    ///
+    /// - `parameters`: Source-ordered metadata for non-receiver arguments.
+    /// # Parameters
+    ///
+    /// - `parameters`: Source-ordered parameter metadata used to validate
+    ///   invocation arguments.
     fn resolve(
         self,
         parameters: &'static [GenericParameterMetadata],
@@ -1121,6 +1573,11 @@ impl MethodSpecializationSpec {
     }
 }
 
+/// Infers the integer representation from a source type expression.
+/// # Parameters
+///
+/// - `expression`: Source type expression retained for context-bound
+///   resolution.
 fn integer_kind_for_expression(expression: &'static ExpressionData) -> Option<ConstIntegerKind> {
     let ExpressionData::Named {
         path,
@@ -1151,6 +1608,7 @@ fn integer_kind_for_expression(expression: &'static ExpressionData) -> Option<Co
 }
 
 impl ConstIntegerKind {
+    /// Returns the source-level type name used for a specialization selector.
     fn type_name(self) -> &'static str {
         match self {
             Self::I8 => "i8",
@@ -1168,6 +1626,17 @@ impl ConstIntegerKind {
         }
     }
 
+    /// Normalizes a source expression before comparing specialization
+    /// selectors. # Parameters
+    ///
+    /// - `negative`: Whether the integer literal has a leading minus sign.
+    /// - `magnitude`: Absolute integer literal magnitude before applying its
+    ///   sign.
+    /// # Parameters
+    ///
+    /// - `negative`: Whether the integer selector has a leading minus sign.
+    /// - `magnitude`: Absolute magnitude of the integer selector before
+    ///   applying its sign.
     fn normalize(self, negative: bool, magnitude: u128) -> Option<String> {
         let (signed, bits) = match self {
             Self::I8 => (true, 8),
@@ -1207,6 +1676,11 @@ impl ConstIntegerKind {
     }
 }
 
+/// Extracts an integer specialization selector from its source expression.
+/// # Parameters
+///
+/// - `kind`: Receiver form, return category, or constant type being recorded.
+/// - `value`: Owned value retained for validation and construction.
 fn integer_selector(kind: ConstIntegerKind, value: String) -> GenericArgumentSelector {
     let type_id = match kind {
         ConstIntegerKind::I8 => TypeId::of::<i8>(),
@@ -1231,23 +1705,36 @@ fn integer_selector(kind: ConstIntegerKind, value: String) -> GenericArgumentSel
 /// A compile-time-bound implementation of one generic method.
 #[derive(Clone)]
 pub(crate) struct ResolvedMethodSpecialization {
+    /// Generic arguments supplied when selecting a method specialization.
     pub(crate) arguments: ResolvedMethodArguments,
+    /// Metadata describing each generic parameter accepted by the method.
     pub(crate) argument_metadata: Option<std::sync::Arc<[GenericArgumentMetadata]>>,
+    /// Invocation availability after generic arguments are checked.
     pub(crate) availability: InvocationAvailability,
+    /// Generated adapters for supported value modes and invocation variants.
     pub(crate) adapters: InvocationAdapters,
 }
 
+/// Resolved generic arguments retained for invocation and display.
 #[derive(Clone)]
 pub(crate) enum ResolvedMethodArguments {
     #[cfg(test)]
-    Static(&'static [GenericArgumentIdentity]),
+    Static(
+        /// Static identities used by hand-written method catalog fixtures.
+        &'static [GenericArgumentIdentity],
+    ),
+    /// Owns resolved argument identities and their matching selectors.
     Owned {
+        /// Provides the display operation used to resolve or dispatch reflected
+        /// methods.
         display: Box<[GenericArgumentIdentity]>,
+        /// Returns the selector list used to compare generic arguments.
         selectors: Box<[GenericArgumentSelector]>,
     },
 }
 
 impl ResolvedMethodArguments {
+    /// Borrows the resolved generic argument identities as a slice.
     pub(crate) fn as_slice(&self) -> &[GenericArgumentIdentity] {
         match self {
             #[cfg(test)]
@@ -1256,6 +1743,14 @@ impl ResolvedMethodArguments {
         }
     }
 
+    /// Compares resolved selectors to determine whether two registrations
+    /// select the same specialization. # Parameters
+    ///
+    /// - `other`: ABI name or metadata value that is not one of the standard
+    ///   forms.
+    /// # Parameters
+    ///
+    /// - `other`: Second metadata value used in the equivalence comparison.
     pub(crate) fn same_selection(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Owned { selectors: left, .. }, Self::Owned { selectors: right, .. }) => {
@@ -1268,6 +1763,15 @@ impl ResolvedMethodArguments {
         }
     }
 
+    /// Checks whether the supplied generic arguments satisfy this
+    /// specialization. # Parameters
+    ///
+    /// - `selectors`: Resolved generic argument selectors used to compare
+    ///   specializations.
+    /// # Parameters
+    ///
+    /// - `selectors`: Resolved generic argument selectors compared during
+    ///   specialization lookup.
     fn matches(&self, selectors: &[GenericArgumentSelector]) -> bool {
         match self {
             Self::Owned {
@@ -1280,14 +1784,25 @@ impl ResolvedMethodArguments {
     }
 }
 
+/// Compares two selector lists element by element.
+/// # Parameters
+///
+/// - `left`: First metadata value in the equality comparison.
+/// - `right`: Second metadata value in the equality comparison.
 fn selector_slices_match(left: &[GenericArgumentSelector], right: &[GenericArgumentSelector]) -> bool {
     left.len() == right.len() && left.iter().zip(right).all(|(left, right)| left.matches(right))
 }
 
+/// Provides the contexteffectivemethod operation used to resolve or dispatch
+/// reflected methods.
 #[derive(Clone)]
 pub(crate) struct ContextEffectiveMethod {
+    /// Returns the static effective method record shared by the catalog view.
     pub(crate) effective: EffectiveMethod,
+    /// Registered concrete generic instantiations available for this method.
     pub(crate) specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+    /// Provides the implementation operation used to resolve or dispatch
+    /// reflected methods.
     pub(crate) implementation:
         Option<&'static crate::runtime::descriptor::impl_descriptor::metadata::ImplApplicationMetadata>,
 }
@@ -1295,11 +1810,21 @@ pub(crate) struct ContextEffectiveMethod {
 /// Mode-specific adapters generated for a concrete specialization.
 #[derive(Clone, Copy)]
 pub struct InvocationAdapters {
+    /// Adapter for calls using local value storage.
     pub(crate) local: Option<&'static dyn InvocationAdapter<Local>>,
+    /// Adapter for calls using thread-safe value storage.
     pub(crate) thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    /// Provides the catching local operation used to resolve or dispatch
+    /// reflected methods.
     pub(crate) catching_local: Option<&'static dyn InvocationAdapter<Local>>,
+    /// Provides the catching thread safe operation used to resolve or dispatch
+    /// reflected methods.
     pub(crate) catching_thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    /// Provides the pinned local operation used to resolve or dispatch
+    /// reflected methods.
     pub(crate) pinned_local: Option<&'static dyn PinnedInvocationAdapter<Local>>,
+    /// Provides the pinned thread safe operation used to resolve or dispatch
+    /// reflected methods.
     pub(crate) pinned_thread_safe: Option<&'static dyn PinnedInvocationAdapter<ThreadSafe>>,
 }
 
@@ -1314,40 +1839,87 @@ static NO_ADAPTERS: InvocationAdapters = InvocationAdapters {
 
 /// Builder for an immutable set of generated invocation adapters.
 pub struct InvocationAdaptersBuilder {
+    /// Adapter for calls using local value storage.
     local: Option<&'static dyn InvocationAdapter<Local>>,
+    /// Adapter for calls using thread-safe value storage.
     thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    /// Provides the catching local operation used to resolve or dispatch
+    /// reflected methods.
     catching_local: Option<&'static dyn InvocationAdapter<Local>>,
+    /// Provides the catching thread safe operation used to resolve or dispatch
+    /// reflected methods.
     catching_thread_safe: Option<&'static dyn InvocationAdapter<ThreadSafe>>,
+    /// Provides the pinned local operation used to resolve or dispatch
+    /// reflected methods.
     pinned_local: Option<&'static dyn PinnedInvocationAdapter<Local>>,
+    /// Provides the pinned thread safe operation used to resolve or dispatch
+    /// reflected methods.
     pinned_thread_safe: Option<&'static dyn PinnedInvocationAdapter<ThreadSafe>>,
 }
 
 impl InvocationAdaptersBuilder {
     /// Sets the local adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn local(mut self, adapter: &'static dyn InvocationAdapter<Local>) -> Self {
         self.local = Some(adapter);
         self
     }
 
     /// Sets the thread-safe adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn thread_safe(mut self, adapter: &'static dyn InvocationAdapter<ThreadSafe>) -> Self {
         self.thread_safe = Some(adapter);
         self
     }
 
     /// Sets the local adapter used by explicit panic-catching invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn catching_local(mut self, adapter: &'static dyn InvocationAdapter<Local>) -> Self {
         self.catching_local = Some(adapter);
         self
     }
 
     /// Sets the thread-safe adapter used by explicit panic-catching invocation.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn catching_thread_safe(mut self, adapter: &'static dyn InvocationAdapter<ThreadSafe>) -> Self {
         self.catching_thread_safe = Some(adapter);
         self
     }
 
     /// Sets the local pinned receiver adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn pinned_local<T: ?Sized + 'static>(
         mut self,
         adapter: &'static crate::runtime::invoke::PinnedFunctionInvocationAdapter<Local, T>,
@@ -1357,6 +1929,23 @@ impl InvocationAdaptersBuilder {
     }
 
     /// Sets the thread-safe pinned receiver adapter.
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `adapter`: Generated adapter function registered for this invocation
+    ///   mode.
     pub const fn pinned_thread_safe<T: ?Sized + 'static>(
         mut self,
         adapter: &'static crate::runtime::invoke::PinnedFunctionInvocationAdapter<ThreadSafe, T>,
@@ -1382,13 +1971,28 @@ impl InvocationAdaptersBuilder {
 /// context.
 #[derive(Clone)]
 pub struct MethodDescriptor<'ctx> {
+    /// Returns the static effective method record shared by the catalog view.
     effective: EffectiveMethod,
+    /// Registered concrete generic instantiations available for this method.
     specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+    /// Provides the implementation operation used to resolve or dispatch
+    /// reflected methods.
     implementation: Option<&'static crate::runtime::descriptor::impl_descriptor::metadata::ImplApplicationMetadata>,
+    /// Returns the reflection context required to resolve this descriptor’s
+    /// referenced types.
     context: &'ctx ReflectionContext,
 }
 
 impl<'ctx> MethodDescriptor<'ctx> {
+    /// Creates static metadata from the declaration facts supplied by
+    /// registration. # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
+    /// # Parameters
+    ///
+    /// - `context`: Reflection context used to resolve this descriptor’s source
+    ///   expressions.
     pub(crate) fn new(effective: EffectiveMethod, context: &'ctx ReflectionContext) -> Self {
         Self {
             effective,
@@ -1397,6 +2001,23 @@ impl<'ctx> MethodDescriptor<'ctx> {
             context,
         }
     }
+    /// Provides the with resolved specializations operation used to resolve or
+    /// dispatch reflected methods. # Parameters
+    ///
+    /// - `specializations`: Concrete generic instantiations registered for the
+    ///   method.
+    /// - `implementation`: Implementation block or function that supplies the
+    ///   method.
+    /// - `context`: Reflection context used to resolve source expressions and
+    ///   type metadata.
+    /// # Parameters
+    ///
+    /// - `specializations`: Concrete generic method implementations available
+    ///   for this registration.
+    /// - `implementation`: Method implementation associated with this effective
+    ///   registration.
+    /// - `context`: Reflection context used to resolve this descriptor’s source
+    ///   expressions.
     pub(crate) fn with_resolved_specializations(
         effective: EffectiveMethod,
         specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
@@ -1451,6 +2072,8 @@ impl<'ctx> MethodDescriptor<'ctx> {
             },
         }
     }
+    /// Provides the implementation descriptor operation used to resolve or
+    /// dispatch reflected methods.
     fn implementation_descriptor(&self) -> crate::runtime::descriptor::impl_descriptor::ImplDescriptor<'ctx> {
         if let Some(implementation) = self.implementation {
             return crate::runtime::descriptor::impl_descriptor::ImplDescriptor::new(implementation, self.context);
@@ -1510,6 +2133,10 @@ impl<'ctx> MethodDescriptor<'ctx> {
     ///
     /// Returns `LookupError::Missing` if no parameter has that identifier, or
     /// `LookupError::Ambiguous` if metadata contains multiple matches.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Reflected field name to match against the target.
     pub fn parameter(&self, name: &str) -> Result<ParameterDescriptor<'ctx>, LookupError> {
         let mut matches = self.effective.metadata.parameters.iter().filter(
             |parameter| matches!(parameter.pattern, ParameterPattern::Identifier(candidate) if candidate == name),
@@ -1571,6 +2198,11 @@ impl<'ctx> MethodDescriptor<'ctx> {
     ///
     /// Returns `LookupError::Missing` when no matching binding exists and
     /// `LookupError::Ambiguous` when multiple identical bindings are present.
+    ///
+    /// # Parameters
+    ///
+    /// - `arguments`: Generic arguments or invocation arguments supplied by the
+    ///   caller.
     pub fn specialization(
         &self,
         arguments: &MethodArguments,
@@ -1609,6 +2241,23 @@ impl<'ctx> MethodDescriptor<'ctx> {
     /// arguments.
     ///
     /// Panics from the method are propagated to the caller.
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub fn invoke<'call, M: ValueMode>(
         &self,
         invocation: Invocation<'call, M>,
@@ -1622,6 +2271,23 @@ impl<'ctx> MethodDescriptor<'ctx> {
 
     /// Invokes the method and converts a panic raised after invocation starts
     /// into [`CaughtInvocationFailure::Panicked`].
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub fn invoke_catching<'call, M: ValueMode>(
         &self,
         invocation: Invocation<'call, M>,
@@ -1634,6 +2300,26 @@ impl<'ctx> MethodDescriptor<'ctx> {
     }
 
     /// Invokes a method while bypassing its visibility and unsafe-call checks.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// - `M`: Value mode that determines the invocation adapter and storage
+    ///   bounds.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     ///
     /// # Safety
     /// The caller must satisfy the method's Rust safety contract and any
@@ -1654,6 +2340,25 @@ impl<'ctx> MethodDescriptor<'ctx> {
     ///
     /// Preflight failures return the original pinned receiver and all supplied
     /// arguments in [`PinnedInvocationFailure`].
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub fn invoke_pinned<'call, T: ?Sized + 'static, M: ValueMode>(
         &self,
         invocation: PinnedInvocation<'call, M, T>,
@@ -1697,6 +2402,27 @@ impl<'ctx> MethodDescriptor<'ctx> {
         self.invoke_pinned_with(specialization.availability, &specialization.adapters, invocation)
     }
 
+    /// Invokes a pinned receiver through the adapter matching its exact type
+    /// and pin mode. # Parameters
+    ///
+    /// - `availability`: Availability decision and its structured reasons.
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `availability`: Availability decision and its structured reasons.
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     fn invoke_pinned_with<'call, T: ?Sized + 'static, M: ValueMode + ModeAdapter>(
         &self,
         availability: InvocationAvailability,
@@ -1739,6 +2465,25 @@ impl<'ctx> MethodDescriptor<'ctx> {
         Ok(adapter.invoke(receiver, invocation))
     }
 
+    /// Runs the appropriate generated adapter after preflight validation.
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// - `catching`: Whether the selected adapter catches method panics.
+    /// - `unchecked`: Adapter slot that bypasses reflected visibility checks.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// - `catching`: Whether the selected adapter catches method panics.
+    /// - `unchecked`: Adapter slot that bypasses reflected visibility checks.
     fn invoke_inner<'call, M: ValueMode + ModeAdapter>(
         &self,
         invocation: Invocation<'call, M>,
@@ -1774,6 +2519,20 @@ impl<'ctx> MethodDescriptor<'ctx> {
             unchecked,
         )
     }
+    /// Invokes the selected method using the validated receiver and arguments.
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `availability`: Availability decision and its structured reasons.
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// - `catching`: Whether the selected adapter catches method panics.
+    /// - `unchecked`: Adapter slot that bypasses reflected visibility checks.
     fn invoke_with<'call, M: ValueMode + ModeAdapter>(
         &self,
         availability: MethodAvailability,
@@ -1800,6 +2559,20 @@ impl<'ctx> MethodDescriptor<'ctx> {
         };
         self.invoke_with_availability(availability, adapters, invocation, catching, unchecked)
     }
+    /// Checks invocation availability before dispatching to an adapter.
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    /// # Parameters
+    ///
+    /// - `availability`: Availability decision and its structured reasons.
+    /// - `adapters`: Generated invocation adapters registered for the method.
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    /// - `catching`: Whether the selected adapter catches method panics.
+    /// - `unchecked`: Adapter slot that bypasses reflected visibility checks.
     fn invoke_with_availability<'call, M: ValueMode + ModeAdapter>(
         &self,
         availability: InvocationAvailability,
@@ -1871,6 +2644,10 @@ impl InvocationAdapters {
         }
     }
 
+    /// Returns the generated invocation adapter for the selected value mode.
+    /// # Type Parameters
+    ///
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
     fn adapter<M: ValueMode + ModeAdapter>(&self) -> Option<&'static dyn InvocationAdapter<M>> {
         M::select_adapter(self)
     }
@@ -1879,23 +2656,45 @@ impl InvocationAdapters {
 /// An explicit set of methods used by context registration to build lookups.
 #[derive(Clone)]
 pub(crate) struct MethodCatalog<'ctx> {
+    /// Concrete target type whose method metadata is being registered.
     target: TypeDescriptor<'ctx>,
+    /// Returns the static method slice, resolving it through the provider when
+    /// configured.
     methods: MethodCatalogMethods<'ctx>,
 }
 
+/// Storage strategy for methods in a catalog tied to a reflection context.
 #[derive(Clone)]
 #[allow(dead_code)] // Retained for crate-level tests that construct static catalogs directly.
 enum MethodCatalogMethods<'ctx> {
-    Borrowed(&'ctx [EffectiveMethod]),
-    Shared(std::sync::Arc<[ContextEffectiveMethod]>),
+    /// Borrows static effective method metadata for the catalog lifetime.
+    Borrowed(
+        /// Methods shared by all contexts for a given target type.
+        &'ctx [EffectiveMethod],
+    ),
+    /// Shares context-bound method metadata through reference counting.
+    Shared(
+        /// Methods resolved for the catalog's reflection context.
+        std::sync::Arc<[ContextEffectiveMethod]>,
+    ),
 }
 
+/// One effective method viewed from either catalog storage strategy.
 enum MethodCatalogMethod<'a> {
-    Static(&'a EffectiveMethod),
-    Context(&'a ContextEffectiveMethod),
+    /// References method metadata independent of a specific context.
+    Static(
+        /// Static registration used to build the effective descriptor.
+        &'a EffectiveMethod,
+    ),
+    /// References method metadata resolved for a particular context.
+    Context(
+        /// Context-bound registration and its resolved specialization data.
+        &'a ContextEffectiveMethod,
+    ),
 }
 
 impl MethodCatalogMethod<'_> {
+    /// Returns the static effective method record shared by the catalog view.
     fn effective(&self) -> &EffectiveMethod {
         match self {
             Self::Static(method) => method,
@@ -1904,14 +2703,26 @@ impl MethodCatalogMethod<'_> {
     }
 }
 
+/// Iterates over effective methods in either borrowed or shared storage.
 enum MethodCatalogMethodIter<'a> {
-    Borrowed(std::slice::Iter<'a, EffectiveMethod>),
-    Shared(std::slice::Iter<'a, ContextEffectiveMethod>),
+    /// Iterates static method registrations.
+    Borrowed(
+        /// Source-ordered static methods for the target type.
+        std::slice::Iter<'a, EffectiveMethod>,
+    ),
+    /// Iterates context-bound method registrations.
+    Shared(
+        /// Methods resolved for the current reflection context.
+        std::slice::Iter<'a, ContextEffectiveMethod>,
+    ),
 }
 
 impl<'a> Iterator for MethodCatalogMethodIter<'a> {
+    /// Provides the item operation used to resolve or dispatch reflected
+    /// methods.
     type Item = MethodCatalogMethod<'a>;
 
+    /// Advances the catalog iterator and wraps the next effective method.
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Borrowed(methods) => methods.next().map(MethodCatalogMethod::Static),
@@ -1922,13 +2733,33 @@ impl<'a> Iterator for MethodCatalogMethodIter<'a> {
 
 /// Static source metadata for a target's effective method catalog.
 pub struct MethodCatalogRegistration {
+    /// Returns the target type identity used to match catalog registrations.
     type_id: fn() -> TypeId,
+    /// Returns the static method slice, resolving it through the provider when
+    /// configured.
     methods: &'static [EffectiveMethod],
+    /// Calls the registration provider to obtain method metadata for the
+    /// target.
     provider: Option<fn() -> &'static [EffectiveMethod]>,
 }
 
 impl MethodCatalogRegistration {
     /// Creates a catalog registration for a reflected target type.
+    ///
+    /// # Parameters
+    ///
+    /// - `methods`: Method records registered for the target type.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `methods`: Method records registered for the target type.
     pub const fn new<T: super::Reflect>(methods: &'static [EffectiveMethod]) -> Self {
         Self {
             type_id: TypeId::of::<T>,
@@ -1939,6 +2770,23 @@ impl MethodCatalogRegistration {
 
     /// Creates a registration whose method slice is initialized by a typed
     /// provider.
+    ///
+    /// # Parameters
+    ///
+    /// - `provider`: Function that supplies the target type’s static method
+    ///   records.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `provider`: Function that supplies the target type’s static method
+    ///   records.
     pub const fn with_provider<T: super::Reflect>(provider: fn() -> &'static [EffectiveMethod]) -> Self {
         Self {
             type_id: TypeId::of::<T>,
@@ -1947,10 +2795,13 @@ impl MethodCatalogRegistration {
         }
     }
 
+    /// Returns the target type identity used to match catalog registrations.
     pub(crate) fn type_id(&self) -> TypeId {
         (self.type_id)()
     }
 
+    /// Returns the static method slice, resolving it through the provider when
+    /// configured.
     pub(crate) fn methods(&self) -> &'static [EffectiveMethod] {
         match self.provider {
             Some(provider) => provider(),
@@ -1962,6 +2813,17 @@ impl MethodCatalogRegistration {
 inventory::collect!(MethodCatalogRegistration);
 
 impl<'ctx> MethodCatalog<'ctx> {
+    /// Creates a catalog borrowing the static method records for `target`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Type descriptor whose effective methods this catalog
+    ///   exposes.
+    /// - `methods`: Static method records registered for the target type.
+    ///
+    /// # Returns
+    ///
+    /// Returns a catalog that borrows `methods` for the context lifetime.
     #[allow(dead_code)] // Used by crate-level tests for hand-written method metadata.
     pub(crate) fn new(target: TypeDescriptor<'ctx>, methods: &'ctx [EffectiveMethod]) -> Self {
         Self {
@@ -1970,6 +2832,19 @@ impl<'ctx> MethodCatalog<'ctx> {
         }
     }
 
+    /// Creates a catalog sharing context-resolved method records through an
+    /// `Arc`.
+    ///
+    /// # Parameters
+    ///
+    /// - `target`: Type descriptor whose effective methods this catalog
+    ///   exposes.
+    /// - `methods`: Context-bound method records resolved for this reflection
+    ///   context.
+    ///
+    /// # Returns
+    ///
+    /// Returns a catalog sharing ownership of `methods`.
     pub(crate) fn from_shared(target: TypeDescriptor<'ctx>, methods: std::sync::Arc<[ContextEffectiveMethod]>) -> Self {
         Self {
             target,
@@ -1977,15 +2852,36 @@ impl<'ctx> MethodCatalog<'ctx> {
         }
     }
 
+    /// Returns the static method slice, resolving it through the provider when
+    /// configured.
     fn methods(&self) -> MethodCatalogMethodIter<'_> {
         match &self.methods {
             MethodCatalogMethods::Borrowed(methods) => MethodCatalogMethodIter::Borrowed(methods.iter()),
             MethodCatalogMethods::Shared(methods) => MethodCatalogMethodIter::Shared(methods.iter()),
         }
     }
+    /// Looks up methods by source name in the catalog's effective method set.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Method name to match against the target type's methods.
+    ///
+    /// # Returns
+    ///
+    /// Returns the lookup result, preserving missing and ambiguous cases.
     pub(crate) fn lookup_method(&self, name: &str) -> Result<Lookup<MethodDescriptor<'ctx>>, ContextError> {
         Ok(self.lookup(|method| method.metadata.name == name))
     }
+    /// Looks up a method by name and requires exactly one effective match.
+    ///
+    /// # Parameters
+    ///
+    /// - `name`: Method name that must identify a unique catalog entry.
+    ///
+    /// # Returns
+    ///
+    /// Returns the unique descriptor or an error for missing or ambiguous
+    /// names.
     #[allow(dead_code)] // Used by crate-level tests for hand-written method metadata.
     pub(crate) fn method(&self, name: &str) -> Result<MethodDescriptor<'ctx>, LookupError> {
         self.lookup_method(name)
@@ -2045,6 +2941,14 @@ impl<'ctx> MethodCatalog<'ctx> {
                 query: LookupQuery::Name(name.into()),
             })
     }
+    /// Provides the lookup operation used to resolve or dispatch reflected
+    /// methods. # Parameters
+    ///
+    /// - `predicate`: Condition used to select matching effective method
+    ///   entries.
+    /// # Parameters
+    ///
+    /// - `predicate`: Condition used to filter the catalog’s effective methods.
     fn lookup(&self, predicate: impl Fn(&EffectiveMethod) -> bool) -> Lookup<MethodDescriptor<'ctx>> {
         let mut matches = self
             .methods()
@@ -2076,6 +2980,7 @@ impl<'ctx> MethodCatalog<'ctx> {
 }
 
 impl crate::runtime::identity::IntoLookupCandidate for MethodDescriptor<'_> {
+    /// Consumes a lookup result into the candidate used by specialization.
     fn into_lookup_candidate(self) -> LookupCandidate {
         let display_name: Box<str> = self.name().into();
         let namespace_id = match self.effective.metadata.namespace {
@@ -2130,7 +3035,9 @@ impl crate::runtime::identity::IntoLookupCandidate for MethodDescriptor<'_> {
 /// Concrete type and const arguments used to select a method specialization.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MethodArguments {
+    /// Generic arguments supplied when selecting a method specialization.
     arguments: Vec<GenericArgumentIdentity>,
+    /// Returns the selector list used to compare generic arguments.
     selectors: Vec<GenericArgumentSelector>,
 }
 
@@ -2140,6 +3047,11 @@ impl MethodArguments {
         Self::default()
     }
     /// Appends a concrete type argument.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
     pub fn type_of<T: crate::runtime::descriptor::Reflect + ?Sized>(mut self) -> Self {
         self.arguments
             .push(GenericArgumentIdentity::Type(std::any::type_name::<T>().into()));
@@ -2151,6 +3063,21 @@ impl MethodArguments {
     /// Primitive integer, boolean, and character values participate in exact
     /// specialization selection. Other `Any` values are retained for error
     /// diagnostics but never treated as a matching const argument.
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: Owned value retained for validation and construction.
     pub fn constant<T: Any>(mut self, value: T) -> Self {
         let (display, selector) = const_argument_identity(&value);
         self.arguments.push(GenericArgumentIdentity::Const(display));
@@ -2169,6 +3096,18 @@ impl MethodArguments {
     }
 }
 
+/// Builds the stable identity used to compare const generic arguments.
+/// # Parameters
+///
+/// - `value`: Owned value retained for validation and construction.
+///
+/// # Type Parameters
+///
+/// - `T`: Concrete Rust type whose metadata or value is used by the operation.
+///
+/// # Parameters
+///
+/// - `value`: Owned value retained for validation and construction.
 fn const_argument_identity<T: Any>(value: &T) -> (Box<str>, GenericArgumentSelector) {
     macro_rules! integer {
         ($($ty:ty),+ $(,)?) => {
@@ -2212,6 +3151,7 @@ fn const_argument_identity<T: Any>(value: &T) -> (Box<str>, GenericArgumentSelec
 
 /// A view over the concrete implementations registered for one method.
 pub struct MethodSpecializations<'ctx> {
+    /// Returns the unique method descriptor for the requested name.
     method: MethodDescriptor<'ctx>,
 }
 
@@ -2240,12 +3180,17 @@ impl<'ctx> MethodSpecializations<'ctx> {
 /// One compile-time-bound method implementation.
 #[derive(Clone)]
 pub struct MethodSpecializationDescriptor<'ctx> {
+    /// Returns the unique method descriptor for the requested name.
     method: MethodDescriptor<'ctx>,
+    /// Registered concrete generic instantiations available for this method.
     specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
+    /// Returns the parameter’s zero-based position, excluding the receiver.
     index: usize,
 }
 
 impl<'ctx> MethodSpecializationDescriptor<'ctx> {
+    /// Provides the resolved operation used to resolve or dispatch reflected
+    /// methods.
     fn resolved(&self) -> &ResolvedMethodSpecialization {
         &self.specializations[self.index]
     }
@@ -2267,6 +3212,23 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
         self.resolved().availability
     }
     /// Invokes this specialization after validating the receiver and arguments.
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub fn invoke<'call, M: ValueMode>(
         self,
         invocation: Invocation<'call, M>,
@@ -2288,6 +3250,25 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
     /// Returns [`PinnedInvocationFailure`] with the original pinned receiver
     /// and arguments when the adapter is unavailable or receiver and argument
     /// validation rejects the call. Panics raised by the method propagate.
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
+    ///
+    ///
+    /// # Type Parameters
+    ///
+    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `T`: Concrete Rust type whose metadata or value is used by the
+    ///   operation.
+    /// - `M`: Value mode that governs storage and thread-safety bounds.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `invocation`: Validated call values passed to the generated method
+    ///   adapter.
     pub fn invoke_pinned<'call, T: ?Sized + 'static, M: ValueMode>(
         &self,
         invocation: PinnedInvocation<'call, M, T>,
@@ -2298,6 +3279,10 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
     }
 }
 
+/// Resolves one parameter candidate from the source-level type expression.
+/// # Parameters
+///
+/// - `parameter`: Declared parameter considered during argument matching.
 fn parameter_candidate(parameter: ParameterDescriptor<'_>) -> LookupCandidate {
     let display_name: Box<str> = parameter.name().unwrap_or("<pattern>").into();
     LookupCandidate {
@@ -2311,6 +3296,13 @@ fn parameter_candidate(parameter: ParameterDescriptor<'_>) -> LookupCandidate {
     }
 }
 
+/// Finds the registered specialization compatible with the supplied generic
+/// arguments. # Parameters
+///
+/// - `index`: Zero-based field position to inspect.
+/// # Parameters
+///
+/// - `index`: Zero-based field position to inspect.
 fn specialization_candidate(index: usize) -> LookupCandidate {
     let display_name: Box<str> = format!("specialization {index}").into();
     LookupCandidate {
@@ -2462,7 +3454,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn descriptor_exposes_receiver_parameters_qualifiers_and_return_metadata() {
+    fn test_descriptor_exposes_receiver_parameters_qualifiers_and_return_metadata() {
         let method = descriptor(&METHOD);
         assert_eq!(method.name(), "inspect");
         assert_eq!(method.target().type_id(), std::any::TypeId::of::<Target>());
@@ -2523,7 +3515,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn parameter_name_lookup_reports_missing_and_duplicate_identifiers() {
+    fn test_parameter_name_lookup_reports_missing_and_duplicate_identifiers() {
         let method = descriptor(&METHOD);
         assert!(matches!(
             method.parameter("absent"),
@@ -2598,7 +3590,7 @@ mod descriptor_behavior_tests {
         .build();
 
     #[test]
-    fn invocation_adapter_runs_and_missing_adapter_is_a_typed_preflight_error() {
+    fn test_invocation_adapter_runs_and_missing_adapter_is_a_typed_preflight_error() {
         static CALLABLE_METHOD: MethodMetadata = MethodMetadata::from_spec(MethodMetadataSpec::new(
             "value",
             MethodNamespaceMetadata::Inherent {
@@ -2641,7 +3633,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn specialization_resolution_rejects_argument_kind_and_arity_mismatches() {
+    fn test_specialization_resolution_rejects_argument_kind_and_arity_mismatches() {
         let empty_adapters = InvocationAdapters::builder().build();
         let error = match MethodSpecializationSpec::new(&CONST_FOR_TYPE_ARGUMENT, empty_adapters)
             .resolve(&GENERIC_PARAMETERS)
@@ -2672,7 +3664,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn specialization_arguments_cover_lifetimes_and_primitive_const_kinds() {
+    fn test_specialization_arguments_cover_lifetimes_and_primitive_const_kinds() {
         static PARAMETERS: [GenericParameterMetadata; 15] = [
             GenericParameterMetadata::lifetime("a", 0, &[]),
             GenericParameterMetadata::const_parameter("flag", 1, &TYPE_EXPRESSION, None),
@@ -2734,7 +3726,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn specialization_selection_reports_missing_and_ambiguous_bindings() {
+    fn test_specialization_selection_reports_missing_and_ambiguous_bindings() {
         static ARGUMENT_ONE: [MethodSpecializationArgument; 1] = [MethodSpecializationArgument::u8(1)];
         static ARGUMENT_TWO: [MethodSpecializationArgument; 1] = [MethodSpecializationArgument::u8(2)];
         static SPECS: [MethodSpecializationSpec; 2] = [
@@ -2887,7 +3879,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn registration_equality_compares_source_availability_and_adapter_identity() {
+    fn test_registration_equality_compares_source_availability_and_adapter_identity() {
         static METADATA: MethodMetadata = MethodMetadata::inherent("unit", "Target::unit");
         let base = EffectiveMethod::for_type::<Target>(&METADATA);
         assert!(base.same_registration(&EffectiveMethod::for_type::<Target>(&METADATA)));
@@ -2908,7 +3900,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn pinned_method_invocation_checks_and_dispatches_the_bound_receiver() {
+    fn test_pinned_method_invocation_checks_and_dispatches_the_bound_receiver() {
         static PINNED_RECEIVER: ReceiverDescriptor = ReceiverDescriptor::for_type::<Target>(ReceiverKind::PinnedShared);
         static NO_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata {
             parameters: &[],
@@ -2955,7 +3947,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn inherent_metadata_constructors_keep_their_documented_defaults() {
+    fn test_inherent_metadata_constructors_keep_their_documented_defaults() {
         let metadata = MethodMetadata::inherent("unit", "Target::unit");
         assert_eq!(metadata.name, "unit");
         assert!(matches!(
@@ -2981,7 +3973,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn runtime_specialization_builders_resolve_each_public_argument_constructor() {
+    fn test_runtime_specialization_builders_resolve_each_public_argument_constructor() {
         static U8_TYPE_EXPRESSION: ExpressionData = ExpressionData::Named {
             path: "u8",
             definition: None,
@@ -3047,7 +4039,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn integer_expression_paths_and_normalization_cover_signed_and_unsigned_ranges() {
+    fn test_integer_expression_paths_and_normalization_cover_signed_and_unsigned_ranges() {
         static EXPRESSIONS: [ExpressionData; 12] = [
             ExpressionData::Named {
                 path: "i8",
@@ -3166,7 +4158,7 @@ mod descriptor_behavior_tests {
     }
 
     #[test]
-    fn receiver_and_optional_return_metadata_preserve_absence() {
+    fn test_receiver_and_optional_return_metadata_preserve_absence() {
         static NO_RECEIVER: MethodMetadata = MethodMetadata::from_spec(MethodMetadataSpec::new(
             "unit",
             MethodNamespaceMetadata::Inherent {

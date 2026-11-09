@@ -35,15 +35,34 @@ use crate::runtime::value::Local as RuntimeLocal;
 
 /// Typed construction and update callbacks using only codegen-v4 dynamic
 /// values.
+///
+/// # Type Parameters
+///
+/// * `T` — concrete target type produced by construction and update.
+/// * `M` — value mode accepted by the callbacks.
 pub struct ConstructProvider<T: 'static, M: ValueMode> {
+    /// Callback that builds a target from its ordered field inputs.
     construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
+    /// Callback that updates an existing target from replacement inputs.
     update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
+    /// Associates the callback pair with its target type without storing it.
     _type: std::marker::PhantomData<fn() -> T>,
 }
 
 impl<T: 'static, M: ValueMode> ConstructProvider<T, M> {
     /// Creates typed callbacks for constructing and updating one concrete
     /// target type.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — target type returned by both callbacks.
+    /// * `M` — ownership mode used for dynamic field values.
+    ///
+    /// # Parameters
+    ///
+    /// * `construct` — function that creates a target from field slots.
+    /// * `update` — function that applies replacement slots to an existing
+    ///   target.
     pub const fn new(
         construct: fn(Vec<Option<DynamicOwned<M>>>) -> T,
         update: fn(T, Vec<Option<DynamicOwned<M>>>) -> T,
@@ -60,6 +79,12 @@ impl<T> RuntimeConstructProvider<RuntimeLocal> for ConstructProvider<T, Local>
 where
     T: ValueFor<Local>,
 {
+    /// Converts runtime field values, calls the typed constructor, and erases
+    /// its result.
+    ///
+    /// # Parameters
+    ///
+    /// * `fields` — ordered field slots supplied by the runtime constructor.
     fn construct(&self, fields: Vec<Option<RuntimeDynamicOwned<RuntimeLocal>>>) -> RuntimeDynamicOwned<RuntimeLocal> {
         let fields = fields
             .into_iter()
@@ -68,6 +93,13 @@ where
         DynamicOwned::<Local>::new((self.construct)(fields)).into_runtime()
     }
 
+    /// Recovers the typed base, converts replacements, then erases the updated
+    /// value.
+    ///
+    /// # Parameters
+    ///
+    /// * `base` — erased value previously created by this typed provider.
+    /// * `replacements` — ordered slots that replace selected fields.
     fn update(
         &self,
         base: RuntimeDynamicOwned<RuntimeLocal>,
@@ -89,6 +121,12 @@ impl<T> RuntimeConstructProvider<crate::runtime::value::ThreadSafe> for Construc
 where
     T: ValueFor<ThreadSafe>,
 {
+    /// Converts thread-safe field values, invokes the typed constructor, and
+    /// erases its result.
+    ///
+    /// # Parameters
+    ///
+    /// * `fields` — ordered field slots supplied by the runtime constructor.
     fn construct(
         &self,
         fields: Vec<Option<RuntimeDynamicOwned<crate::runtime::value::ThreadSafe>>>,
@@ -100,6 +138,13 @@ where
         DynamicOwned::<ThreadSafe>::new((self.construct)(fields)).into_runtime()
     }
 
+    /// Recovers the typed base and replacements before returning an erased
+    /// updated value.
+    ///
+    /// # Parameters
+    ///
+    /// * `base` — erased value previously created by this typed provider.
+    /// * `replacements` — ordered slots that replace selected fields.
     fn update(
         &self,
         base: RuntimeDynamicOwned<crate::runtime::value::ThreadSafe>,
@@ -120,6 +165,14 @@ where
 impl crate::runtime::construct::ConstructionProviders {
     /// Creates providers with the local mode, which works for all reflected
     /// values.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected target type served by the local provider.
+    ///
+    /// # Parameters
+    ///
+    /// * `local` — optional constructor/update callbacks for local values.
     pub const fn new<T: ValueFor<Local>>(local: Option<&'static ConstructProvider<T, Local>>) -> Self {
         let local = match local {
             Some(provider) => Some(provider as &dyn RuntimeConstructProvider<RuntimeLocal>),
@@ -130,6 +183,14 @@ impl crate::runtime::construct::ConstructionProviders {
 
     /// Adds a thread-safe provider when the target and its fields are `Send +
     /// Sync`.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `T` — reflected target type served by the thread-safe provider.
+    ///
+    /// # Parameters
+    ///
+    /// * `provider` — constructor/update callbacks for thread-safe values.
     pub const fn with_thread_safe<T: ValueFor<ThreadSafe>>(
         self,
         provider: &'static ConstructProvider<T, ThreadSafe>,
@@ -186,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn local_provider_converts_construct_and_update_values() {
+    fn test_local_provider_converts_construct_and_update_values() {
         let provider = ConstructProvider::<u8, Local>::new(construct_local, update_local);
         let fields = vec![Some(RuntimeDynamicOwned::<RuntimeLocal>::new(17_u8))];
         let constructed =
@@ -210,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn thread_safe_provider_converts_construct_and_update_values() {
+    fn test_thread_safe_provider_converts_construct_and_update_values() {
         let provider = ConstructProvider::<u32, ThreadSafe>::new(construct_thread_safe, update_thread_safe);
         let fields = vec![Some(RuntimeDynamicOwned::<crate::runtime::value::ThreadSafe>::new(
             23_u32,
@@ -239,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn providers_can_be_registered_for_both_modes() {
+    fn test_providers_can_be_registered_for_both_modes() {
         static LOCAL: ConstructProvider<u8, Local> = ConstructProvider::new(construct_local, update_local);
         static THREAD_SAFE: ConstructProvider<u32, ThreadSafe> =
             ConstructProvider::new(construct_thread_safe, update_thread_safe);

@@ -8,7 +8,6 @@
 
 use std::marker::PhantomData;
 
-
 #[qubit_reflect::Reflect]
 struct Constrained<T>(#[reflect(skip)] PhantomData<T>);
 

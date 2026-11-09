@@ -338,7 +338,7 @@ static DUPLICATE_ARGUMENTS: [GenericArgumentMetadata; 2] = [
 ];
 
 #[test]
-fn definition_and_type_expression_remain_source_level() {
+fn test_definition_and_type_expression_remain_source_level() {
     let context = crate::runtime::context::handle::builder::ReflectionContextBuilder::new()
         .register(
             crate::runtime::context::handle::registration::Registration::of::<EnvelopeU8>()
@@ -375,7 +375,7 @@ fn definition_and_type_expression_remain_source_level() {
 }
 
 #[test]
-fn applications_keep_unreflected_type_arguments_and_const_values() {
+fn test_applications_keep_unreflected_type_arguments_and_const_values() {
     let context = ReflectionContext::empty();
     let arguments = GenericArguments::new(&GENERIC_ARGUMENTS, &context);
 
@@ -406,7 +406,7 @@ fn applications_keep_unreflected_type_arguments_and_const_values() {
 }
 
 #[test]
-fn generic_lookup_reports_missing_parameters() {
+fn test_generic_lookup_reports_missing_parameters() {
     let context = ReflectionContext::empty();
     let definition = GenericDefinitionDescriptor::new(&GENERICS, &context);
     let error = match definition.parameter("Missing") {
@@ -417,7 +417,7 @@ fn generic_lookup_reports_missing_parameters() {
 }
 
 #[test]
-fn concrete_argument_lookup_reports_missing_and_ambiguous_names() {
+fn test_concrete_argument_lookup_reports_missing_and_ambiguous_names() {
     let context = ReflectionContext::empty();
     let arguments = GenericArguments::new(&GENERIC_ARGUMENTS, &context);
     let missing = match arguments.argument("Missing") {
@@ -448,7 +448,7 @@ fn concrete_argument_lookup_reports_missing_and_ambiguous_names() {
 }
 
 #[test]
-fn generic_lookup_reports_ambiguous_parameter_names() {
+fn test_generic_lookup_reports_ambiguous_parameter_names() {
     let context = ReflectionContext::empty();
     let definition = GenericDefinitionDescriptor::new(&DUPLICATE_PARAMETERS, &context);
     let error = match definition.parameter("T") {
@@ -466,7 +466,7 @@ fn generic_lookup_reports_ambiguous_parameter_names() {
 }
 
 #[test]
-fn generic_argument_kind_mismatch_is_reported() {
+fn test_generic_argument_kind_mismatch_is_reported() {
     let context = ReflectionContext::empty();
     let arguments = GenericArguments::new(&GENERIC_ARGUMENTS, &context);
     let error = match arguments.argument("N").expect("N argument is present").type_argument() {
@@ -492,7 +492,7 @@ fn generic_argument_kind_mismatch_is_reported() {
 }
 
 #[test]
-fn lifetime_parameters_stay_on_definitions_and_out_of_applications() {
+fn test_lifetime_parameters_stay_on_definitions_and_out_of_applications() {
     let context = ReflectionContext::empty();
     let definition = GenericDefinitionDescriptor::new(&LIFETIME_GENERICS, &context);
     assert!(matches!(
@@ -506,7 +506,7 @@ fn lifetime_parameters_stay_on_definitions_and_out_of_applications() {
 }
 
 #[test]
-fn type_expression_preserves_composite_source_shapes() {
+fn test_type_expression_preserves_composite_source_shapes() {
     let context = ReflectionContext::empty();
     let cases = [
         (&REFERENCE_EXPRESSION, "&'a T"),
@@ -528,7 +528,7 @@ fn type_expression_preserves_composite_source_shapes() {
 }
 
 #[test]
-fn predicates_preserve_trait_bound_facts_without_solving_them() {
+fn test_predicates_preserve_trait_bound_facts_without_solving_them() {
     let context = ReflectionContext::empty();
     let definition = GenericDefinitionDescriptor::new(&BOUNDED_GENERICS, &context);
     let predicates = definition.predicates();
@@ -542,7 +542,7 @@ fn predicates_preserve_trait_bound_facts_without_solving_them() {
 }
 
 #[test]
-fn type_expression_kinds_expose_every_structural_node_and_context() {
+fn test_type_expression_kinds_expose_every_structural_node_and_context() {
     let context = ReflectionContext::empty();
 
     assert!(matches!(
@@ -648,7 +648,7 @@ fn type_expression_kinds_expose_every_structural_node_and_context() {
 }
 
 #[test]
-fn generic_expression_arguments_and_associated_constraints_keep_source_order() {
+fn test_generic_expression_arguments_and_associated_constraints_keep_source_order() {
     let context = ReflectionContext::empty();
     let TypeExpressionKind::Named(named) = TypeExpression::new(&ARGUMENT_EXPRESSION, &context).kind() else {
         panic!("named expression expected");
@@ -715,7 +715,7 @@ fn generic_expression_arguments_and_associated_constraints_keep_source_order() {
 }
 
 #[test]
-fn function_pointer_and_nested_bounds_expose_signature_facts() {
+fn test_function_pointer_and_nested_bounds_expose_signature_facts() {
     let context = ReflectionContext::empty();
     let TypeExpressionKind::FunctionPointer(function) =
         TypeExpression::new(&PLAIN_FUNCTION_EXPRESSION, &context).kind()
@@ -743,7 +743,7 @@ fn function_pointer_and_nested_bounds_expose_signature_facts() {
 }
 
 #[test]
-fn every_predicate_kind_preserves_its_structural_facts() {
+fn test_every_predicate_kind_preserves_its_structural_facts() {
     let context = ReflectionContext::empty();
     let predicates = GenericDefinitionDescriptor::new(&ALL_PREDICATES_GENERICS, &context).predicates();
     assert_eq!(predicates.len(), 5);
@@ -793,7 +793,7 @@ fn every_predicate_kind_preserves_its_structural_facts() {
 }
 
 #[test]
-fn expression_display_formats_lifetimes_consts_and_argument_forms() {
+fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
     let context = ReflectionContext::empty();
     let cases = [
         (&DISPLAY_PLACEHOLDER_REFERENCE, "&'_ mut T"),
@@ -829,7 +829,7 @@ fn expression_display_formats_lifetimes_consts_and_argument_forms() {
 }
 
 #[test]
-fn expression_errors_expose_kinds_messages_and_error_contract() {
+fn test_expression_errors_expose_kinds_messages_and_error_contract() {
     let context = ReflectionContext::empty();
     let arguments = GenericArguments::new(&GENERIC_ARGUMENTS, &context);
     let error = match arguments.argument("N").expect("const argument exists").type_argument() {

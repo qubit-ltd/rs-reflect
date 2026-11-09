@@ -48,7 +48,7 @@ qubit_reflect::__private::codegen_v4::registration::submit_type!(ContractRecord)
 qubit_reflect::__private::codegen_v4::registration::submit_type!(ContractEnum);
 
 #[test]
-fn construction_facade_is_usable_from_downstream_code() {
+fn test_construction_facade_is_usable_from_downstream_code() {
     let _empty = ContractEnum::Empty;
     let descriptor = TypeDescriptor::of::<ContractRecord>();
     let construction = descriptor.construction();

@@ -36,7 +36,7 @@ struct ContextIndependentUnit;
 struct ContextIndependentEmptyNamed {}
 
 #[test]
-fn type_metadata_remains_available_when_the_context_does_not_index_the_type() {
+fn test_type_metadata_remains_available_when_the_context_does_not_index_the_type() {
     let context = ReflectionContext::builder()
         .build()
         .expect("empty explicit contexts are valid");
@@ -66,7 +66,7 @@ fn type_metadata_remains_available_when_the_context_does_not_index_the_type() {
 }
 
 #[test]
-fn static_construction_shapes_remain_available_without_context_registration() {
+fn test_static_construction_shapes_remain_available_without_context_registration() {
     let context = ReflectionContext::builder()
         .build()
         .expect("empty explicit contexts are valid");

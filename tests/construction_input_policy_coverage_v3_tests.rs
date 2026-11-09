@@ -39,7 +39,7 @@ struct PrivateInputTuple(pub String, u32);
 struct EmptyInput;
 
 #[test]
-fn construction_descriptor_exposes_shape_and_field_policies() {
+fn test_construction_descriptor_exposes_shape_and_field_policies() {
     let construction = TypeDescriptor::of::<InputRecord>().construction();
     assert_eq!(construction.shape(), ConstructionShape::Named);
     assert_eq!(construction.fields().len(), 1);
@@ -58,7 +58,7 @@ fn construction_descriptor_exposes_shape_and_field_policies() {
 }
 
 #[test]
-fn explicit_field_policy_metadata_is_typed_and_debuggable() {
+fn test_explicit_field_policy_metadata_is_typed_and_debuggable() {
     let required = qubit_reflect::construct::ConstructField::typed::<u32>(
         "value",
         Visibility::Public,
@@ -86,7 +86,7 @@ fn explicit_field_policy_metadata_is_typed_and_debuggable() {
 }
 
 #[test]
-fn private_field_metadata_keeps_shape_and_reports_unavailability() {
+fn test_private_field_metadata_keeps_shape_and_reports_unavailability() {
     let construction = TypeDescriptor::of::<PrivateInputRecord>().construction();
     assert!(matches!(
         construction.availability(),

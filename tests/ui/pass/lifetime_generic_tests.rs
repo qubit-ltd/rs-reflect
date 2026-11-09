@@ -24,8 +24,6 @@ struct Borrowed<'scope> {
 }
 
 fn main() {
-    let _ = Borrowed {
-        marker: PhantomData,
-    };
+    let _ = Borrowed { marker: PhantomData };
     assert_eq!(TypeDescriptor::of::<Borrowed<'static>>().name(), "Borrowed");
 }

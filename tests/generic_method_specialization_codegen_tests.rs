@@ -220,7 +220,7 @@ fn builder_mixed_binding() -> MethodBinding<BuilderBindingFixture> {
 }
 
 #[test]
-fn generic_method_bindings_expand_to_typed_runtime_specs() {
+fn test_generic_method_bindings_expand_to_typed_runtime_specs() {
     assert_eq!(
         DefaultMethodFixture::<u32>::generic_default(&SpecializationFixture, 7),
         7
@@ -237,7 +237,7 @@ fn generic_method_bindings_expand_to_typed_runtime_specs() {
 }
 
 #[test]
-fn builder_binding_joins_the_target_method_catalog() {
+fn test_builder_binding_joins_the_target_method_catalog() {
     assert_eq!(BuilderBindingFixture.default_generic(11_u8), 11);
     let context = ReflectionContext::builder()
         .include_linked()
@@ -252,7 +252,7 @@ fn builder_binding_joins_the_target_method_catalog() {
 }
 
 #[test]
-fn specialization_api_exposes_typed_generic_arguments() {
+fn test_specialization_api_exposes_typed_generic_arguments() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(builder_mixed_binding())
@@ -309,7 +309,7 @@ fn specialization_api_exposes_typed_generic_arguments() {
 }
 
 #[test]
-fn impl_method_navigation_uses_context_specializations() {
+fn test_impl_method_navigation_uses_context_specializations() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(builder_mixed_binding())
@@ -365,7 +365,7 @@ fn impl_method_navigation_uses_context_specializations() {
 }
 
 #[test]
-fn specialization_selection_uses_exact_type_identity() {
+fn test_specialization_selection_uses_exact_type_identity() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(builder_type_binding())
@@ -388,7 +388,7 @@ fn specialization_selection_uses_exact_type_identity() {
 }
 
 #[test]
-fn specialization_selection_distinguishes_same_named_types() {
+fn test_specialization_selection_distinguishes_same_named_types() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(same_named_type_binding())
@@ -415,7 +415,7 @@ fn specialization_selection_distinguishes_same_named_types() {
 }
 
 #[test]
-fn method_specializations_do_not_leak_between_contexts() {
+fn test_method_specializations_do_not_leak_between_contexts() {
     let first_context = ReflectionContext::builder()
         .include_linked()
         .bind(builder_type_binding())
@@ -471,7 +471,7 @@ fn method_specializations_do_not_leak_between_contexts() {
 }
 
 #[test]
-fn same_named_trait_application_methods_stay_with_their_context_application() {
+fn test_same_named_trait_application_methods_stay_with_their_context_application() {
     let u8_context = ReflectionContext::builder()
         .include_linked()
         .bind(application_label_u8_binding())
@@ -509,7 +509,7 @@ fn same_named_trait_application_methods_stay_with_their_context_application() {
 }
 
 #[test]
-fn specialization_selection_matches_typed_const_arguments_exactly() {
+fn test_specialization_selection_matches_typed_const_arguments_exactly() {
     let context = ReflectionContext::builder()
         .include_linked()
         .bind(builder_mixed_binding())
@@ -548,7 +548,7 @@ fn specialization_selection_matches_typed_const_arguments_exactly() {
 }
 
 #[test]
-fn builder_rejects_duplicate_method_specialization_structurally() {
+fn test_builder_rejects_duplicate_method_specialization_structurally() {
     let result = ReflectionContext::builder()
         .include_linked()
         .bind(builder_type_binding())

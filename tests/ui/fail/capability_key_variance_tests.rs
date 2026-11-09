@@ -7,8 +7,8 @@
 // =============================================================================
 
 use qubit_reflect::Reflect;
-use qubit_reflect::register_capability;
 use qubit_reflect::capability::CloneCapability;
+use qubit_reflect::register_capability;
 
 #[Reflect]
 struct NotClone;
@@ -16,5 +16,6 @@ struct NotClone;
 register_capability!(NotClone: CloneCapability);
 
 fn main() {
-    // The registration macro must reject a Clone adapter unsupported by the target type.
+    // The registration macro must reject a Clone adapter unsupported by the
+    // target type.
 }

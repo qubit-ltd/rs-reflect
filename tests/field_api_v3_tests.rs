@@ -24,7 +24,7 @@ struct FieldTarget {
 }
 
 #[test]
-fn dynamic_field_access_borrows_and_recovers_replacements() {
+fn test_dynamic_field_access_borrows_and_recovers_replacements() {
     let field = TypeDescriptor::of::<FieldTarget>()
         .field("value")
         .expect("public field is reflected");
@@ -74,7 +74,7 @@ fn dynamic_field_access_borrows_and_recovers_replacements() {
 }
 
 #[test]
-fn dynamic_field_access_enforces_source_visibility() {
+fn test_dynamic_field_access_enforces_source_visibility() {
     let field = TypeDescriptor::of::<FieldTarget>()
         .field("secret")
         .expect("private field is reflected");

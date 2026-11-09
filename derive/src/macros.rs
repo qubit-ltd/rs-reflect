@@ -6,6 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+mod external_trait_input;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
@@ -14,17 +16,19 @@ use quote::quote;
 use syn::Item;
 use syn::ItemEnum;
 use syn::ItemStruct;
-use syn::Token;
-use syn::parse::Parse;
-use syn::parse::ParseStream;
 use syn::parse2;
 use syn::spanned::Spanned;
 
+use self::external_trait_input::ExternalTraitInput;
 use crate::configure;
 use crate::entry;
 use crate::ir::MacroKind;
 
 /// Parses and expands a call-site generic method binding.
+///
+/// # Parameters
+///
+/// - `input`: Macro token stream describing the method path and signature.
 pub fn bind_method(input: TokenStream) -> TokenStream {
     match crate::expand::bind_method::expand(input.into()) {
         Ok(tokens) => tokens.into(),
@@ -33,6 +37,10 @@ pub fn bind_method(input: TokenStream) -> TokenStream {
 }
 
 /// Parses and expands a linked method binding registration.
+///
+/// # Parameters
+///
+/// - `input`: Macro token stream describing the registered method binding.
 pub fn register_method_binding(input: TokenStream) -> TokenStream {
     match crate::expand::bind_method::expand_registered(input.into()) {
         Ok(tokens) => tokens.into(),
@@ -40,32 +48,12 @@ pub fn register_method_binding(input: TokenStream) -> TokenStream {
     }
 }
 
-struct ExternalTraitInput {
-    visibility: syn::Visibility,
-    marker: syn::Ident,
-    path: syn::Path,
-}
-
-impl Parse for ExternalTraitInput {
-    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let visibility = input.parse()?;
-        let marker = input.parse()?;
-        input.parse::<Token![=]>()?;
-        let path = input.parse()?;
-        input.parse::<Token![;]>()?;
-        if !input.is_empty() {
-            return Err(input.error("unexpected tokens after external trait declaration"));
-        }
-        Ok(Self {
-            visibility,
-            marker,
-            path,
-        })
-    }
-}
-
 /// Expands a typed marker and linked identity registration for an external
 /// trait.
+///
+/// # Parameters
+///
+/// - `input`: Marker declaration and external trait path.
 pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
     let result = crate::expand::ExpansionContext::from_attributes(&[])
         .and_then(|context| expand_reflect_external_trait(input.into(), &context));
@@ -75,6 +63,17 @@ pub fn reflect_external_trait(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Generates the marker provider and registration fragment for an external
+/// trait.
+///
+/// # Parameters
+///
+/// - `input`: Parsed macro input tokens.
+/// - `context`: Resolved expansion context naming the runtime facade.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when the declaration or trait path is invalid.
 fn expand_reflect_external_trait(
     input: TokenStream2,
     context: &crate::expand::ExpansionContext,
@@ -106,8 +105,7 @@ fn expand_reflect_external_trait(
         let trait_name = syn::LitStr::new(&trait_name, path.span());
         let source = syn::LitStr::new(&source_path, path.span());
         let fingerprint = context.fingerprint(&source_path);
-        let marker_provider =
-            format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
+        let marker_provider = format_ident!("__qubit_reflect_external_trait_provider_{fingerprint:016x}");
         Ok(quote! {
             const _: () = #facade::__private::codegen_v4::protocol::assert_protocol_version(4);
 
@@ -154,6 +152,10 @@ fn expand_reflect_external_trait(
 }
 
 /// Expands a compiler-checked trait-object registration fragment.
+///
+/// # Parameters
+///
+/// - `input`: Trait-object type to register.
 pub fn register_trait_object(input: TokenStream) -> TokenStream {
     let result = crate::expand::ExpansionContext::from_attributes(&[])
         .and_then(|context| expand_register_trait_object(input.into(), &context));
@@ -163,6 +165,16 @@ pub fn register_trait_object(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Emits a compiler-checked registration fragment for one trait object.
+///
+/// # Parameters
+///
+/// - `input`: Trait-object type tokens to validate and register.
+/// - `context`: Resolved expansion context naming the runtime facade.
+///
+/// # Errors
+///
+/// Returns a syntax diagnostic when `input` is not a trait object.
 fn expand_register_trait_object(
     input: TokenStream2,
     context: &crate::expand::ExpansionContext,
@@ -257,6 +269,12 @@ pub fn reflect_impl(attribute: TokenStream, item: TokenStream) -> TokenStream {
     configure::configure_attribute(MacroKind::Impl, attribute, item)
 }
 
+/// Expands a struct after removing reflection-only helper attributes.
+///
+/// # Parameters
+///
+/// - `attribute`: Arguments supplied to the attribute macro.
+/// - `item`: Parsed source struct to retain and expand.
 fn reflect_type(attribute: TokenStream, mut item: ItemStruct) -> TokenStream {
     let args = TokenStream2::from(attribute);
     let reflected_item = item.to_token_stream();
@@ -267,6 +285,12 @@ fn reflect_type(attribute: TokenStream, mut item: ItemStruct) -> TokenStream {
     expand_type(item, reflected_item, args)
 }
 
+/// Expands an enum after removing reflection-only helper attributes.
+///
+/// # Parameters
+///
+/// - `attribute`: Arguments supplied to the attribute macro.
+/// - `item`: Parsed source enum to retain and expand.
 fn reflect_enum(attribute: TokenStream, mut item: ItemEnum) -> TokenStream {
     let args = TokenStream2::from(attribute);
     let reflected_item = item.to_token_stream();
@@ -280,11 +304,14 @@ fn reflect_enum(attribute: TokenStream, mut item: ItemEnum) -> TokenStream {
     expand_type(item, reflected_item, args)
 }
 
-fn expand_type(
-    item: impl ToTokens,
-    reflected_item: TokenStream2,
-    args: TokenStream2,
-) -> TokenStream {
+/// Combines the preserved source item with its generated reflection output.
+///
+/// # Parameters
+///
+/// - `item`: Source item after helper attributes are removed.
+/// - `reflected_item`: Original item tokens consumed by the reflection parser.
+/// - `args`: Reflection helper arguments for the parser.
+fn expand_type(item: impl ToTokens, reflected_item: TokenStream2, args: TokenStream2) -> TokenStream {
     let item = item.to_token_stream();
     let generated = entry::process_macro(MacroKind::Derive, args.into(), reflected_item.into());
     let item: TokenStream2 = item;
@@ -292,6 +319,11 @@ fn expand_type(
     quote!(#item #generated).into()
 }
 
+/// Removes reflection helper attributes before the Rust item is re-emitted.
+///
+/// # Parameters
+///
+/// - `attributes`: Attribute list on a source item or field.
 fn strip_attributes(attributes: &mut Vec<syn::Attribute>) {
     attributes.retain(|attribute| !attribute.path().is_ident("reflect"));
 }
@@ -316,11 +348,9 @@ mod tests {
     #[test]
     fn test_bind_method_emits_v4_protocol_handshake() {
         let context = ExpansionContext::for_tests();
-        let tokens = crate::expand::bind_method::expand_with_context(
-            quote!(Fixture::method as fn(&Fixture) -> u32),
-            &context,
-        )
-        .expect("method binding should expand");
+        let tokens =
+            crate::expand::bind_method::expand_with_context(quote!(Fixture::method as fn(&Fixture) -> u32), &context)
+                .expect("method binding should expand");
 
         assert_v4_protocol_handshake(tokens);
     }
@@ -340,9 +370,8 @@ mod tests {
     #[test]
     fn test_reflect_external_trait_emits_v4_protocol_handshake() {
         let context = ExpansionContext::for_tests();
-        let tokens =
-            expand_reflect_external_trait(quote!(pub ExternalDebug = ::std::fmt::Debug;), &context)
-                .expect("external trait marker should expand");
+        let tokens = expand_reflect_external_trait(quote!(pub ExternalDebug = ::std::fmt::Debug;), &context)
+            .expect("external trait marker should expand");
 
         assert_v4_protocol_handshake(tokens);
     }

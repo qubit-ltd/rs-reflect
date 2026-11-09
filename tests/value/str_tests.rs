@@ -13,7 +13,7 @@ use qubit_reflect::value::DynamicRef;
 use qubit_reflect::value::Local;
 
 #[test]
-fn shared_str_can_be_inspected_and_extracted_by_type() {
+fn test_shared_str_can_be_inspected_and_extracted_by_type() {
     let text = String::from("hello");
     let value = DynamicRef::<Local>::new(text.as_str());
 
@@ -22,7 +22,7 @@ fn shared_str_can_be_inspected_and_extracted_by_type() {
 }
 
 #[test]
-fn mutable_str_can_be_inspected_mutated_and_extracted_by_type() {
+fn test_mutable_str_can_be_inspected_mutated_and_extracted_by_type() {
     let mut text = String::from("hello");
     {
         let mut value = DynamicMut::<Local>::new(text.as_mut_str());
@@ -42,7 +42,7 @@ fn mutable_str_can_be_inspected_mutated_and_extracted_by_type() {
 }
 
 #[test]
-fn failed_str_extraction_returns_the_original_borrow() {
+fn test_failed_str_extraction_returns_the_original_borrow() {
     let number = 42_u32;
     let failure = DynamicRef::<Local>::new(&number)
         .downcast::<str>()

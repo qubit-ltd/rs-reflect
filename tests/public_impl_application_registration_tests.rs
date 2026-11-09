@@ -61,7 +61,7 @@ fn impl_registration() -> Registration {
 }
 
 #[test]
-fn method_catalog_does_not_satisfy_impl_application_target_inclusion() {
+fn test_method_catalog_does_not_satisfy_impl_application_target_inclusion() {
     let result = ReflectionContext::builder().register(impl_registration()).build();
     let error = match result {
         Ok(_) => panic!("a method catalog does not include its target type"),
@@ -82,7 +82,7 @@ fn method_catalog_does_not_satisfy_impl_application_target_inclusion() {
 }
 
 #[test]
-fn bare_external_generic_trait_applications_retain_positional_arguments() {
+fn test_bare_external_generic_trait_applications_retain_positional_arguments() {
     let context = ReflectionContext::builder()
         .include_linked()
         .build()

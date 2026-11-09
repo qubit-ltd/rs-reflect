@@ -22,7 +22,7 @@ pub struct Record {
 }
 
 #[test]
-fn skipped_member_is_absent_from_the_descriptor() {
+fn test_skipped_member_is_absent_from_the_descriptor() {
     let descriptor = TypeDescriptor::of_in::<Record>(ReflectionContext::global());
     let record = Record {
         visible: 5,

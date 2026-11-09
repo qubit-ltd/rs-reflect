@@ -407,6 +407,8 @@ pub(crate) mod runtime;
 
 #[path = "identity/capability_id.rs"]
 mod old_capability_id;
+#[path = "identity/id_authority.rs"]
+mod old_id_authority;
 #[path = "error/id_error.rs"]
 mod old_id_error;
 mod identity {

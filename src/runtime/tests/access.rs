@@ -322,7 +322,7 @@ fn descriptor<'ctx>(context: &'ctx ReflectionContext) -> FieldDescriptor<'ctx> {
 }
 
 #[test]
-fn typed_field_access_reads_mutates_and_replaces() {
+fn test_typed_field_access_reads_mutates_and_replaces() {
     let context = ReflectionContext::empty();
     let field = descriptor(&context);
     let mut record = Record { id: 11 };
@@ -334,7 +334,7 @@ fn typed_field_access_reads_mutates_and_replaces() {
 }
 
 #[test]
-fn typed_field_access_rejects_wrong_target_and_value_types() {
+fn test_typed_field_access_rejects_wrong_target_and_value_types() {
     let context = ReflectionContext::empty();
     let field = descriptor(&context);
     let wrong_target = 3_u64;
@@ -351,7 +351,7 @@ fn typed_field_access_rejects_wrong_target_and_value_types() {
 }
 
 #[test]
-fn failed_replacement_returns_original_value_without_mutating_target() {
+fn test_failed_replacement_returns_original_value_without_mutating_target() {
     let context = ReflectionContext::empty();
     let field = descriptor(&context);
     let mut wrong_target = 4_u64;
@@ -375,7 +375,7 @@ fn failed_replacement_returns_original_value_without_mutating_target() {
 }
 
 #[test]
-fn inaccessible_field_is_described_but_not_read() {
+fn test_inaccessible_field_is_described_but_not_read() {
     let context = ReflectionContext::empty();
     let ty = TypeDescriptor::of_in::<Record>(&context);
     static PRIVATE_FIELD: FieldMetadata = FieldMetadata::new(
@@ -413,7 +413,7 @@ fn inaccessible_field_is_described_but_not_read() {
 }
 
 #[test]
-fn context_shape_registrations_drive_descriptor_collections() {
+fn test_context_shape_registrations_drive_descriptor_collections() {
     let context = ReflectionContext::builder()
         .include_type::<Record>()
         .include_type::<Choice>()
@@ -444,7 +444,7 @@ fn context_shape_registrations_drive_descriptor_collections() {
 }
 
 #[test]
-fn dynamically_sized_adapter_keeps_dst_out_of_typed_pointer_access() {
+fn test_dynamically_sized_adapter_keeps_dst_out_of_typed_pointer_access() {
     assert_eq!(DST_ADAPTER.owner().type_id, std::any::TypeId::of::<[u8]>());
     assert_eq!(DST_ADAPTER.value().type_id, std::any::TypeId::of::<[u8]>());
     // SAFETY: this adapter is deliberately dynamic-only and never dereferences raw
@@ -456,7 +456,7 @@ fn dynamically_sized_adapter_keeps_dst_out_of_typed_pointer_access() {
 }
 
 #[test]
-fn variant_activity_and_enum_field_access_follow_active_variant() {
+fn test_variant_activity_and_enum_field_access_follow_active_variant() {
     let context = ReflectionContext::empty();
     let ty = TypeDescriptor::of_in::<Choice>(&context);
     let count = VariantDescriptor::new(&COUNT_VARIANT, ty);
@@ -494,7 +494,7 @@ fn variant_activity_and_enum_field_access_follow_active_variant() {
 }
 
 #[test]
-fn dynamic_field_access_preserves_mode_and_replacement_on_failure() {
+fn test_dynamic_field_access_preserves_mode_and_replacement_on_failure() {
     let context = ReflectionContext::empty();
     let field = descriptor(&context);
     let record = Record { id: 21 };
@@ -538,7 +538,7 @@ fn dynamic_field_access_preserves_mode_and_replacement_on_failure() {
 }
 
 #[test]
-fn dynamic_field_adapter_rejects_wrong_target_and_returns_replacement() {
+fn test_dynamic_field_adapter_rejects_wrong_target_and_returns_replacement() {
     let context = ReflectionContext::empty();
     let field = descriptor(&context);
     let wrong_target = 27_u64;
@@ -571,7 +571,7 @@ fn dynamic_field_adapter_rejects_wrong_target_and_returns_replacement() {
 }
 
 #[test]
-fn missing_dynamic_adapter_is_reported_and_preserves_replacement() {
+fn test_missing_dynamic_adapter_is_reported_and_preserves_replacement() {
     static FIELD_WITHOUT_ADAPTER: FieldMetadata = FieldMetadata::new(
         0,
         "id",
@@ -639,7 +639,7 @@ fn missing_dynamic_adapter_is_reported_and_preserves_replacement() {
 }
 
 #[test]
-fn dynamic_only_dst_adapter_reads_and_mutates_but_recovers_unsupported_assignment() {
+fn test_dynamic_only_dst_adapter_reads_and_mutates_but_recovers_unsupported_assignment() {
     let bytes = [1_u8, 2, 3];
     assert!(DynamicFieldAdapter::<Local>::can_get(&DST_ADAPTER));
     assert!(DynamicFieldAdapter::<Local>::can_get_mut(&DST_ADAPTER));
@@ -668,7 +668,7 @@ fn dynamic_only_dst_adapter_reads_and_mutates_but_recovers_unsupported_assignmen
 }
 
 #[test]
-fn field_policy_blocks_only_the_disabled_dynamic_operations() {
+fn test_field_policy_blocks_only_the_disabled_dynamic_operations() {
     let context = ReflectionContext::empty();
     let ty = TypeDescriptor::of_in::<Record>(&context);
     let record = Record { id: 41 };
@@ -715,7 +715,7 @@ fn field_policy_blocks_only_the_disabled_dynamic_operations() {
 }
 
 #[test]
-fn all_non_public_visibility_kinds_deny_safe_access_and_preserve_replacements() {
+fn test_all_non_public_visibility_kinds_deny_safe_access_and_preserve_replacements() {
     let context = ReflectionContext::empty();
     let ty = TypeDescriptor::of_in::<Record>(&context);
     let record = Record { id: 51 };
@@ -752,7 +752,7 @@ fn all_non_public_visibility_kinds_deny_safe_access_and_preserve_replacements() 
 }
 
 #[test]
-fn enum_variant_dynamic_access_checks_activity_and_recovers_replacements() {
+fn test_enum_variant_dynamic_access_checks_activity_and_recovers_replacements() {
     let context = ReflectionContext::empty();
     let ty = TypeDescriptor::of_in::<Choice>(&context);
     let field = FieldDescriptor::new(&COUNT_FIELD, ty, Some(VariantDescriptor::new(&COUNT_VARIANT, ty)));

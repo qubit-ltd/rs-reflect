@@ -34,7 +34,7 @@ impl Reflect for ReentrantFixture {
 qubit_reflect::__private::codegen_v4::registration::submit_type!(ReentrantFixture);
 
 #[test]
-fn public_registration_callback_reentry_child() {
+fn test_public_registration_callback_reentry_child() {
     if std::env::var_os("QUBIT_REFLECT_REENTRANCY_CHILD").is_none() {
         return;
     }
@@ -54,7 +54,7 @@ fn public_registration_callback_reentry_child() {
 }
 
 #[test]
-fn public_registration_callback_reentry_is_bounded() {
+fn test_public_registration_callback_reentry_is_bounded() {
     let marker = std::env::temp_dir().join(format!(
         "qubit-reflect-reentrancy-{}-{}",
         std::process::id(),
@@ -65,7 +65,7 @@ fn public_registration_callback_reentry_is_bounded() {
     ));
     let mut child = Command::new(std::env::current_exe().expect("test executable path"))
         .arg("--exact")
-        .arg("public_registration_callback_reentry_child")
+        .arg("test_public_registration_callback_reentry_child")
         .arg("--nocapture")
         .env("QUBIT_REFLECT_REENTRANCY_CHILD", "1")
         .env("QUBIT_REFLECT_REENTRANCY_MARKER", &marker)

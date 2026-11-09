@@ -27,7 +27,7 @@ mod second {
 }
 
 #[test]
-fn short_name_conflict_does_not_pick_a_registration() {
+fn test_short_name_conflict_does_not_pick_a_registration() {
     let context = ReflectionContext::builder()
         .include_type::<first::Duplicate>()
         .include_type::<second::Duplicate>()

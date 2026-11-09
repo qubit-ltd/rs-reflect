@@ -35,7 +35,7 @@ static NESTED: TypeExpressionData = ExpressionData::Named {
 };
 
 #[test]
-fn downstream_static_expression_views_keep_the_supplied_context() {
+fn test_downstream_static_expression_views_keep_the_supplied_context() {
     assert_eq!(PROTOCOL_VERSION, 4);
     assert_protocol_version(4);
     let context = ReflectionContext::builder()

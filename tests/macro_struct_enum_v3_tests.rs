@@ -76,7 +76,7 @@ enum SkippedTuplePayload {
 }
 
 #[test]
-fn structs_exclude_skipped_fields_without_reflect_or_default_bounds() {
+fn test_structs_exclude_skipped_fields_without_reflect_or_default_bounds() {
     let descriptor = TypeDescriptor::of::<GenericRecord<u32>>();
     assert_eq!(descriptor.fields().len(), 1);
     assert!(descriptor.field("value").is_ok());
@@ -88,7 +88,7 @@ fn structs_exclude_skipped_fields_without_reflect_or_default_bounds() {
 }
 
 #[test]
-fn named_tuple_and_unit_structs_construct_from_ordinary_values() {
+fn test_named_tuple_and_unit_structs_construct_from_ordinary_values() {
     let named = TypeDescriptor::of::<Named>()
         .construct::<Named, _>(
             NamedFields::<Local>::new()
@@ -112,7 +112,7 @@ fn named_tuple_and_unit_structs_construct_from_ordinary_values() {
 }
 
 #[test]
-fn enum_variants_are_queryable_active_and_constructible() {
+fn test_enum_variants_are_queryable_active_and_constructible() {
     let descriptor = TypeDescriptor::of::<Event>();
     assert_eq!(descriptor.variants().len(), 3);
     assert!(descriptor.variant("Absent").is_err());
@@ -147,7 +147,7 @@ fn enum_variants_are_queryable_active_and_constructible() {
 }
 
 #[test]
-fn cfg_and_cfg_attr_fields_follow_the_compiled_rust_shape() {
+fn test_cfg_and_cfg_attr_fields_follow_the_compiled_rust_shape() {
     let descriptor = TypeDescriptor::of::<ConditionalFields>();
     assert_eq!(descriptor.fields().len(), 1);
     assert!(descriptor.field("retained").is_ok());
@@ -156,7 +156,7 @@ fn cfg_and_cfg_attr_fields_follow_the_compiled_rust_shape() {
 }
 
 #[test]
-fn skipped_variant_payload_field_keeps_type_reflection_but_disables_construction() {
+fn test_skipped_variant_payload_field_keeps_type_reflection_but_disables_construction() {
     let variant = TypeDescriptor::of::<SkippedPayload>()
         .variant("Visible")
         .expect("variant remains reflected");

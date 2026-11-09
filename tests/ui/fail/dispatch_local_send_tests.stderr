@@ -16,7 +16,7 @@ note: required because it appears within the type `Box<(dyn qubit_reflect::runti
 note: required because it appears within the type `qubit_reflect::runtime::value::mode::LocalOwned`
   --> src/runtime/value/mode.rs
    |
-   | pub(crate) struct LocalOwned(pub(super) Box<dyn ErasedOwned>);
+   | pub(crate) struct LocalOwned(
    |                   ^^^^^^^^^^
 note: required because it appears within the type `qubit_reflect::value::DynamicOwned`
   --> src/runtime/value/owned.rs

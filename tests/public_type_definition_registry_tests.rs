@@ -20,7 +20,7 @@ struct GenericContextRecord<T> {
 }
 
 #[test]
-fn generic_definition_is_available_from_the_concrete_type_descriptor() {
+fn test_generic_definition_is_available_from_the_concrete_type_descriptor() {
     let context = ReflectionContext::builder()
         .include_type::<GenericContextRecord<u32>>()
         .build()

@@ -1,15 +1,15 @@
 error[E0515]: cannot return value referencing local variable `receiver`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:19:23
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:17:23
    |
-18 |     match method.invoke(Invocation::<Local>::on_ref(&receiver)) {
+16 |     match method.invoke(Invocation::<Local>::on_ref(&receiver)) {
    |                                                     --------- `receiver` is borrowed here
-19 |         Ok(output) => output,
+17 |         Ok(output) => output,
    |                       ^^^^^^ returns a value referencing data owned by the current function
 
 error[E0515]: cannot return value referencing local variable `argument`
-  --> tests/ui/fail/invocation_input_lifetime_tests.rs:29:23
+  --> tests/ui/fail/invocation_input_lifetime_tests.rs:25:23
    |
-28 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
+24 |     match method.invoke(Invocation::<Local>::associated().arg_ref(&argument)) {
    |                                                                   --------- `argument` is borrowed here
-29 |         Ok(output) => output,
+25 |         Ok(output) => output,
    |                       ^^^^^^ returns a value referencing data owned by the current function

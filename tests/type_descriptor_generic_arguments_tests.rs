@@ -56,7 +56,7 @@ impl qubit_reflect::__private::codegen_v4::descriptor::Reflect for Opaque {
 }
 
 #[test]
-fn type_descriptor_reports_registration_definition_and_generic_arguments() {
+fn test_type_descriptor_reports_registration_definition_and_generic_arguments() {
     let _ = GenericChoice::<u32, 3>::Value(1);
     let _ = GenericChoice::<u32, 3>::Bytes([0; 3]);
     let reflected = ReflectionContext::builder()
@@ -159,7 +159,7 @@ fn type_descriptor_reports_registration_definition_and_generic_arguments() {
 }
 
 #[test]
-fn two_instances_share_one_source_definition() {
+fn test_two_instances_share_one_source_definition() {
     let context = ReflectionContext::builder()
         .include_type::<SharedRecord<String>>()
         .include_type::<SharedEvent<u32>>()

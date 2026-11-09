@@ -20,11 +20,20 @@ pub enum TypeKindMetadata {
     /// An owned or borrowed text type.
     Text,
     /// A struct with its reflected fields.
-    Struct(&'static [FieldMetadata]),
+    Struct(
+        /// Static field layout for the struct.
+        &'static [FieldMetadata],
+    ),
     /// An enum with its reflected variants.
-    Enum(&'static [VariantMetadata]),
+    Enum(
+        /// Static variant layout for the enum.
+        &'static [VariantMetadata],
+    ),
     /// A tuple type with its reflected fields.
-    Tuple(&'static [FieldMetadata]),
+    Tuple(
+        /// Static positional field layout for the tuple.
+        &'static [FieldMetadata],
+    ),
     /// A fixed-size array.
     Array,
     /// An optional value such as `Option<T>`.
@@ -54,42 +63,100 @@ pub enum TypeKindMetadata {
 /// A type category paired with its context-bound descriptor.
 pub enum TypeKind<'ctx> {
     /// A primitive type.
-    Primitive(PrimitiveType<'ctx>),
+    Primitive(
+        /// View of the primitive type.
+        PrimitiveType<'ctx>,
+    ),
     /// A text type.
-    Text(TextType<'ctx>),
+    Text(
+        /// View of the text type.
+        TextType<'ctx>,
+    ),
     /// A struct type.
-    Struct(StructType<'ctx>),
+    Struct(
+        /// View of the struct and its fields.
+        StructType<'ctx>,
+    ),
     /// An enum type.
-    Enum(EnumType<'ctx>),
+    Enum(
+        /// View of the enum and its variants.
+        EnumType<'ctx>,
+    ),
     /// A tuple type.
-    Tuple(TupleType<'ctx>),
+    Tuple(
+        /// View of the tuple and its fields.
+        TupleType<'ctx>,
+    ),
     /// An array type.
-    Array(ArrayType<'ctx>),
+    Array(
+        /// View of the fixed-size array.
+        ArrayType<'ctx>,
+    ),
     /// An optional type.
-    Optional(OptionalType<'ctx>),
+    Optional(
+        /// View of the optional type.
+        OptionalType<'ctx>,
+    ),
     /// A sequence collection.
-    Sequence(SequenceType<'ctx>),
+    Sequence(
+        /// View of the sequence collection.
+        SequenceType<'ctx>,
+    ),
     /// A set collection.
-    Set(SetType<'ctx>),
+    Set(
+        /// View of the set collection.
+        SetType<'ctx>,
+    ),
     /// A map collection.
-    Map(MapType<'ctx>),
+    Map(
+        /// View of the key-value collection.
+        MapType<'ctx>,
+    ),
     /// A smart pointer type.
-    SmartPointer(SmartPointerType<'ctx>),
+    SmartPointer(
+        /// View of the smart pointer type.
+        SmartPointerType<'ctx>,
+    ),
     /// A reference type.
-    Reference(ReferenceType<'ctx>),
+    Reference(
+        /// View of the reference type.
+        ReferenceType<'ctx>,
+    ),
     /// A slice type.
-    Slice(SliceType<'ctx>),
+    Slice(
+        /// View of the slice type.
+        SliceType<'ctx>,
+    ),
     /// A raw pointer type.
-    RawPointer(RawPointerType<'ctx>),
+    RawPointer(
+        /// View of the raw pointer type.
+        RawPointerType<'ctx>,
+    ),
     /// A function type.
-    Function(FunctionType<'ctx>),
+    Function(
+        /// View of the function type.
+        FunctionType<'ctx>,
+    ),
     /// A trait object type.
-    TraitObject(TraitObjectType<'ctx>),
+    TraitObject(
+        /// View of the trait object type.
+        TraitObjectType<'ctx>,
+    ),
     /// An opaque type.
-    Opaque(OpaqueType<'ctx>),
+    Opaque(
+        /// View of the opaque type.
+        OpaqueType<'ctx>,
+    ),
 }
 
 impl<'ctx> TypeKind<'ctx> {
+    /// Combines the concrete descriptor with the generated source kind
+    /// metadata.
+    ///
+    /// # Parameters
+    ///
+    /// * `ty` — descriptor for the concrete reflected type.
+    /// * `metadata` — generated kind and member metadata for that type.
     pub(crate) fn from_metadata(ty: TypeDescriptor<'ctx>, metadata: TypeKindMetadata) -> Self {
         match metadata {
             TypeKindMetadata::Primitive => Self::Primitive(PrimitiveType(ty)),
@@ -149,7 +216,9 @@ impl<'ctx> TypeKind<'ctx> {
 /// A reflected struct with its source ordered fields.
 #[derive(Clone, Copy)]
 pub struct StructType<'ctx> {
+    /// Descriptor for the reflected struct type.
     ty: TypeDescriptor<'ctx>,
+    /// Source ordered fields belonging to the struct.
     fields: Fields<'ctx>,
 }
 
@@ -167,7 +236,9 @@ impl<'ctx> StructType<'ctx> {
 /// A reflected enum with its source ordered variants.
 #[derive(Clone, Copy)]
 pub struct EnumType<'ctx> {
+    /// Descriptor for the reflected enum type.
     ty: TypeDescriptor<'ctx>,
+    /// Source ordered variants belonging to the enum.
     variants: Variants<'ctx>,
 }
 
@@ -185,7 +256,9 @@ impl<'ctx> EnumType<'ctx> {
 /// A tuple struct or tuple type with source ordered fields.
 #[derive(Clone, Copy)]
 pub struct TupleType<'ctx> {
+    /// Descriptor for the reflected tuple type.
     ty: TypeDescriptor<'ctx>,
+    /// Positional fields belonging to the tuple.
     fields: Fields<'ctx>,
 }
 
@@ -236,7 +309,7 @@ mod tests {
     use crate::runtime::descriptor::TypeDescriptor;
 
     #[test]
-    fn metadata_maps_to_each_public_kind_view() {
+    fn test_metadata_maps_to_each_public_kind_view() {
         let ty = TypeDescriptor::of::<u8>();
 
         macro_rules! assert_kind {
@@ -287,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn kind_downcasts_return_none_for_unmatched_categories() {
+    fn test_kind_downcasts_return_none_for_unmatched_categories() {
         let ty = TypeDescriptor::of::<u8>();
         let metadata = [
             TypeKindMetadata::Primitive,
@@ -315,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn kind_downcasts_return_the_matching_category() {
+    fn test_kind_downcasts_return_the_matching_category() {
         let ty = TypeDescriptor::of::<u8>();
 
         let struct_kind = TypeKind::from_metadata(ty, TypeKindMetadata::Struct(&[]));

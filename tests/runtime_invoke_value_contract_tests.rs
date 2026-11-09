@@ -13,7 +13,7 @@ use qubit_reflect::value::DynamicValueKind;
 use qubit_reflect::value::Local;
 
 #[test]
-fn invocation_value_is_the_public_dynamic_value_type() {
+fn test_invocation_value_is_the_public_dynamic_value_type() {
     let value: InvocationValue<'_, Local> = DynamicValue::Owned(DynamicOwned::new(23_u32));
     assert_eq!(value.kind(), DynamicValueKind::Owned);
     let recovered = match value.into_owned::<u32>() {
@@ -24,7 +24,7 @@ fn invocation_value_is_the_public_dynamic_value_type() {
 }
 
 #[test]
-fn dynamic_value_recovery_errors_preserve_the_original_tagged_value() {
+fn test_dynamic_value_recovery_errors_preserve_the_original_tagged_value() {
     let owned = DynamicValue::<Local>::Owned(DynamicOwned::new(String::from("owned")));
     let owned = owned
         .into_owned::<u64>()

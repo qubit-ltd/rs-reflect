@@ -37,14 +37,32 @@ use crate::runtime::expression::PredicateData;
 use crate::runtime::expression::TraitExpressionData;
 
 /// Marker-bound static metadata for one trait declaration.
+///
+/// # Type Parameters
+///
+/// * `D` — marker type that owns the trait definition identity.
 pub struct TraitDefinitionSpec<D: 'static> {
+    /// Trait declaration metadata bound to the marker identity.
     metadata: TraitDefinitionMetadata,
+    /// Marker that ties this specification to its declaration type.
     _marker: PhantomData<fn() -> D>,
 }
 
 impl<D: 'static> TraitDefinitionSpec<D> {
     /// Creates a trait definition without exposing or accepting its identity
     /// token.
+    /// # Parameters
+    ///
+    /// * `name` — source name of the trait.
+    /// * `path` — fully qualified source path of the trait.
+    /// * `visibility` — source visibility of the trait.
+    /// * `completeness` — completeness of the retained declaration metadata.
+    /// * `generics` — generic parameter declarations for the trait.
+    /// * `supertraits` — direct supertrait expressions.
+    /// * `methods` — method declarations in source order.
+    /// * `associated_types` — associated type declarations in source order.
+    /// * `associated_consts` — associated constant declarations in source
+    ///   order.
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         name: &'static str,
@@ -84,6 +102,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Returns a method declaration by its source-order index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — source-order index of the method.
     pub const fn method_at(&'static self, index: usize) -> &'static MethodMetadata {
         if index >= self.metadata.methods.len() {
             panic!("method index is out of range");
@@ -97,6 +119,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Returns an associated type declaration by its source-order index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — source-order index of the associated type.
     pub const fn associated_type_at(&'static self, index: usize) -> &'static AssociatedTypeDefinitionMetadata {
         if index >= self.metadata.associated_types.len() {
             panic!("associated type index is out of range");
@@ -110,6 +136,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Finds an associated type declaration by its Rust item name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated type.
     pub const fn associated_type_named(&'static self, name: &'static str) -> &'static AssociatedTypeDefinitionMetadata {
         let mut index = 0;
         while index < self.metadata.associated_types.len() {
@@ -123,6 +153,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Returns a trait generic parameter by its source-order index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — source-order index of the generic parameter.
     pub const fn generic_parameter_at(&'static self, index: usize) -> &'static GenericParameterMetadata {
         if index >= self.metadata.generics.parameters.len() {
             panic!("trait generic parameter index is out of range");
@@ -131,6 +165,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Returns an associated constant declaration by its source-order index.
+    ///
+    /// # Parameters
+    ///
+    /// * `index` — source-order index of the associated constant.
     pub const fn associated_const_at(&'static self, index: usize) -> &'static AssociatedConstDefinitionMetadata {
         if index >= self.metadata.associated_consts.len() {
             panic!("associated constant index is out of range");
@@ -144,6 +182,10 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 
     /// Finds an associated constant declaration by its Rust item name.
+    ///
+    /// # Parameters
+    ///
+    /// * `name` — Rust item name of the associated constant.
     pub const fn associated_const_named(
         &'static self,
         name: &'static str,
@@ -160,6 +202,12 @@ impl<D: 'static> TraitDefinitionSpec<D> {
     }
 }
 
+/// Compares two strings in a const-evaluable context.
+///
+/// # Parameters
+///
+/// * `left` — first string to compare.
+/// * `right` — second string to compare.
 const fn const_str_eq(left: &str, right: &str) -> bool {
     let left_bytes = left.as_bytes();
     let right_bytes = right.as_bytes();
@@ -177,13 +225,35 @@ const fn const_str_eq(left: &str, right: &str) -> bool {
 }
 
 /// Marker-bound static metadata for one compiled trait application.
+///
+/// # Type Parameters
+///
+/// * `T` — concrete reflected target type of the trait application.
 pub struct TraitApplicationSpec<T: 'static> {
+    /// Compiled trait application and its source identity metadata.
     metadata: TraitApplicationMetadata,
+    /// Marker binding this application to the concrete target type.
     _target: PhantomData<fn() -> T>,
 }
 
 impl<T: crate::runtime::descriptor::Reflect + 'static> TraitApplicationSpec<T> {
     /// Creates an application whose declaration and target are both type-bound.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `D` — marker type identifying the trait declaration.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — marker-bound trait declaration.
+    /// * `arguments` — concrete generic arguments for the application.
+    /// * `identity` — canonical identity arguments used to distinguish
+    ///   applications.
+    /// * `direct_supertraits` — direct applications retained for this
+    ///   application.
+    /// * `all_supertraits` — transitive supertrait applications.
+    /// * `supertrait_completeness` — completeness of the retained supertrait
+    ///   closure.
     pub const fn for_target<D: 'static>(
         definition: &'static TraitDefinitionSpec<D>,
         arguments: &'static [GenericArgumentMetadata],
@@ -207,6 +277,22 @@ impl<T: crate::runtime::descriptor::Reflect + 'static> TraitApplicationSpec<T> {
 
     /// Creates a linked application and retains the exact path used by its
     /// impl.
+    /// # Type Parameters
+    ///
+    /// * `D` — marker type identifying the trait declaration.
+    ///
+    /// # Parameters
+    ///
+    /// * `definition` — marker-bound trait declaration.
+    /// * `expression` — exact source expression used by the impl.
+    /// * `arguments` — concrete generic arguments for the application.
+    /// * `identity` — canonical identity arguments used to distinguish
+    ///   applications.
+    /// * `direct_supertraits` — direct applications retained for this
+    ///   application.
+    /// * `all_supertraits` — transitive supertrait applications.
+    /// * `supertrait_completeness` — completeness of the retained supertrait
+    ///   closure.
     #[allow(clippy::too_many_arguments)]
     pub const fn for_target_with_source<D: 'static>(
         definition: &'static TraitDefinitionSpec<D>,
@@ -233,6 +319,13 @@ impl<T: crate::runtime::descriptor::Reflect + 'static> TraitApplicationSpec<T> {
 
     /// Creates a typed application whose definition is resolved from its exact
     /// source path.
+    ///
+    /// # Parameters
+    ///
+    /// * `expression` — source expression identifying the unresolved trait.
+    /// * `arguments` — concrete generic arguments for the application.
+    /// * `identity` — canonical identity arguments used to distinguish
+    ///   applications.
     pub const fn unresolved_for_target(
         expression: &'static TraitExpressionData,
         arguments: &'static [GenericArgumentMetadata],
@@ -252,6 +345,13 @@ impl<T: crate::runtime::descriptor::Reflect + 'static> TraitApplicationSpec<T> {
 
 /// Creates an unresolved direct supertrait application while retaining the
 /// concrete arguments supplied by generated code.
+///
+/// # Parameters
+///
+/// * `expression` — source expression identifying the unresolved trait.
+/// * `arguments` — concrete generic arguments for the application.
+/// * `identity` — canonical identity arguments used to distinguish
+///   applications.
 pub const fn unresolved_application(
     expression: &'static TraitExpressionData,
     arguments: &'static [GenericArgumentMetadata],
@@ -261,6 +361,10 @@ pub const fn unresolved_application(
 }
 
 /// Builds the de-duplicated transitive closure for typed direct applications.
+///
+/// # Parameters
+///
+/// * `direct` — direct trait applications whose inherited closure is collected.
 #[doc(hidden)]
 pub fn all_supertrait_applications(
     direct: &'static [&'static TraitApplication],
@@ -276,6 +380,10 @@ pub fn all_supertrait_applications(
 }
 
 /// Returns whether every direct application and its retained closure is typed.
+///
+/// # Parameters
+///
+/// * `direct` — direct applications and their retained inherited closure.
 #[doc(hidden)]
 pub fn supertrait_applications_complete(direct: &[&'static TraitApplication]) -> SupertraitCompleteness {
     if direct.iter().all(|application| {
@@ -290,6 +398,12 @@ pub fn supertrait_applications_complete(direct: &[&'static TraitApplication]) ->
     }
 }
 
+/// Adds an application only when its marker identity is not already present.
+///
+/// # Parameters
+///
+/// * `values` — ordered application list being assembled.
+/// * `candidate` — application to append when it is not a duplicate.
 fn push_unique_application(values: &mut Vec<&'static TraitApplication>, candidate: &'static TraitApplication) {
     let duplicate = values
         .iter()
@@ -303,11 +417,24 @@ fn push_unique_application(values: &mut Vec<&'static TraitApplication>, candidat
 }
 
 /// Creates an unresolved source trait expression.
+///
+/// # Parameters
+///
+/// * `expression` — source expression describing the trait application.
 pub const fn unresolved_trait_expression(expression: &'static TraitExpressionData) -> TraitExpressionMetadata {
     TraitExpressionMetadata::unresolved(expression)
 }
 
 /// Associates a source trait expression with a typed local definition.
+///
+/// # Type Parameters
+///
+/// * `D` — marker type identifying the local trait declaration.
+///
+/// # Parameters
+///
+/// * `expression` — source expression describing the trait application.
+/// * `definition` — marker-bound local trait declaration.
 pub const fn trait_expression_for<D: 'static>(
     expression: &'static TraitExpressionData,
     definition: &'static TraitDefinitionSpec<D>,
@@ -316,6 +443,13 @@ pub const fn trait_expression_for<D: 'static>(
 }
 
 /// Creates metadata for a trait associated type.
+///
+/// # Parameters
+///
+/// * `name` — Rust item name of the associated type.
+/// * `visibility` — source visibility of the associated type.
+/// * `bounds` — predicates required of the associated type.
+/// * `default` — optional default type expression.
 pub const fn associated_type(
     name: &'static str,
     visibility: Visibility,
@@ -326,6 +460,13 @@ pub const fn associated_type(
 }
 
 /// Creates metadata for a trait associated constant.
+///
+/// # Parameters
+///
+/// * `name` — Rust item name of the associated constant.
+/// * `visibility` — source visibility of the associated constant.
+/// * `ty` — type expression of the associated constant.
+/// * `default` — optional default constant expression.
 pub const fn associated_const(
     name: &'static str,
     visibility: Visibility,
@@ -335,11 +476,20 @@ pub const fn associated_const(
     AssociatedConstDefinitionMetadata::new(name, visibility, ty, default)
 }
 
+/// Returns an empty dependency list for a global trait fragment.
 const fn no_dependencies() -> &'static [std::any::TypeId] {
     &[]
 }
 
 /// Builds a global trait definition registration from marker-bound metadata.
+///
+/// # Type Parameters
+///
+/// * `D` — marker type identifying the trait declaration.
+///
+/// # Parameters
+///
+/// * `definition` — marker-bound declaration metadata to register.
 #[doc(hidden)]
 pub fn register_trait_definition<D: 'static>(
     definition: &'static TraitDefinitionSpec<D>,
@@ -350,6 +500,14 @@ pub fn register_trait_definition<D: 'static>(
 
 /// Builds a trait definition registration from a cached static metadata
 /// provider.
+///
+/// # Type Parameters
+///
+/// * `D` — marker type identifying the trait declaration.
+///
+/// # Parameters
+///
+/// * `definition` — provider for the declaration's static metadata.
 #[doc(hidden)]
 pub fn register_trait_definition_from<D: 'static>(
     definition: fn() -> &'static TraitDefinitionSpec<D>,
@@ -358,6 +516,15 @@ pub fn register_trait_definition_from<D: 'static>(
 }
 
 /// Creates metadata for an external trait whose declaration is unavailable.
+///
+/// # Type Parameters
+///
+/// * `D` — marker type used to identify the external trait.
+///
+/// # Parameters
+///
+/// * `name` — source name of the external trait.
+/// * `path` — fully qualified source path of the external trait.
 #[doc(hidden)]
 pub fn external_trait_definition<D: 'static>(name: &'static str, path: &'static str) -> TraitDefinitionSpec<D> {
     static EMPTY_GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
@@ -375,6 +542,14 @@ pub fn external_trait_definition<D: 'static>(name: &'static str, path: &'static 
 }
 
 /// Builds a concrete trait application registration for target `T`.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type of the application.
+///
+/// # Parameters
+///
+/// * `application` — typed static application metadata to register.
 #[doc(hidden)]
 pub fn register_trait_application<T: crate::runtime::descriptor::Reflect + 'static>(
     application: &'static TraitApplicationSpec<T>,
@@ -384,6 +559,14 @@ pub fn register_trait_application<T: crate::runtime::descriptor::Reflect + 'stat
 }
 
 /// Builds an application registration from a cached static metadata provider.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type of the application.
+///
+/// # Parameters
+///
+/// * `application` — provider for the typed static application metadata.
 #[doc(hidden)]
 pub fn register_trait_application_from<T: crate::runtime::descriptor::Reflect + 'static>(
     application: fn() -> &'static TraitApplicationSpec<T>,
@@ -392,6 +575,11 @@ pub fn register_trait_application_from<T: crate::runtime::descriptor::Reflect + 
 }
 
 /// Creates a global metadata fragment without exposing raw inventory payloads.
+///
+/// # Parameters
+///
+/// * `label` — stable label for this inventory fragment.
+/// * `registration` — callback that creates its registration payload.
 #[doc(hidden)]
 pub const fn trait_definition_fragment(
     label: &'static str,
@@ -401,6 +589,15 @@ pub const fn trait_definition_fragment(
 }
 
 /// Creates an application fragment bound to target `T`.
+///
+/// # Type Parameters
+///
+/// * `T` — reflected target type associated with the fragment.
+///
+/// # Parameters
+///
+/// * `label` — stable label for this inventory fragment.
+/// * `registration` — callback that creates its registration payload.
 #[doc(hidden)]
 pub const fn trait_application_fragment<T: crate::runtime::descriptor::Reflect + 'static>(
     label: &'static str,
@@ -611,7 +808,7 @@ mod tests {
     static EXTERNAL_DIRECT: [&TraitApplicationMetadata; 1] = [&EXTERNAL_APP];
 
     #[test]
-    fn trait_definition_spec_exposes_items_by_index_and_name() {
+    fn test_trait_definition_spec_exposes_items_by_index_and_name() {
         assert_eq!(DEFINITION.path(), "crate::Trait");
         assert_eq!(DEFINITION.metadata().name, "Trait");
         assert_eq!(DEFINITION.method_count(), 1);
@@ -630,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    fn trait_definition_spec_reports_invalid_item_lookups() {
+    fn test_trait_definition_spec_reports_invalid_item_lookups() {
         assert!(std::panic::catch_unwind(|| DEFINITION.method_at(1)).is_err());
         assert!(std::panic::catch_unwind(|| DEFINITION.associated_type_at(1)).is_err());
         assert!(std::panic::catch_unwind(|| DEFINITION.associated_type_named("Missing")).is_err());
@@ -642,7 +839,7 @@ mod tests {
     }
 
     #[test]
-    fn application_specs_preserve_linked_unresolved_and_source_metadata() {
+    fn test_application_specs_preserve_linked_unresolved_and_source_metadata() {
         static LINKED: TraitApplicationSpec<Target> =
             TraitApplicationSpec::for_target(&DEFINITION, &[], &[], &[], &[], SupertraitCompleteness::Complete);
         static LINKED_WITH_SOURCE: TraitApplicationSpec<Target> = TraitApplicationSpec::for_target_with_source(
@@ -674,7 +871,7 @@ mod tests {
     }
 
     #[test]
-    fn supertrait_closure_deduplicates_by_definition_and_argument_identity() {
+    fn test_supertrait_closure_deduplicates_by_definition_and_argument_identity() {
         static DIRECT: [&TraitApplicationMetadata; 4] = [
             &PARENT_APP_WITH_CLOSURE,
             &PARENT_APP,
@@ -694,7 +891,7 @@ mod tests {
     }
 
     #[test]
-    fn supertrait_completeness_tracks_direct_application_metadata() {
+    fn test_supertrait_completeness_tracks_direct_application_metadata() {
         assert_eq!(supertrait_applications_complete(&[]), SupertraitCompleteness::Complete);
         assert_eq!(
             supertrait_applications_complete(&COMPLETE_DIRECT),
@@ -715,7 +912,7 @@ mod tests {
     }
 
     #[test]
-    fn trait_registration_helpers_and_fragments_bind_the_expected_metadata() {
+    fn test_trait_registration_helpers_and_fragments_bind_the_expected_metadata() {
         fn definition_provider() -> &'static TraitDefinitionSpec<TraitMarker> {
             &DEFINITION
         }
@@ -781,7 +978,7 @@ mod tests {
     }
 
     #[test]
-    fn external_trait_definition_is_conservatively_incomplete() {
+    fn test_external_trait_definition_is_conservatively_incomplete() {
         let definition = Box::leak(Box::new(external_trait_definition::<OtherMarker>(
             "Debug",
             "std::fmt::Debug",

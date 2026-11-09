@@ -10,10 +10,10 @@
 
 pub(crate) mod bind_method;
 mod construction;
-mod context;
 mod dispatcher;
 mod enum_repr_ir;
 mod enums;
+mod expansion_context;
 mod expression_codegen;
 mod generic_environment;
 mod generics;
@@ -22,5 +22,6 @@ mod invocation;
 mod structs;
 mod traits;
 
-pub(crate) use context::ExpansionContext;
 pub(crate) use dispatcher::dispatch;
+pub(crate) use expansion_context::ExpansionContext;
+pub(crate) use expansion_context::fingerprint;

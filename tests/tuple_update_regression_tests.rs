@@ -38,7 +38,7 @@ impl Drop for DroppedReplacement {
 }
 
 #[test]
-fn typed_local_named_replacement_preserves_omitted_tuple_field() {
+fn test_typed_local_named_replacement_preserves_omitted_tuple_field() {
     let updated: Pair = TypeDescriptor::of::<Pair>()
         .update(UpdateInput::<Local>::new(Pair(1, "before".to_owned())).field("1", "after".to_owned()))
         .expect("named replacement must work for tuple fields");
@@ -46,7 +46,7 @@ fn typed_local_named_replacement_preserves_omitted_tuple_field() {
 }
 
 #[test]
-fn dynamic_local_and_thread_safe_named_replacements_work() {
+fn test_dynamic_local_and_thread_safe_named_replacements_work() {
     let local = TypeDescriptor::of::<Pair>()
         .update_dynamic(UpdateInput::<Local>::new(Pair(2, "before".to_owned())).field("0", 3_u32))
         .expect("local dynamic tuple update");
@@ -59,7 +59,7 @@ fn dynamic_local_and_thread_safe_named_replacements_work() {
 }
 
 #[test]
-fn empty_tuple_update_is_valid_and_unknown_or_duplicate_fields_are_rejected() {
+fn test_empty_tuple_update_is_valid_and_unknown_or_duplicate_fields_are_rejected() {
     let unchanged: Pair = TypeDescriptor::of::<Pair>()
         .update(UpdateInput::<Local>::new(Pair(5, "same".to_owned())))
         .expect("empty tuple update preserves every field");
@@ -81,7 +81,7 @@ fn empty_tuple_update_is_valid_and_unknown_or_duplicate_fields_are_rejected() {
 }
 
 #[test]
-fn failed_tuple_updates_recover_base_and_replacement_values() {
+fn test_failed_tuple_updates_recover_base_and_replacement_values() {
     DROPPED_REPLACEMENTS.store(0, Ordering::SeqCst);
     let base = Pair(9, "unchanged".to_owned());
     let failure = TypeDescriptor::of::<Pair>()
@@ -121,7 +121,7 @@ fn failed_tuple_updates_recover_base_and_replacement_values() {
 }
 
 #[test]
-fn safe_update_rejects_private_tuple_field() {
+fn test_safe_update_rejects_private_tuple_field() {
     let failure = TypeDescriptor::of::<PrivatePair>()
         .update::<PrivatePair, _>(
             UpdateInput::<Local>::new(PrivatePair(1, "before".to_owned())).field("1", "after".to_owned()),
@@ -131,7 +131,7 @@ fn safe_update_rejects_private_tuple_field() {
 }
 
 #[test]
-fn unsafe_update_can_replace_private_tuple_field() {
+fn test_unsafe_update_can_replace_private_tuple_field() {
     let updated: PrivatePair = unsafe {
         TypeDescriptor::of::<PrivatePair>()
             .update_unchecked(
@@ -143,7 +143,7 @@ fn unsafe_update_can_replace_private_tuple_field() {
 }
 
 #[test]
-fn unit_update_is_valid() {
+fn test_unit_update_is_valid() {
     #[Reflect]
     #[derive(Debug, PartialEq)]
     struct Unit;

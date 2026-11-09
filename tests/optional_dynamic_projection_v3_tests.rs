@@ -120,7 +120,7 @@ fn no_value() -> qubit_reflect::MethodDescriptor<'static> {
 }
 
 #[test]
-fn optional_reference_output_preserves_some_and_none_semantics() {
+fn test_optional_reference_output_preserves_some_and_none_semantics() {
     let target = OptionalTarget { value: 17 };
     assert_eq!(target.maybe_value(true), Some(&17));
     assert_eq!(target.maybe_value(false), None);
@@ -193,7 +193,7 @@ fn optional_reference_output_preserves_some_and_none_semantics() {
 }
 
 #[test]
-fn optional_reference_output_extraction_preserves_value_on_type_mismatch() {
+fn test_optional_reference_output_extraction_preserves_value_on_type_mismatch() {
     let target = OptionalTarget { value: 23 };
     let output = maybe_value()
         .invoke(Invocation::<Local>::on_ref(&target).arg(true))
@@ -217,7 +217,7 @@ fn optional_reference_output_extraction_preserves_value_on_type_mismatch() {
 }
 
 #[test]
-fn optional_reference_default_method_preserves_none_and_receiver_origin() {
+fn test_optional_reference_default_method_preserves_none_and_receiver_origin() {
     let target = OptionalTarget { value: 37 };
     let output = no_value()
         .invoke(Invocation::<Local>::on_ref(&target))
@@ -235,7 +235,7 @@ fn optional_reference_default_method_preserves_none_and_receiver_origin() {
 }
 
 #[test]
-fn optional_mutable_reference_output_is_described_but_not_dynamically_callable() {
+fn test_optional_mutable_reference_output_is_described_but_not_dynamically_callable() {
     let mut target = OptionalTarget { value: 29 };
     let failure = match maybe_mut_value().invoke(Invocation::<Local>::on_mut(&mut target).arg(true)) {
         Ok(_) => panic!("the invocation output API has no optional mutable reference variant"),
@@ -251,7 +251,7 @@ fn optional_mutable_reference_output_is_described_but_not_dynamically_callable()
 }
 
 #[test]
-fn explicit_optional_borrow_lifetimes_are_not_inferred_as_receiver_borrows() {
+fn test_explicit_optional_borrow_lifetimes_are_not_inferred_as_receiver_borrows() {
     let target = OptionalTarget { value: 47 };
     let value = 53_u32;
     let failure = match maybe_explicit().invoke(Invocation::<Local>::on_ref(&target).arg_ref(&value)) {

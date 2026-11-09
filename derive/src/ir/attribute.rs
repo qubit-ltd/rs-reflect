@@ -223,11 +223,20 @@ pub(crate) struct SpecializationBindingIr {
 #[derive(Clone, Debug)]
 pub(crate) enum SpecializationValueIr {
     /// Concrete Rust type argument.
-    Type(TypeIr),
+    Type(
+        /// Parsed Rust type value used as the specialization argument.
+        TypeIr,
+    ),
     /// Const expression tokens.
-    Const(TokenStream),
+    Const(
+        /// Source expression retained for later parameter-kind validation.
+        TokenStream,
+    ),
     /// Path syntax retained until generic parameter kind is known.
-    AmbiguousPath(TokenStream),
+    AmbiguousPath(
+        /// Path tokens whose type or const meaning is not yet known.
+        TokenStream,
+    ),
 }
 
 impl HelperAttributeIr {}

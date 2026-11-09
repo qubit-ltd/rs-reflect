@@ -42,7 +42,7 @@ static DEFINITION: TypeDefinitionRegistration<GenericDefinition> = TypeDefinitio
 static TARGET_REGISTRATION: TypeRegistration<Target> = TypeRegistration::new();
 
 #[test]
-fn public_registration_facades_expose_constructible_typed_inputs() {
+fn test_public_registration_facades_expose_constructible_typed_inputs() {
     let capability = CapabilityRegistration::for_type::<String, TestCapability>(7);
 
     let context = ReflectionContext::builder()

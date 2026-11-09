@@ -71,6 +71,11 @@ pub enum CapabilityInvocationError {
 }
 
 impl fmt::Display for CapabilityInvocationError {
+    /// Formats the adapter failure with its concrete type and mode details.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::TypeMismatch { expected, actual } => write!(
@@ -92,7 +97,10 @@ impl std::error::Error for CapabilityInvocationError {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CapabilityError {
     /// The reflection context could not provide the requested metadata.
-    Context(ContextError),
+    Context(
+        /// Context error that prevented capability resolution.
+        ContextError,
+    ),
     /// No registration exists for this capability ID and target.
     Missing {
         /// Target on which the capability was requested.
@@ -130,10 +138,18 @@ pub enum CapabilityError {
         registrations: Box<[super::capability_registration_origin::CapabilityRegistrationOrigin]>,
     },
     /// The capability descriptor did not satisfy the requested typed contract.
-    Contract(CapabilityContractError),
+    Contract(
+        /// Typed contract error returned while restoring the adapter.
+        CapabilityContractError,
+    ),
 }
 
 impl fmt::Display for CapabilityContractError {
+    /// Formats the contract violation without discarding its capability ID.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IdMismatch { expected, actual } => {
@@ -152,6 +168,11 @@ impl fmt::Display for CapabilityContractError {
 impl std::error::Error for CapabilityContractError {}
 
 impl fmt::Display for CapabilityError {
+    /// Formats the lookup failure while retaining its target or capability ID.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Context(error) => write!(formatter, "reflection context failed: {error}"),
@@ -173,6 +194,7 @@ impl fmt::Display for CapabilityError {
 }
 
 impl std::error::Error for CapabilityError {
+    /// Returns the nested context or contract error when one is retained.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Context(error) => Some(error),
@@ -185,10 +207,19 @@ impl std::error::Error for CapabilityError {
 /// A capability registration could not be constructed.
 #[derive(Debug)]
 pub(crate) enum CapabilityRegistrationError {
-    InvalidId(IdError),
+    /// The supplied identifier violated the capability ID format.
+    InvalidId(
+        /// Validation failure carrying the rejected identifier details.
+        IdError,
+    ),
 }
 
 impl fmt::Display for CapabilityRegistrationError {
+    /// Formats the rejected registration identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `formatter` — destination for the display representation.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidId(error) => write!(formatter, "invalid capability ID: {error}"),
@@ -197,6 +228,8 @@ impl fmt::Display for CapabilityRegistrationError {
 }
 
 impl std::error::Error for CapabilityRegistrationError {
+    /// Returns the identifier validation error that caused registration
+    /// failure.
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::InvalidId(error) => Some(error),

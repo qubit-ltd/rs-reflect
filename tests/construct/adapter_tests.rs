@@ -61,7 +61,7 @@ pub struct RequiredValue {
 pub struct Unit;
 
 #[test]
-fn named_tuple_and_unit_structs_construct_from_plain_values() {
+fn test_named_tuple_and_unit_structs_construct_from_plain_values() {
     let profile: Profile = TypeDescriptor::of::<Profile>()
         .construct(
             NamedFields::<Local>::new()
@@ -93,7 +93,7 @@ fn named_tuple_and_unit_structs_construct_from_plain_values() {
 }
 
 #[test]
-fn construction_descriptors_report_shape_and_fields() {
+fn test_construction_descriptors_report_shape_and_fields() {
     let named = TypeDescriptor::of::<Profile>().construction();
     assert_eq!(named.shape(), ConstructionShape::Named);
     assert!(matches!(named.availability(), ConstructionAvailability::Available));
@@ -109,7 +109,7 @@ fn construction_descriptors_report_shape_and_fields() {
 }
 
 #[test]
-fn enum_variants_construct_from_explicit_variant_descriptors() {
+fn test_enum_variants_construct_from_explicit_variant_descriptors() {
     let descriptor = TypeDescriptor::of::<Event>();
     let started: Event = descriptor
         .variant("Started")
@@ -148,7 +148,7 @@ fn enum_variants_construct_from_explicit_variant_descriptors() {
 }
 
 #[test]
-fn enum_construction_descriptor_tracks_variant_shape() {
+fn test_enum_construction_descriptor_tracks_variant_shape() {
     let variant = TypeDescriptor::of::<Event>()
         .variant("Pair")
         .expect("tuple variant exists");
@@ -158,7 +158,7 @@ fn enum_construction_descriptor_tracks_variant_shape() {
 }
 
 #[test]
-fn required_fields_are_not_defaulted_and_option_fields_are_reflectable() {
+fn test_required_fields_are_not_defaulted_and_option_fields_are_reflectable() {
     let failure = TypeDescriptor::of::<RequiredValue>()
         .construct::<RequiredValue, _>(NamedFields::<Local>::new())
         .expect_err("required fields are not implicitly defaulted");
@@ -187,7 +187,7 @@ fn required_fields_are_not_defaulted_and_option_fields_are_reflectable() {
 }
 
 #[test]
-fn private_fields_require_unsafe_construction_and_update() {
+fn test_private_fields_require_unsafe_construction_and_update() {
     let descriptor = TypeDescriptor::of::<Restricted>();
     assert!(matches!(
         descriptor.construction().availability(),
@@ -228,7 +228,7 @@ fn private_fields_require_unsafe_construction_and_update() {
 }
 
 #[test]
-fn typed_and_dynamic_updates_preserve_unmodified_fields() {
+fn test_typed_and_dynamic_updates_preserve_unmodified_fields() {
     let descriptor = TypeDescriptor::of::<Profile>();
     let updated: Profile = descriptor
         .update(
@@ -258,7 +258,7 @@ fn typed_and_dynamic_updates_preserve_unmodified_fields() {
 }
 
 #[test]
-fn construction_rejects_wrong_shapes_with_structured_recovery() {
+fn test_construction_rejects_wrong_shapes_with_structured_recovery() {
     let profile = TypeDescriptor::of::<Profile>();
     let tuple_failure = profile
         .construct::<Profile, _>(PositionalFields::<Local>::new().value(7_u32))
@@ -293,7 +293,7 @@ fn construction_rejects_wrong_shapes_with_structured_recovery() {
 }
 
 #[test]
-fn variant_construction_rejects_wrong_shape_and_checks_activity() {
+fn test_variant_construction_rejects_wrong_shape_and_checks_activity() {
     let unit_variant = TypeDescriptor::of::<Event>()
         .variant("Started")
         .expect("unit variant exists");

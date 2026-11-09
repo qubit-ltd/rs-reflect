@@ -6,7 +6,6 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
-
 #[qubit_reflect::Reflect]
 struct ConditionalTarget;
 

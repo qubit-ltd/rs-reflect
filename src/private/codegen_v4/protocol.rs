@@ -20,6 +20,10 @@ pub const PROTOCOL_VERSION: u32 = 4;
 ///
 /// Generated code calls this function from a constant item so a mismatch is
 /// reported while compiling the caller crate.
+///
+/// # Parameters
+///
+/// * `expected` — the protocol version embedded by generated code.
 pub const fn assert_protocol_version(expected: u32) {
     assert!(
         expected == PROTOCOL_VERSION,
@@ -33,13 +37,13 @@ mod tests {
     use super::assert_protocol_version;
 
     #[test]
-    fn accepts_the_current_protocol_version_at_runtime() {
+    fn test_accepts_the_current_protocol_version_at_runtime() {
         assert_protocol_version(PROTOCOL_VERSION);
     }
 
     #[test]
     #[should_panic(expected = "generated code and runtime protocol versions do not match")]
-    fn rejects_a_mismatched_protocol_version_at_runtime() {
+    fn test_rejects_a_mismatched_protocol_version_at_runtime() {
         assert_protocol_version(PROTOCOL_VERSION - 1);
     }
 }
