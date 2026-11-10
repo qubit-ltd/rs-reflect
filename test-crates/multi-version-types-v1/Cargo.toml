@@ -8,4 +8,4 @@ publish = false
 name = "multi_version_types_v1"
 
 [dependencies]
-qubit-reflect = { path = "../.." }
+qubit-reflect = { path = "../../", version = "^0.2" }

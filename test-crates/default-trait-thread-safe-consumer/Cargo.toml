@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
-qubit-reflect = { path = "../.." }
+qubit-reflect = { path = "../../", version = "^0.2" }
 default-trait-thread-safe-producer = { path = "../default-trait-thread-safe-producer" }

@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "^0.4"
-qubit-reflect = { path = ".." }
+qubit-reflect = { path = "../", version = "^0.2" }
 
 [[bin]]
 name = "id_parser"

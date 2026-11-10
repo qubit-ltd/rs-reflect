@@ -8,4 +8,4 @@ publish = false
 conditional-extra = []
 
 [dependencies]
-qubit-reflect = { path = "../.." }
+qubit-reflect = { path = "../../", version = "^0.2" }

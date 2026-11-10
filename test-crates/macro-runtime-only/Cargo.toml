@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
-qubit-reflect = { path = "../..", default-features = false }
-qubit-reflect-derive = { path = "../../derive" }
+qubit-reflect = { path = "../../", default-features = false , version = "^0.2" }
+qubit-reflect-derive = { path = "../../derive", version = "^0.2" }
