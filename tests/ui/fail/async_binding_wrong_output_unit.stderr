@@ -1,0 +1,5 @@
+error[E0308]: mismatched types
+  --> tests/ui/fail/async_binding_wrong_output_unit.rs:25:13
+   |
+25 |     let _ = bind_method!(Target::value::<u32> as async fn(&Target) -> ());
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `()`, found `String`

@@ -147,6 +147,7 @@ fn test_bind_method_supports_receiver_and_async_signatures() {
     let _associated = bind_method!(Utility::associated as fn(String) -> String);
     let _borrowed = bind_method!(Utility::borrowed as fn(&String) -> &String);
     let _asynchronous = bind_method!(Utility::async_owned as async fn(String) -> String);
+    let _asynchronous_opaque = bind_method!(Utility::async_owned as async fn(String) -> impl std::fmt::Display);
     let _binding = bind_method!(<Service as Render<u8>>::render as fn(&Service, String) -> String);
     let _descriptor = TypeDescriptor::of::<Utility>();
 }

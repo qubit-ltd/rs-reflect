@@ -184,45 +184,59 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
             ).with_concrete_type::<#concrete_type>())
         })
         .collect();
-    let (return_metadata, return_kind) = match &signature.output {
-        syn::ReturnType::Default => (
-            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
-            "Unit",
-        ),
-        syn::ReturnType::Type(_, ty) if matches!(**ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) => (
-            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
-            "Unit",
-        ),
-        syn::ReturnType::Type(_, ty) => {
-            let ty_ir = crate::parse::convert_type(ty);
-            let expression = super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
-            let (kind, kind_name) = if asynchronous {
-                (quote!(Future), "Future")
-            } else if is_mut_reference(ty) {
-                (quote!(Mutable), "Mutable")
-            } else if is_reference(ty) {
-                (quote!(Shared), "Shared")
-            } else if matches!(**ty, Type::Never(_)) {
-                (quote!(Never), "Never")
-            } else {
-                (quote!(Owned), "Owned")
-            };
-            let metadata = quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
-                #facade::__private::codegen_v4::invoke::ReturnKind::#kind,
+    let (return_metadata, return_kind) = if asynchronous {
+        let output_ty = match &signature.output {
+            syn::ReturnType::Default => syn::parse_quote!(()),
+            syn::ReturnType::Type(_, ty) => (**ty).clone(),
+        };
+        let ty_ir = crate::parse::convert_type(&output_ty);
+        let expression = super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
+        (
+            quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
+                #facade::__private::codegen_v4::invoke::ReturnKind::Future,
                 #expression,
-            ));
-            let metadata = if !asynchronous
-                && !is_mut_reference(ty)
-                && !is_reference(ty)
-                && !matches!(**ty, Type::Never(_))
-                && !matches!(**ty, Type::ImplTrait(_) | Type::Infer(_))
-                && !is_str_type(ty)
-            {
-                quote!(#metadata.with_concrete_type::<#ty>())
-            } else {
-                metadata
-            };
-            (metadata, kind_name)
+            )),
+            "Future",
+        )
+    } else {
+        match &signature.output {
+            syn::ReturnType::Default => (
+                quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
+                "Unit",
+            ),
+            syn::ReturnType::Type(_, ty) if matches!(**ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) => (
+                quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::unit()),
+                "Unit",
+            ),
+            syn::ReturnType::Type(_, ty) => {
+                let ty_ir = crate::parse::convert_type(ty);
+                let expression = super::traits::type_expression(&ty_ir, &GenericEnvironment::new(), &facade);
+                let (kind, kind_name) = if is_mut_reference(ty) {
+                    (quote!(Mutable), "Mutable")
+                } else if is_reference(ty) {
+                    (quote!(Shared), "Shared")
+                } else if matches!(**ty, Type::Never(_)) {
+                    (quote!(Never), "Never")
+                } else {
+                    (quote!(Owned), "Owned")
+                };
+                let metadata = quote!(#facade::__private::codegen_v4::invoke::ReturnMetadata::new(
+                    #facade::__private::codegen_v4::invoke::ReturnKind::#kind,
+                    #expression,
+                ));
+                let metadata = if !asynchronous
+                    && !is_mut_reference(ty)
+                    && !is_reference(ty)
+                    && !matches!(**ty, Type::Never(_))
+                    && !matches!(**ty, Type::ImplTrait(_) | Type::Infer(_))
+                    && !is_str_type(ty)
+                {
+                    quote!(#metadata.with_concrete_type::<#ty>())
+                } else {
+                    metadata
+                };
+                (metadata, kind_name)
+            }
         }
     };
     let generic_definition =
@@ -403,9 +417,47 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
             #facade::__private::codegen_v4::invoke::BorrowOrigin::Receiver,
         )),
         "Future" => {
-            quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::future(async move {
-                #facade::__private::codegen_v4::invoke::InvocationOutput::owned(__call.await)
-            }))
+            let output_ty = match &signature.output {
+                syn::ReturnType::Default => syn::parse_quote!(()),
+                syn::ReturnType::Type(_, ty) => (**ty).clone(),
+            };
+            if matches!(output_ty, Type::Tuple(ref tuple) if tuple.elems.is_empty()) {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::future(async move {
+                    let _: () = __call.await;
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::unit()
+                }))
+            } else if let Type::ImplTrait(opaque) = &output_ty {
+                let output_bounds = opaque
+                    .bounds
+                    .iter()
+                    .filter(|bound| matches!(bound, syn::TypeParamBound::Trait(_) | syn::TypeParamBound::Lifetime(_)))
+                    .collect::<Vec<_>>();
+                let output_type_check = if output_bounds.is_empty() {
+                    quote!(let __result = __call.await;)
+                } else {
+                    quote! {
+                        fn __qubit_reflect_assert_output<__QubitOutput: #(#output_bounds)+*>(
+                            value: __QubitOutput,
+                        ) -> __QubitOutput {
+                            value
+                        }
+                        let __result = __qubit_reflect_assert_output(__call.await);
+                    }
+                };
+                quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::future(async move {
+                    #output_type_check
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::owned(__result)
+                }))
+            } else if matches!(output_ty, Type::Never(_)) {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::future(async move {
+                    match __call.await {}
+                }))
+            } else {
+                quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::future(async move {
+                    let __result: #output_ty = __call.await;
+                    #facade::__private::codegen_v4::invoke::InvocationOutput::owned(__result)
+                }))
+            }
         }
         "Never" => quote!(match __call {}),
         _ => quote!(#facade::__private::codegen_v4::invoke::InvocationOutput::owned(__call)),

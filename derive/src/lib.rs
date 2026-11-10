@@ -106,6 +106,9 @@ pub fn ReflectImpl(attribute: TokenStream, item: TokenStream) -> TokenStream {
 /// `as thread_safe async fn(...)`; unlike derive-generated async adapters,
 /// this explicit adapter is checked by Rust for the future's `Send` bound.
 /// Derive-generated async adapters are available only in `Local` mode.
+/// The signature output must match the method's awaited output exactly;
+/// omitting it means `()`. The reflected future does not run the method until
+/// it is polled, and an async unit method must still be driven to completion.
 ///
 /// ```text
 /// qubit_reflect::bind_method!(
