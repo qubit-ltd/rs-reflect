@@ -5087,7 +5087,9 @@ __private::codegen_v4
 └── protocol
 ```
 
-该模块 `#[doc(hidden)]`，不属于手写应用 API。同一协议版本内不静默改变契约；不兼容变更使用新版本；本次破坏性设计不要求保留 v3。宏与 runtime 不匹配时应产生编译错误。`v4` 只是 codegen/runtime 握手版本，不是产品名称或公开 API 版本号。
+支持边界分为三层：应用代码使用有文档说明的公开描述符、context 和类型化 registration API；内置及下游代码生成器可在协调版本的前提下使用受限的 `__private::codegen_v4` 集成协议；其余实现细节不承诺下游兼容性。该协议不是普通应用 API。`rs-model-metadata` 与 `rs-model-metadata-mm-implementation` 会消费协议中的表达式接口，属于协议集成，而非普通应用 API 调用。
+
+受支持的表达式符号清单以[中文架构说明中的协议清单](architecture.zh_CN.md#生成代码集成协议)为准，不在本规范重复维护。兼容性检查使用 `PROTOCOL_VERSION` 与 `protocol::assert_protocol_version`；版本不匹配时生成代码应在编译期失败。runtime 与生成器必须协调版本。当前发布线保留现有 v4 协议符号；不兼容的协议变更须使用新的版本化命名空间，并协同升级 runtime、derive crate 和受影响的下游生成器。`v4` 是 codegen/runtime 协议版本，不是产品名称或公开 API 版本号。
 
 ### 22.22 生成代码安全边界
 

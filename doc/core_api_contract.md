@@ -28,7 +28,13 @@ Capability queries specify both a capability type and its adapter contract throu
 
 ## Generated-code boundary
 
-Application code should use the public descriptors, contexts, and typed registration APIs. Derive output uses the versioned internal `__private::codegen_v4` protocol. The `__private` module and its protocol are implementation details, not a general downstream API; version runtime and derive crates together.
+There are three distinct support tiers:
+
+1. **Application API:** application code should use the documented public descriptors, contexts, and typed registration APIs.
+2. **Restricted generated-code protocol:** derive crates and downstream metadata generators may consume the versioned `__private::codegen_v4` protocol when they coordinate runtime and generator versions. This is protocol use, not ordinary application API use. Its supported expression symbols are limited to the inventory in [the architecture protocol section](architecture.md#generated-code-integration-protocol); that inventory reflects the built-in derive and audited consumers in `rs-model-metadata` and `rs-model-metadata-mm-implementation`.
+3. **Other implementation details:** symbols outside the documented protocol inventory, including other `__private` and `codegen_v4` items, have no downstream compatibility promise.
+
+Generated code checks `PROTOCOL_VERSION` with `protocol::assert_protocol_version`; a mismatch fails compilation. Keep the runtime and generator versions coordinated. Existing v4 protocol symbols remain available throughout the current release line. An incompatible protocol change requires a new versioned namespace and a coordinated upgrade of the runtime, derive crate, and affected downstream generators.
 
 ## Application responsibilities
 

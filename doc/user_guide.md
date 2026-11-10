@@ -45,15 +45,16 @@ downstream production change.
 For a generic method with a pinned receiver, select the exact specialization
 with `method.specialization(&MethodArguments)` and invoke it through
 `MethodSpecializationDescriptor::invoke_pinned`. A rejected call returns the
-pinned receiver and arguments for recovery. A binding whose runtime argument
-is the method's generic `T` is discoverable, but still cannot be invoked until
-reflection can identify that concrete argument type.
+pinned receiver and arguments for recovery. When the selected binding supplies
+a concrete parameter type for `T`, pinned invocation checks the runtime
+argument against that type before calling the adapter. The selection must match
+the binding, and arguments that fail validation remain available for recovery.
 
 The macros generate source metadata and adapters at compile time. Reflection is opt-in: a member that is not generated into metadata cannot be found through a descriptor. `skip` is a metadata choice, not an access control feature.
 
 ## Integrate a downstream derive
 
-A downstream derive crate may use the versioned `qubit_reflect::__private::codegen_v4` integration protocol when it coordinates its version with the runtime. The supported expression surface is limited to static `ExpressionData`/`TypeExpressionData`, `GenericExpressionArgument`, `TraitExpressionData`, `LifetimeExpression`, `ConstExpression`, `FunctionPointerData`, `TraitObjectData`, `OpaqueTypeData`, `PredicateData`, `TraitBoundModifier`, `GenericParameterMetadata`, `GenericArgumentMetadata`, `GenericDefinitionMetadata`, `TypeDefinitionMetadata`, `TypeDefinitionKind`, and `StructKind`, plus `type_expression_in` to bind data to an explicit context. This list matches the built-in derive output and the audited downstream derive consumer; it does not promise other expression or `codegen_v4` items. Check compatibility with `PROTOCOL_VERSION` and `protocol::assert_protocol_version`. This is not an application API or a promise that every `__private` item is supported. Keep runtime and derive versions aligned. An incompatible protocol change uses a new namespace and requires a coordinated derive and downstream upgrade; the current v4 namespace remains available.
+A downstream derive crate may use the versioned `qubit_reflect::__private::codegen_v4` integration protocol when it coordinates its version with the runtime. The supported expression symbols are listed in the [architecture protocol section](architecture.md#generated-code-integration-protocol); the list reflects built-in derive output and audited downstream generators, including `rs-model-metadata` and `rs-model-metadata-mm-implementation`. Check compatibility with `PROTOCOL_VERSION` and `protocol::assert_protocol_version`. This is not an application API or a promise that every `__private` item is supported. Keep runtime and generator versions aligned. An incompatible protocol change uses a new namespace and requires a coordinated runtime, derive, and downstream upgrade; the current v4 namespace remains available.
 
 ## Reflect a trait implementation
 
@@ -285,6 +286,11 @@ Derive-generated invocation adapters for `async fn` currently support only `Loca
 ## Bind a generic method
 
 Rust creates a generic method's concrete code at compile time. Register each supported specialization with `bind_method!` when building an explicit context; runtime reflection does not synthesize a new monomorphization from a `TypeId`.
+
+For a generic parameter passed to a pinned method, the selected binding also
+provides the concrete parameter type used during pinned-call validation.
+Validation still checks the receiver and every argument, and a rejected call
+returns its original pinned receiver and arguments.
 
 The example below shows the full path from the generic method definition to a
 selected specialization and its result. `Converter::convert` parses its text

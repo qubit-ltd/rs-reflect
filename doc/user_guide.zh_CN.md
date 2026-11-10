@@ -42,14 +42,15 @@ registration 意外出现在 context 中，现在应显式选择目标。context
 调用带 pinned receiver 的泛型方法时，先使用
 `method.specialization(&MethodArguments)` 选择精确特化，再通过
 `MethodSpecializationDescriptor::invoke_pinned` 调用。调用被拒绝时会返回
-pinned receiver 和参数以供恢复。若运行时实参类型仍是方法泛型 `T`，绑定虽然可被
-发现，但在反射能够识别其具体实参类型前仍不可调用。
+pinned receiver 和参数以供恢复。若选中的绑定提供了 `T` 对应的具体参数类型，
+pinned 调用会在执行 adapter 前按该类型校验运行时参数。特化必须与绑定匹配；
+校验拒绝的参数仍可取回并恢复。
 
 宏在编译期生成源码元数据和操作适配器。反射采用显式启用：没有生成进元数据的成员无法通过描述符查到。`skip` 只决定元数据是否包含该成员，不承担访问控制职责。
 
 ## 集成下游 derive
 
-下游 derive crate 可使用带版本的 `qubit_reflect::__private::codegen_v4` 集成协议，但必须协调 runtime 与自身版本。受支持的表达式范围仅包括静态 `ExpressionData`/`TypeExpressionData`、`GenericExpressionArgument`、`TraitExpressionData`、`LifetimeExpression`、`ConstExpression`、`FunctionPointerData`、`TraitObjectData`、`OpaqueTypeData`、`PredicateData`、`TraitBoundModifier`、`GenericParameterMetadata`、`GenericArgumentMetadata`、`GenericDefinitionMetadata`、`TypeDefinitionMetadata`、`TypeDefinitionKind` 和 `StructKind`，以及用于绑定到显式 context 的 `type_expression_in`。该清单与内置 derive 生成及已核查下游 derive 消费的符号一致；不代表其他 expression 或 `codegen_v4` 项目也受支持。兼容性检查使用 `PROTOCOL_VERSION` 与 `protocol::assert_protocol_version`。这不是应用 API，也不表示所有 `__private` 项目都受支持。runtime 与 derive 版本应保持一致。不兼容的协议变更须使用新命名空间并协同升级 derive 和下游生成器；当前 v4 命名空间继续保留。
+下游 derive crate 可使用带版本的 `qubit_reflect::__private::codegen_v4` 集成协议，但必须协调 runtime 与生成器版本。受支持的表达式符号清单见[架构文档中的协议章节](architecture.zh_CN.md#生成代码集成协议)；该清单依据内置 derive 生成及已核查的下游生成器，包括 `rs-model-metadata` 和 `rs-model-metadata-mm-implementation`。兼容性检查使用 `PROTOCOL_VERSION` 与 `protocol::assert_protocol_version`。这不是应用 API，也不表示所有 `__private` 项目都受支持。runtime 与生成器版本应保持一致。不兼容的协议变更须使用新命名空间，并协同升级 runtime、derive 和受影响的下游生成器；当前 v4 命名空间继续保留。
 
 ## 反射 trait 实现
 
@@ -279,6 +280,10 @@ derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定�
 ## 绑定泛型方法
 
 Rust 会在编译期生成泛型方法的具体代码。构建显式 context 时，使用 `bind_method!` 注册各个受支持的特化；运行时反射不会依据 `TypeId` 合成新的单态化代码。
+
+对于以 pinned 方式接收泛型参数的方法，选中的绑定还会提供 pinned 调用校验所需的
+具体参数类型。校验仍会检查 receiver 和全部参数；拒绝调用时会返回原 pinned
+receiver 与参数。
 
 ```rust
 use qubit_reflect::descriptor::MethodArguments;
