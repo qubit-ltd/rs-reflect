@@ -290,6 +290,26 @@ impl ParameterMetadata {
         self.concrete_type = Some(crate::runtime::descriptor::metadata::TypeMetadata::of::<T>);
         self
     }
+
+    /// Returns the concrete type identity recorded for this parameter, if any.
+    pub(crate) fn concrete_type_id(&self) -> Option<TypeId> {
+        self.concrete_type.map(|metadata| metadata().type_id())
+    }
+
+    /// Returns this parameter's zero-based position in the call signature.
+    pub(crate) const fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Returns the passing mode recorded for this parameter.
+    pub(crate) const fn passing(&self) -> PassingMode {
+        self.passing
+    }
+
+    /// Returns the source pattern recorded for this parameter.
+    pub(crate) const fn pattern(&self) -> ParameterPattern {
+        self.pattern
+    }
 }
 
 /// A context-bound view of one declared method parameter.
@@ -947,6 +967,7 @@ impl EffectiveMethod {
             specializations: &[],
             specialization_specs: &[],
             adapters: None,
+            specialization_parameters: None,
         }
     }
 
@@ -960,6 +981,7 @@ impl EffectiveMethod {
         self.specializations = &[];
         self.specialization_specs = &[];
         self.adapters = Some(adapters);
+        self.specialization_parameters = None;
         self
     }
 
@@ -974,6 +996,23 @@ impl EffectiveMethod {
         self.specializations = &[];
         self.specialization_specs = specializations;
         self.adapters = None;
+        self.specialization_parameters = None;
+        self
+    }
+
+    /// Adds specializations and retains this generated binding's call
+    /// signature.
+    ///
+    /// # Parameters
+    ///
+    /// - `specializations`: Concrete generic instantiations registered for the
+    ///   method.
+    pub(crate) const fn with_bound_specializations(
+        mut self,
+        specializations: &'static [MethodSpecializationSpec],
+    ) -> Self {
+        self = self.with_specializations(specializations);
+        self.specialization_parameters = Some(self.metadata.parameters);
         self
     }
 
@@ -988,6 +1027,7 @@ impl EffectiveMethod {
         self.specializations = &[];
         self.specialization_specs = &[];
         self.adapters = None;
+        self.specialization_parameters = None;
         self
     }
 
@@ -1033,12 +1073,16 @@ impl EffectiveMethod {
         if self.specialization_specs.is_empty() {
             Ok(self.specializations.to_vec().into_boxed_slice())
         } else {
-            self.specialization_specs
+            let mut resolved = self
+                .specialization_specs
                 .iter()
                 .copied()
                 .map(|spec| spec.resolve(self.metadata.generics.parameters))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Vec::into_boxed_slice)
+                .collect::<Result<Vec<_>, _>>()?;
+            for specialization in &mut resolved {
+                specialization.parameters = self.specialization_parameters;
+            }
+            Ok(resolved.into_boxed_slice())
         }
     }
 }
@@ -1105,6 +1149,8 @@ pub struct EffectiveMethod {
     pub(crate) specialization_specs: &'static [MethodSpecializationSpec],
     /// Generated adapters for supported value modes and invocation variants.
     pub(crate) adapters: Option<InvocationAdapters>,
+    /// Concrete parameter metadata retained only for generated method bindings.
+    pub(crate) specialization_parameters: Option<&'static [ParameterMetadata]>,
 }
 
 /// A typed generic argument used by a statically registered method
@@ -1569,6 +1615,7 @@ impl MethodSpecializationSpec {
             argument_metadata: Some(metadata.into()),
             availability: self.availability,
             adapters: self.adapters,
+            parameters: None,
         })
     }
 }
@@ -1713,6 +1760,8 @@ pub(crate) struct ResolvedMethodSpecialization {
     pub(crate) availability: InvocationAvailability,
     /// Generated adapters for supported value modes and invocation variants.
     pub(crate) adapters: InvocationAdapters,
+    /// Concrete call parameters supplied by a generated method binding.
+    pub(crate) parameters: Option<&'static [ParameterMetadata]>,
 }
 
 /// Resolved generic arguments retained for invocation and display.
@@ -2383,7 +2432,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
                     }
                 };
                 let adapters = self.effective.adapters.unwrap_or(NO_ADAPTERS);
-                return self.invoke_pinned_with(availability, &adapters, invocation);
+                return self.invoke_pinned_with(availability, &adapters, None, invocation);
             }
             [] => {
                 return Err(PinnedInvocationFailure::new(
@@ -2399,7 +2448,12 @@ impl<'ctx> MethodDescriptor<'ctx> {
             }
         };
         let specialization = specialization.clone();
-        self.invoke_pinned_with(specialization.availability, &specialization.adapters, invocation)
+        self.invoke_pinned_with(
+            specialization.availability,
+            &specialization.adapters,
+            specialization.parameters,
+            invocation,
+        )
     }
 
     /// Invokes a pinned receiver through the adapter matching its exact type
@@ -2427,6 +2481,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
         &self,
         availability: InvocationAvailability,
         adapters: &InvocationAdapters,
+        parameters: Option<&'static [ParameterMetadata]>,
         invocation: PinnedInvocation<'call, M, T>,
     ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
         let expected_kind = invocation.pinned_kind_and_type().0;
@@ -2448,7 +2503,7 @@ impl<'ctx> MethodDescriptor<'ctx> {
                 invocation,
             ));
         }
-        let validated = invocation.validate(self.clone())?;
+        let validated = invocation.validate(self.clone(), parameters)?;
         let Some(adapter) = M::select_pinned_adapter(adapters) else {
             return Err(PinnedInvocationFailure::new(
                 InvocationError::new(InvocationErrorKind::ReceiverAdapterUnavailable),
@@ -3178,23 +3233,81 @@ impl<'ctx> MethodSpecializations<'ctx> {
 }
 
 /// One compile-time-bound method implementation.
+///
+/// A binding supplies the concrete call signature used to validate a pinned
+/// invocation after its generic arguments select this specialization.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// # #[cfg(feature = "derive")]
+/// # fn main() {
+/// mod example {
+///     use std::pin::Pin;
+///     use qubit_reflect::Reflect;
+///     use qubit_reflect::ReflectImpl;
+///     use qubit_reflect::ReflectionContext;
+///     use qubit_reflect::bind_method;
+///     use qubit_reflect::descriptor::MethodArguments;
+///     use qubit_reflect::invoke::PinnedInvocation;
+///     use qubit_reflect::value::Local;
+///
+///     #[Reflect]
+///     pub struct PinnedCounter;
+///
+///     #[ReflectImpl]
+///     impl PinnedCounter {
+///         pub fn echo<T>(self: Pin<&mut Self>, value: T) -> T {
+///             let _ = self;
+///             value
+///         }
+///     }
+///
+///     pub fn run() {
+///         let binding = bind_method!(PinnedCounter::echo::<u32>
+///             as fn(Pin<&mut PinnedCounter>, u32) -> u32);
+///         let context = ReflectionContext::builder()
+///             .include_linked()
+///             .bind(binding)
+///             .build()
+///             .expect("the concrete pinned binding is valid");
+///         let method = context.type_of::<PinnedCounter>().method("echo").expect("method");
+///         let specialization = method.specialization(&MethodArguments::new().type_of::<u32>())
+///             .expect("u32 selects the binding");
+///         let mut receiver = Box::pin(PinnedCounter);
+///         let output = match specialization.invoke_pinned(
+///             PinnedInvocation::<Local, _>::mutable(Pin::as_mut(&mut receiver)).arg(7_u32),
+///         ) {
+///             Ok(output) => output,
+///             Err(failure) => panic!("pinned invocation failed: {:?}", failure.error().kind()),
+///         };
+///         assert_eq!(output.into_owned::<u32>().ok(), Some(7));
+///     }
+/// }
+/// example::run();
+/// # }
+/// # #[cfg(not(feature = "derive"))]
+/// # fn main() {}
+/// ```
 #[derive(Clone)]
 pub struct MethodSpecializationDescriptor<'ctx> {
-    /// Returns the unique method descriptor for the requested name.
+    /// Source method declaration shared by all of its registered
+    /// specializations.
     method: MethodDescriptor<'ctx>,
     /// Registered concrete generic instantiations available for this method.
     specializations: std::sync::Arc<[ResolvedMethodSpecialization]>,
-    /// Returns the parameter’s zero-based position, excluding the receiver.
+    /// Index of this specialization in the method's shared specialization
+    /// array.
     index: usize,
 }
 
 impl<'ctx> MethodSpecializationDescriptor<'ctx> {
-    /// Provides the resolved operation used to resolve or dispatch reflected
-    /// methods.
+    /// Returns the resolved data for this descriptor's selected specialization.
     fn resolved(&self) -> &ResolvedMethodSpecialization {
         &self.specializations[self.index]
     }
-    /// Returns the source method declaration for this specialization.
+    /// Returns the source method declaration that owns this specialization.
     pub fn method(&self) -> MethodDescriptor<'ctx> {
         self.method.clone()
     }
@@ -3213,18 +3326,10 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
     }
     /// Invokes this specialization after validating the receiver and arguments.
     ///
-    /// # Parameters
-    ///
-    /// - `invocation`: Validated call values passed to the generated method
-    ///   adapter.
-    ///
-    ///
     /// # Type Parameters
     ///
-    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+    /// - `'call`: Lifetime of borrowed receiver and argument values.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
-    ///
-    ///
     /// # Parameters
     ///
     /// - `invocation`: Validated call values passed to the generated method
@@ -3251,20 +3356,11 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
     /// and arguments when the adapter is unavailable or receiver and argument
     /// validation rejects the call. Panics raised by the method propagate.
     ///
-    /// # Parameters
-    ///
-    /// - `invocation`: Validated call values passed to the generated method
-    ///   adapter.
-    ///
-    ///
     /// # Type Parameters
     ///
-    /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `'call`: Lifetime of the pinned receiver and borrowed arguments.
+    /// - `T`: Concrete receiver type protected by the pin.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
-    ///
-    ///
     /// # Parameters
     ///
     /// - `invocation`: Validated call values passed to the generated method
@@ -3274,8 +3370,12 @@ impl<'ctx> MethodSpecializationDescriptor<'ctx> {
         invocation: PinnedInvocation<'call, M, T>,
     ) -> Result<InvocationOutput<'call, M>, PinnedInvocationFailure<'call, M, T>> {
         let selected = self.resolved();
-        self.method
-            .invoke_pinned_with(selected.availability, &selected.adapters, invocation)
+        self.method.invoke_pinned_with(
+            selected.availability,
+            &selected.adapters,
+            selected.parameters,
+            invocation,
+        )
     }
 }
 

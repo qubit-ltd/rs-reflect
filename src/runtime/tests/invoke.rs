@@ -296,6 +296,7 @@ static PINNED_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMeth
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: PINNED_ADAPTERS,
+    parameters: None,
 }];
 
 static ADD_ADAPTER: AddAdapter = AddAdapter;
@@ -344,6 +345,7 @@ static TWO_ARGUMENT_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [Resolv
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: ADD_BOTH_ADAPTERS,
+    parameters: None,
 }];
 static EMPTY_ARGUMENTS: [GenericArgumentIdentity; 0] = [];
 static SPECIALIZATION_SET: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
@@ -351,6 +353,7 @@ static SPECIALIZATION_SET: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSp
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: ADAPTERS,
+    parameters: None,
 }];
 static UNAVAILABLE_REASONS: [crate::runtime::invoke::InvocationUnavailableReason; 3] = [
     crate::runtime::invoke::InvocationUnavailableReason::UnsupportedReceiver,
@@ -364,6 +367,7 @@ static UNAVAILABLE_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [Resolve
         reasons: &UNAVAILABLE_REASONS,
     },
     adapters: ADAPTERS,
+    parameters: None,
 }];
 
 static UNSAFE_METHOD: MethodMetadata = MethodMetadata {
@@ -498,18 +502,21 @@ static NO_CATCH_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMe
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: NO_CATCH_ADAPTERS,
+    parameters: None,
 }];
 static PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
     arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: PANICKING_ADAPTERS,
+    parameters: None,
 }];
 static BUILT_PANIC_SPECIALIZATIONS: [ResolvedMethodSpecialization; 1] = [ResolvedMethodSpecialization {
     arguments: ResolvedMethodArguments::Static(&EMPTY_ARGUMENTS),
     argument_metadata: None,
     availability: InvocationAvailability::Callable,
     adapters: BUILT_PANICKING_ADAPTERS,
+    parameters: None,
 }];
 
 fn effective() -> EffectiveMethod {
@@ -525,6 +532,7 @@ fn effective_for(metadata: &'static MethodMetadata) -> EffectiveMethod {
         specializations: &SPECIALIZATION_SET,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     }
 }
 
@@ -576,6 +584,7 @@ fn test_caller_ordered_named_and_positional_bindings_reach_the_adapter_in_declar
         specializations: &TWO_ARGUMENT_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -708,6 +717,7 @@ fn test_unsafe_method_rejection_preserves_receiver_and_all_arguments() {
         specializations: &SPECIALIZATION_SET,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [private];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -744,6 +754,7 @@ fn test_ordinary_invoke_leaves_user_panics_unwinding() {
         specializations: &PANIC_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -769,6 +780,7 @@ fn test_catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         specializations: &PANIC_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -816,6 +828,7 @@ fn test_catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         specializations: &NO_CATCH_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [no_catch];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -851,6 +864,7 @@ fn test_catching_invoke_reports_panics_but_preserves_preflight_rejections() {
         specializations: &SPECIALIZATION_SET,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [asynchronous];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -882,6 +896,7 @@ fn test_builder_catching_slot_catches_only_explicit_invocation() {
         specializations: &BUILT_PANIC_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [method];
     let method = MethodCatalog::new(type_descriptor(&context), &methods)
@@ -920,6 +935,7 @@ fn test_pinned_invocation_uses_pinned_adapter_and_recovers_pin_on_preflight_fail
         specializations: &PINNED_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [effective];
     let method = MethodCatalog::new(TypeDescriptor::new(&PINNED_COUNTER_TYPE, &context), &methods)
@@ -967,6 +983,7 @@ fn test_pinned_receiver_type_mismatch_recovers_the_original_pin_and_arguments() 
         specializations: &PINNED_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [effective];
     let method = MethodCatalog::new(TypeDescriptor::new(&PINNED_COUNTER_TYPE, &context), &methods)
@@ -1261,6 +1278,7 @@ fn test_pinned_thread_safe_dispatch_without_a_mode_adapter_recovers_the_pin() {
         specializations: &PINNED_SPECIALIZATIONS,
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     let methods = [effective];
     let method = MethodCatalog::new(TypeDescriptor::new(&PINNED_COUNTER_TYPE, &context), &methods)

@@ -1000,6 +1000,7 @@ mod tests {
         specializations: &[],
         specialization_specs: &[],
         adapters: None,
+        specialization_parameters: None,
     };
     static EFFECTIVE_METHODS: &[EffectiveMethod] = &[EFFECTIVE_METHOD];
     static DECLARED_TYPE: AssociatedTypeBindingMetadata = AssociatedTypeBindingMetadata {

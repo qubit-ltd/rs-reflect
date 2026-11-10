@@ -102,7 +102,7 @@ impl<T: crate::runtime::descriptor::Reflect> MethodBinding<T> {
         mut self,
         specializations: &'static [crate::runtime::descriptor::method::MethodSpecializationSpec],
     ) -> Self {
-        self.effective = self.effective.with_specializations(specializations);
+        self.effective = self.effective.with_bound_specializations(specializations);
         self
     }
 

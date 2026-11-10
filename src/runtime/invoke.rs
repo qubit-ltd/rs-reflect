@@ -861,7 +861,7 @@ impl<'call, M: ValueMode> Invocation<'call, M> {
         self,
         method: MethodDescriptor<'_>,
     ) -> Result<ValidatedInvocation<'call, M>, InvocationFailure<'call, M>> {
-        match validate_bindings(&self, method, None) {
+        match validate_bindings(&self, method, None, None) {
             Ok(order) => Ok(ValidatedInvocation {
                 invocation: self,
                 order,
@@ -1143,9 +1143,10 @@ impl<'call, M: ValueMode, T: ?Sized + 'static> PinnedInvocation<'call, M, T> {
     pub(crate) fn validate(
         self,
         method: MethodDescriptor<'_>,
+        parameters: Option<&'static [super::descriptor::method::ParameterMetadata]>,
     ) -> Result<ValidatedPinnedInvocation<'call, M, T>, PinnedInvocationFailure<'call, M, T>> {
         let (kind, type_id) = self.pinned_kind_and_type();
-        let order = match validate_bindings(self.arguments(), method, Some((kind, type_id))) {
+        let order = match validate_bindings(self.arguments(), method, Some((kind, type_id)), parameters) {
             Ok(order) => order,
             Err(error) => {
                 return Err(PinnedInvocationFailure {
@@ -1466,8 +1467,28 @@ fn validate_bindings<M: ValueMode>(
     invocation: &Invocation<'_, M>,
     method: MethodDescriptor<'_>,
     pinned_receiver: Option<(ReceiverKind, TypeId)>,
+    concrete_parameters: Option<&'static [super::descriptor::method::ParameterMetadata]>,
 ) -> Result<Vec<(usize, usize)>, InvocationErrorKind> {
     let parameters = method.parameters().iter().collect::<Vec<_>>();
+    if let Some(concrete) = concrete_parameters
+        && (concrete.len() != parameters.len()
+            || concrete.iter().zip(&parameters).any(|(binding, source)| {
+                binding.index() != source.index()
+                    || binding.passing() != source.passing()
+                    || !matches!(
+                        (binding.pattern(), source.pattern()),
+                        (ParameterPattern::Identifier(_), ParameterPattern::Identifier(_))
+                            | (ParameterPattern::Wildcard, ParameterPattern::Wildcard)
+                            | (ParameterPattern::Destructure, ParameterPattern::Destructure)
+                            | (
+                                ParameterPattern::DestructurePattern(_),
+                                ParameterPattern::DestructurePattern(_)
+                            )
+                    )
+            }))
+    {
+        return Err(InvocationErrorKind::ArgumentTypeUnavailable { index: 0 });
+    }
     let mut order = Vec::with_capacity(invocation.bindings.len());
     let mut occupied = vec![false; parameters.len()];
     for binding in &invocation.bindings {
@@ -1587,7 +1608,10 @@ fn validate_bindings<M: ValueMode>(
         if !passing_matches(parameter, binding.value.kind()) {
             return Err(InvocationErrorKind::ArgumentModeMismatch { index: parameter_index });
         }
-        let Some(expected_type) = parameter.find_concrete_type().map(|ty| ty.type_id()) else {
+        let expected_type = concrete_parameters
+            .and_then(|concrete| concrete[parameter_index].concrete_type_id())
+            .or_else(|| parameter.find_concrete_type().map(|ty| ty.type_id()));
+        let Some(expected_type) = expected_type else {
             return Err(InvocationErrorKind::ArgumentTypeUnavailable { index: parameter_index });
         };
         let actual_type = binding.value.type_id();

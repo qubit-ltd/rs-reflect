@@ -1215,6 +1215,9 @@ fn push_method_entry(
                     .resolve_specializations()
                     .map_err(|reason| invalid_method_metadata(entry.method, reason))?
                     .into_vec();
+                for specialization in &mut entry.specializations {
+                    specialization.parameters = entry.method.specialization_parameters;
+                }
                 entry.pending_specs = false;
             }
             for specialization in &entry.specializations {

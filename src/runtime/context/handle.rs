@@ -75,6 +75,41 @@ impl ReflectionContextId {
 
 /// A context containing the registrations and indexes used for reflection
 /// queries.
+///
+/// Explicit contexts keep registrations and descriptors isolated from the
+/// process-wide context and from one another.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::ReflectionContext;
+/// use qubit_reflect::TypeDescriptor;
+/// use qubit_reflect::capability::{CapabilityRegistration, CapabilitySpec};
+///
+/// struct ExampleCapability;
+///
+/// impl CapabilitySpec for ExampleCapability {
+///     type Adapter = &'static str;
+///     const ID: &'static str = "example.context_label";
+/// }
+///
+/// let populated = ReflectionContext::builder()
+///     .include_type::<u32>()
+///     .register(CapabilityRegistration::for_type::<u32, ExampleCapability>("populated"))
+///     .build()
+///     .expect("the populated context is valid");
+/// let isolated = ReflectionContext::builder()
+///     .include_type::<u32>()
+///     .build()
+///     .expect("the isolated context is valid");
+///
+/// let populated_type = TypeDescriptor::of_in::<u32>(&populated);
+/// let isolated_type = TypeDescriptor::of_in::<u32>(&isolated);
+/// assert!(std::ptr::eq(populated_type.context(), &populated));
+/// assert!(std::ptr::eq(isolated_type.context(), &isolated));
+/// assert_eq!(populated_type.capability::<ExampleCapability>().expect("lookup succeeds").adapter(), &"populated");
+/// assert!(isolated_type.find_capability::<ExampleCapability>().expect("lookup succeeds").is_none());
+/// ```
 pub struct ReflectionContext {
     /// Unique identity allocated when the context handle is created.
     id: ReflectionContextId,

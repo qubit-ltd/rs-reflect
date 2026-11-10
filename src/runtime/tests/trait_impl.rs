@@ -233,6 +233,7 @@ static DEFAULT_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
     specializations: &[],
     specialization_specs: &[],
     adapters: None,
+    specialization_parameters: None,
 }];
 static OVERRIDE_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
     target: target_type_metadata,
@@ -242,6 +243,7 @@ static OVERRIDE_EFFECTIVE_METHODS: [EffectiveMethod; 1] = [EffectiveMethod {
     specializations: &[],
     specialization_specs: &[],
     adapters: None,
+    specialization_parameters: None,
 }];
 
 static TRAIT_DEFINITION: TraitDefinitionMetadata = TraitDefinitionMetadata {
