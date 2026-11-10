@@ -187,11 +187,6 @@ reason = "Test builds require `extern crate self as qubit_reflect` so procedural
 
 [[exceptions]]
 rule = "public-type-layout"
-path = "src/construct_vnext.rs"
-reason = "Construction request, plan, and failure types are the cohesive public surface of the vNext construction module."
-
-[[exceptions]]
-rule = "public-type-layout"
 path = "src/private/codegen_v4/impls.rs"
 reason = "Implementation metadata and emitted binding records form one internal code-generation protocol."
 

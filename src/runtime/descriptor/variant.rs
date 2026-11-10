@@ -437,3 +437,6 @@ impl<'ctx> VariantDescriptor<'ctx> {
         self.metadata.adapter.is_active_dynamic(value)
     }
 }
+
+// Construction operations are kept beside the variant descriptor's definition.
+mod construction;

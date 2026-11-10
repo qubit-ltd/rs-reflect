@@ -314,3 +314,6 @@ impl<'ctx> TypeDescriptor<'ctx> {
             .into_unique(LookupSubject::Impl, LookupQuery::Name(trait_.path().into()))
     }
 }
+
+// Construction operations are kept beside the type descriptor's definition.
+mod construction;
