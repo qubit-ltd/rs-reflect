@@ -179,7 +179,12 @@ enum ContextState {
 }
 
 impl ReflectionContext {
-    /// Looks up a trait declaration by its opaque marker identity.
+    /// Looks up a registered trait declaration by its marker type identity.
+    ///
+    /// The marker identifies the declaration independently of its source
+    /// path. A match returns declaration metadata, which may be incomplete
+    /// when the trait is external. The marker type is not required to
+    /// implement any trait.
     ///
     /// # Type Parameters
     ///
@@ -188,6 +193,32 @@ impl ReflectionContext {
     /// # Parameters
     ///
     /// * `self` — context queried for the marker registration.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some` when this context contains a declaration registered
+    /// with `D` as its marker, or `None` when no declaration has that marker.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ContextError`] if context data cannot be initialized or
+    /// validated.
+    ///
+    /// # Panics
+    ///
+    /// When querying the global context, a panic from a linked registration
+    /// callback is resumed. Recursive access to the global context from its
+    /// own initialization callback also panics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_reflect::ReflectionContext;
+    ///
+    /// let context = ReflectionContext::builder().build()?;
+    /// assert!(context.trait_definition_for::<u8>()?.is_none());
+    /// # Ok::<(), qubit_reflect::error::ContextError>(())
+    /// ```
     pub fn trait_definition_for<D: 'static>(&self) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
         Ok(self
             .data()?
@@ -200,9 +231,41 @@ impl ReflectionContext {
 
     /// Looks up a uniquely registered incomplete external trait by source path.
     ///
+    /// This lookup uses the retained source path, not a marker identity, and
+    /// returns metadata only when the path identifies exactly one external
+    /// incomplete trait definition.
+    ///
     /// # Parameters
     ///
     /// * `path` — full source path of the external trait.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some` for a unique external incomplete definition at `path`.
+    /// Returns `None` when no definition has that path, when multiple
+    /// definitions share it, or when its unique definition is not marked
+    /// `ExternalIncomplete`. These cases are not errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ContextError`] if context data cannot be initialized or
+    /// validated.
+    ///
+    /// # Panics
+    ///
+    /// When querying the global context, a panic from a linked registration
+    /// callback is resumed. Recursive access to the global context from its
+    /// own initialization callback also panics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use qubit_reflect::ReflectionContext;
+    ///
+    /// let context = ReflectionContext::builder().build()?;
+    /// assert!(context.external_trait_definition("missing::Trait")?.is_none());
+    /// # Ok::<(), qubit_reflect::error::ContextError>(())
+    /// ```
     pub fn external_trait_definition(&self, path: &str) -> Result<Option<RegisteredTraitDescriptor<'_>>, ContextError> {
         Ok(self
             .external_trait_definition_by_path(path)?
