@@ -213,6 +213,7 @@ pub mod descriptor {
     pub use crate::runtime::expression::TraitBoundModifier;
     pub use crate::runtime::expression::TraitExpression;
     pub use crate::runtime::expression::TraitObjectExpression;
+    pub use crate::runtime::expression::TupleTypeExpressions;
     pub use crate::runtime::expression::TypeExpression;
     pub use crate::runtime::expression::TypeExpressionError;
     pub use crate::runtime::expression::TypeExpressionKind;

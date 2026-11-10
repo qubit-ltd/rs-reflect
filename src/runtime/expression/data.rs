@@ -432,11 +432,11 @@ mod tests {
     use super::TraitObjectData;
     use crate::runtime::context::ReflectionContext;
     use crate::runtime::descriptor::generic::GenericParameterMetadataKind;
+    use crate::runtime::expression::TraitExpression;
+    use crate::runtime::expression::TypeExpressionKind;
     use crate::runtime::expression::predicate::PredicateDescriptor;
     use crate::runtime::expression::predicate::PredicateKind;
-    use crate::runtime::expression::type_expression::TraitExpression;
     use crate::runtime::expression::type_expression::TypeExpression;
-    use crate::runtime::expression::type_expression::TypeExpressionKind;
 
     static TYPE_PARAMETER: GenericParameterMetadata = GenericParameterMetadata {
         name: "T",
@@ -545,32 +545,28 @@ mod tests {
         assert!(std::ptr::eq(arguments.context(), &context));
         assert!(matches!(
             arguments.get(0).expect("type argument exists").kind(),
-            crate::runtime::expression::type_expression::GenericExpressionArgumentKind::Type(ty)
+            crate::runtime::expression::GenericExpressionArgumentKind::Type(ty)
                 if matches!(ty.kind(), TypeExpressionKind::Parameter(_))
                     && std::ptr::eq(ty.context(), &context)
         ));
         assert!(matches!(
             arguments.get(1).expect("lifetime argument exists").kind(),
-            crate::runtime::expression::type_expression::GenericExpressionArgumentKind::Lifetime(
-                LifetimeExpression::Static
-            )
+            crate::runtime::expression::GenericExpressionArgumentKind::Lifetime(LifetimeExpression::Static)
         ));
         assert!(matches!(
             arguments.get(2).expect("const argument exists").kind(),
-            crate::runtime::expression::type_expression::GenericExpressionArgumentKind::Const(
-                ConstExpression::SignedInteger(-3)
-            )
+            crate::runtime::expression::GenericExpressionArgumentKind::Const(ConstExpression::SignedInteger(-3))
         ));
         assert!(matches!(
             arguments.get(3).expect("associated equality exists").kind(),
-            crate::runtime::expression::type_expression::GenericExpressionArgumentKind::AssociatedType {
+            crate::runtime::expression::GenericExpressionArgumentKind::AssociatedType {
                 name: "Item",
                 value,
             } if value.display().to_string() == "u8"
         ));
         assert!(matches!(
             arguments.get(4).expect("associated bound exists").kind(),
-            crate::runtime::expression::type_expression::GenericExpressionArgumentKind::AssociatedTypeBound {
+            crate::runtime::expression::GenericExpressionArgumentKind::AssociatedTypeBound {
                 name: "Error",
                 bounds,
             } if bounds.len() == 2

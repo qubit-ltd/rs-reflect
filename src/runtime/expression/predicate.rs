@@ -6,10 +6,10 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
+use super::TraitExpression;
 use super::data::LifetimeExpression;
 use super::data::PredicateData;
 use super::data::TraitBoundModifier;
-use super::type_expression::TraitExpression;
 use super::type_expression::TypeExpression;
 use crate::runtime::context::ReflectionContext;
 
