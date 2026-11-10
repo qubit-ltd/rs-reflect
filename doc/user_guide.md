@@ -281,7 +281,19 @@ Use typed field access when generic application code still knows its Rust types.
 
 `ThreadSafe` mode is available for values and adapters that satisfy the relevant `Send` and `Sync` bounds. Local values cannot be promoted to `ThreadSafe` by erasure. Choose the mode at the boundary where ownership and concurrency requirements are known.
 
-Derive-generated invocation adapters for `async fn` currently support only `Local`. A stable procedural macro cannot infer a `ThreadSafe` adapter for an opaque future, so it does not automatically generate one even when a particular implementation's future would satisfy `Send`. To request a `ThreadSafe` adapter, explicitly bind the concrete method with `bind_method!(... as thread_safe async fn(...))`; the compiler checks that the generated future satisfies `Send`, without requiring you to name its opaque type.
+Derive-generated invocation adapters for `async fn` currently support only `Local`. A stable procedural macro cannot infer a `ThreadSafe` adapter for an opaque future, so it does not automatically generate one even when a particular implementation's future would satisfy `Send`. To request a `ThreadSafe` adapter, explicitly bind the concrete method with `bind_method!(... as thread_safe async fn(...))`; the compiler checks that the generated future satisfies `Send`, without requiring you to name its opaque type. The binding signature describes the value produced after awaiting the method: its output must match exactly, and an omitted output means `()`. Invocation returns a reflected future without running the method; call `into_future()` and poll it to completion, including for unit-returning methods.
+
+For source-level tuple types, `TypeExpression::tuple_elements()` borrows the retained elements without allocating a `Vec`. It returns `Some` for every tuple, including `()`, and `None` for other types:
+
+```rust,ignore
+if let Some(elements) = field.type_expression().tuple_elements() {
+    for element in elements.iter() {
+        println!("{}", element.display());
+    }
+}
+```
+
+`TypeExpression::kind()` remains compatible, but its `Tuple` variant owns an allocated element collection. Use `tuple_elements()` when callers only need to inspect or iterate tuple elements.
 
 ## Bind a generic method
 

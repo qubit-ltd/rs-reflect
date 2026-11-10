@@ -275,7 +275,19 @@ typed 字段替换失败时返回 `FieldSetFailure<V>`。调用 `into_parts()` �
 
 当值和适配器满足相应 `Send`、`Sync` 约束时，可以使用 `ThreadSafe` 模式。类型擦除后不能把 `Local` 值升级为 `ThreadSafe`。应在已知所有权和并发要求的边界选择模式。
 
-derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定过程宏无法推断 opaque future 的 `ThreadSafe` adapter，因此即使某个实现的 future 满足 `Send`，也不会自动生成该 adapter。若要使用 `ThreadSafe` adapter，可用 `bind_method!(... as thread_safe async fn(...))` 显式绑定具体方法；编译器会检查生成的 future 是否满足 `Send`，无需命名 opaque future 类型。
+derive 为 `async fn` 生成的调用适配器目前仅支持 `Local`。稳定过程宏无法推断 opaque future 的 `ThreadSafe` adapter，因此即使某个实现的 future 满足 `Send`，也不会自动生成该 adapter。若要使用 `ThreadSafe` adapter，可用 `bind_method!(... as thread_safe async fn(...))` 显式绑定具体方法；编译器会检查生成的 future 是否满足 `Send`，无需命名 opaque future 类型。绑定签名描述方法被 await 后产生的值，输出类型必须完全匹配；省略输出等价于 `()`。调用只会取得反射 Future，不会立即执行方法；调用 `into_future()` 并轮询到完成后，方法才会运行完毕，unit 输出的方法也一样。
+
+读取源码级 tuple 类型时，可用 `TypeExpression::tuple_elements()` 借用元素而不分配 `Vec`。所有 tuple（包括 `()`）都会返回 `Some`，其他类型返回 `None`：
+
+```rust,ignore
+if let Some(elements) = field.type_expression().tuple_elements() {
+    for element in elements.iter() {
+        println!("{}", element.display());
+    }
+}
+```
+
+`TypeExpression::kind()` 保持兼容，但其 `Tuple` 变体拥有一个分配得到的元素集合。只需检查或遍历 tuple 元素时，可使用 `tuple_elements()`。
 
 ## 绑定泛型方法
 
