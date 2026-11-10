@@ -63,7 +63,7 @@ Capability 查询也绑定到 context。其契约由 capability 类型和适配�
 - 非法 linked capability 会在构建 context 时报告。应用应处理 `ContextError`，不要依赖后续查询隐藏无效注册。
 - 含非 `Send + Sync` 字段的反射类型可使用 `#[Reflect(local_only)]` 保留本地字段访问和构造能力；这不会让值变为线程安全。若应完全排除成员，仍可使用 `#[reflect(skip)]`。
 - Rc 和 Arc 描述符现在会公开其 pointee 泛型实参；下游生产代码无需为这项元数据增量迁移。
-- 调用 pinned 泛型方法时，先通过 `specialization(&MethodArguments)` 选择精确特化，再调用 `MethodSpecializationDescriptor::invoke_pinned`。校验拒绝时会保留 pinned receiver 和参数。`echo<T>(Pin<&mut Self>, T) -> T` 形式的绑定可以被发现，但泛型参数 metadata 尚不能识别具体实参类型，因此该调用仍不可执行。
+- 调用 pinned 泛型方法时，先通过 `specialization(&MethodArguments)` 选择精确特化，再调用 `MethodSpecializationDescriptor::invoke_pinned`。当选中的绑定提供具体参数类型时，可以通过 `invoke_pinned` 调用 `echo<T>(Pin<&mut Self>, T) -> T` 等形式的绑定。调用仍会校验 receiver 和参数；拒绝时会保留原输入。
 
 ## 延伸阅读
 

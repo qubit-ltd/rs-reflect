@@ -36,6 +36,21 @@ use crate::runtime::lookup::Lookup;
 use crate::runtime::short_name::short_name;
 
 /// A context-bound descriptor for a concrete Rust type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::{ReflectionContext, TypeDescriptor};
+///
+/// let context = ReflectionContext::builder()
+///     .include_type::<u32>()
+///     .build()
+///     .expect("valid context");
+/// let ty = TypeDescriptor::of_in::<u32>(&context);
+///
+/// assert_eq!(ty.type_id(), std::any::TypeId::of::<u32>());
+/// assert!(std::ptr::eq(ty.context(), &context));
+/// ```
 #[derive(Clone, Copy)]
 pub struct TypeDescriptor<'ctx> {
     /// Static reflection metadata for the concrete Rust type.

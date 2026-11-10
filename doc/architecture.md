@@ -63,7 +63,7 @@ The library provides metadata, checked dynamic operations, context validation, a
 - Invalid linked capability registrations are reported while the context is built. Handle that `ContextError` instead of relying on a later lookup to hide the invalid registration.
 - A reflected type with non-`Send + Sync` fields can use `#[Reflect(local_only)]` to retain local field access and construction. This does not make the value thread-safe; `#[reflect(skip)]` remains available when a member should be omitted entirely.
 - Rc and Arc descriptors now expose their pointee generic argument; downstream production code does not need a migration for this metadata addition.
-- For pinned generic methods, select the exact specialization with `specialization(&MethodArguments)` and call `MethodSpecializationDescriptor::invoke_pinned`. Rejected calls retain the pinned receiver and arguments. Bindings such as `echo<T>(Pin<&mut Self>, T) -> T` are discoverable, but invoking one remains unavailable while generic parameter metadata cannot identify the concrete argument type.
+- For pinned generic methods, select the exact specialization with `specialization(&MethodArguments)` and call `MethodSpecializationDescriptor::invoke_pinned`. When the selected binding supplies the concrete parameter type, bindings such as `echo<T>(Pin<&mut Self>, T) -> T` can be invoked through `invoke_pinned`. Receiver and argument validation still applies, and rejected calls retain their inputs.
 
 ## Further reading
 

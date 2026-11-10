@@ -279,6 +279,23 @@ fn identity<T: Reflect + 'static>() -> TypeIdentity {
 /// # Type Parameters
 ///
 /// * `M` — local or thread-safe ownership mode; defaults to [`Local`].
+///
+/// # Examples
+///
+/// ```
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let value = DynamicOwned::<Local>::new(7_u32);
+/// let value = match value.downcast::<String>() {
+///     Ok(_) => panic!("a u32 cannot be recovered as a String"),
+///     Err(failure) => failure.into_value(),
+/// };
+/// let value = match value.downcast::<u32>() {
+///     Ok(value) => value,
+///     Err(_) => panic!("the original u32 value must be recoverable"),
+/// };
+/// assert_eq!(value, 7);
+/// ```
 pub struct DynamicOwned<M: ValueMode = Local> {
     /// Erased allocation holding the concrete value.
     value: M::Owned,

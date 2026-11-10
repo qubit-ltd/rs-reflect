@@ -629,13 +629,60 @@ struct Binding<'call, M: ValueMode> {
 
 /// Caller-owned receiver and argument bindings for one invocation.
 ///
+/// # Examples
+///
+/// ```
+/// # #![allow(proc_macro_derive_resolution_fallback)]
+/// fn main() {
+///     #[cfg(feature = "derive")]
+///     demo();
+/// }
+/// # #[cfg(feature = "derive")]
+/// fn demo() {
+/// use qubit_reflect::{Invocation, Reflect, ReflectImpl, ReflectionContext};
+/// use qubit_reflect::value::Local;
+///
+/// #[Reflect]
+/// struct Counter { value: u32 }
+///
+/// #[ReflectImpl]
+/// impl Counter {
+///     pub fn add(&mut self, amount: u32) -> u32 {
+///         self.value += amount;
+///         self.value
+///     }
+/// }
+///
+/// let context = ReflectionContext::builder()
+///     .include_linked_for::<Counter>()
+///     .build()
+///     .expect("valid context");
+/// let mut counter = Counter { value: 1 };
+/// let invocation = Invocation::<Local>::on_mut(&mut counter).arg(2_u32);
+/// let method = match context.type_of::<Counter>().method("add") {
+///     Ok(method) => method,
+///     Err(_) => panic!("the reflected add method should be registered"),
+/// };
+/// let output = match method.invoke(invocation) {
+///     Ok(output) => output,
+///     Err(_) => panic!("the reflected add method should run"),
+/// };
+/// let result = match output.into_owned::<u32>() {
+///     Ok(value) => value,
+///     Err(_) => panic!("add should return u32"),
+/// };
+/// assert_eq!(result, 3);
+/// assert_eq!(counter.value, 3);
+/// }
+/// ```
+///
 /// # Type Parameters
 ///
-/// - `'call`: Generic type or lifetime parameter carried by the descriptor.
+/// - `'call`: Lifetime of receiver and argument borrows retained for the call.
 /// - `M`: Value mode that governs storage and thread-safety bounds.
 pub struct Invocation<'call, M: ValueMode = Local> {
-    /// Retains the typed pinned receiver until the generated adapter recovers
-    /// it.
+    /// Retains the receiver, which may be owned, shared-borrowed, or
+    /// mutable-borrowed, until the generated adapter recovers it.
     receiver: Option<InvocationReceiver<'call, M>>,
     /// Owned receiver and argument values supplied to the invocation.
     bindings: Vec<Binding<'call, M>>,
