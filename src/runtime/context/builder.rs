@@ -51,10 +51,7 @@ impl ReflectionContextBuilder {
     /// linked context from a factory to inspect registrations: that can invoke
     /// the same factories again.
     pub fn include_linked(mut self) -> Self {
-        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>
-            .into_iter()
-            .copied()
-            .collect();
+        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>.into_iter().copied().collect();
         fragments.sort_by_key(|fragment| fragment.sort_key());
         for fragment in fragments {
             match fragment.materialize() {
@@ -99,10 +96,7 @@ impl ReflectionContextBuilder {
             mut issues,
         } = self;
         let root = TypeId::of::<T>();
-        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>
-            .into_iter()
-            .copied()
-            .collect();
+        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>.into_iter().copied().collect();
         fragments.sort_by_key(|fragment| fragment.sort_key());
 
         let (selected, dependency_edges) = select_fragment_slice(
@@ -140,10 +134,7 @@ impl ReflectionContextBuilder {
             }
         }
         if !issues.is_empty() {
-            return Self {
-                registrations,
-                issues,
-            };
+            return Self { registrations, issues };
         }
         for (fragment, include) in fragments.into_iter().zip(selected) {
             if include {
@@ -153,10 +144,7 @@ impl ReflectionContextBuilder {
                 }
             }
         }
-        Self {
-            registrations,
-            issues,
-        }
+        Self { registrations, issues }
     }
 
     /// Adds a registration or registration fragment to this builder.
@@ -189,9 +177,7 @@ impl ReflectionContextBuilder {
         if let Some(error) = ContextError::from_issues(self.issues.clone().into_boxed_slice()) {
             return Err(error);
         }
-        Ok(ReflectionContext::from_data(ContextData::build(
-            self.registrations,
-        )?))
+        Ok(ReflectionContext::from_data(ContextData::build(self.registrations)?))
     }
 
     /// Builds and validates the context data for internal callers.
@@ -207,6 +193,25 @@ impl ReflectionContextBuilder {
 ///
 /// This is shared with the synthetic slice benchmark so it measures the
 /// production selection logic rather than a copied implementation.
+///
+/// # Type Parameters
+///
+/// * `K` — hashable identity used to connect fragment targets and dependencies.
+/// * `F` — fragment value read by the three supplied accessors.
+///
+/// # Parameters
+///
+/// * `fragments` — ordered fragments; their order determines selection and edge
+///   order.
+/// * `root` — initial target whose transitive dependencies are selected.
+/// * `target` — returns a fragment's target identity, if present.
+/// * `dependencies` — returns the dependencies associated with a fragment.
+/// * `is_global` — identifies fragments selected before dependency traversal.
+///
+/// # Returns
+///
+/// Selection flags aligned with `fragments` and dependency edges in traversal
+/// order.
 pub(crate) fn select_fragment_slice<K, F>(
     fragments: &[F],
     root: K,
@@ -298,7 +303,7 @@ mod selection_tests {
     }
 
     #[test]
-    fn selection_keeps_global_roots_cycles_shared_edges_and_input_order() {
+    fn test_selection_keeps_global_roots_cycles_shared_edges_and_input_order() {
         let fragments = [
             Fragment {
                 target: Some(4),
@@ -337,7 +342,7 @@ mod selection_tests {
     }
 
     #[test]
-    fn selection_does_not_expand_dependencies_of_preselected_global_fragments() {
+    fn test_selection_does_not_expand_dependencies_of_preselected_global_fragments() {
         let fragments = [
             Fragment {
                 target: Some(1),

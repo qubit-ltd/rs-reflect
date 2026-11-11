@@ -196,8 +196,7 @@ static DISPLAY_PREDICATE: PredicateData = PredicateData::TraitBound {
     trait_: &DISPLAY_TRAIT,
     modifier: TraitBoundModifier::None,
 };
-static DISPLAY_PREDICATES: [PredicateData; 2] =
-    [BOUNDED_ASSOCIATED_PREDICATE, DISPLAY_PREDICATE];
+static DISPLAY_PREDICATES: [PredicateData; 2] = [BOUNDED_ASSOCIATED_PREDICATE, DISPLAY_PREDICATE];
 static DISPLAY_BOUND_ARGUMENT: ExpressionData = ExpressionData::Named {
     path: "fixture::Container",
     definition: None,
@@ -252,34 +251,16 @@ static HRTB_FUNCTION: super::super::expression::FunctionPointerData =
     );
 static HRTB_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&HRTB_FUNCTION);
 static ELIDED_BINDER_FUNCTION: super::super::expression::FunctionPointerData =
-    super::super::expression::FunctionPointerData::new(
-        &[],
-        None,
-        false,
-        None,
-        false,
-        &[LifetimeExpression::Elided],
-    );
-static ELIDED_BINDER_FUNCTION_EXPRESSION: ExpressionData =
-    ExpressionData::FunctionPointer(&ELIDED_BINDER_FUNCTION);
+    super::super::expression::FunctionPointerData::new(&[], None, false, None, false, &[LifetimeExpression::Elided]);
+static ELIDED_BINDER_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&ELIDED_BINDER_FUNCTION);
 static NESTED_FUNCTION: super::super::expression::FunctionPointerData =
-    super::super::expression::FunctionPointerData::new(
-        &[&HRTB_FUNCTION_EXPRESSION],
-        None,
-        false,
-        None,
-        false,
-        &[],
-    );
+    super::super::expression::FunctionPointerData::new(&[&HRTB_FUNCTION_EXPRESSION], None, false, None, false, &[]);
 static NESTED_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&NESTED_FUNCTION);
 static HRTB_OBJECT: super::super::expression::TraitObjectData =
     super::super::expression::TraitObjectData::new(&[HRTB_DISPLAY_TRAIT], None);
 static HRTB_OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&HRTB_OBJECT);
 static MULTI_TRAIT_OBJECT: super::super::expression::TraitObjectData =
-    super::super::expression::TraitObjectData::new(
-        &[DISPLAY_TRAIT, ITERATOR_TRAIT],
-        Some(LifetimeExpression::Static),
-    );
+    super::super::expression::TraitObjectData::new(&[DISPLAY_TRAIT, ITERATOR_TRAIT], Some(LifetimeExpression::Static));
 static MULTI_TRAIT_OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&MULTI_TRAIT_OBJECT);
 static ITERATOR_OBJECT: super::super::expression::TraitObjectData =
     super::super::expression::TraitObjectData::new(&[ITERATOR_ITEM_U8], None);
@@ -922,7 +903,9 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         "impl 'a: 'static + 'a"
     );
     assert_eq!(
-        TypeExpression::new(&HRTB_FUNCTION_EXPRESSION, &context).display().to_string(),
+        TypeExpression::new(&HRTB_FUNCTION_EXPRESSION, &context)
+            .display()
+            .to_string(),
         "for<'a> fn(&'a u8)"
     );
     assert_eq!(
@@ -932,7 +915,9 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         "for<'_> fn()"
     );
     assert_eq!(
-        TypeExpression::new(&HRTB_OBJECT_EXPRESSION, &context).display().to_string(),
+        TypeExpression::new(&HRTB_OBJECT_EXPRESSION, &context)
+            .display()
+            .to_string(),
         "dyn for<'a, 'b> core::fmt::Display"
     );
     assert_eq!(
@@ -948,7 +933,9 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         "fixture::Container<Error: ?core::fmt::Display + core::fmt::Display>"
     );
     assert_eq!(
-        TypeExpression::new(&NESTED_FUNCTION_EXPRESSION, &context).display().to_string(),
+        TypeExpression::new(&NESTED_FUNCTION_EXPRESSION, &context)
+            .display()
+            .to_string(),
         "fn(for<'a> fn(&'a u8))"
     );
     assert_eq!(
@@ -964,7 +951,9 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         "impl core::iter::Iterator<Item = u8>"
     );
     assert_eq!(
-        TypeExpression::new(&ASSOCIATED_EXPRESSION, &context).display().to_string(),
+        TypeExpression::new(&ASSOCIATED_EXPRESSION, &context)
+            .display()
+            .to_string(),
         "<T as core::iter::Iterator>::Item"
     );
     assert_eq!(

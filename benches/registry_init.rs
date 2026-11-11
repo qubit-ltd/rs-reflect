@@ -30,9 +30,7 @@ struct RegistryBenchmarkType {
 /// Registers global context initialization and immutable lookup cases.
 fn registry_operations(criterion: &mut Criterion) {
     let context = ReflectionContext::global();
-    context
-        .initialize()
-        .expect("production context initialization");
+    context.initialize().expect("production context initialization");
 
     criterion.bench_function("context/hot_global_initialize", |bench| {
         bench.iter(|| black_box(context.initialize()));
@@ -45,10 +43,7 @@ fn registry_operations(criterion: &mut Criterion) {
             .build()
             .expect("first explicit linked context"),
     );
-    eprintln!(
-        "first_explicit_linked_build_ns={}",
-        cold_start.elapsed().as_nanos()
-    );
+    eprintln!("first_explicit_linked_build_ns={}", cold_start.elapsed().as_nanos());
 
     criterion.bench_function("context/repeated_explicit_linked_build", |bench| {
         bench.iter(|| {
@@ -67,23 +62,11 @@ fn registry_operations(criterion: &mut Criterion) {
     let mut selection = criterion.benchmark_group("selection/synthetic_slice");
     for count in [32_usize, 128, 512] {
         for depth in [1_usize, 8, 32] {
-            for shape in [
-                "chain",
-                "reverse_chain",
-                "branch",
-                "cycle",
-                "shared",
-                "unrelated",
-            ] {
+            for shape in ["chain", "reverse_chain", "branch", "cycle", "shared", "unrelated"] {
                 let fragments = benchmark_fragment_graph(count, depth, shape);
-                selection.bench_function(
-                    format!("{shape}/fragments_{count}/depth_{depth}"),
-                    |bench| {
-                        bench.iter(|| {
-                            black_box(benchmark_select_fragments(black_box(&fragments), 0))
-                        })
-                    },
-                );
+                selection.bench_function(format!("{shape}/fragments_{count}/depth_{depth}"), |bench| {
+                    bench.iter(|| black_box(benchmark_select_fragments(black_box(&fragments), 0)))
+                });
             }
         }
     }
@@ -102,24 +85,20 @@ fn registry_operations(criterion: &mut Criterion) {
 
     let mut lookup = criterion.benchmark_group("context/frozen_type_lookup_batch");
     for batch_size in [1_usize, 100, 10_000] {
-        lookup.bench_with_input(
-            BenchmarkId::from_parameter(batch_size),
-            &batch_size,
-            |bench, size| {
-                bench.iter(|| {
-                    for _ in 0..*size {
-                        black_box((
-                            context
-                                .type_by_id(target_id)
-                                .expect("benchmark type remains registered"),
-                            context
-                                .type_by_short_name(target_name)
-                                .expect("benchmark type lookup remains unique"),
-                        ));
-                    }
-                });
-            },
-        );
+        lookup.bench_with_input(BenchmarkId::from_parameter(batch_size), &batch_size, |bench, size| {
+            bench.iter(|| {
+                for _ in 0..*size {
+                    black_box((
+                        context
+                            .type_by_id(target_id)
+                            .expect("benchmark type remains registered"),
+                        context
+                            .type_by_short_name(target_name)
+                            .expect("benchmark type lookup remains unique"),
+                    ));
+                }
+            });
+        });
     }
     lookup.finish();
 }

@@ -213,7 +213,8 @@ pub struct TraitExpressionData {
     pub path: &'static str,
     /// Type, lifetime, const, and associated-type arguments in source order.
     pub arguments: &'static [GenericExpressionArgument],
-    /// Higher-ranked lifetime binders in source order, as written in `for<...>`.
+    /// Higher-ranked lifetime binders in source order, as written in
+    /// `for<...>`.
     pub lifetimes: &'static [LifetimeExpression],
 }
 

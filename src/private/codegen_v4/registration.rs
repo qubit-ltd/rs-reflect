@@ -28,6 +28,16 @@ pub use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 ///
 /// This entry point exists only for the crate's Criterion benchmark and does
 /// not form a supported API.
+///
+/// # Parameters
+///
+/// * `fragments` — ordered synthetic fragments with target identifiers,
+///   global-selection flags, and dependencies.
+/// * `root` — target identifier whose dependency closure is selected.
+///
+/// # Returns
+///
+/// Selection flags in input order and dependency edges in scan order.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
 pub fn benchmark_select_fragments(
@@ -44,13 +54,19 @@ pub fn benchmark_select_fragments(
 }
 
 /// Builds an ordered synthetic graph and checks its adverse dependency order.
+///
+/// # Parameters
+///
+/// * `count` — number of synthetic fragments to generate.
+/// * `depth` — number of connected targets, capped by `count`.
+/// * `shape` — graph shape such as `chain`, `reverse_chain`, or `branch`.
+///
+/// # Returns
+///
+/// Synthetic fragments in the order consumed by the production selector.
 #[cfg(any(test, feature = "bench-internals"))]
 #[doc(hidden)]
-pub fn benchmark_fragment_graph(
-    count: usize,
-    depth: usize,
-    shape: &str,
-) -> Vec<(Option<usize>, bool, Vec<usize>)> {
+pub fn benchmark_fragment_graph(count: usize, depth: usize, shape: &str) -> Vec<(Option<usize>, bool, Vec<usize>)> {
     let active = depth.min(count);
     let mut fragments: Vec<_> = (0..count)
         .map(|index| {
@@ -85,29 +101,18 @@ pub fn benchmark_fragment_graph(
     fragments
 }
 
-#[cfg(test)]
-mod benchmark_graph_tests {
-    use super::benchmark_fragment_graph;
-
-    #[test]
-    fn reverse_chain_and_branch_use_descending_target_order() {
-        for shape in ["reverse_chain", "branch"] {
-            let fragments = benchmark_fragment_graph(512, 32, shape);
-            let targets: Vec<_> = fragments
-                .iter()
-                .filter_map(|fragment| fragment.0.filter(|target| *target < 32))
-                .collect();
-            assert_eq!(targets, (0..32).rev().collect::<Vec<_>>());
-            assert_eq!(targets.last(), Some(&0));
-        }
-    }
-}
-
 /// Measures the production selection phase over the actual linked inventory.
+///
+/// # Type Parameters
+///
+/// * `T` — linked root type whose fragments are selected.
+///
+/// # Returns
+///
+/// The number of selected fragments and dependency edges.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]
-pub fn benchmark_select_linked_inventory<T: crate::runtime::descriptor::Reflect>() -> (usize, usize)
-{
+pub fn benchmark_select_linked_inventory<T: crate::runtime::descriptor::Reflect>() -> (usize, usize) {
     let mut fragments: Vec<_> = crate::__private::__inventory::iter::<RegistrationFragment>
         .into_iter()
         .copied()
@@ -120,10 +125,7 @@ pub fn benchmark_select_linked_inventory<T: crate::runtime::descriptor::Reflect>
         |fragment| fragment.dependencies(),
         |fragment| fragment.include_in_linked_context(),
     );
-    (
-        selected.iter().filter(|include| **include).count(),
-        edges.len(),
-    )
+    (selected.iter().filter(|include| **include).count(), edges.len())
 }
 
 /// Returns the canonical metadata associated with a generated definition.
@@ -152,20 +154,13 @@ pub fn type_definition_metadata<T: 'static>(
 /// # Parameters
 /// - `definition`: static registration for the generic definition.
 /// - `adapter`: implementation of the declared capability contract.
-pub fn type_definition_with_capability<
-    TMarker: 'static,
-    C: crate::runtime::capability::CapabilitySpec,
->(
+pub fn type_definition_with_capability<TMarker: 'static, C: crate::runtime::capability::CapabilitySpec>(
     definition: &'static TypeDefinitionRegistration<TMarker>,
     adapter: C::Adapter,
 ) -> Registration {
     Registration::metadata_only()
         .with_type_definition(definition)
-        .with_capability(
-            crate::runtime::capability::CapabilityRegistration::for_type_definition::<TMarker, C>(
-                adapter,
-            ),
-        )
+        .with_capability(crate::runtime::capability::CapabilityRegistration::for_type_definition::<TMarker, C>(adapter))
 }
 
 /// Creates a linked capability-only fragment for a generic definition.
@@ -187,10 +182,7 @@ pub const fn linked_definition_capability_fragment(
 /// - `label`: stable label for the global registration fragment.
 /// - `registration`: function that creates the trait object registration.
 #[doc(hidden)]
-pub const fn trait_object_fragment(
-    label: &'static str,
-    registration: fn() -> Registration,
-) -> RegistrationFragment {
+pub const fn trait_object_fragment(label: &'static str, registration: fn() -> Registration) -> RegistrationFragment {
     RegistrationFragment::for_global_registration(label, registration)
 }
 
@@ -262,8 +254,7 @@ pub const fn bind_method<T: crate::runtime::descriptor::Reflect>(
     adapters: crate::runtime::descriptor::method::InvocationAdapters,
 ) -> MethodBinding<T> {
     MethodBinding {
-        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata)
-            .with_adapters(adapters),
+        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata).with_adapters(adapters),
         _target: std::marker::PhantomData,
     }
 }
@@ -341,3 +332,40 @@ macro_rules! __qubit_reflect_register_method_binding {
 
 #[doc(hidden)]
 pub use crate::__qubit_reflect_register_method_binding as register_method_binding;
+
+#[cfg(test)]
+mod benchmark_graph_tests {
+    use super::benchmark_fragment_graph;
+
+    #[test]
+    fn test_benchmark_graph_places_adverse_dependencies_before_sources() {
+        for shape in ["reverse_chain", "branch"] {
+            let fragments = benchmark_fragment_graph(512, 32, shape);
+            let targets: Vec<_> = fragments
+                .iter()
+                .filter_map(|fragment| fragment.0.filter(|target| *target < 32))
+                .collect();
+            assert_eq!(targets, (0..32).rev().collect::<Vec<_>>());
+            assert_eq!(targets.last(), Some(&0));
+        }
+    }
+}
+
+#[cfg(all(test, feature = "bench-internals"))]
+mod benchmark_selection_tests {
+    use super::benchmark_fragment_graph;
+    use super::benchmark_select_fragments;
+    use super::benchmark_select_linked_inventory;
+
+    #[test]
+    fn test_benchmark_selectors_report_consistent_fragment_results() {
+        let fragments = benchmark_fragment_graph(4, 4, "chain");
+        let (selected, edges) = benchmark_select_fragments(&fragments, 0);
+
+        assert_eq!(selected, [true; 4]);
+        assert_eq!(edges.len(), 3);
+
+        let (linked_count, linked_edges) = benchmark_select_linked_inventory::<u8>();
+        assert!(linked_edges <= linked_count.saturating_mul(linked_count));
+    }
+}

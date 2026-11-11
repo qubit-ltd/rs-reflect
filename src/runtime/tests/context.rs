@@ -213,14 +213,8 @@ fn root_fragment_dependency_registration() -> Registration {
 type GenericStructDefinitionMarker = ContextFixture<9>;
 /// Marker identity for the generic enum definition fixture.
 type GenericEnumDefinitionMarker = ContextFixture<10>;
-static GENERIC_TYPE_PARAMETERS: [crate::runtime::descriptor::generic::GenericParameterMetadata; 1] = [
-    crate::runtime::descriptor::generic::GenericParameterMetadata::type_parameter(
-        "T",
-        0,
-        &[],
-        None,
-    ),
-];
+static GENERIC_TYPE_PARAMETERS: [crate::runtime::descriptor::generic::GenericParameterMetadata; 1] =
+    [crate::runtime::descriptor::generic::GenericParameterMetadata::type_parameter("T", 0, &[], None)];
 static GENERIC_DEFINITION_METADATA: GenericDefinitionMetadata =
     GenericDefinitionMetadata::new(&GENERIC_TYPE_PARAMETERS, &[]);
 static GENERIC_STRUCT_DEFINITION: TypeDefinitionRegistration<GenericStructDefinitionMarker> =
@@ -370,8 +364,7 @@ static SHARED_TRAIT_B: TraitDefinitionMetadata = TraitDefinitionMetadata::new::<
     &[],
     &[],
 );
-static SHARED_TRAIT_EXPRESSION: TraitExpressionData =
-    TraitExpressionData::new("tests::shared::Shared", &[], &[]);
+static SHARED_TRAIT_EXPRESSION: TraitExpressionData = TraitExpressionData::new("tests::shared::Shared", &[], &[]);
 static SHARED_TRAIT_APPLICATION: TraitApplicationMetadata = TraitApplicationMetadata::linked(
     &SHARED_TRAIT_A,
     &SHARED_TRAIT_EXPRESSION,
@@ -422,20 +415,18 @@ mod second;
 fn test_metadata_only_fragments_register_definitions_without_a_type_record() {
     struct DefinitionMarker;
     static GENERICS: GenericDefinitionMetadata = GenericDefinitionMetadata::new(&[], &[]);
-    static DEFINITION: TypeDefinitionRegistration<DefinitionMarker> =
-        TypeDefinitionRegistration::new(
-            "Envelope",
-            "example::Envelope",
-            TypeDefinitionKind::Struct(crate::runtime::descriptor::generic::StructKind::Named),
-            &GENERICS,
-        );
+    static DEFINITION: TypeDefinitionRegistration<DefinitionMarker> = TypeDefinitionRegistration::new(
+        "Envelope",
+        "example::Envelope",
+        TypeDefinitionKind::Struct(crate::runtime::descriptor::generic::StructKind::Named),
+        &GENERICS,
+    );
 
     fn registration() -> Registration {
         Registration::metadata_only().with_type_definition(&DEFINITION)
     }
 
-    let fragment =
-        RegistrationFragment::for_global_registration("envelope-definition", registration);
+    let fragment = RegistrationFragment::for_global_registration("envelope-definition", registration);
     let registration = fragment.materialize().expect("fragment is well-formed");
     assert!(registration.type_record().is_none());
 
@@ -513,12 +504,7 @@ fn test_descriptors_distinguish_registered_types_from_unindexed_metadata() {
 
     assert!(indexed.is_registered().expect("registry read succeeds"));
     assert!(!unindexed.is_registered().expect("registry read succeeds"));
-    assert!(
-        context
-            .find_type_by_id(unindexed.type_id())
-            .unwrap()
-            .is_none()
-    );
+    assert!(context.find_type_by_id(unindexed.type_id()).unwrap().is_none());
     assert!(std::ptr::eq(unindexed.context(), &context));
 
     let types = context.types().expect("type collection is available");
@@ -538,14 +524,8 @@ fn test_definition_path_ambiguity_and_iteration_preserve_distinct_identities() {
     let context = ReflectionContext::builder()
         .register(Registration::type_definition(&GENERIC_STRUCT_DEFINITION))
         .register(Registration::type_definition(&GENERIC_ENUM_DEFINITION))
-        .register(
-            Registration::metadata_only()
-                .with_type_definition_metadata(&CONFLICTING_TYPE_DEFINITION_A),
-        )
-        .register(
-            Registration::metadata_only()
-                .with_type_definition_metadata(&CONFLICTING_TYPE_DEFINITION_B),
-        );
+        .register(Registration::metadata_only().with_type_definition_metadata(&CONFLICTING_TYPE_DEFINITION_A))
+        .register(Registration::metadata_only().with_type_definition_metadata(&CONFLICTING_TYPE_DEFINITION_B));
     // The two definitions sharing an identity are rejected before a context
     // can expose partially built indexes.
     let conflict = context
@@ -575,18 +555,13 @@ fn test_definition_path_ambiguity_and_iteration_preserve_distinct_identities() {
     assert_eq!(definitions.get(0).unwrap().path(), "tests::GenericEnum");
     assert!(definitions.get(2).is_none());
     assert!(matches!(
-        context
-            .lookup_type_definition_by_name("missing::Definition")
-            .unwrap(),
+        context.lookup_type_definition_by_name("missing::Definition").unwrap(),
         crate::runtime::lookup::Lookup::Missing
     ));
 
     let ambiguous = ReflectionContext::builder()
         .register(Registration::type_definition(&GENERIC_STRUCT_DEFINITION))
-        .register(
-            Registration::metadata_only()
-                .with_type_definition_metadata(&DUPLICATE_PATH_TYPE_DEFINITION),
-        )
+        .register(Registration::metadata_only().with_type_definition_metadata(&DUPLICATE_PATH_TYPE_DEFINITION))
         .build()
         .expect("different definition identities can share a source path");
     assert!(matches!(
@@ -641,16 +616,11 @@ fn test_same_trait_path_keeps_typed_links_and_reports_lookup_ambiguity() {
     assert_eq!(trait_a.path(), trait_b.path());
     assert_eq!(trait_a.completeness(), TraitCompleteness::Complete);
 
-    let applications = context
-        .trait_applications()
-        .expect("applications are iterable");
+    let applications = context.trait_applications().expect("applications are iterable");
     assert_eq!(applications.len(), 1);
     let linked_definition = applications.get(0).unwrap().definition().unwrap();
     assert_eq!(linked_definition.path(), trait_a.path());
-    assert_eq!(
-        linked_definition.id(),
-        TraitDefinitionId::of::<SharedTraitMarkerA>()
-    );
+    assert_eq!(linked_definition.id(), TraitDefinitionId::of::<SharedTraitMarkerA>());
     assert_eq!(
         context
             .trait_applications_by_path("tests::shared::Shared")
@@ -867,19 +837,10 @@ fn test_linked_target_selection_runs_only_selected_factories_each_time() {
             .include_linked_for::<FactoryRoot>()
             .build()
             .expect("factory fixture context builds");
-        assert_eq!(
-            LINKED_FACTORY_ROOT_CALLS.load(Ordering::SeqCst),
-            expected_calls
-        );
-        assert_eq!(
-            LINKED_FACTORY_DEPENDENCY_CALLS.load(Ordering::SeqCst),
-            expected_calls
-        );
+        assert_eq!(LINKED_FACTORY_ROOT_CALLS.load(Ordering::SeqCst), expected_calls);
+        assert_eq!(LINKED_FACTORY_DEPENDENCY_CALLS.load(Ordering::SeqCst), expected_calls);
         assert_eq!(LINKED_FACTORY_OUTSIDE_CALLS.load(Ordering::SeqCst), 0);
-        assert_eq!(
-            *LINKED_FACTORY_CALL_ORDER.lock().unwrap(),
-            ["dependency", "root"],
-        );
+        assert_eq!(*LINKED_FACTORY_CALL_ORDER.lock().unwrap(), ["dependency", "root"],);
     }
 }
 
@@ -914,21 +875,15 @@ fn test_lookup_candidates_have_stable_registration_order() {
         .expect("context builds");
 
     assert!(matches!(
-        context
-            .lookup_type_by_short_name("Missing")
-            .expect("lookup succeeds"),
+        context.lookup_type_by_short_name("Missing").expect("lookup succeeds"),
         crate::runtime::lookup::Lookup::Missing
     ));
-    let crate::runtime::lookup::Lookup::Ambiguous(candidates) = context
-        .lookup_type_by_short_name("Thing")
-        .expect("lookup succeeds")
+    let crate::runtime::lookup::Lookup::Ambiguous(candidates) =
+        context.lookup_type_by_short_name("Thing").expect("lookup succeeds")
     else {
         panic!("both same short names should be returned as ambiguous");
     };
-    let candidate_ids: Vec<_> = candidates
-        .iter()
-        .map(|candidate| candidate.type_id())
-        .collect();
+    let candidate_ids: Vec<_> = candidates.iter().map(|candidate| candidate.type_id()).collect();
     assert_eq!(
         candidate_ids,
         [
@@ -974,9 +929,7 @@ fn test_global_initialization_caches_success_and_failure_without_holding_its_loc
     let first_error = failed
         .get_or_initialize(|| {
             failure_calls.fetch_add(1, Ordering::SeqCst);
-            Err(crate::runtime::error::ContextError::new(
-                "fixture validation failed",
-            ))
+            Err(crate::runtime::error::ContextError::new("fixture validation failed"))
         })
         .err()
         .expect("initialization fails");
@@ -997,9 +950,7 @@ fn test_global_initialization_recursive_reentry_child() {
     let context = GlobalContext::new();
     let panic = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         context.get_or_initialize(|| {
-            let _ = context.get_or_initialize(|| {
-                Ok(crate::runtime::context::handle::data::ContextData::empty())
-            });
+            let _ = context.get_or_initialize(|| Ok(crate::runtime::context::handle::data::ContextData::empty()));
             Ok(crate::runtime::context::handle::data::ContextData::empty())
         })
     })) {
@@ -1007,11 +958,12 @@ fn test_global_initialization_recursive_reentry_child() {
         Err(panic) => panic,
     };
     assert!(
-        panic.downcast_ref::<String>().is_some_and(|message| {
-            message == "recursive global reflection context initialization"
-        }) || panic.downcast_ref::<&str>().is_some_and(|message| {
-            *message == "recursive global reflection context initialization"
-        }),
+        panic
+            .downcast_ref::<String>()
+            .is_some_and(|message| { message == "recursive global reflection context initialization" })
+            || panic
+                .downcast_ref::<&str>()
+                .is_some_and(|message| { *message == "recursive global reflection context initialization" }),
         "recursive initialization used an unexpected panic payload"
     );
     let _retried = context
@@ -1046,8 +998,7 @@ fn test_global_initialization_recursive_reentry_is_bounded() {
     let output = child.wait_with_output().expect("collect child output");
     assert!(
         !timed_out
-            && String::from_utf8_lossy(&output.stderr)
-                .contains("recursive global reflection context initialization"),
+            && String::from_utf8_lossy(&output.stderr).contains("recursive global reflection context initialization"),
         "expected recursive initialization to panic with the fixed diagnostic before the deadline; timed_out={timed_out}, stderr={}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -1093,23 +1044,15 @@ fn test_global_initialization_concurrent_callers_share_one_arc() {
     }
     barrier.wait();
     for _ in 0..4 {
-        entered_rx
-            .recv()
-            .expect("all callers reached initialization");
+        entered_rx.recv().expect("all callers reached initialization");
     }
-    release_tx
-        .send(())
-        .expect("release the winning initializer");
+    release_tx.send(()).expect("release the winning initializer");
     let results: Vec<_> = callers
         .into_iter()
         .map(|caller| caller.join().expect("caller thread completes"))
         .collect();
     assert_eq!(calls.load(Ordering::SeqCst), 1);
-    assert!(
-        results
-            .iter()
-            .all(|result| Arc::ptr_eq(&results[0], result))
-    );
+    assert!(results.iter().all(|result| Arc::ptr_eq(&results[0], result)));
 }
 
 #[test]
@@ -1127,9 +1070,7 @@ fn test_global_initialization_waiter_restarts_after_initializer_panic() {
     let initializer_context = Arc::clone(&context);
     let initializer = std::thread::spawn(move || {
         initializer_context.get_or_initialize(|| {
-            initializer_entered_tx
-                .send(())
-                .expect("report initializer started");
+            initializer_entered_tx.send(()).expect("report initializer started");
             release_rx.recv().expect("release panicking initializer");
             panic!("fixture initializer panic");
         })
