@@ -43,6 +43,66 @@ pub fn benchmark_select_fragments(
     )
 }
 
+/// Builds an ordered synthetic graph and checks its adverse dependency order.
+#[cfg(any(test, feature = "bench-internals"))]
+#[doc(hidden)]
+pub fn benchmark_fragment_graph(
+    count: usize,
+    depth: usize,
+    shape: &str,
+) -> Vec<(Option<usize>, bool, Vec<usize>)> {
+    let active = depth.min(count);
+    let mut fragments: Vec<_> = (0..count)
+        .map(|index| {
+            let dependencies = match shape {
+                "chain" | "reverse_chain" if index + 1 < active => vec![index + 1],
+                "branch" if index < active && index + 2 < active => vec![index + 1, index + 2],
+                "cycle" if index < active => vec![(index + 1) % active],
+                "shared" if index > 0 && index < active => vec![0],
+                _ => Vec::new(),
+            };
+            (Some(index), false, dependencies)
+        })
+        .collect();
+    if active > 1 && matches!(shape, "reverse_chain" | "branch") {
+        fragments.reverse();
+        let active_targets: Vec<_> = fragments
+            .iter()
+            .filter_map(|fragment| fragment.0.filter(|target| *target < active))
+            .collect();
+        assert_eq!(active_targets, (0..active).rev().collect::<Vec<_>>());
+        assert_eq!(active_targets.last(), Some(&0));
+        for (source_index, fragment) in fragments.iter().enumerate() {
+            for dependency in &fragment.2 {
+                let dependency_index = fragments
+                    .iter()
+                    .position(|candidate| candidate.0 == Some(*dependency))
+                    .expect("each synthetic dependency has a target fragment");
+                assert!(dependency_index < source_index);
+            }
+        }
+    }
+    fragments
+}
+
+#[cfg(test)]
+mod benchmark_graph_tests {
+    use super::benchmark_fragment_graph;
+
+    #[test]
+    fn reverse_chain_and_branch_use_descending_target_order() {
+        for shape in ["reverse_chain", "branch"] {
+            let fragments = benchmark_fragment_graph(512, 32, shape);
+            let targets: Vec<_> = fragments
+                .iter()
+                .filter_map(|fragment| fragment.0.filter(|target| *target < 32))
+                .collect();
+            assert_eq!(targets, (0..32).rev().collect::<Vec<_>>());
+            assert_eq!(targets.last(), Some(&0));
+        }
+    }
+}
+
 /// Measures the production selection phase over the actual linked inventory.
 #[cfg(feature = "bench-internals")]
 #[doc(hidden)]

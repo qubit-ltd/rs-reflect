@@ -16,6 +16,7 @@ use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use qubit_reflect::__private::codegen_v4::registration::benchmark_fragment_graph;
 use qubit_reflect::__private::codegen_v4::registration::benchmark_select_fragments;
 use qubit_reflect::__private::codegen_v4::registration::benchmark_select_linked_inventory;
 use qubit_reflect::Reflect;
@@ -74,7 +75,7 @@ fn registry_operations(criterion: &mut Criterion) {
                 "shared",
                 "unrelated",
             ] {
-                let fragments = make_graph(count, depth, shape);
+                let fragments = benchmark_fragment_graph(count, depth, shape);
                 selection.bench_function(
                     format!("{shape}/fragments_{count}/depth_{depth}"),
                     |bench| {
@@ -121,30 +122,6 @@ fn registry_operations(criterion: &mut Criterion) {
         );
     }
     lookup.finish();
-}
-
-/// Builds an ordered synthetic graph outside the timed benchmark closure.
-fn make_graph(count: usize, depth: usize, shape: &str) -> Vec<(Option<usize>, bool, Vec<usize>)> {
-    let active = depth.min(count);
-    let mut fragments: Vec<_> = (0..count)
-        .map(|index| {
-            let dependencies = match shape {
-                "chain" if index + 1 < active => vec![index + 1],
-                "reverse_chain" if index + 1 < active => vec![index + 1],
-                "branch" if index < active && index + 2 < active => vec![index + 1, index + 2],
-                "cycle" if index < active => vec![(index + 1) % active],
-                "shared" if index > 0 && index < active => vec![0],
-                _ => Vec::new(),
-            };
-            (Some(index), false, dependencies)
-        })
-        .collect();
-    if active > 1 && matches!(shape, "reverse_chain" | "branch") {
-        // Keep the root's fragment last so each pass discovers one further
-        // target, modeling an adverse but valid sorted inventory order.
-        fragments.rotate_left(1);
-    }
-    fragments
 }
 
 criterion_group!(benches, registry_operations);
