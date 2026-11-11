@@ -105,6 +105,44 @@ fn test_lookup_state_accessors_and_consuming_extractors_cover_each_variant() {
 }
 
 #[test]
+fn test_lookup_is_empty_matches_candidate_collection_for_each_variant() {
+    let missing = Lookup::<u32>::Missing;
+    assert_is_empty_consistent(&missing);
+    assert!(missing.is_empty());
+    assert_eq!(missing.only(), None);
+
+    let unique = Lookup::Unique(1_u32);
+    assert_is_empty_consistent(&unique);
+    assert!(!unique.is_empty());
+    assert_eq!(unique.only(), Some(1));
+
+    let empty = Lookup::<u32>::Ambiguous(Vec::new().into_boxed_slice());
+    assert_is_empty_consistent(&empty);
+    assert!(empty.is_empty());
+    assert!(empty.is_ambiguous());
+    assert_eq!(empty.only(), None);
+
+    let single = Lookup::Ambiguous(vec![1_u32].into_boxed_slice());
+    assert_is_empty_consistent(&single);
+    assert!(!single.is_empty());
+    assert!(single.is_ambiguous());
+    assert_eq!(single.only(), None);
+
+    let multiple = Lookup::Ambiguous(vec![1_u32, 2].into_boxed_slice());
+    assert_is_empty_consistent(&multiple);
+    assert!(!multiple.is_empty());
+    assert!(multiple.is_ambiguous());
+    assert_eq!(multiple.only(), None);
+}
+
+fn assert_is_empty_consistent<T>(lookup: &Lookup<T>) {
+    let length = lookup.len();
+    let candidates_are_empty = lookup.candidates().is_empty();
+    assert_eq!(lookup.is_empty(), length == 0);
+    assert_eq!(lookup.is_empty(), candidates_are_empty);
+}
+
+#[test]
 fn test_into_unique_returns_the_unique_value_without_changing_it() {
     let result = Lookup::Unique(candidate("Widget"))
         .into_unique(LookupSubject::Type, LookupQuery::Name("Widget".into()))

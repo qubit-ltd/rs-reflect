@@ -35,7 +35,11 @@ pub enum Lookup<T> {
 }
 
 impl<T> Lookup<T> {
-    /// Returns whether no candidate matched.
+    /// Returns whether the lookup is in the `Missing` state.
+    ///
+    /// Unlike [`is_empty`](Self::is_empty), this checks the result variant,
+    /// not the number of retained candidates. An `Ambiguous` result with no
+    /// candidates is still ambiguous, but it is empty.
     pub fn is_missing(&self) -> bool {
         matches!(self, Self::Missing)
     }
@@ -57,9 +61,12 @@ impl<T> Lookup<T> {
         }
     }
 
-    /// Returns whether the lookup found no candidates.
+    /// Returns whether the lookup contains no candidates.
+    ///
+    /// This is a collection predicate based on [`len`](Self::len), while
+    /// [`is_missing`](Self::is_missing) reports the lookup's result state.
     pub fn is_empty(&self) -> bool {
-        self.is_missing()
+        self.len() == 0
     }
 
     /// Returns all candidates as a slice, including the unique candidate.
