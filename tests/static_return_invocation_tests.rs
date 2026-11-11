@@ -15,6 +15,9 @@ use qubit_reflect::invoke::InvocationErrorKind;
 use qubit_reflect::invoke::InvocationUnavailableReason;
 use qubit_reflect::value::Local;
 
+struct Handle<T: ?Sized>(std::marker::PhantomData<T>);
+impl<T: ?Sized + 'static> qubit_reflect::descriptor::Reflect for Handle<T> {}
+
 #[Reflect]
 struct StaticTarget;
 
@@ -34,6 +37,10 @@ impl StaticTarget {
 
     pub fn static_function(&self) -> for<'a> fn(&'a u8) -> u8 {
         identity
+    }
+
+    pub fn static_trait_handle(&self) -> Handle<dyn for<'a> Fn(&'a u8) -> u8> {
+        Handle(std::marker::PhantomData)
     }
 
     #[expect(
@@ -148,4 +155,16 @@ fn test_higher_ranked_function_pointer_return_is_invocable() {
         .into_owned::<for<'a> fn(&'a u8) -> u8>()
         .unwrap_or_else(|_| panic!("function pointer result should preserve its higher-ranked signature"));
     assert_eq!(function(&23), 23);
+}
+
+#[test]
+fn test_higher_ranked_trait_object_inside_handle_is_invocable() {
+    let target = StaticTarget;
+    let _ordinary = target.static_trait_handle();
+    let output = method("static_trait_handle")
+        .invoke(Invocation::<Local>::on_ref(&target))
+        .unwrap_or_else(|failure| panic!("unexpected invocation failure: {:?}", failure.error().kind()));
+    let _handle = output
+        .into_owned::<Handle<dyn for<'a> Fn(&'a u8) -> u8>>()
+        .unwrap_or_else(|_| panic!("the exact handle output must be preserved"));
 }

@@ -138,10 +138,9 @@ fn bound_contains_non_static_lifetime(
     match bound {
         GenericBoundIr::Lifetime(lifetime) => lifetime != "'static" && !bound_lifetimes.contains(lifetime),
         GenericBoundIr::Trait { path, lifetimes, .. } => {
-            lifetimes
-                .iter()
-                .any(|lifetime| lifetime != "'static" && !bound_lifetimes.contains(lifetime))
-                || path_contains_non_static_lifetime(path, bound_lifetimes, in_function_signature)
+            let mut nested_bound_lifetimes = bound_lifetimes.to_vec();
+            nested_bound_lifetimes.extend(lifetimes.iter().cloned());
+            path_contains_non_static_lifetime(path, &nested_bound_lifetimes, in_function_signature)
         }
         GenericBoundIr::Other(_) => true,
     }
@@ -192,6 +191,13 @@ mod tests {
             (quote!(dyn Send + 'a), true),
             (quote!(impl Send + 'a), true),
             (quote!(dyn Fn(Wrapper<'a>) -> u8), true),
+            (quote!(dyn for<'a> Fn(&'a u8) -> u8), false),
+            (quote!(dyn for<'a> Fn(&'a u8) -> u8 + 'static), false),
+            (quote!(Handle<dyn for<'a> Fn(&'a u8) -> u8>), false),
+            (quote!(dyn for<'a> Fn(&'a u8) -> u8 + 'env), true),
+            (quote!(dyn for<'a> Fn(&'env u8) -> u8), true),
+            // The HRTB binder belongs to its trait bound and must not bind this sibling.
+            (quote!(dyn for<'a> Fn(&'a u8) -> u8 + Send + 'a), true),
             (quote!(!), false),
             (quote!(_), true),
             (quote!(fixture!()), true),
@@ -204,6 +210,15 @@ mod tests {
                 "type fixture: {tokens}",
             );
         }
+    }
+
+    #[test]
+    fn test_trait_bound_binders_do_not_leak_to_sibling_bounds() {
+        let bound = parsed_type(quote!(dyn for<'a> Fn(&'a u8) -> u8));
+        let sibling = parsed_type(quote!(dyn Send + 'a));
+
+        assert!(!type_contains_non_static_lifetime(&bound, &[], false));
+        assert!(type_contains_non_static_lifetime(&sibling, &[], false));
     }
 
     #[test]
