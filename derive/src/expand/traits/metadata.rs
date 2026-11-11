@@ -54,19 +54,19 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
             let receiver = match &method.receiver {
                 Some(receiver) => match receiver.kind {
                     ReceiverKindIr::Value => {
-                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                        quote!(::core::option::Option::Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
                             #facade::__private::codegen_v4::invoke::ReceiverKind::Owned
                             , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
                         )))
                     }
                     ReceiverKindIr::SharedReference => {
-                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                        quote!(::core::option::Option::Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
                             #facade::__private::codegen_v4::invoke::ReceiverKind::Shared
                             , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
                         )))
                     }
                     ReceiverKindIr::MutableReference => {
-                        quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                        quote!(::core::option::Option::Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
                             #facade::__private::codegen_v4::invoke::ReceiverKind::Mutable
                             , &#facade::__private::codegen_v4::expression::ExpressionData::SelfType
                         )))
@@ -84,12 +84,12 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                         } else {
                             quote!(#facade::__private::codegen_v4::invoke::ReceiverKind::Owned)
                         };
-                        quote!(Some(
+                        quote!(::core::option::Option::Some(
                             #facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(#kind, #receiver_expression)
                         ))
                     }
                 },
-                None => quote!(None),
+                None => quote!(::core::option::Option::None),
             };
             let parameters = method.parameters.iter().map(|parameter| {
                 let pattern = match parameter.pattern.kind {
@@ -172,8 +172,8 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 .as_deref()
                 .map(|abi| function_abi(Some(abi), method.span, facade));
             let abi = match abi {
-                Some(abi) => quote!(Some(#abi)),
-                None => quote!(None),
+                Some(abi) => quote!(::core::option::Option::Some(#abi)),
+                None => quote!(::core::option::Option::None),
             };
             let has_default = method.has_default;
             let is_generic = !method.generics.params.is_empty();
@@ -216,8 +216,8 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 .as_ref()
                 .map(|value| type_expression(value, &item_environment, facade));
             let default = match default {
-                Some(value) => quote!(Some(#value)),
-                None => quote!(None),
+                Some(value) => quote!(::core::option::Option::Some(#value)),
+                None => quote!(::core::option::Option::None),
             };
             quote!(#facade::__private::codegen_v4::traits::associated_type(
                 #name,
@@ -237,7 +237,7 @@ pub(super) fn build(declaration: &TraitDeclarationIr, trait_name: &LitStr, facad
                 .value
                 .as_ref()
                 .map(|value| const_expression(value, &environment, facade))
-                .unwrap_or_else(|| quote!(None));
+                .unwrap_or_else(|| quote!(::core::option::Option::None));
             quote!(#facade::__private::codegen_v4::traits::associated_const(
                 #name,
                 #facade::__private::codegen_v4::traits::TraitVisibility::Public,

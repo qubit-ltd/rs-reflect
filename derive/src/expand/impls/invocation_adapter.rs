@@ -198,19 +198,19 @@ pub(super) fn thread_safe_definition(
             let (receiver, arguments) = validated.into_parts();
             let receiver: T = receiver.expect("validated invocation has a receiver")
                 .into_owned::<T>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         },
         Some(ReceiverKindIr::SharedReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_ref::<T>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         },
         Some(ReceiverKindIr::MutableReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_mut::<T>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         },
         None => quote! { let (_receiver, arguments) = validated.into_parts(); },
         Some(ReceiverKindIr::Typed) => unreachable!(),

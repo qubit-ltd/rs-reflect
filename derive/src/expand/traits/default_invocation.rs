@@ -418,29 +418,29 @@ fn emit_default_method(
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_ref::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type"));
         },
         Some(ReceiverKindIr::MutableReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_mut::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type"));
         },
         Some(ReceiverKindIr::Value) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_owned::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type"));
         },
         Some(ReceiverKindIr::Typed) if pinned_receiver_mutable == Some(true) => quote! {
             let (_receiver, arguments) = validated.into_parts();
             let receiver = pinned_receiver.downcast_mut::<__QubitReflectTarget>()
-                .unwrap_or_else(|| unreachable!("validated invocation checked pinned receiver type"));
+                .unwrap_or_else(|| ::core::unreachable!("validated invocation checked pinned receiver type"));
         },
         Some(ReceiverKindIr::Typed) if pinned_receiver_mutable == Some(false) => quote! {
             let (_receiver, arguments) = validated.into_parts();
             let receiver = pinned_receiver.downcast_ref::<__QubitReflectTarget>()
-                .unwrap_or_else(|| unreachable!("validated invocation checked pinned receiver type"));
+                .unwrap_or_else(|| ::core::unreachable!("validated invocation checked pinned receiver type"));
         },
         Some(ReceiverKindIr::Typed) => return None,
         None => quote! {
@@ -911,19 +911,19 @@ fn thread_safe_default_adapter(
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_owned::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type and mode"));
         },
         Some(ReceiverKindIr::SharedReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_ref::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type and mode"));
         },
         Some(ReceiverKindIr::MutableReference) => quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver")
                 .into_mut::<__QubitReflectTarget>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver type and mode"));
         },
         None => quote! {
             let (_receiver, arguments) = validated.into_parts();
@@ -951,7 +951,7 @@ fn thread_safe_default_adapter(
                         let #argument: #ty = arguments.next()
                             .expect("validated invocation contains each declared argument")
                             .into_ref::<#element_type>()
-                            .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                            .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
                     }
                 }
                 TypeKindIr::Reference {
@@ -962,14 +962,14 @@ fn thread_safe_default_adapter(
                         let #argument: #ty = arguments.next()
                             .expect("validated invocation contains each declared argument")
                             .into_mut::<#element_type>()
-                            .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                            .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
                     }
                 }
                 _ => quote! {
                     let #argument: #ty = <#ty as #value_eligibility<__QubitReflectTarget>>::into_owned(
                         arguments.next().expect("validated invocation contains each declared argument"),
                     )
-                    .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
                 },
             }
         });
