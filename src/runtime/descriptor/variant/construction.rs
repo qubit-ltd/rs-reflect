@@ -23,24 +23,18 @@ impl<'ctx> VariantDescriptor<'ctx> {
     pub fn construction(self) -> ConstructionDescriptor<'ctx> {
         ConstructionDescriptor::new(self.construction_runtime(), ConstructionTarget::Variant(self))
     }
-
-    /// Constructs this enum variant into a typed owned value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Constructs this enum variant as a typed owned value after validating its
+    /// target type, input shape, and field values.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
-    /// - `I`: Input type carrying values for the operation.
-    ///
+    /// - `T`: Concrete output type represented by this descriptor.
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     pub fn construct<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -48,51 +42,41 @@ impl<'ctx> VariantDescriptor<'ctx> {
     {
         self.construction().construct(input)
     }
-
-    /// Constructs this enum variant into a dynamic owned value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Constructs this enum variant as a dynamic owned value after validating
+    /// its input shape and field values.
     ///
     /// # Type Parameters
     ///
-    /// - `I`: Input type carrying values for the operation.
-    ///
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     pub fn construct_dynamic<I>(self, input: I) -> Result<DynamicOwned<I::Mode>, ConstructionFailure<I::Mode>>
     where
         I: ConstructionInputMode + ConstructionInput<I::Mode>,
     {
         self.construction().construct_dynamic(input)
     }
-
-    /// Constructs this variant while bypassing reflected visibility checks.
-    ///
+    /// Constructs this enum variant as a typed owned value while bypassing
+    /// reflected field visibility checks. Target type and input validation
+    /// still apply.
     ///
     /// # Type Parameters
     ///
+    /// - `T`: Concrete output type represented by this descriptor.
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
-    /// - `I`: Input type carrying values for the operation.
-    ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn construct_unchecked<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -100,27 +84,22 @@ impl<'ctx> VariantDescriptor<'ctx> {
     {
         unsafe { self.construction().construct_unchecked(input) }
     }
-
-    /// Constructs this variant dynamically while bypassing visibility checks.
-    ///
+    /// Constructs this enum variant as a dynamic owned value while bypassing
+    /// reflected field visibility checks. Input validation still applies.
     ///
     /// # Type Parameters
     ///
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
-    /// - `I`: Input type carrying values for the operation.
-    ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn construct_dynamic_unchecked<I>(
         self,
         input: I,

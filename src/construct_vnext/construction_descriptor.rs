@@ -34,17 +34,14 @@ pub struct ConstructionDescriptor<'ctx> {
 }
 
 impl<'ctx> ConstructionDescriptor<'ctx> {
-    /// Wraps a runtime input value produced by the corresponding public
-    /// builder. # Parameters
+    /// Wraps a runtime construction descriptor with its public target.
     ///
-    /// - `inner`: Runtime representation being adapted to the public API.
-    /// - `target`: Target type whose effective method metadata is being
-    ///   resolved.
     /// # Parameters
     ///
-    /// - `inner`: Runtime representation being adapted to the public API.
-    /// - `target`: Target descriptor whose construction or method metadata is
-    ///   queried.
+    /// - `inner`: Runtime descriptor that performs construction and update
+    ///   operations.
+    /// - `target`: Struct or variant descriptor identifying the construction
+    ///   target.
     pub(crate) fn new(inner: runtime::ConstructionDescriptor<'ctx>, target: ConstructionTarget<'ctx>) -> Self {
         Self { inner, target }
     }
@@ -70,20 +67,17 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         ConstructionFields::new(self.inner.fields())
     }
 
-    /// Delegates typed construction to the runtime descriptor and preserves its
-    /// recovery input. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// Delegates typed construction to the runtime descriptor, retaining input
+    /// on failure.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by the target.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Runtime construction input to validate and consume.
     pub(super) fn construct_runtime<T, M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -95,24 +89,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.construct::<T, M, _>(input)
     }
 
-    /// Delegates typed construction while bypassing the visibility policy.
+    /// Delegates typed construction while bypassing reflected field visibility
+    /// checks. Target type and input validation still apply.
     ///
     /// # Safety
     ///
-    /// The caller must preserve invariants normally enforced by reflected field
-    /// visibility. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by the target.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Runtime construction input to validate and consume.
     pub(super) unsafe fn construct_unchecked_runtime<T, M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -124,10 +116,8 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.construct_unchecked::<T, M, _>(input) }
     }
 
-    /// Delegates dynamic construction and preserves runtime validation
-    /// failures. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// Delegates dynamic construction and retains runtime validation input on
+    /// failure.
     ///
     /// # Type Parameters
     ///
@@ -135,7 +125,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Runtime construction input to validate and consume.
     pub(super) fn construct_dynamic_runtime<M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -146,14 +136,13 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.construct_dynamic::<M, _>(input)
     }
 
-    /// Delegates dynamic construction while bypassing the visibility policy.
+    /// Delegates dynamic construction while bypassing reflected field
+    /// visibility checks. Input validation still applies.
     ///
     /// # Safety
     ///
-    /// The caller must preserve invariants normally enforced by reflected field
-    /// visibility. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     ///
     /// # Type Parameters
     ///
@@ -161,7 +150,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Runtime construction input to validate and consume.
     pub(super) unsafe fn construct_dynamic_unchecked_runtime<M>(
         self,
         input: RuntimeConstructionInput<M>,
@@ -172,20 +161,17 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.construct_dynamic_unchecked::<M, _>(input) }
     }
 
-    /// Delegates typed update and preserves runtime recovery data.
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// Delegates typed update and retains the original value and replacements
+    /// on failure.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by the target.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Original value and requested field replacements.
     pub(super) fn update_runtime<T, M>(self, input: UpdateInput<M>) -> Result<T, runtime::UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -194,24 +180,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.update::<T, M>(input.inner)
     }
 
-    /// Delegates typed update while bypassing the visibility policy.
+    /// Delegates typed update while bypassing reflected field visibility
+    /// checks. Type and replacement validation still apply.
     ///
     /// # Safety
     ///
-    /// The caller must preserve invariants normally enforced by reflected field
-    /// visibility. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by the target.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Original value and requested field replacements.
     pub(super) unsafe fn update_unchecked_runtime<T, M>(
         self,
         input: UpdateInput<M>,
@@ -223,10 +207,8 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.update_unchecked::<T, M>(input.inner) }
     }
 
-    /// Delegates dynamic update to the runtime descriptor.
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// Delegates dynamic update and retains the original value and replacements
+    /// on failure.
     ///
     /// # Type Parameters
     ///
@@ -234,7 +216,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Original value and requested field replacements.
     pub(super) fn update_dynamic_runtime<M>(
         self,
         input: UpdateInput<M>,
@@ -245,14 +227,13 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         self.inner.update_dynamic(input.inner)
     }
 
-    /// Delegates dynamic update while bypassing the visibility policy.
+    /// Delegates dynamic update while bypassing reflected field visibility
+    /// checks. Type and replacement validation still apply.
     ///
     /// # Safety
     ///
-    /// The caller must preserve invariants normally enforced by reflected field
-    /// visibility. # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     ///
     /// # Type Parameters
     ///
@@ -260,7 +241,7 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Original value and requested field replacements.
     pub(super) unsafe fn update_dynamic_unchecked_runtime<M>(
         self,
         input: UpdateInput<M>,
@@ -271,23 +252,18 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { self.inner.update_dynamic_unchecked(input.inner) }
     }
 
-    /// Constructs a typed value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Constructs a typed value after validating the target type, input shape,
+    /// and field values.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
-    /// - `I`: Input type carrying values for the operation.
-    ///
+    /// - `T`: Concrete output type represented by this descriptor.
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     pub fn construct<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -296,28 +272,23 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         I::Mode::construct(self, input)
     }
 
-    /// Constructs a typed value while bypassing reflected visibility checks.
-    ///
+    /// Constructs a typed value while bypassing reflected field visibility
+    /// checks. Target type and input validation still apply.
     ///
     /// # Type Parameters
     ///
+    /// - `T`: Concrete output type represented by this descriptor.
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
-    /// - `I`: Input type carrying values for the operation.
-    ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn construct_unchecked<T, I>(self, input: I) -> Result<T, ConstructionFailure<I::Mode>>
     where
         T: ValueFor<I::Mode>,
@@ -326,21 +297,17 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { I::Mode::construct_unchecked(self, input) }
     }
 
-    /// Constructs a dynamically owned value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Constructs a dynamic owned value after validating the input shape and
+    /// field values.
     ///
     /// # Type Parameters
     ///
-    /// - `I`: Input type carrying values for the operation.
-    ///
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     pub fn construct_dynamic<I>(self, input: I) -> Result<DynamicOwned<I::Mode>, ConstructionFailure<I::Mode>>
     where
         I: ConstructionInputMode + ConstructionInput<I::Mode>,
@@ -348,26 +315,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         I::Mode::construct_dynamic(self, input)
     }
 
-    /// Constructs a dynamic value while bypassing reflected visibility checks.
-    ///
+    /// Constructs a dynamic owned value while bypassing reflected field
+    /// visibility checks. Input validation still applies.
     ///
     /// # Type Parameters
     ///
+    /// - `I`: Construction input whose associated mode selects value storage.
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
-    /// - `I`: Input type carrying values for the operation.
-    ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: Owned construction fields to validate and consume. On
+    ///   failure, the error retains the input for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn construct_dynamic_unchecked<I>(
         self,
         input: I,
@@ -378,23 +341,18 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { I::Mode::construct_dynamic_unchecked(self, input) }
     }
 
-    /// Updates a typed owned struct value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Updates a typed owned struct value after validating its type and field
+    /// replacements.
     ///
     /// # Type Parameters
     ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by this descriptor.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
-    ///
     ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: The owned struct and field replacements to validate. On
+    ///   failure, the error retains both for recovery.
     pub fn update<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -403,21 +361,17 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         M::update(self, input)
     }
 
-    /// Updates a dynamic owned struct value.
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
+    /// Updates a dynamic owned struct value after validating its type and field
+    /// replacements.
     ///
     /// # Type Parameters
     ///
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
-    ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: The owned struct and field replacements to validate. On
+    ///   failure, the error retains both for recovery.
     pub fn update_dynamic<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
@@ -425,28 +379,23 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         M::update_dynamic(self, input)
     }
 
-    /// Updates a typed owned struct value while bypassing visibility checks.
-    ///
+    /// Updates a typed owned struct value while bypassing reflected field
+    /// visibility checks. Type and replacement validation still apply.
     ///
     /// # Type Parameters
     ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
-    /// - `T`: Concrete Rust type whose metadata or value is used by the
-    ///   operation.
+    /// - `T`: Concrete output type represented by this descriptor.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
-    ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: The owned struct and field replacements to validate. On
+    ///   failure, the error retains both for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn update_unchecked<T, M>(self, input: UpdateInput<M>) -> Result<T, UpdateFailure<M>>
     where
         T: ValueFor<M>,
@@ -455,26 +404,22 @@ impl<'ctx> ConstructionDescriptor<'ctx> {
         unsafe { M::update_unchecked(self, input) }
     }
 
-    /// Updates a dynamic owned struct value while bypassing visibility checks.
-    ///
+    /// Updates a dynamic owned struct value while bypassing reflected field
+    /// visibility checks. Type and replacement validation still apply.
     ///
     /// # Type Parameters
     ///
-    ///
-    /// # Parameters
-    ///
-    /// - `input`: Owned values supplied for validation and application.
-    ///
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
-    ///
     /// # Parameters
     ///
-    /// - `input`: Owned values supplied for validation and application.
+    /// - `input`: The owned struct and field replacements to validate. On
+    ///   failure, the error retains both for recovery.
     ///
     /// # Safety
-    /// The caller must uphold invariants protected by private or restricted
-    /// fields.
+    ///
+    /// The caller must uphold invariants normally enforced by reflected field
+    /// visibility.
     pub unsafe fn update_dynamic_unchecked<M: ConstructionMode>(
         self,
         input: UpdateInput<M>,
