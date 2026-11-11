@@ -14,6 +14,9 @@ use super::super::data::FunctionPointerData;
 use super::super::data::GenericExpressionArgument;
 use super::super::data::LifetimeExpression;
 use super::super::data::OpaqueTypeData;
+use super::super::data::PredicateData;
+use super::super::data::TraitBoundModifier;
+use super::super::data::TraitExpressionData;
 use super::super::data::TraitObjectData;
 use super::super::type_expression::TypeExpression;
 use crate::runtime::context::ReflectionContext;
@@ -37,7 +40,9 @@ impl fmt::Display for ExpressionDisplay<'_> {
     /// Returns a formatting error if writing to the destination fails.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.expression.data {
-            ExpressionData::Named { path, arguments, .. } => {
+            ExpressionData::Named {
+                path, arguments, ..
+            } => {
                 formatter.write_str(path)?;
                 write_generic_arguments(formatter, arguments, self.expression.context)
             }
@@ -56,8 +61,7 @@ impl fmt::Display for ExpressionDisplay<'_> {
                         "<{} as ",
                         TypeExpression::new(self_type, self.expression.context).display()
                     )?;
-                    formatter.write_str(trait_.path)?;
-                    write_generic_arguments(formatter, trait_.arguments, self.expression.context)?;
+                    write_trait_expression(formatter, trait_, self.expression.context)?;
                     formatter.write_str(">::")?;
                     formatter.write_str(name)?;
                 } else {
@@ -75,7 +79,9 @@ impl fmt::Display for ExpressionDisplay<'_> {
                 target,
             } => {
                 formatter.write_str("&")?;
-                if let Some(lifetime) = lifetime.filter(|value| *value != LifetimeExpression::Elided) {
+                if let Some(lifetime) =
+                    lifetime.filter(|value| *value != LifetimeExpression::Elided)
+                {
                     write_lifetime(formatter, lifetime)?;
                     formatter.write_str(" ")?;
                 }
@@ -128,8 +134,12 @@ impl fmt::Display for ExpressionDisplay<'_> {
             ExpressionData::FunctionPointer(function) => {
                 write_function_pointer(formatter, function, self.expression.context)
             }
-            ExpressionData::TraitObject(object) => write_trait_object(formatter, object),
-            ExpressionData::Opaque(opaque) => write_opaque(formatter, opaque),
+            ExpressionData::TraitObject(object) => {
+                write_trait_object(formatter, object, self.expression.context)
+            }
+            ExpressionData::Opaque(opaque) => {
+                write_opaque(formatter, opaque, self.expression.context)
+            }
             ExpressionData::Never => formatter.write_str("!"),
         }
     }
@@ -160,13 +170,20 @@ fn write_generic_arguments(
             formatter.write_str(", ")?;
         }
         match argument {
-            GenericExpressionArgument::Type(ty) => write!(formatter, "{}", TypeExpression::new(ty, context).display())?,
+            GenericExpressionArgument::Type(ty) => {
+                write!(formatter, "{}", TypeExpression::new(ty, context).display())?
+            }
             GenericExpressionArgument::Lifetime(lifetime) => write_lifetime(formatter, *lifetime)?,
             GenericExpressionArgument::Const(value) => write_const(formatter, *value)?,
-            GenericExpressionArgument::AssociatedType { name, value } => {
-                write!(formatter, "{name} = {}", TypeExpression::new(value, context).display())?
+            GenericExpressionArgument::AssociatedType { name, value } => write!(
+                formatter,
+                "{name} = {}",
+                TypeExpression::new(value, context).display()
+            )?,
+            GenericExpressionArgument::AssociatedTypeBound { name, bounds } => {
+                write!(formatter, "{name}: ")?;
+                write_predicates(formatter, bounds, context)?;
             }
-            GenericExpressionArgument::AssociatedTypeBound { name, .. } => write!(formatter, "{name}: …")?,
         }
     }
     formatter.write_str(">")
@@ -227,6 +244,7 @@ fn write_function_pointer(
     function: &FunctionPointerData,
     context: &ReflectionContext,
 ) -> fmt::Result {
+    write_lifetime_binder(formatter, function.lifetimes)?;
     if function.unsafe_ {
         formatter.write_str("unsafe ")?;
     }
@@ -238,7 +256,11 @@ fn write_function_pointer(
         if index > 0 {
             formatter.write_str(", ")?;
         }
-        write!(formatter, "{}", TypeExpression::new(argument, context).display())?;
+        write!(
+            formatter,
+            "{}",
+            TypeExpression::new(argument, context).display()
+        )?;
     }
     if function.variadic {
         if !function.arguments.is_empty() {
@@ -248,7 +270,11 @@ fn write_function_pointer(
     }
     formatter.write_str(")")?;
     if let Some(result) = function.result {
-        write!(formatter, " -> {}", TypeExpression::new(result, context).display())?;
+        write!(
+            formatter,
+            " -> {}",
+            TypeExpression::new(result, context).display()
+        )?;
     }
     Ok(())
 }
@@ -263,13 +289,17 @@ fn write_function_pointer(
 /// # Errors
 ///
 /// Returns a formatting error if writing a bound fails.
-fn write_trait_object(formatter: &mut fmt::Formatter<'_>, object: &TraitObjectData) -> fmt::Result {
+fn write_trait_object(
+    formatter: &mut fmt::Formatter<'_>,
+    object: &TraitObjectData,
+    context: &ReflectionContext,
+) -> fmt::Result {
     formatter.write_str("dyn ")?;
     for (index, trait_) in object.traits.iter().enumerate() {
         if index > 0 {
             formatter.write_str(" + ")?;
         }
-        formatter.write_str(trait_.path)?;
+        write_trait_expression(formatter, trait_, context)?;
     }
     if let Some(lifetime) = object.lifetime {
         if !object.traits.is_empty() {
@@ -290,19 +320,103 @@ fn write_trait_object(formatter: &mut fmt::Formatter<'_>, object: &TraitObjectDa
 /// # Errors
 ///
 /// Returns a formatting error if writing any bound fails.
-fn write_opaque(formatter: &mut fmt::Formatter<'_>, opaque: &OpaqueTypeData) -> fmt::Result {
+fn write_opaque(
+    formatter: &mut fmt::Formatter<'_>,
+    opaque: &OpaqueTypeData,
+    context: &ReflectionContext,
+) -> fmt::Result {
     formatter.write_str("impl ")?;
     for (index, bound) in opaque.bounds.iter().enumerate() {
         if index > 0 {
             formatter.write_str(" + ")?;
         }
-        match bound {
-            super::super::data::PredicateData::TraitBound { trait_, .. } => formatter.write_str(trait_.path)?,
-            super::super::data::PredicateData::LifetimeOutlives { lifetime, .. } => {
-                write_lifetime(formatter, *lifetime)?
-            }
-            _ => formatter.write_str("_")?,
-        }
+        write_predicate(formatter, bound, context)?;
     }
     Ok(())
+}
+
+fn write_lifetime_binder(
+    formatter: &mut fmt::Formatter<'_>,
+    lifetimes: &[LifetimeExpression],
+) -> fmt::Result {
+    if lifetimes.is_empty() {
+        return Ok(());
+    }
+    formatter.write_str("for<")?;
+    for (index, lifetime) in lifetimes.iter().enumerate() {
+        if index > 0 {
+            formatter.write_str(", ")?;
+        }
+        write_lifetime(formatter, *lifetime)?;
+    }
+    formatter.write_str("> ")
+}
+
+fn write_trait_expression(
+    formatter: &mut fmt::Formatter<'_>,
+    trait_: &TraitExpressionData,
+    context: &ReflectionContext,
+) -> fmt::Result {
+    write_lifetime_binder(formatter, trait_.lifetimes)?;
+    write_trait_path_and_arguments(formatter, trait_, context)
+}
+
+fn write_trait_path_and_arguments(
+    formatter: &mut fmt::Formatter<'_>,
+    trait_: &TraitExpressionData,
+    context: &ReflectionContext,
+) -> fmt::Result {
+    formatter.write_str(trait_.path)?;
+    write_generic_arguments(formatter, trait_.arguments, context)
+}
+
+fn write_predicates(
+    formatter: &mut fmt::Formatter<'_>,
+    predicates: &[PredicateData],
+    context: &ReflectionContext,
+) -> fmt::Result {
+    for (index, predicate) in predicates.iter().enumerate() {
+        if index > 0 {
+            formatter.write_str(" + ")?;
+        }
+        write_predicate(formatter, predicate, context)?;
+    }
+    Ok(())
+}
+
+fn write_predicate(
+    formatter: &mut fmt::Formatter<'_>,
+    predicate: &PredicateData,
+    context: &ReflectionContext,
+) -> fmt::Result {
+    match predicate {
+        PredicateData::TraitBound {
+            trait_, modifier, ..
+        } => {
+            write_lifetime_binder(formatter, trait_.lifetimes)?;
+            if *modifier == TraitBoundModifier::Maybe {
+                formatter.write_str("?")?;
+            }
+            write_trait_path_and_arguments(formatter, trait_, context)
+        }
+        PredicateData::LifetimeOutlives { lifetime, outlives } => {
+            write_lifetime(formatter, *lifetime)?;
+            if *outlives != LifetimeExpression::Elided {
+                formatter.write_str(": ")?;
+                write_lifetime(formatter, *outlives)?;
+            }
+            Ok(())
+        }
+        PredicateData::TypeOutlives { lifetime, .. } => write_lifetime(formatter, *lifetime),
+        PredicateData::TypeEquality { left, right } => write!(
+            formatter,
+            "{} = {}",
+            TypeExpression::new(left, context).display(),
+            TypeExpression::new(right, context).display()
+        ),
+        PredicateData::ConstEvaluatable(expression) => {
+            formatter.write_str("const ")?;
+            write_const(formatter, *expression)
+        }
+    }
 }

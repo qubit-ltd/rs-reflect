@@ -51,7 +51,7 @@ impl<'ctx> TraitExpression<'ctx> {
         None
     }
 
-    /// Returns explicit lifetime arguments in source order.
+    /// Returns explicit higher-ranked lifetime binders in source order.
     pub const fn lifetimes(self) -> &'static [LifetimeExpression] {
         self.data.lifetimes
     }

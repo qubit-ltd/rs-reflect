@@ -157,6 +157,19 @@ static ITERATOR_TRAIT: TraitExpressionData = TraitExpressionData {
     arguments: &[],
     lifetimes: &[],
 };
+static HRTB_DISPLAY_TRAIT: TraitExpressionData = TraitExpressionData::new(
+    "core::fmt::Display",
+    &[],
+    &[LifetimeExpression::Named("a"), LifetimeExpression::Named("b")],
+);
+static ITERATOR_ITEM_U8: TraitExpressionData = TraitExpressionData::new(
+    "core::iter::Iterator",
+    &[GenericExpressionArgument::AssociatedType {
+        name: "Item",
+        value: &U8_EXPRESSION,
+    }],
+    &[],
+);
 static BOUNDED_ASSOCIATED_PREDICATE: PredicateData = PredicateData::TraitBound {
     ty: &T_EXPRESSION,
     trait_: &DISPLAY_TRAIT,
@@ -183,6 +196,24 @@ static DISPLAY_PREDICATE: PredicateData = PredicateData::TraitBound {
     trait_: &DISPLAY_TRAIT,
     modifier: TraitBoundModifier::None,
 };
+static DISPLAY_PREDICATES: [PredicateData; 2] =
+    [BOUNDED_ASSOCIATED_PREDICATE, DISPLAY_PREDICATE];
+static DISPLAY_BOUND_ARGUMENT: ExpressionData = ExpressionData::Named {
+    path: "fixture::Container",
+    definition: None,
+    arguments: &[GenericExpressionArgument::AssociatedTypeBound {
+        name: "Error",
+        bounds: &[BOUNDED_ASSOCIATED_PREDICATE],
+    }],
+};
+static MULTI_DISPLAY_BOUND_ARGUMENT: ExpressionData = ExpressionData::Named {
+    path: "fixture::Container",
+    definition: None,
+    arguments: &[GenericExpressionArgument::AssociatedTypeBound {
+        name: "Error",
+        bounds: &DISPLAY_PREDICATES,
+    }],
+};
 static BOUNDED_TYPE_PARAMETER: GenericParameterMetadata = GenericParameterMetadata {
     name: "T",
     index: 0,
@@ -205,6 +236,51 @@ static ASSOCIATED_EXPRESSION: ExpressionData = ExpressionData::AssociatedType {
     name: "Item",
     arguments: &[],
 };
+static HRTB_REFERENCE: ExpressionData = ExpressionData::Reference {
+    lifetime: Some(LifetimeExpression::Named("a")),
+    mutable: false,
+    target: &U8_EXPRESSION,
+};
+static HRTB_FUNCTION: super::super::expression::FunctionPointerData =
+    super::super::expression::FunctionPointerData::new(
+        &[&HRTB_REFERENCE],
+        None,
+        false,
+        None,
+        false,
+        &[LifetimeExpression::Named("a")],
+    );
+static HRTB_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&HRTB_FUNCTION);
+static NESTED_FUNCTION: super::super::expression::FunctionPointerData =
+    super::super::expression::FunctionPointerData::new(
+        &[&HRTB_FUNCTION_EXPRESSION],
+        None,
+        false,
+        None,
+        false,
+        &[],
+    );
+static NESTED_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&NESTED_FUNCTION);
+static HRTB_OBJECT: super::super::expression::TraitObjectData =
+    super::super::expression::TraitObjectData::new(&[HRTB_DISPLAY_TRAIT], None);
+static HRTB_OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&HRTB_OBJECT);
+static MULTI_TRAIT_OBJECT: super::super::expression::TraitObjectData =
+    super::super::expression::TraitObjectData::new(
+        &[DISPLAY_TRAIT, ITERATOR_TRAIT],
+        Some(LifetimeExpression::Static),
+    );
+static MULTI_TRAIT_OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&MULTI_TRAIT_OBJECT);
+static ITERATOR_OBJECT: super::super::expression::TraitObjectData =
+    super::super::expression::TraitObjectData::new(&[ITERATOR_ITEM_U8], None);
+static ITERATOR_OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&ITERATOR_OBJECT);
+static ITERATOR_OPAQUE: OpaqueTypeData = OpaqueTypeData {
+    bounds: &[PredicateData::TraitBound {
+        ty: &T_EXPRESSION,
+        trait_: &ITERATOR_ITEM_U8,
+        modifier: TraitBoundModifier::None,
+    }],
+};
+static ITERATOR_OPAQUE_EXPRESSION: ExpressionData = ExpressionData::Opaque(&ITERATOR_OPAQUE);
 static TRAIT_OBJECT_DATA: super::super::expression::TraitObjectData = super::super::expression::TraitObjectData {
     traits: &[DISPLAY_TRAIT],
     lifetime: Some(LifetimeExpression::Static),
@@ -812,7 +888,7 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         TypeExpression::new(&ARGUMENT_EXPRESSION, &context)
             .display()
             .to_string(),
-        "fixture::Container<'_, 'x', Item = u8, Error: …>"
+        "fixture::Container<'_, 'x', Item = u8, Error: 'a>"
     );
     assert_eq!(
         TypeExpression::new(&DISPLAY_SINGLE_TUPLE, &context)
@@ -821,10 +897,64 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
         "(T,)"
     );
     assert_eq!(
+        TypeExpression::new(&UNIT_EXPRESSION, &context).display().to_string(),
+        "()"
+    );
+    assert_eq!(
+        TypeExpression::new(&TUPLE_EXPRESSION, &context).display().to_string(),
+        "(T, u8)"
+    );
+    assert_eq!(
         TypeExpression::new(&DISPLAY_FALLBACK_OPAQUE, &context)
             .display()
             .to_string(),
-        "impl 'a + _"
+        "impl 'a: 'static + 'a"
+    );
+    assert_eq!(
+        TypeExpression::new(&HRTB_FUNCTION_EXPRESSION, &context).display().to_string(),
+        "for<'a> fn(&'a u8)"
+    );
+    assert_eq!(
+        TypeExpression::new(&HRTB_OBJECT_EXPRESSION, &context).display().to_string(),
+        "dyn for<'a, 'b> core::fmt::Display"
+    );
+    assert_eq!(
+        TypeExpression::new(&MULTI_TRAIT_OBJECT_EXPRESSION, &context)
+            .display()
+            .to_string(),
+        "dyn core::fmt::Display + core::iter::Iterator + 'static"
+    );
+    assert_eq!(
+        TypeExpression::new(&MULTI_DISPLAY_BOUND_ARGUMENT, &context)
+            .display()
+            .to_string(),
+        "fixture::Container<Error: ?core::fmt::Display + core::fmt::Display>"
+    );
+    assert_eq!(
+        TypeExpression::new(&NESTED_FUNCTION_EXPRESSION, &context).display().to_string(),
+        "fn(for<'a> fn(&'a u8))"
+    );
+    assert_eq!(
+        TypeExpression::new(&ITERATOR_OBJECT_EXPRESSION, &context)
+            .display()
+            .to_string(),
+        "dyn core::iter::Iterator<Item = u8>"
+    );
+    assert_eq!(
+        TypeExpression::new(&ITERATOR_OPAQUE_EXPRESSION, &context)
+            .display()
+            .to_string(),
+        "impl core::iter::Iterator<Item = u8>"
+    );
+    assert_eq!(
+        TypeExpression::new(&ASSOCIATED_EXPRESSION, &context).display().to_string(),
+        "<T as core::iter::Iterator>::Item"
+    );
+    assert_eq!(
+        TypeExpression::new(&DISPLAY_BOUND_ARGUMENT, &context)
+            .display()
+            .to_string(),
+        "fixture::Container<Error: ?core::fmt::Display>"
     );
 }
 

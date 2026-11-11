@@ -371,6 +371,8 @@ The method descriptor keeps the source declaration. Select a concrete specializa
 
 When comparing retained type-expression metadata, use `TypeExpression::structurally_eq` instead of comparing `display()` output. Display text is for diagnostics; structural comparison checks source facts and does not establish Rust type identity.
 
+`display()` includes retained bounds and higher-ranked lifetime binders where available. Its diagnostic format can change as more source facts are shown; do not persist or parse it as a stable identifier.
+
 ## Dependency features
 
 The default feature set includes `derive`. A runtime-only crate can disable defaults. `ecosystem-types` and `qubit-types` add metadata for optional external types; enable only the integrations used by the application.

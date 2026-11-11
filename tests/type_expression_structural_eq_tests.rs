@@ -411,7 +411,8 @@ fn test_structural_comparison_keeps_source_differences_and_ignores_context() {
         .expect("second empty context builds");
     let left = type_expression_in(&EXPRESSION_U8, &first);
     let right = type_expression_in(&EXPRESSION_U16, &first);
-    assert_eq!(left.display().to_string(), right.display().to_string());
+    assert_eq!(left.display().to_string(), "dyn core::iter::Iterator<Item = u8>");
+    assert_eq!(right.display().to_string(), "dyn core::iter::Iterator<Item = u16>");
     assert!(!left.structurally_eq(right));
     assert!(left.structurally_eq(type_expression_in(&EXPRESSION_U8, &second)));
     assert!(type_expression_in(&PARAM_T, &first).structurally_eq(type_expression_in(&PARAM_T2, &second)));

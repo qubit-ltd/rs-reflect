@@ -362,6 +362,8 @@ trait 方法绑定时使用显式身份提示。对本地反射 trait，`reflect
 
 比较保留的类型表达式元数据时，使用 `TypeExpression::structurally_eq`，不要比较 `display()` 输出。显示文本用于诊断；结构比较检查源码事实，不证明 Rust 类型身份。
 
+`display()` 会在可用时显示保留的 bounds 和高阶 lifetime binder。随着更多源码事实被展示，诊断格式可能变化；不要将其持久化或解析为稳定标识。
+
 ## 依赖功能
 
 默认 feature 集包含 `derive`。仅需运行时 API 的 crate 可以关闭默认功能。`ecosystem-types` 和 `qubit-types` 为可选外部类型补充元数据；应用只需启用实际使用的集成。

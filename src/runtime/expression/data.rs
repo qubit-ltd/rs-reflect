@@ -213,7 +213,7 @@ pub struct TraitExpressionData {
     pub path: &'static str,
     /// Type, lifetime, const, and associated-type arguments in source order.
     pub arguments: &'static [GenericExpressionArgument],
-    /// Explicit lifetime arguments in source order.
+    /// Higher-ranked lifetime binders in source order, as written in `for<...>`.
     pub lifetimes: &'static [LifetimeExpression],
 }
 
@@ -224,7 +224,7 @@ impl TraitExpressionData {
     ///
     /// * `path` — trait path as written in source.
     /// * `arguments` — type, lifetime, const, and associated-type arguments.
-    /// * `lifetimes` — explicit lifetime arguments in source order.
+    /// * `lifetimes` — higher-ranked lifetime binders in source order.
     pub const fn new(
         path: &'static str,
         arguments: &'static [GenericExpressionArgument],
@@ -332,7 +332,7 @@ pub enum ExpressionData {
 #[doc(hidden)]
 #[derive(Clone, Copy)]
 pub struct FunctionPointerData {
-    /// Explicit higher-ranked lifetimes.
+    /// Explicit higher-ranked lifetime binders in source order.
     pub lifetimes: &'static [LifetimeExpression],
     /// Parameter type expressions in source order.
     pub arguments: &'static [&'static ExpressionData],
@@ -698,7 +698,7 @@ mod tests {
             TypeExpression::new(&FUNCTION_EXPRESSION, &context)
                 .display()
                 .to_string(),
-            "fn(u8, ...)"
+            "for<'a> fn(u8, ...)"
         );
 
         static OBJECT_EXPRESSION: ExpressionData = ExpressionData::TraitObject(&OBJECT);
@@ -726,7 +726,7 @@ mod tests {
         assert!(std::ptr::eq(opaque.context(), &context));
         assert_eq!(
             TypeExpression::new(&OPAQUE_EXPRESSION, &context).display().to_string(),
-            "impl 'a + _"
+            "impl 'a: 'static + 'a"
         );
     }
 }
