@@ -88,7 +88,7 @@ fn method_metadata(
                 } else {
                     target.clone()
                 };
-                quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
+                quote!(::core::option::Option::Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::trait_self(
                     #receiver_kind,
                     #expression,
                 )))
@@ -96,13 +96,13 @@ fn method_metadata(
                 let receiver_descriptor = quote!(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#receiver_ty>(#receiver_kind));
                 if matches!(receiver_ir.kind, ReceiverKindIr::Typed) {
                     let expression = super::traits::type_expression(&receiver_ir.ty, &method_environment, facade);
-                    quote!(Some(#receiver_descriptor.with_expression(#expression)))
+                    quote!(::core::option::Option::Some(#receiver_descriptor.with_expression(#expression)))
                 } else {
-                    quote!(Some(#receiver_descriptor))
+                    quote!(::core::option::Option::Some(#receiver_descriptor))
                 }
             }
         }
-        None => quote!(None),
+        None => quote!(::core::option::Option::None),
     };
     let parameters = method.parameters.iter().map(|parameter| {
         let pattern = match parameter.pattern.kind {
@@ -170,7 +170,10 @@ fn method_metadata(
         .abi
         .as_deref()
         .map(|abi| crate::expand::expression_codegen::function_abi(Some(abi), method.span, facade));
-    let abi = abi.map_or_else(|| quote!(None), |abi| quote!(Some(#abi)));
+    let abi = abi.map_or_else(
+        || quote!(::core::option::Option::None),
+        |abi| quote!(::core::option::Option::Some(#abi)),
+    );
     let has_default = method.has_default;
     let is_generic = !method.generics.params.is_empty();
     quote! {
@@ -400,7 +403,10 @@ fn expand_generic_impl_definition(
                 .value
                 .as_ref()
                 .map(|value| super::traits::type_expression(value, &environment, facade));
-            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            let value = value.map_or_else(
+                || quote!(::core::option::Option::None),
+                |value| quote!(::core::option::Option::Some(#value)),
+            );
             quote!(#codegen::traits::associated_type(
                 #name,
                 #codegen::traits::TraitVisibility::Public,
@@ -419,7 +425,7 @@ fn expand_generic_impl_definition(
                 .value
                 .as_ref()
                 .map(|value| super::expression_codegen::const_expression(value, &environment, facade));
-            let value = value.unwrap_or_else(|| quote!(None));
+            let value = value.unwrap_or_else(|| quote!(::core::option::Option::None));
             quote!(#codegen::traits::associated_const(
                 #name,
                 #codegen::traits::TraitVisibility::Public,
@@ -447,9 +453,9 @@ fn expand_generic_impl_definition(
             } else {
                 quote!(#codegen::traits::unresolved_trait_expression(#expression))
             };
-            quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(#metadata))))
+            quote!(::core::option::Option::Some(::std::boxed::Box::leak(::std::boxed::Box::new(#metadata))))
         }
-        None => quote!(None),
+        None => quote!(::core::option::Option::None),
     };
     let kind = if declaration.trait_path.is_some() {
         quote!(#codegen::impls::Kind::Trait)
@@ -600,7 +606,10 @@ fn expand_concrete_impl(
                 .value
                 .as_ref()
                 .map(|value| super::traits::type_expression(value, &environment, &facade));
-            let value = value.map_or_else(|| quote!(None), |value| quote!(Some(#value)));
+            let value = value.map_or_else(
+                || quote!(::core::option::Option::None),
+                |value| quote!(::core::option::Option::Some(#value)),
+            );
             quote!(#codegen::traits::associated_type(
                 #name,
                 #codegen::traits::TraitVisibility::Public,
@@ -619,7 +628,7 @@ fn expand_concrete_impl(
                 .value
                 .as_ref()
                 .map(|value| super::expression_codegen::const_expression(value, &environment, &facade));
-            let value = value.unwrap_or_else(|| quote!(None));
+            let value = value.unwrap_or_else(|| quote!(::core::option::Option::None));
             quote!(#codegen::traits::associated_const(
                 #name,
                 #codegen::traits::TraitVisibility::Public,
@@ -876,7 +885,7 @@ fn expand_concrete_impl(
                     &[],
                 ),
             )));
-            quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
+            quote!(::core::option::Option::Some(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #codegen::traits::trait_expression_for(#expression, #provider()),
             ))))
         }
@@ -892,11 +901,11 @@ fn expand_concrete_impl(
                     &[],
                 ),
             )));
-            quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
+            quote!(::core::option::Option::Some(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #codegen::traits::unresolved_trait_expression(#expression),
             ))))
         }
-        _ => quote!(None),
+        _ => quote!(::core::option::Option::None),
     };
     let associated_type_bindings: Vec<_> = declaration
         .associated_types
@@ -1046,8 +1055,8 @@ fn expand_concrete_impl(
                 quote!({
                     let builder = #builder;
                     match #selector {
-                        Some(adapter) => #thread_safe_builder.build(),
-                        None => builder.build(),
+                    ::core::option::Option::Some(adapter) => #thread_safe_builder.build(),
+                    ::core::option::Option::None => builder.build(),
                     }
                 })
             } else {
@@ -1116,9 +1125,9 @@ fn expand_concrete_impl(
         }
     };
     let trait_application = if declaration.trait_path.is_some() {
-        quote!(Some(trait_application_provider().metadata()))
+        quote!(::core::option::Option::Some(trait_application_provider().metadata()))
     } else {
-        quote!(None)
+        quote!(::core::option::Option::None)
     };
     let tokens = quote! {
         #retained

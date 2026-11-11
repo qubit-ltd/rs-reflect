@@ -189,7 +189,7 @@ pub(crate) fn argument_binding(parameter: &ParameterIr, _facade: &TokenStream, _
                 let #argument = arguments.next()
                     .expect("validated invocation contains each declared argument")
                     .into_mut::<#element>()
-                    .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
             }
         }
         TypeKindIr::Reference { element, .. } => {
@@ -198,10 +198,10 @@ pub(crate) fn argument_binding(parameter: &ParameterIr, _facade: &TokenStream, _
                 let #argument = arguments.next()
                     .expect("validated invocation contains each declared argument");
                 let #argument = match #argument.into_ref::<#element>() {
-                    Ok(value) => value,
-                    Err(value) => match value.into_mut::<#element>() {
-                        Ok(value) => &*value,
-                        Err(_) => unreachable!("validated invocation checked argument type and mode"),
+                    ::core::result::Result::Ok(value) => value,
+                    ::core::result::Result::Err(value) => match value.into_mut::<#element>() {
+                        ::core::result::Result::Ok(value) => &*value,
+                        ::core::result::Result::Err(_) => ::core::unreachable!("validated invocation checked argument type and mode"),
                     },
                 };
             }
@@ -212,7 +212,7 @@ pub(crate) fn argument_binding(parameter: &ParameterIr, _facade: &TokenStream, _
                 let #argument: #ty = arguments.next()
                     .expect("validated invocation contains each declared argument")
                     .into_owned::<#ty>()
-                    .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
             }
         }
     }

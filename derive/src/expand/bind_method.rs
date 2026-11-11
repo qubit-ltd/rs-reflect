@@ -151,9 +151,9 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
         }
     });
     let receiver_metadata = receiver_kind.map_or_else(
-        || quote!(None),
+        || quote!(::core::option::Option::None),
         |kind| {
-            quote!(Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#target>(
+            quote!(::core::option::Option::Some(#facade::__private::codegen_v4::invoke::ReceiverDescriptor::for_type::<#target>(
                 #facade::__private::codegen_v4::invoke::ReceiverKind::#kind,
             )))
         },
@@ -265,7 +265,7 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
                 let definition_provider = trait_definition_provider_path(canonical_path);
                 let source_path = trait_path.clone();
                 (
-                    quote!(Some(#definition_provider().metadata())),
+                    quote!(::core::option::Option::Some(#definition_provider().metadata())),
                     quote! {
                         let (_, __qubit_trait_identity, _, _) =
                             <#target as #source_path>::__qbr_trait_application_metadata();
@@ -275,7 +275,7 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
                 )
             }
             Some(TraitBindingHint::External(handle)) => (
-                quote!(Some(#handle::__qubit_reflect_trait_definition().metadata())),
+                quote!(::core::option::Option::Some(#handle::__qubit_reflect_trait_definition().metadata())),
                 quote! {
                     let __qubit_trait_identity = ::std::boxed::Box::leak(
                         ::std::vec![#(#identity),*].into_boxed_slice(),
@@ -285,7 +285,7 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
             None => {
                 let definition_provider = trait_definition_provider_path(&trait_path);
                 (
-                    quote!(Some(#definition_provider().metadata())),
+                    quote!(::core::option::Option::Some(#definition_provider().metadata())),
                     quote! {
                         static __QUBIT_BIND_METHOD_TRAIT_APPLICATION_IDENTITY:
                             [#facade::__private::codegen_v4::traits::ArgumentIdentity; #identity_len] =
@@ -361,30 +361,30 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
                 quote! {
                     let (_receiver, __arguments) = __validated.into_parts();
                     let __receiver = __pinned_receiver.downcast_mut::<#target>()
-                        .unwrap_or_else(|| unreachable!("validated invocation checked pinned receiver"));
+                        .unwrap_or_else(|| ::core::unreachable!("validated invocation checked pinned receiver"));
                 }
             } else if is_pin_shared_type(receiver) {
                 quote! {
                     let (_receiver, __arguments) = __validated.into_parts();
                     let __receiver = __pinned_receiver.downcast_ref::<#target>()
-                        .unwrap_or_else(|| unreachable!("validated invocation checked pinned receiver"));
+                        .unwrap_or_else(|| ::core::unreachable!("validated invocation checked pinned receiver"));
                 }
             } else if is_mut_reference(receiver) {
                 quote! {
                     let (__receiver, __arguments) = __validated.into_parts();
                     let __receiver = __receiver.expect("validated invocation has a receiver")
                         .into_mut::<#target>()
-                        .unwrap_or_else(|_| unreachable!("validated invocation checked receiver"));
+                        .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver"));
                 }
             } else if is_reference(receiver) {
                 quote! {
                     let (__receiver, __arguments) = __validated.into_parts();
                     let __receiver = __receiver.expect("validated invocation has a receiver");
                     let __receiver = match __receiver.into_ref::<#target>() {
-                        Ok(value) => value,
-                        Err(receiver) => receiver.into_mut::<#target>()
+                        ::core::result::Result::Ok(value) => value,
+                        ::core::result::Result::Err(receiver) => receiver.into_mut::<#target>()
                             .map(|value| &*value)
-                            .unwrap_or_else(|_| unreachable!("validated invocation checked receiver")),
+                            .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver")),
                     };
                 }
             } else {
@@ -392,7 +392,7 @@ pub(crate) fn expand_with_context(input: TokenStream, context: &ExpansionContext
                     let (__receiver, __arguments) = __validated.into_parts();
                     let __receiver = __receiver.expect("validated invocation has a receiver")
                         .into_owned::<#target>()
-                        .unwrap_or_else(|_| unreachable!("validated invocation checked receiver"));
+                        .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked receiver"));
                 }
             }
         },
@@ -939,7 +939,7 @@ fn binding(ty: &Type, index: usize, _facade: &TokenStream) -> TokenStream {
                 let #value: &mut #element = arguments.next()
                     .expect("validated invocation contains each declared argument")
                     .into_mut::<#element>()
-                    .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
             }
         }
         Type::Reference(reference) => {
@@ -948,10 +948,10 @@ fn binding(ty: &Type, index: usize, _facade: &TokenStream) -> TokenStream {
                 let #value = arguments.next()
                     .expect("validated invocation contains each declared argument");
                 let #value: &#element = match #value.into_ref::<#element>() {
-                    Ok(value) => value,
-                    Err(value) => match value.into_mut::<#element>() {
-                        Ok(value) => &*value,
-                        Err(_) => unreachable!("validated invocation checked argument type and mode"),
+                    ::core::result::Result::Ok(value) => value,
+                    ::core::result::Result::Err(value) => match value.into_mut::<#element>() {
+                        ::core::result::Result::Ok(value) => &*value,
+                        ::core::result::Result::Err(_) => ::core::unreachable!("validated invocation checked argument type and mode"),
                     },
                 };
             }
@@ -960,7 +960,7 @@ fn binding(ty: &Type, index: usize, _facade: &TokenStream) -> TokenStream {
             let #value: #ty = arguments.next()
                 .expect("validated invocation contains each declared argument")
                 .into_owned::<#ty>()
-                .unwrap_or_else(|_| unreachable!("validated invocation checked argument type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validated invocation checked argument type and mode"));
         },
     }
 }

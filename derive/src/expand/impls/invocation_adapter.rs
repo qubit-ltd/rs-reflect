@@ -155,12 +155,12 @@ pub(super) fn thread_safe_definition(
                     quote!(let #name: &<T as #call_trait>::#associated_argument = arguments.next()
                         .expect("validated invocation contains each declared argument")
                         .into_ref::<<T as #call_trait>::#associated_argument>()
-                        .unwrap_or_else(|_| unreachable!("validation checked argument type and mode"));)
+                        .unwrap_or_else(|_| ::core::unreachable!("validation checked argument type and mode"));)
                 }
                 _ => quote!(let #name: <T as #call_trait>::#associated_argument = arguments.next()
                     .expect("validated invocation contains each declared argument")
                     .into_owned::<<T as #call_trait>::#associated_argument>()
-                    .unwrap_or_else(|_| unreachable!("validation checked argument type and mode"));),
+                    .unwrap_or_else(|_| ::core::unreachable!("validation checked argument type and mode"));),
             }
         })
         .collect::<Vec<_>>();
@@ -303,7 +303,7 @@ pub(super) fn thread_safe_definition(
         }
 
         trait #selector_trait {
-            fn select_thread_safe(self) -> Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>>;
+            fn select_thread_safe(self) -> ::core::option::Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>>;
         }
 
         impl<T> #selector_trait for &&#probe<T>
@@ -313,14 +313,14 @@ pub(super) fn thread_safe_definition(
             #(#parameter_bounds)*
             #return_bound
         {
-            fn select_thread_safe(self) -> Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>> {
-                Some(&#probe::<T>::ADAPTER)
+            fn select_thread_safe(self) -> ::core::option::Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>> {
+                ::core::option::Option::Some(&#probe::<T>::ADAPTER)
             }
         }
 
         impl<T> #selector_trait for &#probe<T> {
-            fn select_thread_safe(self) -> Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>> {
-                None
+            fn select_thread_safe(self) -> ::core::option::Option<&'static dyn #facade::__private::codegen_v4::invoke::InvocationAdapter<#value_mode>> {
+                ::core::option::Option::None
             }
         }
     };
@@ -457,10 +457,10 @@ fn definition_for_call(
                 .collect();
             let receiver = if pinned_mutable {
                 quote!(pinned_receiver.downcast_mut::<#target>()
-                    .unwrap_or_else(|| unreachable!("validation checked pinned receiver type")))
+                    .unwrap_or_else(|| ::core::unreachable!("validation checked pinned receiver type")))
             } else {
                 quote!(pinned_receiver.downcast_ref::<#target>()
-                    .unwrap_or_else(|| unreachable!("validation checked pinned receiver type")))
+                    .unwrap_or_else(|| ::core::unreachable!("validation checked pinned receiver type")))
             };
             let call = if let Some(trait_path) = &trait_call_path {
                 quote!(<#target as #trait_path>::#method_name #generic_call (receiver, #(#call_arguments),*))
@@ -563,7 +563,7 @@ fn definition_for_call(
             let receiver: #target = receiver
                 .expect("validated invocation has a receiver")
                 .into_owned::<#target>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         }
     } else if let Some(receiver_type) = &typed_owned_receiver {
         quote! {
@@ -571,7 +571,7 @@ fn definition_for_call(
             let receiver: #receiver_type = receiver
                 .expect("validated invocation has a receiver")
                 .into_owned::<#receiver_type>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         }
     } else if matches!(
         method.receiver.as_ref().map(|receiver| receiver.kind),
@@ -582,18 +582,18 @@ fn definition_for_call(
             let receiver: &mut #target = receiver
                 .expect("validated invocation has a receiver")
                 .into_mut::<#target>()
-                .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode"));
+                .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode"));
         }
     } else if method.receiver.is_some() {
         quote! {
             let (receiver, arguments) = validated.into_parts();
             let receiver = receiver.expect("validated invocation has a receiver");
             let receiver: &#target = match receiver.into_ref::<#target>() {
-                Ok(value) => value,
-                Err(receiver) => receiver
+                ::core::result::Result::Ok(value) => value,
+                ::core::result::Result::Err(receiver) => receiver
                     .into_mut::<#target>()
                     .map(|value| &*value)
-                    .unwrap_or_else(|_| unreachable!("validation checked receiver type and mode")),
+                    .unwrap_or_else(|_| ::core::unreachable!("validation checked receiver type and mode")),
             };
         }
     } else {
