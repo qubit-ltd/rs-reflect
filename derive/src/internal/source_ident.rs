@@ -36,12 +36,12 @@ mod tests {
     use super::source_ident;
 
     #[test]
-    fn preserves_ordinary_and_raw_identifier_spellings() {
+    fn test_reconstructs_ordinary_and_raw_identifier_spellings() {
         for name in ["T", "r#type", "r#const"] {
             let identifier = source_ident(name, proc_macro2::Span::call_site());
             assert_eq!(identifier.to_string(), name);
-            let parsed: syn::Ident = syn::parse_str(&identifier.to_string())
-                .expect("rebuilt identifier parses as source syntax");
+            let parsed: syn::Ident =
+                syn::parse_str(&identifier.to_string()).expect("rebuilt identifier parses as source syntax");
             assert_eq!(parsed.to_string(), name);
         }
     }

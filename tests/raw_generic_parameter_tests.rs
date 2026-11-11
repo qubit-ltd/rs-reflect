@@ -28,7 +28,7 @@ enum Choice<r#type, const r#const: usize> {
 }
 
 #[test]
-fn raw_generic_names_preserve_definition_and_argument_metadata() {
+fn test_raw_generic_names_preserve_definition_and_argument_metadata() {
     let context = ReflectionContext::builder()
         .include_type::<Record<u32, 2>>()
         .include_type::<Choice<u32, 3>>()
@@ -37,10 +37,7 @@ fn raw_generic_names_preserve_definition_and_argument_metadata() {
 
     let record = TypeDescriptor::of_in::<Record<u32, 2>>(&context);
     assert_eq!(
-        record
-            .find_definition()
-            .expect("record definition exists")
-            .name(),
+        record.find_definition().expect("record definition exists").name(),
         "Record"
     );
     let record_arguments = record.generic_arguments();
@@ -68,10 +65,7 @@ fn raw_generic_names_preserve_definition_and_argument_metadata() {
 
     let choice = TypeDescriptor::of_in::<Choice<u32, 3>>(&context);
     assert_eq!(
-        choice
-            .find_definition()
-            .expect("choice definition exists")
-            .name(),
+        choice.find_definition().expect("choice definition exists").name(),
         "Choice"
     );
     let choice_arguments = choice.generic_arguments();

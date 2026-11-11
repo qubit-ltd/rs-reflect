@@ -297,9 +297,7 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
                         PathArgumentsIr::AngleBracketed(arguments) => arguments.iter().all(|argument| match argument {
                             PathArgumentIr::Lifetime(lifetime) => lifetime == "'static",
                             PathArgumentIr::Type(ty) => is_static_concrete_type(ty, environment),
-                            PathArgumentIr::Const(value) => {
-                                !contains_generic_const(value, environment)
-                            }
+                            PathArgumentIr::Const(value) => !contains_generic_const(value, environment),
                             PathArgumentIr::AssociatedType { .. }
                             | PathArgumentIr::AssociatedConst { .. }
                             | PathArgumentIr::Constraint { .. }
@@ -318,8 +316,7 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
             .iter()
             .all(|element| is_static_concrete_type(element, environment)),
         TypeKindIr::Array { element, length } => {
-            is_static_concrete_type(element, environment)
-                && !contains_generic_const(length, environment)
+            is_static_concrete_type(element, environment) && !contains_generic_const(length, environment)
         }
         TypeKindIr::Pointer { element, .. } => is_static_concrete_type(element, environment),
         TypeKindIr::Reference { .. }
@@ -448,7 +445,7 @@ mod tests {
     use crate::ir::TraitBoundModifierIr;
 
     #[test]
-    fn generic_const_detection_accepts_raw_parameter_spelling() {
+    fn test_generic_const_detection_accepts_raw_parameter_spelling() {
         let environment = GenericEnvironment::new().with_const_parameter("r#const");
 
         assert!(contains_generic_const(&quote!(r#const), &environment));
