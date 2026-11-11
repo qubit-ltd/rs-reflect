@@ -24,6 +24,48 @@ pub use crate::runtime::context::handle::registration::TraitObjectRegistration;
 pub use crate::runtime::context::handle::registration::TypeDefinitionRegistration;
 pub use crate::runtime::descriptor::generic::TypeDefinitionMetadata;
 
+/// Runs the production fragment selector on a synthetic ordered fragment slice.
+///
+/// This entry point exists only for the crate's Criterion benchmark and does
+/// not form a supported API.
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub fn benchmark_select_fragments(
+    fragments: &[(Option<usize>, bool, Vec<usize>)],
+    root: usize,
+) -> (Vec<bool>, Vec<(usize, usize)>) {
+    crate::runtime::context::handle::builder::select_fragment_slice(
+        fragments,
+        root,
+        |fragment| fragment.0,
+        |fragment| fragment.2.as_slice(),
+        |fragment| fragment.1,
+    )
+}
+
+/// Measures the production selection phase over the actual linked inventory.
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub fn benchmark_select_linked_inventory<T: crate::runtime::descriptor::Reflect>() -> (usize, usize)
+{
+    let mut fragments: Vec<_> = crate::__private::__inventory::iter::<RegistrationFragment>
+        .into_iter()
+        .copied()
+        .collect();
+    fragments.sort_by_key(|fragment| fragment.sort_key());
+    let (selected, edges) = crate::runtime::context::handle::builder::select_fragment_slice(
+        &fragments,
+        std::any::TypeId::of::<T>(),
+        |fragment| fragment.target_type_id(),
+        |fragment| fragment.dependencies(),
+        |fragment| fragment.include_in_linked_context(),
+    );
+    (
+        selected.iter().filter(|include| **include).count(),
+        edges.len(),
+    )
+}
+
 /// Returns the canonical metadata associated with a generated definition.
 ///
 /// # Type Parameters
@@ -50,13 +92,20 @@ pub fn type_definition_metadata<T: 'static>(
 /// # Parameters
 /// - `definition`: static registration for the generic definition.
 /// - `adapter`: implementation of the declared capability contract.
-pub fn type_definition_with_capability<TMarker: 'static, C: crate::runtime::capability::CapabilitySpec>(
+pub fn type_definition_with_capability<
+    TMarker: 'static,
+    C: crate::runtime::capability::CapabilitySpec,
+>(
     definition: &'static TypeDefinitionRegistration<TMarker>,
     adapter: C::Adapter,
 ) -> Registration {
     Registration::metadata_only()
         .with_type_definition(definition)
-        .with_capability(crate::runtime::capability::CapabilityRegistration::for_type_definition::<TMarker, C>(adapter))
+        .with_capability(
+            crate::runtime::capability::CapabilityRegistration::for_type_definition::<TMarker, C>(
+                adapter,
+            ),
+        )
 }
 
 /// Creates a linked capability-only fragment for a generic definition.
@@ -78,7 +127,10 @@ pub const fn linked_definition_capability_fragment(
 /// - `label`: stable label for the global registration fragment.
 /// - `registration`: function that creates the trait object registration.
 #[doc(hidden)]
-pub const fn trait_object_fragment(label: &'static str, registration: fn() -> Registration) -> RegistrationFragment {
+pub const fn trait_object_fragment(
+    label: &'static str,
+    registration: fn() -> Registration,
+) -> RegistrationFragment {
     RegistrationFragment::for_global_registration(label, registration)
 }
 
@@ -150,7 +202,8 @@ pub const fn bind_method<T: crate::runtime::descriptor::Reflect>(
     adapters: crate::runtime::descriptor::method::InvocationAdapters,
 ) -> MethodBinding<T> {
     MethodBinding {
-        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata).with_adapters(adapters),
+        effective: crate::runtime::descriptor::method::EffectiveMethod::for_type::<T>(metadata)
+            .with_adapters(adapters),
         _target: std::marker::PhantomData,
     }
 }

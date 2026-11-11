@@ -51,7 +51,10 @@ impl ReflectionContextBuilder {
     /// linked context from a factory to inspect registrations: that can invoke
     /// the same factories again.
     pub fn include_linked(mut self) -> Self {
-        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>.into_iter().copied().collect();
+        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>
+            .into_iter()
+            .copied()
+            .collect();
         fragments.sort_by_key(|fragment| fragment.sort_key());
         for fragment in fragments {
             match fragment.materialize() {
@@ -96,38 +99,19 @@ impl ReflectionContextBuilder {
             mut issues,
         } = self;
         let root = TypeId::of::<T>();
-        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>.into_iter().copied().collect();
+        let mut fragments: Vec<_> = inventory::iter::<RegistrationFragment>
+            .into_iter()
+            .copied()
+            .collect();
         fragments.sort_by_key(|fragment| fragment.sort_key());
 
-        let mut included = HashSet::from([root]);
-        let mut dependency_edges = Vec::new();
-        let mut selected = vec![false; fragments.len()];
-        for (index, fragment) in fragments.iter().enumerate() {
-            if fragment.include_in_linked_context() {
-                selected[index] = true;
-            }
-        }
-        loop {
-            let mut changed = false;
-            for (index, fragment) in fragments.iter().enumerate() {
-                if selected[index]
-                    || fragment
-                        .target_type_id()
-                        .is_none_or(|target| !included.contains(&target))
-                {
-                    continue;
-                }
-                selected[index] = true;
-                changed = true;
-                for dependency in fragment.dependencies() {
-                    dependency_edges.push((fragment.target_type_id().unwrap(), *dependency));
-                    changed |= included.insert(*dependency);
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
+        let (selected, dependency_edges) = select_fragment_slice(
+            &fragments,
+            root,
+            RegistrationFragment::target_type_id,
+            |fragment| fragment.dependencies(),
+            RegistrationFragment::include_in_linked_context,
+        );
 
         if !fragments.iter().enumerate().any(|(index, fragment)| {
             selected[index] && fragment.includes_type() && fragment.target_type_id() == Some(root)
@@ -156,7 +140,10 @@ impl ReflectionContextBuilder {
             }
         }
         if !issues.is_empty() {
-            return Self { registrations, issues };
+            return Self {
+                registrations,
+                issues,
+            };
         }
         for (fragment, include) in fragments.into_iter().zip(selected) {
             if include {
@@ -166,7 +153,10 @@ impl ReflectionContextBuilder {
                 }
             }
         }
-        Self { registrations, issues }
+        Self {
+            registrations,
+            issues,
+        }
     }
 
     /// Adds a registration or registration fragment to this builder.
@@ -199,7 +189,9 @@ impl ReflectionContextBuilder {
         if let Some(error) = ContextError::from_issues(self.issues.clone().into_boxed_slice()) {
             return Err(error);
         }
-        Ok(ReflectionContext::from_data(ContextData::build(self.registrations)?))
+        Ok(ReflectionContext::from_data(ContextData::build(
+            self.registrations,
+        )?))
     }
 
     /// Builds and validates the context data for internal callers.
@@ -209,6 +201,49 @@ impl ReflectionContextBuilder {
         }
         ContextData::build(self.registrations)
     }
+}
+
+/// Selects the transitive closure from an ordered fragment slice.
+///
+/// This is shared with the synthetic slice benchmark so it measures the
+/// production selection logic rather than a copied implementation.
+pub(crate) fn select_fragment_slice<K, F>(
+    fragments: &[F],
+    root: K,
+    target: impl Fn(&F) -> Option<K>,
+    dependencies: impl for<'a> Fn(&'a F) -> &'a [K],
+    is_global: impl Fn(&F) -> bool,
+) -> (Vec<bool>, Vec<(K, K)>)
+where
+    K: Copy + Eq + std::hash::Hash,
+{
+    let mut included = HashSet::from([root]);
+    let mut dependency_edges = Vec::new();
+    let mut selected = vec![false; fragments.len()];
+    for (index, fragment) in fragments.iter().enumerate() {
+        selected[index] = is_global(fragment);
+    }
+    loop {
+        let mut changed = false;
+        for (index, fragment) in fragments.iter().enumerate() {
+            let Some(target_id) = target(fragment) else {
+                continue;
+            };
+            if selected[index] || !included.contains(&target_id) {
+                continue;
+            }
+            selected[index] = true;
+            changed = true;
+            for &dependency in dependencies(fragment) {
+                dependency_edges.push((target_id, dependency));
+                changed |= included.insert(dependency);
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    (selected, dependency_edges)
 }
 
 /// Creates a diagnostic identity for a reflected type identifier.
@@ -238,5 +273,85 @@ impl ReflectionContext {
     /// * `T` — the reflected type to describe.
     pub fn type_of<T: Reflect + ?Sized>(&self) -> TypeDescriptor<'_> {
         TypeDescriptor::of_in::<T>(self)
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::select_fragment_slice;
+
+    #[derive(Clone)]
+    struct Fragment {
+        target: Option<usize>,
+        global: bool,
+        dependencies: Vec<usize>,
+    }
+
+    fn select(fragments: &[Fragment], root: usize) -> (Vec<bool>, Vec<(usize, usize)>) {
+        select_fragment_slice(
+            fragments,
+            root,
+            |fragment| fragment.target,
+            |fragment| fragment.dependencies.as_slice(),
+            |fragment| fragment.global,
+        )
+    }
+
+    #[test]
+    fn selection_keeps_global_roots_cycles_shared_edges_and_input_order() {
+        let fragments = [
+            Fragment {
+                target: Some(4),
+                global: false,
+                dependencies: vec![1, 2],
+            },
+            Fragment {
+                target: Some(3),
+                global: false,
+                dependencies: vec![4],
+            },
+            Fragment {
+                target: Some(2),
+                global: false,
+                dependencies: vec![3, 99],
+            },
+            Fragment {
+                target: Some(1),
+                global: false,
+                dependencies: vec![3],
+            },
+            Fragment {
+                target: Some(8),
+                global: true,
+                dependencies: vec![77],
+            },
+            Fragment {
+                target: Some(6),
+                global: false,
+                dependencies: vec![],
+            },
+        ];
+        let (selected, edges) = select(&fragments, 4);
+        assert_eq!(selected, [true, true, true, true, true, false]);
+        assert_eq!(edges, [(4, 1), (4, 2), (2, 3), (2, 99), (1, 3), (3, 4)]);
+    }
+
+    #[test]
+    fn selection_does_not_expand_dependencies_of_preselected_global_fragments() {
+        let fragments = [
+            Fragment {
+                target: Some(1),
+                global: true,
+                dependencies: vec![2],
+            },
+            Fragment {
+                target: Some(2),
+                global: false,
+                dependencies: vec![],
+            },
+        ];
+        let (selected, edges) = select(&fragments, 9);
+        assert_eq!(selected, [true, false]);
+        assert!(edges.is_empty());
     }
 }
