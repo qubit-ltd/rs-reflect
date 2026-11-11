@@ -7,5 +7,5 @@ publish = false
 [workspace]
 
 [dependencies]
-qubit-reflect = { path = "../../.." }
-type = { package = "qubit-reflect-derive", path = "../../../derive" }
+qubit-reflect = { path = "../../../", version = "^0.2" }
+type = { package = "qubit-reflect-derive", path = "../../../derive", version = "^0.2" }
