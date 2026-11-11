@@ -43,7 +43,7 @@ macro_rules! descriptor_collection {
                 self.values.get(index).copied()
             }
 
-            /// Iterates over the descriptors in registration order.
+            /// Iterates over the descriptors in the order stored in this collection.
             pub fn iter(&self) -> impl ExactSizeIterator<Item = $item> + '_ {
                 self.values.iter().copied()
             }
