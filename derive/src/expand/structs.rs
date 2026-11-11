@@ -102,7 +102,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Type)
         {
-            let parameter = syn::Ident::new(&parameter.name, parameter.span);
+            let parameter = crate::internal::source_ident(&parameter.name, parameter.span);
             where_clause.predicates.push(syn::parse_quote!(#parameter: 'static));
         }
         for field in visible_fields.iter().filter(|field| {

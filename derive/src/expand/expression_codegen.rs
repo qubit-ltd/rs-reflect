@@ -210,7 +210,7 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
 #[must_use]
 pub(crate) fn generic_arguments(generics: &GenericsIr, definition: &Ident, facade: &TokenStream) -> TokenStream {
     let arguments = generics.params.iter().enumerate().filter_map(|(index, parameter)| {
-        let name = Ident::new(&parameter.name, parameter.span);
+        let name = crate::internal::source_ident(&parameter.name, parameter.span);
         match parameter.kind {
             GenericKindIr::Lifetime => None,
             GenericKindIr::Type => Some(quote!(

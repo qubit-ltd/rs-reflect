@@ -153,7 +153,7 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             .iter()
             .filter(|parameter| parameter.kind == GenericKindIr::Type)
         {
-            let parameter = Ident::new(&parameter.name, parameter.span);
+            let parameter = crate::internal::source_ident(&parameter.name, parameter.span);
             where_clause.predicates.push(parse_quote!(#parameter: 'static));
         }
         for variant in &declaration.variants {

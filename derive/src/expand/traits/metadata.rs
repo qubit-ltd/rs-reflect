@@ -298,7 +298,7 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
                             PathArgumentIr::Lifetime(lifetime) => lifetime == "'static",
                             PathArgumentIr::Type(ty) => is_static_concrete_type(ty, environment),
                             PathArgumentIr::Const(value) => {
-                                !contains_generic_const(value.to_string().as_str(), environment)
+                                !contains_generic_const(value, environment)
                             }
                             PathArgumentIr::AssociatedType { .. }
                             | PathArgumentIr::AssociatedConst { .. }
@@ -319,7 +319,7 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
             .all(|element| is_static_concrete_type(element, environment)),
         TypeKindIr::Array { element, length } => {
             is_static_concrete_type(element, environment)
-                && !contains_generic_const(length.to_string().as_str(), environment)
+                && !contains_generic_const(length, environment)
         }
         TypeKindIr::Pointer { element, .. } => is_static_concrete_type(element, environment),
         TypeKindIr::Reference { .. }
@@ -340,10 +340,12 @@ fn is_static_concrete_type(ty: &crate::ir::TypeIr, environment: &GenericEnvironm
 ///
 /// - `value`: Const expression spelling to scan.
 /// - `environment`: Generic environment providing const parameter names.
-fn contains_generic_const(value: &str, environment: &GenericEnvironment) -> bool {
-    value
-        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
-        .any(|identifier| environment.is_const_parameter(identifier))
+fn contains_generic_const(value: &TokenStream, environment: &GenericEnvironment) -> bool {
+    value.clone().into_iter().any(|token| match token {
+        proc_macro2::TokenTree::Ident(identifier) => environment.is_const_parameter(&identifier.to_string()),
+        proc_macro2::TokenTree::Group(group) => contains_generic_const(&group.stream(), environment),
+        proc_macro2::TokenTree::Punct(_) | proc_macro2::TokenTree::Literal(_) => false,
+    })
 }
 
 /// Emits a static boxed slice expression from generated values.
@@ -437,12 +439,22 @@ mod tests {
     use quote::quote;
 
     use super::associated_type_bound;
+    use super::contains_generic_const;
     use crate::expand::generic_environment::GenericEnvironment;
     use crate::ir::GenericBoundIr;
     use crate::ir::PathArgumentsIr;
     use crate::ir::PathIr;
     use crate::ir::PathSegmentIr;
     use crate::ir::TraitBoundModifierIr;
+
+    #[test]
+    fn generic_const_detection_accepts_raw_parameter_spelling() {
+        let environment = GenericEnvironment::new().with_const_parameter("r#const");
+
+        assert!(contains_generic_const(&quote!(r#const), &environment));
+        assert!(contains_generic_const(&quote!({ r#const + 1 }), &environment));
+        assert!(!contains_generic_const(&quote!(N), &environment));
+    }
 
     #[test]
     fn test_associated_type_bounds_emit_typed_expression_data() {

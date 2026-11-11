@@ -376,7 +376,7 @@ fn trait_application_hook(
         .iter()
         .filter(|parameter| parameter.kind != crate::ir::GenericKindIr::Lifetime)
         .map(|parameter| {
-            let name = syn::Ident::new(&parameter.name, parameter.span);
+            let name = crate::internal::source_ident(&parameter.name, parameter.span);
             quote!(#name)
         })
         .collect::<Vec<_>>();
@@ -395,7 +395,7 @@ fn trait_application_hook(
     };
 
     for (index, parameter) in declaration.generics.params.iter().enumerate() {
-        let name = syn::Ident::new(&parameter.name, parameter.span);
+        let name = crate::internal::source_ident(&parameter.name, parameter.span);
         match parameter.kind {
             crate::ir::GenericKindIr::Lifetime => {}
             crate::ir::GenericKindIr::Type => {

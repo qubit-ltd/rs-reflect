@@ -163,6 +163,11 @@ path = "tests/type_descriptor_generic_arguments_tests.rs"
 required-features = ["derive"]
 
 [[test]]
+name = "raw_generic_parameter_tests"
+path = "tests/raw_generic_parameter_tests.rs"
+required-features = ["derive"]
+
+[[test]]
 name = "type_expression_fuzz_model_tests"
 path = "tests/internal/type_expression_fuzz_model_tests.rs"
 required-features = ["derive"]
