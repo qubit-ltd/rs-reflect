@@ -10,8 +10,8 @@
 //!
 //! The crate exposes immutable descriptors plus checked field access, method
 //! invocation, construction, capability, and registry APIs. Reflection is
-//! opt-in through [`macro@Reflect`] and [`ReflectImpl`] attributes when the
-//! `derive` feature is enabled.
+//! opt-in through the `Reflect` and `ReflectImpl` attributes when the `derive`
+//! feature is enabled.
 //!
 //! # Quick start
 //!
