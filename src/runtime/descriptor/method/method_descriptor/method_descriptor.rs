@@ -308,25 +308,42 @@ impl<'ctx> MethodDescriptor<'ctx> {
         }
     }
 
-    /// Invokes the method and converts a panic raised after invocation starts
-    /// into [`CaughtInvocationFailure::Panicked`].
+    /// Invokes a synchronous method with a panic-catching adapter and converts
+    /// a panic raised after invocation starts into
+    /// [`crate::invoke::CaughtInvocationFailure::Panicked`].
     ///
-    /// # Parameters
+    /// Catching is available only when the selected value mode has a catching
+    /// adapter and the build uses panic unwinding. Async methods and builds
+    /// configured with `panic=abort` are rejected before user method code runs.
+    /// A panic while polling a future returned by an async method is outside
+    /// this synchronous panic-catching boundary.
     ///
-    /// - `invocation`: Validated call values passed to the generated method
-    ///   adapter.
-    ///
+    /// A rejected invocation is returned in
+    /// [`crate::invoke::CaughtInvocationFailure::Rejected`]. Its original
+    /// inputs can be recovered with
+    /// [`crate::invoke::InvocationFailure::into_invocation`]. Once user code
+    /// starts, a panic does not roll back its side effects or guarantee
+    /// recovery of values already consumed by that code.
     ///
     /// # Type Parameters
     ///
     /// - `'call`: Generic type or lifetime parameter carried by the descriptor.
     /// - `M`: Value mode that governs storage and thread-safety bounds.
     ///
-    ///
     /// # Parameters
     ///
-    /// - `invocation`: Validated call values passed to the generated method
-    ///   adapter.
+    /// - `invocation`: Call values passed to the generated method adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::invoke::CaughtInvocationFailure::Rejected`] if
+    /// preflight validation fails. If the selected value mode has no catching
+    /// adapter, the method is async, or the build uses `panic=abort`, the
+    /// rejection has error kind
+    /// [`crate::invoke::InvocationErrorKind::ValueModeUnavailable`]. Earlier
+    /// visibility, safety, or method-availability checks can report their own
+    /// errors. Returns [`crate::invoke::CaughtInvocationFailure::Panicked`]
+    /// when the method adapter panics after invocation begins.
     pub fn invoke_catching<'call, M: ValueMode>(
         &self,
         invocation: Invocation<'call, M>,

@@ -267,7 +267,7 @@ fn explicit_context_demo() {
 
 typed 字段替换失败时返回 `FieldSetFailure<V>`。调用 `into_parts()` 可以同时取回诊断信息和原替换值，便于 handler 保留或报告输入。方法开始执行前，调用校验可能因为 receiver 或参数的类型、传递模式、参数绑定或方法可用性而失败。此时 `InvocationFailure` 会保留执行前被拒绝的输入。
 
-用户代码一旦开始执行，反射无法撤销它产生的副作用。如果方法先修改对象再返回业务错误，调用方应使用自身的事务或补偿策略。普通 `invoke()` 也不会捕获 panic；只有应用已经确定 panic 处理策略时，才选择显式的捕获入口。
+用户代码一旦开始执行，反射无法撤销它产生的副作用。如果方法先修改对象再返回业务错误，调用方应使用自身的事务或补偿策略。普通 `invoke()` 不捕获 panic；只有应用已确定 panic 处理策略时，才选择 [`MethodDescriptor::invoke_catching`](https://docs.rs/qubit-reflect/latest/qubit_reflect/struct.MethodDescriptor.html#method.invoke_catching)。该入口只为同步调用捕获 panic，且所选 value mode 必须提供 catching adapter，构建也必须使用 panic unwind。异步方法和 `panic=abort` 构建会在进入用户方法前被拒绝；通过更早的检查后，这些拒绝的错误类型为 `ValueModeUnavailable`，其他前置检查仍可能返回各自的错误。`CaughtInvocationFailure::Rejected` 保留原调用，可通过其中的 `InvocationFailure::into_invocation` 取回输入。future 后续 poll 时发生的 panic 不在此同步边界内；捕获 panic 也不会回滚副作用，或保证恢复已被用户代码消费的值。
 
 ## 在框架边界使用动态值
 
