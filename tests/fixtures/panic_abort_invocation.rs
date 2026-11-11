@@ -62,15 +62,12 @@ fn main() {
         .type_of::<Worker>()
         .method("set")
         .expect("the panic method must be registered");
-    let failure = match method.invoke_catching(Invocation::<Local>::on_mut(&mut worker).arg(payload)) {
-        Err(failure) => failure,
-        Ok(_) => panic!("panic=abort cannot support catching dispatch"),
-    };
-    let rejected = match failure {
-        CaughtInvocationFailure::Rejected(rejected) => rejected,
-        CaughtInvocationFailure::Panicked(_) => {
+    let rejected = match method.invoke_catching(Invocation::<Local>::on_mut(&mut worker).arg(payload)) {
+        Err(CaughtInvocationFailure::Rejected(rejected)) => rejected,
+        Err(CaughtInvocationFailure::Panicked(_)) => {
             panic!("abort mode must reject before entering the user method");
         }
+        Ok(_) => panic!("panic=abort cannot support catching dispatch"),
     };
     assert!(matches!(
         rejected.error().kind(),
@@ -84,6 +81,7 @@ fn main() {
         Err(_) => panic!("normal invocation should reuse the recovered input"),
     };
     assert!(matches!(output, qubit_reflect::InvocationOutput::Unit));
+    drop(output);
     assert_eq!(worker.value, "recovered value".len());
     assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
