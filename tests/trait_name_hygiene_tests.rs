@@ -3,17 +3,7 @@
 //
 //    SPDX-License-Identifier: Apache-2.0
 //
-//    Licensed under the Apache License, Version 2.0 (the "License");
-//    you may not use this file except in compliance with the License.
-//    You may obtain a copy of the License at
-//
-//        https://www.apache.org/licenses/LICENSE-2.0
-//
-//    Unless required by applicable law or agreed to in writing, software
-//    distributed under the License is distributed on an "AS IS" BASIS,
-//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//    See the License for the specific language governing permissions and
-//    limitations under the License.
+//    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 
 #![cfg(feature = "derive")]
@@ -68,43 +58,25 @@ fn assert_default_methods_for_local() {
     use qubit_reflect::value::Local;
 
     let mut target = shadowed_names::Target { count: 0 };
-    let type_descriptor =
-        qubit_reflect::ReflectionContext::global().type_of::<shadowed_names::Target>();
+    let type_descriptor = qubit_reflect::ReflectionContext::global().type_of::<shadowed_names::Target>();
 
     let read = type_descriptor.method("read").expect("default read method");
     let output = read
         .invoke(qubit_reflect::Invocation::<Local>::on_ref(&target))
         .unwrap_or_else(|_| panic!("default read invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        7
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 7);
 
     let sum = type_descriptor.method("sum").expect("default sum method");
     let output = sum
         .invoke(qubit_reflect::Invocation::<Local>::on_ref(&target).arg(4_u32))
         .unwrap_or_else(|_| panic!("default sum invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        5
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 5);
 
-    let update = type_descriptor
-        .method("update")
-        .expect("default update method");
+    let update = type_descriptor.method("update").expect("default update method");
     let output = update
         .invoke(qubit_reflect::Invocation::<Local>::on_mut(&mut target).arg(9_u32))
         .unwrap_or_else(|_| panic!("default update invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        9
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 9);
     assert_eq!(target.count, 9);
 }
 
@@ -112,43 +84,25 @@ fn assert_default_methods_for_thread_safe() {
     use qubit_reflect::value::ThreadSafe;
 
     let mut target = shadowed_names::Target { count: 0 };
-    let type_descriptor =
-        qubit_reflect::ReflectionContext::global().type_of::<shadowed_names::Target>();
+    let type_descriptor = qubit_reflect::ReflectionContext::global().type_of::<shadowed_names::Target>();
 
     let read = type_descriptor.method("read").expect("default read method");
     let output = read
         .invoke(qubit_reflect::Invocation::<ThreadSafe>::on_ref(&target))
         .unwrap_or_else(|_| panic!("default read invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        7
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 7);
 
     let sum = type_descriptor.method("sum").expect("default sum method");
     let output = sum
         .invoke(qubit_reflect::Invocation::<ThreadSafe>::on_ref(&target).arg(4_u32))
         .unwrap_or_else(|_| panic!("default sum invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        5
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 5);
 
-    let update = type_descriptor
-        .method("update")
-        .expect("default update method");
+    let update = type_descriptor.method("update").expect("default update method");
     let output = update
         .invoke(qubit_reflect::Invocation::<ThreadSafe>::on_mut(&mut target).arg(9_u32))
         .unwrap_or_else(|_| panic!("default update invocation"));
-    assert_eq!(
-        output
-            .into_owned::<u32>()
-            .unwrap_or_else(|_| panic!("u32 result")),
-        9
-    );
+    assert_eq!(output.into_owned::<u32>().unwrap_or_else(|_| panic!("u32 result")), 9);
     assert_eq!(target.count, 9);
 }
 
