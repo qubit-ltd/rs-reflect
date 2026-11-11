@@ -251,6 +251,17 @@ static HRTB_FUNCTION: super::super::expression::FunctionPointerData =
         &[LifetimeExpression::Named("a")],
     );
 static HRTB_FUNCTION_EXPRESSION: ExpressionData = ExpressionData::FunctionPointer(&HRTB_FUNCTION);
+static ELIDED_BINDER_FUNCTION: super::super::expression::FunctionPointerData =
+    super::super::expression::FunctionPointerData::new(
+        &[],
+        None,
+        false,
+        None,
+        false,
+        &[LifetimeExpression::Elided],
+    );
+static ELIDED_BINDER_FUNCTION_EXPRESSION: ExpressionData =
+    ExpressionData::FunctionPointer(&ELIDED_BINDER_FUNCTION);
 static NESTED_FUNCTION: super::super::expression::FunctionPointerData =
     super::super::expression::FunctionPointerData::new(
         &[&HRTB_FUNCTION_EXPRESSION],
@@ -913,6 +924,12 @@ fn test_expression_display_formats_lifetimes_consts_and_argument_forms() {
     assert_eq!(
         TypeExpression::new(&HRTB_FUNCTION_EXPRESSION, &context).display().to_string(),
         "for<'a> fn(&'a u8)"
+    );
+    assert_eq!(
+        TypeExpression::new(&ELIDED_BINDER_FUNCTION_EXPRESSION, &context)
+            .display()
+            .to_string(),
+        "for<'_> fn()"
     );
     assert_eq!(
         TypeExpression::new(&HRTB_OBJECT_EXPRESSION, &context).display().to_string(),

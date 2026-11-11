@@ -347,7 +347,13 @@ fn write_lifetime_binder(
         if index > 0 {
             formatter.write_str(", ")?;
         }
-        write_lifetime(formatter, *lifetime)?;
+        if *lifetime == LifetimeExpression::Elided {
+            // An elided lifetime cannot name a binder; keep malformed public
+            // metadata visible instead of producing the empty `for<>` form.
+            formatter.write_str("'_")?;
+        } else {
+            write_lifetime(formatter, *lifetime)?;
+        }
     }
     formatter.write_str("> ")
 }
