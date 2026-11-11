@@ -230,13 +230,13 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 ),
             ));
             let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
-            (Some(#type_definition_ident), generic_arguments)
+            (::core::option::Option::Some(#type_definition_ident), generic_arguments)
         })
     } else {
         quote!({
             let #type_definition_ident = #facade::__private::codegen_v4::registration::type_definition_metadata(#definition_fn());
             let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
-            (Some(#type_definition_ident), generic_arguments)
+            (::core::option::Option::Some(#type_definition_ident), generic_arguments)
         })
     };
     let (shape, construction_shape) = match declaration.field_shape {
@@ -391,7 +391,7 @@ fn tuple_field_patterns(
         };
         quote!(#cfg Self(#(#prefix,)* #binding, ..) => #binding,)
     });
-    quote!(#(#arms)* _ => unreachable!("field is present in the active tuple shape"))
+    quote!(#(#arms)* _ => ::core::unreachable!("field is present in the active tuple shape"))
 }
 
 /// Reports whether a type shape can be recursively reflected without its owner.
@@ -510,7 +510,7 @@ fn struct_provider(
     if !constructible {
         return (
             TokenStream::new(),
-            quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(None)),
+            quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(::core::option::Option::None)),
             quote!(#facade::__private::codegen_v4::construct::ConstructionAvailability::Unavailable {
                 reasons: ::std::vec![#facade::__private::codegen_v4::construct::ConstructionUnavailableReason::FieldNotReflectable].into_boxed_slice(),
             }),
@@ -542,8 +542,7 @@ fn struct_provider(
             (TokenStream::new(), TokenStream::new())
         };
     let make_functions = quote!(#local_functions #thread_safe_functions);
-    let local_providers =
-        quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(Some(#local_provider)));
+    let local_providers = quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(::core::option::Option::Some(#local_provider)));
     let provider = if declaration.generics.params.is_empty() && !declaration.local_only {
         quote!({
             let providers = #local_providers;
@@ -586,8 +585,8 @@ fn struct_provider_mode(
         let variable = format_ident!("field_{position}");
         let ty = &field.ty.tokens;
         let index = syn::Index::from(position);
-        construct_bindings.push(quote!(let #variable = fields.get_mut(#index).and_then(Option::take).expect("validated construction field must be present")
-            .downcast::<#ty>().unwrap_or_else(|_| unreachable!("validated construction field type"));));
+        construct_bindings.push(quote!(let #variable = fields.get_mut(#index).and_then(::core::option::Option::take).expect("validated construction field must be present")
+            .downcast::<#ty>().unwrap_or_else(|_| ::core::unreachable!("validated construction field type"));));
         let member = field
             .name
             .as_ref()
@@ -599,9 +598,9 @@ fn struct_provider_mode(
             initializers.push(quote!(#variable));
         }
         updates.push(quote! {
-            if let Some(replacement) = fields.get_mut(#index).and_then(Option::take) {
+            if let ::core::option::Option::Some(replacement) = fields.get_mut(#index).and_then(::core::option::Option::take) {
                 value.#member = replacement.downcast::<#ty>()
-                    .unwrap_or_else(|_| unreachable!("validated update field type"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated update field type"));
             }
         });
     }
@@ -611,11 +610,11 @@ fn struct_provider_mode(
         crate::ir::FieldShapeIr::Unnamed => quote!(Self(#(#initializers),*)),
     };
     let functions = quote! {
-        fn #construct_name(mut fields: ::std::vec::Vec<Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
+        fn #construct_name(mut fields: ::std::vec::Vec<::core::option::Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
             #(#construct_bindings)*
             #construct_value
         }
-        fn #update_name(mut value: Self, mut fields: ::std::vec::Vec<Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
+        fn #update_name(mut value: Self, mut fields: ::std::vec::Vec<::core::option::Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
             #(#updates)*
             value
         }

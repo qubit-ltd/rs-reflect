@@ -10,7 +10,6 @@
 
 use proc_macro_crate::FoundCrate;
 use proc_macro_crate::crate_name;
-use proc_macro2::Ident;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -98,7 +97,7 @@ impl ExpansionContext {
         let facade = match found {
             Some(FoundCrate::Itself) => quote!(::qubit_reflect),
             Some(FoundCrate::Name(name)) => {
-                let identifier = Ident::new(&name, Span::call_site());
+                let identifier = crate::internal::dependency_ident(&name)?;
                 quote!(::#identifier)
             }
             None => {

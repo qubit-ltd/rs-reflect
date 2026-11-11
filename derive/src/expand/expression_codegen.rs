@@ -62,10 +62,10 @@ pub(crate) fn function_abi(abi: Option<&str>, span: Span, facade: &TokenStream) 
 /// - `span`: Source location used for generated string literals.
 fn function_pointer_abi(abi: Option<&str>, span: Span) -> TokenStream {
     match abi {
-        Some("Rust") | None => quote!(None),
+        Some("Rust") | None => quote!(::core::option::Option::None),
         Some(value) => {
             let value = LitStr::new(value, span);
-            quote!(Some(#value))
+            quote!(::core::option::Option::Some(#value))
         }
     }
 }
@@ -105,9 +105,9 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Type(value)) => {
                         let value = type_expression(value, &environment, facade);
-                        quote!(Some(#value))
+                        quote!(::core::option::Option::Some(#value))
                     }
-                    _ => quote!(None),
+                    _ => quote!(::core::option::Option::None),
                 };
                 quote!(#facade::__private::codegen_v4::expression::GenericParameterMetadata::type_parameter(
                     #name, #index, #bounds, #default,
@@ -121,13 +121,13 @@ pub(crate) fn generic_definition(generics: &GenericsIr, span: Span, facade: &Tok
                     .unwrap_or_else(|| {
                         leaked_expression(
                             quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
-                                path: "_", definition: None, arguments: &[],
+                                path: "_", definition: ::core::option::Option::None, arguments: &[],
                             }),
                         )
                     });
                 let default = match parameter.default.as_ref() {
                     Some(crate::ir::GenericDefaultIr::Const(value)) => const_expression(value, &environment, facade),
-                    _ => quote!(None),
+                    _ => quote!(::core::option::Option::None),
                 };
                 quote!(#facade::__private::codegen_v4::expression::GenericParameterMetadata::const_parameter(
                     #name, #index, #ty, #default,
@@ -219,7 +219,7 @@ pub(crate) fn generic_arguments(generics: &GenericsIr, definition: &Ident, facad
                     ::std::boxed::Box::leak(::std::boxed::Box::new(
                         #facade::__private::codegen_v4::expression::ExpressionData::Named {
                             path: ::std::any::type_name::<#name>(),
-                            definition: None,
+                            definition: ::core::option::Option::None,
                             arguments: &[],
                         }
                     )),
@@ -425,13 +425,13 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
             let target = type_expression(element, environment, facade);
             let lifetime = match lifetime.as_deref() {
                 Some("'static") => {
-                    quote!(Some(#facade::__private::codegen_v4::expression::LifetimeExpression::Static))
+                    quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::LifetimeExpression::Static))
                 }
                 Some(value) => {
                     let value = LitStr::new(value.trim_start_matches('\''), ty.span);
-                    quote!(Some(#facade::__private::codegen_v4::expression::LifetimeExpression::Named(#value)))
+                    quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::LifetimeExpression::Named(#value)))
                 }
-                None => quote!(None),
+                None => quote!(::core::option::Option::None),
             };
             leaked_expression(
                 quote!(#facade::__private::codegen_v4::expression::ExpressionData::Reference {
@@ -486,8 +486,8 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
             let return_type = output
                 .as_deref()
                 .map(|value| type_expression(value, environment, facade))
-                .map(|value| quote!(Some(#value)));
-            let return_type = return_type.unwrap_or_else(|| quote!(None));
+                .map(|value| quote!(::core::option::Option::Some(#value)));
+            let return_type = return_type.unwrap_or_else(|| quote!(::core::option::Option::None));
             let abi = function_pointer_abi(abi.as_deref(), ty.span);
             let data = quote!(#facade::__private::codegen_v4::expression::FunctionPointerData::new(
                 #parameters, #return_type, #is_unsafe, #abi, #is_variadic, #higher_ranked_lifetimes,
@@ -512,8 +512,8 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
                     GenericBoundIr::Lifetime(value) => Some(lifetime_expression(value, ty.span, facade)),
                     _ => None,
                 })
-                .map(|value| quote!(Some(#value)))
-                .unwrap_or_else(|| quote!(None));
+                .map(|value| quote!(::core::option::Option::Some(#value)))
+                .unwrap_or_else(|| quote!(::core::option::Option::None));
             let data = leaked_expression(quote!(#facade::__private::codegen_v4::expression::TraitObjectData::new(
                 #traits, #lifetime,
             )));
@@ -530,7 +530,7 @@ pub(crate) fn type_expression(ty: &TypeIr, environment: &GenericEnvironment, fac
             let source = LitStr::new(&ty.source, ty.span);
             leaked_expression(
                 quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
-                    path: #source, definition: None, arguments: &[],
+                    path: #source, definition: ::core::option::Option::None, arguments: &[],
                 }),
             )
         }
@@ -626,11 +626,11 @@ fn path_expression(
                 .take(qualified.position)
                 .flat_map(|segment| path_arguments(&segment.arguments, environment, facade, ty.span));
             let arguments = leak_slice(arguments);
-            quote!(Some(::std::boxed::Box::leak(::std::boxed::Box::new(
+            quote!(::core::option::Option::Some(::std::boxed::Box::leak(::std::boxed::Box::new(
                 #facade::__private::codegen_v4::expression::TraitExpressionData::new(#trait_name, #arguments, &[])
             )) as &'static #facade::__private::codegen_v4::expression::TraitExpressionData))
         } else {
-            quote!(None)
+            quote!(::core::option::Option::None)
         };
         return leaked_expression(
             quote!(#facade::__private::codegen_v4::expression::ExpressionData::AssociatedType {
@@ -646,7 +646,7 @@ fn path_expression(
     let arguments = leak_slice(arguments);
     leaked_expression(
         quote!(#facade::__private::codegen_v4::expression::ExpressionData::Named {
-            path: #source, definition: None, arguments: #arguments,
+            path: #source, definition: ::core::option::Option::None, arguments: #arguments,
         }),
     )
 }
@@ -676,8 +676,8 @@ pub(crate) fn path_arguments(
             let inputs = inputs.iter().map(|value| type_expression(value, environment, facade));
             let inputs = leak_expression_slice(inputs, facade);
             let output = output.as_deref().map(|value| type_expression(value, environment, facade));
-            let output = output.map(|value| quote!(Some(#value))).unwrap_or_else(|| quote!(None));
-            let abi = quote!(None);
+            let output = output.map(|value| quote!(::core::option::Option::Some(#value))).unwrap_or_else(|| quote!(::core::option::Option::None));
+            let abi = quote!(::core::option::Option::None);
             let lifetimes = leak_slice(std::iter::empty());
             let function = leaked_expression(quote!(#facade::__private::codegen_v4::expression::FunctionPointerData::new(
                 #inputs, #output, false, #abi, false, #lifetimes,
@@ -882,11 +882,11 @@ pub(super) fn const_expression(
         Expr::Lit(expression) => match expression.lit {
             Lit::Bool(value) => {
                 let value = value.value;
-                quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Boolean(#value)))
+                quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::Boolean(#value)))
             }
             Lit::Char(value) => {
                 let value = value.value();
-                quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Character(#value)))
+                quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::Character(#value)))
             }
             Lit::Int(value) => integer_const_expression(&value, false, facade)
                 .unwrap_or_else(|| unsupported_const_default(value.to_token_stream())),
@@ -904,9 +904,9 @@ pub(super) fn const_expression(
             let identifier = path.path.segments[0].ident.to_string();
             let name = LitStr::new(&identifier, path.path.segments[0].ident.span());
             if environment.is_const_parameter(&identifier) {
-                quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Parameter(#name)))
+                quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::Parameter(#name)))
             } else {
-                quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Path(#name)))
+                quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::Path(#name)))
             }
         }
         Expr::Path(path) => {
@@ -919,7 +919,7 @@ pub(super) fn const_expression(
                 &segments.map(|segment| segment.value()).collect::<Vec<_>>().join("::"),
                 Span::call_site(),
             );
-            quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::Path(#path)))
+            quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::Path(#path)))
         }
         _ => unsupported_const_default(value),
     }
@@ -945,10 +945,14 @@ fn integer_const_expression(value: &LitInt, negative: bool, facade: &TokenStream
     if signed {
         let magnitude = value.base10_parse::<i128>().ok()?;
         let value = if negative { magnitude.checked_neg()? } else { magnitude };
-        Some(quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#value))))
+        Some(
+            quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::SignedInteger(#value))),
+        )
     } else {
         let value = value.base10_parse::<u128>().ok()?;
-        Some(quote!(Some(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#value))))
+        Some(
+            quote!(::core::option::Option::Some(#facade::__private::codegen_v4::expression::ConstExpression::UnsignedInteger(#value))),
+        )
     }
 }
 

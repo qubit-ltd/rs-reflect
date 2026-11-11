@@ -8,6 +8,8 @@
 
 //! Shared implementation utilities without reflection-domain semantics.
 
+mod dependency_ident;
 mod error_collector;
 
+pub(crate) use dependency_ident::dependency_ident;
 pub(crate) use error_collector::ErrorCollector;

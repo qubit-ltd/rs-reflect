@@ -369,7 +369,7 @@ fn support_path() -> Result<TokenStream> {
         let path = match found {
             FoundCrate::Itself => quote!(crate),
             FoundCrate::Name(name) => {
-                let identifier = Ident::new(&name, Span::call_site());
+                let identifier = crate::internal::dependency_ident(&name)?;
                 quote!(::#identifier)
             }
         };
@@ -380,7 +380,7 @@ fn support_path() -> Result<TokenStream> {
             ::qubit_reflect::__private::codegen_v4::macro_support::ConfiguredReflection
         )),
         Ok(FoundCrate::Name(name)) => {
-            let identifier = Ident::new(&name, Span::call_site());
+            let identifier = crate::internal::dependency_ident(&name)?;
             Ok(quote!(::#identifier::__private::codegen_v4::macro_support::ConfiguredReflection))
         }
         Err(_) => Err(Error::new(

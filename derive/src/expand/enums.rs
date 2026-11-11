@@ -251,8 +251,8 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             let binding = format_ident!("field_value");
             let (pattern, mutable_pattern) = if let Some(field_name) = &field.name {
                 (
-                    quote!(Self::#variant_name { #field_name: #binding, .. } => #binding, _ => unreachable!("field is only active for its variant")),
-                    quote!(Self::#variant_name { #field_name: #binding, .. } => #binding, _ => unreachable!("field is only active for its variant")),
+                    quote!(Self::#variant_name { #field_name: #binding, .. } => #binding, _ => ::core::unreachable!("field is only active for its variant")),
+                    quote!(Self::#variant_name { #field_name: #binding, .. } => #binding, _ => ::core::unreachable!("field is only active for its variant")),
                 )
             } else {
                 (
@@ -407,13 +407,13 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
                 ),
             ));
             let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
-            (Some(#type_definition_ident), generic_arguments)
+            (::core::option::Option::Some(#type_definition_ident), generic_arguments)
         })
     } else {
         quote!({
             let #type_definition_ident = #facade::__private::codegen_v4::registration::type_definition_metadata(#definition_fn());
             let generic_arguments: &'static [#facade::__private::codegen_v4::expression::GenericArgumentMetadata] = #generic_arguments;
-            (Some(#type_definition_ident), generic_arguments)
+            (::core::option::Option::Some(#type_definition_ident), generic_arguments)
         })
     };
     let type_submission = if declaration.generics.params.is_empty() {
@@ -496,7 +496,7 @@ fn numeric_discriminant_v4(
     facade: &TokenStream,
 ) -> TokenStream {
     let Some(repr) = repr else {
-        return quote!(None);
+        return quote!(::core::option::Option::None);
     };
     let variant = match repr {
         "i8" => quote!(I8),
@@ -511,10 +511,10 @@ fn numeric_discriminant_v4(
         "u64" => quote!(U64),
         "u128" => quote!(U128),
         "usize" => quote!(Usize),
-        _ => return quote!(None),
+        _ => return quote!(::core::option::Option::None),
     };
     let repr = Ident::new(repr, variant_name.span());
-    quote!(Some(#facade::__private::codegen_v4::access::NumericDiscriminant::#variant(
+    quote!(::core::option::Option::Some(#facade::__private::codegen_v4::access::NumericDiscriminant::#variant(
         #enum_name::#variant_name as #repr
     )))
 }
@@ -609,7 +609,7 @@ fn tuple_field_patterns(
         };
         quote!(#cfg #pattern => #binding,)
     });
-    quote!(#(#arms)* _ => unreachable!("field is only active for its variant"))
+    quote!(#(#arms)* _ => ::core::unreachable!("field is only active for its variant"))
 }
 
 /// Reports whether a source variant contains a field marked `reflect(skip)`.
@@ -646,7 +646,7 @@ fn enum_variant_provider(
     if !constructible {
         return (
             TokenStream::new(),
-            quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(None)),
+            quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(::core::option::Option::None)),
             quote!(#facade::__private::codegen_v4::construct::ConstructionAvailability::Unavailable {
                 reasons: ::std::vec![#facade::__private::codegen_v4::construct::ConstructionUnavailableReason::FieldNotReflectable].into_boxed_slice(),
             }),
@@ -657,7 +657,7 @@ fn enum_variant_provider(
         let (thread_safe_methods, thread_safe_provider) =
             enum_variant_provider_mode(variant, facade, "thread_safe", quote!(ThreadSafe));
         let providers = quote!({
-            let providers = #facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(Some(#local_provider));
+            let providers = #facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(::core::option::Option::Some(#local_provider));
             providers.with_thread_safe::<Self>(#thread_safe_provider)
         });
         return (
@@ -668,7 +668,7 @@ fn enum_variant_provider(
     }
     (
         local_methods,
-        quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(Some(#local_provider))),
+        quote!(#facade::__private::codegen_v4::construct::ConstructionProviders::new::<Self>(::core::option::Option::Some(#local_provider))),
         quote!(#facade::__private::codegen_v4::construct::ConstructionAvailability::Available),
     )
 }
@@ -700,24 +700,26 @@ fn enum_variant_provider_mode(
     for (position, (field, variable)) in fields.iter().zip(&variables).enumerate() {
         let ty = &field.ty.tokens;
         let position = syn::Index::from(position);
-        downcasts.push(quote!(let #variable = fields.get_mut(#position).and_then(Option::take)
+        downcasts.push(
+            quote!(let #variable = fields.get_mut(#position).and_then(::core::option::Option::take)
             .expect("validated construction field must be present")
-            .downcast::<#ty>().unwrap_or_else(|_| unreachable!("validated construction field type"));));
+            .downcast::<#ty>().unwrap_or_else(|_| ::core::unreachable!("validated construction field type"));),
+        );
         updates.push(
-            quote!(if let Some(replacement) = fields.get_mut(#position).and_then(Option::take) {
+            quote!(if let ::core::option::Option::Some(replacement) = fields.get_mut(#position).and_then(::core::option::Option::take) {
                 #variable = replacement.downcast::<#ty>()
-                    .unwrap_or_else(|_| unreachable!("validated update field type"));
+                    .unwrap_or_else(|_| ::core::unreachable!("validated update field type"));
             }),
         );
     }
     let (destructure, updated_value, created_value) = match variant.kind {
         VariantKindIr::Unit => (
-            quote!(let Self::#variant_name = value else { unreachable!("validated active enum variant") };),
+            quote!(let Self::#variant_name = value else { ::core::unreachable!("validated active enum variant") };),
             quote!(Self::#variant_name),
             quote!(Self::#variant_name),
         ),
         VariantKindIr::Tuple => (
-            quote!(let Self::#variant_name(#(mut #variables),*) = value else { unreachable!("validated active enum variant") };),
+            quote!(let Self::#variant_name(#(mut #variables),*) = value else { ::core::unreachable!("validated active enum variant") };),
             quote!(Self::#variant_name(#(#variables),*)),
             quote!(Self::#variant_name(#(#variables),*)),
         ),
@@ -727,18 +729,18 @@ fn enum_variant_provider_mode(
                 .map(|field| field.name.as_ref().expect("named variant field"))
                 .collect();
             (
-                quote!(let Self::#variant_name { #(#field_names: mut #variables),* } = value else { unreachable!("validated active enum variant") };),
+                quote!(let Self::#variant_name { #(#field_names: mut #variables),* } = value else { ::core::unreachable!("validated active enum variant") };),
                 quote!(Self::#variant_name { #(#field_names: #variables),* }),
                 quote!(Self::#variant_name { #(#field_names: #variables),* }),
             )
         }
     };
     let methods = quote! {
-        fn #construct_name(mut fields: ::std::vec::Vec<Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
+        fn #construct_name(mut fields: ::std::vec::Vec<::core::option::Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
             #(#downcasts)*
             #created_value
         }
-        fn #update_name(value: Self, mut fields: ::std::vec::Vec<Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
+        fn #update_name(value: Self, mut fields: ::std::vec::Vec<::core::option::Option<#facade::__private::codegen_v4::value::DynamicOwned<#facade::__private::codegen_v4::value::#mode>>>) -> Self {
             #destructure
             #(#updates)*
             #updated_value

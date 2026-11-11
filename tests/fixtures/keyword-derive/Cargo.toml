@@ -1,0 +1,11 @@
+[package]
+name = "reflect-keyword-derive-consumer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+qubit-reflect = { path = "../../.." }
+type = { package = "qubit-reflect-derive", path = "../../../derive" }
