@@ -8,7 +8,10 @@
 
 use std::any::Any;
 use std::any::TypeId;
+use std::any::type_name;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Mutex;
 use std::sync::OnceLock;
@@ -95,6 +98,16 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
     ///
     /// # Parameters
     /// - `initialize`: creates the registration when the cache has no entry.
+    ///
+    /// # Panics
+    /// Panics if initialization directly or indirectly requests this type
+    /// again on the same thread. Registration initializers may depend on other
+    /// types as long as that dependency chain does not return to a type whose
+    /// initialization is already in progress on this thread. Cycles formed
+    /// across multiple threads are not detected and may block.
+    ///
+    /// If `initialize` panics, the registration remains uninitialized and a
+    /// later call may retry it.
     pub fn get_or_init_with(initialize: impl FnOnce() -> Self) -> &'static Self {
         let type_id = TypeId::of::<T>();
         let cell = {
@@ -105,6 +118,13 @@ impl<T: ?Sized + 'static> TypeRegistration<T> {
                 .entry(type_id)
                 .or_insert_with(|| Box::leak(Box::new(OnceLock::new())))
         };
+        if let Some(value) = cell.get() {
+            return value
+                .downcast_ref::<Self>()
+                .expect("registration cache is keyed by exact TypeId");
+        }
+
+        let _guard = RegistrationInitializationGuard::enter::<T>();
         cell.get_or_init(|| Box::new(initialize()) as Box<dyn Any + Send + Sync>)
             .downcast_ref::<Self>()
             .expect("registration cache is keyed by exact TypeId")
@@ -172,4 +192,40 @@ type RegistrationCache = HashMap<TypeId, &'static OnceLock<Box<dyn Any + Send + 
 fn registration_cache() -> &'static Mutex<RegistrationCache> {
     static REGISTRATIONS: OnceLock<Mutex<RegistrationCache>> = OnceLock::new();
     REGISTRATIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+thread_local! {
+    /// Types currently being initialized by this thread.
+    static INITIALIZING_REGISTRATIONS: RefCell<HashSet<TypeId>> = RefCell::new(HashSet::new());
+}
+
+/// Removes this type from the current thread's active initialization set.
+struct RegistrationInitializationGuard {
+    /// Type whose initialization this guard tracks.
+    type_id: TypeId,
+}
+
+impl RegistrationInitializationGuard {
+    /// Marks `T` as initializing or panics if it is already active on this
+    /// thread.
+    ///
+    /// # Type Parameters
+    /// - `T`: the Rust type whose registration is being initialized.
+    fn enter<T: ?Sized + 'static>() -> Self {
+        let type_id = TypeId::of::<T>();
+        let inserted = INITIALIZING_REGISTRATIONS.with(|initializing| initializing.borrow_mut().insert(type_id));
+        if !inserted {
+            panic!("recursive type registration initialization for {}", type_name::<T>());
+        }
+        Self { type_id }
+    }
+}
+
+impl Drop for RegistrationInitializationGuard {
+    /// Removes the type from active initialization tracking.
+    fn drop(&mut self) {
+        INITIALIZING_REGISTRATIONS.with(|initializing| {
+            initializing.borrow_mut().remove(&self.type_id);
+        });
+    }
 }
