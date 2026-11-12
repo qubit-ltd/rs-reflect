@@ -44,6 +44,15 @@ pub enum CfgTupleFields {
     EnabledMiddle(u8, #[cfg(not(any()))] u16, u32),
 }
 
+#[Reflect]
+enum CfgVariants {
+    Enabled,
+    #[cfg(any())]
+    DisabledByCfg(MissingCfgVariantType),
+    #[cfg_attr(all(), cfg(any()))]
+    DisabledByCfgAttr(MissingCfgAttrVariantType),
+}
+
 /// Verifies enum variants and their fields retain source names and positions.
 #[test]
 fn test_derive_enum_preserves_variant_and_field_metadata() {
@@ -107,6 +116,16 @@ fn test_tuple_variant_field_adapters_follow_cfg_compiled_shape() {
             .unwrap(),
         23
     );
+}
+
+#[test]
+fn test_cfg_variants_are_absent_from_reflection() {
+    let variants = TypeDescriptor::of::<CfgVariants>().variants();
+
+    assert_eq!(variants.len(), 1);
+    assert_eq!(variants.get_at(0).expect("enabled variant").name(), "Enabled");
+    assert!(variants.get("DisabledByCfg").is_none());
+    assert!(variants.get("DisabledByCfgAttr").is_none());
 }
 
 /// Verifies a variant adapter accepts only its exact active variant.

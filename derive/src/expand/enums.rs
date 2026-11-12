@@ -157,6 +157,9 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             where_clause.predicates.push(parse_quote!(#parameter: 'static));
         }
         for variant in &declaration.variants {
+            if !super::generics::variant_cfg_attributes(&declaration, variant.index).is_empty() {
+                continue;
+            }
             for field in &variant.fields {
                 if field
                     .attributes
@@ -262,10 +265,12 @@ fn expand_v4(declaration: TypeDeclarationIr, context: &ExpansionContext) -> syn:
             };
             let cfg_field = super::generics::field_cfg_attributes(&declaration, Some(variant.index), field_index);
             methods.push(quote! {
+                #(#cfg)*
                 #(#cfg_field)*
                 fn #get(value: &Self) -> & #ty {
                     match value { #pattern }
                 }
+                #(#cfg)*
                 #(#cfg_field)*
                 fn #get_mut(value: &mut Self) -> &mut #ty {
                     match value { #mutable_pattern }
