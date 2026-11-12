@@ -24,6 +24,14 @@ pub const PROTOCOL_VERSION: u32 = 4;
 /// # Parameters
 ///
 /// * `expected` — the protocol version embedded by generated code.
+///
+/// A consumer compiled against a different protocol version fails at compile
+/// time:
+///
+/// ```compile_fail
+/// use qubit_reflect::__private::codegen_v4::protocol::assert_protocol_version;
+/// const _: () = assert_protocol_version(3);
+/// ```
 pub const fn assert_protocol_version(expected: u32) {
     assert!(
         expected == PROTOCOL_VERSION,

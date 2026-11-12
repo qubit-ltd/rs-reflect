@@ -296,6 +296,16 @@ fn identity<T: Reflect + 'static>() -> TypeIdentity {
 /// };
 /// assert_eq!(value, 7);
 /// ```
+///
+/// A local value cannot be moved to another thread:
+///
+/// ```compile_fail
+/// use std::rc::Rc;
+/// use qubit_reflect::value::{DynamicOwned, Local};
+///
+/// let value = DynamicOwned::<Local>::new(Rc::new(7_u8));
+/// std::thread::spawn(move || drop(value));
+/// ```
 pub struct DynamicOwned<M: ValueMode = Local> {
     /// Erased allocation holding the concrete value.
     value: M::Owned,
