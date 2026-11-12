@@ -58,6 +58,6 @@ jobs:
       pull-requests: write
       pages: write
       id-token: write
-    uses: qubit-ltd/rs-infra-ci/.github/workflows/github-ci.yml@22e34b76a52b6a9c5c09ddf3fa1fa58b07c46f06
+    uses: qubit-ltd/rs-infra-ci/.github/workflows/github-ci.yml@a81e93ba53d1a1cc00e7861f2cfb82f2c5c672bc
     with:
       derive-coverage: true
