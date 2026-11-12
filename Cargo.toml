@@ -1,6 +1,6 @@
 [package]
 name = "qubit-reflect"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -59,7 +59,6 @@ qubit-datatype = { version = "^0.15", optional = true }
 qubit-id = { version = "^0.7", default-features = false, optional = true }
 thiserror = "^2.0"
 uuid = { version = "^1.29", optional = true }
-# Pre-publication exception: qubit-reflect-derive 0.2.0 is not on crates.io yet.
 qubit-reflect-derive = { version = "^0.2", path = "derive", optional = true }
 
 [dev-dependencies]

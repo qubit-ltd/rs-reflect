@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-reflect"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "inventory",
  "qubit-reflect-derive",
@@ -68,7 +68,7 @@ dependencies = [
 
 [[package]]
 name = "qubit-reflect-derive"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
