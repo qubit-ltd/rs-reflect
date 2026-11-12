@@ -261,9 +261,29 @@ fn compile_and_run(root: &Path, temp_root: &Path, snippet: &Snippet) -> Result<(
     }
 }
 
+fn fetch_locked_dependencies(root: &Path) -> Result<(), String> {
+    let output = Command::new("cargo")
+        .arg("fetch")
+        .arg("--locked")
+        .arg("--manifest-path")
+        .arg(root.join("Cargo.toml"))
+        .output()
+        .map_err(|error| format!("could not start cargo fetch: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "cargo fetch --locked failed with {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    ))
+}
+
 #[test]
 fn test_documentation_body_snippets_compile_and_run() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    fetch_locked_dependencies(root).expect("fetch locked dependencies for offline consumers");
     let temp_root = unique_temp_dir();
     fs::create_dir_all(&temp_root).expect("create isolated temporary consumers directory");
     let failures: Vec<_> = SNIPPETS
